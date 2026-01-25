@@ -19,20 +19,32 @@
     .tab.active{ background: #111; color:#fff; border-color:#111; }
     .section{ display:none; margin-top: 12px; }
     .section.active{ display:block; }
+
     label{ display:block; font-weight:700; margin-top:10px; }
     input, select, textarea{ width:100%; padding:10px; margin-top:6px; border-radius:10px; border:1px solid #ccc; font-size:16px; }
     textarea{ resize: vertical; }
+
     .row2{ display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .row3{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+
     .muted{ color:var(--muted); font-size: 13px; }
     .btn{ display:inline-block; padding:12px 14px; border-radius: 12px; border:0; cursor:pointer; font-size:16px; font-weight:800; }
     .btn-primary{ background:var(--btn); color:#fff; width:100%; margin-top: 12px; }
     .btn-secondary{ background:var(--btn2); color:#fff; width:100%; margin-top: 12px; }
     .btn-ghost{ background:var(--ghost); color:#111; }
     .btn-small{ padding:8px 10px; font-size: 13px; border-radius: 10px; font-weight:700; }
+
     .err{ display:none; margin-top:10px; color:#b00; font-weight:700; }
+
     .files{ display:flex; flex-direction:column; gap:8px; margin-top: 8px; }
-    .imp-file-row{ display:grid; grid-template-columns: 1fr 90px; gap: 8px; align-items:center; }
+    .imp-file-row{
+      display:grid;
+      grid-template-columns: 1fr 150px 150px 90px;
+      gap: 8px;
+      align-items:center;
+    }
+    .imp-file-row input, .imp-file-row select{ margin-top:0; }
+
     .cart-card{ border:1px solid var(--border); border-radius: 12px; padding: 12px; margin-top: 10px; }
     .cart-head{ display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
     .cart-title{ font-weight:900; }
@@ -43,12 +55,19 @@
     .cart-body .row:first-child{ border-top:0; }
     .cart-body .k{ color:#333; }
     .cart-body .v{ font-weight:700; text-align:right; }
-    .cart-actions{ margin-top: 10px; display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
+
+    .cart-actions{ margin-top: 10px; display:flex; justify-content:flex-end; gap:8px; flex-wrap: wrap; }
+
     .totalbox{ margin-top: 12px; padding-top: 12px; border-top:1px solid var(--border); display:flex; justify-content:space-between; font-weight:900; font-size: 18px; }
     .pay{ margin-top:12px; padding-top:12px; border-top:1px solid var(--border); }
     .pill{ display:inline-block; padding: 3px 8px; border-radius: 999px; background:#111; color:#fff; font-size: 12px; font-weight:800; }
+
     @media (max-width: 920px){
       .grid{ grid-template-columns: 1fr; }
+    }
+    @media (max-width: 560px){
+      .imp-file-row{ grid-template-columns: 1fr 1fr; }
+      .imp-file-row .span2{ grid-column: 1 / span 2; }
     }
   </style>
 </head>
@@ -70,36 +89,15 @@
         <div class="section active" id="sec_imp">
           <div class="muted">
             Impresión en 70 g. El precio por página se determina por el total de páginas por grupo (B/N SF, B/N DF, Color).
-            Anillado opcional.
+            Anillado opcional (hasta 350 hojas por anillado; si supera, se divide).
           </div>
 
-          <div class="row3">
-            <div>
-              <label>Tipo</label>
-              <select id="imp_mode">
-                <option value="bn">Blanco y negro</option>
-                <option value="color">Color</option>
-              </select>
-            </div>
-            <div>
-              <label>Faz</label>
-              <select id="imp_faz">
-                <option value="sf">Simple faz</option>
-                <option value="df">Doble faz</option>
-              </select>
-            </div>
+          <div class="row3" style="margin-top:10px;">
             <div>
               <label>Ejemplares</label>
-              <input id="imp_copias" type="number" min="1" step="1" value="1" />
+              <input id="imp_ejemplares" type="number" min="1" step="1" value="1" />
               <div class="muted">Cantidad de veces que querés imprimir lo mismo (1 = normal).</div>
             </div>
-          </div>
-
-          <label>Archivos (páginas por archivo)</label>
-          <div class="files" id="imp_files"></div>
-          <button type="button" class="btn btn-small btn-ghost" id="imp_add_file" style="margin-top:8px;">+ Agregar archivo</button>
-
-          <div class="row2" style="margin-top:10px;">
             <div>
               <label>Anillado</label>
               <select id="imp_anillado">
@@ -115,6 +113,12 @@
               </select>
             </div>
           </div>
+
+          <label style="margin-top:14px;">Archivos (cada uno con su tipo y faz)</label>
+          <div class="muted">Agregá una fila por archivo. Si un archivo es Color o Doble faz, marcálo en esa fila.</div>
+
+          <div class="files" id="imp_files"></div>
+          <button type="button" class="btn btn-small btn-ghost" id="imp_add_file" style="margin-top:8px;">+ Agregar archivo</button>
 
           <div class="err" id="imp_err"></div>
           <button type="button" class="btn btn-primary" id="imp_btn_add">Agregar al carrito</button>
@@ -221,7 +225,7 @@
         </div>
 
         <label style="margin-top:10px;">Observaciones</label>
-        <textarea id="order_notes" rows="3" placeholder="Ej: quiero anillado por separado, agregar portada, etc."></textarea>
+        <textarea id="order_notes" rows="3" placeholder="Ej: faltó un archivo, anillado por separado, urgencia, etc."></textarea>
 
         <button type="button" class="btn btn-secondary" id="btn_whatsapp">Enviar pedido por WhatsApp</button>
 
