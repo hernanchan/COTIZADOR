@@ -523,10 +523,25 @@ function setImpresionesFormFromRaw(raw){
   $("imp_btn_add").innerText = "Actualizar ítem";
 }
 
-function clearImpresionesEditMode(){
+ffunction clearImpresionesEditMode(){
   EDITING_ID = null;
   EDITING_KIND = null;
   $("imp_btn_add").innerText = "Agregar al carrito";
+  resetImpresionesForm(); // <-- agrega esto
+}
+
+function resetImpresionesForm(){
+  $("imp_mode").value = "bn";
+  $("imp_faz").value = "sf";
+  $("imp_copias").value = 1;
+
+  $("imp_anillado").value = "no";
+  updateImpresionesAnilladoUI();
+  $("imp_anillado_modo").value = "juntos";
+
+  // deja 1 fila vacía
+  $("imp_files").innerHTML = "";
+  addImpresionesFileRow("");
 }
 
 // ======================
