@@ -20,7 +20,8 @@
     .section{ display:none; margin-top: 12px; }
     .section.active{ display:block; }
     label{ display:block; font-weight:700; margin-top:10px; }
-    input, select{ width:100%; padding:10px; margin-top:6px; border-radius:10px; border:1px solid #ccc; font-size:16px; }
+    input, select, textarea{ width:100%; padding:10px; margin-top:6px; border-radius:10px; border:1px solid #ccc; font-size:16px; }
+textarea{ resize: vertical; }
     .row2{ display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .row3{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
     .muted{ color:var(--muted); font-size: 13px; }
@@ -67,7 +68,7 @@
 
         <!-- IMPRESIONES -->
         <div class="section active" id="sec_imp">
-          <div class="muted">Impresión en 70 g. El precio por página se determina por el total de páginas (sumando archivos y copias). Anillado opcional.</div>
+         <div class="muted">Impresión en 70 g. El precio por página se determina por el total de páginas. Agregá archivos al carrito para mejorar el precio unitario. Anillado opcional.</div>
 
           <div class="row3">
             <div>
@@ -85,10 +86,12 @@
               </select>
             </div>
             <div>
-              <label>Copias</label>
-              <input id="imp_copias" type="number" min="1" step="1" value="1" />
-            </div>
-          </div>
+              <div>
+  <label>Ejemplares</label>
+  <input id="imp_copias" type="number" min="1" step="1" value="1" />
+  <div class="muted">Cantidad de veces que querés imprimir lo mismo (1 = normal).</div>
+</div>
+
 
           <label>Archivos (páginas por archivo)</label>
           <div class="files" id="imp_files"></div>
@@ -210,12 +213,16 @@
 
         <div id="cart_items" style="margin-top:10px;"></div>
 
-        <div class="totalbox">
-          <div>Total</div>
-          <div id="cart_total">$0</div>
-        </div>
+       <div class="totalbox">
+  <div>Total</div>
+  <div id="cart_total">$0</div>
+</div>
 
-        <button type="button" class="btn btn-secondary" id="btn_whatsapp">Enviar pedido por WhatsApp</button>
+<label style="margin-top:10px;">Observaciones</label>
+<textarea id="order_notes" rows="3" placeholder="Ej: me faltó agregar un archivo, quiero 2 ejemplares, anillado por separado, etc."></textarea>
+
+<button type="button" class="btn btn-secondary" id="btn_whatsapp">Enviar pedido por WhatsApp</button>
+
 
         <div class="pay">
           <div style="font-weight:900;">Pago por transferencia</div>
