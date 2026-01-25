@@ -287,6 +287,9 @@ function buildWhatsAppMessage(){
     msg += (idx+1) + ") " + it.title + " — " + it.subtitle + " — " + moneyARS(it.total) + "\n";
   });
   msg += "\nTOTAL: " + moneyARS(total) + "\n\n";
+  const notes = ($("order_notes")?.value || "").trim();
+if (notes) msg += "\nOBSERVACIONES:\n" + notes + "\n";
+
   msg += "Pago por transferencia:\n";
   msg += "Alias: " + biz.payment.alias + "\n";
   msg += "Titular: " + biz.payment.titular + "\n";
