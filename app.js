@@ -1,5 +1,8 @@
 // Cotizador v1 - Librería Saber
 let CONFIG = null;
+let EDITING_ID = null;     // id del ítem del carrito que estoy editando
+let EDITING_KIND = null;   // "impresiones" | etc (por ahora usamos impresiones)
+
 let CART = [];
 
 function $(id){ return document.getElementById(id); }
@@ -258,24 +261,19 @@ function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
 
-function addToCart(result){
+function addToCart(result, meta = null){
   CART.push({
     id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)),
+    kind: meta?.kind || null,
+    raw: meta?.raw || null,
     title: result.title,
     subtitle: result.subtitle,
     total: result.total,
-    breakdown: result.breakdown,
-    raw: result.raw || null
+    breakdown: result.breakdown
   });
-  recalcCart();  // <-- en vez de renderCart directo
-}
-function recalcCart(){
-  // 1) Recalcula IMPRESIONES como bloque global
-  recalcImpresionesGlobal();
-
-  // 2) Renderiza
   renderCart();
 }
+
 
 function recalcImpresionesGlobal(){
   const cfg = CONFIG.items.impresiones;
@@ -366,9 +364,27 @@ function recalcImpresionesGlobal(){
   }
 }
 
+function updateCartItem(id, result, meta = null){
+  const idx = CART.findIndex(x => x.id === id);
+  if (idx === -1) return;
+
+  CART[idx] = {
+    ...CART[idx],
+    kind: meta?.kind || CART[idx].kind,
+    raw: meta?.raw || CART[idx].raw,
+    title: result.title,
+    subtitle: result.subtitle,
+    total: result.total,
+    breakdown: result.breakdown
+  };
+  renderCart();
+}
 
 function removeFromCart(id){
   CART = CART.filter(x => x.id !== id);
+  if (EDITING_ID === id){
+    clearImpresionesEditMode();
+  }
   renderCart();
 }
 
@@ -399,15 +415,39 @@ function renderCart(){
       </div>
       <div class="cart-body">${lines}</div>
       <div class="cart-actions">
-        <button class="btn btn-small btn-ghost" data-rm="${it.id}">Quitar</button>
-      </div>
+  ${it.kind === "impresiones" ? `<button class="btn btn-small btn-ghost" data-ed="${it.id}">Editar</button>` : ``}
+  <button class="btn btn-small btn-ghost" data-rm="${it.id}">Quitar</button>
+</div>
+
     `;
     host.appendChild(card);
   }
 
+    // Listener Quitar (ya lo tenés)
   host.querySelectorAll("button[data-rm]").forEach(b => {
     b.addEventListener("click", () => removeFromCart(b.getAttribute("data-rm")));
   });
+
+  // Listener Editar (PEGAR ACÁ)
+  host.querySelectorAll("button[data-ed]").forEach(b => {
+    b.addEventListener("click", () => {
+      const id = b.getAttribute("data-ed");
+      const it = CART.find(x => x.id === id);
+      if (!it || it.kind !== "impresiones" || !it.raw) return;
+
+      EDITING_ID = id;
+      EDITING_KIND = "impresiones";
+      setImpresionesFormFromRaw(it.raw);
+
+      // Ir a la pestaña Impresiones
+      document.querySelector('.tab[data-tab="imp"]')?.click();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  });
+
+  // Total
+  $("cart_total").innerText = moneyARS(cartTotal());
+
 
   $("cart_total").innerText = moneyARS(cartTotal());
 }
@@ -489,17 +529,52 @@ async function loadConfig(){
   updatePloteosPaperOptions();
   renderCart();
 }
+function setImpresionesFormFromRaw(raw){
+  $("imp_mode").value = raw.mode;
+  $("imp_faz").value = raw.faz;
+  $("imp_copias").value = raw.copias;
+
+  // reconstruir filas de archivos
+  $("imp_files").innerHTML = "";
+  (raw.pagesPerFile || []).forEach(p => addImpresionesFileRow(String(p)));
+
+  $("imp_anillado").value = raw.anillado;
+  updateImpresionesAnilladoUI();
+  $("imp_anillado_modo").value = raw.anilladoModo || "juntos";
+
+  // feedback visual
+  $("imp_btn_add").innerText = "Actualizar ítem";
+}
+function clearImpresionesEditMode(){
+  EDITING_ID = null;
+  EDITING_KIND = null;
+  $("imp_btn_add").innerText = "Agregar al carrito";
+}
 
 function initEvents(){
   $("imp_add_file").addEventListener("click", () => addImpresionesFileRow(""));
   $("imp_anillado").addEventListener("change", updateImpresionesAnilladoUI);
-  $("imp_btn_add").addEventListener("click", () => {
-    const err = $("imp_err"); clearError(err);
-    const r = buildImpresionesItem();
+ $("imp_btn_add").addEventListener("click", () => {
+  const err = $("imp_err"); clearError(err);
+  const r = calcImpresiones();
+  if (!r.ok) return showError(err, r.error);
 
-    if (!r.ok) return showError(err, r.error);
-    addToCart(r);
-  });
+  const raw = getImpresionesInputs();
+
+  // si estoy editando un ítem, lo actualizo (NO duplico)
+  if (EDITING_KIND === "impresiones" && EDITING_ID){
+    updateCartItem(EDITING_ID, r, { kind:"impresiones", raw });
+    clearImpresionesEditMode();
+    return;
+  }
+
+  // si no estoy editando, agrego nuevo
+  addToCart(r, { kind:"impresiones", raw });
+
+  // opcional: limpiar el formulario después de agregar
+  // (si querés lo hacemos luego)
+});
+
 
   $("plo_kind").addEventListener("change", updatePloteosPaperOptions);
   $("plo_btn_add").addEventListener("click", () => {
