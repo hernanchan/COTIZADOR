@@ -1,0 +1,249 @@
+{
+  "business": {
+    "name": "Librería Saber",
+    "whatsapp_phone": "5493513110130",
+    "payment": {
+      "method": "transferencia",
+      "alias": "libreriasaber.mp",
+      "titular": "Hernan Maximiliano Meichtry",
+      "cuil": "20-22792046-8"
+    },
+    "delivery_note": "Entrega en ~1 hora: sujeto a recepción de PDF/archivo + comprobante y disponibilidad."
+  },
+  "items": {
+    "impresiones": {
+      "label": "Impresiones (70 g)",
+      "unit": "pagina",
+      "color": {
+        "same_price_sf_df": true,
+        "price_tiers_per_page": [
+          {
+            "min": 1,
+            "max": 10,
+            "price": 200
+          },
+          {
+            "min": 11,
+            "max": 20,
+            "price": 170
+          },
+          {
+            "min": 21,
+            "max": 50,
+            "price": 160
+          },
+          {
+            "min": 51,
+            "max": 100,
+            "price": 120
+          },
+          {
+            "min": 101,
+            "max": null,
+            "price": 85
+          }
+        ]
+      },
+      "bn": {
+        "sf": [
+          {
+            "min": 1,
+            "max": 10,
+            "price": 100
+          },
+          {
+            "min": 11,
+            "max": 30,
+            "price": 80
+          },
+          {
+            "min": 31,
+            "max": 100,
+            "price": 68
+          },
+          {
+            "min": 101,
+            "max": 200,
+            "price": 59
+          },
+          {
+            "min": 201,
+            "max": 300,
+            "price": 56
+          },
+          {
+            "min": 301,
+            "max": null,
+            "price": 44
+          }
+        ],
+        "df": [
+          {
+            "min": 1,
+            "max": 10,
+            "price": 100
+          },
+          {
+            "min": 11,
+            "max": 30,
+            "price": 75
+          },
+          {
+            "min": 31,
+            "max": 100,
+            "price": 56
+          },
+          {
+            "min": 101,
+            "max": 200,
+            "price": 48
+          },
+          {
+            "min": 201,
+            "max": 300,
+            "price": 43
+          },
+          {
+            "min": 301,
+            "max": null,
+            "price": 36
+          }
+        ]
+      },
+      "binding": {
+        "label": "Anillado",
+        "tiers_by_sheets": [
+          {
+            "max_sheets": 100,
+            "price": 2000
+          },
+          {
+            "max_sheets": 200,
+            "price": 2500
+          },
+          {
+            "max_sheets": null,
+            "price": 3000
+          }
+        ],
+        "mode_options": [
+          {
+            "value": "juntos",
+            "label": "Juntos (1 anillado por copia)"
+          },
+          {
+            "value": "separados",
+            "label": "Separados (1 anillado por archivo por copia)"
+          }
+        ]
+      }
+    },
+    "ploteos": {
+      "label": "Ploteos (por metro lineal)",
+      "unit": "metro_lineal",
+      "rules": {
+        "rotation_optimize": true,
+        "rounding": "none"
+      },
+      "paper_types": [
+        {
+          "value": "obra",
+          "label": "Papel obra"
+        },
+        {
+          "value": "recubierto",
+          "label": "Papel recubierto"
+        }
+      ],
+      "kinds": [
+        {
+          "value": "cad",
+          "label": "Planos / líneas (CAD)",
+          "allowed_papers": [
+            "obra"
+          ]
+        },
+        {
+          "value": "pleno",
+          "label": "Afiche / Póster (Pleno)",
+          "allowed_papers": [
+            "obra",
+            "recubierto"
+          ]
+        }
+      ],
+      "rolls": {
+        "obra": [
+          42,
+          60,
+          90
+        ],
+        "recubierto": [
+          60,
+          90
+        ]
+      },
+      "prices_per_meter": {
+        "obra": {
+          "cad": {
+            "42": 3056,
+            "60": 5184,
+            "90": 5544
+          },
+          "pleno": {
+            "42": 7060,
+            "60": 9072,
+            "90": 9432
+          }
+        },
+        "recubierto": {
+          "pleno": {
+            "60": 17300,
+            "90": 22204
+          }
+        }
+      }
+    },
+    "fotos": {
+      "label": "Impresión de fotografías (200 g)",
+      "unit": "unidad",
+      "sizes": [
+        {
+          "value": "10x15",
+          "label": "10×15 cm",
+          "price": 500
+        },
+        {
+          "value": "13x18",
+          "label": "13×18 cm",
+          "price": 800
+        },
+        {
+          "value": "a4",
+          "label": "A4",
+          "price": 1600
+        }
+      ]
+    },
+    "adhesivo_a4": {
+      "label": "Papel adhesivo A4",
+      "unit": "unidad",
+      "types": [
+        {
+          "value": "foto",
+          "label": "Adhesivo fotográfico A4",
+          "price": 1000
+        },
+        {
+          "value": "obra",
+          "label": "Adhesivo obra A4",
+          "price": 700
+        }
+      ],
+      "discount": {
+        "min_qty": 21,
+        "percent": 10
+      }
+    }
+  }
+}
