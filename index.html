@@ -32,7 +32,7 @@
     .btn-small{ padding:8px 10px; font-size: 13px; border-radius: 10px; font-weight:700; }
     .err{ display:none; margin-top:10px; color:#b00; font-weight:700; }
     .files{ display:flex; flex-direction:column; gap:8px; margin-top: 8px; }
-    .imp-file-row{ display:grid; grid-template-columns: 1fr 90px; gap: 8px; align-items:center; }
+    .imp-file-row{ display:grid; grid-template-columns: 1fr 160px 90px; gap: 8px; align-items:center; }
     .cart-card{ border:1px solid var(--border); border-radius: 12px; padding: 12px; margin-top: 10px; }
     .cart-head{ display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
     .cart-title{ font-weight:900; }
@@ -60,20 +60,20 @@
     <div class="grid" style="margin-top:12px;">
       <div class="card">
         <div class="tabs" id="tabs">
-          <button class="tab active" data-tab="imp" type="button">Impresiones</button>
-          <button class="tab" data-tab="plo" type="button">Ploteos</button>
-          <button class="tab" data-tab="foto" type="button">Fotos</button>
-          <button class="tab" data-tab="adh" type="button">Adhesivo A4</button>
+          <button class="tab active" data-tab="imp">Impresiones</button>
+          <button class="tab" data-tab="plo">Ploteos</button>
+          <button class="tab" data-tab="foto">Fotos</button>
+          <button class="tab" data-tab="adh">Adhesivo A4</button>
         </div>
 
         <!-- IMPRESIONES -->
         <div class="section active" id="sec_imp">
           <div class="muted">
-            Impresión en 70 g. El precio por página se determina por el total de páginas.
-            Agregá archivos al carrito para mejorar el precio unitario. Anillado opcional.
+            Impresión en 70 g. El precio por página se determina por el total de páginas del carrito (por grupo).
+            En B/N se separa Simple Faz y Doble Faz (tienen escalas distintas). Anillado opcional.
           </div>
 
-          <div class="row3">
+          <div class="row2" style="margin-top:10px;">
             <div>
               <label>Tipo</label>
               <select id="imp_mode">
@@ -81,15 +81,6 @@
                 <option value="color">Color</option>
               </select>
             </div>
-
-            <div>
-              <label>Faz</label>
-              <select id="imp_faz">
-                <option value="sf">Simple faz</option>
-                <option value="df">Doble faz</option>
-              </select>
-            </div>
-
             <div>
               <label>Ejemplares</label>
               <input id="imp_copias" type="number" min="1" step="1" value="1" />
@@ -97,7 +88,8 @@
             </div>
           </div>
 
-          <label>Archivos (páginas por archivo)</label>
+          <label style="margin-top:12px;">Archivos</label>
+          <div class="muted">Por cada archivo: cargá páginas y elegí Simple o Doble faz.</div>
           <div class="files" id="imp_files"></div>
           <button type="button" class="btn btn-small btn-ghost" id="imp_add_file" style="margin-top:8px;">+ Agregar archivo</button>
 
@@ -115,6 +107,7 @@
                 <option value="juntos">Juntos</option>
                 <option value="separados">Separados</option>
               </select>
+              <div class="muted">Si supera 350 hojas, se divide en 2 o más anillados automáticamente.</div>
             </div>
           </div>
 
@@ -223,7 +216,7 @@
         </div>
 
         <label style="margin-top:10px;">Observaciones</label>
-        <textarea id="order_notes" rows="3" placeholder="Ej: me faltó agregar un archivo, quiero 2 ejemplares, anillado por separado, etc."></textarea>
+        <textarea id="order_notes" rows="3" placeholder="Ej: quiero anillado por separado, agregar un archivo más, etc."></textarea>
 
         <button type="button" class="btn btn-secondary" id="btn_whatsapp">Enviar pedido por WhatsApp</button>
 
@@ -239,7 +232,6 @@
   </div>
 
   <script>
-    // Tabs (sin dependencias)
     (function(){
       const tabs = document.querySelectorAll(".tab");
       const map = { imp:"sec_imp", plo:"sec_plo", foto:"sec_foto", adh:"sec_adh" };
