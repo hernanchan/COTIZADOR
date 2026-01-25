@@ -1,0 +1,247 @@
+<!doctype html> 
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cotizador - Librería Saber</title>
+  <style>
+    :root{
+      --bg:#f6f7f8; --card:#fff; --border:#e6e6e6; --text:#111; --muted:#555;
+      --btn:#111; --btn2:#0a6; --ghost:#f0f0f0;
+    }
+    body{ font-family: Arial, sans-serif; background:var(--bg); color:var(--text); margin:0; }
+    .wrap{ max-width: 980px; margin: 0 auto; padding: 18px; }
+    h1{ font-size: 22px; margin: 0 0 10px; }
+    .grid{ display:grid; grid-template-columns: 1.2fr 0.8fr; gap: 14px; }
+    .card{ background:var(--card); border:1px solid var(--border); border-radius: 12px; padding: 14px; }
+    .tabs{ display:flex; gap: 8px; flex-wrap: wrap; }
+    .tab{ padding:10px 12px; border-radius: 10px; border:1px solid var(--border); background:#fff; cursor:pointer; font-weight:700; }
+    .tab.active{ background: #111; color:#fff; border-color:#111; }
+    .section{ display:none; margin-top: 12px; }
+    .section.active{ display:block; }
+    label{ display:block; font-weight:700; margin-top:10px; }
+    input, select{ width:100%; padding:10px; margin-top:6px; border-radius:10px; border:1px solid #ccc; font-size:16px; }
+    .row2{ display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .row3{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    .muted{ color:var(--muted); font-size: 13px; }
+    .btn{ display:inline-block; padding:12px 14px; border-radius: 12px; border:0; cursor:pointer; font-size:16px; font-weight:800; }
+    .btn-primary{ background:var(--btn); color:#fff; width:100%; margin-top: 12px; }
+    .btn-secondary{ background:var(--btn2); color:#fff; width:100%; margin-top: 12px; }
+    .btn-ghost{ background:var(--ghost); color:#111; }
+    .btn-small{ padding:8px 10px; font-size: 13px; border-radius: 10px; font-weight:700; }
+    .err{ display:none; margin-top:10px; color:#b00; font-weight:700; }
+    .files{ display:flex; flex-direction:column; gap:8px; margin-top: 8px; }
+    .imp-file-row{ display:grid; grid-template-columns: 1fr 90px; gap: 8px; align-items:center; }
+    .cart-card{ border:1px solid var(--border); border-radius: 12px; padding: 12px; margin-top: 10px; }
+    .cart-head{ display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
+    .cart-title{ font-weight:900; }
+    .cart-sub{ color:var(--muted); font-size: 13px; margin-top:2px; }
+    .cart-price{ font-weight:900; white-space:nowrap; }
+    .cart-body{ margin-top: 10px; }
+    .cart-body .row{ display:flex; justify-content:space-between; gap:10px; border-top:1px dashed #eee; padding:6px 0; }
+    .cart-body .row:first-child{ border-top:0; }
+    .cart-body .k{ color:#333; }
+    .cart-body .v{ font-weight:700; text-align:right; }
+    .cart-actions{ margin-top: 10px; display:flex; justify-content:flex-end; }
+    .totalbox{ margin-top: 12px; padding-top: 12px; border-top:1px solid var(--border); display:flex; justify-content:space-between; font-weight:900; font-size: 18px; }
+    .pay{ margin-top:12px; padding-top:12px; border-top:1px solid var(--border); }
+    .pill{ display:inline-block; padding: 3px 8px; border-radius: 999px; background:#111; color:#fff; font-size: 12px; font-weight:800; }
+    @media (max-width: 920px){
+      .grid{ grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Cotizador <span class="pill" id="biz_name"></span></h1>
+    <div class="muted">Cotizá, agregá al carrito y enviá el pedido por WhatsApp.</div>
+
+    <div class="grid" style="margin-top:12px;">
+      <div class="card">
+        <div class="tabs" id="tabs">
+          <button class="tab active" data-tab="imp">Impresiones</button>
+          <button class="tab" data-tab="plo">Ploteos</button>
+          <button class="tab" data-tab="foto">Fotos</button>
+          <button class="tab" data-tab="adh">Adhesivo A4</button>
+        </div>
+
+        <!-- IMPRESIONES -->
+        <div class="section active" id="sec_imp">
+          <div class="muted">Impresión en 70 g. El precio por página se determina por el total de páginas (sumando archivos y copias). Anillado opcional.</div>
+
+          <div class="row3">
+            <div>
+              <label>Tipo</label>
+              <select id="imp_mode">
+                <option value="bn">Blanco y negro</option>
+                <option value="color">Color</option>
+              </select>
+            </div>
+            <div>
+              <label>Faz</label>
+              <select id="imp_faz">
+                <option value="sf">Simple faz</option>
+                <option value="df">Doble faz</option>
+              </select>
+            </div>
+            <div>
+              <label>Copias</label>
+              <input id="imp_copias" type="number" min="1" step="1" value="1" />
+            </div>
+          </div>
+
+          <label>Archivos (páginas por archivo)</label>
+          <div class="files" id="imp_files"></div>
+          <button type="button" class="btn btn-small btn-ghost" id="imp_add_file" style="margin-top:8px;">+ Agregar archivo</button>
+
+          <div class="row2" style="margin-top:10px;">
+            <div>
+              <label>Anillado</label>
+              <select id="imp_anillado">
+                <option value="no">No</option>
+                <option value="si">Sí</option>
+              </select>
+            </div>
+            <div id="imp_anillado_modo_wrap" style="display:none;">
+              <label>¿Juntos o separados?</label>
+              <select id="imp_anillado_modo">
+                <option value="juntos">Juntos</option>
+                <option value="separados">Separados</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="err" id="imp_err"></div>
+          <button type="button" class="btn btn-primary" id="imp_btn_add">Agregar al carrito</button>
+        </div>
+
+        <!-- PLOTEOS -->
+        <div class="section" id="sec_plo">
+          <div class="muted">Se cobra por metro lineal. El sistema rota y elige el rollo más conveniente para el menor precio.</div>
+
+          <div class="row2">
+            <div>
+              <label>Tipo</label>
+              <select id="plo_kind">
+                <option value="cad">Planos / líneas (CAD)</option>
+                <option value="pleno">Afiche / Póster (Pleno)</option>
+              </select>
+            </div>
+            <div>
+              <label>Papel</label>
+              <select id="plo_paper"></select>
+            </div>
+          </div>
+
+          <div class="row3" style="margin-top:10px;">
+            <div>
+              <label>Ancho (cm)</label>
+              <input id="plo_w" type="number" min="1" step="0.1" placeholder="Ej: 60" />
+            </div>
+            <div>
+              <label>Alto (cm)</label>
+              <input id="plo_h" type="number" min="1" step="0.1" placeholder="Ej: 40" />
+            </div>
+            <div>
+              <label>Copias</label>
+              <input id="plo_copias" type="number" min="1" step="1" value="1" />
+            </div>
+          </div>
+
+          <div class="err" id="plo_err"></div>
+          <button type="button" class="btn btn-primary" id="plo_btn_add">Agregar al carrito</button>
+        </div>
+
+        <!-- FOTOS -->
+        <div class="section" id="sec_foto">
+          <div class="muted">Papel fotográfico 200 g. Precio fijo por tamaño.</div>
+
+          <div class="row2">
+            <div>
+              <label>Tamaño</label>
+              <select id="foto_size">
+                <option value="10x15">10×15 cm</option>
+                <option value="13x18">13×18 cm</option>
+                <option value="a4">A4</option>
+              </select>
+            </div>
+            <div>
+              <label>Cantidad</label>
+              <input id="foto_qty" type="number" min="1" step="1" value="1" />
+            </div>
+          </div>
+
+          <div class="err" id="foto_err"></div>
+          <button type="button" class="btn btn-primary" id="foto_btn_add">Agregar al carrito</button>
+        </div>
+
+        <!-- ADHESIVO -->
+        <div class="section" id="sec_adh">
+          <div class="muted">A4 adhesivo. Descuento 10% desde 21 unidades.</div>
+
+          <div class="row2">
+            <div>
+              <label>Tipo</label>
+              <select id="adh_type">
+                <option value="foto">Adhesivo fotográfico A4</option>
+                <option value="obra">Adhesivo obra A4</option>
+              </select>
+            </div>
+            <div>
+              <label>Cantidad</label>
+              <input id="adh_qty" type="number" min="1" step="1" value="1" />
+            </div>
+          </div>
+
+          <div class="err" id="adh_err"></div>
+          <button type="button" class="btn btn-primary" id="adh_btn_add">Agregar al carrito</button>
+        </div>
+
+      </div>
+
+      <!-- CARRITO -->
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+          <div>
+            <div style="font-weight:900; font-size:18px;">Carrito</div>
+            <div class="muted">Revisá y enviá por WhatsApp.</div>
+          </div>
+        </div>
+
+        <div id="cart_items" style="margin-top:10px;"></div>
+
+        <div class="totalbox">
+          <div>Total</div>
+          <div id="cart_total">$0</div>
+        </div>
+
+        <button type="button" class="btn btn-secondary" id="btn_whatsapp">Enviar pedido por WhatsApp</button>
+
+        <div class="pay">
+          <div style="font-weight:900;">Pago por transferencia</div>
+          <div style="margin-top:8px;"><b>Alias:</b> <span id="pay_alias"></span></div>
+          <div><b>Titular:</b> <span id="pay_titular"></span></div>
+          <div><b>CUIL:</b> <span id="pay_cuil"></span></div>
+          <div class="muted" style="margin-top:8px;" id="delivery_note"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Tabs (sin dependencias)
+    (function(){
+      const tabs = document.querySelectorAll(".tab");
+      const map = { imp:"sec_imp", plo:"sec_plo", foto:"sec_foto", adh:"sec_adh" };
+      tabs.forEach(t => t.addEventListener("click", () => {
+        tabs.forEach(x => x.classList.remove("active"));
+        t.classList.add("active");
+        Object.values(map).forEach(id => document.getElementById(id).classList.remove("active"));
+        document.getElementById(map[t.getAttribute("data-tab")]).classList.add("active");
+      }));
+    })();
+  </script>
+
+  <script src="./app.js"></script>
+</body>
+</html>
