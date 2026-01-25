@@ -87,11 +87,14 @@ function impresionesKey(raw){
 
 function findCompatibleImpresionesItem(raw){
   const key = impresionesKey(raw);
-  return CART.find(it => it.kind === "impresiones" && it.raw && it.raw.kind === "impresiones" && impresionesKey(it.raw) === key) || null;
+  return CART.find(it =>
+    it.kind === "impresiones" &&
+    it.raw && it.raw.kind === "impresiones" &&
+    impresionesKey(it.raw) === key
+  ) || null;
 }
 
 function calcImpresionesFormOnly(){
-  // Validación mínima solo de formulario (para agregar/editar/fusionar)
   const inp = getImpresionesInputs();
   if (inp.pagesPerFile.length === 0){
     return { ok:false, error:"Ingresá al menos 1 archivo con páginas." };
@@ -425,7 +428,6 @@ function renderCart(){
       EDITING_KIND = "impresiones";
       setImpresionesFormFromRaw(it.raw);
 
-      // Ir a la pestaña Impresiones
       document.querySelector('.tab[data-tab="imp"]')?.click();
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
@@ -512,7 +514,6 @@ function setImpresionesFormFromRaw(raw){
   $("imp_faz").value = raw.faz;
   $("imp_copias").value = raw.ejemplares ?? raw.copias ?? 1;
 
-  // reconstruir filas
   $("imp_files").innerHTML = "";
   (raw.pagesPerFile || []).forEach(p => addImpresionesFileRow(String(p)));
 
@@ -521,13 +522,6 @@ function setImpresionesFormFromRaw(raw){
   $("imp_anillado_modo").value = raw.anilladoModo || "juntos";
 
   $("imp_btn_add").innerText = "Actualizar ítem";
-}
-
-ffunction clearImpresionesEditMode(){
-  EDITING_ID = null;
-  EDITING_KIND = null;
-  $("imp_btn_add").innerText = "Agregar al carrito";
-  resetImpresionesForm(); // <-- agrega esto
 }
 
 function resetImpresionesForm(){
@@ -539,9 +533,15 @@ function resetImpresionesForm(){
   updateImpresionesAnilladoUI();
   $("imp_anillado_modo").value = "juntos";
 
-  // deja 1 fila vacía
   $("imp_files").innerHTML = "";
   addImpresionesFileRow("");
+}
+
+function clearImpresionesEditMode(){
+  EDITING_ID = null;
+  EDITING_KIND = null;
+  $("imp_btn_add").innerText = "Agregar al carrito";
+  resetImpresionesForm();
 }
 
 // ======================
@@ -580,34 +580,43 @@ function initEvents(){
 
     const raw = getImpresionesRawNormalized();
 
-    // Si estoy editando: actualizo ese ítem (no duplico)
+    // 1) Si estoy editando: actualizo ese ítem (no duplico)
     if (EDITING_KIND === "impresiones" && EDITING_ID){
       const display = buildImpresionesDisplayFromRaw(raw);
       updateCartItem(EDITING_ID, display, { kind:"impresiones", raw });
+      // sale de modo edición y resetea form
       clearImpresionesEditMode();
       recalcImpresionesGlobal();
       renderCart();
       return;
     }
 
-    // Si NO estoy editando: intento fusionar con un ítem compatible
+    // 2) Si NO estoy editando: intento fusionar con un ítem compatible
     const existing = findCompatibleImpresionesItem(raw);
     if (existing){
+      // Suma archivos al mismo ítem (clave: misma config)
       existing.raw.pagesPerFile = (existing.raw.pagesPerFile || []).concat(raw.pagesPerFile || []);
-      existing.raw.ejemplares = raw.ejemplares; // si querés otra regla (sumar/máximo), te la ajusto
+      // Mantengo los ejemplares del formulario (si querés otra regla la cambio)
+      existing.raw.ejemplares = raw.ejemplares;
+
       const display = buildImpresionesDisplayFromRaw(existing.raw);
       updateCartItem(existing.id, display, { kind:"impresiones", raw: existing.raw });
+
       recalcImpresionesGlobal();
       renderCart();
+      // IMPORTANTÍSIMO: reset para que no confunda
+      resetImpresionesForm();
       return;
     }
 
-    // Si no hay compatible, agrego nuevo
+    // 3) Si no hay compatible, agrego nuevo
     const display = buildImpresionesDisplayFromRaw(raw);
     addToCart(display, { kind:"impresiones", raw });
 
     recalcImpresionesGlobal();
     renderCart();
+    // IMPORTANTÍSIMO: reset para que no confunda
+    resetImpresionesForm();
   });
 
   // Ploteos
