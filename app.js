@@ -1,8 +1,8 @@
-// Cotizador v1 - Librería Saber
+// Cotizador v1 - Librería Saber (Opción B: por archivo)
 let CONFIG = null;
 
-let EDITING_ID = null;
-let EDITING_KIND = null;
+let EDITING_ID = null;     // id del ítem del carrito editando
+let EDITING_KIND = null;   // "impresiones"
 
 let CART = [];
 
@@ -35,280 +35,270 @@ function bindingPrice(bindingTiers, sheets){
   }
   return 0;
 }
+
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
+
 function showError(where, msg){ where.innerText = msg; where.style.display = "block"; }
 function clearError(where){ where.innerText = ""; where.style.display = "none"; }
 
-// ======================
-// IMPRESIONES - FORM
-// ======================
+// =====================================================
+// IMPRESIONES (por archivo)
+// =====================================================
 
 function getImpresionesInputs(){
-  const mode = $("imp_mode").value; // bn | color
-  const faz = $("imp_faz").value;   // sf | df (faz del/los archivos que estás cargando ahora)
-  const copias = clampInt($("imp_copias").value, 1);
+  const ejemplares = clampInt($("imp_ejemplares").value, 1);
+  const anillado = $("imp_anillado").value; // no|si
+  const anilladoModo = $("imp_anillado_modo").value; // juntos|separados
 
   const fileRows = Array.from(document.querySelectorAll(".imp-file-row"));
-  const pagesPerFile = fileRows
-    .map(r => clampInt(r.querySelector("input").value, 0))
-    .filter(x => x > 0);
+  const files = [];
 
-  const anillado = $("imp_anillado").value; // no | si
-  const anilladoModo = $("imp_anillado_modo").value; // juntos | separados
+  for (const r of fileRows){
+    const pages = clampInt(r.querySelector('input[data-pages]').value, 0);
+    const mode  = r.querySelector('select[data-mode]').value; // bn|color
+    const faz   = r.querySelector('select[data-faz]').value;  // sf|df
+    if (pages > 0){
+      files.push({ pages, mode, faz });
+    }
+  }
 
-  return { mode, faz, copias, pagesPerFile, anillado, anilladoModo };
+  return { ejemplares, anillado, anilladoModo, files };
 }
 
-function calcImpresionesFormOnly(){
+function validateImpresionesForm(){
   const inp = getImpresionesInputs();
-  if (inp.pagesPerFile.length === 0){
+  if (!inp.files || inp.files.length === 0){
     return { ok:false, error:"Ingresá al menos 1 archivo con páginas." };
   }
   return { ok:true };
 }
 
-function getImpresionesRawNormalized(){
-  const inp = getImpresionesInputs();
-  // Guardamos archivos con su faz (esto es lo que te faltaba)
-  const files = inp.pagesPerFile.map(p => ({ pages: p, faz: inp.faz }));
-
-  return {
-    kind: "impresiones",
-    mode: inp.mode,                 // bn | color
-    ejemplares: inp.copias,         // cantidad de veces
-    files,                          // [{pages, faz}]
-    anillado: inp.anillado,         // no | si
-    anilladoModo: inp.anilladoModo  // juntos | separados
-  };
-}
-
-// Compatibilidad para "fusionar" (mismo tipo + mismo anillado/mode)
-function impresionesKey(raw){
+// Clave para fusionar: mismo anillado, modo y ejemplares
+function impresionesMergeKey(raw){
   return [
-    raw.mode,
     raw.anillado,
-    raw.anillado === "si" ? raw.anilladoModo : "na"
+    raw.anillado === "si" ? raw.anilladoModo : "na",
+    String(raw.ejemplares || 1)
   ].join("|");
 }
-function findCompatibleImpresionesItem(raw){
-  const key = impresionesKey(raw);
-  return CART.find(it => it.kind === "impresiones" && it.raw && it.raw.kind === "impresiones" && impresionesKey(it.raw) === key) || null;
+
+function findMergeTargetImpresiones(raw){
+  const key = impresionesMergeKey(raw);
+  return CART.find(it => it.kind === "impresiones" && it.raw && it.raw.kind === "impresiones" && impresionesMergeKey(it.raw) === key) || null;
 }
 
-function buildImpresionesDisplayFromRaw(raw){
+// Helpers de agrupación de precio por página
+function groupKeyFromFile(f){
+  if (f.mode === "color") return "color";
+  // bn
+  return (f.faz === "df") ? "bn_df" : "bn_sf";
+}
+function groupLabel(key){
+  if (key === "color") return "Color";
+  if (key === "bn_sf") return "B/N Simple faz";
+  if (key === "bn_df") return "B/N Doble faz";
+  return key;
+}
+
+// Hojas por archivo (para anillado)
+function sheetsForFile(f){
+  // SF: hojas = páginas; DF: hojas = ceil(páginas/2)
+  return (f.faz === "df") ? ceilDiv(f.pages, 2) : f.pages;
+}
+
+// Divide anillado si supera 350 hojas (por anillado)
+function bindingCostForSheetsWithSplit(cfg, totalSheetsOneCopy){
+  const maxSheets = 350;
+  let remaining = Math.max(0, totalSheetsOneCopy);
+  let cost = 0;
+  let parts = 0;
+
+  while (remaining > 0){
+    const chunk = Math.min(maxSheets, remaining);
+    cost += bindingPrice(cfg.binding.tiers_by_sheets, chunk);
+    remaining -= chunk;
+    parts += 1;
+  }
+  return { cost, parts };
+}
+
+function buildImpresionesDisplaySkeleton(raw){
   const cfg = CONFIG.items.impresiones;
 
-  const label = (raw.mode === "color") ? "Impresiones Color" : "Impresiones B/N";
-  const files = raw.files || [];
+  const fileCount = raw.files?.length || 0;
+  const totalPagesOneCopy = (raw.files || []).reduce((s,f)=> s + (f.pages || 0), 0);
+  const totalSheetsOneCopy = (raw.files || []).reduce((s,f)=> s + sheetsForFile(f), 0);
 
-  // Contadores por faz (1 ejemplar)
-  const oneSfPages = files.reduce((s,f)=> s + ((f.faz==="sf") ? (f.pages||0) : 0), 0);
-  const oneDfPages = files.reduce((s,f)=> s + ((f.faz==="df") ? (f.pages||0) : 0), 0);
+  const groups = {};
+  for (const f of (raw.files || [])){
+    const gk = groupKeyFromFile(f);
+    groups[gk] = (groups[gk] || 0) + (f.pages || 0);
+  }
 
-  const ej = raw.ejemplares || 1;
-  const totalSf = oneSfPages * ej;
-  const totalDf = oneDfPages * ej;
+  const groupLines = Object.keys(groups).sort().map(k => `${groupLabel(k)}: ${groups[k]} pág`).join(" | ");
 
-  const breakdown = [
-    ["Archivos", String(files.length)],
-    ["Ejemplares", String(ej)],
-    ["Páginas B/N/Color SF (total)", String(totalSf)],
-    ["Páginas B/N/Color DF (total)", String(totalDf)],
-    ["Anillado", (raw.anillado === "si") ? (raw.anilladoModo === "separados" ? "Separados" : "Juntos") : "No"],
-    ["Total ítem", moneyARS(0)]
-  ];
+  const anillTxt = (raw.anillado === "si")
+    ? (raw.anilladoModo === "juntos" ? "Sí (Juntos)" : "Sí (Separados)")
+    : "No";
 
   return {
     title: cfg.label,
-    subtitle: label,
+    subtitle: `${fileCount} archivo(s) — ${groupLines || "sin datos"}`,
     total: 0,
-    breakdown
+    breakdown: [
+      ["Ejemplares", String(raw.ejemplares || 1)],
+      ["Archivos", String(fileCount)],
+      ["Páginas (1 ejemplar)", String(totalPagesOneCopy)],
+      ["Hojas (1 ejemplar)", String(totalSheetsOneCopy)],
+      ["Anillado", anillTxt],
+      ["Total ítem", moneyARS(0)]
+    ]
   };
 }
 
-// Hojas por archivo según faz
-function sheetsForFile(pages, faz){
-  const p = Math.max(0, Number(pages)||0);
-  return (faz === "df") ? ceilDiv(p, 2) : p;
-}
-function splitPacks350(totalSheets){
-  let r = Math.max(0, Number(totalSheets)||0);
-  const packs = [];
-  while (r > 0){
-    const chunk = Math.min(350, r);
-    packs.push(chunk);
-    r -= chunk;
-  }
-  return packs;
-}
-
-// Recalcula impresiones agrupando: color / bn_sf / bn_df
+// Recalcula TODAS las impresiones del carrito aplicando escala por páginas del grupo
 function recalcImpresionesGlobal(){
   const cfg = CONFIG.items.impresiones;
+
   const impItems = CART.filter(it => it.kind === "impresiones" && it.raw && it.raw.kind === "impresiones");
   if (impItems.length === 0) return;
 
-  // Armo grupos por escala:
-  // - Color: una escala, indep. de faz
-  // - B/N: dos escalas distintas por faz
-  const groups = { color: [], bn_sf: [], bn_df: [] };
-
-  for (const it of impItems){
-    const r = it.raw;
-    const files = r.files || [];
-
-    if (r.mode === "color"){
-      groups.color.push(it);
-    } else {
-      // B/N: el mismo ítem puede tener SF y DF: lo “partimos” lógicamente para el cálculo unitario,
-      // pero el ítem final sigue siendo uno (solo separa páginas para precio).
-      // Lo resolvemos calculando páginas SF/DF y sumándolas a los grupos correspondientes,
-      // manteniendo referencia al ítem.
-      groups.bn_sf.push(it);
-      groups.bn_df.push(it);
-    }
-  }
-
-  // Total páginas por grupo (para obtener unitario)
-  let totalColorPages = 0;
-  let totalBnSfPages = 0;
-  let totalBnDfPages = 0;
+  // Total de páginas por grupo (considera ejemplares)
+  const groupTotals = { bn_sf:0, bn_df:0, color:0 };
 
   for (const it of impItems){
     const r = it.raw;
     const ej = r.ejemplares || 1;
-    const files = r.files || [];
-    const sfPages = files.reduce((s,f)=> s + ((f.faz==="sf") ? (f.pages||0) : 0), 0) * ej;
-    const dfPages = files.reduce((s,f)=> s + ((f.faz==="df") ? (f.pages||0) : 0), 0) * ej;
-
-    if (r.mode === "color"){
-      totalColorPages += (sfPages + dfPages); // color cobra por página igual
-    } else {
-      totalBnSfPages += sfPages;
-      totalBnDfPages += dfPages;
+    for (const f of (r.files || [])){
+      const gk = groupKeyFromFile(f);
+      groupTotals[gk] += (f.pages || 0) * ej;
     }
   }
 
-  // Unitarios
-  let unitColor = tierPrice(cfg.color.price_tiers_per_page, totalColorPages);
-  if (unitColor === null) unitColor = 0;
+  // Unit price por grupo
+  const unit = { bn_sf:0, bn_df:0, color:0 };
 
-  let unitBnSf = tierPrice(cfg.bn.sf, totalBnSfPages);
-  if (unitBnSf === null) unitBnSf = 0;
+  // Color
+  if (groupTotals.color > 0){
+    const up = tierPrice(cfg.color.price_tiers_per_page, groupTotals.color);
+    unit.color = (up === null) ? 0 : up;
+  }
 
-  let unitBnDf = tierPrice(cfg.bn.df, totalBnDfPages);
-  if (unitBnDf === null) unitBnDf = 0;
+  // BN SF
+  if (groupTotals.bn_sf > 0){
+    const up = tierPrice(cfg.bn.sf, groupTotals.bn_sf);
+    unit.bn_sf = (up === null) ? 0 : up;
+  }
 
-  // Aplico a cada ítem
+  // BN DF
+  if (groupTotals.bn_df > 0){
+    const up = tierPrice(cfg.bn.df, groupTotals.bn_df);
+    unit.bn_df = (up === null) ? 0 : up;
+  }
+
+  // Ahora actualizo cada ítem
   for (const it of impItems){
     const r = it.raw;
     const ej = r.ejemplares || 1;
-    const files = r.files || [];
 
-    const sfPages = files.reduce((s,f)=> s + ((f.faz==="sf") ? (f.pages||0) : 0), 0) * ej;
-    const dfPages = files.reduce((s,f)=> s + ((f.faz==="df") ? (f.pages||0) : 0), 0) * ej;
-
-    let printing = 0;
-    let unitApplied = 0;
-
-    if (r.mode === "color"){
-      const pages = sfPages + dfPages;
-      unitApplied = unitColor;
-      printing = pages * unitApplied;
-    } else {
-      // B/N: se desagrupa por faz
-      printing = (sfPages * unitBnSf) + (dfPages * unitBnDf);
+    // Printing subtotal por grupo dentro del ítem
+    const itemGroupPages = { bn_sf:0, bn_df:0, color:0 };
+    for (const f of (r.files || [])){
+      const gk = groupKeyFromFile(f);
+      itemGroupPages[gk] += (f.pages || 0);
     }
 
-    // Anillado (se calcula por hojas, respetando DF)
-    let binding = 0;
-    let bindingDetail = "No";
-    let bindingSheetsOne = 0;
-    let bindingPacks = [];
+    const itemGroupPagesWithEj = {
+      bn_sf: itemGroupPages.bn_sf * ej,
+      bn_df: itemGroupPages.bn_df * ej,
+      color: itemGroupPages.color * ej,
+    };
 
-    if (r.anillado === "si"){
-      const sheetsByFile = files.map(f => sheetsForFile(f.pages||0, f.faz||"sf"));
-      if (r.anilladoModo === "separados"){
-        // cada archivo por separado, con regla de 350 (si pasa, se parte en 2+ anillados)
-        let perCopyTotal = 0;
-        let packTextArr = [];
-        for (const s of sheetsByFile){
-          const packs = splitPacks350(s);
-          // costo = suma del costo de cada pack
-          const costFile = packs.reduce((acc, p)=> acc + bindingPrice(cfg.binding.tiers_by_sheets, p), 0);
-          perCopyTotal += costFile;
-          packTextArr.push(packs.join("+"));
-        }
-        binding = perCopyTotal * ej;
-        bindingDetail = "Separados";
-        // para mostrar algo “claro”: sumamos hojas por ejemplar
-        bindingSheetsOne = sheetsByFile.reduce((a,b)=>a+b,0);
-        bindingPacks = packTextArr;
-      } else {
-        // juntos: suma total de hojas por ejemplar y aplica regla de 350 (parte en packs)
-        const totalSheetsOne = sheetsByFile.reduce((a,b)=>a+b,0);
-        const packs = splitPacks350(totalSheetsOne);
-        const costPerCopy = packs.reduce((acc, p)=> acc + bindingPrice(cfg.binding.tiers_by_sheets, p), 0);
-        binding = costPerCopy * ej;
+    const sub_bn_sf = itemGroupPagesWithEj.bn_sf * unit.bn_sf;
+    const sub_bn_df = itemGroupPagesWithEj.bn_df * unit.bn_df;
+    const sub_color = itemGroupPagesWithEj.color * unit.color;
 
-        bindingDetail = "Juntos";
-        bindingSheetsOne = totalSheetsOne;
-        bindingPacks = packs;
-      }
-    }
+    const printingTotal = sub_bn_sf + sub_bn_df + sub_color;
 
-    it.total = printing + binding;
+    // Binding
+    let bindingTotal = 0;
+    let bindingPartsPerCopy = 0;
 
-    // Subtítulo y breakdown claro para cliente + operativo
-    const label = (r.mode === "color") ? "Impresiones Color" : "Impresiones B/N";
-    const filesDesc = files.map((f,i)=> `A${i+1}:${f.pages}p ${f.faz==="df"?"DF":"SF"}`).join(" | ");
-
-    // Anillado operativo packs
-    let bindingPackTxt = "";
     if (r.anillado === "si"){
       if (r.anilladoModo === "juntos"){
-        bindingPackTxt = "Packs 350: " + (Array.isArray(bindingPacks) ? bindingPacks.join(" + ") : "");
+        const totalSheetsOneCopy = (r.files || []).reduce((s,f)=> s + sheetsForFile(f), 0);
+        const { cost, parts } = bindingCostForSheetsWithSplit(cfg, totalSheetsOneCopy);
+        bindingPartsPerCopy = parts;
+        bindingTotal = cost * ej;
       } else {
-        bindingPackTxt = "Packs 350 por archivo: " + (Array.isArray(bindingPacks) ? bindingPacks.join(" | ") : "");
+        // separados: cada archivo puede dividirse si >350 hojas
+        let perCopy = 0;
+        let parts = 0;
+        for (const f of (r.files || [])){
+          const sheets = sheetsForFile(f);
+          const res = bindingCostForSheetsWithSplit(cfg, sheets);
+          perCopy += res.cost;
+          parts += res.parts;
+        }
+        bindingPartsPerCopy = parts;
+        bindingTotal = perCopy * ej;
       }
     }
 
-    it.subtitle = label;
+    it.total = printingTotal + bindingTotal;
 
-    it.breakdown = [
-      ["Archivos", filesDesc],
-      ["Ejemplares", String(ej)],
-      ["Páginas SF (total)", String(sfPages)],
-      ["Páginas DF (total)", String(dfPages)],
-      ["Grupo Color (pág)", String(totalColorPages)],
-      ["Grupo B/N SF (pág)", String(totalBnSfPages)],
-      ["Grupo B/N DF (pág)", String(totalBnDfPages)],
-      ["Precio pág Color", moneyARS(unitColor)],
-      ["Precio pág B/N SF", moneyARS(unitBnSf)],
-      ["Precio pág B/N DF", moneyARS(unitBnDf)],
-      ["Subtotal impresión", moneyARS(printing)],
-      ["Anillado", (r.anillado === "si") ? bindingDetail : "No"],
-      ...(r.anillado === "si" ? [
-        ["Hojas por ejemplar (anillado)", String(bindingSheetsOne)],
-        ["División 350", bindingPackTxt],
-        ["Subtotal anillado", moneyARS(binding)]
-      ] : []),
-      ["Total ítem", moneyARS(it.total)]
-    ];
+    // Armado de breakdown claro (para vos por WhatsApp)
+    const lines = [];
+
+    // Resumen de archivos
+    const files = r.files || [];
+    const fileSummary = files.map((f, idx) => {
+      const t = (f.mode === "color") ? "Color" : "B/N";
+      const z = (f.faz === "df") ? "DF" : "SF";
+      return `A${idx+1}:${f.pages}p ${t} ${z}`;
+    }).join(", ");
+
+    lines.push(["Archivos", `${files.length} — ${fileSummary}`]);
+    lines.push(["Ejemplares", String(ej)]);
+
+    // Grupos y escalas
+    const gt = groupTotals;
+    lines.push(["Grupo B/N SF", `${itemGroupPagesWithEj.bn_sf} pág (grupo: ${gt.bn_sf}) — ${moneyARS(unit.bn_sf)}/p — ${moneyARS(sub_bn_sf)}`]);
+    lines.push(["Grupo B/N DF", `${itemGroupPagesWithEj.bn_df} pág (grupo: ${gt.bn_df}) — ${moneyARS(unit.bn_df)}/p — ${moneyARS(sub_bn_df)}`]);
+    lines.push(["Grupo Color", `${itemGroupPagesWithEj.color} pág (grupo: ${gt.color}) — ${moneyARS(unit.color)}/p — ${moneyARS(sub_color)}`]);
+
+    lines.push(["Subtotal impresión", moneyARS(printingTotal)]);
+
+    const anillTxt = (r.anillado === "si")
+      ? (r.anilladoModo === "juntos" ? `Sí (Juntos)` : `Sí (Separados)`)
+      : "No";
+
+    if (r.anillado === "si"){
+      lines.push(["Anillado", `${anillTxt} — ${bindingPartsPerCopy} anillado(s) por ejemplar (máx 350 hojas c/u)`]);
+      lines.push(["Subtotal anillado", moneyARS(bindingTotal)]);
+    } else {
+      lines.push(["Anillado", "No"]);
+      lines.push(["Subtotal anillado", moneyARS(0)]);
+    }
+
+    lines.push(["Total ítem", moneyARS(it.total)]);
+
+    it.subtitle = `Impresiones — ${files.length} archivo(s)`;
+    it.breakdown = lines;
   }
 }
 
-// ======================
+// =====================================================
 // PLOTEOS / FOTOS / ADHESIVO (igual que antes)
-// ======================
+// =====================================================
 
 function isFinitePos(n){ return typeof n === "number" && isFinite(n) && n > 0; }
 
 function getPloteosInputs(){
-  const kind = $("plo_kind").value;
-  const paper = $("plo_paper").value;
+  const kind = $("plo_kind").value;   // cad|pleno
+  const paper = $("plo_paper").value; // obra|recubierto
   const width = Number($("plo_w").value);
   const height = Number($("plo_h").value);
   const copias = clampInt($("plo_copias").value, 1);
@@ -415,9 +405,9 @@ function calcAdhesivo(){
   return { ok:true, title: cfg.label, subtitle: def.label, total, breakdown };
 }
 
-// ======================
+// =====================================================
 // CARRITO
-// ======================
+// =====================================================
 
 function addToCart(result, meta = null){
   CART.push({
@@ -448,7 +438,9 @@ function updateCartItem(id, result, meta = null){
 
 function removeFromCart(id){
   CART = CART.filter(x => x.id !== id);
-  if (EDITING_ID === id) clearImpresionesEditMode();
+  if (EDITING_ID === id){
+    clearImpresionesEditMode();
+  }
   recalcImpresionesGlobal();
   renderCart();
 }
@@ -479,7 +471,7 @@ function renderCart(){
       <div class="cart-head">
         <div>
           <div class="cart-title">${escapeHtml(it.title)}</div>
-          <div class="cart-sub">${escapeHtml(it.subtitle)}</div>
+          <div class="cart-sub">${escapeHtml(it.subtitle || "")}</div>
         </div>
         <div class="cart-price">${moneyARS(it.total)}</div>
       </div>
@@ -506,6 +498,7 @@ function renderCart(){
       EDITING_KIND = "impresiones";
       setImpresionesFormFromRaw(it.raw);
 
+      // Pestaña Impresiones
       document.querySelector('.tab[data-tab="imp"]')?.click();
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
@@ -514,73 +507,44 @@ function renderCart(){
   $("cart_total").innerText = moneyARS(cartTotal());
 }
 
-// ======================
-// WHATSAPP (claro para ambos)
-// ======================
+// =====================================================
+// WHATSAPP
+// =====================================================
 
 function buildWhatsAppMessage(){
   const biz = CONFIG.business;
   const total = cartTotal();
 
-  let msg = "PEDIDO - " + (biz.name || "Librería Saber") + "\n";
-  msg += "==============================\n\n";
+  let msg = "Hola! Quiero confirmar este pedido:\n\n";
 
-  // RESUMEN (cliente)
-  msg += "RESUMEN\n";
   CART.forEach((it, idx) => {
-    msg += (idx+1) + ") " + it.subtitle + " — " + moneyARS(it.total) + "\n";
+    msg += (idx+1) + ") " + it.title + " — " + (it.subtitle || "") + " — " + moneyARS(it.total) + "\n";
+    // detalle corto (solo lo más importante)
+    if (it.kind === "impresiones" && it.raw && it.raw.files){
+      const r = it.raw;
+      const files = r.files.map((f,i) => {
+        const t = (f.mode === "color") ? "Color" : "B/N";
+        const z = (f.faz === "df") ? "DF" : "SF";
+        return `A${i+1}:${f.pages}p ${t} ${z}`;
+      }).join(", ");
+      const an = (r.anillado === "si") ? (r.anilladoModo === "juntos" ? "Anillado: Juntos" : "Anillado: Separados") : "Anillado: No";
+      msg += "   - Ejemplares: " + (r.ejemplares || 1) + "\n";
+      msg += "   - " + an + "\n";
+      msg += "   - Archivos: " + files + "\n";
+    }
   });
-  msg += "\nTOTAL: " + moneyARS(total) + "\n\n";
+
+  msg += "\nTOTAL: " + moneyARS(total) + "\n";
 
   const notes = ($("order_notes")?.value || "").trim();
-  if (notes) msg += "OBSERVACIONES:\n" + notes + "\n\n";
+  if (notes) msg += "\nOBSERVACIONES:\n" + notes + "\n";
 
-  // DETALLE (producción)
-  msg += "DETALLE PARA PRODUCCIÓN\n";
-  msg += "------------------------------\n";
-  CART.forEach((it, idx) => {
-    msg += (idx+1) + ") " + it.title + " — " + it.subtitle + "\n";
-
-    if (it.kind === "impresiones" && it.raw && it.raw.kind === "impresiones"){
-      const r = it.raw;
-      const files = r.files || [];
-      msg += "   Tipo: " + (r.mode === "color" ? "COLOR" : "B/N") + "\n";
-      msg += "   Ejemplares: " + (r.ejemplares || 1) + "\n";
-      msg += "   Archivos:\n";
-      files.forEach((f,i)=>{
-        const hojas = sheetsForFile(f.pages||0, f.faz||"sf");
-        msg += "     - A" + (i+1) + ": " + (f.pages||0) + " pág " + (f.faz==="df"?"DF":"SF") + " (" + hojas + " hojas)\n";
-      });
-      if (r.anillado === "si"){
-        msg += "   Anillado: " + (r.anilladoModo === "separados" ? "SEPARADOS" : "JUNTOS") + "\n";
-        if (r.anilladoModo === "juntos"){
-          const totalSheetsOne = files.reduce((s,f)=> s + sheetsForFile(f.pages||0, f.faz||"sf"), 0);
-          const packs = splitPacks350(totalSheetsOne);
-          msg += "   Hojas por ejemplar (juntos): " + totalSheetsOne + "\n";
-          msg += "   División 350: " + packs.join(" + ") + "\n";
-        }
-      } else {
-        msg += "   Anillado: NO\n";
-      }
-      msg += "   Total ítem: " + moneyARS(it.total) + "\n";
-    } else {
-      // Para ploteos/fotos/adhesivo, el breakdown ya es suficiente
-      (it.breakdown || []).forEach(([k,v]) => {
-        msg += "   " + k + ": " + v + "\n";
-      });
-      msg += "   Total ítem: " + moneyARS(it.total) + "\n";
-    }
-
-    msg += "\n";
-  });
-
-  msg += "==============================\n";
-  msg += "PAGO POR TRANSFERENCIA:\n";
+  msg += "\nPago por transferencia:\n";
   msg += "Alias: " + biz.payment.alias + "\n";
   msg += "Titular: " + biz.payment.titular + "\n";
   msg += "CUIL: " + biz.payment.cuil + "\n\n";
   msg += "Adjunto comprobante y archivos.\n";
-  msg += biz.delivery_note;
+  msg += (biz.delivery_note || "");
 
   return msg.trim();
 }
@@ -595,19 +559,38 @@ function openWhatsApp(){
   window.open(url, "_blank");
 }
 
-// ======================
+// =====================================================
 // UI helpers
-// ======================
+// =====================================================
 
-function addImpresionesFileRow(pages=""){
+function addImpresionesFileRow(pages="", mode="bn", faz="sf"){
   const host = $("imp_files");
   const row = document.createElement("div");
   row.className = "imp-file-row";
+
   row.innerHTML = `
-    <input type="number" min="1" step="1" placeholder="Páginas del archivo" value="${pages}">
+    <input data-pages type="number" min="1" step="1" placeholder="Páginas" value="${pages}">
+    <select data-mode>
+      <option value="bn">B/N</option>
+      <option value="color">Color</option>
+    </select>
+    <select data-faz>
+      <option value="sf">Simple faz</option>
+      <option value="df">Doble faz</option>
+    </select>
     <button type="button" class="btn btn-small btn-ghost">Quitar</button>
   `;
+
+  row.querySelector('select[data-mode]').value = mode;
+  row.querySelector('select[data-faz]').value = faz;
+
   row.querySelector("button").addEventListener("click", () => row.remove());
+
+  // mobile: si se vuelve 2 columnas, hacemos que el input ocupe 2
+  if (window.matchMedia && window.matchMedia("(max-width: 560px)").matches){
+    row.querySelector('input[data-pages]').classList.add("span2");
+  }
+
   host.appendChild(row);
 }
 
@@ -630,45 +613,44 @@ function updatePloteosPaperOptions(){
   }
 }
 
-function setImpresionesFormFromRaw(raw){
-  $("imp_mode").value = raw.mode || "bn";
-  // En edición, seteo faz en base al primer archivo (si hay mezcla, igual lo dejás como referencia)
-  const firstFaz = (raw.files && raw.files[0] && raw.files[0].faz) ? raw.files[0].faz : "sf";
-  $("imp_faz").value = firstFaz;
-  $("imp_copias").value = raw.ejemplares ?? 1;
+function resetImpresionesForm(){
+  $("imp_ejemplares").value = 1;
+  $("imp_anillado").value = "no";
+  updateImpresionesAnilladoUI();
+  $("imp_anillado_modo").value = "juntos";
 
-  // reconstruir filas SOLO con páginas (el selector de faz define cómo interpretás las nuevas filas)
   $("imp_files").innerHTML = "";
-  (raw.files || []).forEach(f => addImpresionesFileRow(String(f.pages || "")));
+  addImpresionesFileRow("", "bn", "sf");
 
+  $("imp_btn_add").innerText = "Agregar al carrito";
+}
+
+function setImpresionesFormFromRaw(raw){
+  $("imp_ejemplares").value = raw.ejemplares ?? 1;
   $("imp_anillado").value = raw.anillado || "no";
   updateImpresionesAnilladoUI();
   $("imp_anillado_modo").value = raw.anilladoModo || "juntos";
 
-  $("imp_btn_add").innerText = "Actualizar ítem";
-}
-
-function resetImpresionesForm(){
-  $("imp_mode").value = "bn";
-  $("imp_faz").value = "sf";
-  $("imp_copias").value = 1;
-  $("imp_anillado").value = "no";
-  updateImpresionesAnilladoUI();
-  $("imp_anillado_modo").value = "juntos";
   $("imp_files").innerHTML = "";
-  addImpresionesFileRow("");
+  for (const f of (raw.files || [])){
+    addImpresionesFileRow(String(f.pages || ""), f.mode || "bn", f.faz || "sf");
+  }
+  if ((raw.files || []).length === 0){
+    addImpresionesFileRow("", "bn", "sf");
+  }
+
+  $("imp_btn_add").innerText = "Actualizar ítem";
 }
 
 function clearImpresionesEditMode(){
   EDITING_ID = null;
   EDITING_KIND = null;
-  $("imp_btn_add").innerText = "Agregar al carrito";
   resetImpresionesForm();
 }
 
-// ======================
+// =====================================================
 // INIT
-// ======================
+// =====================================================
 
 async function loadConfig(){
   const res = await fetch("./config.json", { cache: "no-store" });
@@ -679,64 +661,72 @@ async function loadConfig(){
   $("pay_alias").innerText = CONFIG.business.payment.alias;
   $("pay_titular").innerText = CONFIG.business.payment.titular;
   $("pay_cuil").innerText = CONFIG.business.payment.cuil;
-  $("delivery_note").innerText = CONFIG.business.delivery_note;
+  $("delivery_note").innerText = CONFIG.business.delivery_note || "";
 
+  // impresiones
   resetImpresionesForm();
+
+  // ploteos
   updatePloteosPaperOptions();
 
+  // carrito
   recalcImpresionesGlobal();
   renderCart();
 }
 
 function initEvents(){
   // Impresiones
-  $("imp_add_file").addEventListener("click", () => addImpresionesFileRow(""));
+  $("imp_add_file").addEventListener("click", () => addImpresionesFileRow("", "bn", "sf"));
   $("imp_anillado").addEventListener("change", updateImpresionesAnilladoUI);
 
   $("imp_btn_add").addEventListener("click", () => {
     const err = $("imp_err"); clearError(err);
 
-    const v = calcImpresionesFormOnly();
+    const v = validateImpresionesForm();
     if (!v.ok) return showError(err, v.error);
 
-    const rawNew = getImpresionesRawNormalized();
+    const inp = getImpresionesInputs();
+    const raw = {
+      kind: "impresiones",
+      ejemplares: inp.ejemplares,
+      anillado: inp.anillado,
+      anilladoModo: inp.anilladoModo,
+      files: inp.files.slice()
+    };
 
-    // Editando: REEMPLAZA raw completo (nota: en edición, las filas no distinguen faz;
-    // si querés editar mezcla SF/DF en un mismo ítem, lo hacemos con UI más avanzada)
+    // EDITANDO
     if (EDITING_KIND === "impresiones" && EDITING_ID){
-      const display = buildImpresionesDisplayFromRaw(rawNew);
-      updateCartItem(EDITING_ID, display, { kind:"impresiones", raw: rawNew });
+      const display = buildImpresionesDisplaySkeleton(raw);
+      updateCartItem(EDITING_ID, display, { kind:"impresiones", raw });
       clearImpresionesEditMode();
       recalcImpresionesGlobal();
       renderCart();
       return;
     }
 
-    // No editando: fusiona con compatible (mismo mode/anillado)
-    const existing = findCompatibleImpresionesItem(rawNew);
+    // NO EDITANDO: intento fusionar
+    const existing = findMergeTargetImpresiones(raw);
     if (existing){
-      // mantiene ejemplares del último (regla simple)
-      existing.raw.ejemplares = rawNew.ejemplares;
+      existing.raw.files = (existing.raw.files || []).concat(raw.files || []);
+      // ejemplares: mantenemos el del formulario (si querés otra regla, lo ajusto)
+      existing.raw.ejemplares = raw.ejemplares;
 
-      // concatena archivos, respetando faz del bloque que se agregó
-      existing.raw.files = (existing.raw.files || []).concat(rawNew.files || []);
-
-      const display = buildImpresionesDisplayFromRaw(existing.raw);
+      const display = buildImpresionesDisplaySkeleton(existing.raw);
       updateCartItem(existing.id, display, { kind:"impresiones", raw: existing.raw });
 
-      resetImpresionesForm();
       recalcImpresionesGlobal();
       renderCart();
+      resetImpresionesForm();
       return;
     }
 
-    // Nuevo ítem
-    const display = buildImpresionesDisplayFromRaw(rawNew);
-    addToCart(display, { kind:"impresiones", raw: rawNew });
+    // nuevo
+    const display = buildImpresionesDisplaySkeleton(raw);
+    addToCart(display, { kind:"impresiones", raw });
 
-    resetImpresionesForm();
     recalcImpresionesGlobal();
     renderCart();
+    resetImpresionesForm();
   });
 
   // Ploteos
@@ -745,7 +735,7 @@ function initEvents(){
     const err = $("plo_err"); clearError(err);
     const r = calcPloteos();
     if (!r.ok) return showError(err, r.error);
-    addToCart(r);
+    addToCart(r, { kind:"ploteos", raw:null });
     renderCart();
   });
 
@@ -754,7 +744,7 @@ function initEvents(){
     const err = $("foto_err"); clearError(err);
     const r = calcFotos();
     if (!r.ok) return showError(err, r.error);
-    addToCart(r);
+    addToCart(r, { kind:"fotos", raw:null });
     renderCart();
   });
 
@@ -763,7 +753,7 @@ function initEvents(){
     const err = $("adh_err"); clearError(err);
     const r = calcAdhesivo();
     if (!r.ok) return showError(err, r.error);
-    addToCart(r);
+    addToCart(r, { kind:"adhesivo", raw:null });
     renderCart();
   });
 
@@ -777,4 +767,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     initEvents();
   } catch(e){
     console.error(e);
-    alert("Error carg
+    alert("Error cargando el cotizador: " + (e.message || e));
+  }
+});
