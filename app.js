@@ -47,6 +47,42 @@ function getImpresionesInputs(){
   const anilladoModo = $("imp_anillado_modo").value; // juntos | separados
   return { mode, faz, copias, pagesPerFile, anillado, anilladoModo };
 }
+function buildImpresionesItem(){
+  const cfg = CONFIG.items.impresiones;
+  const inp = getImpresionesInputs();
+
+  if (inp.pagesPerFile.length === 0){
+    return { ok:false, error:"Ingresá al menos 1 archivo con páginas." };
+  }
+
+  const label = (inp.mode === "color") ? "Impresiones Color" : "Impresiones B/N";
+  const fazLabel = (inp.faz === "df") ? "Doble faz" : "Simple faz";
+
+  // Este ítem NO calcula total final: guarda datos
+  const raw = {
+    kind: "impresiones",
+    mode: inp.mode,
+    faz: inp.faz,
+    ejemplares: inp.copias, // si renombrás, cambiá acá
+    pagesPerFile: inp.pagesPerFile.slice(),
+    anillado: inp.anillado,
+    anilladoModo: inp.anilladoModo
+  };
+
+  // Subtotal “provisorio” solo para mostrar algo antes del recálculo global
+  const pagesOne = inp.pagesPerFile.reduce((a,b)=>a+b,0);
+  const totalPages = pagesOne * inp.copias;
+
+  const breakdown = [
+    ["Archivos", inp.pagesPerFile.length + " (" + inp.pagesPerFile.join(" + ") + " pág)"],
+    ["Ejemplares", String(inp.copias)],
+    ["Páginas (este archivo)", String(totalPages)],
+    ["Tipo", label + " - " + fazLabel],
+    ["Anillado", (inp.anillado === "si") ? ((inp.anilladoModo === "juntos") ? "Juntos" : "Separados") : "No"],
+  ];
+
+  return { ok:true, title: cfg.label, subtitle: label + " - " + fazLabel, total: 0, breakdown, raw };
+}
 
 function calcImpresiones(){
   const cfg = CONFIG.items.impresiones;
@@ -228,10 +264,108 @@ function addToCart(result){
     title: result.title,
     subtitle: result.subtitle,
     total: result.total,
-    breakdown: result.breakdown
+    breakdown: result.breakdown,
+    raw: result.raw || null
   });
+  recalcCart();  // <-- en vez de renderCart directo
+}
+function recalcCart(){
+  // 1) Recalcula IMPRESIONES como bloque global
+  recalcImpresionesGlobal();
+
+  // 2) Renderiza
   renderCart();
 }
+
+function recalcImpresionesGlobal(){
+  const cfg = CONFIG.items.impresiones;
+
+  // Tomo todos los ítems del carrito que sean impresiones
+  const impItems = CART.filter(it => it.raw && it.raw.kind === "impresiones");
+  if (impItems.length === 0) return;
+
+  // Si hay mezclas (color + BN) o mezclas de faz en BN, NO se puede mezclar escala:
+  // se calculan por grupo.
+  // Armamos grupos por "mode" y "faz" (en color faz no afecta unitario, pero sí anillado)
+  const groups = {};
+  for (const it of impItems){
+    const r = it.raw;
+    const key = r.mode === "color" ? "color" : ("bn_" + r.faz);
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(it);
+  }
+
+  // Para cada grupo aplico escala por TOTAL páginas del grupo
+  for (const key of Object.keys(groups)){
+    const items = groups[key];
+
+    // Total páginas del grupo
+    let groupTotalPages = 0;
+    for (const it of items){
+      const r = it.raw;
+      const pagesOneCopy = r.pagesPerFile.reduce((a,b)=>a+b,0);
+      groupTotalPages += pagesOneCopy * r.ejemplares;
+    }
+
+    // Unitario por página según escala
+    let unitPrice = 0;
+    if (key === "color"){
+      unitPrice = tierPrice(cfg.color.price_tiers_per_page, groupTotalPages);
+    } else {
+      const faz = key.replace("bn_","");
+      const tiers = (faz === "df") ? cfg.bn.df : cfg.bn.sf;
+      unitPrice = tierPrice(tiers, groupTotalPages);
+    }
+    if (unitPrice === null) unitPrice = 0;
+
+    // Total impresión del grupo
+    const groupPrinting = groupTotalPages * unitPrice;
+
+    // Ahora asigno a cada ítem su “parte” proporcional (según sus páginas)
+    for (const it of items){
+      const r = it.raw;
+      const pagesOneCopy = r.pagesPerFile.reduce((a,b)=>a+b,0);
+      const itemPages = pagesOneCopy * r.ejemplares;
+
+      const itemPrinting = itemPages * unitPrice;
+
+      // Anillado por ítem (se mantiene por archivo: juntos/separados por ítem)
+      let binding = 0;
+      if (r.anillado === "si"){
+        const sheetsPerFile = r.pagesPerFile.map(p => (r.faz === "df" ? ceilDiv(p,2) : p));
+        if (r.anilladoModo === "separados"){
+          const perCopy = sheetsPerFile.reduce((sum, s)=> sum + bindingPrice(cfg.binding.tiers_by_sheets, s), 0);
+          binding = perCopy * r.ejemplares;
+        } else {
+          const totalSheetsOneCopy = sheetsPerFile.reduce((a,b)=>a+b,0);
+          const perCopy = bindingPrice(cfg.binding.tiers_by_sheets, totalSheetsOneCopy);
+          binding = perCopy * r.ejemplares;
+        }
+      }
+
+      it.total = itemPrinting + binding;
+
+      // Actualizo breakdown para que sea claro
+      // (podés ajustar textos)
+      const label = (r.mode === "color") ? "Impresiones Color" : "Impresiones B/N";
+      const fazLabel = (r.faz === "df") ? "Doble faz" : "Simple faz";
+
+      it.subtitle = label + " - " + fazLabel;
+      it.breakdown = [
+        ["Archivos", r.pagesPerFile.length + " (" + r.pagesPerFile.join(" + ") + " pág)"],
+        ["Ejemplares", String(r.ejemplares)],
+        ["Páginas (este ítem)", String(itemPages)],
+        ["Páginas totales (grupo)", String(groupTotalPages)],
+        ["Precio por página aplicado", moneyARS(unitPrice)],
+        ["Subtotal impresión (este ítem)", moneyARS(itemPrinting)],
+        ["Anillado", (r.anillado === "si") ? ((r.anilladoModo === "juntos") ? "Juntos" : "Separados") : "No"],
+        ["Subtotal anillado", moneyARS(binding)],
+        ["Total ítem", moneyARS(it.total)],
+      ];
+    }
+  }
+}
+
 
 function removeFromCart(id){
   CART = CART.filter(x => x.id !== id);
@@ -361,7 +495,8 @@ function initEvents(){
   $("imp_anillado").addEventListener("change", updateImpresionesAnilladoUI);
   $("imp_btn_add").addEventListener("click", () => {
     const err = $("imp_err"); clearError(err);
-    const r = calcImpresiones();
+    const r = buildImpresionesItem();
+
     if (!r.ok) return showError(err, r.error);
     addToCart(r);
   });
