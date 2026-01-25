@@ -1,4 +1,4 @@
-<!doctype html> 
+<!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8" />
@@ -21,7 +21,7 @@
     .section.active{ display:block; }
     label{ display:block; font-weight:700; margin-top:10px; }
     input, select, textarea{ width:100%; padding:10px; margin-top:6px; border-radius:10px; border:1px solid #ccc; font-size:16px; }
-textarea{ resize: vertical; }
+    textarea{ resize: vertical; }
     .row2{ display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .row3{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
     .muted{ color:var(--muted); font-size: 13px; }
@@ -43,7 +43,7 @@ textarea{ resize: vertical; }
     .cart-body .row:first-child{ border-top:0; }
     .cart-body .k{ color:#333; }
     .cart-body .v{ font-weight:700; text-align:right; }
-    .cart-actions{ margin-top: 10px; display:flex; justify-content:flex-end; }
+    .cart-actions{ margin-top: 10px; display:flex; justify-content:flex-end; gap:8px; }
     .totalbox{ margin-top: 12px; padding-top: 12px; border-top:1px solid var(--border); display:flex; justify-content:space-between; font-weight:900; font-size: 18px; }
     .pay{ margin-top:12px; padding-top:12px; border-top:1px solid var(--border); }
     .pill{ display:inline-block; padding: 3px 8px; border-radius: 999px; background:#111; color:#fff; font-size: 12px; font-weight:800; }
@@ -60,15 +60,18 @@ textarea{ resize: vertical; }
     <div class="grid" style="margin-top:12px;">
       <div class="card">
         <div class="tabs" id="tabs">
-          <button class="tab active" data-tab="imp">Impresiones</button>
-          <button class="tab" data-tab="plo">Ploteos</button>
-          <button class="tab" data-tab="foto">Fotos</button>
-          <button class="tab" data-tab="adh">Adhesivo A4</button>
+          <button class="tab active" data-tab="imp" type="button">Impresiones</button>
+          <button class="tab" data-tab="plo" type="button">Ploteos</button>
+          <button class="tab" data-tab="foto" type="button">Fotos</button>
+          <button class="tab" data-tab="adh" type="button">Adhesivo A4</button>
         </div>
 
         <!-- IMPRESIONES -->
         <div class="section active" id="sec_imp">
-         <div class="muted">Impresión en 70 g. El precio por página se determina por el total de páginas. Agregá archivos al carrito para mejorar el precio unitario. Anillado opcional.</div>
+          <div class="muted">
+            Impresión en 70 g. El precio por página se determina por el total de páginas.
+            Agregá archivos al carrito para mejorar el precio unitario. Anillado opcional.
+          </div>
 
           <div class="row3">
             <div>
@@ -78,6 +81,7 @@ textarea{ resize: vertical; }
                 <option value="color">Color</option>
               </select>
             </div>
+
             <div>
               <label>Faz</label>
               <select id="imp_faz">
@@ -85,13 +89,13 @@ textarea{ resize: vertical; }
                 <option value="df">Doble faz</option>
               </select>
             </div>
-            <div>
-              <div>
-  <label>Ejemplares</label>
-  <input id="imp_copias" type="number" min="1" step="1" value="1" />
-  <div class="muted">Cantidad de veces que querés imprimir lo mismo (1 = normal).</div>
-</div>
 
+            <div>
+              <label>Ejemplares</label>
+              <input id="imp_copias" type="number" min="1" step="1" value="1" />
+              <div class="muted">Cantidad de veces que querés imprimir lo mismo (1 = normal).</div>
+            </div>
+          </div>
 
           <label>Archivos (páginas por archivo)</label>
           <div class="files" id="imp_files"></div>
@@ -213,16 +217,15 @@ textarea{ resize: vertical; }
 
         <div id="cart_items" style="margin-top:10px;"></div>
 
-       <div class="totalbox">
-  <div>Total</div>
-  <div id="cart_total">$0</div>
-</div>
+        <div class="totalbox">
+          <div>Total</div>
+          <div id="cart_total">$0</div>
+        </div>
 
-<label style="margin-top:10px;">Observaciones</label>
-<textarea id="order_notes" rows="3" placeholder="Ej: me faltó agregar un archivo, quiero 2 ejemplares, anillado por separado, etc."></textarea>
+        <label style="margin-top:10px;">Observaciones</label>
+        <textarea id="order_notes" rows="3" placeholder="Ej: me faltó agregar un archivo, quiero 2 ejemplares, anillado por separado, etc."></textarea>
 
-<button type="button" class="btn btn-secondary" id="btn_whatsapp">Enviar pedido por WhatsApp</button>
-
+        <button type="button" class="btn btn-secondary" id="btn_whatsapp">Enviar pedido por WhatsApp</button>
 
         <div class="pay">
           <div style="font-weight:900;">Pago por transferencia</div>
