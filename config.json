@@ -60,22 +60,22 @@
           {
             "min": 31,
             "max": 100,
-            "price": 68
+            "price": 72
           },
           {
             "min": 101,
             "max": 200,
-            "price": 59
+            "price": 63
           },
           {
             "min": 201,
             "max": 300,
-            "price": 56
+            "price": 60
           },
           {
             "min": 301,
             "max": null,
-            "price": 44
+            "price": 47
           }
         ],
         "df": [
@@ -92,22 +92,22 @@
           {
             "min": 31,
             "max": 100,
-            "price": 56
+            "price": 60
           },
           {
             "min": 101,
             "max": 200,
-            "price": 48
+            "price": 52
           },
           {
             "min": 201,
             "max": 300,
-            "price": 43
+            "price": 47
           },
           {
             "min": 301,
             "max": null,
-            "price": 36
+            "price": 39
           }
         ]
       },
