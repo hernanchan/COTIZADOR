@@ -1,8 +1,8 @@
-// Cotizador v1 - Librería Saber
+// Cotizador v1 - Librería Saber (Opción B: por archivo)
 let CONFIG = null;
 
-let EDITING_ID = null;     // id del ítem del carrito que estoy editando
-let EDITING_KIND = null;   // "impresiones" | etc
+let EDITING_ID = null;     // id del ítem del carrito editando
+let EDITING_KIND = null;   // "impresiones"
 
 let CART = [];
 
@@ -43,53 +43,31 @@ function escapeHtml(s){
 function showError(where, msg){ where.innerText = msg; where.style.display = "block"; }
 function clearError(where){ where.innerText = ""; where.style.display = "none"; }
 
-// ======================
-// IMPRESIONES
-// ======================
+// =====================================================
+// IMPRESIONES (por archivo)
+// =====================================================
 
 function getImpresionesInputs(){
   const ejemplares = clampInt($("imp_ejemplares").value, 1);
-  const anillado = $("imp_anillado").value; // no | si
+  const anillado = $("imp_anillado").value; // no|si
+  const anilladoModo = $("imp_anillado_modo").value; // juntos|separados
 
   const fileRows = Array.from(document.querySelectorAll(".imp-file-row"));
-  const files = fileRows.map(r => {
-    const pages = clampInt(r.querySelector('input[type="number"]').value, 0);
-    const mode = r.querySelector('select[data-field="mode"]').value; // bn|color
-    const faz  = r.querySelector('select[data-field="faz"]').value;  // sf|df
-    return { pages, mode, faz };
-  }).filter(f => f.pages > 0);
+  const files = [];
 
-  return { ejemplares, anillado, files };
+  for (const r of fileRows){
+    const pages = clampInt(r.querySelector('input[data-pages]').value, 0);
+    const mode  = r.querySelector('select[data-mode]').value; // bn|color
+    const faz   = r.querySelector('select[data-faz]').value;  // sf|df
+    if (pages > 0){
+      files.push({ pages, mode, faz });
+    }
+  }
+
+  return { ejemplares, anillado, anilladoModo, files };
 }
 
-function getImpresionesRawNormalized(){
-  const inp = getImpresionesInputs();
-  return {
-    kind: "impresiones",
-    ejemplares: inp.ejemplares,
-    anillado: inp.anillado,
-    files: inp.files.map(f => ({ pages:f.pages, mode:f.mode, faz:f.faz }))
-  };
-}
-
-function impresionesKey(raw){
-  // Se fusiona SOLO si coincide el anillado (y si anillado es sí, también modo).
-  // En esta versión, el tipo/faz se guarda por archivo, así que la clave no incluye mode/faz.
-  return [
-    raw.anillado
-  ].join("|");
-}
-
-function findCompatibleImpresionesItem(raw){
-  const key = impresionesKey(raw);
-  return CART.find(it =>
-    it.kind === "impresiones" &&
-    it.raw && it.raw.kind === "impresiones" &&
-    impresionesKey(it.raw) === key
-  ) || null;
-}
-
-function calcImpresionesFormOnly(){
+function validateImpresionesForm(){
   const inp = getImpresionesInputs();
   if (!inp.files || inp.files.length === 0){
     return { ok:false, error:"Ingresá al menos 1 archivo con páginas." };
@@ -97,159 +75,224 @@ function calcImpresionesFormOnly(){
   return { ok:true };
 }
 
+// Clave para fusionar: mismo anillado, modo y ejemplares
+function impresionesMergeKey(raw){
+  return [
+    raw.anillado,
+    raw.anillado === "si" ? raw.anilladoModo : "na",
+    String(raw.ejemplares || 1)
+  ].join("|");
+}
+
+function findMergeTargetImpresiones(raw){
+  const key = impresionesMergeKey(raw);
+  return CART.find(it => it.kind === "impresiones" && it.raw && it.raw.kind === "impresiones" && impresionesMergeKey(it.raw) === key) || null;
+}
+
+// Helpers de agrupación de precio por página
+function groupKeyFromFile(f){
+  if (f.mode === "color") return "color";
+  // bn
+  return (f.faz === "df") ? "bn_df" : "bn_sf";
+}
+function groupLabel(key){
+  if (key === "color") return "Color";
+  if (key === "bn_sf") return "B/N Simple faz";
+  if (key === "bn_df") return "B/N Doble faz";
+  return key;
+}
+
+// Hojas por archivo (para anillado)
+function sheetsForFile(f){
+  // SF: hojas = páginas; DF: hojas = ceil(páginas/2)
+  return (f.faz === "df") ? ceilDiv(f.pages, 2) : f.pages;
+}
+
+// Divide anillado si supera 350 hojas (por anillado)
+function bindingCostForSheetsWithSplit(cfg, totalSheetsOneCopy){
+  const maxSheets = 350;
+  let remaining = Math.max(0, totalSheetsOneCopy);
+  let cost = 0;
+  let parts = 0;
+
+  while (remaining > 0){
+    const chunk = Math.min(maxSheets, remaining);
+    cost += bindingPrice(cfg.binding.tiers_by_sheets, chunk);
+    remaining -= chunk;
+    parts += 1;
+  }
+  return { cost, parts };
+}
+
 function buildImpresionesDisplaySkeleton(raw){
   const cfg = CONFIG.items.impresiones;
 
-  // resumen de archivos (A1:156p B/N SF, etc)
-  const filesLabel = (raw.files || []).map((f, i) => {
-    const m = (f.mode === "color") ? "Color" : "B/N";
-    const z = (f.faz === "df") ? "DF" : "SF";
-    return `A${i+1}:${f.pages}p ${m} ${z}`;
-  });
+  const fileCount = raw.files?.length || 0;
+  const totalPagesOneCopy = (raw.files || []).reduce((s,f)=> s + (f.pages || 0), 0);
+  const totalSheetsOneCopy = (raw.files || []).reduce((s,f)=> s + sheetsForFile(f), 0);
 
-  const totalFiles = (raw.files || []).length;
+  const groups = {};
+  for (const f of (raw.files || [])){
+    const gk = groupKeyFromFile(f);
+    groups[gk] = (groups[gk] || 0) + (f.pages || 0);
+  }
 
-  // Totales por grupo (para precio unitario por grupo)
-  const sumGroup = (mode, faz) => {
-    return (raw.files || [])
-      .filter(f => (f.mode === mode) && (mode === "color" ? true : f.faz === faz))
-      .reduce((s, f) => s + f.pages, 0) * (raw.ejemplares || 1);
-  };
+  const groupLines = Object.keys(groups).sort().map(k => `${groupLabel(k)}: ${groups[k]} pág`).join(" | ");
 
-  const bn_sf_pages = sumGroup("bn","sf");
-  const bn_df_pages = sumGroup("bn","df");
-  const color_pages = sumGroup("color","sf");
-
-  const breakdown = [
-    ["Archivos", `${totalFiles} — ${filesLabel.join(" | ")}`],
-    ["Ejemplares", String(raw.ejemplares || 1)],
-    ["Grupo B/N SF", `${bn_sf_pages} pág`],
-    ["Grupo B/N DF", `${bn_df_pages} pág`],
-    ["Grupo Color", `${color_pages} pág`],
-    ["Anillado", raw.anillado === "si" ? "Sí" : "No"],
-    ["Total ítem", moneyARS(0)]
-  ];
+  const anillTxt = (raw.anillado === "si")
+    ? (raw.anilladoModo === "juntos" ? "Sí (Juntos)" : "Sí (Separados)")
+    : "No";
 
   return {
     title: cfg.label,
-    subtitle: `Impresiones — ${totalFiles} archivo(s)`,
+    subtitle: `${fileCount} archivo(s) — ${groupLines || "sin datos"}`,
     total: 0,
-    breakdown
+    breakdown: [
+      ["Ejemplares", String(raw.ejemplares || 1)],
+      ["Archivos", String(fileCount)],
+      ["Páginas (1 ejemplar)", String(totalPagesOneCopy)],
+      ["Hojas (1 ejemplar)", String(totalSheetsOneCopy)],
+      ["Anillado", anillTxt],
+      ["Total ítem", moneyARS(0)]
+    ]
   };
 }
 
+// Recalcula TODAS las impresiones del carrito aplicando escala por páginas del grupo
 function recalcImpresionesGlobal(){
   const cfg = CONFIG.items.impresiones;
 
   const impItems = CART.filter(it => it.kind === "impresiones" && it.raw && it.raw.kind === "impresiones");
   if (impItems.length === 0) return;
 
-  // 1) juntamos TODOS los archivos del carrito en 3 grupos de escala:
-  // - B/N SF
-  // - B/N DF
-  // - Color (faz no cambia el unitario en tu config)
-  const allFiles = [];
+  // Total de páginas por grupo (considera ejemplares)
+  const groupTotals = { bn_sf:0, bn_df:0, color:0 };
+
   for (const it of impItems){
     const r = it.raw;
     const ej = r.ejemplares || 1;
     for (const f of (r.files || [])){
-      allFiles.push({ ownerId: it.id, pages: f.pages, mode: f.mode, faz: f.faz, ejemplares: ej });
+      const gk = groupKeyFromFile(f);
+      groupTotals[gk] += (f.pages || 0) * ej;
     }
   }
 
-  const groupPages = {
-    bn_sf: 0,
-    bn_df: 0,
-    color: 0
-  };
+  // Unit price por grupo
+  const unit = { bn_sf:0, bn_df:0, color:0 };
 
-  for (const f of allFiles){
-    const pages = f.pages * (f.ejemplares || 1);
-    if (f.mode === "color"){
-      groupPages.color += pages;
-    } else {
-      if (f.faz === "df") groupPages.bn_df += pages;
-      else groupPages.bn_sf += pages;
-    }
+  // Color
+  if (groupTotals.color > 0){
+    const up = tierPrice(cfg.color.price_tiers_per_page, groupTotals.color);
+    unit.color = (up === null) ? 0 : up;
   }
 
-  // 2) precio unitario por grupo según escala (tiers)
-  let price_bn_sf = tierPrice(cfg.bn.sf, groupPages.bn_sf); if (price_bn_sf === null) price_bn_sf = 0;
-  let price_bn_df = tierPrice(cfg.bn.df, groupPages.bn_df); if (price_bn_df === null) price_bn_df = 0;
-  let price_color = tierPrice(cfg.color.price_tiers_per_page, groupPages.color); if (price_color === null) price_color = 0;
+  // BN SF
+  if (groupTotals.bn_sf > 0){
+    const up = tierPrice(cfg.bn.sf, groupTotals.bn_sf);
+    unit.bn_sf = (up === null) ? 0 : up;
+  }
 
-  // 3) recalcular cada ítem: suma de sus archivos * unitario del grupo + anillado
+  // BN DF
+  if (groupTotals.bn_df > 0){
+    const up = tierPrice(cfg.bn.df, groupTotals.bn_df);
+    unit.bn_df = (up === null) ? 0 : up;
+  }
+
+  // Ahora actualizo cada ítem
   for (const it of impItems){
     const r = it.raw;
     const ej = r.ejemplares || 1;
 
-    let itemPages_bn_sf = 0;
-    let itemPages_bn_df = 0;
-    let itemPages_color = 0;
-
+    // Printing subtotal por grupo dentro del ítem
+    const itemGroupPages = { bn_sf:0, bn_df:0, color:0 };
     for (const f of (r.files || [])){
-      const p = f.pages * ej;
-      if (f.mode === "color") itemPages_color += p;
-      else if (f.faz === "df") itemPages_bn_df += p;
-      else itemPages_bn_sf += p;
+      const gk = groupKeyFromFile(f);
+      itemGroupPages[gk] += (f.pages || 0);
     }
 
-    const printing =
-      (itemPages_bn_sf * price_bn_sf) +
-      (itemPages_bn_df * price_bn_df) +
-      (itemPages_color * price_color);
+    const itemGroupPagesWithEj = {
+      bn_sf: itemGroupPages.bn_sf * ej,
+      bn_df: itemGroupPages.bn_df * ej,
+      color: itemGroupPages.color * ej,
+    };
 
-    // Anillado: en esta versión lo dejamos por “ítem” (no se mezcla entre ítems),
-    // y si supera 350 hojas se divide (2 anillados, 3, etc).
-    let binding = 0;
+    const sub_bn_sf = itemGroupPagesWithEj.bn_sf * unit.bn_sf;
+    const sub_bn_df = itemGroupPagesWithEj.bn_df * unit.bn_df;
+    const sub_color = itemGroupPagesWithEj.color * unit.color;
+
+    const printingTotal = sub_bn_sf + sub_bn_df + sub_color;
+
+    // Binding
+    let bindingTotal = 0;
+    let bindingPartsPerCopy = 0;
+
     if (r.anillado === "si"){
-      // hojas = páginas/2 si DF, páginas si SF, color no cambia hojas (igual)
-      const sheets = (r.files || []).reduce((s, f) => {
-        const isDF = (f.mode !== "color" && f.faz === "df"); // DF aplica a B/N; si tu color también puede ser DF, decímelo y lo ajusto
-        const sh = isDF ? ceilDiv(f.pages, 2) : f.pages;
-        return s + sh;
-      }, 0) * ej;
-
-      // límite 350 hojas por anillado
-      const parts = Math.max(1, Math.ceil(sheets / 350));
-
-      // precio del anillado por parte (según tiers por hojas) * partes
-      // (si querés tiers distintos para “doble anillado”, se puede)
-      const sheetsPerPart = Math.ceil(sheets / parts);
-      const per = bindingPrice(cfg.binding.tiers_by_sheets, sheetsPerPart);
-      binding = per * parts;
+      if (r.anilladoModo === "juntos"){
+        const totalSheetsOneCopy = (r.files || []).reduce((s,f)=> s + sheetsForFile(f), 0);
+        const { cost, parts } = bindingCostForSheetsWithSplit(cfg, totalSheetsOneCopy);
+        bindingPartsPerCopy = parts;
+        bindingTotal = cost * ej;
+      } else {
+        // separados: cada archivo puede dividirse si >350 hojas
+        let perCopy = 0;
+        let parts = 0;
+        for (const f of (r.files || [])){
+          const sheets = sheetsForFile(f);
+          const res = bindingCostForSheetsWithSplit(cfg, sheets);
+          perCopy += res.cost;
+          parts += res.parts;
+        }
+        bindingPartsPerCopy = parts;
+        bindingTotal = perCopy * ej;
+      }
     }
 
-    it.total = printing + binding;
+    it.total = printingTotal + bindingTotal;
 
-    // breakdown para WhatsApp (detalle)
-    const totalFiles = (r.files || []).length;
-    const filesLabel = (r.files || []).map((f, i) => {
-      const m = (f.mode === "color") ? "Color" : "B/N";
+    // Armado de breakdown claro (para vos por WhatsApp)
+    const lines = [];
+
+    // Resumen de archivos
+    const files = r.files || [];
+    const fileSummary = files.map((f, idx) => {
+      const t = (f.mode === "color") ? "Color" : "B/N";
       const z = (f.faz === "df") ? "DF" : "SF";
-      return `A${i+1}:${f.pages}p ${m} ${z}`;
-    });
+      return `A${idx+1}:${f.pages}p ${t} ${z}`;
+    }).join(", ");
 
-    it.title = cfg.label;
-    it.subtitle = `Impresiones — ${totalFiles} archivo(s)`;
+    lines.push(["Archivos", `${files.length} — ${fileSummary}`]);
+    lines.push(["Ejemplares", String(ej)]);
 
-    it.breakdown = [
-      ["Archivos", `${totalFiles} — ${filesLabel.join(" | ")}`],
-      ["Ejemplares", String(ej)],
-      ["Grupo B/N SF", `${itemPages_bn_sf} pág (grupo: ${groupPages.bn_sf}) — ${moneyARS(price_bn_sf)}/p`],
-      ["Grupo B/N DF", `${itemPages_bn_df} pág (grupo: ${groupPages.bn_df}) — ${moneyARS(price_bn_df)}/p`],
-      ["Grupo Color", `${itemPages_color} pág (grupo: ${groupPages.color}) — ${moneyARS(price_color)}/p`],
-      ["Subtotal impresión", moneyARS(printing)],
-      ["Anillado", (r.anillado === "si") ? "Sí" : "No"],
-      ["Subtotal anillado", moneyARS(binding)],
-      ["Total ítem", moneyARS(it.total)]
-    ];
+    // Grupos y escalas
+    const gt = groupTotals;
+    lines.push(["Grupo B/N SF", `${itemGroupPagesWithEj.bn_sf} pág (grupo: ${gt.bn_sf}) — ${moneyARS(unit.bn_sf)}/p — ${moneyARS(sub_bn_sf)}`]);
+    lines.push(["Grupo B/N DF", `${itemGroupPagesWithEj.bn_df} pág (grupo: ${gt.bn_df}) — ${moneyARS(unit.bn_df)}/p — ${moneyARS(sub_bn_df)}`]);
+    lines.push(["Grupo Color", `${itemGroupPagesWithEj.color} pág (grupo: ${gt.color}) — ${moneyARS(unit.color)}/p — ${moneyARS(sub_color)}`]);
+
+    lines.push(["Subtotal impresión", moneyARS(printingTotal)]);
+
+    const anillTxt = (r.anillado === "si")
+      ? (r.anilladoModo === "juntos" ? `Sí (Juntos)` : `Sí (Separados)`)
+      : "No";
+
+    if (r.anillado === "si"){
+      lines.push(["Anillado", `${anillTxt} — ${bindingPartsPerCopy} anillado(s) por ejemplar (máx 350 hojas c/u)`]);
+      lines.push(["Subtotal anillado", moneyARS(bindingTotal)]);
+    } else {
+      lines.push(["Anillado", "No"]);
+      lines.push(["Subtotal anillado", moneyARS(0)]);
+    }
+
+    lines.push(["Total ítem", moneyARS(it.total)]);
+
+    it.subtitle = `Impresiones — ${files.length} archivo(s)`;
+    it.breakdown = lines;
   }
 }
 
-// ======================
-// PLOTEOS
-// ======================
+// =====================================================
+// PLOTEOS / FOTOS / ADHESIVO (igual que antes)
+// =====================================================
 
 function isFinitePos(n){ return typeof n === "number" && isFinite(n) && n > 0; }
 
@@ -287,7 +330,7 @@ function calcPloteos(){
     for (const r of eligible){
       const pm = prices[String(r)];
       if (pm === undefined) continue;
-      const meters = (h / 100) * inp.copias; // exact
+      const meters = (h / 100) * inp.copias;
       const cost = meters * pm;
       const cand = { roll:r, meters, cost, w, h, pm };
       if (!best || cand.cost < best.cost) best = cand;
@@ -307,17 +350,16 @@ function calcPloteos(){
     ["Tipo", kindLabel],
     ["Papel", paperLabel],
     ["Medida ingresada (cm)", inp.width + " × " + inp.height],
+    ["Orientación elegida (cm)", best.w + " × " + best.h],
     ["Rollo elegido", best.roll + " cm"],
+    ["Precio por metro", moneyARS(best.pm)],
+    ["Metros cobrados", best.meters.toFixed(2)],
     ["Copias", String(inp.copias)],
     ["Subtotal", moneyARS(best.cost)]
   ];
 
   return { ok:true, title: cfg.label, subtitle: kindLabel + " - " + paperLabel, total: best.cost, breakdown };
 }
-
-// ======================
-// FOTOS
-// ======================
 
 function getFotosInputs(){
   const size = $("foto_size").value;
@@ -333,14 +375,11 @@ function calcFotos(){
   const breakdown = [
     ["Tamaño", def.label],
     ["Cantidad", String(inp.qty)],
+    ["Precio unitario", moneyARS(def.price)],
     ["Subtotal", moneyARS(subtotal)]
   ];
   return { ok:true, title: cfg.label, subtitle: def.label, total: subtotal, breakdown };
 }
-
-// ======================
-// ADHESIVO
-// ======================
 
 function getAdhInputs(){
   const type = $("adh_type").value;
@@ -358,14 +397,17 @@ function calcAdhesivo(){
   const breakdown = [
     ["Tipo", def.label],
     ["Cantidad", String(inp.qty)],
+    ["Precio unitario", moneyARS(def.price)],
+    ["Subtotal", moneyARS(subtotal)],
+    ["Descuento", disc>0 ? (cfg.discount.percent + "% (" + moneyARS(disc) + ")") : "No aplica"],
     ["Total", moneyARS(total)]
   ];
   return { ok:true, title: cfg.label, subtitle: def.label, total, breakdown };
 }
 
-// ======================
+// =====================================================
 // CARRITO
-// ======================
+// =====================================================
 
 function addToCart(result, meta = null){
   CART.push({
@@ -396,7 +438,9 @@ function updateCartItem(id, result, meta = null){
 
 function removeFromCart(id){
   CART = CART.filter(x => x.id !== id);
-  if (EDITING_ID === id) clearImpresionesEditMode();
+  if (EDITING_ID === id){
+    clearImpresionesEditMode();
+  }
   recalcImpresionesGlobal();
   renderCart();
 }
@@ -415,68 +459,24 @@ function renderCart(){
     return;
   }
 
-  function pickRows(rows, wanted){
-    const out = [];
-    for (const k of wanted){
-      const found = rows.find(([kk]) => String(kk).toLowerCase() === String(k).toLowerCase());
-      if (found) out.push(found);
-    }
-    return out;
-  }
-
-  function compactRowsForItem(it){
-    const rows = Array.isArray(it.breakdown) ? it.breakdown : [];
-    if (it.kind === "impresiones"){
-      return pickRows(rows, ["Archivos", "Ejemplares", "Anillado", "Total ítem"]);
-    }
-    if (it.kind === "ploteos"){
-      return pickRows(rows, ["Tipo", "Papel", "Medida ingresada (cm)", "Copias", "Subtotal"]);
-    }
-    if (it.kind === "fotos"){
-      return pickRows(rows, ["Tamaño", "Cantidad", "Subtotal"]);
-    }
-    if (it.kind === "adhesivo"){
-      return pickRows(rows, ["Tipo", "Cantidad", "Total"]);
-    }
-    return rows.slice(0, 3);
-  }
-
   for (const it of CART){
     const card = document.createElement("div");
     card.className = "cart-card";
 
-    const rowsAll = Array.isArray(it.breakdown) ? it.breakdown : [];
-    const rowsCompact = compactRowsForItem(it);
-
-    const compactHtml = rowsCompact
+    const lines = (it.breakdown || [])
       .map(([k,v]) => `<div class="row"><div class="k">${escapeHtml(k)}</div><div class="v">${escapeHtml(v)}</div></div>`)
       .join("");
-
-    const detailHtml = rowsAll
-      .map(([k,v]) => `<div class="row"><div class="k">${escapeHtml(k)}</div><div class="v">${escapeHtml(v)}</div></div>`)
-      .join("");
-
-    const hasDetails = rowsAll.length > rowsCompact.length;
 
     card.innerHTML = `
       <div class="cart-head">
         <div>
-          <div class="cart-title">${escapeHtml(it.title || "Ítem")}</div>
+          <div class="cart-title">${escapeHtml(it.title)}</div>
           <div class="cart-sub">${escapeHtml(it.subtitle || "")}</div>
         </div>
         <div class="cart-price">${moneyARS(it.total)}</div>
       </div>
-
-      <div class="cart-body cart-compact">${compactHtml}</div>
-
-      ${hasDetails ? `
-        <div class="cart-actions" style="justify-content:flex-start; gap:8px;">
-          <button class="btn btn-small btn-ghost" data-tg="${it.id}">Ver detalle</button>
-        </div>
-        <div class="cart-body cart-detail" data-det="${it.id}" style="display:none;">${detailHtml}</div>
-      ` : ``}
-
-      <div class="cart-actions" style="gap:8px;">
+      <div class="cart-body">${lines}</div>
+      <div class="cart-actions">
         ${it.kind === "impresiones" ? `<button class="btn btn-small btn-ghost" data-ed="${it.id}">Editar</button>` : ``}
         <button class="btn btn-small btn-ghost" data-rm="${it.id}">Quitar</button>
       </div>
@@ -484,24 +484,10 @@ function renderCart(){
     host.appendChild(card);
   }
 
-  // Toggle detalle
-  host.querySelectorAll("button[data-tg]").forEach(b => {
-    b.addEventListener("click", () => {
-      const id = b.getAttribute("data-tg");
-      const det = host.querySelector(`div[data-det="${CSS.escape(id)}"]`);
-      if (!det) return;
-      const isOpen = det.style.display !== "none";
-      det.style.display = isOpen ? "none" : "block";
-      b.textContent = isOpen ? "Ver detalle" : "Ocultar detalle";
-    });
-  });
-
-  // Quitar
   host.querySelectorAll("button[data-rm]").forEach(b => {
     b.addEventListener("click", () => removeFromCart(b.getAttribute("data-rm")));
   });
 
-  // Editar (Impresiones)
   host.querySelectorAll("button[data-ed]").forEach(b => {
     b.addEventListener("click", () => {
       const id = b.getAttribute("data-ed");
@@ -512,6 +498,7 @@ function renderCart(){
       EDITING_KIND = "impresiones";
       setImpresionesFormFromRaw(it.raw);
 
+      // Pestaña Impresiones
       document.querySelector('.tab[data-tab="imp"]')?.click();
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
@@ -531,19 +518,23 @@ function buildWhatsAppMessage(){
   let msg = "Hola! Quiero confirmar este pedido:\n\n";
 
   CART.forEach((it, idx) => {
-    msg += (idx+1) + ") " + (it.title || "Ítem") + " — " + moneyARS(it.total) + "\n";
-    if (it.subtitle) msg += "   " + it.subtitle + "\n";
-
-    // Detalle para que vos puedas producirlo sin dudas
-    const rows = Array.isArray(it.breakdown) ? it.breakdown : [];
-    for (const [k,v] of rows){
-      if (String(k).toLowerCase().includes("total")) continue;
-      msg += "   - " + k + ": " + v + "\n";
+    msg += (idx+1) + ") " + it.title + " — " + (it.subtitle || "") + " — " + moneyARS(it.total) + "\n";
+    // detalle corto (solo lo más importante)
+    if (it.kind === "impresiones" && it.raw && it.raw.files){
+      const r = it.raw;
+      const files = r.files.map((f,i) => {
+        const t = (f.mode === "color") ? "Color" : "B/N";
+        const z = (f.faz === "df") ? "DF" : "SF";
+        return `A${i+1}:${f.pages}p ${t} ${z}`;
+      }).join(", ");
+      const an = (r.anillado === "si") ? (r.anilladoModo === "juntos" ? "Anillado: Juntos" : "Anillado: Separados") : "Anillado: No";
+      msg += "   - Ejemplares: " + (r.ejemplares || 1) + "\n";
+      msg += "   - " + an + "\n";
+      msg += "   - Archivos: " + files + "\n";
     }
-    msg += "\n";
   });
 
-  msg += "TOTAL: " + moneyARS(total) + "\n";
+  msg += "\nTOTAL: " + moneyARS(total) + "\n";
 
   const notes = ($("order_notes")?.value || "").trim();
   if (notes) msg += "\nOBSERVACIONES:\n" + notes + "\n";
@@ -553,7 +544,7 @@ function buildWhatsAppMessage(){
   msg += "Titular: " + biz.payment.titular + "\n";
   msg += "CUIL: " + biz.payment.cuil + "\n\n";
   msg += "Adjunto comprobante y archivos.\n";
-  msg += biz.delivery_note;
+  msg += (biz.delivery_note || "");
 
   return msg.trim();
 }
@@ -568,30 +559,43 @@ function openWhatsApp(){
   window.open(url, "_blank");
 }
 
-// ======================
+// =====================================================
 // UI helpers
-// ======================
+// =====================================================
 
 function addImpresionesFileRow(pages="", mode="bn", faz="sf"){
   const host = $("imp_files");
   const row = document.createElement("div");
   row.className = "imp-file-row";
+
   row.innerHTML = `
-    <input type="number" min="1" step="1" placeholder="Páginas" value="${pages}">
-    <select data-field="mode">
+    <input data-pages type="number" min="1" step="1" placeholder="Páginas" value="${pages}">
+    <select data-mode>
       <option value="bn">B/N</option>
       <option value="color">Color</option>
     </select>
-    <select data-field="faz">
+    <select data-faz>
       <option value="sf">Simple faz</option>
       <option value="df">Doble faz</option>
     </select>
     <button type="button" class="btn btn-small btn-ghost">Quitar</button>
   `;
-  row.querySelector('select[data-field="mode"]').value = mode;
-  row.querySelector('select[data-field="faz"]').value = faz;
+
+  row.querySelector('select[data-mode]').value = mode;
+  row.querySelector('select[data-faz]').value = faz;
+
   row.querySelector("button").addEventListener("click", () => row.remove());
+
+  // mobile: si se vuelve 2 columnas, hacemos que el input ocupe 2
+  if (window.matchMedia && window.matchMedia("(max-width: 560px)").matches){
+    row.querySelector('input[data-pages]').classList.add("span2");
+  }
+
   host.appendChild(row);
+}
+
+function updateImpresionesAnilladoUI(){
+  $("imp_anillado_modo_wrap").style.display = ($("imp_anillado").value === "si") ? "block" : "none";
 }
 
 function updatePloteosPaperOptions(){
@@ -609,52 +613,44 @@ function updatePloteosPaperOptions(){
   }
 }
 
-function setImpresionesFormFromRaw(raw){
-  $("imp_ejemplares").value = raw.ejemplares ?? 1;
-  $("imp_anillado").value = raw.anillado || "no";
-
-  $("imp_files").innerHTML = "";
-  (raw.files || []).forEach(f => addImpresionesFileRow(String(f.pages), f.mode, f.faz));
-
-  $("imp_btn_add").innerText = "Actualizar ítem";
-}
-
 function resetImpresionesForm(){
   $("imp_ejemplares").value = 1;
   $("imp_anillado").value = "no";
+  updateImpresionesAnilladoUI();
+  $("imp_anillado_modo").value = "juntos";
 
   $("imp_files").innerHTML = "";
-  addImpresionesFileRow("");
+  addImpresionesFileRow("", "bn", "sf");
+
+  $("imp_btn_add").innerText = "Agregar al carrito";
 }
 
-function resetPloteosForm(){
-  $("plo_kind").value = "cad";
-  updatePloteosPaperOptions();
-  $("plo_w").value = "";
-  $("plo_h").value = "";
-  $("plo_copias").value = 1;
-}
+function setImpresionesFormFromRaw(raw){
+  $("imp_ejemplares").value = raw.ejemplares ?? 1;
+  $("imp_anillado").value = raw.anillado || "no";
+  updateImpresionesAnilladoUI();
+  $("imp_anillado_modo").value = raw.anilladoModo || "juntos";
 
-function resetFotosForm(){
-  $("foto_size").value = "10x15";
-  $("foto_qty").value = 1;
-}
+  $("imp_files").innerHTML = "";
+  for (const f of (raw.files || [])){
+    addImpresionesFileRow(String(f.pages || ""), f.mode || "bn", f.faz || "sf");
+  }
+  if ((raw.files || []).length === 0){
+    addImpresionesFileRow("", "bn", "sf");
+  }
 
-function resetAdhForm(){
-  $("adh_type").value = "foto";
-  $("adh_qty").value = 1;
+  $("imp_btn_add").innerText = "Actualizar ítem";
 }
 
 function clearImpresionesEditMode(){
   EDITING_ID = null;
   EDITING_KIND = null;
-  $("imp_btn_add").innerText = "Agregar al carrito";
   resetImpresionesForm();
 }
 
-// ======================
+// =====================================================
 // INIT
-// ======================
+// =====================================================
 
 async function loadConfig(){
   const res = await fetch("./config.json", { cache: "no-store" });
@@ -665,28 +661,40 @@ async function loadConfig(){
   $("pay_alias").innerText = CONFIG.business.payment.alias;
   $("pay_titular").innerText = CONFIG.business.payment.titular;
   $("pay_cuil").innerText = CONFIG.business.payment.cuil;
-  $("delivery_note").innerText = CONFIG.business.delivery_note;
+  $("delivery_note").innerText = CONFIG.business.delivery_note || "";
 
+  // impresiones
   resetImpresionesForm();
+
+  // ploteos
   updatePloteosPaperOptions();
 
+  // carrito
   recalcImpresionesGlobal();
   renderCart();
 }
 
 function initEvents(){
   // Impresiones
-  $("imp_add_file").addEventListener("click", () => addImpresionesFileRow(""));
+  $("imp_add_file").addEventListener("click", () => addImpresionesFileRow("", "bn", "sf"));
+  $("imp_anillado").addEventListener("change", updateImpresionesAnilladoUI);
 
   $("imp_btn_add").addEventListener("click", () => {
     const err = $("imp_err"); clearError(err);
 
-    const v = calcImpresionesFormOnly();
+    const v = validateImpresionesForm();
     if (!v.ok) return showError(err, v.error);
 
-    const raw = getImpresionesRawNormalized();
+    const inp = getImpresionesInputs();
+    const raw = {
+      kind: "impresiones",
+      ejemplares: inp.ejemplares,
+      anillado: inp.anillado,
+      anilladoModo: inp.anilladoModo,
+      files: inp.files.slice()
+    };
 
-    // Editar
+    // EDITANDO
     if (EDITING_KIND === "impresiones" && EDITING_ID){
       const display = buildImpresionesDisplaySkeleton(raw);
       updateCartItem(EDITING_ID, display, { kind:"impresiones", raw });
@@ -696,20 +704,23 @@ function initEvents(){
       return;
     }
 
-    // Fusionar por anillado (misma condición)
-    const existing = findCompatibleImpresionesItem(raw);
+    // NO EDITANDO: intento fusionar
+    const existing = findMergeTargetImpresiones(raw);
     if (existing){
       existing.raw.files = (existing.raw.files || []).concat(raw.files || []);
+      // ejemplares: mantenemos el del formulario (si querés otra regla, lo ajusto)
       existing.raw.ejemplares = raw.ejemplares;
+
       const display = buildImpresionesDisplaySkeleton(existing.raw);
       updateCartItem(existing.id, display, { kind:"impresiones", raw: existing.raw });
+
       recalcImpresionesGlobal();
       renderCart();
       resetImpresionesForm();
       return;
     }
 
-    // Nuevo
+    // nuevo
     const display = buildImpresionesDisplaySkeleton(raw);
     addToCart(display, { kind:"impresiones", raw });
 
@@ -724,8 +735,7 @@ function initEvents(){
     const err = $("plo_err"); clearError(err);
     const r = calcPloteos();
     if (!r.ok) return showError(err, r.error);
-    addToCart(r, { kind:"ploteos" });
-    resetPloteosForm();
+    addToCart(r, { kind:"ploteos", raw:null });
     renderCart();
   });
 
@@ -734,8 +744,7 @@ function initEvents(){
     const err = $("foto_err"); clearError(err);
     const r = calcFotos();
     if (!r.ok) return showError(err, r.error);
-    addToCart(r, { kind:"fotos" });
-    resetFotosForm();
+    addToCart(r, { kind:"fotos", raw:null });
     renderCart();
   });
 
@@ -744,8 +753,7 @@ function initEvents(){
     const err = $("adh_err"); clearError(err);
     const r = calcAdhesivo();
     if (!r.ok) return showError(err, r.error);
-    addToCart(r, { kind:"adhesivo" });
-    resetAdhForm();
+    addToCart(r, { kind:"adhesivo", raw:null });
     renderCart();
   });
 
