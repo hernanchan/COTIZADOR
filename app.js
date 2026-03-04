@@ -5,6 +5,7 @@ let EDITING_ID = null;     // id del ítem del carrito editando
 let EDITING_KIND = null;   // "impresiones"
 
 let CART = [];
+let SHOW_DETAIL = false;
 
 function $(id){ return document.getElementById(id); }
 
@@ -449,6 +450,51 @@ function cartTotal(){
   return CART.reduce((s, x) => s + (Number(x.total)||0), 0);
 }
 
+
+function sumImpresiones(raw){
+  const ej = raw?.ejemplares || 1;
+  const files = raw?.files || [];
+
+  let bn_sf = 0, bn_df = 0, color = 0;
+  for (const f of files){
+    const pages = Number(f.pages) || 0;
+    if (f.mode === "color") color += pages;
+    else if (f.faz === "df") bn_df += pages;
+    else bn_sf += pages;
+  }
+
+  return { ej, filesCount: files.length, bn_sf, bn_df, color };
+}
+
+function resumenClienteCartItem(it){
+  // Devuelve filas cortas [k,v]
+  if (it.kind === "impresiones" && it.raw){
+    const r = it.raw;
+    const s = sumImpresiones(r);
+
+    const parts = [];
+    if (s.bn_sf) parts.push(`B/N SF: ${s.bn_sf}`);
+    if (s.bn_df) parts.push(`B/N DF: ${s.bn_df}`);
+    if (s.color) parts.push(`Color: ${s.color}`);
+    const pagesTxt = parts.length ? parts.join(" | ") : "Sin páginas";
+
+    const an = (r.anillado === "si")
+      ? (r.anilladoModo === "juntos" ? "Sí (juntos)" : "Sí (separados)")
+      : "No";
+
+    return [
+      ["Ejemplares", String(s.ej)],
+      ["Archivos", String(s.filesCount)],
+      ["Páginas", pagesTxt],
+      ["Anillado", an],
+    ];
+  }
+
+  // Para el resto: recorto a 4 filas
+  const b = (it.breakdown || []).slice(0, 4);
+  return b.length ? b : [];
+}
+
 function renderCart(){
   const host = $("cart_items");
   host.innerHTML = "";
@@ -463,7 +509,9 @@ function renderCart(){
     const card = document.createElement("div");
     card.className = "cart-card";
 
-    const lines = (it.breakdown || [])
+    const rowsToShow = SHOW_DETAIL ? (it.breakdown || []) : resumenClienteCartItem(it);
+
+    const lines = rowsToShow
       .map(([k,v]) => `<div class="row"><div class="k">${escapeHtml(k)}</div><div class="v">${escapeHtml(v)}</div></div>`)
       .join("");
 
@@ -759,6 +807,12 @@ function initEvents(){
 
   // WhatsApp
   $("btn_whatsapp").addEventListener("click", openWhatsApp);
+
+  // Carrito (resumen vs detalle)
+  $("toggle_detail")?.addEventListener("change", (e) => {
+    SHOW_DETAIL = !!e.target.checked;
+    renderCart();
+  });
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
