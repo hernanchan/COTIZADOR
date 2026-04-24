@@ -363,24 +363,95 @@ function calcPloteos(){
 }
 
 function getFotosInputs(){
+  const line = $("foto_line") ? $("foto_line").value : "normal";
   const size = $("foto_size").value;
   const qty = clampInt($("foto_qty").value, 1);
-  return { size, qty };
+  return { line, size, qty };
 }
+
+function getFotosLineDef(cfg, lineValue){
+  const lines = (cfg && cfg.lines && Array.isArray(cfg.lines) && cfg.lines.length)
+    ? cfg.lines
+    : [{ value:"normal", label: cfg.label, short:"Normal", description:"", sizes: (cfg.sizes || []) }];
+
+  return lines.find(l => l.value === lineValue) || lines[0];
+}
+
+function populateFotosUI(){
+  const cfg = CONFIG.items.fotos;
+  const lineSel = $("foto_line");
+  const sizeSel = $("foto_size");
+  const note = $("foto_line_note");
+
+  if (!lineSel || !sizeSel) return;
+
+  const lines = (cfg.lines && Array.isArray(cfg.lines) && cfg.lines.length)
+    ? cfg.lines
+    : [{ value:"normal", label: cfg.label, short:"Normal", description:"", sizes: (cfg.sizes || []) }];
+
+  // líneas
+  lineSel.innerHTML = "";
+  for (const l of lines){
+    const opt = document.createElement("option");
+    opt.value = l.value;
+    opt.textContent = l.label;
+    lineSel.appendChild(opt);
+  }
+
+  // por defecto: normal si existe
+  const hasNormal = lines.some(l => l.value === "normal");
+  lineSel.value = hasNormal ? "normal" : lines[0].value;
+
+  function fillSizes(){
+    const ld = getFotosLineDef(cfg, lineSel.value);
+    const sizes = ld.sizes || [];
+    sizeSel.innerHTML = "";
+    for (const s of sizes){
+      const opt = document.createElement("option");
+      opt.value = s.value;
+      opt.textContent = s.label;
+      sizeSel.appendChild(opt);
+    }
+    // nota
+    if (note){
+      note.innerText = ld.description ? ld.description : "";
+      note.style.display = ld.description ? "block" : "none";
+    }
+  }
+
+  fillSizes();
+  lineSel.addEventListener("change", fillSizes);
+}
+
 function calcFotos(){
   const cfg = CONFIG.items.fotos;
   const inp = getFotosInputs();
-  const def = cfg.sizes.find(s => s.value === inp.size);
+
+  const lineDef = getFotosLineDef(cfg, inp.line);
+  const def = (lineDef.sizes || []).find(s => s.value === inp.size);
+
   if (!def) return { ok:false, error:"Tamaño inválido." };
+
   const subtotal = inp.qty * def.price;
+
+  const shortLine = lineDef.short || lineDef.label || inp.line;
   const breakdown = [
+    ["Línea", shortLine],
     ["Tamaño", def.label],
     ["Cantidad", String(inp.qty)],
     ["Precio unitario", moneyARS(def.price)],
     ["Subtotal", moneyARS(subtotal)]
   ];
-  return { ok:true, title: cfg.label, subtitle: def.label, total: subtotal, breakdown };
+
+  return {
+    ok:true,
+    title: cfg.label,
+    subtitle: `${def.label} — ${shortLine}`,
+    total: subtotal,
+    breakdown
+  };
 }
+
 
 function getAdhInputs(){
   const type = $("adh_type").value;
@@ -716,6 +787,9 @@ async function loadConfig(){
 
   // ploteos
   updatePloteosPaperOptions();
+
+  // fotos
+  populateFotosUI();
 
   // carrito
   recalcImpresionesGlobal();
