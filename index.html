@@ -268,7 +268,23 @@
 
         <div id="cart_items" style="margin-top:10px;"></div>
 
-        <div class="totalbox">
+        
+<div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
+  <div style="font-weight:900;">Código de descuento</div>
+  <div class="muted">Si tenés un código vigente, ingresalo y aplicalo.</div>
+  <div class="row2" style="margin-top:8px;">
+    <div>
+      <input id="promo_code" type="text" placeholder="Ej: SABER10" style="text-transform:uppercase;" />
+    </div>
+    <div>
+      <button type="button" class="btn btn-ghost" id="promo_apply" style="width:100%; margin-top:6px;">Aplicar</button>
+    </div>
+  </div>
+  <div class="err" id="promo_err"></div>
+  <div class="muted" id="promo_applied" style="margin-top:8px; display:none;"></div>
+</div>
+
+<div class="totalbox">
           <div>Total</div>
           <div id="cart_total">$0</div>
         </div>
