@@ -7,6 +7,11 @@ let EDITING_KIND = null;   // "impresiones"
 let CART = [];
 let SHOW_DETAIL = false;
 
+// Overrides (para Modo asistido si el modo avanzado no tiene esos campos)
+let FOTO_LINE_OVERRIDE = null;
+let FOTO_SIZE_OVERRIDE = null;
+let FOTO_QTY_OVERRIDE = null;
+
 function $(id){ return document.getElementById(id); }
 
 function moneyARS(n){
@@ -363,9 +368,14 @@ function calcPloteos(){
 }
 
 function getFotosInputs(){
-  const line = $("foto_line") ? $("foto_line").value : "normal";
-  const size = $("foto_size").value;
-  const qty = clampInt($("foto_qty").value, 1);
+  const lineSel = $("foto_line");
+  const sizeSel = $("foto_size");
+  const qtyInp  = $("foto_qty");
+
+  const line = (lineSel && lineSel.value) ? lineSel.value : (FOTO_LINE_OVERRIDE || "normal");
+  const size = (sizeSel && sizeSel.value) ? sizeSel.value : (FOTO_SIZE_OVERRIDE || "");
+  const qty  = (qtyInp && qtyInp.value) ? clampInt(qtyInp.value, 1) : (FOTO_QTY_OVERRIDE || 1);
+
   return { line, size, qty };
 }
 
@@ -1118,17 +1128,27 @@ $("wiz_foto_line").addEventListener("change", applyFotoLine);("change", applyFot
 
     $("wiz_back0b").onclick = ()=>{ WIZ.step=0; WIZ.flow=null; renderWizard(); };
     $("wiz_add_foto").onclick = ()=>{
-      // set advanced form fields and click
-      $("foto_line").value = $("wiz_foto_line").value;
-      // ensure foto sizes in advanced updated
+      // set overrides (por si el modo avanzado no tiene esos campos visibles/opciones)
+      FOTO_LINE_OVERRIDE = $("wiz_foto_line").value;
+      FOTO_SIZE_OVERRIDE = $("wiz_foto_size").value;
+      FOTO_QTY_OVERRIDE  = clampInt($("wiz_foto_qty").value, 1);
+
+      // set advanced form fields when exist
+      if ($("foto_line")) $("foto_line").value = FOTO_LINE_OVERRIDE;
       populateFotosUI();
-      $("foto_size").value = $("wiz_foto_size").value;
-      $("foto_qty").value = clampInt($("wiz_foto_qty").value, 1);
+      if ($("foto_size")) $("foto_size").value = FOTO_SIZE_OVERRIDE;
+      if ($("foto_qty")) $("foto_qty").value = FOTO_QTY_OVERRIDE;
+
       $("foto_btn_add").click();
 
       const err = $("foto_err");
       const hadErr = err && err.style.display !== "none" && (err.innerText||"").trim();
       if (hadErr){ wizSetError("Revisá: " + hadErr); return; }
+
+      // clear overrides after successful add
+      FOTO_LINE_OVERRIDE = null;
+      FOTO_SIZE_OVERRIDE = null;
+      FOTO_QTY_OVERRIDE = null;
 
       WIZ.step=0; WIZ.flow=null; renderWizard();
     };
@@ -1174,6 +1194,11 @@ $("wiz_foto_line").addEventListener("change", applyFotoLine);("change", applyFot
       const err = $("adh_err");
       const hadErr = err && err.style.display !== "none" && (err.innerText||"").trim();
       if (hadErr){ wizSetError("Revisá: " + hadErr); return; }
+
+      // clear overrides after successful add
+      FOTO_LINE_OVERRIDE = null;
+      FOTO_SIZE_OVERRIDE = null;
+      FOTO_QTY_OVERRIDE = null;
 
       WIZ.step=0; WIZ.flow=null; renderWizard();
     };
@@ -1251,6 +1276,11 @@ $("wiz_foto_line").addEventListener("change", applyFotoLine);("change", applyFot
       const err = $("plo_err");
       const hadErr = err && err.style.display !== "none" && (err.innerText||"").trim();
       if (hadErr){ wizSetError("Revisá: " + hadErr); return; }
+
+      // clear overrides after successful add
+      FOTO_LINE_OVERRIDE = null;
+      FOTO_SIZE_OVERRIDE = null;
+      FOTO_QTY_OVERRIDE = null;
 
       WIZ.step=0; WIZ.flow=null; renderWizard();
     };
