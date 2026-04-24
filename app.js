@@ -1,4 +1,7 @@
 // Cotizador v1 - Librería Saber (Opción B: por archivo)
+const BUILD_ID = "wiz-fotos-fix2-2026-04-24";
+console.log("Cotizador BUILD:", BUILD_ID);
+
 let CONFIG = null;
 
 let EDITING_ID = null;     // id del ítem del carrito editando
@@ -372,9 +375,18 @@ function getFotosInputs(){
   const sizeSel = $("foto_size");
   const qtyInp  = $("foto_qty");
 
-  const line = (lineSel && lineSel.value) ? lineSel.value : (FOTO_LINE_OVERRIDE || "normal");
-  const size = (sizeSel && sizeSel.value) ? sizeSel.value : (FOTO_SIZE_OVERRIDE || "");
-  const qty  = (qtyInp && qtyInp.value) ? clampInt(qtyInp.value, 1) : (FOTO_QTY_OVERRIDE || 1);
+  // Si viene del Modo asistido, los overrides mandan (evita que el modo avanzado fuerce "normal")
+  const line = (FOTO_LINE_OVERRIDE !== null && FOTO_LINE_OVERRIDE !== undefined)
+    ? FOTO_LINE_OVERRIDE
+    : ((lineSel && lineSel.value) ? lineSel.value : "normal");
+
+  const size = (FOTO_SIZE_OVERRIDE !== null && FOTO_SIZE_OVERRIDE !== undefined)
+    ? FOTO_SIZE_OVERRIDE
+    : ((sizeSel && sizeSel.value) ? sizeSel.value : "");
+
+  const qty = (FOTO_QTY_OVERRIDE !== null && FOTO_QTY_OVERRIDE !== undefined)
+    ? FOTO_QTY_OVERRIDE
+    : ((qtyInp && qtyInp.value) ? clampInt(qtyInp.value, 1) : 1);
 
   return { line, size, qty };
 }
