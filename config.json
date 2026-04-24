@@ -344,8 +344,8 @@
         "type": "free_binding"
       }
     ],
-    "source": "local",
-    "remote_url": "",
+    "source": "remote",
+    "remote_url": "https://hernanchan.github.io/COTIZADOR/promos.json",
     "cache_bust": true
   }
 }
