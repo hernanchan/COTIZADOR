@@ -2,7 +2,7 @@
   "enabled": true,
   "one_code_at_a_time": true,
   "codes": [
-    { "code":"MARTESDECOPIAS", "active": true,  "label":"10% en impresiones", "type":"percent_kinds", "percent":10, "kinds":["impresiones"] },
+    { "code":"MARTESDECOPIAS", "active": false,  "label":"10% en impresiones", "type":"percent_kinds", "percent":10, "kinds":["impresiones"] },
     { "code":"FOTOSPREMIUM",  "active": false, "label":"Premium al precio normal (10x15/13x18/A4)", "type":"photo_premium_to_normal" },
     { "code":"ANILLADO0",     "active": false, "label":"Anillado gratis", "type":"free_binding" },
     { "code":"STICKER10",     "active": false, "label":"10% Stickers A3", "type":"percent_adh_types", "percent":10, "types":["stickers_a3"] }
