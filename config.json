@@ -9,7 +9,6 @@
       "cuil": "20-22792046-8"
     },
     "delivery_note": "Entrega sujeta a disponibilidad y complejidad del pedido. Si el importe transferido no coincide con la cotización, te contactaremos por WhatsApp para ajustar la diferencia o reintegrar el dinero."
-
   },
   "items": {
     "impresiones": {
@@ -223,6 +222,59 @@
           "value": "a4",
           "label": "A4",
           "price": 1600
+        }
+      ],
+      "lines": [
+        {
+          "value": "normal",
+          "label": "Línea normal (200 g / 4 colores)",
+          "short": "Normal",
+          "description": "Papel fotográfico 200 g, impresión 4 colores.",
+          "sizes": [
+            {
+              "value": "10x15",
+              "label": "10×15 cm",
+              "price": 500
+            },
+            {
+              "value": "13x18",
+              "label": "13×18 cm",
+              "price": 800
+            },
+            {
+              "value": "a4",
+              "label": "A4",
+              "price": 1600
+            }
+          ]
+        },
+        {
+          "value": "luster",
+          "label": "Premium Photo Luster (260 g / 6 colores)",
+          "short": "Photo Luster",
+          "description": "Photo Luster RC microporoso semi mate 260 g, impresión 6 colores: mayor intensidad y durabilidad.",
+          "sizes": [
+            {
+              "value": "10x15",
+              "label": "10×15 cm",
+              "price": 800
+            },
+            {
+              "value": "13x18",
+              "label": "13×18 cm",
+              "price": 1200
+            },
+            {
+              "value": "a4",
+              "label": "A4",
+              "price": 2500
+            },
+            {
+              "value": "a3",
+              "label": "A3",
+              "price": 4500
+            }
+          ]
         }
       ]
     },
