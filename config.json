@@ -223,74 +223,41 @@
           "label": "A4",
           "price": 1600
         }
-      ],
-      "lines": [
-        {
-          "value": "normal",
-          "label": "Línea normal (200 g / 4 colores)",
-          "short": "Normal",
-          "description": "Papel fotográfico 200 g, impresión 4 colores.",
-          "sizes": [
-            {
-              "value": "10x15",
-              "label": "10×15 cm",
-              "price": 500
-            },
-            {
-              "value": "13x18",
-              "label": "13×18 cm",
-              "price": 800
-            },
-            {
-              "value": "a4",
-              "label": "A4",
-              "price": 1600
-            }
-          ]
-        },
-        {
-          "value": "luster",
-          "label": "Premium Photo Luster (260 g / 6 colores)",
-          "short": "Photo Luster",
-          "description": "Photo Luster RC microporoso semi mate 260 g, impresión 6 colores: mayor intensidad y durabilidad.",
-          "sizes": [
-            {
-              "value": "10x15",
-              "label": "10×15 cm",
-              "price": 800
-            },
-            {
-              "value": "13x18",
-              "label": "13×18 cm",
-              "price": 1200
-            },
-            {
-              "value": "a4",
-              "label": "A4",
-              "price": 2500
-            },
-            {
-              "value": "a3",
-              "label": "A3",
-              "price": 4500
-            }
-          ]
-        }
       ]
     },
     "adhesivo_a4": {
-      "label": "Papel adhesivo A4",
+      "label": "Papel adhesivo (A4/A3)",
       "unit": "unidad",
       "types": [
         {
           "value": "foto",
           "label": "Adhesivo fotográfico A4",
-          "price": 1400
+          "price": 1500
         },
         {
           "value": "obra",
           "label": "Adhesivo obra A4",
           "price": 700
+        },
+        {
+          "value": "foto_a3",
+          "label": "Adhesivo fotográfico A3",
+          "price": 2800
+        },
+        {
+          "value": "obra_a3",
+          "label": "Adhesivo obra A3",
+          "price": 1500
+        },
+        {
+          "value": "stickers_a4",
+          "label": "Stickers con precorte A4 (fotográfico adhesivo)",
+          "price": 3000
+        },
+        {
+          "value": "stickers_a3",
+          "label": "Stickers con precorte A3 (fotográfico adhesivo)",
+          "price": 5000
         }
       ],
       "discount": {
