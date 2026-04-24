@@ -171,21 +171,26 @@
 
         <!-- FOTOS -->
         <div class="section" id="sec_foto">
-          <div class="muted">Papel fotográfico 200 g. Precio fijo por tamaño.</div>
+          <div class="muted" id="foto_desc">Seleccioná la línea de papel y el tamaño. Precio fijo por unidad.</div>
 
           <div class="row2">
             <div>
-              <label>Tamaño</label>
-              <select id="foto_size">
-                <option value="10x15">10×15 cm</option>
-                <option value="13x18">13×18 cm</option>
-                <option value="a4">A4</option>
-              </select>
+              <label>Línea / Papel</label>
+              <select id="foto_line"></select>
+              <div class="muted" id="foto_line_note" style="margin-top:6px;"></div>
             </div>
+            <div>
+              <label>Tamaño</label>
+              <select id="foto_size"></select>
+            </div>
+          </div>
+
+          <div class="row2" style="margin-top:10px;">
             <div>
               <label>Cantidad</label>
               <input id="foto_qty" type="number" min="1" step="1" value="1" />
             </div>
+            <div></div>
           </div>
 
           <div class="err" id="foto_err"></div>
