@@ -363,24 +363,95 @@ function calcPloteos(){
 }
 
 function getFotosInputs(){
+  const line = $("foto_line") ? $("foto_line").value : "normal";
   const size = $("foto_size").value;
   const qty = clampInt($("foto_qty").value, 1);
-  return { size, qty };
+  return { line, size, qty };
 }
+
+function getFotosLineDef(cfg, lineValue){
+  const lines = (cfg && cfg.lines && Array.isArray(cfg.lines) && cfg.lines.length)
+    ? cfg.lines
+    : [{ value:"normal", label: cfg.label, short:"Normal", description:"", sizes: (cfg.sizes || []) }];
+
+  return lines.find(l => l.value === lineValue) || lines[0];
+}
+
+function populateFotosUI(){
+  const cfg = CONFIG.items.fotos;
+  const lineSel = $("foto_line");
+  const sizeSel = $("foto_size");
+  const note = $("foto_line_note");
+
+  if (!lineSel || !sizeSel) return;
+
+  const lines = (cfg.lines && Array.isArray(cfg.lines) && cfg.lines.length)
+    ? cfg.lines
+    : [{ value:"normal", label: cfg.label, short:"Normal", description:"", sizes: (cfg.sizes || []) }];
+
+  // líneas
+  lineSel.innerHTML = "";
+  for (const l of lines){
+    const opt = document.createElement("option");
+    opt.value = l.value;
+    opt.textContent = l.label;
+    lineSel.appendChild(opt);
+  }
+
+  // por defecto: normal si existe
+  const hasNormal = lines.some(l => l.value === "normal");
+  lineSel.value = hasNormal ? "normal" : lines[0].value;
+
+  function fillSizes(){
+    const ld = getFotosLineDef(cfg, lineSel.value);
+    const sizes = ld.sizes || [];
+    sizeSel.innerHTML = "";
+    for (const s of sizes){
+      const opt = document.createElement("option");
+      opt.value = s.value;
+      opt.textContent = s.label;
+      sizeSel.appendChild(opt);
+    }
+    // nota
+    if (note){
+      note.innerText = ld.description ? ld.description : "";
+      note.style.display = ld.description ? "block" : "none";
+    }
+  }
+
+  fillSizes();
+  lineSel.addEventListener("change", fillSizes);
+}
+
 function calcFotos(){
   const cfg = CONFIG.items.fotos;
   const inp = getFotosInputs();
-  const def = cfg.sizes.find(s => s.value === inp.size);
+
+  const lineDef = getFotosLineDef(cfg, inp.line);
+  const def = (lineDef.sizes || []).find(s => s.value === inp.size);
+
   if (!def) return { ok:false, error:"Tamaño inválido." };
+
   const subtotal = inp.qty * def.price;
+
+  const shortLine = lineDef.short || lineDef.label || inp.line;
   const breakdown = [
+    ["Línea", shortLine],
     ["Tamaño", def.label],
     ["Cantidad", String(inp.qty)],
     ["Precio unitario", moneyARS(def.price)],
     ["Subtotal", moneyARS(subtotal)]
   ];
-  return { ok:true, title: cfg.label, subtitle: def.label, total: subtotal, breakdown };
+
+  return {
+    ok:true,
+    title: cfg.label,
+    subtitle: `${def.label} — ${shortLine}`,
+    total: subtotal,
+    breakdown
+  };
 }
+
 
 function getAdhInputs(){
   const type = $("adh_type").value;
@@ -697,6 +768,508 @@ function clearImpresionesEditMode(){
 }
 
 // =====================================================
+
+/* =====================================================
+   WIZARD (Modo asistido) - solo UI. Usa la misma lógica
+   de cálculo / descuentos: rellena campos y dispara los
+   mismos botones "Agregar al carrito".
+===================================================== */
+
+let WIZARD_ACTIVE = true;
+
+const WIZ = {
+  step: 0,
+  flow: null,         // "imp"|"foto"|"adh"|"plo"
+  imp: {
+    fileIndex: 0,
+    files: []        // {pages, mode, faz}
+  }
+};
+
+function setModeButtons(){
+  $("btn_mode_wiz")?.classList.toggle("active", WIZARD_ACTIVE);
+  $("btn_mode_adv")?.classList.toggle("active", !WIZARD_ACTIVE);
+}
+
+function showWizard(active){
+  WIZARD_ACTIVE = !!active;
+  setModeButtons();
+
+  const tabs = $("tabs");
+  const wiz = $("sec_wiz");
+
+  if (tabs) tabs.style.display = WIZARD_ACTIVE ? "none" : "flex";
+  if (wiz) wiz.style.display = WIZARD_ACTIVE ? "block" : "none";
+
+  // secciones avanzadas
+  const sections = ["sec_imp","sec_plo","sec_foto","sec_adh"];
+  sections.forEach(id => {
+    const el = $(id);
+    if (!el) return;
+    el.style.display = WIZARD_ACTIVE ? "none" : "";
+  });
+
+  // toggle detalle queda visible siempre (es del carrito), no lo tocamos
+
+  if (WIZARD_ACTIVE){
+    WIZ.step = 0;
+    WIZ.flow = null;
+    WIZ.imp = { fileIndex:0, files:[] };
+    renderWizard();
+  } else {
+    // volver a mostrar la pestaña activa actual (como está)
+    document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
+    document.getElementById("sec_imp")?.classList.add("active");
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    document.querySelector('.tab[data-tab="imp"]')?.classList.add("active");
+  }
+}
+
+function wizSetError(msg){
+  const err = $("wiz_err");
+  if (!err) return;
+  if (!msg){
+    err.innerText = "";
+    err.style.display = "none";
+  } else {
+    err.innerText = msg;
+    err.style.display = "block";
+  }
+}
+
+function wizSetSteps(txt){
+  const el = $("wiz_steps");
+  if (el) el.textContent = txt || "";
+}
+
+function wizSetActions(html){
+  const el = $("wiz_actions");
+  if (el) el.innerHTML = html || "";
+}
+
+function renderWizard(){
+  wizSetError("");
+  const host = $("wiz_host");
+  if (!host) return;
+
+  // Paso 0: elegir rubro
+  if (WIZ.step === 0){
+    wizSetSteps("Paso 1/2 — Elegí qué querés cotizar");
+    host.innerHTML = `
+      <div class="muted">Respondé estas preguntas y el sistema arma el ítem y lo agrega al carrito.</div>
+
+      <div class="wiz-grid2" style="margin-top:10px;">
+        <button type="button" class="btn btn-primary" id="wiz_go_imp">Impresiones</button>
+        <button type="button" class="btn btn-primary" id="wiz_go_foto">Fotos</button>
+        <button type="button" class="btn btn-primary" id="wiz_go_adh">Adhesivo / Stickers</button>
+        <button type="button" class="btn btn-primary" id="wiz_go_plo">Ploteos</button>
+      </div>
+    `;
+    wizSetActions(`<button type="button" class="btn btn-ghost" id="wiz_to_adv">Ir al modo avanzado</button>`);
+    $("wiz_go_imp").onclick = ()=>{ WIZ.flow="imp"; WIZ.step=10; WIZ.imp={fileIndex:0, files:[]}; renderWizard(); };
+    $("wiz_go_foto").onclick = ()=>{ WIZ.flow="foto"; WIZ.step=20; renderWizard(); };
+    $("wiz_go_adh").onclick = ()=>{ WIZ.flow="adh"; WIZ.step=30; renderWizard(); };
+    $("wiz_go_plo").onclick = ()=>{ WIZ.flow="plo"; WIZ.step=40; renderWizard(); };
+    $("wiz_to_adv").onclick = ()=> showWizard(false);
+    return;
+  }
+
+  // IMPRESIONES
+  if (WIZ.flow === "imp"){
+    // Paso 10: cuántos archivos
+    if (WIZ.step === 10){
+      wizSetSteps("Impresiones — Paso 1/3 — ¿Cuántos archivos vas a imprimir?");
+      host.innerHTML = `
+        <label>Cantidad de archivos</label>
+        <input id="wiz_imp_n" type="number" min="1" step="1" value="${Math.max(1, WIZ.imp.files.length || 1)}" />
+        <div class="muted">Cada archivo puede tener distinta cantidad de páginas, color y faz.</div>
+      `;
+      wizSetActions(`
+        <button type="button" class="btn btn-ghost" id="wiz_back0">Volver</button>
+        <button type="button" class="btn btn-secondary" id="wiz_next_imp_n">Siguiente</button>
+      `);
+      $("wiz_back0").onclick = ()=>{ WIZ.step=0; WIZ.flow=null; renderWizard(); };
+      $("wiz_next_imp_n").onclick = ()=>{
+        const n = clampInt($("wiz_imp_n").value, 1);
+        WIZ.imp.files = Array.from({length:n}, (_,i)=> WIZ.imp.files[i] || {pages:0, mode:"bn", faz:"sf"});
+        WIZ.imp.fileIndex = 0;
+        WIZ.step = 11;
+        renderWizard();
+      };
+      return;
+    }
+
+    // Paso 11: archivo i
+    if (WIZ.step === 11){
+      const i = WIZ.imp.fileIndex;
+      const total = WIZ.imp.files.length;
+      const f = WIZ.imp.files[i] || {pages:0, mode:"bn", faz:"sf"};
+      wizSetSteps(`Impresiones — Paso 2/3 — Archivo ${i+1} de ${total}`);
+      host.innerHTML = `
+        <div class="muted">Completá este archivo. Después pasamos al siguiente.</div>
+
+        <div class="wiz-grid3" style="margin-top:10px;">
+          <div>
+            <label>Páginas</label>
+            <input id="wiz_imp_pages" type="number" min="1" step="1" value="${f.pages ? escapeHtml(String(f.pages)) : ""}" placeholder="Ej: 12" />
+          </div>
+          <div>
+            <label>Color</label>
+            <select id="wiz_imp_mode">
+              <option value="bn">B/N</option>
+              <option value="color">Color</option>
+            </select>
+          </div>
+          <div>
+            <label>Faz</label>
+            <select id="wiz_imp_faz">
+              <option value="sf">Simple faz</option>
+              <option value="df">Doble faz</option>
+            </select>
+          </div>
+        </div>
+      `;
+      $("wiz_imp_mode").value = f.mode || "bn";
+      $("wiz_imp_faz").value = f.faz || "sf";
+
+      const backBtn = (i===0) ? `<button type="button" class="btn btn-ghost" id="wiz_back_imp_n">Atrás</button>`
+                              : `<button type="button" class="btn btn-ghost" id="wiz_prev_file">Archivo anterior</button>`;
+      const nextLabel = (i === total-1) ? "Continuar" : "Siguiente archivo";
+
+      wizSetActions(`
+        <button type="button" class="btn btn-ghost" id="wiz_cancel_imp">Cancelar</button>
+        ${backBtn}
+        <button type="button" class="btn btn-secondary" id="wiz_next_file">${nextLabel}</button>
+      `);
+
+      $("wiz_cancel_imp").onclick = ()=>{ WIZ.step=0; WIZ.flow=null; renderWizard(); };
+      if (i===0){
+        $("wiz_back_imp_n").onclick = ()=>{ WIZ.step=10; renderWizard(); };
+      } else {
+        $("wiz_prev_file").onclick = ()=>{
+          const ok = wizSaveImpFile();
+          if (!ok) return;
+          WIZ.imp.fileIndex = Math.max(0, WIZ.imp.fileIndex - 1);
+          renderWizard();
+        };
+      }
+
+      $("wiz_next_file").onclick = ()=>{
+        const ok = wizSaveImpFile();
+        if (!ok) return;
+        if (WIZ.imp.fileIndex < total-1){
+          WIZ.imp.fileIndex += 1;
+          renderWizard();
+        } else {
+          WIZ.step = 12;
+          renderWizard();
+        }
+      };
+      return;
+    }
+
+    // Paso 12: ejemplares + anillado
+    if (WIZ.step === 12){
+      wizSetSteps("Impresiones — Paso 3/3 — Ejemplares y anillado");
+      host.innerHTML = `
+        <div class="wiz-grid3" style="margin-top:10px;">
+          <div>
+            <label>Ejemplares</label>
+            <input id="wiz_imp_ej" type="number" min="1" step="1" value="1" />
+            <div class="muted">Cuántas copias de todo el conjunto.</div>
+          </div>
+          <div>
+            <label>Anillado</label>
+            <select id="wiz_imp_an">
+              <option value="no">No</option>
+              <option value="si">Sí</option>
+            </select>
+          </div>
+          <div id="wiz_imp_an_modo_wrap" style="display:none;">
+            <label>¿Juntos o separados?</label>
+            <select id="wiz_imp_an_modo">
+              <option value="juntos">Juntos</option>
+              <option value="separados">Separados</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="muted" style="margin-top:10px;">
+          Tip: si todos tus archivos son iguales (mismo tipo y faz), podés cargar menos archivos sumando las páginas.
+        </div>
+      `;
+
+      const updateAn = ()=>{
+        const v = $("wiz_imp_an").value;
+        $("wiz_imp_an_modo_wrap").style.display = (v==="si") ? "block" : "none";
+      };
+      $("wiz_imp_an").addEventListener("change", updateAn);
+      updateAn();
+
+      wizSetActions(`
+        <button type="button" class="btn btn-ghost" id="wiz_back_files">Atrás</button>
+        <button type="button" class="btn btn-secondary" id="wiz_add_imp">Agregar al carrito</button>
+        <button type="button" class="btn btn-ghost" id="wiz_home">Otra cotización</button>
+      `);
+
+      $("wiz_back_files").onclick = ()=>{ WIZ.step=11; WIZ.imp.fileIndex = Math.max(0, WIZ.imp.files.length-1); renderWizard(); };
+
+      $("wiz_add_imp").onclick = ()=>{
+        // Relleno los campos del modo avanzado y disparo el mismo botón
+        // 1) reset form para tener rows limpias
+        clearImpresionesEditMode(); // vuelve a estado base
+        $("imp_ejemplares").value = clampInt($("wiz_imp_ej").value, 1);
+        $("imp_anillado").value = $("wiz_imp_an").value;
+        updateImpresionesAnilladoUI();
+        if ($("wiz_imp_an").value === "si"){
+          $("imp_anillado_modo").value = $("wiz_imp_an_modo").value;
+        }
+
+        // files
+        $("imp_files").innerHTML = "";
+        for (const f of WIZ.imp.files){
+          addImpresionesFileRow(String(f.pages||""), f.mode || "bn", f.faz || "sf");
+        }
+
+        // click original (misma lógica)
+        $("imp_btn_add").click();
+
+        // Si no hubo error, vuelvo al inicio del wizard
+        const impErr = $("imp_err");
+        const hadErr = impErr && impErr.style.display !== "none" && (impErr.innerText || "").trim();
+        if (hadErr){
+          wizSetError("Revisá: " + hadErr);
+          return;
+        }
+
+        WIZ.step=0; WIZ.flow=null; WIZ.imp={fileIndex:0, files:[]};
+        renderWizard();
+      };
+
+      $("wiz_home").onclick = ()=>{ WIZ.step=0; WIZ.flow=null; renderWizard(); };
+      return;
+    }
+
+    return;
+  }
+
+  // FOTOS
+  if (WIZ.flow === "foto"){
+    wizSetSteps("Fotos — Elegí línea, tamaño y cantidad");
+    const lines = (CONFIG?.items?.fotos?.lines || []);
+    const sizes = (CONFIG?.items?.fotos?.sizes || []);
+    const lineOptions = lines.map(l => `<option value="${escapeHtml(l.value)}">${escapeHtml(l.label)}</option>`).join("");
+    host.innerHTML = `
+      <div class="muted" id="wiz_foto_desc"></div>
+
+      <div class="wiz-grid3" style="margin-top:10px;">
+        <div>
+          <label>Línea</label>
+          <select id="wiz_foto_line">${lineOptions}</select>
+        </div>
+        <div>
+          <label>Tamaño</label>
+          <select id="wiz_foto_size"></select>
+        </div>
+        <div>
+          <label>Cantidad</label>
+          <input id="wiz_foto_qty" type="number" min="1" step="1" value="1" />
+        </div>
+      </div>
+    `;
+
+    function applyFotoLine(){
+      const lv = $("wiz_foto_line").value;
+      const line = lines.find(x=>x.value===lv) || lines[0];
+      const desc = line?.desc || "";
+      $("wiz_foto_desc").textContent = desc;
+
+      // sizes allowed
+      const allowed = (line?.sizes || []).length ? line.sizes : sizes.map(s=>s.value);
+      const sel = $("wiz_foto_size");
+      sel.innerHTML = "";
+      for (const s of sizes){
+        if (!allowed.includes(s.value)) continue;
+        const opt = document.createElement("option");
+        opt.value = s.value;
+        opt.textContent = s.label;
+        sel.appendChild(opt);
+      }
+    }
+    $("wiz_foto_line").addEventListener("change", applyFotoLine);
+    applyFotoLine();
+
+    wizSetActions(`
+      <button type="button" class="btn btn-ghost" id="wiz_back0b">Volver</button>
+      <button type="button" class="btn btn-secondary" id="wiz_add_foto">Agregar al carrito</button>
+    `);
+
+    $("wiz_back0b").onclick = ()=>{ WIZ.step=0; WIZ.flow=null; renderWizard(); };
+    $("wiz_add_foto").onclick = ()=>{
+      // set advanced form fields and click
+      $("foto_line").value = $("wiz_foto_line").value;
+      // ensure foto sizes in advanced updated
+      populateFotosUI();
+      $("foto_size").value = $("wiz_foto_size").value;
+      $("foto_qty").value = clampInt($("wiz_foto_qty").value, 1);
+      $("foto_btn_add").click();
+
+      const err = $("foto_err");
+      const hadErr = err && err.style.display !== "none" && (err.innerText||"").trim();
+      if (hadErr){ wizSetError("Revisá: " + hadErr); return; }
+
+      WIZ.step=0; WIZ.flow=null; renderWizard();
+    };
+    return;
+  }
+
+  // ADHESIVO
+  if (WIZ.flow === "adh"){
+    wizSetSteps("Adhesivo / Stickers — Elegí tipo y cantidad");
+    host.innerHTML = `
+      <div class="muted">A4 y A3 adhesivo. Stickers con precorte en adhesivo fotográfico.</div>
+
+      <div class="wiz-grid2" style="margin-top:10px;">
+        <div>
+          <label>Tipo</label>
+          <select id="wiz_adh_type">
+            <option value="foto">Adhesivo fotográfico A4</option>
+            <option value="obra">Adhesivo obra A4</option>
+            <option value="foto_a3">Adhesivo fotográfico A3</option>
+            <option value="obra_a3">Adhesivo obra A3</option>
+            <option value="stickers_a4">Stickers con precorte A4 (adhesivo fotográfico)</option>
+            <option value="stickers_a3">Stickers con precorte A3 (adhesivo fotográfico)</option>
+          </select>
+        </div>
+        <div>
+          <label>Cantidad</label>
+          <input id="wiz_adh_qty" type="number" min="1" step="1" value="1" />
+        </div>
+      </div>
+    `;
+
+    wizSetActions(`
+      <button type="button" class="btn btn-ghost" id="wiz_back0c">Volver</button>
+      <button type="button" class="btn btn-secondary" id="wiz_add_adh">Agregar al carrito</button>
+    `);
+
+    $("wiz_back0c").onclick = ()=>{ WIZ.step=0; WIZ.flow=null; renderWizard(); };
+    $("wiz_add_adh").onclick = ()=>{
+      $("adh_type").value = $("wiz_adh_type").value;
+      $("adh_qty").value = clampInt($("wiz_adh_qty").value, 1);
+      $("adh_btn_add").click();
+
+      const err = $("adh_err");
+      const hadErr = err && err.style.display !== "none" && (err.innerText||"").trim();
+      if (hadErr){ wizSetError("Revisá: " + hadErr); return; }
+
+      WIZ.step=0; WIZ.flow=null; renderWizard();
+    };
+    return;
+  }
+
+  // PLOTEOS
+  if (WIZ.flow === "plo"){
+    wizSetSteps("Ploteos — Elegí tipo, papel y medida");
+    host.innerHTML = `
+      <div class="muted">Se cobra por metro lineal. El sistema rota y elige el rollo más conveniente.</div>
+
+      <div class="wiz-grid2" style="margin-top:10px;">
+        <div>
+          <label>Tipo</label>
+          <select id="wiz_plo_kind">
+            <option value="cad">Planos / líneas (CAD)</option>
+            <option value="pleno">Afiche / Póster (Pleno)</option>
+          </select>
+        </div>
+        <div>
+          <label>Papel</label>
+          <select id="wiz_plo_paper"></select>
+        </div>
+      </div>
+
+      <div class="wiz-grid3" style="margin-top:10px;">
+        <div>
+          <label>Ancho (cm)</label>
+          <input id="wiz_plo_w" type="number" min="1" step="0.1" placeholder="Ej: 60" />
+        </div>
+        <div>
+          <label>Alto (cm)</label>
+          <input id="wiz_plo_h" type="number" min="1" step="0.1" placeholder="Ej: 40" />
+        </div>
+        <div>
+          <label>Copias</label>
+          <input id="wiz_plo_c" type="number" min="1" step="1" value="1" />
+        </div>
+      </div>
+    `;
+
+    function applyPlo(){
+      $("plo_kind").value = $("wiz_plo_kind").value;
+      updatePloteosPaperOptions();
+      // copy papers to wizard select
+      const advPaper = $("plo_paper");
+      const wizPaper = $("wiz_plo_paper");
+      wizPaper.innerHTML = "";
+      Array.from(advPaper.options).forEach(o=>{
+        const opt = document.createElement("option");
+        opt.value = o.value;
+        opt.textContent = o.textContent;
+        wizPaper.appendChild(opt);
+      });
+    }
+    $("wiz_plo_kind").addEventListener("change", applyPlo);
+    applyPlo();
+
+    wizSetActions(`
+      <button type="button" class="btn btn-ghost" id="wiz_back0d">Volver</button>
+      <button type="button" class="btn btn-secondary" id="wiz_add_plo">Agregar al carrito</button>
+    `);
+
+    $("wiz_back0d").onclick = ()=>{ WIZ.step=0; WIZ.flow=null; renderWizard(); };
+    $("wiz_add_plo").onclick = ()=>{
+      $("plo_kind").value = $("wiz_plo_kind").value;
+      updatePloteosPaperOptions();
+      $("plo_paper").value = $("wiz_plo_paper").value;
+      $("plo_w").value = $("wiz_plo_w").value;
+      $("plo_h").value = $("wiz_plo_h").value;
+      $("plo_copias").value = clampInt($("wiz_plo_c").value, 1);
+      $("plo_btn_add").click();
+
+      const err = $("plo_err");
+      const hadErr = err && err.style.display !== "none" && (err.innerText||"").trim();
+      if (hadErr){ wizSetError("Revisá: " + hadErr); return; }
+
+      WIZ.step=0; WIZ.flow=null; renderWizard();
+    };
+    return;
+  }
+}
+
+function wizSaveImpFile(){
+  const pages = clampInt($("wiz_imp_pages").value, 0);
+  if (pages <= 0){
+    wizSetError("Ingresá páginas (> 0).");
+    return false;
+  }
+  const mode = $("wiz_imp_mode").value;
+  const faz  = $("wiz_imp_faz").value;
+
+  const i = WIZ.imp.fileIndex;
+  WIZ.imp.files[i] = { pages, mode, faz };
+  wizSetError("");
+  return true;
+}
+
+function initWizard(){
+  // Botones modo
+  $("btn_mode_wiz")?.addEventListener("click", ()=> showWizard(true));
+  $("btn_mode_adv")?.addEventListener("click", ()=> showWizard(false));
+
+  // Default: asistido
+  showWizard(true);
+}
+
 // INIT
 // =====================================================
 
@@ -716,6 +1289,9 @@ async function loadConfig(){
 
   // ploteos
   updatePloteosPaperOptions();
+
+  // fotos
+  populateFotosUI();
 
   // carrito
   recalcImpresionesGlobal();
@@ -819,7 +1395,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   try{
     await loadConfig();
     initEvents();
-  } catch(e){
+  
+    initWizard();
+} catch(e){
     console.error(e);
     alert("Error cargando el cotizador: " + (e.message || e));
   }
