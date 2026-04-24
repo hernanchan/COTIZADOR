@@ -69,6 +69,22 @@
       .imp-file-row{ grid-template-columns: 1fr 1fr; }
       .imp-file-row .span2{ grid-column: 1 / span 2; }
     }
+  
+/* Wizard (Modo asistido) */
+.modebar{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.modebtn{ padding:10px 12px; border-radius: 10px; border:1px solid var(--border); background:#fff; cursor:pointer; font-weight:900; }
+.modebtn.active{ background:#0a6; color:#fff; border-color:#0a6; }
+.wiz{ margin-top: 12px; }
+.wiz-title{ font-weight:900; font-size:18px; }
+.wiz-card{ border:1px solid var(--border); border-radius:12px; padding:12px; margin-top:10px; background:#fff; }
+.wiz-actions{ display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+.wiz-actions .btn{ width:auto; margin-top:0; }
+.wiz-steps{ color:var(--muted); font-size:13px; margin-top:4px; }
+.wiz-grid2{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+.wiz-grid3{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; }
+@media (max-width: 560px){
+  .wiz-grid2, .wiz-grid3{ grid-template-columns: 1fr; }
+}
   </style>
 </head>
 <body>
@@ -84,6 +100,22 @@
           <button class="tab" data-tab="foto">Fotos</button>
           <button class="tab" data-tab="adh">Adhesivo A4</button>
         </div>
+
+
+<div class="modebar" id="modebar">
+  <button class="modebtn active" id="btn_mode_wiz" type="button">Modo asistido</button>
+  <button class="modebtn" id="btn_mode_adv" type="button">Modo avanzado</button>
+</div>
+
+<!-- WIZARD -->
+<div class="wiz" id="sec_wiz">
+  <div class="wiz-title">Cotización asistida</div>
+  <div class="wiz-steps" id="wiz_steps"></div>
+  <div class="wiz-card" id="wiz_host"></div>
+  <div class="err" id="wiz_err"></div>
+  <div class="wiz-actions" id="wiz_actions"></div>
+</div>
+
 
         <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:8px;">
           <label style="display:flex; align-items:center; gap:8px; font-weight:700; cursor:pointer;">
@@ -171,41 +203,46 @@
 
         <!-- FOTOS -->
         <div class="section" id="sec_foto">
-          <div class="muted">Papel fotográfico 200 g. Precio fijo por tamaño.</div>
+          <div class="muted" id="foto_desc">Seleccioná la línea de papel y el tamaño. Precio fijo por unidad.</div>
 
           <div class="row2">
             <div>
-              <label>Tamaño</label>
-              <select id="foto_size">
-                <option value="10x15">10×15 cm</option>
-                <option value="13x18">13×18 cm</option>
-                <option value="a4">A4</option>
-              </select>
+              <label>Línea / Papel</label>
+              <select id="foto_line"></select>
+              <div class="muted" id="foto_line_note" style="margin-top:6px;"></div>
             </div>
+            <div>
+              <label>Tamaño</label>
+              <select id="foto_size"></select>
+            </div>
+          </div>
+
+          <div class="row2" style="margin-top:10px;">
             <div>
               <label>Cantidad</label>
               <input id="foto_qty" type="number" min="1" step="1" value="1" />
             </div>
+            <div></div>
           </div>
 
           <div class="err" id="foto_err"></div>
           <button type="button" class="btn btn-primary" id="foto_btn_add">Agregar al carrito</button>
         </div>
 
-                <!-- ADHESIVO -->
+        <!-- ADHESIVO -->
         <div class="section" id="sec_adh">
-          <div class="muted">A4 y A3 adhesivo. Descuento 10% desde 21 unidades.</div>
+          <div class="muted">A4 y A3 adhesivo. Stickers con precorte en adhesivo fotográfico. Descuento 10% desde 21 unidades.</div>
 
           <div class="row2">
             <div>
               <label>Tipo</label>
               <select id="adh_type">
                 <option value="foto">Adhesivo fotográfico A4</option>
-                <option value="obra">Adhesivo obra A4</option>
-                <option value="foto_a3">Adhesivo fotográfico A3</option>
-                <option value="obra_a3">Adhesivo obra A3</option>
-                <option value="stickers_a4">Stickers con precorte A4 (adhesivo fotográfico)</option>
-                <option value="stickers_a3">Stickers con precorte A3 (adhesivo fotográfico)</option>
+<option value="obra">Adhesivo obra A4</option>
+<option value="foto_a3">Adhesivo fotográfico A3</option>
+<option value="obra_a3">Adhesivo obra A3</option>
+<option value="stickers_a4">Stickers con precorte A4 (adhesivo fotográfico)</option>
+<option value="stickers_a3">Stickers con precorte A3 (adhesivo fotográfico)</option>
               </select>
             </div>
             <div>
@@ -218,6 +255,7 @@
           <button type="button" class="btn btn-primary" id="adh_btn_add">Agregar al carrito</button>
         </div>
 
+      </div>
 
       <!-- CARRITO -->
       <div class="card">
