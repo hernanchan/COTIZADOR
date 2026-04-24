@@ -1,5 +1,5 @@
 // Cotizador v1 - Librería Saber (Opción B: por archivo)
-const BUILD_ID = "wiz-fotos-fix2-2026-04-24";
+const BUILD_ID = "wiz-promos-active-2026-04-24";
 console.log("Cotizador BUILD:", BUILD_ID);
 
 let CONFIG = null;
@@ -9,6 +9,10 @@ let EDITING_KIND = null;   // "impresiones"
 
 let CART = [];
 let SHOW_DETAIL = false;
+
+// Promociones / cupones (1 código a la vez)
+let PROMO_APPLIED = null; // {code,label,type,percent,kinds}
+let PROMO_LAST_DISCOUNT = 0;
 
 // Overrides (para Modo asistido si el modo avanzado no tiene esos campos)
 let FOTO_LINE_OVERRIDE = null;
@@ -20,6 +24,15 @@ function $(id){ return document.getElementById(id); }
 function moneyARS(n){
   const v = Math.round(Number(n) || 0);
   return "$" + v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
+
+function parseMoneyARS(s){
+  // "$1.234" -> 1234
+  if (s === null || s === undefined) return 0;
+  const t = String(s).replace(/\s/g, "");
+  const digits = t.replace(/[^0-9]/g, "");
+  return digits ? parseInt(digits, 10) : 0;
 }
 
 function clampInt(x, minVal=0){
@@ -588,6 +601,113 @@ function resumenClienteCartItem(it){
   return b.length ? b : [];
 }
 
+
+function getPromoDef(code){
+  const promos = CONFIG?.promos;
+  if (!promos || !promos.enabled) return null;
+  const list = Array.isArray(promos.codes) ? promos.codes : [];
+  const norm = String(code || "").trim().toUpperCase();
+  if (!norm) return null;
+  return list.find(p => {
+    const c = String(p.code || "").trim().toUpperCase();
+    const a = (p.active === true); // por seguridad: si falta, NO está vigente
+    return a && c === norm;
+  }) || null;
+}
+
+function calcPromoDiscount(){
+  // Devuelve descuento en pesos (>=0). No modifica totales de ítems.
+  if (!PROMO_APPLIED) return 0;
+  const p = PROMO_APPLIED;
+
+  // total actual sin descuento
+  const total = cartTotal();
+
+  if (p.type === "percent_total"){
+    const pct = Number(p.percent) || 0;
+    return Math.max(0, Math.round(total * (pct/100)));
+  }
+
+  if (p.type === "percent_kinds"){
+    const pct = Number(p.percent) || 0;
+    const kinds = Array.isArray(p.kinds) ? p.kinds : [];
+    const base = CART.filter(it => kinds.includes(it.kind)).reduce((s,it)=> s + (Number(it.total)||0), 0);
+    return Math.max(0, Math.round(base * (pct/100)));
+  }
+
+  if (p.type === "free_binding"){
+    // Suma los subtotales de anillado de todos los ítems "impresiones"
+    let sum = 0;
+    for (const it of CART){
+      if (it.kind !== "impresiones") continue;
+      const rows = it.breakdown || [];
+      // Buscar "Subtotal anillado"
+      const row = rows.find(([k,_]) => String(k).toLowerCase().includes("subtotal anillado"));
+      if (row){
+        sum += parseMoneyARS(row[1]);
+      }
+    }
+    return Math.max(0, sum);
+  }
+
+
+if (p.type === "percent_adh_types"){
+  const pct = Number(p.percent) || 0;
+  const types = Array.isArray(p.types) ? p.types : [];
+  let base = 0;
+  for (const it of CART){
+    if (it.kind !== "adhesivo") continue;
+    const t = it.raw?.type;
+    if (types.includes(t)) base += (Number(it.total)||0);
+  }
+  return Math.max(0, Math.round(base * (pct/100)));
+}
+
+if (p.type === "photo_premium_to_normal"){
+  const fotosCfg = CONFIG?.items?.fotos;
+  const lines = fotosCfg?.lines || [];
+  const normal = lines.find(x => x.value === "normal") || lines[0];
+  const luster = lines.find(x => x.value === "luster");
+  if (!normal || !luster) return 0;
+
+  const normalPrices = {};
+  for (const s of (normal.sizes || [])){ normalPrices[s.value] = Number(s.price)||0; }
+  const lusterPrices = {};
+  for (const s of (luster.sizes || [])){ lusterPrices[s.value] = Number(s.price)||0; }
+
+  const eligible = ["10x15","13x18","a4"]; // A3 fuera
+
+  let disc = 0;
+  for (const it of CART){
+    if (it.kind !== "fotos") continue;
+    const r = it.raw || {};
+    if (r.line !== "luster") continue;
+    const size = r.size;
+    const qty = Number(r.qty)||0;
+    if (!eligible.includes(size)) continue;
+    const prem = lusterPrices[size] || 0;
+    const normp = normalPrices[size] || 0;
+    const diff = Math.max(0, prem - normp);
+    disc += diff * qty;
+  }
+
+  const maxBase = CART
+    .filter(it => it.kind==="fotos" && it.raw?.line==="luster" && eligible.includes(it.raw?.size))
+    .reduce((s,it)=> s + (Number(it.total)||0), 0);
+
+  return Math.max(0, Math.min(disc, maxBase));
+}
+
+  return 0;
+}
+
+function cartTotalFinal(){
+  const t = cartTotal();
+  const d = calcPromoDiscount();
+  PROMO_LAST_DISCOUNT = d;
+  return Math.max(0, t - d);
+}
+
 function renderCart(){
   const host = $("cart_items");
   host.innerHTML = "";
@@ -595,6 +715,8 @@ function renderCart(){
   if (CART.length === 0){
     host.innerHTML = '<div class="muted">Todavía no agregaste ítems.</div>';
     $("cart_total").innerText = moneyARS(0);
+    const pa = $("promo_applied"); if (pa){ pa.style.display="none"; pa.innerHTML=""; }
+    const pe = $("promo_err"); if (pe) clearError(pe);
     return;
   }
 
@@ -645,7 +767,23 @@ function renderCart(){
     });
   });
 
-  $("cart_total").innerText = moneyARS(cartTotal());
+  $("cart_total").innerText = moneyARS(cartTotalFinal());
+
+  // promo UI
+  const pa = $("promo_applied");
+  if (pa){
+    if (PROMO_APPLIED){
+      const d = PROMO_LAST_DISCOUNT || 0;
+      pa.style.display = "block";
+      pa.innerHTML = `<b>Aplicado:</b> ${escapeHtml(PROMO_APPLIED.code)} — ${escapeHtml(PROMO_APPLIED.label || "")} — <b>- ${moneyARS(d)}</b> <button type="button" class="btn btn-small btn-ghost" id="promo_clear" style="margin-left:8px;">Quitar</button>`;
+      setTimeout(()=>{
+        $("promo_clear")?.addEventListener("click", ()=>{ PROMO_APPLIED=null; PROMO_LAST_DISCOUNT=0; renderCart(); });
+      }, 0);
+    } else {
+      pa.style.display = "none";
+      pa.innerHTML = "";
+    }
+  }
 }
 
 // =====================================================
@@ -675,7 +813,16 @@ function buildWhatsAppMessage(){
     }
   });
 
-  msg += "\nTOTAL: " + moneyARS(total) + "\n";
+  const discount = calcPromoDiscount();
+  const finalTotal = Math.max(0, total - discount);
+  if (PROMO_APPLIED && discount > 0){
+    msg += "\nSUBTOTAL: " + moneyARS(total) + "\n";
+    msg += "DESCUENTO (" + PROMO_APPLIED.code + "): - " + moneyARS(discount) + "\n";
+    msg += "TOTAL: " + moneyARS(finalTotal) + "\n";
+  } else {
+    msg += "\nTOTAL: " + moneyARS(total) + "\n";
+  }
+
 
   const notes = ($("order_notes")?.value || "").trim();
   if (notes) msg += "\nOBSERVACIONES:\n" + notes + "\n";
@@ -1327,10 +1474,45 @@ function initWizard(){
 // INIT
 // =====================================================
 
+
+async function loadRemotePromos(){
+  const promos = CONFIG?.promos;
+  if (!promos) return null;
+
+  const src = promos.source || "local";
+  const url = (promos.remote_url || "").trim();
+
+  if ((src === "remote" || src === "remote_then_local") && url){
+    try{
+      const u = promos.cache_bust ? (url + (url.includes("?") ? "&" : "?") + "v=" + Date.now()) : url;
+      const res = await fetch(u, { cache: "no-store" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      if (!data || typeof data !== "object") throw new Error("JSON inválido");
+
+      const merged = { ...promos, ...data };
+      merged.codes = Array.isArray(merged.codes) ? merged.codes : [];
+      return merged;
+    } catch(e){
+      console.warn("Promos remotas: no se pudo cargar (" + (e.message||e) + ").");
+      if (src === "remote") return { ...promos, enabled:false, codes:[] };
+      return null;
+    }
+  }
+  return null;
+}
+
 async function loadConfig(){
   const res = await fetch("./config.json", { cache: "no-store" });
   if (!res.ok) throw new Error("No se pudo cargar config.json");
   CONFIG = await res.json();
+
+  // Promos remotas (opcional)
+  const remotePromos = await loadRemotePromos();
+  if (remotePromos){
+    CONFIG.promos = remotePromos;
+  }
+
 
   $("biz_name").innerText = CONFIG.business.name;
   $("pay_alias").innerText = CONFIG.business.payment.alias;
@@ -1422,7 +1604,8 @@ function initEvents(){
     const err = $("foto_err"); clearError(err);
     const r = calcFotos();
     if (!r.ok) return showError(err, r.error);
-    addToCart(r, { kind:"fotos", raw:null });
+    const inp = getFotosInputs();
+    addToCart(r, { kind:"fotos", raw:{ line: inp.line, size: inp.size, qty: inp.qty } });
     renderCart();
   });
 
@@ -1431,12 +1614,44 @@ function initEvents(){
     const err = $("adh_err"); clearError(err);
     const r = calcAdhesivo();
     if (!r.ok) return showError(err, r.error);
-    addToCart(r, { kind:"adhesivo", raw:null });
+    const inp = getAdhInputs();
+    addToCart(r, { kind:"adhesivo", raw:{ type: inp.type } });
     renderCart();
   });
 
   // WhatsApp
   $("btn_whatsapp").addEventListener("click", openWhatsApp);
+
+  // Promos
+  $("promo_apply")?.addEventListener("click", ()=>{
+    const err = $("promo_err"); if (err) clearError(err);
+    const code = ($("promo_code")?.value || "").trim().toUpperCase();
+    if (!code){
+      if (err) return showError(err, "Ingresá un código.");
+      return;
+    }
+    const def = getPromoDef(code);
+    if (!def){
+      if (err) return showError(err, "Código inválido o promoción no vigente.");
+      return;
+    }
+    PROMO_APPLIED = {
+      code: String(def.code||"").trim().toUpperCase(),
+      label: def.label || "",
+      type: def.type || "",
+      percent: def.percent,
+      kinds: def.kinds
+    };
+    if ($("promo_code")) $("promo_code").value = PROMO_APPLIED.code;
+    renderCart();
+  });
+
+  $("promo_code")?.addEventListener("keydown", (e)=>{
+    if (e.key === "Enter"){
+      e.preventDefault();
+      $("promo_apply")?.click();
+    }
+  });
 
   // Carrito (resumen vs detalle)
   $("toggle_detail")?.addEventListener("change", (e) => {
