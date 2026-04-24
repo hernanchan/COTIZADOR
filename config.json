@@ -318,5 +318,34 @@
         "percent": 10
       }
     }
+  },
+  "promos": {
+    "enabled": false,
+    "one_code_at_a_time": true,
+    "codes": [
+      {
+        "code": "SABER10",
+        "label": "10% OFF (todo)",
+        "type": "percent_total",
+        "percent": 10
+      },
+      {
+        "code": "FOTOS10",
+        "label": "10% OFF (fotos)",
+        "type": "percent_kinds",
+        "percent": 10,
+        "kinds": [
+          "fotos"
+        ]
+      },
+      {
+        "code": "ANILLADO0",
+        "label": "Anillado gratis",
+        "type": "free_binding"
+      }
+    ],
+    "source": "local",
+    "remote_url": "",
+    "cache_bust": true
   }
 }
