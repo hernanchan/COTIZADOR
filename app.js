@@ -1078,25 +1078,37 @@ function renderWizard(){
       </div>
     `;
 
-    function applyFotoLine(){
-      const lv = $("wiz_foto_line").value;
-      const line = lines.find(x=>x.value===lv) || lines[0];
-      const desc = line?.desc || "";
-      $("wiz_foto_desc").textContent = desc;
+    
+function applyFotoLine(){
+  const lv = $("wiz_foto_line").value;
+  const line = lines.find(x=>x.value===lv) || lines[0];
 
-      // sizes allowed
-      const allowed = (line?.sizes || []).length ? line.sizes : sizes.map(s=>s.value);
-      const sel = $("wiz_foto_size");
-      sel.innerHTML = "";
-      for (const s of sizes){
-        if (!allowed.includes(s.value)) continue;
-        const opt = document.createElement("option");
-        opt.value = s.value;
-        opt.textContent = s.label;
-        sel.appendChild(opt);
-      }
-    }
-    $("wiz_foto_line").addEventListener("change", applyFotoLine);
+  // descripción breve
+  const desc = line?.description || line?.desc || "";
+  $("wiz_foto_desc").textContent = desc;
+
+  // tamaños: si la línea trae tamaños propios, se usan esos (incluye A3 en Luster)
+  const lineSizes = Array.isArray(line?.sizes) && line.sizes.length ? line.sizes : null;
+
+  const sel = $("wiz_foto_size");
+  sel.innerHTML = "";
+
+  const source = lineSizes ? lineSizes : sizes;
+
+  for (const s of source){
+    // soporta config en formato objeto {value,label,price} o lista de values
+    const v = (typeof s === "string") ? s : s.value;
+    const label = (typeof s === "string")
+      ? (sizes.find(x=>x.value===s)?.label || s)
+      : (s.label || v);
+
+    const opt = document.createElement("option");
+    opt.value = v;
+    opt.textContent = label;
+    sel.appendChild(opt);
+  }
+}
+$("wiz_foto_line").addEventListener("change", applyFotoLine);("change", applyFotoLine);
     applyFotoLine();
 
     wizSetActions(`
