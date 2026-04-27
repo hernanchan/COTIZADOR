@@ -4,7 +4,7 @@
   "codes": [
     {
       "code": "PROMOFINDE",
-      "active": true,
+      "active": false,
       "label": "20% OFF en todo el carrito",
       "type": "percent_total",
       "percent": 20
