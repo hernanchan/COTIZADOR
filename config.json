@@ -115,7 +115,7 @@
         "tiers_by_sheets": [
           {
             "max_sheets": 100,
-            "price": 2000
+            "price": 2035
           },
           {
             "max_sheets": 200,
@@ -123,7 +123,7 @@
           },
           {
             "max_sheets": null,
-            "price": 3000
+            "price": 3500
           }
         ],
         "mode_options": [
