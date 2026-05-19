@@ -11,7 +11,7 @@
     },
     {
       "code": "MARTESDECOPIAS",
-      "active": false,
+      "active": true,
       "label": "10% en impresiones",
       "type": "percent_kinds",
       "percent": 10,
