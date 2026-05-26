@@ -27,7 +27,7 @@
     },
     {
       "code": "ANILLADO0",
-      "active": false,
+      "active": true,
       "label": "Anillado gratis",
       "type": "free_binding"
     },
