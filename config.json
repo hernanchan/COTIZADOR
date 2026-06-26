@@ -317,6 +317,154 @@
         "min_qty": 21,
         "percent": 10
       }
+    },
+    "grafica_comercial": {
+      "label": "Gráfica comercial",
+      "unit": "lote",
+      "description": "Los precios no incluyen diseño. El archivo debe estar listo para imprimir y queda sujeto a revisión técnica.",
+      "cart_note": "Precio no incluye diseño. Archivo sujeto a revisión.",
+      "products": [
+        {
+          "value": "tarjetas_personales_100",
+          "label": "Tarjetas personales x100",
+          "description": "Tarjetas personales 8,5 × 5 cm, impresas en papel ilustración brillante de 300 g. Pack de 100 unidades iguales.",
+          "variants": [
+            {
+              "value": "simple_faz",
+              "label": "Simple faz · full color frente",
+              "pack_qty": 100,
+              "price": 15000
+            },
+            {
+              "value": "doble_faz",
+              "label": "Doble faz · full color ambas caras",
+              "pack_qty": 100,
+              "price": 28000
+            }
+          ]
+        },
+        {
+          "value": "tarjetas_personales_1000",
+          "label": "Tarjetas personales x1000",
+          "description": "Tarjetas personales 85 × 50 mm, impresas en papel ilustración brillante de 300 g. Se imprime en múltiplos de 1000 unidades.",
+          "variants": [
+            {
+              "value": "barniz_uv_frente",
+              "label": "Full color · barniz UV solo frente",
+              "pack_qty": 1000,
+              "price": 41000
+            },
+            {
+              "value": "opp_mate_doble_faz",
+              "label": "Doble faz · OPP mate ambas caras",
+              "pack_qty": 1000,
+              "price": 54000
+            }
+          ]
+        },
+        {
+          "value": "recetarios_15x21_bn",
+          "label": "Recetarios médicos 15×21 B/N emblocados",
+          "description": "Recetarios médicos 15 × 21 cm, impresos en blanco y negro, emblocados.",
+          "variants": [
+            {
+              "value": "x100",
+              "label": "Pack x100",
+              "pack_qty": 100,
+              "price": 5000
+            },
+            {
+              "value": "x400",
+              "label": "Pack x400",
+              "pack_qty": 400,
+              "price": 15000
+            }
+          ]
+        },
+        {
+          "value": "recetarios_10x15_bn",
+          "label": "Recetarios médicos 10×15 B/N emblocados",
+          "description": "Recetarios médicos 10 × 15 cm, impresos en blanco y negro, emblocados.",
+          "variants": [
+            {
+              "value": "x100",
+              "label": "Pack x100",
+              "pack_qty": 100,
+              "price": 3000
+            },
+            {
+              "value": "x400",
+              "label": "Pack x400",
+              "pack_qty": 400,
+              "price": 10000
+            }
+          ]
+        },
+        {
+          "value": "recetarios_10x15_color",
+          "label": "Recetarios médicos 10×15 color inkjet emblocados",
+          "description": "Recetarios médicos 10 × 15 cm, emblocados, con impresión color inkjet.",
+          "variants": [
+            {
+              "value": "x400",
+              "label": "Pack x400",
+              "pack_qty": 400,
+              "price": 18000
+            }
+          ]
+        },
+        {
+          "value": "folletos_10x15_bn",
+          "label": "Folletos B/N 10×15",
+          "description": "Folletos 10 × 15 cm, impresos en láser blanco y negro.",
+          "variants": [
+            {
+              "value": "x100",
+              "label": "Pack x100",
+              "pack_qty": 100,
+              "price": 4800
+            },
+            {
+              "value": "x500",
+              "label": "Pack x500",
+              "pack_qty": 500,
+              "price": 13000
+            }
+          ]
+        },
+        {
+          "value": "folletos_10x15_color_frente",
+          "label": "Folletos full color 10×15 frente",
+          "description": "Folletos 10 × 15 cm, impresos full color solo frente, en papel ilustración de 115 g.",
+          "variants": [
+            {
+              "value": "x1000",
+              "label": "Pack x1000",
+              "pack_qty": 1000,
+              "price": 37000
+            },
+            {
+              "value": "x5000",
+              "label": "Pack x5000",
+              "pack_qty": 5000,
+              "price": 110000
+            }
+          ]
+        },
+        {
+          "value": "folletos_10x15_doble_faz",
+          "label": "Folletos doble faz full color 10×15",
+          "description": "Folletos 10 × 15 cm, impresos full color frente y dorso, en papel ilustración de 170 g. Se imprime en múltiplos de 2000 unidades.",
+          "variants": [
+            {
+              "value": "x2000",
+              "label": "Pack x2000",
+              "pack_qty": 2000,
+              "price": 87000
+            }
+          ]
+        }
+      ]
     }
   },
   "promos": {
