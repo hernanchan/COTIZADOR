@@ -1,5 +1,5 @@
 // Cotizador v1 - Librería Saber (Opción B: por archivo)
-const BUILD_ID = "wiz-promos-active-2026-04-24";
+const BUILD_ID = "wiz-grafica-comercial-2026-06-26";
 console.log("Cotizador BUILD:", BUILD_ID);
 
 let CONFIG = null;
@@ -512,6 +512,89 @@ function calcAdhesivo(){
   return { ok:true, title: cfg.label, subtitle: def.label, total, breakdown };
 }
 
+
+// =====================================================
+// GRAFICA COMERCIAL
+// =====================================================
+function getGCProductDef(value){
+  const cfg = CONFIG.items.grafica_comercial;
+  return (cfg.products || []).find(p => p.value === value) || (cfg.products || [])[0] || null;
+}
+function getGCVariantDef(product, value){
+  return (product?.variants || []).find(v => v.value === value) || (product?.variants || [])[0] || null;
+}
+function populateGraficaComercialUI(){
+  const cfg = CONFIG.items.grafica_comercial;
+  const prodSel = $("gc_product");
+  const varSel = $("gc_variant");
+  const desc = $("gc_product_desc");
+  if (!cfg || !prodSel || !varSel) return;
+
+  prodSel.innerHTML = "";
+  for (const p of (cfg.products || [])){
+    const opt = document.createElement("option");
+    opt.value = p.value;
+    opt.textContent = p.label;
+    prodSel.appendChild(opt);
+  }
+
+  function fillVariants(){
+    const p = getGCProductDef(prodSel.value);
+    varSel.innerHTML = "";
+    for (const v of (p?.variants || [])){
+      const opt = document.createElement("option");
+      opt.value = v.value;
+      opt.textContent = `${v.label} — ${moneyARS(v.price)}`;
+      varSel.appendChild(opt);
+    }
+    if (desc){
+      desc.innerText = p?.description || "";
+      desc.style.display = p?.description ? "block" : "none";
+    }
+  }
+
+  prodSel.addEventListener("change", fillVariants);
+  fillVariants();
+}
+function getGraficaComercialInputs(){
+  const product = $("gc_product").value;
+  const variant = $("gc_variant").value;
+  const lots = clampInt($("gc_lots").value, 1);
+  return { product, variant, lots };
+}
+function calcGraficaComercial(){
+  const cfg = CONFIG.items.grafica_comercial;
+  const inp = getGraficaComercialInputs();
+  const p = getGCProductDef(inp.product);
+  if (!p) return { ok:false, error:"Producto inválido." };
+  const v = getGCVariantDef(p, inp.variant);
+  if (!v) return { ok:false, error:"Variante inválida." };
+
+  const lots = Math.max(1, inp.lots || 1);
+  const units = (Number(v.pack_qty) || 0) * lots;
+  const total = (Number(v.price) || 0) * lots;
+  const note = cfg.cart_note || "Precio no incluye diseño. Archivo sujeto a revisión.";
+
+  const breakdown = [
+    ["Producto", p.label],
+    ["Variante", v.label],
+    ["Cantidad", `${lots} lote(s) — ${units} unidad(es)`],
+    ["Precio por lote", moneyARS(v.price)],
+    ["Descripción", p.description || ""],
+    ["Aclaración", note],
+    ["Total", moneyARS(total)]
+  ];
+
+  return {
+    ok:true,
+    title: cfg.label,
+    subtitle: `${p.label} — ${v.label}`,
+    total,
+    breakdown,
+    raw:{ product: inp.product, variant: inp.variant, lots, product_label:p.label, variant_label:v.label, units, note }
+  };
+}
+
 // =====================================================
 // CARRITO
 // =====================================================
@@ -593,6 +676,15 @@ function resumenClienteCartItem(it){
       ["Archivos", String(s.filesCount)],
       ["Páginas", pagesTxt],
       ["Anillado", an],
+    ];
+  }
+
+  if (it.kind === "grafica_comercial" && it.raw){
+    return [
+      ["Producto", it.raw.product_label || it.subtitle || ""],
+      ["Variante", it.raw.variant_label || ""],
+      ["Cantidad", `${it.raw.lots || 1} lote(s) — ${it.raw.units || ""} unidad(es)`],
+      ["Aclaración", it.raw.note || "Precio no incluye diseño. Archivo sujeto a revisión."]
     ];
   }
 
@@ -811,6 +903,10 @@ function buildWhatsAppMessage(){
       msg += "   - " + an + "\n";
       msg += "   - Archivos: " + files + "\n";
     }
+    if (it.kind === "grafica_comercial" && it.raw){
+      msg += "   - Cantidad: " + (it.raw.lots || 1) + " lote(s) — " + (it.raw.units || "") + " unidad(es)\n";
+      msg += "   - " + (it.raw.note || "Precio no incluye diseño. Archivo sujeto a revisión.") + "\n";
+    }
   });
 
   const discount = calcPromoDiscount();
@@ -971,7 +1067,7 @@ function showWizard(active){
   if (wiz) wiz.style.display = WIZARD_ACTIVE ? "block" : "none";
 
   // secciones avanzadas
-  const sections = ["sec_imp","sec_plo","sec_foto","sec_adh"];
+  const sections = ["sec_imp","sec_plo","sec_foto","sec_adh","sec_gc"];
   sections.forEach(id => {
     const el = $(id);
     if (!el) return;
@@ -1032,6 +1128,7 @@ function renderWizard(){
         <button type="button" class="btn btn-primary" id="wiz_go_foto">Fotos</button>
         <button type="button" class="btn btn-primary" id="wiz_go_adh">Adhesivo / Stickers</button>
         <button type="button" class="btn btn-primary" id="wiz_go_plo">Ploteos</button>
+        <button type="button" class="btn btn-primary" id="wiz_go_gc">Gráfica comercial</button>
       </div>
     `;
     wizSetActions(`<button type="button" class="btn btn-ghost" id="wiz_to_adv">Ir al modo avanzado</button>`);
@@ -1039,6 +1136,7 @@ function renderWizard(){
     $("wiz_go_foto").onclick = ()=>{ WIZ.flow="foto"; WIZ.step=20; renderWizard(); };
     $("wiz_go_adh").onclick = ()=>{ WIZ.flow="adh"; WIZ.step=30; renderWizard(); };
     $("wiz_go_plo").onclick = ()=>{ WIZ.flow="plo"; WIZ.step=40; renderWizard(); };
+    $("wiz_go_gc").onclick = ()=>{ WIZ.flow="gc"; WIZ.step=50; renderWizard(); };
     $("wiz_to_adv").onclick = ()=> showWizard(false);
     return;
   }
@@ -1445,6 +1543,75 @@ $("wiz_foto_line").addEventListener("change", applyFotoLine);("change", applyFot
     };
     return;
   }
+
+
+  // GRAFICA COMERCIAL
+  if (WIZ.flow === "gc"){
+    wizSetSteps("Gráfica comercial — Elegí producto, variante y lotes");
+    const cfg = CONFIG?.items?.grafica_comercial;
+    const products = cfg?.products || [];
+    const options = products.map(p => `<option value="${escapeHtml(p.value)}">${escapeHtml(p.label)}</option>`).join("");
+    host.innerHTML = `
+      <div class="muted">${escapeHtml(cfg?.description || "Los precios no incluyen diseño. El archivo debe estar listo para imprimir y queda sujeto a revisión técnica.")}</div>
+      <div class="wiz-grid2" style="margin-top:10px;">
+        <div>
+          <label>Producto</label>
+          <select id="wiz_gc_product">${options}</select>
+        </div>
+        <div>
+          <label>Variante / lote</label>
+          <select id="wiz_gc_variant"></select>
+        </div>
+      </div>
+      <div class="muted" id="wiz_gc_desc" style="margin-top:10px;"></div>
+      <div class="wiz-grid2" style="margin-top:10px;">
+        <div>
+          <label>Cantidad de lotes</label>
+          <input id="wiz_gc_lots" type="number" min="1" step="1" value="1" />
+        </div>
+        <div></div>
+      </div>
+    `;
+
+    function applyGC(){
+      const p = (products || []).find(x=>x.value === $("wiz_gc_product").value) || products[0];
+      const sel = $("wiz_gc_variant");
+      sel.innerHTML = "";
+      for (const v of (p?.variants || [])){
+        const opt = document.createElement("option");
+        opt.value = v.value;
+        opt.textContent = `${v.label} — ${moneyARS(v.price)}`;
+        sel.appendChild(opt);
+      }
+      const d = $("wiz_gc_desc");
+      if (d) d.textContent = p?.description || "";
+    }
+
+    $("wiz_gc_product").addEventListener("change", applyGC);
+    applyGC();
+
+    wizSetActions(`
+      <button type="button" class="btn btn-ghost" id="wiz_back0e">Volver</button>
+      <button type="button" class="btn btn-secondary" id="wiz_add_gc">Agregar al carrito</button>
+    `);
+
+    $("wiz_back0e").onclick = ()=>{ WIZ.step=0; WIZ.flow=null; renderWizard(); };
+    $("wiz_add_gc").onclick = ()=>{
+      $("gc_product").value = $("wiz_gc_product").value;
+      populateGraficaComercialUI();
+      $("gc_variant").value = $("wiz_gc_variant").value;
+      $("gc_lots").value = clampInt($("wiz_gc_lots").value, 1);
+      $("gc_btn_add").click();
+
+      const err = $("gc_err");
+      const hadErr = err && err.style.display !== "none" && (err.innerText||"").trim();
+      if (hadErr){ wizSetError("Revisá: " + hadErr); return; }
+
+      WIZ.step=0; WIZ.flow=null; renderWizard();
+    };
+    return;
+  }
+
 }
 
 function wizSaveImpFile(){
@@ -1528,6 +1695,9 @@ async function loadConfig(){
 
   // fotos
   populateFotosUI();
+
+  // gráfica comercial
+  populateGraficaComercialUI();
 
   // carrito
   recalcImpresionesGlobal();
@@ -1619,6 +1789,15 @@ function initEvents(){
     renderCart();
   });
 
+  // Gráfica comercial
+  $("gc_btn_add")?.addEventListener("click", () => {
+    const err = $("gc_err"); clearError(err);
+    const r = calcGraficaComercial();
+    if (!r.ok) return showError(err, r.error);
+    addToCart(r, { kind:"grafica_comercial", raw:r.raw });
+    renderCart();
+  });
+
   // WhatsApp
   $("btn_whatsapp").addEventListener("click", openWhatsApp);
 
@@ -1640,7 +1819,8 @@ function initEvents(){
       label: def.label || "",
       type: def.type || "",
       percent: def.percent,
-      kinds: def.kinds
+      kinds: def.kinds,
+      types: def.types
     };
     if ($("promo_code")) $("promo_code").value = PROMO_APPLIED.code;
     renderCart();
