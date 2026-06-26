@@ -99,6 +99,7 @@
           <button class="tab" data-tab="plo">Ploteos</button>
           <button class="tab" data-tab="foto">Fotos</button>
           <button class="tab" data-tab="adh">Adhesivo A4</button>
+          <button class="tab" data-tab="gc">Gráfica comercial</button>
         </div>
 
 
@@ -255,6 +256,35 @@
           <button type="button" class="btn btn-primary" id="adh_btn_add">Agregar al carrito</button>
         </div>
 
+        <!-- GRAFICA COMERCIAL -->
+        <div class="section" id="sec_gc">
+          <div class="muted" id="gc_desc">Los precios no incluyen diseño. El archivo debe estar listo para imprimir y queda sujeto a revisión técnica.</div>
+
+          <div class="row2">
+            <div>
+              <label>Producto</label>
+              <select id="gc_product"></select>
+            </div>
+            <div>
+              <label>Variante / lote</label>
+              <select id="gc_variant"></select>
+            </div>
+          </div>
+
+          <div class="muted" id="gc_product_desc" style="margin-top:10px;"></div>
+
+          <div class="row2" style="margin-top:10px;">
+            <div>
+              <label>Cantidad de lotes</label>
+              <input id="gc_lots" type="number" min="1" step="1" value="1" />
+            </div>
+            <div></div>
+          </div>
+
+          <div class="err" id="gc_err"></div>
+          <button type="button" class="btn btn-primary" id="gc_btn_add">Agregar al carrito</button>
+        </div>
+
       </div>
 
       <!-- CARRITO -->
@@ -308,7 +338,7 @@
   <script>
     (function(){
       const tabs = document.querySelectorAll(".tab");
-      const map = { imp:"sec_imp", plo:"sec_plo", foto:"sec_foto", adh:"sec_adh" };
+      const map = { imp:"sec_imp", plo:"sec_plo", foto:"sec_foto", adh:"sec_adh", gc:"sec_gc" };
       tabs.forEach(t => t.addEventListener("click", () => {
         tabs.forEach(x => x.classList.remove("active"));
         t.classList.add("active");
