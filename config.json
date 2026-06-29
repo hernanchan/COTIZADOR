@@ -54,27 +54,27 @@
           {
             "min": 11,
             "max": 30,
-            "price": 80
+            "price": 84
           },
           {
             "min": 31,
             "max": 100,
-            "price": 72
+            "price": 76
           },
           {
             "min": 101,
             "max": 200,
-            "price": 63
+            "price": 66
           },
           {
             "min": 201,
             "max": 300,
-            "price": 60
+            "price": 63
           },
           {
             "min": 301,
             "max": null,
-            "price": 47
+            "price": 49
           }
         ],
         "df": [
@@ -86,27 +86,27 @@
           {
             "min": 11,
             "max": 30,
-            "price": 75
+            "price": 80
           },
           {
             "min": 31,
             "max": 100,
-            "price": 60
+            "price": 64
           },
           {
             "min": 101,
             "max": 200,
-            "price": 52
+            "price": 56
           },
           {
             "min": 201,
             "max": 300,
-            "price": 47
+            "price": 50
           },
           {
             "min": 301,
             "max": null,
-            "price": 39
+            "price": 42
           }
         ]
       },
@@ -115,11 +115,11 @@
         "tiers_by_sheets": [
           {
             "max_sheets": 100,
-            "price": 2035
+            "price": 2330
           },
           {
             "max_sheets": 200,
-            "price": 2500
+            "price": 2580
           },
           {
             "max_sheets": null,
