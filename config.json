@@ -285,7 +285,7 @@
         {
           "value": "foto",
           "label": "Adhesivo fotográfico A4",
-          "price": 1500
+          "price": 1900
         },
         {
           "value": "obra",
@@ -295,7 +295,7 @@
         {
           "value": "foto_a3",
           "label": "Adhesivo fotográfico A3",
-          "price": 2800
+          "price": 3300
         },
         {
           "value": "obra_a3",
