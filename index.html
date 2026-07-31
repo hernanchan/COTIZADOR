@@ -216,6 +216,17 @@
             <div class="text-small text-muted" id="proto-code-status">Se validará contra las promociones vigentes.</div>
           </details>
           <div class="card" id="proto-auto-promo" style="display:none;margin-top:10px"></div>
+          <div class="muted-box" style="margin-top:14px;font-size:12px;line-height:1.5">
+            <strong>Importante:</strong> presupuesto sujeto a revisión de archivos, cantidades y características. Si existen diferencias, te informaremos antes de producir para solicitar el saldo, reintegrar el excedente o cancelar el pedido.
+          </div>
+          <details style="margin-top:12px">
+            <summary>Revisión del presupuesto y condiciones del pedido</summary>
+            <div class="text-small text-muted" style="margin-top:9px;line-height:1.55">
+              <p>El importe informado es estimativo y se calcula según los datos ingresados por el cliente. Antes de iniciar la producción, Librería Saber verificará los archivos, cantidades, páginas, medidas, materiales, tipo de impresión y terminaciones solicitadas.</p>
+              <p>Si se detectan diferencias, nos comunicaremos por WhatsApp para informar el importe corregido. Si el monto abonado fuera menor, se solicitará la diferencia; si fuera mayor, se reintegrará el excedente. Si el cliente no acepta la corrección, podrá cancelar el pedido y se reintegrará lo abonado, siempre que la producción todavía no haya comenzado.</p>
+              <p><strong>La orden entra en producción únicamente después de la revisión técnica y la confirmación del pago correspondiente.</strong></p>
+            </div>
+          </details>
           <div class="proto-actions" style="margin-top:14px">
             <a class="btn btn-primary" id="proto-whatsapp" href="https://wa.me/5493513110130" target="_blank" rel="noopener"><svg aria-hidden="true" style="width:18px;height:18px;vertical-align:-4px;margin-right:5px"><use href="#i-whatsapp"/></svg>Confirmar pedido por WhatsApp</a>
             <button class="btn" type="button" id="proto-add">Agregar otro trabajo</button>
@@ -446,7 +457,7 @@
           return (index+1)+". "+item.work+": "+item.qty+", "+item.mode+(item.binding?", con anillado":"")+" — "+money(item.total);
         });
         var discountLine=returnCoupon&&couponDiscount>0?"\nCupón "+returnCoupon.reference+": -"+money(couponDiscount)+".":"";
-        var message="Hola, quiero confirmar este pedido:\n\n"+lines.join("\n")+discountLine+"\n\nTOTAL ESTIMADO: "+money(grandTotal)+".\nSEÑA DEL 50% PARA CONFIRMAR: "+money(deposit)+".\n\nPara que la orden entre en producción, adjunto el comprobante de la seña.\nAlias: libreriasaber.mp";
+        var message="Hola, quiero confirmar este pedido:\n\n"+lines.join("\n")+discountLine+"\n\nTOTAL ESTIMADO: "+money(grandTotal)+".\nSEÑA DEL 50% PARA CONFIRMAR: "+money(deposit)+".\n\nPara que la orden entre en producción, adjunto el comprobante de la seña.\nAlias: libreriasaber.mp\n\nPresupuesto sujeto a revisión de archivos, cantidades y características. Si existen diferencias, me informarán antes de producir para solicitar el saldo, reintegrar el excedente o cancelar el pedido.";
         root.querySelector("#proto-whatsapp").href="https://wa.me/5493513110130?text="+encodeURIComponent(message);
         var status=root.querySelector("#proto-code-status");
         if(returnCoupon){status.textContent=returnCoupon.reference+" aplicado · 10% · vence "+new Date(returnCoupon.expiresAt*1000).toLocaleDateString("es-AR")+(couponDiscount<couponCandidate?" · descuento limitado por el máximo acumulable":"")+".";}
