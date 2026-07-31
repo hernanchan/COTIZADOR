@@ -202,8 +202,9 @@
           <div class="price-block">
             <div class="text-muted">Precio estimado</div>
             <div class="viz-stat-value" id="proto-total">$0</div>
+            <div><strong>Seña para confirmar (50%): <span id="proto-deposit">$0</span></strong></div>
           </div>
-          <div class="muted-box" id="proto-note">Precio estimado sujeto a revisión técnica.</div>
+          <div class="muted-box" id="proto-note"><strong>¿Cómo confirmo?</strong><br>Enviá el pedido por WhatsApp junto con el comprobante de la seña. La orden entra en producción cuando recibimos el comprobante.</div>
           <details style="margin-top:14px">
             <summary>¿Tenés un código de descuento?</summary>
             <div class="viz-controls" style="margin-top:10px">
@@ -216,11 +217,11 @@
           </details>
           <div class="card" id="proto-auto-promo" style="display:none;margin-top:10px"></div>
           <div class="proto-actions" style="margin-top:14px">
-            <a class="btn btn-primary" id="proto-whatsapp" href="https://wa.me/5493513110130" target="_blank" rel="noopener"><svg aria-hidden="true" style="width:18px;height:18px;vertical-align:-4px;margin-right:5px"><use href="#i-whatsapp"/></svg>Consultar y encargar por WhatsApp</a>
+            <a class="btn btn-primary" id="proto-whatsapp" href="https://wa.me/5493513110130" target="_blank" rel="noopener"><svg aria-hidden="true" style="width:18px;height:18px;vertical-align:-4px;margin-right:5px"><use href="#i-whatsapp"/></svg>Confirmar pedido por WhatsApp</a>
             <button class="btn" type="button" id="proto-add">Agregar otro trabajo</button>
           </div>
           <div class="text-small text-muted" style="margin-top:14px">
-            Precio estimado sujeto a revisión del archivo y de las características del trabajo. Los trabajos se encargan con una seña del 50%. La producción comienza una vez confirmada la seña. En gráfica comercial, el precio no incluye diseño.
+            Precio estimado sujeto a revisión del archivo y de las características del trabajo. La orden entra en producción al recibir el comprobante de la seña del 50%. En gráfica comercial, el precio no incluye diseño.
           </div>
         </div>
         <div class="card">
@@ -439,11 +440,13 @@
         var couponDiscount=Math.max(0,Math.min(couponCandidate,allowedTotalDiscount-dailyDiscount));
         var grandTotal=Math.max(0,afterDaily-couponDiscount);
         root.querySelector("#proto-total").textContent=money(grandTotal);
+        var deposit=Math.round(grandTotal*.5);
+        root.querySelector("#proto-deposit").textContent=money(deposit);
         var lines=items.map(function(item,index){
           return (index+1)+". "+item.work+": "+item.qty+", "+item.mode+(item.binding?", con anillado":"")+" — "+money(item.total);
         });
         var discountLine=returnCoupon&&couponDiscount>0?"\nCupón "+returnCoupon.reference+": -"+money(couponDiscount)+".":"";
-        var message="Hola, quisiera consultar por este presupuesto:\n"+lines.join("\n")+discountLine+"\nTotal estimado: "+money(grandTotal)+".\nLos trabajos se encargan con una seña del 50%.";
+        var message="Hola, quiero confirmar este pedido:\n\n"+lines.join("\n")+discountLine+"\n\nTOTAL ESTIMADO: "+money(grandTotal)+".\nSEÑA DEL 50% PARA CONFIRMAR: "+money(deposit)+".\n\nPara que la orden entre en producción, adjunto el comprobante de la seña.\nAlias: libreriasaber.mp";
         root.querySelector("#proto-whatsapp").href="https://wa.me/5493513110130?text="+encodeURIComponent(message);
         var status=root.querySelector("#proto-code-status");
         if(returnCoupon){status.textContent=returnCoupon.reference+" aplicado · 10% · vence "+new Date(returnCoupon.expiresAt*1000).toLocaleDateString("es-AR")+(couponDiscount<couponCandidate?" · descuento limitado por el máximo acumulable":"")+".";}
