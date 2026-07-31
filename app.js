@@ -1,5 +1,5 @@
 // Cotizador v1 - Librería Saber (Opción B: por archivo)
-const BUILD_ID = "wiz-grafica-comercial-2026-06-26";
+const BUILD_ID = "escalas-mostrador-2026-07-30";
 console.log("Cotizador BUILD:", BUILD_ID);
 
 let CONFIG = null;
@@ -49,6 +49,15 @@ function tierPrice(tiers, qty){
     if (qty >= min && qty <= max) return t.price;
   }
   return null;
+}
+
+function tierDiscount(tiers, qty){
+  for (const t of (tiers || [])){
+    const min = (t.min ?? 0);
+    const max = (t.max === null || t.max === undefined) ? Infinity : t.max;
+    if (qty >= min && qty <= max) return Number(t.percent) || 0;
+  }
+  return 0;
 }
 function bindingPrice(bindingTiers, sheets){
   for (const t of bindingTiers){
@@ -467,14 +476,17 @@ function calcFotos(){
 
   if (!def) return { ok:false, error:"Tamaño inválido." };
 
-  const subtotal = inp.qty * def.price;
+  const discountPercent = tierDiscount(cfg.discount_tiers, inp.qty);
+  const unitPrice = Math.round(def.price * (1 - discountPercent / 100));
+  const subtotal = inp.qty * unitPrice;
 
   const shortLine = lineDef.short || lineDef.label || inp.line;
   const breakdown = [
     ["Línea", shortLine],
     ["Tamaño", def.label],
     ["Cantidad", String(inp.qty)],
-    ["Precio unitario", moneyARS(def.price)],
+    ["Precio unitario", moneyARS(unitPrice)],
+    ["Escala aplicada", discountPercent > 0 ? `${discountPercent}% de descuento` : "Precio base"],
     ["Subtotal", moneyARS(subtotal)]
   ];
 
@@ -498,15 +510,18 @@ function calcAdhesivo(){
   const inp = getAdhInputs();
   const def = cfg.types.find(t => t.value === inp.type);
   if (!def) return { ok:false, error:"Tipo inválido." };
-  const subtotal = inp.qty * def.price;
-  const disc = (inp.qty >= cfg.discount.min_qty) ? (subtotal * (cfg.discount.percent/100)) : 0;
-  const total = subtotal - disc;
+  const discountPercent = tierDiscount(def.discount_tiers || cfg.discount_tiers, inp.qty);
+  const unitPrice = discountPercent > 0
+    ? Math.round((def.price * (1 - discountPercent / 100)) / 100) * 100
+    : def.price;
+  const subtotal = inp.qty * unitPrice;
+  const total = subtotal;
   const breakdown = [
     ["Tipo", def.label],
     ["Cantidad", String(inp.qty)],
-    ["Precio unitario", moneyARS(def.price)],
+    ["Precio unitario", moneyARS(unitPrice)],
     ["Subtotal", moneyARS(subtotal)],
-    ["Descuento", disc>0 ? (cfg.discount.percent + "% (" + moneyARS(disc) + ")") : "No aplica"],
+    ["Escala aplicada", discountPercent > 0 ? `${discountPercent}% de descuento` : "Precio base"],
     ["Total", moneyARS(total)]
   ];
   return { ok:true, title: cfg.label, subtitle: def.label, total, breakdown };
