@@ -123,7 +123,7 @@
           },
           {
             "max_sheets": null,
-            "price": 3500
+            "price": 3800
           }
         ],
         "mode_options": [
@@ -207,6 +207,28 @@
     "fotos": {
       "label": "Impresión de fotografías (200 g)",
       "unit": "unidad",
+      "discount_tiers": [
+        {
+          "min": 1,
+          "max": 19,
+          "percent": 0
+        },
+        {
+          "min": 20,
+          "max": 49,
+          "percent": 5
+        },
+        {
+          "min": 50,
+          "max": 99,
+          "percent": 10
+        },
+        {
+          "min": 100,
+          "max": null,
+          "percent": 13
+        }
+      ],
       "sizes": [
         {
           "value": "10x15",
@@ -281,6 +303,33 @@
     "adhesivo_a4": {
       "label": "Adhesivo (A4/A3) y Stickers con precorte",
       "unit": "unidad",
+      "discount_tiers": [
+        {
+          "min": 1,
+          "max": 10,
+          "percent": 0
+        },
+        {
+          "min": 11,
+          "max": 20,
+          "percent": 5
+        },
+        {
+          "min": 21,
+          "max": 50,
+          "percent": 10
+        },
+        {
+          "min": 51,
+          "max": 100,
+          "percent": 12
+        },
+        {
+          "min": 101,
+          "max": null,
+          "percent": 15
+        }
+      ],
       "types": [
         {
           "value": "foto",
@@ -305,12 +354,36 @@
         {
           "value": "stickers_a4",
           "label": "Stickers con precorte A4 (adhesivo fotográfico)",
-          "price": 3000
+          "price": 3000,
+          "discount_tiers": [
+            {
+              "min": 1,
+              "max": 20,
+              "percent": 0
+            },
+            {
+              "min": 21,
+              "max": null,
+              "percent": 10
+            }
+          ]
         },
         {
           "value": "stickers_a3",
           "label": "Stickers con precorte A3 (adhesivo fotográfico)",
-          "price": 5000
+          "price": 5000,
+          "discount_tiers": [
+            {
+              "min": 1,
+              "max": 20,
+              "percent": 0
+            },
+            {
+              "min": 21,
+              "max": null,
+              "percent": 10
+            }
+          ]
         }
       ],
       "discount": {
