@@ -256,23 +256,63 @@
       var graphicCategory="tarjetas";
       var cart=[];
       var currentItem=null;
-      var returnCoupon=null;
-      var returnCouponPublicKey={"key_ops":["verify"],"ext":true,"kty":"EC","x":"hR4XGw1P9ynQetW55ryE4CTgTNFefEB-dJqdQc-V3Yk","y":"9l79C0sbiSAj7Sx20QZnOYQIjd5tzj5GceftdUfun1M","crv":"P-256"};
-      function base64UrlBytes(value){
-        var raw=String(value||"");var base64=raw.replace(/-/g,"+").replace(/_/g,"/")+"=".repeat((4-raw.length%4)%4);var binary=atob(base64);return Uint8Array.from(binary,function(c){return c.charCodeAt(0);});
+      var manualCoupon=null;
+      var extraPromos=[];
+      var promosCsvUrl="https://docs.google.com/spreadsheets/d/e/2PACX-1vSVe0GKHSmYbfjpIkrvgA1lDqxz57j-VEDkY5BqYtVzKj_5ePB9NoyRhkTvf0S5dN-Ur6wrQANcg3WT/pub?gid=495325142&single=true&output=csv";
+      function parseCsv(text){
+        var rows=[],row=[],field="",quoted=false;
+        for(var i=0;i<text.length;i++){
+          var c=text[i],next=text[i+1];
+          if(c==='"'&&quoted&&next==='"'){field+='"';i++;}
+          else if(c==='"'){quoted=!quoted;}
+          else if(c===","&&!quoted){row.push(field);field="";}
+          else if((c==="\n"||c==="\r")&&!quoted){if(c==="\r"&&next==="\n")i++;row.push(field);if(row.some(function(v){return v!=="";}))rows.push(row);row=[];field="";}
+          else field+=c;
+        }
+        row.push(field);if(row.some(function(v){return v!=="";}))rows.push(row);return rows;
       }
-      async function verifyReturnCoupon(code){
+      function normalizeText(value){return String(value||"").trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");}
+      function parsePromoDate(value,endOfDay){
+        var text=String(value||"").trim(),parts;
+        if(/^\d{4}-\d{2}-\d{2}$/.test(text)){parts=text.split("-");return new Date(Number(parts[0]),Number(parts[1])-1,Number(parts[2]),endOfDay?23:0,endOfDay?59:0,endOfDay?59:0);}
+        if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(text)){parts=text.split("/");return new Date(Number(parts[2]),Number(parts[1])-1,Number(parts[0]),endOfDay?23:0,endOfDay?59:0,endOfDay?59:0);}
+        return null;
+      }
+      function numericValue(value){
+        var text=String(value||"").replace(/[^0-9,.-]/g,"");
+        var comma=text.lastIndexOf(","),dot=text.lastIndexOf(".");
+        if(comma>=0&&dot>=0)text=comma>dot?text.replace(/\./g,"").replace(",","."):text.replace(/,/g,"");
+        else if(comma>=0)text=/,\d{3}$/.test(text)?text.replace(/,/g,""):text.replace(",",".");
+        else if(dot>=0&&/\.\d{3}$/.test(text))text=text.replace(/\./g,"");
+        return Number(text)||0;
+      }
+      async function loadExtraPromos(){
         try{
-          var parts=String(code||"").trim().split(".");
-          if(parts.length!==3||parts[0]!=="SBR1")return null;
-          var payloadBytes=base64UrlBytes(parts[1]),signature=base64UrlBytes(parts[2]);
-          var key=await crypto.subtle.importKey("jwk",returnCouponPublicKey,{name:"ECDSA",namedCurve:"P-256"},false,["verify"]);
-          var valid=await crypto.subtle.verify({name:"ECDSA",hash:"SHA-256"},key,signature,payloadBytes);
-          if(!valid)return null;
-          var payload=JSON.parse(new TextDecoder().decode(payloadBytes)),now=Math.floor(Date.now()/1000);
-          if(Number(payload.e)<now||Number(payload.p)!==10||Number(payload.m)!==5000)return null;
-          return {token:String(code).trim(),reference:payload.r?"VOLVE10-"+String(payload.r).toUpperCase():"VOLVE10",percent:10,maxDiscount:5000,expiresAt:Number(payload.e)};
-        }catch(e){return null;}
+          var separator=promosCsvUrl.indexOf("?")>=0?"&":"?";
+          var response=await fetch(promosCsvUrl+separator+"actualizacion="+Date.now(),{cache:"no-store"});
+          if(!response.ok)throw new Error("No se pudo leer la planilla");
+          var rows=parseCsv(await response.text());
+          var headerIndex=rows.findIndex(function(r){return normalizeText(r[0])==="ACTIVA"&&normalizeText(r[1])==="CODIGO";});
+          if(headerIndex<0)throw new Error("Encabezados no encontrados");
+          extraPromos=rows.slice(headerIndex+1).map(function(r){return {
+            active:normalizeText(r[0])==="SI",code:normalizeText(r[1]),label:String(r[2]||"").trim(),type:normalizeText(r[3]),value:numericValue(r[4]),product:normalizeText(r[5]),from:parsePromoDate(r[6],false),to:parsePromoDate(r[7],true),maxDiscount:numericValue(r[8])
+          };}).filter(function(p){return p.active&&p.code;});
+          return true;
+        }catch(e){extraPromos=[];return false;}
+      }
+      function findManualCoupon(code){
+        var normalized=normalizeText(code),now=new Date();
+        return extraPromos.find(function(p){return p.code===normalized&&p.from&&p.to&&now>=p.from&&now<=p.to&&(p.type==="PORCENTAJE"||p.type==="MONTO")&&p.value>0;})||null;
+      }
+      function couponBaseForItem(item,product){
+        if(product==="TODO")return item.originalTotal||item.total;
+        if(product==="IMPRESIONES"&&item.service==="impresiones")return item.originalTotal||item.total;
+        if(product==="FOTOS"&&item.service==="fotos")return item.originalTotal||item.total;
+        if(product==="STICKERS"&&item.service==="stickers")return item.originalTotal||item.total;
+        if(product==="PLOTEOS"&&item.service==="ploteos")return item.originalTotal||item.total;
+        if(product==="GRAFICA COMERCIAL"&&item.service==="grafica")return item.originalTotal||item.total;
+        if(product==="ANILLADOS"&&item.binding)return item.bindingCharge||0;
+        return 0;
       }
       function showStep(n){
         current=n;
@@ -445,8 +485,13 @@
         var originalTotal=items.reduce(function(sum,item){return sum+(item.originalTotal||item.total);},0);
         var dailyDiscount=items.reduce(function(sum,item){return sum+(item.promoSaving||0);},0);
         var afterDaily=items.reduce(function(sum,item){return sum+item.total;},0);
-        var eligibleCouponBase=returnCoupon?items.filter(function(item){return item.service!=="grafica";}).reduce(function(sum,item){return sum+(item.originalTotal||item.total);},0):0;
-        var couponCandidate=returnCoupon?Math.min(returnCoupon.maxDiscount,Math.round(eligibleCouponBase*returnCoupon.percent/100)):0;
+        var eligibleCouponBase=manualCoupon?items.reduce(function(sum,item){return sum+couponBaseForItem(item,manualCoupon.product);},0):0;
+        var couponCandidate=0;
+        if(manualCoupon){
+          couponCandidate=manualCoupon.type==="PORCENTAJE"?Math.round(eligibleCouponBase*manualCoupon.value/100):manualCoupon.value;
+          couponCandidate=Math.min(eligibleCouponBase,couponCandidate);
+          if(manualCoupon.maxDiscount>0)couponCandidate=Math.min(couponCandidate,manualCoupon.maxDiscount);
+        }
         var allowedTotalDiscount=Math.round(originalTotal*.25);
         var couponDiscount=Math.max(0,Math.min(couponCandidate,allowedTotalDiscount-dailyDiscount));
         var grandTotal=Math.max(0,afterDaily-couponDiscount);
@@ -456,11 +501,14 @@
         var lines=items.map(function(item){
           return "• "+item.work+"\n  "+item.qty+" · "+item.mode+(item.binding?" · Con anillado":"")+"\n  "+money(item.total);
         });
-        var discountLine=returnCoupon&&couponDiscount>0?"\n• Cupón "+returnCoupon.reference+": -"+money(couponDiscount):"";
+        var discountLine=manualCoupon&&couponDiscount>0?"\n• Cupón "+manualCoupon.code+": -"+money(couponDiscount):"";
         var message="Hola, quiero confirmar este pedido.\n\n*PEDIDO*\n"+lines.join("\n\n")+discountLine+"\n\n*TOTAL: "+money(grandTotal)+"*\n*SEÑA 50%: "+money(deposit)+"*\n\n*PARA CONFIRMAR, ENVÍO EN ESTE CHAT:*\n1. Los archivos definitivos.\n2. El comprobante de la seña.\n\nLa orden entra en producción después de recibir y revisar ambos.\n*Alias:* libreriasaber.mp\n\n_Sujeto a revisión. Si hay diferencias, me contactarán antes de producir._";
         root.querySelector("#proto-whatsapp").href="https://api.whatsapp.com/send?phone=5493513110130&text="+encodeURIComponent(message);
         var status=root.querySelector("#proto-code-status");
-        if(returnCoupon){status.textContent=returnCoupon.reference+" aplicado · 10% · vence "+new Date(returnCoupon.expiresAt*1000).toLocaleDateString("es-AR")+(couponDiscount<couponCandidate?" · descuento limitado por el máximo acumulable":"")+".";}
+        if(manualCoupon){
+          if(eligibleCouponBase<=0)status.textContent=manualCoupon.code+" es válido, pero no hay productos alcanzados por esta promoción.";
+          else status.textContent=manualCoupon.code+" aplicado · "+manualCoupon.label+" · vence "+manualCoupon.to.toLocaleDateString("es-AR")+(couponDiscount<couponCandidate?" · descuento limitado por el máximo acumulable":"")+".";
+        }
       }
       root.querySelectorAll("[data-service]").forEach(function(b){b.addEventListener("click",function(){
         if(b.dataset.service==="otro")window.open("https://wa.me/5493513110130?text="+encodeURIComponent("Hola, necesito ayuda para cotizar un trabajo."),"_blank","noopener");
@@ -558,7 +606,7 @@
         }else if(promo&&(promo.code==="SABADO20"||promo.code==="DOMINGO20")){
           promoSaving=Math.round(total*.2);total-=promoSaving;promoLabel=promo.code+" · 20% en el carrito";
         }
-        currentItem={service:service,work:serviceName(service),qty:qtyText,mode:modeText,binding:binding,promoLabel:promoLabel,promoSaving:promoSaving,originalTotal:originalTotal,total:Math.round(total)};
+        currentItem={service:service,work:serviceName(service),qty:qtyText,mode:modeText,binding:binding,bindingCharge:bindingCharge,promoLabel:promoLabel,promoSaving:promoSaving,originalTotal:originalTotal,total:Math.round(total)};
         renderCart();
         root.querySelector("#proto-auto-promo").style.display=promoSaving>0?"block":"none";
         root.querySelector("#proto-auto-promo").textContent=promoSaving>0?"Cupón de hoy aplicado: "+promoLabel+". Ahorrás $"+Math.round(promoSaving).toLocaleString("es-AR")+".":"";
@@ -570,17 +618,23 @@
       });
       root.querySelector("#proto-apply-code").addEventListener("click",async function(){
         var code=root.querySelector("#proto-code").value.trim();
-        if(!code){root.querySelector("#proto-code-status").textContent="Ingresá el cupón recibido por WhatsApp.";return;}
-        var verified=await verifyReturnCoupon(code);
-        if(!verified){root.querySelector("#proto-code-status").textContent="El cupón no es válido o está vencido.";return;}
-        returnCoupon=verified;renderCart();
+        if(!code){root.querySelector("#proto-code-status").textContent="Ingresá el código de promoción.";return;}
+        root.querySelector("#proto-code-status").textContent="Comprobando promoción...";
+        var loaded=true;
+        if(!extraPromos.length)loaded=await loadExtraPromos();
+        if(!loaded){root.querySelector("#proto-code-status").textContent="No pudimos consultar las promociones. Revisá la conexión e intentá nuevamente.";return;}
+        var verified=findManualCoupon(code);
+        if(!verified){manualCoupon=null;root.querySelector("#proto-code-status").textContent="El código no existe, está desactivado o está fuera de fecha.";renderCart();return;}
+        manualCoupon=verified;renderCart();
       });
       (async function(){
+        var loaded=await loadExtraPromos();
         var token=new URLSearchParams(location.search).get("cupon");
         if(!token)return;
         root.querySelector("#proto-code").value=token;
-        returnCoupon=await verifyReturnCoupon(token);
-        root.querySelector("#proto-code-status").textContent=returnCoupon?returnCoupon.reference+" cargado automáticamente.":"El cupón del enlace no es válido o está vencido.";
+        manualCoupon=loaded?findManualCoupon(token):null;
+        root.querySelector("#proto-code-status").textContent=manualCoupon?manualCoupon.code+" cargado automáticamente.":"El código no existe, está desactivado o está fuera de fecha.";
+        if(manualCoupon)renderCart();
       })();
     })();
   </script>
