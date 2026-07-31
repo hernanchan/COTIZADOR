@@ -15,8 +15,8 @@
       "label": "Impresiones (70 g)",
       "unit": "pagina",
       "color": {
-        "same_price_sf_df": true,
-        "price_tiers_per_page": [
+        "same_price_sf_df": false,
+        "sf": [
           {
             "min": 1,
             "max": 10,
@@ -36,6 +36,33 @@
             "min": 51,
             "max": 100,
             "price": 140
+          },
+          {
+            "min": 101,
+            "max": null,
+            "price": 90
+          }
+        ],
+        "df": [
+          {
+            "min": 1,
+            "max": 10,
+            "price": 200
+          },
+          {
+            "min": 11,
+            "max": 20,
+            "price": 180
+          },
+          {
+            "min": 21,
+            "max": 50,
+            "price": 160
+          },
+          {
+            "min": 51,
+            "max": 100,
+            "price": 126
           },
           {
             "min": 101,
