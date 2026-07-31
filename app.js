@@ -122,12 +122,13 @@ function findMergeTargetImpresiones(raw){
 
 // Helpers de agrupación de precio por página
 function groupKeyFromFile(f){
-  if (f.mode === "color") return "color";
+  if (f.mode === "color") return (f.faz === "df") ? "color_df" : "color_sf";
   // bn
   return (f.faz === "df") ? "bn_df" : "bn_sf";
 }
 function groupLabel(key){
-  if (key === "color") return "Color";
+  if (key === "color_sf") return "Color Simple faz";
+  if (key === "color_df") return "Color Doble faz";
   if (key === "bn_sf") return "B/N Simple faz";
   if (key === "bn_df") return "B/N Doble faz";
   return key;
@@ -197,7 +198,7 @@ function recalcImpresionesGlobal(){
   if (impItems.length === 0) return;
 
   // Total de páginas por grupo (considera ejemplares)
-  const groupTotals = { bn_sf:0, bn_df:0, color:0 };
+  const groupTotals = { bn_sf:0, bn_df:0, color_sf:0, color_df:0 };
 
   for (const it of impItems){
     const r = it.raw;
@@ -209,12 +210,16 @@ function recalcImpresionesGlobal(){
   }
 
   // Unit price por grupo
-  const unit = { bn_sf:0, bn_df:0, color:0 };
+  const unit = { bn_sf:0, bn_df:0, color_sf:0, color_df:0 };
 
-  // Color
-  if (groupTotals.color > 0){
-    const up = tierPrice(cfg.color.price_tiers_per_page, groupTotals.color);
-    unit.color = (up === null) ? 0 : up;
+  // Color: el mostrador separa simple y doble faz por escala.
+  if (groupTotals.color_sf > 0){
+    const up = tierPrice(cfg.color.sf, groupTotals.color_sf);
+    unit.color_sf = (up === null) ? 0 : up;
+  }
+  if (groupTotals.color_df > 0){
+    const up = tierPrice(cfg.color.df, groupTotals.color_df);
+    unit.color_df = (up === null) ? 0 : up;
   }
 
   // BN SF
@@ -235,7 +240,7 @@ function recalcImpresionesGlobal(){
     const ej = r.ejemplares || 1;
 
     // Printing subtotal por grupo dentro del ítem
-    const itemGroupPages = { bn_sf:0, bn_df:0, color:0 };
+    const itemGroupPages = { bn_sf:0, bn_df:0, color_sf:0, color_df:0 };
     for (const f of (r.files || [])){
       const gk = groupKeyFromFile(f);
       itemGroupPages[gk] += (f.pages || 0);
@@ -244,14 +249,16 @@ function recalcImpresionesGlobal(){
     const itemGroupPagesWithEj = {
       bn_sf: itemGroupPages.bn_sf * ej,
       bn_df: itemGroupPages.bn_df * ej,
-      color: itemGroupPages.color * ej,
+      color_sf: itemGroupPages.color_sf * ej,
+      color_df: itemGroupPages.color_df * ej,
     };
 
     const sub_bn_sf = itemGroupPagesWithEj.bn_sf * unit.bn_sf;
     const sub_bn_df = itemGroupPagesWithEj.bn_df * unit.bn_df;
-    const sub_color = itemGroupPagesWithEj.color * unit.color;
+    const sub_color_sf = itemGroupPagesWithEj.color_sf * unit.color_sf;
+    const sub_color_df = itemGroupPagesWithEj.color_df * unit.color_df;
 
-    const printingTotal = sub_bn_sf + sub_bn_df + sub_color;
+    const printingTotal = sub_bn_sf + sub_bn_df + sub_color_sf + sub_color_df;
 
     // Binding
     let bindingTotal = 0;
@@ -298,7 +305,8 @@ function recalcImpresionesGlobal(){
     const gt = groupTotals;
     lines.push(["Grupo B/N SF", `${itemGroupPagesWithEj.bn_sf} pág (grupo: ${gt.bn_sf}) — ${moneyARS(unit.bn_sf)}/p — ${moneyARS(sub_bn_sf)}`]);
     lines.push(["Grupo B/N DF", `${itemGroupPagesWithEj.bn_df} pág (grupo: ${gt.bn_df}) — ${moneyARS(unit.bn_df)}/p — ${moneyARS(sub_bn_df)}`]);
-    lines.push(["Grupo Color", `${itemGroupPagesWithEj.color} pág (grupo: ${gt.color}) — ${moneyARS(unit.color)}/p — ${moneyARS(sub_color)}`]);
+    lines.push(["Grupo Color SF", `${itemGroupPagesWithEj.color_sf} pág (grupo: ${gt.color_sf}) — ${moneyARS(unit.color_sf)}/p — ${moneyARS(sub_color_sf)}`]);
+    lines.push(["Grupo Color DF", `${itemGroupPagesWithEj.color_df} pág (grupo: ${gt.color_df}) — ${moneyARS(unit.color_df)}/p — ${moneyARS(sub_color_df)}`]);
 
     lines.push(["Subtotal impresión", moneyARS(printingTotal)]);
 
