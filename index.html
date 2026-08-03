@@ -4,12 +4,21 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Prototipo original · Cotizador Librería Saber</title>
+  <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-NZOZBFD3MT"></script>
   <script>
-    window.dataLayer=window.dataLayer||[];
+    window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
-    gtag("js",new Date());
-    gtag("config","G-NZOZBFD3MT");
+    gtag('js', new Date());
+
+    gtag('config', 'G-NZOZBFD3MT', {
+      send_page_view: false
+    });
+    gtag('event', 'page_view', {
+      send_to: 'G-NZOZBFD3MT',
+      page_title: document.title,
+      page_location: window.location.href
+    });
   </script>
   <style>
     :root{--background:#fff;--foreground:#191a1d;--card:#f6f6f7;--border:#dedfe2;--muted:#e9e9ea;--muted-foreground:#85878d;--primary:#3195ed;--primary-foreground:#fff;font-family:Arial,sans-serif;color:var(--foreground);background:var(--background)}
