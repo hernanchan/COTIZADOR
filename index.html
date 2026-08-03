@@ -4,6 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Prototipo original · Cotizador Librería Saber</title>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-GGF2PXKVWG"></script>
+  <script>
+    window.dataLayer=window.dataLayer||[];
+    function gtag(){dataLayer.push(arguments);}
+    gtag("js",new Date());
+    gtag("config","G-GGF2PXKVWG");
+  </script>
   <style>
     :root{--background:#fff;--foreground:#191a1d;--card:#f6f6f7;--border:#dedfe2;--muted:#e9e9ea;--muted-foreground:#85878d;--primary:#3195ed;--primary-foreground:#fff;font-family:Arial,sans-serif;color:var(--foreground);background:var(--background)}
     *{box-sizing:border-box}body{margin:0;background:#fff}.page{width:min(760px,100%);margin:0 auto;padding:24px 22px 40px}.btn{border:1px solid var(--border);border-radius:12px;background:#fff;color:var(--foreground);padding:11px 13px;font:inherit;font-weight:600;cursor:pointer;text-decoration:none}.btn-primary{background:var(--primary);border-color:var(--primary);color:#fff}.btn-ghost{background:transparent}.viz-tile{background:#fafafa}.viz-stat-value{font-size:58px;font-weight:800;line-height:.95;letter-spacing:-2px}.card{background:#f3f3f4;border:1px solid #d9dade;border-radius:14px;padding:13px}.text-muted{color:var(--muted-foreground)}.text-small{font-size:12px;line-height:1.4}.form-label{display:grid;gap:7px;font-size:13px;font-weight:600}.form-control,.form-select{width:100%;border:1px solid var(--border);border-radius:10px;background:#fff;padding:10px;font:inherit}.form-check{display:flex;gap:9px;align-items:center;font-size:13px}.form-check-input{width:17px;height:17px}.viz-controls{display:flex;gap:8px;align-items:end}.viz-controls .form-label{flex:1}summary{cursor:pointer;font-size:13px;font-weight:600}
@@ -247,6 +254,9 @@
   <script>
     (function(){
       var root=document.getElementById("cotizador-simple-demo");
+      function trackEvent(name,params){
+        if(typeof window.gtag==="function")window.gtag("event",name,params||{});
+      }
       var current=1;
       var service="impresiones";
       var printSize="a4";
@@ -520,7 +530,7 @@
       }
       root.querySelectorAll("[data-service]").forEach(function(b){b.addEventListener("click",function(){
         if(b.dataset.service==="otro")window.open("https://wa.me/5493513110130?text="+encodeURIComponent("Hola, necesito ayuda para cotizar un trabajo."),"_blank","noopener");
-        else{service=b.dataset.service;showServiceForm(service);showStep(2);}
+        else{service=b.dataset.service;trackEvent("iniciar_cotizacion",{servicio:service});showServiceForm(service);showStep(2);}
       });});
       root.querySelectorAll("[data-back]").forEach(function(b){b.addEventListener("click",function(){showStep(Number(b.dataset.back));});});
       root.querySelectorAll("#proto-print-size button").forEach(function(b){b.addEventListener("click",function(){printSize=b.dataset.value;choose("proto-print-size",printSize);updatePrintChoices();});});
@@ -615,6 +625,7 @@
           promoSaving=Math.round(total*.2);total-=promoSaving;promoLabel=promo.code+" · 20% en el carrito";
         }
         currentItem={service:service,work:serviceName(service),qty:qtyText,mode:modeText,binding:binding,bindingCharge:bindingCharge,promoLabel:promoLabel,promoSaving:promoSaving,originalTotal:originalTotal,total:Math.round(total)};
+        trackEvent("presupuesto_calculado",{servicio:service,value:currentItem.total,currency:"ARS"});
         renderCart();
         root.querySelector("#proto-auto-promo").style.display=promoSaving>0?"block":"none";
         root.querySelector("#proto-auto-promo").textContent=promoSaving>0?"Cupón de hoy aplicado: "+promoLabel+". Ahorrás $"+Math.round(promoSaving).toLocaleString("es-AR")+".":"";
@@ -633,7 +644,12 @@
         if(!loaded){root.querySelector("#proto-code-status").textContent="No pudimos consultar las promociones. Revisá la conexión e intentá nuevamente.";return;}
         var verified=findManualCoupon(code);
         if(!verified){manualCoupon=null;root.querySelector("#proto-code-status").textContent="El código no existe, está desactivado o está fuera de fecha.";renderCart();return;}
-        manualCoupon=verified;renderCart();
+        manualCoupon=verified;trackEvent("cupon_aplicado",{codigo:verified.code,producto:verified.product});renderCart();
+      });
+      root.querySelector("#proto-whatsapp").addEventListener("click",function(){
+        var items=cart.slice();if(currentItem)items.push(currentItem);
+        var total=items.reduce(function(sum,item){return sum+item.total;},0);
+        trackEvent("confirmar_whatsapp",{value:Math.round(total),currency:"ARS",cantidad_items:items.length});
       });
       (async function(){
         var loaded=await loadExtraPromos();
