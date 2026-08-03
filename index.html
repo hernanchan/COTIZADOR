@@ -347,8 +347,11 @@
         var options=printSize==="a3"?[
           ["obra80","Obra 80 g · opción habitual"],["obra140","Obra 140 g"],["obra180","Obra 180 g"],["ilustr120","Ilustración 120 g"],["adhesivo","Autoadhesivo"]
         ]:[
-          ["obra140","Obra 140 g"],["obra180","Obra 180 g"],["ilustr120","Ilustración 120 g"],["adhesivo","Autoadhesivo"]
+          ["obra140","Obra 140 g"],["obra180","Obra 180 g"],["ilustr120","Ilustración 120 g"],["ilustr180","Ilustración 180 g"],["adhesivo","Autoadhesivo"]
         ];
+        if(printSize==="a4"&&sides==="df"){
+          options.splice(options.length-1,0,["ilustr120df","Ilustración 120 g D/F"],["ilustr240df","Ilustración 240 g D/F"]);
+        }
         select.textContent="";
         options.forEach(function(option){
           var element=document.createElement("option");
@@ -440,10 +443,15 @@
           obra140:{cost:60,multiplier:10,discounts:[0,5,10,12,23.3]},
           obra180:{cost:70,multiplier:12,discounts:[0,5,10,12,15]},
           ilustr120:{cost:59.2,multiplier:11,discounts:[0,5,10,12,21.5]},
+          ilustr180:{cost:108.6,multiplier:7,discounts:[0,5,10,12,15],directCost:true,round100:true},
+          ilustr120df:{cost:136,multiplier:4,discounts:[0,5,10,12,15],directCost:true,round100:true},
+          ilustr240df:{cost:200,multiplier:5,discounts:[0,5,10,12,15],directCost:true,round100:true},
           adhesivo:{cost:180,multiplier:8.09,discounts:[0,5,10,12,15]}
         };
         var selected=a4Materials[material];
-        return Math.round((selected.cost+50)*selected.multiplier*(1-selected.discounts[index]/100));
+        var baseCost=selected.directCost?selected.cost:selected.cost+50;
+        var calculated=baseCost*selected.multiplier*(1-selected.discounts[index]/100);
+        return selected.round100?Math.round(calculated/100)*100:Math.round(calculated);
       }
       function money(value){
         return "$"+Math.round(value).toLocaleString("es-AR");
@@ -521,7 +529,7 @@
       root.querySelector("#photo-size").addEventListener("change",updatePhotoChoices);
       root.querySelector("#plot-kind").addEventListener("change",updatePlotPapers);
       root.querySelectorAll("#graphic-category button").forEach(function(b){b.addEventListener("click",function(){graphicCategory=b.dataset.value;choose("graphic-category",graphicCategory);updateGraphicProducts();});});
-      root.querySelectorAll("#proto-sides button").forEach(function(b){b.addEventListener("click",function(){sides=b.dataset.value;choose("proto-sides",sides);});});
+      root.querySelectorAll("#proto-sides button").forEach(function(b){b.addEventListener("click",function(){sides=b.dataset.value;choose("proto-sides",sides);updatePrintChoices();});});
       updateGraphicProducts();
       updatePlotPapers();
       root.querySelector("#proto-calc").addEventListener("click",function(){
