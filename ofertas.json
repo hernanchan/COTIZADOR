@@ -1,0 +1,20 @@
+{
+  "enabled": true,
+  "updated_at": "2026-08-04",
+  "products": [
+    {
+      "id": "ejemplo-producto",
+      "active": false,
+      "name": "Producto de oferta",
+      "image": "assets/ofertas/producto-ejemplo.jpg",
+      "normal_price": 0,
+      "offer_price": 0,
+      "condition": "Disponible agregando un trabajo de impresión.",
+      "requires_print_job": true,
+      "max_per_order": 1,
+      "badge": "OFERTA EXCLUSIVA",
+      "from": "",
+      "to": ""
+    }
+  ]
+}
