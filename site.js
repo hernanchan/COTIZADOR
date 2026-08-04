@@ -26,6 +26,7 @@
     syncFrameOrder();
   }
   function activeProducts(data){
+    if(!data||data.enabled===false)return [];
     var now=new Date();
     return (data.products||[]).filter(function(p){
       if(!p.active)return false;
@@ -180,7 +181,7 @@
     try{
       var url=new URL(href,location.href);
       var text=url.searchParams.get("text");
-      return {url:url,text:text?decodeURIComponent(text):""};
+      return {url:url,text:text||""};
     }catch(e){return null;}
   }
   function augmentMessage(baseMessage){
