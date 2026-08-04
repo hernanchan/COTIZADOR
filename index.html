@@ -4,11 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Prototipo original · Cotizador Librería Saber</title>
-  <meta id="ga-diagnostic" name="ga-diagnostic" content="pending">
   <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-NZOZBFD3MT"
-    onload="document.getElementById('ga-diagnostic').content='library-loaded'"
-    onerror="document.getElementById('ga-diagnostic').content='library-error'"></script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-NZOZBFD3MT"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
@@ -20,10 +17,7 @@
     gtag('event', 'page_view', {
       send_to: 'G-NZOZBFD3MT',
       page_title: document.title,
-      page_location: window.location.href,
-      event_callback: function(){
-        document.getElementById('ga-diagnostic').content = 'event-processed';
-      }
+      page_location: window.location.href
     });
   </script>
   <style>
