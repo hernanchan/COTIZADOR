@@ -3,673 +3,179 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Prototipo original · Cotizador Librería Saber</title>
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-7SFTK3QSD8"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-
-    gtag('config', 'G-7SFTK3QSD8', {
-      send_page_view: false
-    });
-    gtag('event', 'page_view', {
-      send_to: 'G-7SFTK3QSD8',
-      page_title: document.title,
-      page_location: window.location.href
-    });
-  </script>
-  <style>
-    :root{--background:#fff;--foreground:#191a1d;--card:#f6f6f7;--border:#dedfe2;--muted:#e9e9ea;--muted-foreground:#85878d;--primary:#3195ed;--primary-foreground:#fff;font-family:Arial,sans-serif;color:var(--foreground);background:var(--background)}
-    *{box-sizing:border-box}body{margin:0;background:#fff}.page{width:min(760px,100%);margin:0 auto;padding:24px 22px 40px}.btn{border:1px solid var(--border);border-radius:12px;background:#fff;color:var(--foreground);padding:11px 13px;font:inherit;font-weight:600;cursor:pointer;text-decoration:none}.btn-primary{background:var(--primary);border-color:var(--primary);color:#fff}.btn-ghost{background:transparent}.viz-tile{background:#fafafa}.viz-stat-value{font-size:58px;font-weight:800;line-height:.95;letter-spacing:-2px}.card{background:#f3f3f4;border:1px solid #d9dade;border-radius:14px;padding:13px}.text-muted{color:var(--muted-foreground)}.text-small{font-size:12px;line-height:1.4}.form-label{display:grid;gap:7px;font-size:13px;font-weight:600}.form-control,.form-select{width:100%;border:1px solid var(--border);border-radius:10px;background:#fff;padding:10px;font:inherit}.form-check{display:flex;gap:9px;align-items:center;font-size:13px}.form-check-input{width:17px;height:17px}.viz-controls{display:flex;gap:8px;align-items:end}.viz-controls .form-label{flex:1}summary{cursor:pointer;font-size:13px;font-weight:600}
-    @media(max-width:620px){.page{padding:18px 14px 30px}.viz-stat-value{font-size:50px}.viz-controls{align-items:stretch;flex-direction:column}}
-  </style>
+  <meta name="description" content="Cotizador online de LIBRERIA SABER. Impresiones, fotos, stickers, ploteos y gráfica comercial en Córdoba Capital.">
+  <meta name="theme-color" content="#0b3d70">
+  <title>LIBRERIA SABER · Cotizador online</title>
+  <link rel="stylesheet" href="site.css">
 </head>
-<body><main class="page">
-<div id="cotizador-simple-demo">
-  <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
-    <symbol id="i-printer" viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6zM18 12h.01"/></symbol>
-    <symbol id="i-photo" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></symbol>
-    <symbol id="i-sticker" viewBox="0 0 24 24"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7a9 9 0 0 0 9-9V5a2 2 0 0 0-2-2z"/><path d="M12 21v-7a2 2 0 0 1 2-2h7"/></symbol>
-    <symbol id="i-ruler" viewBox="0 0 24 24"><path d="m16 2 6 6L8 22l-6-6zM15 7l2 2M11 11l2 2M7 15l2 2"/></symbol>
-    <symbol id="i-briefcase" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12h18M10 12v2h4v-2"/></symbol>
-    <symbol id="i-help" viewBox="0 0 24 24"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3v-7a4 4 0 0 1-1-3V7a4 4 0 0 1 4-4h11a4 4 0 0 1 4 4z"/><path d="M9.5 9a2.5 2.5 0 1 1 3.6 2.25c-.7.35-1.1.75-1.1 1.75M12 17h.01"/></symbol>
-    <symbol id="i-card" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></symbol>
-    <symbol id="i-notepad" viewBox="0 0 24 24"><path d="M6 3h12a2 2 0 0 1 2 2v16H4V5a2 2 0 0 1 2-2zM8 1v4M16 1v4M8 10h8M8 14h6M8 18h4"/></symbol>
-    <symbol id="i-flyer" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 9v12M13 13h4M13 17h4"/></symbol>
-    <symbol id="i-whatsapp" viewBox="0 0 24 24"><path d="M20.5 11.7a8.5 8.5 0 0 1-12.6 7.4L3 20.5l1.4-4.7A8.5 8.5 0 1 1 20.5 11.7z"/><path d="M8.2 7.8c.3-.6.6-.6.9-.6h.4c.2 0 .4.1.5.4l.8 1.9c.1.3 0 .5-.1.7l-.6.8c-.2.2-.1.4 0 .6.6 1.1 1.5 2 2.6 2.6.2.1.4.1.6-.1l.9-1.1c.2-.2.4-.3.7-.2l1.9.9c.3.1.4.3.4.5 0 .3-.2 1.5-1 2.1-.7.6-1.7.9-2.8.6-1-.3-2.4-.8-4.1-2.3-1.4-1.3-2.4-2.8-2.7-3.9-.4-1.2 0-2.3.6-2.9z"/></symbol>
-  </svg>
-  <style>
-    #cotizador-simple-demo .proto-shell{display:grid;gap:18px}
-    #cotizador-simple-demo .proto-head{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
-    #cotizador-simple-demo .proto-progress{display:flex;gap:8px;align-items:center;color:var(--muted-foreground)}
-    #cotizador-simple-demo .proto-dot{width:10px;height:10px;border-radius:999px;background:var(--muted)}
-    #cotizador-simple-demo .proto-dot.is-active{background:var(--primary)}
-    #cotizador-simple-demo .service-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
-    #cotizador-simple-demo .service-btn{display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-height:112px;text-align:left}
-    #cotizador-simple-demo .service-btn svg,#cotizador-simple-demo #proto-whatsapp svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-    #cotizador-simple-demo .step{display:none}
-    #cotizador-simple-demo .step.is-active{display:grid;gap:18px}
-    #cotizador-simple-demo .question-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
-    #cotizador-simple-demo .choice-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-    #cotizador-simple-demo .choice-row .btn[aria-pressed="true"]{background:var(--primary);color:var(--primary-foreground)}
-    #cotizador-simple-demo .result-layout{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(230px,.75fr);gap:18px;align-items:start}
-    #cotizador-simple-demo .price-block{display:grid;gap:8px;margin-bottom:16px}
-    #cotizador-simple-demo .summary-lines{display:grid;gap:9px}
-    #cotizador-simple-demo .summary-line{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:1px solid var(--border);padding-bottom:8px}
-    #cotizador-simple-demo .summary-main{display:grid;gap:3px;min-width:0;flex:1}
-    #cotizador-simple-demo .summary-end{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;text-align:right}
-    #cotizador-simple-demo .proto-actions{display:flex;gap:10px;flex-wrap:wrap}
-    #cotizador-simple-demo .muted-box{padding:14px;background:var(--muted);color:var(--muted-foreground);border-radius:12px}
-    #cotizador-simple-demo .service-form{display:none;gap:16px}
-    #cotizador-simple-demo .service-form.is-active{display:grid}
-    @media(max-width:620px){
-      #cotizador-simple-demo .service-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-      #cotizador-simple-demo .question-grid,#cotizador-simple-demo .result-layout{grid-template-columns:1fr}
-    }
-  </style>
-
-  <div class="proto-shell">
-    <div class="proto-head">
-      <div>
-        <div id="proto-heading"><strong>¿Qué necesitás cotizar?</strong></div>
-        <div class="text-muted text-small" id="proto-subheading">Elegí una opción. Solo te preguntaremos lo necesario.</div>
-      </div>
-      <div class="proto-progress" aria-label="Progreso">
-        <span id="step-label">Paso 1 de 3</span>
-        <span class="proto-dot is-active"></span><span class="proto-dot"></span><span class="proto-dot"></span>
-      </div>
+<body>
+  <header class="site-header">
+    <div class="container nav-wrap">
+      <a class="brand" href="#inicio" aria-label="Ir al inicio de LIBRERIA SABER">
+        <img src="assets/logo-sbr.png" alt="Logo de LIBRERIA SABER">
+        <span class="brand-copy">
+          <strong>LIBRERIA SABER</strong>
+          <span>Escolar · Oficina · Gráfica</span>
+        </span>
+      </a>
+      <nav class="main-nav" aria-label="Navegación principal">
+        <a href="#inicio">Inicio</a>
+        <a href="#cotizador">Cotizador</a>
+        <a href="#servicios">Servicios</a>
+        <a href="#promos">Promos</a>
+        <a href="#contacto">Contacto</a>
+        <a class="nav-cta" href="#cotizador">Cotizar ahora</a>
+      </nav>
     </div>
+  </header>
 
-    <section class="step is-active" data-step="1">
-      <div class="service-grid">
-        <button class="btn viz-tile service-btn" type="button" data-service="impresiones"><svg aria-hidden="true"><use href="#i-printer"/></svg><strong>Imprimir documentos</strong><span class="text-muted text-small">Copias B/N o color</span></button>
-        <button class="btn viz-tile service-btn" type="button" data-service="fotos"><svg aria-hidden="true"><use href="#i-photo"/></svg><strong>Imprimir fotos</strong><span class="text-muted text-small">10×15, 13×18, A4</span></button>
-        <button class="btn viz-tile service-btn" type="button" data-service="stickers"><svg aria-hidden="true"><use href="#i-sticker"/></svg><strong>Stickers</strong><span class="text-muted text-small">Planchas con precorte</span></button>
-        <button class="btn viz-tile service-btn" type="button" data-service="ploteos"><svg aria-hidden="true"><use href="#i-ruler"/></svg><strong>Ploteos</strong><span class="text-muted text-small">Planos y pósteres</span></button>
-        <button class="btn viz-tile service-btn" type="button" data-service="grafica"><svg aria-hidden="true"><use href="#i-briefcase"/></svg><strong>Gráfica comercial</strong><span class="text-muted text-small">Tarjetas y folletos</span></button>
-        <button class="btn viz-tile service-btn" type="button" data-service="otro"><svg aria-hidden="true"><use href="#i-help"/></svg><strong>No estoy seguro</strong><span class="text-muted text-small">Te ayudamos por WhatsApp</span></button>
+  <main>
+    <section class="hero" id="inicio">
+      <div class="container hero-grid">
+        <div>
+          <div class="eyebrow">Sitio oficial</div>
+          <h1>LIBRERIA <span>SABER</span></h1>
+          <p class="hero-lead">Útiles escolares, oficina, impresiones y ploteos.</p>
+          <p class="hero-text">Todo lo que necesitás, en un mismo lugar. Cotizá tu trabajo online, revisá las promociones vigentes y envianos el pedido directamente por WhatsApp.</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="#cotizador">Cotizar un trabajo</a>
+            <a class="btn btn-secondary" href="#promos">Ver promociones</a>
+          </div>
+          <div class="hero-badges">
+            <span class="hero-badge"><i></i>Presupuesto inmediato</span>
+            <span class="hero-badge"><i></i>Confirmación por WhatsApp</span>
+            <span class="hero-badge"><i></i>Atención en Córdoba Capital</span>
+          </div>
+        </div>
+        <div class="hero-visual" aria-hidden="true">
+          <div class="visual-card">
+            <img class="hero-logo" src="assets/logo-sbr.png" alt="">
+            <div class="paper-stack">
+              <div class="paper two"></div>
+              <div class="paper one"></div>
+              <div class="paper three"><span class="paper-lines"></span></div>
+            </div>
+            <div class="ruler"></div>
+            <div class="pencil"></div>
+          </div>
+        </div>
       </div>
     </section>
 
-    <section class="step" data-step="2">
-      <div class="service-form is-active" data-form="impresiones">
-        <div>
-          <span class="form-label">¿Qué tamaño necesitás?</span>
-          <div class="choice-row" id="proto-print-size">
-            <button class="btn" type="button" data-value="a4" aria-pressed="true">A4 · Hoja común</button>
-            <button class="btn" type="button" data-value="a3" aria-pressed="false">A3 · Hoja grande</button>
-          </div>
-        </div>
-        <div>
-          <span class="form-label">¿Blanco y negro o color?</span>
-          <div class="choice-row" id="proto-color">
-            <button class="btn" type="button" data-value="bn" aria-pressed="true">Blanco y negro</button>
-            <button class="btn" type="button" data-value="color" aria-pressed="false">Color</button>
-          </div>
-        </div>
-        <div id="proto-paper-kind-wrap" style="display:none">
-          <span class="form-label">¿Papel común o especial?</span>
-          <div class="choice-row" id="proto-paper-kind">
-            <button class="btn" type="button" data-value="common" aria-pressed="true">Papel común</button>
-            <button class="btn" type="button" data-value="special" aria-pressed="false">Papel especial</button>
-          </div>
-        </div>
-        <label class="form-label" id="proto-special-paper-wrap" style="display:none">Elegí el papel
-          <select class="form-select" id="proto-special-paper"></select>
-        </label>
-        <div class="question-grid">
-          <label class="form-label">¿Cuántas páginas tiene el documento?
-            <input class="form-control" id="proto-pages" type="number" min="1" value="1">
-          </label>
-          <label class="form-label">¿Cuántas copias iguales necesitás?
-            <input class="form-control" id="proto-copies" type="number" min="1" value="1">
-          </label>
+    <section id="servicios">
+      <div class="container">
+        <div class="section-head">
           <div>
-            <span class="form-label">¿Cómo se imprime?</span>
-            <div class="choice-row" id="proto-sides">
-              <button class="btn" type="button" data-value="sf" aria-pressed="true">Una cara</button>
-              <button class="btn" type="button" data-value="df" aria-pressed="false">Ambas caras</button>
-            </div>
+            <h2>Servicios principales</h2>
+            <p>Elegí un servicio y te llevamos directamente a la opción correspondiente dentro del cotizador.</p>
           </div>
         </div>
-        <label class="form-check">
-          <input class="form-check-input" id="proto-binding" type="checkbox">
-          <span class="form-check-label">Quiero agregar anillado</span>
-        </label>
-      </div>
-
-      <div class="service-form" data-form="fotos">
-        <div class="question-grid">
-          <label class="form-label" id="photo-line-wrap">Tipo de papel
-            <select class="form-select" id="photo-line"><option value="normal">Fotográfico normal</option><option value="luster">Premium Luster</option></select>
-          </label>
-          <label class="form-label">Tamaño
-            <select class="form-select" id="photo-size"><option value="10x15">10×15 cm</option><option value="13x18">13×18 cm</option><option value="a4">A4</option><option value="a3">A3</option><option value="polaroid">Estilo Polaroid</option><option value="carnet">Carnet 4×4 · plancha de 6</option></select>
-          </label>
-          <label class="form-label"><span id="photo-qty-label">¿Cuántas fotos?</span>
-            <input class="form-control" id="photo-qty" type="number" min="1" value="1">
-          </label>
+        <div class="services-grid">
+          <button class="service-card" data-service-target="impresiones">
+            <span class="service-icon">🖨</span><span><strong>Impresiones</strong><span>Documentos A4 y A3, blanco y negro o color.</span></span>
+          </button>
+          <button class="service-card" data-service-target="fotos">
+            <span class="service-icon">▣</span><span><strong>Fotos</strong><span>10×15, 13×18, A4, A3, Polaroid y carnet.</span></span>
+          </button>
+          <button class="service-card" data-service-target="stickers">
+            <span class="service-icon">✦</span><span><strong>Stickers</strong><span>Planchas impresas con precorte.</span></span>
+          </button>
+          <button class="service-card" data-service-target="ploteos">
+            <span class="service-icon">↔</span><span><strong>Ploteos</strong><span>Planos, pósteres y trabajos de gran formato.</span></span>
+          </button>
+          <button class="service-card" data-service-target="grafica">
+            <span class="service-icon">▤</span><span><strong>Gráfica comercial</strong><span>Tarjetas, recetarios y folletos.</span></span>
+          </button>
+          <button class="service-card" data-service-target="otro">
+            <span class="service-icon">?</span><span><strong>Asesoramiento</strong><span>Cuando no sabés qué opción elegir.</span></span>
+          </button>
         </div>
-        <div class="muted-box" id="photo-help">Los descuentos por cantidad se aplican automáticamente.</div>
-      </div>
-
-      <div class="service-form" data-form="stickers">
-        <div class="question-grid">
-          <label class="form-label">Tamaño de la plancha
-            <select class="form-select" id="sticker-size"><option value="a4">Plancha A4</option><option value="a3">Plancha A3</option></select>
-          </label>
-          <label class="form-label">¿Cuántas planchas?
-            <input class="form-control" id="sticker-qty" type="number" min="1" value="1">
-          </label>
-        </div>
-        <div class="muted-box">Incluye impresión en adhesivo fotográfico y precorte.</div>
-      </div>
-
-      <div class="service-form" data-form="ploteos">
-        <div class="question-grid">
-          <label class="form-label">¿Qué querés plotear?
-            <select class="form-select" id="plot-kind"><option value="cad">Plano o dibujo de líneas</option><option value="pleno">Póster o imagen plena</option></select>
-          </label>
-          <label class="form-label">Papel
-            <select class="form-select" id="plot-paper"><option value="obra">Papel obra</option></select>
-          </label>
-          <label class="form-label">Ancho en centímetros
-            <input class="form-control" id="plot-width" type="number" min="1" value="60">
-          </label>
-          <label class="form-label">Alto en centímetros
-            <input class="form-control" id="plot-height" type="number" min="1" value="90">
-          </label>
-          <label class="form-label">Cantidad
-            <input class="form-control" id="plot-qty" type="number" min="1" value="1">
-          </label>
-        </div>
-      </div>
-
-      <div class="service-form" data-form="grafica">
-        <div>
-          <span class="form-label">¿Qué producto necesitás?</span>
-          <div class="service-grid" id="graphic-category">
-            <button class="btn viz-tile service-btn" type="button" data-value="tarjetas" aria-pressed="true"><svg aria-hidden="true"><use href="#i-card"/></svg><strong>Tarjetas personales</strong></button>
-            <button class="btn viz-tile service-btn" type="button" data-value="recetarios" aria-pressed="false"><svg aria-hidden="true"><use href="#i-notepad"/></svg><strong>Recetarios</strong></button>
-            <button class="btn viz-tile service-btn" type="button" data-value="folletos" aria-pressed="false"><svg aria-hidden="true"><use href="#i-flyer"/></svg><strong>Folletos</strong></button>
-          </div>
-        </div>
-        <div class="question-grid">
-          <label class="form-label">Elegí la variante
-            <select class="form-select" id="graphic-product"></select>
-          </label>
-          <label class="form-label">Cantidad de lotes
-            <input class="form-control" id="graphic-lots" type="number" min="1" value="1">
-          </label>
-        </div>
-        <div class="muted-box">El precio no incluye diseño. El archivo queda sujeto a revisión técnica.</div>
-      </div>
-      <div class="proto-actions">
-        <button class="btn btn-ghost" type="button" data-back="1">Volver</button>
-        <button class="btn btn-primary" type="button" id="proto-calc">Calcular precio</button>
       </div>
     </section>
 
-    <section class="step" data-step="3">
-      <div class="result-layout">
-        <div>
-          <div class="price-block">
-            <div class="text-muted">Precio estimado</div>
-            <div class="viz-stat-value" id="proto-total">$0</div>
-            <div><strong>Seña para confirmar (50%): <span id="proto-deposit">$0</span></strong></div>
-          </div>
-          <div class="muted-box" id="proto-note"><strong>Para confirmar, enviá por WhatsApp:</strong><br>1. Los archivos definitivos.<br>2. El comprobante de la seña.<br><strong>La orden entra en producción después de recibir y revisar ambos.</strong></div>
-          <details style="margin-top:14px">
-            <summary>¿Tenés un código de descuento?</summary>
-            <div class="viz-controls" style="margin-top:10px">
-              <label class="form-label">Código
-                <input class="form-control" id="proto-code" type="text" placeholder="Ingresalo acá">
-              </label>
-              <button class="btn" id="proto-apply-code" type="button">Aplicar</button>
-            </div>
-            <div class="text-small text-muted" id="proto-code-status">Se validará contra las promociones vigentes.</div>
-          </details>
-          <div class="card" id="proto-auto-promo" style="display:none;margin-top:10px"></div>
-          <div class="muted-box" style="margin-top:14px;font-size:12px;line-height:1.5">
-            <strong>Importante:</strong> presupuesto sujeto a revisión de archivos, cantidades y características. Si existen diferencias, te informaremos antes de producir para solicitar el saldo, reintegrar el excedente o cancelar el pedido.
-          </div>
-          <details style="margin-top:12px">
-            <summary>Revisión del presupuesto y condiciones del pedido</summary>
-            <div class="text-small text-muted" style="margin-top:9px;line-height:1.55">
-              <p>El importe informado es estimativo y se calcula según los datos ingresados por el cliente. Antes de iniciar la producción, Librería Saber verificará los archivos, cantidades, páginas, medidas, materiales, tipo de impresión y terminaciones solicitadas.</p>
-              <p>Si se detectan diferencias, nos comunicaremos por WhatsApp para informar el importe corregido. Si el monto abonado fuera menor, se solicitará la diferencia; si fuera mayor, se reintegrará el excedente. Si el cliente no acepta la corrección, podrá cancelar el pedido y se reintegrará lo abonado, siempre que la producción todavía no haya comenzado.</p>
-              <p><strong>La orden entra en producción únicamente después de la revisión técnica y la confirmación del pago correspondiente.</strong></p>
-            </div>
-          </details>
-          <div class="proto-actions" style="margin-top:14px">
-            <a class="btn btn-primary" id="proto-whatsapp" href="https://wa.me/5493513110130" target="_blank" rel="noopener"><svg aria-hidden="true" style="width:18px;height:18px;vertical-align:-4px;margin-right:5px"><use href="#i-whatsapp"/></svg>Confirmar pedido por WhatsApp</a>
-            <button class="btn" type="button" id="proto-add">Agregar otro trabajo</button>
-          </div>
-          <div class="text-small text-muted" style="margin-top:14px">
-            Precio estimado sujeto a revisión del archivo y de las características del trabajo. La orden entra en producción después de recibir y revisar los archivos definitivos y el comprobante de la seña del 50%. En gráfica comercial, el precio no incluye diseño.
+    <section class="section-soft" id="promos">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <h2>Promociones y oportunidades</h2>
+            <p>Códigos vigentes y productos seleccionados que podés sumar al mismo pedido del cotizador.</p>
           </div>
         </div>
-        <div class="card">
-          <strong>Trabajos incluidos</strong>
-          <div class="summary-lines" id="cart-summary" style="margin-top:12px"></div>
+        <div class="promo-grid" id="promo-grid" aria-live="polite">
+          <div class="promo-empty">Cargando promociones...</div>
         </div>
       </div>
-      <button class="btn btn-ghost" type="button" data-back="2">Cambiar datos</button>
     </section>
-  </div>
 
-  <script>
-    (function(){
-      var root=document.getElementById("cotizador-simple-demo");
-      function trackEvent(name,params){
-        if(typeof window.gtag==="function")window.gtag("event",name,params||{});
-      }
-      var current=1;
-      var service="impresiones";
-      var printSize="a4";
-      var color="bn";
-      var sides="sf";
-      var paperKind="common";
-      var graphicCategory="tarjetas";
-      var cart=[];
-      var currentItem=null;
-      var manualCoupon=null;
-      var extraPromos=[];
-      var promosCsvUrl="https://docs.google.com/spreadsheets/d/e/2PACX-1vSVe0GKHSmYbfjpIkrvgA1lDqxz57j-VEDkY5BqYtVzKj_5ePB9NoyRhkTvf0S5dN-Ur6wrQANcg3WT/pub?gid=495325142&single=true&output=csv";
-      function parseCsv(text){
-        var rows=[],row=[],field="",quoted=false;
-        for(var i=0;i<text.length;i++){
-          var c=text[i],next=text[i+1];
-          if(c==='"'&&quoted&&next==='"'){field+='"';i++;}
-          else if(c==='"'){quoted=!quoted;}
-          else if(c===","&&!quoted){row.push(field);field="";}
-          else if((c==="\n"||c==="\r")&&!quoted){if(c==="\r"&&next==="\n")i++;row.push(field);if(row.some(function(v){return v!=="";}))rows.push(row);row=[];field="";}
-          else field+=c;
-        }
-        row.push(field);if(row.some(function(v){return v!=="";}))rows.push(row);return rows;
-      }
-      function normalizeText(value){return String(value||"").trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");}
-      function parsePromoDate(value,endOfDay){
-        var text=String(value||"").trim(),parts;
-        if(/^\d{4}-\d{2}-\d{2}$/.test(text)){parts=text.split("-");return new Date(Number(parts[0]),Number(parts[1])-1,Number(parts[2]),endOfDay?23:0,endOfDay?59:0,endOfDay?59:0);}
-        if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(text)){parts=text.split("/");return new Date(Number(parts[2]),Number(parts[1])-1,Number(parts[0]),endOfDay?23:0,endOfDay?59:0,endOfDay?59:0);}
-        return null;
-      }
-      function numericValue(value){
-        var text=String(value||"").replace(/[^0-9,.-]/g,"");
-        var comma=text.lastIndexOf(","),dot=text.lastIndexOf(".");
-        if(comma>=0&&dot>=0)text=comma>dot?text.replace(/\./g,"").replace(",","."):text.replace(/,/g,"");
-        else if(comma>=0)text=/,\d{3}$/.test(text)?text.replace(/,/g,""):text.replace(",",".");
-        else if(dot>=0&&/\.\d{3}$/.test(text))text=text.replace(/\./g,"");
-        return Number(text)||0;
-      }
-      async function loadExtraPromos(){
-        try{
-          var separator=promosCsvUrl.indexOf("?")>=0?"&":"?";
-          var response=await fetch(promosCsvUrl+separator+"actualizacion="+Date.now(),{cache:"no-store"});
-          if(!response.ok)throw new Error("No se pudo leer la planilla");
-          var rows=parseCsv(await response.text());
-          var headerIndex=rows.findIndex(function(r){return normalizeText(r[0])==="ACTIVA"&&normalizeText(r[1])==="CODIGO";});
-          if(headerIndex<0)throw new Error("Encabezados no encontrados");
-          extraPromos=rows.slice(headerIndex+1).map(function(r){return {
-            active:normalizeText(r[0])==="SI",code:normalizeText(r[1]),label:String(r[2]||"").trim(),type:normalizeText(r[3]),value:numericValue(r[4]),product:normalizeText(r[5]),from:parsePromoDate(r[6],false),to:parsePromoDate(r[7],true),maxDiscount:numericValue(r[8])
-          };}).filter(function(p){return p.active&&p.code;});
-          return true;
-        }catch(e){extraPromos=[];return false;}
-      }
-      function findManualCoupon(code){
-        var normalized=normalizeText(code),now=new Date();
-        return extraPromos.find(function(p){return p.code===normalized&&p.from&&p.to&&now>=p.from&&now<=p.to&&(p.type==="PORCENTAJE"||p.type==="MONTO")&&p.value>0;})||null;
-      }
-      function couponBaseForItem(item,product){
-        if(product==="TODO")return item.originalTotal||item.total;
-        if(product==="IMPRESIONES"&&item.service==="impresiones")return item.originalTotal||item.total;
-        if(product==="FOTOS"&&item.service==="fotos")return item.originalTotal||item.total;
-        if(product==="STICKERS"&&item.service==="stickers")return item.originalTotal||item.total;
-        if(product==="PLOTEOS"&&item.service==="ploteos")return item.originalTotal||item.total;
-        if(product==="GRAFICA COMERCIAL"&&item.service==="grafica")return item.originalTotal||item.total;
-        if(product==="ANILLADOS"&&item.binding)return item.bindingCharge||0;
-        return 0;
-      }
-      function showStep(n){
-        current=n;
-        root.querySelectorAll(".step").forEach(function(s){s.classList.toggle("is-active",Number(s.dataset.step)===n);});
-        root.querySelectorAll(".proto-dot").forEach(function(d,i){d.classList.toggle("is-active",i<n);});
-        root.querySelector("#step-label").textContent="Paso "+n+" de 3";
-        root.querySelector("#proto-heading").innerHTML=n===1?"<strong>¿Qué necesitás cotizar?</strong>":n===2?"<strong>Contanos el trabajo</strong>":"<strong>Tu presupuesto</strong>";
-        root.querySelector("#proto-subheading").textContent=n===1?"Elegí una opción. Solo te preguntaremos lo necesario.":n===2?"Cuatro respuestas simples, sin términos técnicos.":"Revisá el resumen y consultanos por WhatsApp.";
-      }
-      function choose(group,value){
-        root.querySelectorAll("#"+group+" button").forEach(function(b){b.setAttribute("aria-pressed",String(b.dataset.value===value));});
-      }
-      function serviceName(value){
-        return value==="impresiones"?"Impresión de documento":value==="fotos"?"Impresión de fotos":value==="stickers"?"Stickers con precorte":value==="ploteos"?"Ploteo":value==="grafica"?"Gráfica comercial":"Consulta";
-      }
-      function scheduledPromo(){
-        var day=new Date().getDay();
-        if(day===1)return {code:"LUNESDEPLANOS",text:"Lunes: 10% en ploteos CAD sobre papel obra desde 2 metros"};
-        if(day===2)return {code:"MARTESDECOPIAS",text:"Martes: 10% en impresiones"};
-        if(day===3)return {code:"FOTOSPREMIUM",text:"Miércoles: fotos Premium al precio normal"};
-        if(day===4)return {code:"ANILLADO0",text:"Jueves: anillado gratis"};
-        if(day===5)return {code:"STICKER10",text:"Viernes: 10% en planchas A3 de stickers"};
-        if(day===0)return {code:"DOMINGO20",text:"Domingo: 20% en el carrito"};
-        if(day===6)return {code:"SABADO20",text:"Sábado: 20% en el carrito"};
-        return null;
-      }
-      function showServiceForm(value){
-        root.querySelectorAll(".service-form").forEach(function(f){f.classList.toggle("is-active",f.dataset.form===value);});
-      }
-      function paperOptions(){
-        var select=root.querySelector("#proto-special-paper");
-        var options=printSize==="a3"?[
-          ["obra80","Obra 80 g · opción habitual"],["obra140","Obra 140 g"],["obra180","Obra 180 g"],["ilustr120","Ilustración 120 g"],["adhesivo","Autoadhesivo"]
-        ]:[
-          ["obra140","Obra 140 g"],["obra180","Obra 180 g"],["ilustr120","Ilustración 120 g"],["ilustr180","Ilustración 180 g"],["adhesivo","Autoadhesivo"]
-        ];
-        if(printSize==="a4"&&sides==="df"){
-          options.splice(options.length-1,0,["ilustr120df","Ilustración 120 g D/F"],["ilustr240df","Ilustración 240 g D/F"]);
-        }
-        select.textContent="";
-        options.forEach(function(option){
-          var element=document.createElement("option");
-          element.value=option[0];
-          element.textContent=option[1];
-          select.appendChild(element);
-        });
-      }
-      function updatePrintChoices(){
-        var isColor=color==="color";
-        root.querySelector("#proto-paper-kind-wrap").style.display=isColor&&printSize==="a4"?"block":"none";
-        root.querySelector("#proto-special-paper-wrap").style.display=isColor&&(printSize==="a3"||paperKind==="special")?"block":"none";
-        paperOptions();
-      }
-      function updatePhotoChoices(){
-        var size=root.querySelector("#photo-size").value;
-        var carnet=size==="carnet";
-        root.querySelector("#photo-line-wrap").style.display=carnet?"none":"block";
-        root.querySelector("#photo-qty-label").textContent=carnet?"¿Cuántas planchas de 6 fotos?":"¿Cuántas fotos?";
-        root.querySelector("#photo-help").textContent=carnet?"Cada plancha incluye 6 fotos de 4×4 cm. No lleva descuento por cantidad.":"Los descuentos por cantidad se aplican automáticamente.";
-      }
-      function updateGraphicProducts(){
-        var products={
-          tarjetas:[
-            [15000,"100 unidades · simple faz"],[28000,"100 unidades · doble faz"],[41000,"1.000 unidades · barniz UV"],[54000,"1.000 unidades · OPP mate doble faz"]
-          ],
-          recetarios:[
-            [5000,"15×21 B/N · 100 unidades"],[15000,"15×21 B/N · 400 unidades"],[3000,"10×15 B/N · 100 unidades"],[10000,"10×15 B/N · 400 unidades"],[18000,"10×15 color · 400 unidades"]
-          ],
-          folletos:[
-            [4800,"B/N 10×15 · 100 unidades"],[13000,"B/N 10×15 · 500 unidades"],[37000,"Color 10×15 frente · 1.000 unidades"],[110000,"Color 10×15 frente · 5.000 unidades"],[87000,"Color 10×15 doble faz · 2.000 unidades"]
-          ]
-        };
-        var select=root.querySelector("#graphic-product");
-        select.textContent="";
-        products[graphicCategory].forEach(function(product){
-          var option=document.createElement("option");
-          option.value=String(product[0]);
-          option.dataset.description=product[1];
-          option.textContent=product[1]+" · "+money(product[0]);
-          select.appendChild(option);
-        });
-      }
-      function updatePlotPapers(){
-        var kind=root.querySelector("#plot-kind").value,select=root.querySelector("#plot-paper");
-        var options=kind==="cad"?[["obra","Papel obra"]]:[["obra","Papel obra"],["recubierto","Papel recubierto"]];
-        select.textContent="";options.forEach(function(row){var option=document.createElement("option");option.value=row[0];option.textContent=row[1];select.appendChild(option);});
-      }
-      function tierPrice(q,mode,face){
-        if(mode==="color"){
-          if(q<=10)return 200;
-          if(q<=20)return 180;
-          if(q<=50)return 160;
-          if(q<=100)return face==="df"?126:140;
-          return 90;
-        }
-        if(q<=10)return 100;
-        if(q<=30)return face==="df"?80:84;
-        if(q<=100)return face==="df"?64:76;
-        if(q<=200)return face==="df"?56:66;
-        if(q<=300)return face==="df"?50:63;
-        return face==="df"?42:49;
-      }
-      function colorScaleIndex(q){
-        return q<=10?0:q<=20?1:q<=50?2:q<=100?3:4;
-      }
-      function impressionUnitPrice(q){
-        if(color==="bn"&&printSize==="a4")return tierPrice(q,color,sides);
-        if(color==="bn"){
-          var bnMultipliers=sides==="df"?[9.45,8.45,7.45,6.45,6,4]:[7.1,6.6,6.1,5.6,5.2,4];
-          var tier=q<=10?0:q<=30?1:q<=100?2:q<=200?3:q<=300?4:5;
-          return Math.floor((sides==="df"?53:70.5)*bnMultipliers[tier]);
-        }
-        var index=colorScaleIndex(q);
-        if(printSize==="a4"&&paperKind==="common")return tierPrice(q,color,sides);
-        var material=root.querySelector("#proto-special-paper").value;
-        if(printSize==="a3"){
-          if(material==="obra80"){
-            var a3BnMultipliers=sides==="df"?[9.45,8.45,7.45,6.45,6,4]:[7.1,6.6,6.1,5.6,5.2,4];
-            var a3BnTier=q<=10?0:q<=30?1:q<=100?2:q<=200?3:q<=300?4:5;
-            return 2*Math.floor((sides==="df"?53:70.5)*a3BnMultipliers[a3BnTier]);
-          }
-          var a3Costs={obra140:100,obra180:130,ilustr120:187,adhesivo:470};
-          var normalFactors=[12,11.4,11,10.5,10];
-          var adhesiveFactors=[7,6.5,6.3,6,5];
-          return a3Costs[material]*(material==="adhesivo"?adhesiveFactors:normalFactors)[index];
-        }
-        var a4Materials={
-          obra140:{cost:60,multiplier:10,discounts:[0,5,10,12,23.3]},
-          obra180:{cost:70,multiplier:12,discounts:[0,5,10,12,15]},
-          ilustr120:{cost:59.2,multiplier:11,discounts:[0,5,10,12,21.5]},
-          ilustr180:{cost:108.6,multiplier:7,discounts:[0,5,10,12,15],directCost:true,round100:true},
-          ilustr120df:{cost:136,multiplier:4,discounts:[0,5,10,12,15],directCost:true,round100:true},
-          ilustr240df:{cost:200,multiplier:5,discounts:[0,5,10,12,15],directCost:true,round100:true},
-          adhesivo:{cost:180,multiplier:8.09,discounts:[0,5,10,12,15]}
-        };
-        var selected=a4Materials[material];
-        var baseCost=selected.directCost?selected.cost:selected.cost+50;
-        var calculated=baseCost*selected.multiplier*(1-selected.discounts[index]/100);
-        return selected.round100?Math.round(calculated/100)*100:Math.round(calculated);
-      }
-      function money(value){
-        return "$"+Math.round(value).toLocaleString("es-AR");
-      }
-      function renderCart(){
-        var items=cart.slice();
-        if(currentItem)items.push(currentItem);
-        var summary=root.querySelector("#cart-summary");
-        summary.textContent="";
-        items.forEach(function(item,index){
-          var row=document.createElement("div");
-          row.className="summary-line";
-          var main=document.createElement("div");
-          main.className="summary-main";
-          var name=document.createElement("strong");
-          name.textContent=item.work;
-          var details=document.createElement("span");
-          details.className="text-small";
-          details.textContent=item.qty+" · "+item.mode+(item.binding?" · Con anillado":"")+(item.promoLabel?" · "+item.promoLabel:"");
-          main.appendChild(name);
-          main.appendChild(details);
-          var end=document.createElement("div");
-          end.className="summary-end";
-          var amount=document.createElement("strong");
-          amount.textContent=money(item.total);
-          end.appendChild(amount);
-          if(index<cart.length){
-            var remove=document.createElement("button");
-            remove.className="btn btn-ghost";
-            remove.type="button";
-            remove.textContent="Quitar";
-            remove.addEventListener("click",function(){cart.splice(index,1);renderCart();});
-            end.appendChild(remove);
-          }
-          row.appendChild(main);
-          row.appendChild(end);
-          summary.appendChild(row);
-        });
-        var originalTotal=items.reduce(function(sum,item){return sum+(item.originalTotal||item.total);},0);
-        var dailyDiscount=items.reduce(function(sum,item){return sum+(item.promoSaving||0);},0);
-        var afterDaily=items.reduce(function(sum,item){return sum+item.total;},0);
-        var eligibleCouponBase=manualCoupon?items.reduce(function(sum,item){return sum+couponBaseForItem(item,manualCoupon.product);},0):0;
-        var couponCandidate=0;
-        if(manualCoupon){
-          couponCandidate=manualCoupon.type==="PORCENTAJE"?Math.round(eligibleCouponBase*manualCoupon.value/100):manualCoupon.value;
-          couponCandidate=Math.min(eligibleCouponBase,couponCandidate);
-          if(manualCoupon.maxDiscount>0)couponCandidate=Math.min(couponCandidate,manualCoupon.maxDiscount);
-        }
-        var allowedTotalDiscount=Math.round(originalTotal*.25);
-        var couponDiscount=Math.max(0,Math.min(couponCandidate,allowedTotalDiscount-dailyDiscount));
-        var grandTotal=Math.max(0,afterDaily-couponDiscount);
-        root.querySelector("#proto-total").textContent=money(grandTotal);
-        var deposit=Math.round(grandTotal*.5);
-        root.querySelector("#proto-deposit").textContent=money(deposit);
-        var lines=items.map(function(item){
-          return "• "+item.work+"\n  "+item.qty+" · "+item.mode+(item.binding?" · Con anillado":"")+"\n  "+money(item.total);
-        });
-        var discountLine=manualCoupon&&couponDiscount>0?"\n• Cupón "+manualCoupon.code+": -"+money(couponDiscount):"";
-        var message="Hola, quiero confirmar este pedido.\n\n*PEDIDO*\n"+lines.join("\n\n")+discountLine+"\n\n*TOTAL: "+money(grandTotal)+"*\n*SEÑA 50%: "+money(deposit)+"*\n\n*PARA CONFIRMAR, ENVÍO EN ESTE CHAT:*\n1. Los archivos definitivos.\n2. El comprobante de la seña.\n\nLa orden entra en producción después de recibir y revisar ambos.\n*Alias:* libreriasaber.mp\n\n_Sujeto a revisión. Si hay diferencias, me contactarán antes de producir._";
-        root.querySelector("#proto-whatsapp").href="https://api.whatsapp.com/send?phone=5493513110130&text="+encodeURIComponent(message);
-        var status=root.querySelector("#proto-code-status");
-        if(manualCoupon){
-          if(eligibleCouponBase<=0)status.textContent=manualCoupon.code+" es válido, pero no hay productos alcanzados por esta promoción.";
-          else status.textContent=manualCoupon.code+" aplicado · "+manualCoupon.label+" · vence "+manualCoupon.to.toLocaleDateString("es-AR")+(couponDiscount<couponCandidate?" · descuento limitado por el máximo acumulable":"")+".";
-        }
-      }
-      root.querySelectorAll("[data-service]").forEach(function(b){b.addEventListener("click",function(){
-        if(b.dataset.service==="otro")window.open("https://wa.me/5493513110130?text="+encodeURIComponent("Hola, necesito ayuda para cotizar un trabajo."),"_blank","noopener");
-        else{service=b.dataset.service;trackEvent("iniciar_cotizacion",{servicio:service});showServiceForm(service);showStep(2);}
-      });});
-      root.querySelectorAll("[data-back]").forEach(function(b){b.addEventListener("click",function(){showStep(Number(b.dataset.back));});});
-      root.querySelectorAll("#proto-print-size button").forEach(function(b){b.addEventListener("click",function(){printSize=b.dataset.value;choose("proto-print-size",printSize);updatePrintChoices();});});
-      root.querySelectorAll("#proto-color button").forEach(function(b){b.addEventListener("click",function(){color=b.dataset.value;choose("proto-color",color);updatePrintChoices();});});
-      root.querySelectorAll("#proto-paper-kind button").forEach(function(b){b.addEventListener("click",function(){paperKind=b.dataset.value;choose("proto-paper-kind",paperKind);updatePrintChoices();});});
-      root.querySelector("#photo-size").addEventListener("change",updatePhotoChoices);
-      root.querySelector("#plot-kind").addEventListener("change",updatePlotPapers);
-      root.querySelectorAll("#graphic-category button").forEach(function(b){b.addEventListener("click",function(){graphicCategory=b.dataset.value;choose("graphic-category",graphicCategory);updateGraphicProducts();});});
-      root.querySelectorAll("#proto-sides button").forEach(function(b){b.addEventListener("click",function(){sides=b.dataset.value;choose("proto-sides",sides);updatePrintChoices();});});
-      updateGraphicProducts();
-      updatePlotPapers();
-      root.querySelector("#proto-calc").addEventListener("click",function(){
-        var total=0;
-        var bindingCharge=0;
-        var qtyText="";
-        var modeText="";
-        var binding=false;
-        if(service==="impresiones"){
-          var pages=Math.max(1,Number(root.querySelector("#proto-pages").value)||1);
-          var copies=Math.max(1,Number(root.querySelector("#proto-copies").value)||1);
-          var prints=pages*copies;
-          total=prints*impressionUnitPrice(prints);
-          binding=root.querySelector("#proto-binding").checked;
-          if(binding){bindingCharge=(pages<=100?2330:pages<=200?2580:3800)*(printSize==="a3"?2:1);total+=bindingCharge;}
-          qtyText=pages+" páginas × "+copies+" copia"+(copies===1?"":"s");
-          var paperText=color==="bn"?"Obra 70 g":printSize==="a4"&&paperKind==="common"?"Obra 70 g":root.querySelector("#proto-special-paper").options[root.querySelector("#proto-special-paper").selectedIndex].text;
-          modeText=printSize.toUpperCase()+" · "+(color==="bn"?"B/N":"Color")+" · "+paperText+" · "+(sides==="sf"?"Una cara":"Ambas caras");
-        }else if(service==="fotos"){
-          var line=root.querySelector("#photo-line").value;
-          var size=root.querySelector("#photo-size").value;
-          var photoQty=Math.max(1,Number(root.querySelector("#photo-qty").value)||1);
-          var prices={normal:{"10x15":500,"13x18":800,a4:1600,a3:3500,polaroid:2900},luster:{"10x15":800,"13x18":1200,a4:2500,a3:4500,polaroid:2900}};
-          var discount=size==="carnet"?0:photoQty>=100?13:photoQty>=50?10:photoQty>=20?5:0;
-          if(size==="carnet"){
-            total=photoQty*1000;
-            qtyText=photoQty+" plancha"+(photoQty===1?"":"s")+" de 6 fotos";
-            modeText="Foto carnet 4×4 · recorte y preparación incluidos";
-          }else{
-            total=photoQty*Math.round(prices[line][size]*(1-discount/100));
-            qtyText=photoQty+" foto"+(photoQty===1?"":"s")+" · "+(size==="polaroid"?"Estilo Polaroid":size.toUpperCase());
-            modeText=line==="normal"?"Papel fotográfico":"Premium Luster";
-          }
-        }else if(service==="stickers"){
-          var stickerSize=root.querySelector("#sticker-size").value;
-          var stickerQty=Math.max(1,Number(root.querySelector("#sticker-qty").value)||1);
-          total=stickerQty*(stickerSize==="a4"?3000:5000)*(stickerQty>=21?0.9:1);
-          qtyText=stickerQty+" plancha"+(stickerQty===1?"":"s")+" "+stickerSize.toUpperCase();
-          modeText="Adhesivo fotográfico con precorte";
-        }else if(service==="ploteos"){
-          var kind=root.querySelector("#plot-kind").value;
-          var plotPaper=root.querySelector("#plot-paper").value;
-          var width=Math.max(1,Number(root.querySelector("#plot-width").value)||1);
-          var height=Math.max(1,Number(root.querySelector("#plot-height").value)||1);
-          var plotQty=Math.max(1,Number(root.querySelector("#plot-qty").value)||1);
-          var rolls=plotPaper==="recubierto"?[60,90]:[42,60,90];
-          var priceTables={obra:{cad:{42:3618,60:5184,90:6024},pleno:{42:6534,60:9072,90:9912}},recubierto:{pleno:{60:17300,90:22204}}};
-          var meterPrices=priceTables[plotPaper][kind];
-          function bestOrientation(w,h){var best=null;rolls.forEach(function(candidateRoll){if(w>candidateRoll||meterPrices[candidateRoll]===undefined)return;var meters=(h/100)*plotQty,cost=meters*meterPrices[candidateRoll];if(!best||cost<best.cost)best={roll:candidateRoll,meters:meters,cost:cost};});return best;}
-          var normal=bestOrientation(width,height),rotated=bestOrientation(height,width);
-          var best=!normal?rotated:!rotated?normal:(rotated.cost<normal.cost?rotated:normal);
-          if(!best){alert("Las medidas no entran en los rollos disponibles.");return;}
-          var roll=best.roll,plotMeters=best.meters;
-          total=best.cost;
-          qtyText=plotQty+" unidad"+(plotQty===1?"":"es")+" · "+width+"×"+height+" cm";
-          modeText=(kind==="cad"?"Plano / líneas":"Póster / imagen plena")+" · "+(plotPaper==="obra"?"Papel obra":"Papel recubierto");
-        }else{
-          var product=root.querySelector("#graphic-product");
-          var lots=Math.max(1,Number(root.querySelector("#graphic-lots").value)||1);
-          total=Number(product.value)*lots;
-          qtyText=lots+" lote"+(lots===1?"":"s");
-          var graphicNames={tarjetas:"Tarjetas personales",recetarios:"Recetarios",folletos:"Folletos"};
-          modeText=graphicNames[graphicCategory]+" · "+product.options[product.selectedIndex].dataset.description;
-        }
-        var originalTotal=Math.round(total);
-        var promo=scheduledPromo();
-        var promoSaving=0;
-        var promoLabel="";
-        if(promo&&promo.code==="LUNESDEPLANOS"&&service==="ploteos"&&kind==="cad"&&plotPaper==="obra"&&plotMeters>=2){
-          promoSaving=Math.round(total*.1);total-=promoSaving;promoLabel="LUNESDEPLANOS · 10% en planos desde 2 metros";
-        }else if(promo&&promo.code==="MARTESDECOPIAS"&&service==="impresiones"){
-          promoSaving=Math.round(total*.1);total-=promoSaving;promoLabel="MARTESDECOPIAS · 10% en impresiones";
-        }else if(promo&&promo.code==="FOTOSPREMIUM"&&service==="fotos"&&line==="luster"&&size!=="a3"){
-          var normalUnit=Math.round(prices.normal[size]*(1-discount/100));
-          var premiumPromoTotal=photoQty*normalUnit;
-          promoSaving=Math.max(0,total-premiumPromoTotal);total=premiumPromoTotal;promoLabel="FOTOSPREMIUM · Premium al precio normal";
-        }else if(promo&&promo.code==="ANILLADO0"&&service==="impresiones"&&bindingCharge>0){
-          promoSaving=bindingCharge;total-=promoSaving;promoLabel="ANILLADO0 · Anillado gratis";
-        }else if(promo&&promo.code==="STICKER10"&&service==="stickers"&&stickerSize==="a3"){
-          var fridayTotal=stickerQty*5000*.9;
-          promoSaving=Math.max(0,total-fridayTotal);total=Math.min(total,fridayTotal);promoLabel="STICKER10 · 10% en Stickers A3";
-        }else if(promo&&(promo.code==="SABADO20"||promo.code==="DOMINGO20")){
-          promoSaving=Math.round(total*.2);total-=promoSaving;promoLabel=promo.code+" · 20% en el carrito";
-        }
-        currentItem={service:service,work:serviceName(service),qty:qtyText,mode:modeText,binding:binding,bindingCharge:bindingCharge,promoLabel:promoLabel,promoSaving:promoSaving,originalTotal:originalTotal,total:Math.round(total)};
-        trackEvent("presupuesto_calculado",{servicio:service,value:currentItem.total,currency:"ARS"});
-        renderCart();
-        root.querySelector("#proto-auto-promo").style.display=promoSaving>0?"block":"none";
-        root.querySelector("#proto-auto-promo").textContent=promoSaving>0?"Cupón de hoy aplicado: "+promoLabel+". Ahorrás $"+Math.round(promoSaving).toLocaleString("es-AR")+".":"";
-        showStep(3);
-      });
-      root.querySelector("#proto-add").addEventListener("click",function(){
-        if(currentItem){cart.push(currentItem);currentItem=null;}
-        showStep(1);
-      });
-      root.querySelector("#proto-apply-code").addEventListener("click",async function(){
-        var code=root.querySelector("#proto-code").value.trim();
-        if(!code){root.querySelector("#proto-code-status").textContent="Ingresá el código de promoción.";return;}
-        root.querySelector("#proto-code-status").textContent="Comprobando promoción...";
-        var loaded=true;
-        if(!extraPromos.length)loaded=await loadExtraPromos();
-        if(!loaded){root.querySelector("#proto-code-status").textContent="No pudimos consultar las promociones. Revisá la conexión e intentá nuevamente.";return;}
-        var verified=findManualCoupon(code);
-        if(!verified){manualCoupon=null;root.querySelector("#proto-code-status").textContent="El código no existe, está desactivado o está fuera de fecha.";renderCart();return;}
-        manualCoupon=verified;trackEvent("cupon_aplicado",{codigo:verified.code,producto:verified.product});renderCart();
-      });
-      root.querySelector("#proto-whatsapp").addEventListener("click",function(){
-        var items=cart.slice();if(currentItem)items.push(currentItem);
-        var total=items.reduce(function(sum,item){return sum+item.total;},0);
-        trackEvent("confirmar_whatsapp",{value:Math.round(total),currency:"ARS",cantidad_items:items.length});
-      });
-      (async function(){
-        var loaded=await loadExtraPromos();
-        var token=new URLSearchParams(location.search).get("cupon");
-        if(!token)return;
-        root.querySelector("#proto-code").value=token;
-        manualCoupon=loaded?findManualCoupon(token):null;
-        root.querySelector("#proto-code-status").textContent=manualCoupon?manualCoupon.code+" cargado automáticamente.":"El código no existe, está desactivado o está fuera de fecha.";
-        if(manualCoupon)renderCart();
-      })();
-    })();
-  </script>
-</div>
-</main></body></html>
+    <section id="cotizador">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <h2>Cotizador online</h2>
+            <p>Completá los datos del trabajo. Los productos de oferta que agregues se incorporarán al mensaje final de WhatsApp.</p>
+          </div>
+        </div>
+        <div class="quote-shell">
+          <div class="quote-top">
+            <strong>Cotizador oficial de LIBRERIA SABER</strong>
+            <span>Precios estimados sujetos a revisión técnica.</span>
+          </div>
+          <iframe id="cotizador-frame" src="cotizador.html" title="Cotizador de LIBRERIA SABER"></iframe>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-soft" id="contacto">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <h2>Contacto</h2>
+            <p>Canales reales de LIBRERIA SABER para consultas, envío de archivos y confirmación de pedidos.</p>
+          </div>
+        </div>
+        <div class="contact-grid">
+          <div class="contact-card">
+            <h3>Hablemos por WhatsApp</h3>
+            <p>El cotizador prepara el detalle del pedido. Después podés enviar los archivos y confirmar la seña desde el mismo chat.</p>
+            <div class="contact-list">
+              <a class="contact-link" href="https://wa.me/5493513110130" target="_blank" rel="noopener"><span>WhatsApp</span><span>+54 9 351 311-0130</span></a>
+              <a class="contact-link" href="https://www.instagram.com/libreriasaber/" target="_blank" rel="noopener"><span>Instagram</span><span>@libreriasaber</span></a>
+            </div>
+          </div>
+          <div class="contact-card">
+            <h3>LIBRERIA SABER</h3>
+            <p><strong>Córdoba Capital, Argentina.</strong></p>
+            <p>Útiles escolares, artículos de oficina, impresiones, fotos, stickers, ploteos y gráfica comercial.</p>
+            <a class="btn btn-primary" href="https://wa.me/5493513110130?text=Hola%2C%20necesito%20informaci%C3%B3n%20sobre%20horarios%20y%20ubicaci%C3%B3n." target="_blank" rel="noopener">Consultar horarios y ubicación</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-wrap">
+      <strong>LIBRERIA SABER</strong>
+      <small>Presupuestos online · Córdoba Capital</small>
+    </div>
+  </footer>
+
+  <button class="offer-cart-toggle" id="offer-cart-toggle" type="button">Ofertas agregadas: <span id="offer-count">0</span></button>
+  <div class="cart-backdrop" id="cart-backdrop"></div>
+  <aside class="offer-drawer" id="offer-drawer" aria-label="Productos de oferta agregados">
+    <div class="drawer-head">
+      <h3>Productos agregados</h3>
+      <button class="icon-btn" id="drawer-close" type="button" aria-label="Cerrar">×</button>
+    </div>
+    <div class="drawer-list" id="drawer-list"></div>
+    <div class="drawer-foot">
+      <div class="drawer-total"><span>Total ofertas</span><span id="drawer-total">$0</span></div>
+      <div class="order-note">Estos productos se sumarán al detalle y al total del mensaje final de WhatsApp.</div>
+      <button class="btn btn-primary" id="go-quote" type="button">Ir al cotizador</button>
+      <a class="btn btn-secondary" id="send-products-only" href="#" target="_blank" rel="noopener">Enviar solo estos productos</a>
+    </div>
+  </aside>
+
+  <script src="site.js" defer></script>
+</body>
+</html>
