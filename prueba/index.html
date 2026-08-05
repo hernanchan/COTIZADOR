@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="description" content="Vista de prueba del nuevo sitio y cotizador de LIBRERIA SABER.">
+  <meta name="theme-color" content="#0b3d70">
+  <title>PRUEBA · LIBRERIA SABER</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/hernanchan/COTIZADOR@50b47daecfd3b1490bab03c235d47b7285f9f49e/site.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/hernanchan/COTIZADOR@50b47daecfd3b1490bab03c235d47b7285f9f49e/mobile.css">
+</head>
+<body>
+  <div style="background:#f7941d;color:#fff;text-align:center;padding:8px 12px;font:800 13px/1.3 Arial,sans-serif;letter-spacing:.03em">VERSIÓN DE PRUEBA · EL COTIZADOR ACTUAL SIGUE SIN CAMBIOS</div>
+  <header class="site-header">
+    <div class="container nav-wrap">
+      <a class="brand" href="#inicio" aria-label="Ir al inicio de LIBRERIA SABER">
+        <img src="https://cdn.jsdelivr.net/gh/hernanchan/COTIZADOR@50b47daecfd3b1490bab03c235d47b7285f9f49e/assets/logo-sbr.png" alt="Logo de LIBRERIA SABER">
+        <span class="brand-copy">
+          <strong>LIBRERIA SABER</strong>
+          <span>Escolar · Oficina · Gráfica</span>
+        </span>
+      </a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="main-nav" aria-label="Abrir menú">
+        <span></span><span></span><span></span>
+      </button>
+      <nav class="main-nav" id="main-nav" aria-label="Navegación principal">
+        <a href="#inicio">Inicio</a>
+        <a href="#cotizador">Cotizador</a>
+        <a href="#servicios">Servicios</a>
+        <a href="#promos" data-promo-link hidden>Promos</a>
+        <a href="#contacto">Contacto</a>
+        <a class="nav-cta" href="#cotizador">Cotizar ahora</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero" id="inicio">
+      <div class="container hero-grid">
+        <div>
+          <div class="eyebrow">Sitio oficial</div>
+          <h1>LIBRERIA <span>SABER</span></h1>
+          <p class="hero-lead">Útiles escolares, oficina, impresiones y ploteos.</p>
+          <p class="hero-text">Más de 35 años acompañando a estudiantes, familias, comercios y profesionales de la zona. Todo lo que necesitás, en un mismo lugar. Cotizá tu trabajo online y envianos el pedido directamente por WhatsApp.</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="#cotizador">Cotizar un trabajo</a>
+            <a class="btn btn-secondary" href="#promos" data-promo-link hidden>Ver promociones</a>
+          </div>
+          <div class="hero-badges">
+            <span class="hero-badge"><i></i>Presupuesto inmediato</span>
+            <span class="hero-badge"><i></i>Confirmación por WhatsApp</span>
+            <span class="hero-badge"><i></i>Atención en Córdoba Capital</span>
+          </div>
+        </div>
+        <div class="hero-visual" aria-hidden="true">
+          <div class="visual-card">
+            <img class="hero-logo" src="https://cdn.jsdelivr.net/gh/hernanchan/COTIZADOR@50b47daecfd3b1490bab03c235d47b7285f9f49e/assets/logo-sbr.png" alt="">
+            <div class="paper-stack">
+              <div class="paper two"></div>
+              <div class="paper one"></div>
+              <div class="paper three"><span class="paper-lines"></span></div>
+            </div>
+            <div class="ruler"></div>
+            <div class="pencil"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="servicios">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <h2>Servicios principales</h2>
+            <p>Los servicios con precio automático abren el cotizador. Los trabajos especiales se consultan directamente por WhatsApp.</p>
+          </div>
+        </div>
+        <div class="services-grid">
+          <button class="service-card" data-service-target="impresiones"><span class="service-icon">🖨</span><span><strong>Impresiones</strong><span>Documentos A4 y A3, blanco y negro o color.</span></span></button>
+          <button class="service-card" data-service-target="fotos"><span class="service-icon">▣</span><span><strong>Fotos</strong><span>10×15, 13×18, A4, A3, Polaroid y carnet.</span></span></button>
+          <button class="service-card" data-service-target="stickers"><span class="service-icon">✦</span><span><strong>Stickers</strong><span>Planchas impresas con precorte.</span></span></button>
+          <button class="service-card" data-service-target="anillados"><span class="service-icon">◫</span><span><strong>Impresión + anillado</strong><span>Cotizá las impresiones y agregá el anillado al trabajo.</span></span></button>
+          <button class="service-card" data-service-target="ploteos"><span class="service-icon">↔</span><span><strong>Ploteos</strong><span>Planos, pósteres y trabajos de gran formato.</span></span></button>
+          <button class="service-card" data-contact-service="Ploteo de corte"><span class="service-icon">✂</span><span><strong>Ploteo de corte</strong><span>Vinilo, corte, pelado y colocación. Consultar por WhatsApp.</span></span></button>
+          <button class="service-card" data-service-target="grafica"><span class="service-icon">▤</span><span><strong>Gráfica comercial</strong><span>Tarjetas, recetarios y folletos.</span></span></button>
+          <button class="service-card" data-contact-service="Escaneo de documentos"><span class="service-icon">◎</span><span><strong>Escaneo</strong><span>Digitalización de documentos. Consultar por WhatsApp.</span></span></button>
+          <button class="service-card" data-service-target="otro"><span class="service-icon">?</span><span><strong>Asesoramiento</strong><span>Cuando no sabés qué opción elegir.</span></span></button>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-soft" id="promos" hidden>
+      <div class="container">
+        <div class="section-head"><div><h2>Promociones y oportunidades</h2><p>Productos seleccionados que podés sumar al mismo pedido del cotizador.</p></div></div>
+        <div class="promo-grid" id="promo-grid" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section id="cotizador">
+      <div class="container">
+        <div class="section-head"><div><h2>Cotizador online</h2><p>Completá los datos del trabajo y enviá el presupuesto directamente por WhatsApp.</p></div></div>
+        <div class="quote-shell">
+          <div class="quote-top"><strong>Cotizador oficial de LIBRERIA SABER</strong><span>Precios estimados sujetos a revisión técnica.</span></div>
+          <iframe id="cotizador-frame" src="../index.html" title="Cotizador de LIBRERIA SABER"></iframe>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-soft" id="contacto">
+      <div class="container">
+        <div class="section-head"><div><h2>Contacto</h2><p>Canales oficiales de LIBRERIA SABER para consultas, envío de archivos y confirmación de pedidos.</p></div></div>
+        <div class="contact-grid">
+          <div class="contact-card">
+            <h3>Hablemos por WhatsApp</h3>
+            <p>El cotizador prepara el detalle del pedido. Después podés enviar los archivos y confirmar la seña desde el mismo chat.</p>
+            <div class="contact-list">
+              <a class="contact-link" href="https://wa.me/5493513110130" target="_blank" rel="noopener"><span>WhatsApp</span><span>+54 9 351 311-0130</span></a>
+              <a class="contact-link" href="mailto:libreriasaber@gmail.com"><span>Correo</span><span>libreriasaber@gmail.com</span></a>
+              <a class="contact-link" href="https://www.instagram.com/libreriasaber/" target="_blank" rel="noopener"><span>Instagram</span><span>@libreriasaber</span></a>
+            </div>
+          </div>
+          <div class="contact-card">
+            <h3>LIBRERIA SABER</h3>
+            <p><strong>Javier Lascano Colodrero, barrio Poeta Lugones, Córdoba.</strong></p>
+            <p><strong>Horario:</strong><br>Lunes a viernes de 7:00 a 13:30 y de 16:30 a 20:00.</p>
+            <p>Útiles escolares, artículos de oficina, impresiones, fotos, stickers, ploteos y gráfica comercial.</p>
+            <a class="btn btn-primary" href="https://maps.app.goo.gl/xZTZycc15UEd1TJB8" target="_blank" rel="noopener">Cómo llegar</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer"><div class="container footer-wrap"><strong>LIBRERIA SABER</strong><small>Presupuestos online · Córdoba Capital</small></div></footer>
+
+  <button class="offer-cart-toggle" id="offer-cart-toggle" type="button">Ofertas agregadas: <span id="offer-count">0</span></button>
+  <div class="cart-backdrop" id="cart-backdrop"></div>
+  <aside class="offer-drawer" id="offer-drawer" aria-label="Productos de oferta agregados">
+    <div class="drawer-head"><h3>Productos agregados</h3><button class="icon-btn" id="drawer-close" type="button" aria-label="Cerrar">×</button></div>
+    <div class="drawer-list" id="drawer-list"></div>
+    <div class="drawer-foot">
+      <div class="drawer-total"><span>Total ofertas</span><span id="drawer-total">$0</span></div>
+      <div class="order-note">Estos productos se sumarán al detalle y al total del mensaje final de WhatsApp.</div>
+      <button class="btn btn-primary" id="go-quote" type="button">Ir al cotizador</button>
+      <a class="btn btn-secondary" id="send-products-only" href="#" target="_blank" rel="noopener">Enviar solo estos productos</a>
+    </div>
+  </aside>
+
+  <script src="https://cdn.jsdelivr.net/gh/hernanchan/COTIZADOR@50b47daecfd3b1490bab03c235d47b7285f9f49e/site.js" defer></script>
+</body>
+</html>
