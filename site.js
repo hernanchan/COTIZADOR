@@ -294,10 +294,25 @@
     document.getElementById("cotizador").scrollIntoView({behavior:"smooth",block:"start"});
     setTimeout(function(){
       try{
-        var target=frame.contentDocument.querySelector('[data-service="'+service+'"]');
+        var internalService=service==="anillados"?"impresiones":service;
+        var target=frame.contentDocument.querySelector('[data-service="'+internalService+'"]');
         if(target)target.click();
+        if(service==="anillados"){
+          setTimeout(function(){
+            try{
+              var binding=frame.contentDocument.getElementById("proto-binding");
+              if(binding&&!binding.checked)binding.click();
+              resizeFrame();
+            }catch(e){}
+          },100);
+        }
       }catch(e){}
     },500);
+  }
+  function consultService(service){
+    var message="Hola, quiero consultar por el servicio de *"+service+"*.";
+    var href="https://api.whatsapp.com/send?phone=5493513110130&text="+encodeURIComponent(message);
+    window.open(href,"_blank","noopener");
   }
   function setMenu(open){
     mainNav.classList.toggle("is-open",open);
@@ -307,6 +322,9 @@
 
   document.querySelectorAll("[data-service-target]").forEach(function(button){
     button.addEventListener("click",function(){selectService(button.dataset.serviceTarget);});
+  });
+  document.querySelectorAll("[data-contact-service]").forEach(function(button){
+    button.addEventListener("click",function(){consultService(button.dataset.contactService);});
   });
   navToggle.addEventListener("click",function(){setMenu(!mainNav.classList.contains("is-open"));});
   mainNav.querySelectorAll("a").forEach(function(link){
