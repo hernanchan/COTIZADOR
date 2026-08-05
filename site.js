@@ -1,7 +1,11 @@
 (function(){
   "use strict";
   var frame=document.getElementById("cotizador-frame");
+  var promoSection=document.getElementById("promos");
   var promoGrid=document.getElementById("promo-grid");
+  var promoLinks=document.querySelectorAll("[data-promo-link]");
+  var navToggle=document.getElementById("nav-toggle");
+  var mainNav=document.getElementById("main-nav");
   var cartToggle=document.getElementById("offer-cart-toggle");
   var cartBackdrop=document.getElementById("cart-backdrop");
   var drawer=document.getElementById("offer-drawer");
@@ -58,18 +62,20 @@
       products=activeProducts(data);
     }catch(e){products=[];}
     if(!products.length&&new URLSearchParams(location.search).get("demoPromos")==="1")products=demoProducts();
+
+    var activeIds=products.map(function(product){return product.id;});
+    promoCart=promoCart.filter(function(item){return activeIds.indexOf(item.id)!==-1;});
+    localStorage.setItem("saberPromoCart",JSON.stringify(promoCart));
+    renderDrawer();
     renderPromos();
   }
   function renderPromos(){
+    var hasProducts=products.length>0;
+    promoSection.hidden=!hasProducts;
+    promoLinks.forEach(function(link){link.hidden=!hasProducts;});
     promoGrid.textContent="";
-    if(!products.length){
-      var empty=document.createElement("div");
-      empty.className="promo-empty";
-      empty.style.gridColumn="1/-1";
-      empty.innerHTML="<strong>No hay productos destacados activos en este momento.</strong><br>Los códigos de descuento se siguen aplicando dentro del cotizador.";
-      promoGrid.appendChild(empty);
-      return;
-    }
+    if(!hasProducts)return;
+
     products.forEach(function(product){
       var card=document.createElement("article");
       card.className="promo-card";
@@ -113,15 +119,27 @@
       var action=document.createElement("div");
       action.className="promo-action";
       var qty=document.createElement("input");
-      qty.type="number";qty.min="1";qty.max=String(product.max_per_order||99);qty.value="1";qty.className="qty-input";qty.setAttribute("aria-label","Cantidad");
+      qty.type="number";
+      qty.min="1";
+      qty.max=String(product.max_per_order||99);
+      qty.value="1";
+      qty.className="qty-input";
+      qty.setAttribute("aria-label","Cantidad");
       var add=document.createElement("button");
-      add.className="btn btn-primary";add.type="button";add.textContent="Agregar al pedido";
+      add.className="btn btn-primary";
+      add.type="button";
+      add.textContent="Agregar al pedido";
       add.addEventListener("click",function(){
         addProduct(product,Math.max(1,Math.min(Number(qty.value)||1,Number(product.max_per_order)||99)));
       });
-      action.appendChild(qty);action.appendChild(add);
-      body.appendChild(title);body.appendChild(prices);body.appendChild(condition);body.appendChild(action);
-      card.appendChild(media);card.appendChild(body);
+      action.appendChild(qty);
+      action.appendChild(add);
+      body.appendChild(title);
+      body.appendChild(prices);
+      body.appendChild(condition);
+      body.appendChild(action);
+      card.appendChild(media);
+      card.appendChild(body);
       promoGrid.appendChild(card);
     });
   }
@@ -152,13 +170,18 @@
       copy.querySelector("strong").textContent=item.name;
       copy.querySelector("small").textContent=item.qty+" × "+money(item.price)+" = "+money(item.qty*item.price);
       var remove=document.createElement("button");
-      remove.className="remove-offer";remove.type="button";remove.textContent="Quitar";
+      remove.className="remove-offer";
+      remove.type="button";
+      remove.textContent="Quitar";
       remove.addEventListener("click",function(){promoCart.splice(index,1);saveCart();});
-      row.appendChild(copy);row.appendChild(remove);drawerList.appendChild(row);
+      row.appendChild(copy);
+      row.appendChild(remove);
+      drawerList.appendChild(row);
     });
     if(!promoCart.length){
       var empty=document.createElement("div");
-      empty.className="promo-empty";empty.textContent="Todavía no agregaste productos.";
+      empty.className="promo-empty";
+      empty.textContent="Todavía no agregaste productos.";
       drawerList.appendChild(empty);
     }
     offerCount.textContent=String(cartQty());
@@ -276,16 +299,28 @@
       }catch(e){}
     },500);
   }
+  function setMenu(open){
+    mainNav.classList.toggle("is-open",open);
+    navToggle.setAttribute("aria-expanded",String(open));
+    navToggle.setAttribute("aria-label",open?"Cerrar menú":"Abrir menú");
+  }
 
   document.querySelectorAll("[data-service-target]").forEach(function(button){
     button.addEventListener("click",function(){selectService(button.dataset.serviceTarget);});
+  });
+  navToggle.addEventListener("click",function(){setMenu(!mainNav.classList.contains("is-open"));});
+  mainNav.querySelectorAll("a").forEach(function(link){
+    link.addEventListener("click",function(){setMenu(false);});
   });
   cartToggle.addEventListener("click",openDrawer);
   cartBackdrop.addEventListener("click",closeDrawer);
   document.getElementById("drawer-close").addEventListener("click",closeDrawer);
   document.getElementById("go-quote").addEventListener("click",function(){closeDrawer();document.getElementById("cotizador").scrollIntoView({behavior:"smooth"});});
   frame.addEventListener("load",connectFrame);
-  window.addEventListener("resize",resizeFrame);
+  window.addEventListener("resize",function(){
+    resizeFrame();
+    if(window.innerWidth>760)setMenu(false);
+  });
   renderDrawer();
   loadProducts();
 })();
