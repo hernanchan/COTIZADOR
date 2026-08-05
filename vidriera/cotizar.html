@@ -5,30 +5,33 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="robots" content="noindex,nofollow,noarchive">
   <meta name="theme-color" content="#082f57">
-  <title>Cotizador · Prueba Vidriera Saber</title>
+  <title>Cotizador · Librería Saber</title>
   <style>
     :root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;--blue:#082f57;--orange:#f7941d;--line:#dbe5ed;--muted:#637187}
-    *{box-sizing:border-box}body{margin:0;background:#f4f8fb;color:#132033}.top{position:sticky;top:0;z-index:30;background:#fff;border-bottom:1px solid var(--line);box-shadow:0 8px 24px rgba(8,47,87,.07)}.bar{width:min(1180px,calc(100% - 28px));margin:auto;min-height:72px;display:flex;align-items:center;justify-content:space-between;gap:16px}.back{text-decoration:none;font-weight:900;color:var(--blue);padding:11px 14px;border:1px solid var(--line);border-radius:12px}.title{min-width:0}.title b{display:block;color:var(--blue);font-size:18px}.title span{display:block;color:var(--muted);font-size:12px;margin-top:3px}.wa{text-decoration:none;background:var(--orange);color:#fff;font-weight:900;padding:12px 15px;border-radius:12px}.notice{background:#f7941d;color:#fff;text-align:center;font-size:12px;font-weight:900;letter-spacing:.06em;padding:7px 10px}.shell{width:min(1180px,calc(100% - 20px));margin:18px auto 32px;background:#fff;border:1px solid var(--line);border-radius:22px;overflow:hidden;box-shadow:0 20px 50px rgba(8,47,87,.12)}iframe{display:block;width:100%;height:1500px;border:0;background:#fff}@media(max-width:680px){.bar{min-height:66px}.title span{display:none}.wa{font-size:12px;padding:11px}.back{font-size:12px;padding:10px}.shell{margin-top:10px;border-radius:15px}iframe{height:1900px}}
+    *{box-sizing:border-box}
+    body{margin:0;background:#f4f8fb;color:#132033}
+    .top{position:sticky;top:0;z-index:30;background:#fff;border-bottom:1px solid var(--line);box-shadow:0 8px 24px rgba(8,47,87,.07)}
+    .bar{width:min(1180px,calc(100% - 28px));margin:auto;min-height:72px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+    .back{text-decoration:none;font-weight:900;color:var(--blue);padding:11px 14px;border:1px solid var(--line);border-radius:12px}
+    .title{min-width:0}.title b{display:block;color:var(--blue);font-size:18px}.title span{display:block;color:var(--muted);font-size:12px;margin-top:3px}
+    .wa{text-decoration:none;background:var(--orange);color:#fff;font-weight:900;padding:12px 15px;border-radius:12px}
+    .notice{background:#f7941d;color:#fff;text-align:center;font-size:12px;font-weight:900;letter-spacing:.06em;padding:7px 10px}
+    .shell{width:min(1180px,calc(100% - 20px));margin:18px auto 32px;background:#fff;border:1px solid var(--line);border-radius:22px;overflow:hidden;box-shadow:0 20px 50px rgba(8,47,87,.12)}
+    iframe{display:block;width:100%;height:1900px;border:0;background:#fff}
+    @media(max-width:680px){.bar{min-height:66px}.title span{display:none}.wa{font-size:12px;padding:11px}.back{font-size:12px;padding:10px}.shell{margin-top:10px;border-radius:15px}iframe{height:2300px}}
   </style>
 </head>
 <body>
   <div class="notice">PANTALLA DE PRUEBA · EL COTIZADOR ORIGINAL NO FUE MODIFICADO</div>
-  <header class="top"><div class="bar"><a class="back" href="index.html">← Volver a la vidriera</a><div class="title"><b>Cotizador de Librería Saber</b><span>Una herramienta separada de la portada comercial</span></div><a class="wa" href="https://wa.me/5493513110130" target="_blank" rel="noopener">WhatsApp</a></div></header>
-  <main class="shell"><iframe id="quote-frame" src="../index.html" title="Cotizador actual de Librería Saber"></iframe></main>
-  <script>
-    (function(){
-      var frame=document.getElementById('quote-frame');
-      function resize(){
-        try{
-          var doc=frame.contentDocument;
-          if(!doc)return;
-          var h=Math.max(doc.body.scrollHeight,doc.documentElement.scrollHeight);
-          if(h>500)frame.style.height=(h+24)+'px';
-        }catch(e){}
-      }
-      frame.addEventListener('load',function(){resize();try{new MutationObserver(resize).observe(frame.contentDocument.body,{subtree:true,childList:true,attributes:true});}catch(e){}});
-      window.addEventListener('resize',resize);
-    })();
-  </script>
+  <header class="top">
+    <div class="bar">
+      <a class="back" href="index.html">← Volver a la vidriera</a>
+      <div class="title"><b>Cotizador de Librería Saber</b><span>Una herramienta separada de la portada comercial</span></div>
+      <a class="wa" href="https://wa.me/5493513110130" target="_blank" rel="noopener">WhatsApp</a>
+    </div>
+  </header>
+  <main class="shell">
+    <iframe src="https://hernanchan.github.io/COTIZADOR/" title="Cotizador actual de Librería Saber"></iframe>
+  </main>
 </body>
 </html>
