@@ -18,11 +18,14 @@
           <span>Escolar · Oficina · Gráfica</span>
         </span>
       </a>
-      <nav class="main-nav" aria-label="Navegación principal">
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="main-nav" aria-label="Abrir menú">
+        <span></span><span></span><span></span>
+      </button>
+      <nav class="main-nav" id="main-nav" aria-label="Navegación principal">
         <a href="#inicio">Inicio</a>
         <a href="#cotizador">Cotizador</a>
         <a href="#servicios">Servicios</a>
-        <a href="#promos">Promos</a>
+        <a href="#promos" data-promo-link hidden>Promos</a>
         <a href="#contacto">Contacto</a>
         <a class="nav-cta" href="#cotizador">Cotizar ahora</a>
       </nav>
@@ -36,10 +39,10 @@
           <div class="eyebrow">Sitio oficial</div>
           <h1>LIBRERIA <span>SABER</span></h1>
           <p class="hero-lead">Útiles escolares, oficina, impresiones y ploteos.</p>
-          <p class="hero-text">Más de 35 años acompañando a estudiantes, familias, comercios y profesionales de la zona. Todo lo que necesitás, en un mismo lugar. Cotizá tu trabajo online, revisá las promociones vigentes y envianos el pedido directamente por WhatsApp.</p>
+          <p class="hero-text">Más de 35 años acompañando a estudiantes, familias, comercios y profesionales de la zona. Todo lo que necesitás, en un mismo lugar. Cotizá tu trabajo online y envianos el pedido directamente por WhatsApp.</p>
           <div class="hero-actions">
             <a class="btn btn-primary" href="#cotizador">Cotizar un trabajo</a>
-            <a class="btn btn-secondary" href="#promos">Ver promociones</a>
+            <a class="btn btn-secondary" href="#promos" data-promo-link hidden>Ver promociones</a>
           </div>
           <div class="hero-badges">
             <span class="hero-badge"><i></i>Presupuesto inmediato</span>
@@ -93,17 +96,15 @@
       </div>
     </section>
 
-    <section class="section-soft" id="promos">
+    <section class="section-soft" id="promos" hidden>
       <div class="container">
         <div class="section-head">
           <div>
             <h2>Promociones y oportunidades</h2>
-            <p>Códigos vigentes y productos seleccionados que podés sumar al mismo pedido del cotizador.</p>
+            <p>Productos seleccionados que podés sumar al mismo pedido del cotizador.</p>
           </div>
         </div>
-        <div class="promo-grid" id="promo-grid" aria-live="polite">
-          <div class="promo-empty">Cargando promociones...</div>
-        </div>
+        <div class="promo-grid" id="promo-grid" aria-live="polite"></div>
       </div>
     </section>
 
@@ -112,7 +113,7 @@
         <div class="section-head">
           <div>
             <h2>Cotizador online</h2>
-            <p>Completá los datos del trabajo. Los productos de oferta que agregues se incorporarán al mensaje final de WhatsApp.</p>
+            <p>Completá los datos del trabajo y enviá el presupuesto directamente por WhatsApp.</p>
           </div>
         </div>
         <div class="quote-shell">
