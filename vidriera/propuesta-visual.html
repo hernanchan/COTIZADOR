@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="theme-color" content="#082f57">
+<title>Propuesta visual · Librería Saber</title>
+<style>
+:root{
+  --navy:#082f57;
+  --navy-2:#0d4778;
+  --orange:#f7941d;
+  --orange-2:#ffb04b;
+  --ink:#172338;
+  --muted:#66758a;
+  --line:#dce6ee;
+  --soft:#f4f7fa;
+  --white:#fff;
+  --shadow:0 24px 70px rgba(8,47,87,.13);
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+  color:var(--ink);
+  scroll-behavior:smooth;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#fff}
+a{color:inherit}
+button{font:inherit}
+.wrap{width:min(1180px,calc(100% - 36px));margin:auto}
+.preview{background:#eef5fa;color:var(--navy);font-size:12px;font-weight:850;text-align:center;padding:7px 12px;letter-spacing:.04em}
+header{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.95);backdrop-filter:blur(16px);border-bottom:1px solid rgba(8,47,87,.09)}
+.nav{min-height:78px;display:flex;align-items:center;justify-content:space-between;gap:24px}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none;min-width:230px}
+.brand img{width:58px;height:58px;object-fit:contain}
+.brand b{display:block;color:var(--navy);font-size:18px;letter-spacing:.01em}
+.brand small{display:block;color:var(--muted);font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-top:4px}
+.links{display:flex;align-items:center;gap:4px}
+.links a{text-decoration:none;font-size:14px;font-weight:800;padding:11px 12px;border-radius:11px;color:#34445a}
+.links a:hover{background:#edf4f8;color:var(--navy)}
+.links .quote{background:var(--navy);color:#fff;padding-inline:16px}
+.hero{position:relative;overflow:hidden;background:linear-gradient(125deg,#061d34 0%,#082f57 50%,#0f5f99 100%);color:#fff}
+.hero:before{content:"";position:absolute;width:520px;height:520px;border-radius:50%;right:-240px;top:-250px;background:rgba(247,148,29,.95)}
+.hero:after{content:"";position:absolute;width:310px;height:310px;border-radius:50%;left:-190px;bottom:-220px;border:70px solid rgba(255,255,255,.05)}
+.hero-grid{position:relative;z-index:2;min-height:610px;display:grid;grid-template-columns:1.08fr .92fr;gap:54px;align-items:center;padding:68px 0}
+.eyebrow{display:inline-flex;align-items:center;gap:10px;color:#ffd39d;font-size:12px;font-weight:950;letter-spacing:.13em;text-transform:uppercase}
+.eyebrow:before{content:"";width:35px;height:4px;border-radius:99px;background:var(--orange)}
+h1{font-size:clamp(48px,6.2vw,78px);line-height:.96;letter-spacing:-.055em;margin:21px 0 20px;max-width:720px}
+h1 span{display:block;color:var(--orange-2)}
+.lead{max-width:630px;color:#d9e8f4;font-size:18px;line-height:1.65;margin:0}
+.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;border-radius:13px;padding:14px 19px;text-decoration:none;font-weight:900;border:1px solid transparent}
+.btn svg{width:18px;height:18px}
+.btn-orange{background:var(--orange);color:#fff;box-shadow:0 12px 30px rgba(247,148,29,.25)}
+.btn-white{background:#fff;color:var(--navy)}
+.proof{display:flex;gap:22px;flex-wrap:wrap;margin-top:28px;color:#d6e5f1;font-size:13px;font-weight:750}
+.proof span{display:flex;align-items:center;gap:8px}
+.proof i{width:8px;height:8px;border-radius:50%;background:var(--orange-2);box-shadow:0 0 0 5px rgba(247,148,29,.14)}
+.visual{position:relative;height:450px}
+.visual-main{position:absolute;inset:18px 0 0 24px;border-radius:32px;background:linear-gradient(145deg,#fff,#edf4f8);box-shadow:0 34px 75px rgba(0,0,0,.26);overflow:hidden}
+.visual-main:before{content:"";position:absolute;width:260px;height:260px;border-radius:50%;right:-60px;bottom:-85px;background:linear-gradient(145deg,var(--orange),#ffbd67)}
+.visual-main:after{content:"";position:absolute;width:210px;height:210px;border-radius:50%;left:-80px;top:-95px;background:#dceaf3}
+.logo-card{position:absolute;z-index:4;left:28px;top:26px;width:115px;height:128px;object-fit:contain}
+.mock-sheet{position:absolute;z-index:3;left:112px;top:115px;width:245px;height:300px;background:#fff;border-radius:19px;box-shadow:0 20px 42px rgba(8,47,87,.18);transform:rotate(-5deg);padding:20px;border:1px solid #e2ebf1}
+.mock-sheet .line{height:9px;border-radius:99px;background:#dce6ee;margin-bottom:11px}
+.mock-sheet .line.short{width:58%}
+.mock-sheet .line.blue{background:#0d5d97;width:78%;height:15px;margin-bottom:18px}
+.mock-sheet .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-top:18px}
+.mock-sheet .box{height:72px;border-radius:11px;background:#eef4f8}
+.mock-sheet .box:nth-child(2){background:#fff0df}
+.notebook{position:absolute;z-index:5;right:26px;top:48px;width:190px;height:235px;border-radius:22px;background:linear-gradient(160deg,#0b416f,#1171b2);box-shadow:0 22px 42px rgba(8,47,87,.25);transform:rotate(5deg);padding:23px;color:#fff}
+.notebook:before{content:"";position:absolute;left:-9px;top:18px;bottom:18px;width:18px;background:repeating-linear-gradient(to bottom,#d6e1e8 0 7px,transparent 7px 17px)}
+.notebook b{font-size:25px;line-height:1.05;display:block;margin-top:28px}
+.notebook small{display:block;color:#d7e9f6;line-height:1.5;margin-top:10px}
+.badge{position:absolute;z-index:8;background:#fff;color:var(--navy);border:1px solid #e0e9ef;border-radius:14px;padding:12px 14px;box-shadow:0 16px 32px rgba(8,47,87,.18);font-size:13px;font-weight:900}
+.badge small{display:block;color:var(--muted);font-weight:650;margin-top:4px}
+.b1{left:24px;bottom:48px}
+.b2{right:22px;bottom:62px}
+section{padding:78px 0}
+.section-head{display:flex;align-items:end;justify-content:space-between;gap:28px;margin-bottom:28px}
+.section-head h2{margin:0;color:var(--navy);font-size:clamp(32px,4.3vw,49px);line-height:1.02;letter-spacing:-.04em}
+.section-head p{margin:0;color:var(--muted);line-height:1.65;max-width:580px}
+.kicker{color:var(--orange);font-size:12px;font-weight:950;letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px}
+.category-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.category{position:relative;overflow:hidden;min-height:240px;border:1px solid var(--line);border-radius:24px;padding:24px;background:#fff;text-decoration:none;box-shadow:0 12px 30px rgba(8,47,87,.07);transition:.2s;display:flex;flex-direction:column}
+.category:hover{transform:translateY(-6px);box-shadow:0 22px 42px rgba(8,47,87,.12)}
+.category .icon{width:52px;height:52px;border-radius:16px;background:#eef4f8;display:grid;place-items:center;color:var(--navy)}
+.category .icon svg{width:27px;height:27px}
+.category h3{margin:auto 0 7px;color:var(--navy);font-size:25px}
+.category p{margin:0;color:var(--muted);font-size:13px;line-height:1.55}
+.category .more{margin-top:16px;color:var(--orange);font-size:12px;font-weight:950;text-transform:uppercase;letter-spacing:.07em}
+.category.featured{background:linear-gradient(145deg,#0a355e,#12669e);border-color:transparent;color:#fff}
+.category.featured h3,.category.featured p{color:#fff}
+.category.featured p{color:#d7e8f4}
+.category.featured .icon{background:rgba(255,255,255,.12);color:#fff}
+.category.featured .more{color:#ffbd69}
+.promos{background:var(--soft)}
+.promo-strip{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
+.promo{position:relative;background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px;min-height:150px}
+.promo strong{display:block;color:var(--orange);font-size:11px;font-weight:950;letter-spacing:.1em;text-transform:uppercase}
+.promo b{display:block;color:var(--navy);font-size:19px;margin-top:14px}
+.promo span{display:block;color:var(--muted);font-size:12px;line-height:1.5;margin-top:7px}
+.promo.today{background:var(--navy);border-color:var(--navy);transform:translateY(-5px);box-shadow:0 18px 35px rgba(8,47,87,.18)}
+.promo.today strong{color:#ffbd69}
+.promo.today b{color:#fff}
+.promo.today span{color:#d9e8f3}
+.today-tag{display:none;position:absolute;right:12px;top:11px;background:var(--orange);color:#fff;border-radius:999px;padding:5px 8px;font-size:9px;font-weight:950;text-transform:uppercase}
+.promo.today .today-tag{display:block}
+.services-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.service{border:1px solid var(--line);border-radius:20px;padding:21px;text-decoration:none;background:#fff;display:grid;grid-template-columns:54px 1fr auto;gap:14px;align-items:center;transition:.2s}
+.service:hover{border-color:#b8ccda;transform:translateY(-3px);box-shadow:0 14px 28px rgba(8,47,87,.08)}
+.service .icon{width:54px;height:54px;border-radius:16px;background:#eef4f8;color:var(--navy);display:grid;place-items:center}
+.service .icon svg{width:27px;height:27px}
+.service b{display:block;color:var(--navy);font-size:17px}
+.service small{display:block;color:var(--muted);font-size:12px;margin-top:5px;line-height:1.45}
+.service .type{font-size:10px;font-weight:950;letter-spacing:.07em;text-transform:uppercase;color:var(--orange);white-space:nowrap}
+.story{background:linear-gradient(135deg,#061f3a,#0e568f);color:#fff}
+.story-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:42px;align-items:center}
+.story h2{font-size:clamp(38px,5vw,59px);line-height:1.02;margin:0;letter-spacing:-.04em}
+.story p{color:#d8e7f2;line-height:1.7;font-size:17px}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.stat{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.14);border-radius:19px;padding:21px}
+.stat b{display:block;color:#ffbd69;font-size:27px}
+.stat span{display:block;color:#dbe9f3;font-size:12px;line-height:1.5;margin-top:7px}
+.contact{padding-top:70px;padding-bottom:90px}
+.contact-box{border:1px solid var(--line);border-radius:27px;background:var(--soft);padding:30px;display:grid;grid-template-columns:1.1fr .9fr;gap:28px}
+.contact-box h2{margin:0;color:var(--navy);font-size:34px}
+.contact-box p{color:var(--muted);line-height:1.65}
+.contact-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+.contact-actions .btn{background:var(--navy);color:#fff}
+.contact-actions .secondary{background:#fff;color:var(--navy);border-color:var(--line)}
+.details{display:grid;gap:11px}
+.detail{background:#fff;border-radius:15px;padding:15px;color:var(--navy);font-size:14px;font-weight:850}
+.detail small{display:block;color:var(--muted);font-weight:600;margin-top:5px}
+footer{background:#061f3a;color:#fff;padding:27px 0}
+.foot{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.foot small{color:#bbcada}
+.mobile-cta{display:none;position:fixed;left:10px;right:10px;bottom:10px;z-index:70;background:#fff;border:1px solid var(--line);border-radius:17px;padding:8px;grid-template-columns:1fr 1fr;gap:8px;box-shadow:0 15px 40px rgba(8,47,87,.2)}
+.mobile-cta a{text-decoration:none;text-align:center;border-radius:12px;padding:12px;font-weight:900;font-size:13px}
+.mobile-cta .q{background:var(--navy);color:#fff}
+.mobile-cta .w{background:#eaf8ef;color:#087735}
+@media(max-width:1020px){
+ .hero-grid{grid-template-columns:1fr}.visual{height:420px;max-width:700px;margin:auto;width:100%}
+ .category-grid{grid-template-columns:repeat(2,1fr)}
+ .promo-strip{grid-template-columns:repeat(3,1fr)}
+ .services-grid{grid-template-columns:repeat(2,1fr)}
+ .story-grid,.contact-box{grid-template-columns:1fr}
+}
+@media(max-width:760px){
+ .wrap{width:min(100% - 24px,1180px)}
+ .links{display:none}.brand img{width:50px;height:50px}.brand small{display:none}.preview{font-size:10px}
+ .hero-grid{padding:46px 0 52px;min-height:auto}.lead{font-size:16px}h1{font-size:48px}
+ .actions .btn{width:100%}.visual{height:350px}.visual-main{inset:12px 0 0}.notebook{width:155px;height:205px;right:14px}.notebook b{font-size:20px}.mock-sheet{left:65px;top:105px;width:200px;height:255px}.logo-card{width:78px;height:88px;left:17px;top:17px}.b1{left:14px;bottom:37px}.b2{right:12px;bottom:46px}
+ section{padding:57px 0}.section-head{display:block}.section-head p{margin-top:12px}
+ .category-grid,.promo-strip,.services-grid,.stats{grid-template-columns:1fr}.category{min-height:205px}
+ .promo.today{transform:none}.service{grid-template-columns:52px 1fr}.service .type{grid-column:2}
+ .foot{flex-direction:column;align-items:flex-start}.mobile-cta{display:grid}body{padding-bottom:82px}
+}
+</style>
+</head>
+<body>
+<div class="preview">PROPUESTA VISUAL · NO REEMPLAZA LA WEB ACTUAL</div>
+<header>
+  <div class="wrap nav">
+    <a class="brand" href="#inicio">
+      <img src="https://cdn.jsdelivr.net/gh/hernanchan/COTIZADOR@50b47daecfd3b1490bab03c235d47b7285f9f49e/assets/logo-sbr.png" alt="Logo Librería Saber">
+      <span><b>LIBRERÍA SABER</b><small>Escolar · Oficina · Impresiones · Gráfica</small></span>
+    </a>
+    <nav class="links">
+      <a href="#categorias">Categorías</a>
+      <a href="#promos">Promociones</a>
+      <a href="#servicios">Servicios</a>
+      <a href="#contacto">Contacto</a>
+      <a class="quote" href="cotizar.html">Cotizar online</a>
+    </nav>
+  </div>
+</header>
+<main>
+<section class="hero" id="inicio">
+  <div class="wrap hero-grid">
+    <div>
+      <div class="eyebrow">35 años junto a vos</div>
+      <h1>TODO LO QUE NECESITÁS, <span>EN UN MISMO LUGAR</span></h1>
+      <p class="lead">Escolar, oficina, impresiones, ploteos y gráfica con atención personalizada y cotización online.</p>
+      <div class="actions">
+        <a class="btn btn-orange" href="cotizar.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+          Cotizar impresiones
+        </a>
+        <a class="btn btn-white" href="https://wa.me/5493513110130" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8A8.5 8.5 0 0 1 12.5 20a8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7A8.38 8.38 0 0 1 4 11.5 8.5 8.5 0 0 1 8.7 3.9 8.38 8.38 0 0 1 12.5 3h.5a8.48 8.48 0 0 1 8 8z"/></svg>
+          Consultar por WhatsApp
+        </a>
+      </div>
+      <div class="proof"><span><i></i>Atención personalizada</span><span><i></i>Horario extendido</span><span><i></i>Pedidos online</span></div>
+    </div>
+    <div class="visual" aria-hidden="true">
+      <div class="visual-main">
+        <img class="logo-card" src="https://cdn.jsdelivr.net/gh/hernanchan/COTIZADOR@50b47daecfd3b1490bab03c235d47b7285f9f49e/assets/logo-sbr.png" alt="">
+        <div class="mock-sheet"><div class="line blue"></div><div class="line"></div><div class="line short"></div><div class="grid"><div class="box"></div><div class="box"></div><div class="box"></div><div class="box"></div></div></div>
+        <div class="notebook"><b>Tu librería, también online</b><small>Productos, servicios y cotizador en una sola experiencia.</small></div>
+        <div class="badge b1">Impresiones<small>Documentos · fotos · stickers</small></div>
+        <div class="badge b2">Gráfica<small>Ploteos · vinilo · cartelería</small></div>
+      </div>
+    </div>
+  </div>
+</section>
+<section id="categorias">
+  <div class="wrap">
+    <div class="section-head"><div><div class="kicker">Qué encontrás</div><h2>Cuatro áreas, una sola solución</h2></div><p>Accesos claros, menos texto y una estética más comercial. Solamente Impresiones abre el cotizador.</p></div>
+    <div class="category-grid">
+      <a class="category" href="https://wa.me/5493513110130?text=Hola%2C%20quiero%20consultar%20por%20productos%20escolares" target="_blank">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5v-14"/></svg></div><h3>Escolar</h3><p>Cuadernos, carpetas, mochilas, cartucheras y escritura.</p><span class="more">Consultar productos</span>
+      </a>
+      <a class="category" href="https://wa.me/5493513110130?text=Hola%2C%20quiero%20consultar%20por%20art%C3%ADculos%20de%20oficina" target="_blank">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg></div><h3>Oficina</h3><p>Papelería, archivo, organización y reposición comercial.</p><span class="more">Consultar productos</span>
+      </a>
+      <a class="category featured" href="cotizar.html">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg></div><h3>Impresiones</h3><p>Documentos, fotos, stickers, ploteos y anillados.</p><span class="more">Cotizar online</span>
+      </a>
+      <a class="category" href="https://wa.me/5493513110130?text=Hola%2C%20quiero%20consultar%20por%20un%20trabajo%20de%20gr%C3%A1fica" target="_blank">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M8.6 8.6 20 20M8.6 15.4 20 4"/></svg></div><h3>Gráfica</h3><p>Tarjetas, folletos, vinilo, cartelería y trabajos especiales.</p><span class="more">Consultar trabajo</span>
+      </a>
+    </div>
+  </div>
+</section>
+<section class="promos" id="promos">
+  <div class="wrap">
+    <div class="section-head"><div><div class="kicker">Beneficios automáticos</div><h2>Una promoción para cada día</h2></div><p>El beneficio del día se resalta automáticamente y el cotizador lo aplica cuando corresponde.</p></div>
+    <div class="promo-strip">
+      <div class="promo" data-day="1"><span class="today-tag">Hoy</span><strong>Lunes</strong><b>Planos</b><span>10% en ploteos CAD desde 2 metros.</span></div>
+      <div class="promo" data-day="2"><span class="today-tag">Hoy</span><strong>Martes</strong><b>Copias</b><span>10% en impresiones.</span></div>
+      <div class="promo" data-day="3"><span class="today-tag">Hoy</span><strong>Miércoles</strong><b>Fotos</b><span>Premium al precio normal.</span></div>
+      <div class="promo" data-day="4"><span class="today-tag">Hoy</span><strong>Jueves</strong><b>Anillado</b><span>Anillado sin cargo.</span></div>
+      <div class="promo" data-day="5"><span class="today-tag">Hoy</span><strong>Viernes</strong><b>Stickers</b><span>10% en planchas A3.</span></div>
+      <div class="promo" data-day="weekend"><span class="today-tag">Hoy</span><strong>Fin de semana</strong><b>20% online</b><span>Aplicación automática en el cotizador.</span></div>
+    </div>
+  </div>
+</section>
+<section id="servicios">
+  <div class="wrap">
+    <div class="section-head"><div><div class="kicker">Servicios</div><h2>Elegí cómo resolverlo</h2></div><p>Cada servicio indica claramente si se puede cotizar online o si requiere consulta por WhatsApp.</p></div>
+    <div class="services-grid">
+      <a class="service" href="cotizar.html"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg></div><span><b>Impresiones</b><small>A4 y A3, blanco y negro o color.</small></span><span class="type">Cotizar</span></a>
+      <a class="service" href="cotizar.html"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="m21 15-5-5L5 19"/></svg></div><span><b>Fotos</b><small>10×15, 13×18, A4 y A3.</small></span><span class="type">Cotizar</span></a>
+      <a class="service" href="cotizar.html"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3 2.4 4.9L20 9l-4 3.9.9 5.6L12 16l-4.9 2.5.9-5.6L4 9l5.6-1.1z"/></svg></div><span><b>Stickers</b><small>Impresión y precorte en plancha.</small></span><span class="type">Cotizar</span></a>
+      <a class="service" href="cotizar.html"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3zM8 3v18M16 3v18M3 8h18M3 16h18"/></svg></div><span><b>Ploteos</b><small>Planos, pósteres y gran formato.</small></span><span class="type">Cotizar</span></a>
+      <a class="service" href="cotizar.html"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 4h8M8 8h8M6 2h12v20H6z"/><path d="M3 6h3M3 10h3M3 14h3M3 18h3"/></svg></div><span><b>Anillados</b><small>Impresión y terminación en un pedido.</small></span><span class="type">Cotizar</span></a>
+      <a class="service" href="https://wa.me/5493513110130?text=Hola%2C%20quiero%20consultar%20por%20ploteo%20de%20corte" target="_blank"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M8.6 8.6 20 20M8.6 15.4 20 4"/></svg></div><span><b>Ploteo de corte</b><small>Vinilo, corte, pelado y posicionador.</small></span><span class="type">Consultar</span></a>
+    </div>
+  </div>
+</section>
+<section class="story">
+  <div class="wrap story-grid">
+    <div><div class="kicker" style="color:#ffbd69">Librería Saber</div><h2>35 años resolviendo cerca de casa.</h2><p>Más de tres décadas acompañando a estudiantes, familias, comercios y profesionales de la zona.</p></div>
+    <div class="stats"><div class="stat"><b>Escolar</b><span>Todo para estudiar durante el año.</span></div><div class="stat"><b>Oficina</b><span>Artículos para trabajar y organizarse.</span></div><div class="stat"><b>Impresiones</b><span>Presupuesto online en pocos pasos.</span></div><div class="stat"><b>Gráfica</b><span>Soluciones a medida con revisión técnica.</span></div></div>
+  </div>
+</section>
+<section class="contact" id="contacto">
+  <div class="wrap contact-box">
+    <div><h2>Estamos en Poeta Lugones</h2><p>Consultanos productos, enviá archivos o confirmá un presupuesto.</p><div class="contact-actions"><a class="btn" href="https://wa.me/5493513110130" target="_blank">WhatsApp</a><a class="btn secondary" href="mailto:libreriasaber@gmail.com">Correo</a><a class="btn secondary" href="https://maps.app.goo.gl/xZTZycc15UEd1TJB8" target="_blank">Cómo llegar</a></div></div>
+    <div class="details"><div class="detail">Javier Lascano Colodrero<small>Barrio Poeta Lugones, Córdoba.</small></div><div class="detail">Lunes a viernes<small>7:00 a 13:30 y 16:30 a 20:00.</small></div><div class="detail">WhatsApp<small>+54 9 351 311-0130</small></div></div>
+  </div>
+</section>
+</main>
+<footer><div class="wrap foot"><b>LIBRERÍA SABER</b><small>35 años junto a vos · Córdoba Capital</small></div></footer>
+<div class="mobile-cta"><a class="q" href="cotizar.html">Cotizar</a><a class="w" href="https://wa.me/5493513110130" target="_blank">WhatsApp</a></div>
+<script>
+(function(){
+  var d=new Date().getDay();
+  var key=(d===0||d===6)?'weekend':String(d);
+  var card=document.querySelector('[data-day="'+key+'"]');
+  if(card) card.classList.add('today');
+})();
+</script>
+</body>
+</html>
