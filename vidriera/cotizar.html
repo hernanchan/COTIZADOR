@@ -14,22 +14,50 @@
     .bar{width:min(1180px,calc(100% - 28px));margin:auto;min-height:72px;display:flex;align-items:center;justify-content:space-between;gap:16px}
     .back{text-decoration:none;font-weight:900;color:var(--blue);padding:11px 14px;border:1px solid var(--line);border-radius:12px}
     .title{min-width:0}.title b{display:block;color:var(--blue);font-size:18px}.title span{display:block;color:var(--muted);font-size:12px;margin-top:3px}
-    .wa{text-decoration:none;background:var(--orange);color:#fff;font-weight:900;padding:12px 15px;border-radius:12px}
+    .cart-status{background:var(--orange);color:#fff;font-weight:900;padding:12px 15px;border-radius:12px;white-space:nowrap}
     .shell{width:min(1180px,calc(100% - 20px));margin:18px auto 32px;background:#fff;border:1px solid var(--line);border-radius:22px;overflow:hidden;box-shadow:0 20px 50px rgba(8,47,87,.12)}
     iframe{display:block;width:100%;height:1900px;border:0;background:#fff}
-    @media(max-width:680px){.bar{min-height:66px}.title span{display:none}.wa{font-size:12px;padding:11px}.back{font-size:12px;padding:10px}.shell{margin-top:10px;border-radius:15px}iframe{height:2300px}}
+    @media(max-width:680px){.bar{min-height:66px}.title span{display:none}.cart-status{font-size:11px;padding:10px}.back{font-size:12px;padding:10px}.shell{margin-top:10px;border-radius:15px}iframe{height:2300px}}
   </style>
 </head>
 <body>
   <header class="top">
     <div class="bar">
-      <a class="back" href="index.html">← Volver a la vidriera</a>
-      <div class="title"><b>Cotizador de Librería Saber</b><span>Una herramienta separada de la portada comercial</span></div>
-      <a class="wa" href="https://wa.me/5493513110130" target="_blank" rel="noopener">WhatsApp</a>
+      <a class="back" href="propuesta-tienda.html">← Volver a la tienda</a>
+      <div class="title"><b>Cotizador de Librería Saber</b><span>El pedido de artículos se conserva mientras cotizás tus trabajos</span></div>
+      <div class="cart-status" id="cartStatus">Carrito 0</div>
     </div>
   </header>
   <main class="shell">
-    <iframe src="https://hernanchan.github.io/COTIZADOR/" title="Cotizador actual de Librería Saber"></iframe>
+    <iframe id="cotizadorFrame" src="https://hernanchan.github.io/COTIZADOR/?integrado=1" title="Cotizador actual de Librería Saber"></iframe>
   </main>
+  <script>
+    (function(){
+      var key='saberCartV1';
+      function readCart(){try{return JSON.parse(localStorage.getItem(key)||'[]')}catch(e){return []}}
+      function updateStatus(){var cart=readCart();var count=cart.reduce(function(sum,item){return sum+(Number(item.qty)||1)},0);document.getElementById('cartStatus').textContent='Carrito '+count}
+      updateStatus();
+      window.addEventListener('storage',updateStatus);
+      window.addEventListener('message',function(event){
+        if(event.origin!=='https://hernanchan.github.io')return;
+        if(!event.data||event.data.type!=='SABER_ADD_PRINT')return;
+        var item=event.data.payload;
+        if(!item||item.type!=='print'||!Number(item.price))return;
+        var cart=readCart();
+        cart.push({
+          id:String(item.id||('PRINT-'+Date.now())),
+          type:'print',
+          name:String(item.name||'Trabajo de impresión y gráfica'),
+          price:Number(item.price)||0,
+          qty:1,
+          detail:String(item.detail||''),
+          deposit:Number(item.deposit)||0
+        });
+        localStorage.setItem(key,JSON.stringify(cart));
+        updateStatus();
+        location.href='propuesta-tienda.html?carrito=1';
+      });
+    })();
+  </script>
 </body>
 </html>
