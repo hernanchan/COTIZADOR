@@ -23,7 +23,7 @@
 <body>
   <header class="top">
     <div class="bar">
-      <a class="back" href="propuesta-tienda.html">← Volver a la tienda</a>
+      <a class="back" href="index.html">← Volver a la tienda</a>
       <div class="title"><b>Cotizador de Librería Saber</b><span>El pedido de artículos se conserva mientras cotizás tus trabajos</span></div>
       <div class="cart-status" id="cartStatus">Carrito 0</div>
     </div>
@@ -55,7 +55,7 @@
         });
         localStorage.setItem(key,JSON.stringify(cart));
         updateStatus();
-        location.href='propuesta-tienda.html?carrito=1';
+        location.href='index.html?carrito=1';
       });
     })();
   </script>
