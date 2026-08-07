@@ -475,6 +475,10 @@
       function money(value){
         return "$"+Math.round(value).toLocaleString("es-AR");
       }
+      function displayedMoney(text){
+        var digits=String(text||"").replace(/[^0-9]/g,"");
+        return digits?parseInt(digits,10):0;
+      }
       function renderCart(){
         var items=cart.slice();
         if(currentItem)items.push(currentItem);
@@ -655,9 +659,35 @@
         if(!verified){manualCoupon=null;root.querySelector("#proto-code-status").textContent="El código no existe, está desactivado o está fuera de fecha.";renderCart();return;}
         manualCoupon=verified;trackEvent("cupon_aplicado",{codigo:verified.code,producto:verified.product});renderCart();
       });
-      root.querySelector("#proto-whatsapp").addEventListener("click",function(){
+      var integratedMode=new URLSearchParams(location.search).get("integrado")==="1"&&window.parent!==window;
+      if(integratedMode){
+        var integratedButton=root.querySelector("#proto-whatsapp");
+        integratedButton.removeAttribute("target");
+        integratedButton.removeAttribute("rel");
+        integratedButton.href="#";
+        integratedButton.textContent="Agregar al pedido general";
+      }
+      root.querySelector("#proto-whatsapp").addEventListener("click",function(event){
         var items=cart.slice();if(currentItem)items.push(currentItem);
-        var total=items.reduce(function(sum,item){return sum+item.total;},0);
+        var total=displayedMoney(root.querySelector("#proto-total").textContent);
+        if(integratedMode){
+          event.preventDefault();
+          if(!items.length)return;
+          var detail=items.map(function(item){return item.work+" — "+item.qty+" · "+item.mode+(item.binding?" · Con anillado":"")+(item.promoLabel?" · "+item.promoLabel:"");}).join(" | ");
+          var title=items.length===1?items[0].work:"Pedido de impresión y gráfica";
+          var payload={
+            id:"PRINT-"+Date.now(),
+            type:"print",
+            name:title,
+            price:total,
+            qty:1,
+            detail:detail,
+            deposit:displayedMoney(root.querySelector("#proto-deposit").textContent)
+          };
+          window.parent.postMessage({type:"SABER_ADD_PRINT",payload:payload},"*");
+          trackEvent("agregar_pedido_general",{value:Math.round(total),currency:"ARS",cantidad_items:items.length});
+          return;
+        }
         trackEvent("confirmar_whatsapp",{value:Math.round(total),currency:"ARS",cantidad_items:items.length});
       });
       (async function(){
