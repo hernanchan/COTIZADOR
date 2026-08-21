@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Prueba precios web · Librería Saber</title>
+<style>
+:root{--blue:#0a3158;--orange:#f7931e;--bg:#f6f8fb;--line:#d9e0e7;--muted:#687583;font-family:Arial,sans-serif;color:#172230}*{box-sizing:border-box}body{margin:0;background:var(--bg)}.wrap{width:min(920px,calc(100% - 28px));margin:28px auto}.head{background:var(--blue);color:#fff;border-radius:22px;padding:24px}.head h1{margin:0 0 7px;font-size:30px}.head p{margin:0;color:#dce9f3;line-height:1.5}.badge{display:inline-block;margin-top:14px;background:var(--orange);padding:7px 10px;border-radius:999px;font-size:12px;font-weight:800}.card{background:#fff;border:1px solid var(--line);border-radius:20px;padding:20px;margin-top:16px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.field{display:grid;gap:7px}.field label,.label{font-size:13px;font-weight:800;color:#334155}.choice{display:grid;grid-template-columns:1fr 1fr;gap:8px}.choice button{border:1px solid var(--line);background:#fff;border-radius:12px;padding:12px;font-weight:800;cursor:pointer}.choice button.active{background:var(--blue);color:#fff;border-color:var(--blue)}select,input{width:100%;border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff;font:inherit;font-weight:700}.result{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.stat{background:#f5f7f9;border-radius:15px;padding:14px}.stat small{display:block;color:var(--muted);font-size:11px;font-weight:800;text-transform:uppercase}.stat strong{display:block;color:var(--blue);font-size:24px;margin-top:5px}.total{background:linear-gradient(135deg,#0a3158,#0e4e84);color:#fff;border-radius:18px;padding:20px;margin-top:14px}.total small{display:block;color:#cfe0ef;font-weight:800}.total strong{display:block;font-size:44px;margin-top:4px}.note{font-size:12px;color:var(--muted);line-height:1.5;margin-top:10px}.error{background:#fff3f3;color:#9f1d1d;border:1px solid #fecaca;padding:14px;border-radius:14px}.loading{color:var(--muted)}optgroup{font-weight:900}@media(max-width:680px){.grid,.result{grid-template-columns:1fr}.wrap{margin:14px auto}.head{padding:20px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head"><h1>Prueba de precios A4 / A3</h1><p>Esta pantalla lee los precios exportados desde el Presupuestador de Mostrador. No genera pedidos y no modifica el cotizador que usan los clientes.</p><span class="badge">ENTORNO DE PRUEBA</span></div>
+  <div class="card" id="app"><div class="loading">Cargando precios…</div></div>
+</div>
+<script>
+(async function(){
+const app=document.getElementById('app');let cfg;
+try{const r=await fetch('precios-web.json?v='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error('No se pudo cargar precios-web.json');cfg=await r.json()}catch(e){app.innerHTML='<div class="error">No se pudo cargar la configuración de precios.</div>';return}
+let size='A4',mode='BN',face='simple';
+function money(n){return new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(Number(n)||0)}
+function norm(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase()}
+function gram(name){const m=String(name).match(/(\d{2,3})\s*(?:G|GR|GRS)/i);return m?Number(m[1]):9999}
+function familyOrder(f){return ({'OBRA':1,'ILUSTRACION':2,'FOTOGRAFICO':3,'ADHESIVO':4,'OTROS':5})[norm(f)]||9}
+function sortedMaterials(arr){return arr.slice().sort((a,b)=>familyOrder(a.family)-familyOrder(b.family)||gram(a.name)-gram(b.name)||a.name.localeCompare(b.name,'es'))}
+function scaleIndex(scales,q){let i=scales.findIndex(s=>q>=s.from&&(s.to==null||q<=s.to));return i<0?scales.length-1:i}
+function bindingTotal(pages,size){let remaining=pages,total=0,table=size==='A3'?cfg.bindings.a3:cfg.bindings.a4;while(remaining>0){const chunk=Math.min(350,remaining);const row=table.find(x=>chunk<=x.to)||table[table.length-1];total+=Number(row.price)||0;remaining-=chunk}return total}
+function render(){
+app.innerHTML=`
+<div class="grid">
+ <div><div class="label">Tamaño</div><div class="choice" id="size"><button data-v="A4">A4</button><button data-v="A3">A3</button></div></div>
+ <div><div class="label">Impresión</div><div class="choice" id="mode"><button data-v="BN">Blanco y negro</button><button data-v="COLOR">Color</button></div></div>
+ <div><div class="label">Faz</div><div class="choice" id="face"><button data-v="simple">Simple faz</button><button data-v="double">Doble faz</button></div></div>
+ <div class="field" id="matWrap"><label for="material">Material</label><select id="material"></select></div>
+ <div class="field"><label for="pages">Páginas</label><input id="pages" type="number" min="1" value="1"></div>
+ <div class="field"><label for="copies">Copias iguales</label><input id="copies" type="number" min="1" value="1"></div>
+ <div class="field"><label><input id="binding" type="checkbox" style="width:auto;margin-right:8px">Agregar anillado</label></div>
+</div>
+<div class="result" style="margin-top:18px"><div class="stat"><small>Cantidad cotizada</small><strong id="qty">1</strong></div><div class="stat"><small>Escala aplicada</small><strong id="scale">-</strong></div><div class="stat"><small>Precio unitario</small><strong id="unit">$0</strong></div><div class="stat"><small>Anillado</small><strong id="bind">$0</strong></div></div>
+<div class="total"><small>Total calculado</small><strong id="total">$0</strong></div>
+<div class="note">Fuente: ${cfg.source} · generada ${new Date(cfg.generatedAt).toLocaleString('es-AR')}. La cantidad usada para buscar escala es páginas × copias, igual que en el cotizador web actual.</div>`;
+ ['size','mode','face'].forEach(id=>document.getElementById(id).addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')return;const v=e.target.dataset.v;if(id==='size')size=v;if(id==='mode')mode=v;if(id==='face')face=v;refreshControls()}));
+ ['pages','copies','material','binding'].forEach(id=>document.getElementById(id).addEventListener('input',calc));
+ refreshControls();
+}
+function fillMaterials(){const wrap=document.getElementById('matWrap'),sel=document.getElementById('material');if(mode==='BN'){wrap.style.display='none';sel.innerHTML='';return}wrap.style.display='grid';const source=size==='A4'?cfg.colorA4.materials:cfg.colorA3.materials;const mats=sortedMaterials(source);sel.innerHTML='';let current='';mats.forEach(m=>{if(m.family!==current){current=m.family;const og=document.createElement('optgroup');og.label=current;og.dataset.family=current;sel.appendChild(og)}const og=[...sel.querySelectorAll('optgroup')].find(x=>x.dataset.family===m.family);const op=document.createElement('option');op.value=m.id;op.textContent=m.name;og.appendChild(op)})}
+function refreshControls(){document.querySelectorAll('#size button').forEach(b=>b.classList.toggle('active',b.dataset.v===size));document.querySelectorAll('#mode button').forEach(b=>b.classList.toggle('active',b.dataset.v===mode));document.querySelectorAll('#face button').forEach(b=>b.classList.toggle('active',b.dataset.v===face));fillMaterials();calc()}
+function calc(){const pages=Math.max(1,Number(document.getElementById('pages').value)||1),copies=Math.max(1,Number(document.getElementById('copies').value)||1),q=pages*copies;let unit=0,label='-',material=null;if(mode==='BN'){const section=size==='A4'?cfg.bnA4:cfg.bnA3;const i=scaleIndex(section.scales,q);unit=Number(section.scales[i][face])||0;label=section.scales[i].label}else{const section=size==='A4'?cfg.colorA4:cfg.colorA3;const id=document.getElementById('material').value;material=section.materials.find(m=>m.id===id)||section.materials[0];const i=scaleIndex(section.scales,q);unit=Number(material.prices[i][face])||0;label=section.scales[i].label}const bind=document.getElementById('binding').checked?bindingTotal(pages,size):0;const total=Math.round(q*unit+bind);document.getElementById('qty').textContent=q;document.getElementById('scale').textContent=label;document.getElementById('unit').textContent=money(unit);document.getElementById('bind').textContent=money(bind);document.getElementById('total').textContent=money(total)}
+render();
+})();
+</script>
+</body>
+</html>
