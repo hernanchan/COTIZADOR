@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="theme-color" content="#082f57">
+<title>Cotizador de prueba · Librería Saber</title>
+<style>
+:root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;--blue:#082f57;--orange:#f7941d;--line:#dbe5ed;--muted:#637187}*{box-sizing:border-box}body{margin:0;background:#f4f8fb;color:#132033}.top{position:sticky;top:0;z-index:30;background:#fff;border-bottom:1px solid var(--line);box-shadow:0 8px 24px rgba(8,47,87,.07)}.bar{width:min(1180px,calc(100% - 28px));margin:auto;min-height:72px;display:flex;align-items:center;justify-content:space-between;gap:16px}.back{text-decoration:none;font-weight:900;color:var(--blue);padding:11px 14px;border:1px solid var(--line);border-radius:12px}.title{min-width:0}.title b{display:block;color:var(--blue);font-size:18px}.title span{display:block;color:var(--muted);font-size:12px;margin-top:3px}.cart-status{background:var(--orange);color:#fff;font-weight:900;padding:12px 15px;border-radius:12px;white-space:nowrap}.warning{width:min(1180px,calc(100% - 28px));margin:14px auto 0;background:#fff3d8;border:1px solid #efc369;color:#6e4900;padding:11px 13px;border-radius:12px;font-size:12px;font-weight:800}.shell{width:min(1180px,calc(100% - 20px));margin:12px auto 32px;background:#fff;border:1px solid var(--line);border-radius:22px;overflow:hidden;box-shadow:0 20px 50px rgba(8,47,87,.12)}iframe{display:block;width:100%;height:1350px;border:0;background:#fff}@media(max-width:680px){.bar{min-height:66px}.title span{display:none}.cart-status{font-size:11px;padding:10px}.back{font-size:12px;padding:10px}.shell{margin-top:10px;border-radius:15px}iframe{height:1650px}}
+</style>
+</head>
+<body>
+<header class="top"><div class="bar"><a class="back" href="index.html">← Volver a la tienda</a><div class="title"><b>Cotizador de prueba A4/A3</b><span>Usa los precios exportados desde el mostrador y conserva el carrito general</span></div><div class="cart-status" id="cartStatus">Carrito 0</div></div></header>
+<div class="warning">PRUEBA INTERNA · El cotizador oficial sigue funcionando por separado.</div>
+<main class="shell"><iframe id="cotizadorFrame" src="https://hernanchan.github.io/COTIZADOR/cotizador-prueba-web.html?integrado=1" title="Cotizador de prueba A4 y A3"></iframe></main>
+<script>
+(function(){
+const key='saberCartV1';
+function readCart(){try{return JSON.parse(localStorage.getItem(key)||'[]')}catch(e){return []}}
+function updateStatus(){const cart=readCart(),count=cart.reduce((sum,item)=>sum+(Number(item.qty)||1),0);document.getElementById('cartStatus').textContent='Carrito '+count}
+updateStatus();window.addEventListener('storage',updateStatus);
+window.addEventListener('message',function(event){
+ if(event.origin!=='https://hernanchan.github.io')return;
+ if(!event.data||event.data.type!=='SABER_ADD_PRINT')return;
+ const item=event.data.payload;
+ if(!item||item.type!=='print'||!Number(item.price))return;
+ const cart=readCart();
+ cart.push({id:String(item.id||('PRINT-'+Date.now())),type:'print',name:String(item.name||'Trabajo de impresión'),price:Number(item.price)||0,qty:1,detail:String(item.detail||''),deposit:Number(item.deposit)||0});
+ localStorage.setItem(key,JSON.stringify(cart));updateStatus();location.href='index.html?carrito=1';
+});
+})();
+</script>
+</body>
+</html>
