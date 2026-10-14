@@ -76,7 +76,7 @@ function renderPolaroidSandbox(product){
  subheading.textContent='Seis fotos por hoja A4, con encuadre manual y vista previa protegida.';
  const price=Number(cfg.polaroidPack?.pricePerSheet)||0;
  if(price<=0){app.innerHTML=backButton()+'<div class="error">El precio de Polaroids no está configurado.</div>';bindBack();return;}
- app.innerHTML=backButton()+'<div class="stage-banner">PRUEBA SIN R2: ninguna foto saldrá del dispositivo. Precio regular: '+money(price)+' por hoja de 6 Polaroids. El pedido es simulado; no hagas transferencias.</div><iframe id="polaroidEditorFrame" class="pol-editor" title="Editor de seis Polaroids" src="editor.html"></iframe>';
+ app.innerHTML=backButton()+'<div class="stage-banner">PRUEBA SIN R2: ninguna foto saldrá del dispositivo. Precio regular: '+money(price)+' por hoja de 6 Polaroids. El pedido es simulado; no hagas transferencias.</div><iframe id="polaroidEditorFrame" class="pol-editor" title="Editor de seis Polaroids" src="editor.html?unitPrice='+encodeURIComponent(price)+'"></iframe>';
  bindBack();
  const back=document.getElementById('backServices');back.textContent='← Volver a elegir servicios';
  const frame=document.getElementById('polaroidEditorFrame');
@@ -94,9 +94,11 @@ function renderPolaroidSandbox(product){
 
  const handler=(event)=>{
    if(event.source!==frame.contentWindow||event.origin!==window.location.origin||event.data?.type!=='SABER_POLAROID_DRAFT_READY')return;
-   window.removeEventListener('message',handler);
    if(!document.body.contains(frame))return;
-   finishItem({service:'fotos',work:'Polaroids · 6 fotos (PRUEBA, SIN ARCHIVOS RECIBIDOS)',qty:'1 hoja A4 · 6 unidades de 85 × 90 mm',mode:product.paper+' · Recortes definidos · PRUEBA SIN ENVÍO',binding:false,bindingCharge:0,baseTotal:price,meta:{q:1,photosCount:6,product,unit:price,polaroidPack:true,testOnly:true,filesReceived:false}});
+   const sheetCount=Number(event.data.payload?.sheets),photoCount=Number(event.data.payload?.photos);
+   if(!Number.isInteger(sheetCount)||sheetCount<1||sheetCount>10||photoCount!==sheetCount*6||event.data.payload?.uploadsReceived!==false)return;
+   window.removeEventListener('message',handler);
+   finishItem({service:'fotos',work:'Polaroids · Pack de 6 (PRUEBA, SIN ARCHIVOS RECIBIDOS)',qty:sheetCount+' hoja'+(sheetCount===1?'':'s')+' A4 · '+photoCount+' Polaroids',mode:product.paper+' · 85 × 90 mm · PRUEBA SIN ENVÍO',binding:false,bindingCharge:0,baseTotal:price*sheetCount,meta:{q:sheetCount,photosCount:photoCount,product,unit:price,polaroidPack:true,testOnly:true,filesReceived:false}});
  };
  window.addEventListener('message',handler);
 }
