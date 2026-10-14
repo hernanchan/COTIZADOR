@@ -16,8 +16,8 @@
     .title{min-width:0}.title b{display:block;color:var(--blue);font-size:18px}.title span{display:block;color:var(--muted);font-size:12px;margin-top:3px}
     .cart-status{background:var(--orange);color:#fff;font-weight:900;padding:12px 15px;border-radius:12px;white-space:nowrap}
     .shell{width:min(1180px,calc(100% - 20px));margin:18px auto 32px;background:#fff;border:1px solid var(--line);border-radius:22px;overflow:hidden;box-shadow:0 20px 50px rgba(8,47,87,.12)}
-    iframe{display:block;width:100%;height:2050px;border:0;background:#fff}
-    @media(max-width:680px){.bar{min-height:66px}.title span{display:none}.cart-status{font-size:11px;padding:10px}.back{font-size:12px;padding:10px}.shell{margin-top:10px;border-radius:15px}iframe{height:2500px}}
+    iframe{display:block;width:100%;height:880px;border:0;background:#fff}
+    @media(max-width:680px){.bar{min-height:66px}.title span{display:none}.cart-status{font-size:11px;padding:10px}.back{font-size:12px;padding:10px}.shell{margin-top:10px;border-radius:15px}iframe{height:1600px}}
   </style>
 </head>
 <body>
@@ -39,7 +39,16 @@
       updateStatus();
       window.addEventListener('storage',updateStatus);
       window.addEventListener('message',function(event){
-        if(event.origin!==location.origin)return;
+        if(event.origin!==location.origin||event.source!==document.getElementById('cotizadorFrame').contentWindow)return;
+        if(event.data?.type==='SABER_STAGE_HEIGHT'){
+          const height=Number(event.data.height);
+          if(Number.isFinite(height)&&height>=380&&height<=5000){
+            const frame=document.getElementById('cotizadorFrame');
+            const px=Math.ceil(height);
+            if(Math.abs(frame.getBoundingClientRect().height-px)>3)frame.style.height=px+'px';
+          }
+          return;
+        }
         if(!event.data||event.data.type!=='SABER_ADD_PRINT')return;
         var item=event.data.payload;
         if(!item||item.type!=='print'||!Number(item.price))return;
