@@ -132,16 +132,17 @@ function deleteCurrentSheet(){
  for(const p of photos)if(p&&p.url)URL.revokeObjectURL(p.url);
  sheets.splice(activeSheet,1);showSheet(Math.min(activeSheet,sheets.length-1));
 }
-$('prevSheet').addEventListener('click',()=>showSheet(activeSheet-1));
-$('nextSheet').addEventListener('click',()=>showSheet(activeSheet+1));
-$('addSheet').addEventListener('click',addNewSheet);
-$('deleteSheet').addEventListener('click',deleteCurrentSheet);
 
 let editorIndex=-1;
 let beforeEdit=null;
 let replaceIndex=-1;
 let busy=false;
 const $=id=>document.getElementById(id);
+$('prevSheet').addEventListener('click',()=>showSheet(activeSheet-1));
+$('nextSheet').addEventListener('click',()=>showSheet(activeSheet+1));
+$('addSheet').addEventListener('click',addNewSheet);
+$('deleteSheet').addEventListener('click',deleteCurrentSheet);
+
 const preview=$('preview'), pc=preview.getContext('2d',{alpha:false});
 const cropCanvas=$('cropCanvas'), ec=cropCanvas.getContext('2d',{alpha:false});
 const mm=72/25.4;
