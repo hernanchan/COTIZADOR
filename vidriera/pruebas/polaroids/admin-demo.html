@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<title>Polaroids · Panel de pedidos · DEMO Librería Saber</title>
+<style>
+:root{font-family:Inter,Segoe UI,Arial,sans-serif;color:#243448;background:#f3f6fa;--navy:#0a3158;--blue:#195da1;--orange:#ef8b24;--line:#dce4ed;--light:#f5f8fc;--muted:#697b90}
+*{box-sizing:border-box}body{margin:0}button,input,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.42;cursor:not-allowed}
+header{background:var(--navy);color:white;padding:18px clamp(16px,3vw,45px);display:flex;align-items:center;justify-content:space-between;gap:16px}
+header h1{font-size:23px;margin:0 0 4px;font-weight:850;letter-spacing:-.6px}header p{margin:0;font-size:12px;color:#d8e7f6;line-height:1.4}
+.brand{display:flex;align-items:center;gap:12px}.logomark{background:#f18b24;border-radius:10px;width:40px;height:40px;display:grid;place-items:center;font-size:24px;flex-shrink:0}.demo-tag{background:#ffedcf;color:#81521b;border:1px solid #f1b65d;border-radius:999px;padding:7px 11px;font-weight:850;font-size:11px;text-align:center;white-space:nowrap}
+.noticebar{padding:10px 16px;background:#fff3e2;color:#79551c;border-bottom:1px solid #ebcf9c;text-align:center;font-size:12px;font-weight:750;line-height:1.5}
+main{max-width:1450px;margin:auto;padding:19px 20px 45px}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:15px}.metric{background:#fff;border:1px solid var(--line);border-radius:13px;padding:13px 17px}.metric strong{font-size:24px;color:var(--navy);display:block}.metric span{font-size:12px;color:var(--muted)}
+.workspace{display:grid;grid-template-columns:minmax(290px,370px) minmax(0,1fr);align-items:start;gap:15px}.panel{background:#fff;border:1px solid var(--line);border-radius:15px;box-shadow:0 4px 20px #0a315808}.panel-head{padding:16px 17px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px}.panel h2{margin:0;font-size:16px;color:var(--navy)}.panel-head small{font-size:11px;color:var(--muted)}
+.filters{padding:13px 15px;display:grid;grid-template-columns:1fr 1fr;gap:8px}.filters input{grid-column:1/-1}.filters input,.filters select,.qty-select{border:1px solid #cbd7e3;background:#fff;border-radius:9px;padding:10px;color:#314761;min-width:0;width:100%;font-size:12px}
+.orders{padding:0 10px 12px;max-height:660px;overflow:auto}.order{width:100%;text-align:left;background:#fff;border:1px solid var(--line);border-radius:11px;margin:5px 0;padding:12px;display:block}.order:hover{border-color:#629bd2;background:#f6faff}.order.selected{border:2px solid var(--blue);padding:11px;background:#eff6fd}.order-top{display:flex;justify-content:space-between;align-items:start;gap:8px}.order strong{color:var(--navy);font-size:13px}.order .sub{font-size:11px;line-height:1.5;color:#687a90;margin-top:5px}.state{border-radius:20px;padding:5px 8px;white-space:nowrap;font-size:10px;font-weight:800;display:inline-flex;align-items:center;gap:4px}.pending_deposit{background:#fff1db;color:#8b5a16}.paid{background:#e6f1ff;color:#195e9a}.ready{background:#e7f6ed;color:#24734a}.delivered{background:#eaf0f4;color:#4d6073}.discarded{background:#ffe7e7;color:#9f4545}
+.tools{border-top:1px solid var(--line);padding:14px 15px;display:grid;gap:9px}.tools label{font-size:12px;font-weight:750;color:#3f5064}.button{padding:11px 14px;border:1px solid transparent;border-radius:9px;background:var(--blue);color:#fff;font-weight:800;font-size:12px}.button.secondary{background:#edf3f9;color:#2a567f;border-color:#d3e2ed}.button.orange{background:var(--orange);color:#2b251a}.button.danger{background:#fff3f1;border-color:#e4b9b8;color:#a03939}.button.block{width:100%}.help{color:var(--muted);font-size:11px;line-height:1.5;margin:0}
+.empty{padding:38px 24px;text-align:center;color:#687d95}.detail{padding:18px}.title-line{display:flex;justify-content:space-between;gap:12px;align-items:start;flex-wrap:wrap}.detail h2{font-size:23px;margin:0;color:var(--navy)}.subtitle{color:var(--muted);font-size:12px;margin:6px 0 0}
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin:17px 0}.summary div{border:1px solid var(--line);background:var(--light);border-radius:10px;padding:11px}.summary label{display:block;font-size:11px;color:var(--muted)}.summary strong{display:block;color:var(--navy);font-size:18px;margin-top:3px}
+.detail-grid{display:grid;grid-template-columns:minmax(260px,1fr) minmax(270px,410px);gap:18px;align-items:start}.section-title{font-size:14px;color:var(--navy);margin:0 0 10px}.step{border:1px solid var(--line);border-radius:11px;padding:12px 13px;margin-bottom:10px;display:flex;gap:11px;align-items:start}.dot{width:27px;height:27px;border-radius:50%;flex-shrink:0;display:grid;place-items:center;background:#eaf0f6;color:#53718f;font-weight:900}.step.done .dot{background:#dff3e7;color:#1b7750}.step b{display:block;font-size:12px}.step span{font-size:11px;display:block;color:var(--muted);line-height:1.5;margin-top:3px}.actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 15px}.rule{border-left:4px solid var(--orange);background:#fff7e9;padding:11px 13px;border-radius:8px;color:#755528;font-size:11px;line-height:1.6}
+.sheet-tools{display:flex;align-items:center;justify-content:center;gap:12px;margin:0 0 12px}.sheet-tools button{border:1px solid var(--line);background:var(--light);color:var(--navy);border-radius:8px;padding:7px 11px;font-weight:800}.sheet-tools b{font-size:12px;color:#415877}
+.a4{width:min(100%,355px);margin:auto;position:relative;aspect-ratio:210/297;background:#fff;border:1px solid #cfd8e3;box-shadow:0 5px 22px #1f385126;overflow:hidden}.pose{position:absolute;left:9.5238%;top:4.5454%;width:80.9524%;height:90.909%;display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(3,1fr)}.frame{background:#fff;border:1px dashed #b3c2d1;position:relative;overflow:hidden}.photo{position:absolute;left:5.8824%;top:4.4444%;width:88.2353%;height:83.3333%;display:grid;place-items:center;color:#ffffffb5;font-weight:900;font-size:25px;overflow:hidden}.frame small{position:absolute;bottom:1.8%;right:5%;font-size:6px;letter-spacing:.02em;color:#8ba2b9}.a4:after{content:'SOLO DEMOSTRACIÓN · SIN FOTOS RECIBIDAS';position:absolute;top:47%;left:-24%;width:148%;text-align:center;transform:rotate(-25deg);font-weight:900;font-size:17px;letter-spacing:1px;color:#173f64a8;pointer-events:none;text-shadow:0 1px white}.sheet-caption{font-size:11px;text-align:center;color:var(--muted);margin:10px 0 0;line-height:1.5}
+@media(max-width:1100px){.summary{grid-template-columns:repeat(2,1fr)}.detail-grid{grid-template-columns:1fr}.a4{width:min(100%,330px)}}
+@media(max-width:720px){header{padding:14px}header h1{font-size:18px}header p{font-size:11px}main{padding:12px 10px 35px}.metrics{grid-template-columns:repeat(2,1fr)}.workspace{grid-template-columns:1fr}.orders{max-height:285px}.detail{padding:13px}.summary{gap:6px}.summary div{padding:9px}.summary strong{font-size:15px}}
+</style>
+</head>
+<body>
+<header>
+ <div class="brand"><div class="logomark" aria-hidden="true">▤</div><div><h1>Librería Saber · Polaroids</h1><p>Panel de recepción y seguimiento de pedidos · Diseño de prueba</p></div></div>
+ <span class="demo-tag">DEMO LOCAL · SIN R2</span>
+</header>
+<div class="noticebar">⚠ Pedidos y fotografías ficticios. Este archivo NO recibe imágenes reales, NO genera PDF profesional ni tiene acceso administrativo seguro.</div>
+<main>
+ <div class="metrics" aria-label="Resumen de trabajos"><div class="metric"><strong id="mPending">0</strong><span>Pendientes de seña</span></div><div class="metric"><strong id="mPaid">0</strong><span>Con seña recibida</span></div><div class="metric"><strong id="mReady">0</strong><span>Listos para entregar</span></div><div class="metric"><strong id="mSheets">0</strong><span>Hojas A4 activas</span></div></div>
+ <div class="workspace">
+  <aside class="panel">
+   <div class="panel-head"><h2>Pedidos</h2><small id="orderCount">0 trabajos</small></div>
+   <div class="filters"><input id="search" type="search" autocomplete="off" placeholder="Buscar referencia o cliente de prueba" aria-label="Buscar pedidos"><select id="statusFilter" aria-label="Filtrar por estado"><option value="all">Todos los estados</option><option value="pending_deposit">Pendiente de seña</option><option value="paid">Seña recibida</option><option value="ready">Listo para entregar</option><option value="delivered">Entregado</option><option value="discarded">Descartado</option></select><select id="sort" aria-label="Ordenar"><option value="new">Más recientes</option><option value="old">Más antiguos</option></select></div>
+   <div id="orders" class="orders" aria-live="polite"></div>
+   <div class="tools"><label for="newSheets">Simular nuevo pedido</label><select id="newSheets" class="qty-select"><option value="1">1 hoja · 6 Polaroids · $3.000</option><option value="2">2 hojas · 12 Polaroids · $6.000</option><option value="3">3 hojas · 18 Polaroids · $9.000</option></select><button class="button orange block" id="newOrder">+ Crear pedido de prueba</button><button class="button secondary block" id="reset">Restablecer ejemplos</button><p class="help">Los cambios de esta demostración se guardan únicamente en este navegador. Ningún pedido llega a Librería Saber.</p></div>
+  </aside>
+  <section class="panel" aria-label="Detalle de pedido"><div id="empty" class="empty">Seleccioná un pedido de prueba para revisar sus hojas y el estado de la seña.</div>
+   <div id="detail" class="detail" hidden>
+    <div class="title-line"><div><h2 id="reference"></h2><p class="subtitle" id="created"></p></div><span class="state" id="state"></span></div>
+    <div class="summary"><div><label>Hojas A4</label><strong id="sheetCount"></strong></div><div><label>Polaroids</label><strong id="photoCount"></strong></div><div><label>Total</label><strong id="total"></strong></div><div><label>Seña (50%)</label><strong id="deposit"></strong></div></div>
+    <div class="detail-grid"><div><h3 class="section-title">Control del pedido</h3>
+      <div class="step done"><div class="dot">1</div><div><b>Pedido simulado registrado</b><span>Las fotografías mostradas son ilustraciones generadas, no archivos de clientes.</span></div></div>
+      <div class="step" id="depositStep"><div class="dot">2</div><div><b>Comprobar la seña</b><span id="depositText">Pendiente de verificación manual del comprobante.</span></div></div>
+      <div class="step" id="fileStep"><div class="dot">3</div><div><b>Recuperar originales y preparar PDF</b><span>Se habilitará únicamente cuando funcione la recepción privada y se autentique el personal.</span></div></div>
+      <div class="step" id="readyStep"><div class="dot">4</div><div><b>Preparar y entregar</b><span id="readyText">No comenzar la producción sin la seña.</span></div></div>
+      <div class="actions"><button class="button" id="markPaid">Marcar seña recibida</button><button class="button secondary" id="markReady">Simular preparado</button><button class="button secondary" id="markDelivered">Simular entregado</button><button class="button danger" id="discard">Descartar</button></div>
+      <div class="rule"><strong>Seguridad:</strong> en la versión real el cliente no recibirá el PDF listo para imprimir. Las fotos y los encuadres se recuperarán desde el servidor privado solo con autenticación. En esta demo no existen archivos originales ni conexiones de red.</div>
+      <div class="actions"><button id="pdf" class="button secondary" disabled title="Requiere recepción privada y archivos originales">PDF de impresión · disponible más adelante</button></div>
+     </div>
+     <div><h3 class="section-title">Vista de las hojas del pedido</h3><div class="sheet-tools"><button id="prev" aria-label="Hoja anterior">←</button><b id="sheetLabel">Hoja 1 de 1</b><button id="next" aria-label="Hoja siguiente">→</button></div><div class="a4" aria-label="Esquema ilustrativo de seis Polaroids A4"><div class="pose" id="pose"></div></div><p class="sheet-caption">2 columnas × 3 filas · 85 × 90 mm por Polaroid.<br>Solo una representación gráfica; no es un archivo de impresión.</p></div>
+    </div>
+   </div>
+  </section>
+ </div>
+</main>
+<script>
+(()=>{'use strict';
+const KEY='libreriasaber_polaroids_panel_demo_v1';const PRICE=3000;
+const labels={pending_deposit:'Pendiente de seña',paid:'Seña recibida',ready:'Listo para entregar',delivered:'Entregado',discarded:'Descartado'};
+const $=id=>document.getElementById(id),fmt=n=>'$'+n.toLocaleString('es-AR');
+const fixedTime=new Date('2026-10-14T14:00:00-03:00').getTime();
+function initial(){return{counter:4,orders:[
+ {id:'DEMO-0003',createdAt:fixedTime+3600000,client:'Cliente de ejemplo C',sheets:3,status:'pending_deposit'},
+ {id:'DEMO-0002',createdAt:fixedTime,client:'Cliente de ejemplo B',sheets:2,status:'paid'},
+ {id:'DEMO-0001',createdAt:fixedTime-7200000,client:'Cliente de ejemplo A',sheets:1,status:'ready'}
+]}}
+function load(){try{const j=JSON.parse(localStorage.getItem(KEY)||'null');if(j&&Array.isArray(j.orders)&&Number.isInteger(j.counter))return j}catch(e){}return initial()}
+let data=load(),selected=data.orders[0]?.id||null,sheetIndex=0;
+function save(){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){}}
+function selectedOrder(){return data.orders.find(o=>o.id===selected)}
+function statusEl(el,status){el.className='state '+status;el.textContent=labels[status]||status}
+function renderMetrics(){const active=data.orders.filter(o=>o.status!=='discarded'&&o.status!=='delivered');$('mPending').textContent=active.filter(o=>o.status==='pending_deposit').length;$('mPaid').textContent=active.filter(o=>o.status==='paid').length;$('mReady').textContent=active.filter(o=>o.status==='ready').length;$('mSheets').textContent=active.reduce((sum,o)=>sum+o.sheets,0)}
+function renderOrders(){const term=$('search').value.toLocaleLowerCase('es-AR').trim(),filter=$('statusFilter').value,sort=$('sort').value;
+ const list=data.orders.filter(o=>(filter==='all'||o.status===filter)&&(o.id+' '+o.client).toLocaleLowerCase('es-AR').includes(term)).sort((a,b)=>sort==='old'?a.createdAt-b.createdAt:b.createdAt-a.createdAt);
+ $('orderCount').textContent=list.length+' trabajo'+(list.length===1?'':'s');const root=$('orders');root.replaceChildren();if(!list.length){const el=document.createElement('p');el.className='empty';el.textContent='No hay pedidos con ese filtro.';root.append(el);return}
+ for(const o of list){const b=document.createElement('button');b.type='button';b.className='order'+(o.id===selected?' selected':'');b.setAttribute('aria-label','Abrir '+o.id);const top=document.createElement('div');top.className='order-top';const name=document.createElement('strong');name.textContent=o.id;const st=document.createElement('span');statusEl(st,o.status);top.append(name,st);const meta=document.createElement('div');meta.className='sub';meta.textContent=o.client+' · '+o.sheets+' hoja'+(o.sheets===1?'':'s')+' · '+fmt(o.sheets*PRICE);b.append(top,meta);b.onclick=()=>{selected=o.id;sheetIndex=0;render()};root.append(b)} }
+const colors=[['#56769e','#bbdec6'],['#aa7276','#e4b786'],['#6774a5','#b9d5ea'],['#638f86','#ead3a7'],['#b18a6c','#e3a8b9'],['#7272a7','#bbd4b5'],['#91736f','#c9d8ec']];
+function renderPose(o){$('sheetLabel').textContent='Hoja '+(sheetIndex+1)+' de '+o.sheets;$('prev').disabled=sheetIndex<=0;$('next').disabled=sheetIndex>=o.sheets-1;const root=$('pose');root.replaceChildren();for(let i=0;i<6;i++){const n=i+sheetIndex*6,frame=document.createElement('div');frame.className='frame';const pic=document.createElement('div');pic.className='photo';const c=colors[(n+o.id.length)%colors.length];pic.style.background='linear-gradient(145deg,'+c[0]+' 0%,'+c[1]+' 100%)';pic.textContent=(n+1).toString().padStart(2,'0');const sub=document.createElement('small');sub.textContent='POLAROID · DEMO';frame.append(pic,sub);root.append(frame)}}
+function renderDetail(){const o=selectedOrder();$('empty').hidden=!!o;$('detail').hidden=!o;if(!o)return;
+ $('reference').textContent=o.id;$('created').textContent=o.client+' · '+new Date(o.createdAt).toLocaleString('es-AR');statusEl($('state'),o.status);
+ $('sheetCount').textContent=o.sheets;$('photoCount').textContent=o.sheets*6;$('total').textContent=fmt(o.sheets*PRICE);$('deposit').textContent=fmt(o.sheets*PRICE/2);
+ const paid=['paid','ready','delivered'].includes(o.status),ready=['ready','delivered'].includes(o.status);
+ $('depositStep').classList.toggle('done',paid);$('readyStep').classList.toggle('done',ready);
+ $('depositText').textContent=paid?'Seña de '+fmt(o.sheets*PRICE/2)+' marcada como recibida (simulación).':'Pendiente de revisar el comprobante de '+fmt(o.sheets*PRICE/2)+'.';
+ $('readyText').textContent=ready?'Trabajo marcado como preparado (simulación).':o.status==='discarded'?'Trabajo descartado.':'Solo continuar después de comprobar la seña.';
+ $('markPaid').disabled=o.status!=='pending_deposit';$('markReady').disabled=o.status!=='paid';$('markDelivered').disabled=o.status!=='ready';$('discard').disabled=['discarded','delivered'].includes(o.status);
+ sheetIndex=Math.min(Math.max(0,sheetIndex),o.sheets-1);renderPose(o)
+}
+function render(){renderMetrics();renderOrders();renderDetail();save()}
+function advance(expected,next,message){const o=selectedOrder();if(!o||o.status!==expected)return;if(!confirm(message+'\n\nEsto modifica únicamente datos ficticios de demostración.'))return;o.status=next;render()}
+$('markPaid').onclick=()=>advance('pending_deposit','paid','¿Simular que recibiste la seña?');
+$('markReady').onclick=()=>advance('paid','ready','¿Simular que el pedido ya fue preparado?');
+$('markDelivered').onclick=()=>advance('ready','delivered','¿Simular que entregaste el pedido?');
+$('discard').onclick=()=>{const o=selectedOrder();if(!o||['discarded','delivered'].includes(o.status))return;if(!confirm('¿Descartar el pedido ficticio '+o.id+'?'))return;o.status='discarded';render()};
+$('prev').onclick=()=>{const o=selectedOrder();if(o&&sheetIndex>0){sheetIndex--;renderPose(o)}};
+$('next').onclick=()=>{const o=selectedOrder();if(o&&sheetIndex<o.sheets-1){sheetIndex++;renderPose(o)}};
+$('newOrder').onclick=()=>{const n=Number($('newSheets').value);if(![1,2,3].includes(n))return;const id='DEMO-'+String(data.counter++).padStart(4,'0');data.orders.unshift({id,createdAt:Date.now(),client:'Cliente de ejemplo '+(data.counter-1),sheets:n,status:'pending_deposit'});selected=id;sheetIndex=0;$('search').value='';$('statusFilter').value='all';$('sort').value='new';render()};
+$('reset').onclick=()=>{if(!confirm('¿Restablecer todos los pedidos ficticios de la demostración?'))return;data=initial();selected=data.orders[0].id;sheetIndex=0;$('search').value='';$('statusFilter').value='all';$('sort').value='new';render()};
+for(const id of ['search','statusFilter','sort'])$(id).addEventListener(id==='search'?'input':'change',renderOrders);
+render();
+})();
+</script>
+</body>
+</html>
