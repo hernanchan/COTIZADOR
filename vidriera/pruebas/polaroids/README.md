@@ -63,3 +63,14 @@ Este prototipo **no afirma que Librería Saber haya recibido los archivos**.
 - Total de la orden derivado del número de hojas; se muestra en el editor y se calcula nuevamente en el cotizador con el precio de configuración.
 - Máximo operativo de prueba: diez hojas (60 Polaroids) por pedido.
 - Se mantiene la simulación: los originales y archivos finales NO se transmiten.
+
+## Panel de gestión — maqueta local (14/10/2026)
+
+Archivo: `admin-demo.html` (también descargable como `Polaroids_Panel_Pedidos_DEMO_LOCAL.html`).
+
+- Pedidos **exclusivamente ficticios**, de una a tres hojas A4; importes de ARS 3.000 por hoja, seña del 50 %.
+- Búsqueda, filtros, navegación entre hojas, simulación de recepción de seña, preparado, entregado y descarte.
+- Persistencia local de los pedidos ficticios mediante `localStorage`, restablecible; **ningún archivo real ni pedido real se guarda o envía**.
+- PDF profesional deshabilitado; requiere recuperar imágenes originales desde el backend privado.
+- No confundir el panel de demostración con `web/polaroids-admin.html` del prototipo Worker/R2. Aquel panel técnico hoy solo admite una hoja, y **no está desplegado**.
+- La autenticación y el almacenamiento privados siguen pendientes. Este archivo nunca debe interpretarse como sistema de recepción seguro.
