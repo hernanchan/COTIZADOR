@@ -13,6 +13,27 @@ header{background:#ffffff;border-bottom:1px solid var(--line);padding:18px clamp
 
 .demo-cart{max-width:1316px;margin:0 auto 20px;padding:20px 22px}.demo-cart-title{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:16px;color:var(--ink)}.demo-cart-title span{font-size:11px;color:#9a641f;background:#fff5e7;padding:5px 7px;border-radius:5px;font-weight:700}.demo-cart-empty{color:var(--muted);font-size:13px;margin-top:12px}.demo-cart-ok{border:1px solid #c5dfce;background:#f2fbf5;padding:15px;border-radius:8px;margin-top:13px}.demo-cart-ok .name{font-size:15px;font-weight:800}.demo-cart-ok .desc{font-size:12px;color:#536578;margin-top:6px}.demo-cart-ok .warning{font-size:12px;color:#915c28;margin-top:10px}.paper{cursor:default}.preview-tag{display:block;font-size:11px;font-weight:700;color:#915c28;text-align:center;margin-top:7px}
 @media(max-width:540px){.app>.left{grid-row:1;order:0}.app>.right{grid-row:2;order:0}.slots{grid-template-columns:1fr}.slot{padding:9px;gap:12px}.slot-picture{flex-basis:60px;height:68px}.slot button{font-size:12px;padding:8px 11px}.slot button.del{padding:4px 9px}.drop{padding:20px}.app{grid-template-columns:minmax(0,1fr)}.modalfoot{flex-direction:column}.modalfoot .primary{flex:1!important}.demo-cart{margin:0 10px 18px;padding:15px}.sheet-title h2{font-size:15px}}
+
+/* Diseño compacto de producción: dos columnas reales en PC, una en móvil. */
+@media(min-width:951px){
+  header{padding:12px 18px}
+  .app{max-width:1200px;grid-template-columns:minmax(360px,425px) minmax(400px,1fr);gap:14px;margin:14px auto;padding:0 14px}
+  .left{padding:15px}.right{padding:14px 16px}
+  .drop{padding:10px;margin-bottom:10px}
+  .drop svg{width:24px;height:24px;margin-bottom:2px}
+  .slots{gap:7px}.slot{padding:7px;gap:7px}
+  .slot-picture{flex-basis:52px;height:59px;padding:3px 3px 9px}
+  .options{margin-top:11px;padding-top:10px}
+  .fixed-format{padding:9px}
+  .trim-tip{padding:7px 9px;margin-top:6px}
+  .details{margin:6px 0}
+  .buttons{margin-top:10px}
+  .status{margin-top:6px}
+  .paper-holder{width:min(100%,440px)}
+  .legend{margin-top:8px}.info{margin-top:7px}
+}
+html.embedded .demo-cart{display:none}
+@media(max-width:950px){html.embedded .app{margin-bottom:8px}}
 </style>
 </head>
 <body>
@@ -49,6 +70,19 @@ header{background:#ffffff;border-bottom:1px solid var(--line);padding:18px clamp
  </div>
 </div>
 <script>
+if(window.parent!==window){
+ document.documentElement.classList.add('embedded');
+ function reportEditorHeight(){
+   const area=document.querySelector('.app');
+   if(!area)return;
+   const height=Math.ceil(area.getBoundingClientRect().bottom+window.scrollY+22);
+   window.parent.postMessage({type:'SABER_POLAROID_EDITOR_HEIGHT',height},window.location.origin);
+ }
+ if(window.ResizeObserver)new ResizeObserver(reportEditorHeight).observe(document.querySelector('.app'));
+ window.addEventListener('load',reportEditorHeight);
+ requestAnimationFrame(reportEditorHeight);
+}
+
 'use strict';
 const PAGE={w:210,h:297};
 const FORMAT={w:85,h:90,photo:75,left:5,top:4,bottom:11,gapX:0,gapY:0,label:'Compacta · 85 × 90 mm'};
