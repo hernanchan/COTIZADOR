@@ -1,7 +1,7 @@
 # Polaroids Web – Integración aislada (SIN R2)
 
 **Rama de prueba:** `polaroids/integracion-sin-r2-20261014`.
-**Estado:** prototipo técnico; no desplegado en producción ni en GitHub Pages.
+**Estado:** prototipo técnico publicado solo como vista previa de Cloudflare Pages; no desplegado en producción.
 **Sitio público y rama `main`:** sin modificaciones.
 
 ## Objetivo y recorrido
@@ -15,9 +15,9 @@ El cotizador arma un ítem de prueba `print` y comunica `SABER_ADD_PRINT` al car
 que calcula la seña del 50 % como los otros trabajos.
 
 **No se transmiten ni guardan las fotografías originales**, no se sube PDF, no se
-crean pedidos reales, no se abre el WhatsApp del pedido. El precio de Polaroids
-en esta prueba es **$ 10.000 por hoja ficticios**. No debe publicarse ni
-usarse como tarifa real.
+crean pedidos reales, no se abre el WhatsApp del pedido. El precio regular informado para el servicio Polaroids es **ARS 3.000 por hoja A4 de seis fotografías**.
+Se configura en `precios-web.json` bajo `polaroidPack.pricePerSheet` y en este prototipo **no aplica promociones**.
+El carrito y el pedido siguen siendo simulados; esta vista previa no debe utilizarse para recibir trabajos reales.
 
 ## Archivos
 
@@ -48,7 +48,7 @@ artículos y otros trabajos. La página no envía el pedido.
 1. Almacenamiento privado de originales y encuadres, más generación de PDF solo en servidor.
 2. Registro de pedidos y referencia duradera recuperable por Librería Saber.
 3. Validar calidad de imagen y subidas de varias hojas; límites y caducidad de archivos.
-4. Revisar precio REAL por plancha de 6 y promociones aplicables.
+4. Revisar reglas comerciales y futuras promociones: precio regular actual ARS 3.000 por plancha de seis.
 5. Revisar eliminación/cancelación de trabajos y privacidad de datos.
 6. Testeo integral desde celular, prueba de carrito mixto, y control de seguridad.
 7. Publicación únicamente tras aprobación expresa del titular.
