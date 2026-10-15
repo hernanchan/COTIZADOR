@@ -44,6 +44,15 @@ html.embedded .demo-cart{display:none}
 @media(max-width:540px){.sheetnavbuttons .secondary{flex:1}.sheetnavbuttons .delete-sheet{flex:0 0 auto}}
 .sheetnav,.demo-cart{display:none!important}
 @media(min-width:951px){.app{max-width:1160px}}
+/* Instrucciones simples junto a la vista previa: sin información técnica de imposición. */
+.preview-guide{align-self:stretch;width:min(100%,520px);margin:12px auto 0;padding:12px 14px;border:1px solid #e0e8f2;border-radius:10px;background:#f8fafd}
+.preview-guide h3{margin:0 0 9px;font-size:13px;color:#294e74}
+.guide-step{display:flex;align-items:flex-start;gap:9px;margin-top:7px}
+.guide-step p{margin:0;font-size:11.5px;line-height:1.4;color:#526379}
+.guide-step strong{color:#263b51}
+.guide-num{display:flex;align-items:center;justify-content:center;flex:0 0 20px;height:20px;border-radius:50%;background:#e5edf8;color:#305b86;font-size:11px;font-weight:800}
+#preview{cursor:pointer}
+@media(max-width:540px){.preview-guide{margin-top:10px;padding:11px}.guide-step p{font-size:12px}}
 </style>
 </head>
 <body>
@@ -61,16 +70,19 @@ html.embedded .demo-cart{display:none}
   <div class="slots" id="slots"></div>
   <div class="options"><label>2. Tus Polaroids</label>
   <div class="fixed-format"><strong>85 × 90 mm por fotografía</strong><span>Imagen interior 75 × 75 mm · borde blanco inferior de 11 mm</span></div>
-  <div class="details" id="measure"></div>
-  <div class="trim-tip"><strong>Las seis fotos se imprimirán y cortarán en Librería Saber. Vos podés ajustar cada encuadre, pero no necesitás ocuparte de las marcas de corte.</div></div>
+  <div class="trim-tip">Las seis fotos se imprimirán y cortarán en Librería Saber. Vos podés ajustar cada encuadre; del corte nos encargamos nosotros.</div></div>
   <div class="buttons"><button class="primary" id="btnPdf" disabled>Enviar las seis fotos a Drive</button><button class="secondary" id="btnDemo" title="Para probar antes de usar fotos reales">Cargar prueba</button><button class="secondary" id="btnClear">Vaciar</button></div>
-  <div class="status" id="status" role="status" aria-live="polite">Faltan 6 fotografías para completar la pose.</div>
+  <div class="status" id="status" role="status" aria-live="polite">Cargá seis fotografías para completar tu hoja.</div>
 </section>
 <section class="panel right">
-  <div class="sheet-title"><h2>Vista previa de la pose</h2><small id="previewSheetLabel">Hoja 1 · A4 vertical</small></div>
+  <div class="sheet-title"><h2>Vista previa de tus Polaroids</h2><small id="previewSheetLabel">Hoja 1 · A4 vertical</small></div>
   <div class="paper-holder"><canvas class="paper" id="preview" width="840" height="1188" title="Hacé clic en una foto para corregir su encuadre"></canvas></div>
-  <p class="legend"><b>VISTA PREVIA · LIBRERÍA SABER.</b> El cliente solo puede ver esta muestra. El archivo listo para imprimir será de acceso exclusivo del negocio cuando se implemente la recepción segura.</p>
-  <div class="info"><span>Fotos sin deformar</span><span>Marcos aprobados</span><span>Sin PDF descargable</span></div>
+  <section class="preview-guide" aria-label="Cómo ajustar tus fotografías">
+    <h3>Cómo ajustar tus fotos</h3>
+    <div class="guide-step"><span class="guide-num">1</span><p><strong>Elegí una foto.</strong> Tocala en la vista previa o pulsá «Ajustar» a la izquierda.</p></div>
+    <div class="guide-step"><span class="guide-num">2</span><p><strong>Elegí el encuadre.</strong> Arrastrá la imagen con el dedo o el mouse para acomodarla.</p></div>
+    <div class="guide-step"><span class="guide-num">3</span><p><strong>Usá el zoom.</strong> Acercá o alejá con el control y pulsá «Aplicar» para guardar.</p></div>
+  </section>
 </section>
 </main>
 <section class="demo-cart panel" id="demoCart"><div class="demo-cart-title"><b>Integración en pruebas</b></div><div id="cartItem" class="demo-cart-empty">Al pulsar «Agregar al carrito de prueba», se enviará únicamente un aviso de simulación al cotizador; las fotos no salen de tu dispositivo.</div></section>
@@ -179,7 +191,7 @@ function renderSlots(){const target=$('slots');target.replaceChildren();let tota
  const name=document.createElement('span');name.className='name';name.title=p?p.name:'';name.textContent=p?p.name:'Sin cargar';inf.append(name);
  const actions=document.createElement('div');actions.className='actions';if(p){const edit=document.createElement('button');edit.textContent='Ajustar';edit.title='Corregir el encuadre';edit.onclick=()=>openEditor(i);actions.append(edit);const change=document.createElement('button');change.textContent='Cambiar';change.onclick=()=>{replaceIndex=i;$('inputReplace').click()};actions.append(change);const del=document.createElement('button');del.className='del';del.textContent='✕';del.title='Quitar foto';del.onclick=()=>{dropPhoto(i);renderAll()};actions.append(del)}else{const add=document.createElement('button');add.textContent='+ Agregar';add.onclick=()=>{replaceIndex=i;$('inputReplace').click()};actions.append(add)}inf.append(actions);el.append(inf);target.append(el)
  }$('count').textContent=total+' de 6';updateSheetNav();if(total===6)status('Seis fotos completas. Ajustá los encuadres y enviá esta hoja privada.','ok');else status('Hoja '+(activeSheet+1)+': faltan '+(6-total)+' fotografía'+(6-total===1?'':'s')+'.');}
-function renderAll(){const a=config(),{x0,y0}=layout();$('measure').textContent=`Pose completa: ${a.w*2} × ${a.h*3} mm · Sin separación entre piezas · Margen de hoja: ${x0.toFixed(1)} mm laterales / ${y0.toFixed(1)} mm superior e inferior · Marcas perimetrales.`;renderSlots();renderPreview()}
+function renderAll(){renderSlots();renderPreview()}
 function dropPhoto(i){if(photos[i]&&photos[i].url)URL.revokeObjectURL(photos[i].url);photos[i]=null}
 function loadImage(file){return new Promise((resolve,reject)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>resolve({name:file.name,img:im,url:u,file,zoom:1,cx:.5,cy:.5});im.onerror=()=>{URL.revokeObjectURL(u);reject(new Error('No se pudo abrir '+file.name+'. Usá JPG, PNG o WebP.'))};im.src=u})}
 async function acceptFiles(files,specific=-1){if(!files.length)return;const filtered=files.filter(f=>['image/jpeg','image/png'].includes(f.type)||/\.(jpe?g|png)$/i.test(f.name));if(!filtered.length){status('No se reconocieron imágenes válidas.','bad');return}
