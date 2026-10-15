@@ -323,10 +323,11 @@ function listarPedidosPrueba() {
   let truncated=false;
   while(folders.hasNext()) {
     const folder=folders.next();
-    const match=/^PRUEBA_6_POLAROIDS_([a-f0-9]{32})$/i.exec(folder.getName());
-    if(!match)continue;
+    const pilot=/^PRUEBA_6_POLAROIDS_([a-f0-9]{32})$/i.exec(folder.getName());
+    const customer=/^PEDIDO_(POL-[a-f0-9]{24})$/i.exec(folder.getName());
+    if(!pilot&&!customer)continue;
     if(results.length>=100){truncated=true;break;}
-    const ticket=match[1].toLowerCase();
+    const ticket=customer?customer[1].toUpperCase():pilot[1].toLowerCase();
     const files=enumerarArchivosPrueba_(folder);
     const complete=files.originales===6&&files.recortes===6&&files.pdfId&&files.json;
     const states=estadosPanelPrueba_();
@@ -337,6 +338,7 @@ function listarPedidosPrueba() {
     const date=folder.getDateCreated();
     results.push({
       reference:ticket,created:date.getTime(),status,
+      source:customer?'cliente':'prueba',
       statusText:states[status]||'Recepción incompleta',
       originals:files.originales,crops:files.recortes,hasJson:files.json,
       hasPdf:!!files.pdfId,canPrint:!!files.pdfId&&
@@ -348,13 +350,15 @@ function listarPedidosPrueba() {
     });
   }
   results.sort((a,b)=>b.created-a.created);
-  return {orders:results,truncated,scope:'PILOTO PRIVADO · una hoja de 6 Polaroids por trabajo'};
+  return {orders:results,truncated,scope:'RECEPCIÓN PRIVADA · una hoja de 6 Polaroids por trabajo'};
 }
 function actualizarEstadoPedidoPrueba(reference,next) {
   const {cfg,root}=accesoPanelPrueba_();
-  if(typeof reference!=='string'||!/^[a-f0-9]{32}$/i.test(reference))
+  if(typeof reference!=='string'||
+     !(/^[a-f0-9]{32}$/i.test(reference)||/^POL-[a-f0-9]{24}$/i.test(reference)))
     throw new Error('Referencia inválida.');
-  const ticket=reference.toLowerCase();
+  const customer=/^POL-[a-f0-9]{24}$/i.test(reference);
+  const ticket=customer?reference.toUpperCase():reference.toLowerCase();
   const transitions={
     pendiente_sena:['sena_confirmada','anulado'],
     sena_confirmada:['pendiente_sena','preparado','anulado'],
@@ -367,7 +371,7 @@ function actualizarEstadoPedidoPrueba(reference,next) {
   const lock=LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    const folderName='PRUEBA_6_POLAROIDS_'+ticket;
+    const folderName=customer?'PEDIDO_'+ticket:'PRUEBA_6_POLAROIDS_'+ticket;
     const matches=root.getFoldersByName(folderName);
     if(!matches.hasNext())throw new Error('No existe ese trabajo en la carpeta privada.');
     const files=enumerarArchivosPrueba_(matches.next());
