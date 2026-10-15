@@ -81,7 +81,10 @@ footer{background:#071f36;color:#fff;padding:25px 0}.footerrow{display:flex;alig
  window.addProduct=function(code){const p=products.find(x=>x.code===code);if(!p)return;const found=cart.find(x=>x.id===code);if(found)found.qty++;else cart.push({id:p.code,type:'product',name:p.name,price:p.offer||p.price,qty:1});save();openCart()};
  window.askProduct=function(name){window.open('https://wa.me/5493513110130?text='+encodeURIComponent('Hola, quiero consultar por: '+decodeURIComponent(name)),'_blank')};
  window.changeQty=function(id,delta){const i=cart.findIndex(x=>x.id===id);if(i<0||cart[i].type!=='product')return;cart[i].qty+=delta;if(cart[i].qty<=0)cart.splice(i,1);save()};window.removeItem=function(id){cart=cart.filter(x=>x.id!==id);save()};function save(){localStorage.setItem(cartKey,JSON.stringify(cart));renderCart()}
- function renderCart(){const body=document.getElementById('cartBody');const count=cart.reduce((a,b)=>a+(Number(b.qty)||1),0);document.getElementById('cartBadge').textContent=count;document.getElementById('mobileBadge').textContent=count;if(!cart.length){body.innerHTML='<div class="empty">Todavía no agregaste nada al pedido.</div>'}else{const groups=[['product','ARTÍCULOS'],['print','IMPRESIÓN Y GRÁFICA']];body.innerHTML=groups.map(([type,title])=>{const items=cart.filter(x=>x.type===type);if(!items.length)return '';return `<div class="cart-group"><div class="cart-group-title">${title}</div>${items.map(x=>{const detail=x.type==='print'?(x.detail||'Trabajo cotizado'):`${money(x.price)} c/u`;const controls=x.type==='product'?`<div class="qty"><button onclick="changeQty('${x.id}',-1)">−</button><span>${x.qty}</span><button onclick="changeQty('${x.id}',1)">+</button><button class="remove" onclick="removeItem('${x.id}')">Quitar</button></div>`:`<div class="qty"><button class="remove" onclick="removeItem('${x.id}')">Quitar trabajo</button></div>`;return `<div class="cart-item"><div class="cart-row"><div><b>${escapeHtml(x.name)}</b><small>${escapeHtml(detail)}</small></div><b>${money(x.price*(Number(x.qty)||1))}</b></div>${controls}</div>`}).join('')}</div>`}).join('')}const prod=cart.filter(x=>x.type==='product').reduce((s,x)=>s+x.price*x.qty,0);const prints=cart.filter(x=>x.type==='print');const pr=prints.reduce((s,x)=>s+x.price*(Number(x.qty)||1),0);const deposit=prints.reduce((s,x)=>s+(Number(x.deposit)||Math.round(Number(x.price||0)*.5)),0);document.getElementById('productsSubtotal').textContent=money(prod);document.getElementById('printsSubtotal').textContent=money(pr);document.getElementById('depositSubtotal').textContent=money(deposit);document.getElementById('grandTotal').textContent=money(prod+pr)}
+ function renderCart(){const body=document.getElementById('cartBody');const count=cart.reduce((a,b)=>a+(Number(b.qty)||1),0);document.getElementById('cartBadge').textContent=count;document.getElementById('mobileBadge').textContent=count;if(!cart.length){body.innerHTML='<div class="empty">Todavía no agregaste nada al pedido.</div>'}else{const groups=[['product','ARTÍCULOS'],['print','IMPRESIÓN Y GRÁFICA']];body.innerHTML=groups.map(([type,title])=>{const items=cart.filter(x=>x.type===type);if(!items.length)return '';return `<div class="cart-group"><div class="cart-group-title">${title}</div>${items.map(x=>{const refs=Array.isArray(x.draftReferences)
+    ?x.draftReferences.filter(r=>/^POL-[A-F0-9-]{12,48}$/.test(String(r))).slice(0,10):[];
+    const draftNote=refs.length?' · Referencia(s) provisional(es): '+refs.join(', ')+' · FOTOS NO RECIBIDAS':'';
+    const detail=x.type==='print'?(x.detail||'Trabajo cotizado')+draftNote:`${money(x.price)} c/u`;const controls=x.type==='product'?`<div class="qty"><button onclick="changeQty('${x.id}',-1)">−</button><span>${x.qty}</span><button onclick="changeQty('${x.id}',1)">+</button><button class="remove" onclick="removeItem('${x.id}')">Quitar</button></div>`:`<div class="qty"><button class="remove" onclick="removeItem('${x.id}')">Quitar trabajo</button></div>`;return `<div class="cart-item"><div class="cart-row"><div><b>${escapeHtml(x.name)}</b><small>${escapeHtml(detail)}</small></div><b>${money(x.price*(Number(x.qty)||1))}</b></div>${controls}</div>`}).join('')}</div>`}).join('')}const prod=cart.filter(x=>x.type==='product').reduce((s,x)=>s+x.price*x.qty,0);const prints=cart.filter(x=>x.type==='print');const pr=prints.reduce((s,x)=>s+x.price*(Number(x.qty)||1),0);const deposit=prints.reduce((s,x)=>s+(Number(x.deposit)||Math.round(Number(x.price||0)*.5)),0);document.getElementById('productsSubtotal').textContent=money(prod);document.getElementById('printsSubtotal').textContent=money(pr);document.getElementById('depositSubtotal').textContent=money(deposit);document.getElementById('grandTotal').textContent=money(prod+pr)}
  window.openCart=function(){document.getElementById('cart').classList.add('open');document.getElementById('overlay').classList.add('open')};window.closeCart=function(){document.getElementById('cart').classList.remove('open');document.getElementById('overlay').classList.remove('open')};
  function itemQty(x){const q=Number(x.qty);return Number.isInteger(q)&&q>0?q:1}
  function amount(x){return (Number(x.price)||0)*itemQty(x)}
@@ -105,7 +108,16 @@ footer{background:#071f36;color:#fff;padding:25px 0}.footerrow{display:flex;alig
    }
    if(works.length){
      lines.push('IMPRESIÓN Y GRÁFICA:');
-     works.forEach(x=>{lines.push('- '+x.name+' · '+money(amount(x)));if(x.detail)lines.push('  '+x.detail)});
+     works.forEach(x=>{
+       lines.push('- '+x.name+' · '+money(amount(x)));
+       if(x.detail)lines.push('  '+x.detail);
+       const refs=Array.isArray(x.draftReferences)?
+         x.draftReferences.filter(r=>/^POL-[A-F0-9-]{12,48}$/.test(String(r))).slice(0,10):[];
+       if(refs.length){
+         lines.push('  Referencia(s) provisional(es): '+refs.join(', '));
+         lines.push('  IMPORTANTE: Fotos todavía NO recibidas');
+       }
+     });
      lines.push('');
    }
    lines.push('Artículos: '+money(productTotal));
@@ -115,7 +127,8 @@ footer{background:#071f36;color:#fff;padding:25px 0}.footerrow{display:flex;alig
    lines.push('');
    lines.push('El pedido puede enviarse por WhatsApp antes de abonar la seña.');
    lines.push('La impresión se realizará únicamente después de confirmar el pago del 50 % correspondiente.');
-   lines.push('SIMULACIÓN: No se recibieron fotografías ni se registró un pedido real.');
+   lines.push('SIMULACIÓN: Las referencias anteriores son identificadores del borrador, NO prueban recepción de fotos.');
+   lines.push('No se recibieron fotografías ni se registró un pedido real.');
    return lines.join('\n');
  }
  window.sendWhatsApp=function(){
