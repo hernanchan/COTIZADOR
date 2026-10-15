@@ -24,6 +24,69 @@ main{max-width:1450px;margin:auto;padding:19px 20px 45px}.metrics{display:grid;g
 .a4{width:min(100%,355px);margin:auto;position:relative;aspect-ratio:210/297;background:#fff;border:1px solid #cfd8e3;box-shadow:0 5px 22px #1f385126;overflow:hidden}.pose{position:absolute;left:9.5238%;top:4.5454%;width:80.9524%;height:90.909%;display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(3,1fr)}.frame{background:#fff;border:1px dashed #b3c2d1;position:relative;overflow:hidden}.photo{position:absolute;left:5.8824%;top:4.4444%;width:88.2353%;height:83.3333%;display:grid;place-items:center;color:#ffffffb5;font-weight:900;font-size:25px;overflow:hidden}.frame small{position:absolute;bottom:1.8%;right:5%;font-size:6px;letter-spacing:.02em;color:#8ba2b9}.a4:after{content:'SOLO DEMOSTRACIÓN · SIN FOTOS RECIBIDAS';position:absolute;top:47%;left:-24%;width:148%;text-align:center;transform:rotate(-25deg);font-weight:900;font-size:17px;letter-spacing:1px;color:#173f64a8;pointer-events:none;text-shadow:0 1px white}.sheet-caption{font-size:11px;text-align:center;color:var(--muted);margin:10px 0 0;line-height:1.5}
 @media(max-width:1100px){.summary{grid-template-columns:repeat(2,1fr)}.detail-grid{grid-template-columns:1fr}.a4{width:min(100%,330px)}}
 @media(max-width:720px){header{padding:14px}header h1{font-size:18px}header p{font-size:11px}main{padding:12px 10px 35px}.metrics{grid-template-columns:repeat(2,1fr)}.workspace{grid-template-columns:1fr}.orders{max-height:285px}.detail{padding:13px}.summary{gap:6px}.summary div{padding:9px}.summary strong{font-size:15px}}
+
+/* Panel móvil: lista y detalle en pantallas separadas, sin alterar el diseño de PC. */
+.mobile-back{display:none}
+@media(max-width:720px){
+ header{padding:12px 14px;gap:8px}
+ header h1{font-size:17px;line-height:1.18}
+ header p{font-size:10px;line-height:1.25}
+ .brand{gap:8px;min-width:0}
+ .logomark{width:33px;height:33px;border-radius:8px;font-size:19px}
+ .demo-tag{font-size:9px;line-height:1.2;white-space:normal;max-width:94px;padding:5px 6px}
+ .noticebar{padding:8px 12px;font-size:11px}
+ main{padding:11px 10px 28px}
+ .metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-bottom:10px}
+ .metric{padding:10px 12px;min-width:0}
+ .metric strong{font-size:23px}
+ .metric span{font-size:11px;line-height:1.2;display:block}
+ .workspace{display:block}
+ .panel{border-radius:12px}
+ .panel-head{padding:13px 14px}
+ .filters{padding:12px;gap:8px}
+ .filters input,.filters select,.qty-select{font-size:14px;min-height:45px;padding:10px 12px}
+ .orders{max-height:none;overflow:visible;padding:0 10px 8px}
+ .order{min-height:76px;margin:7px 0;padding:12px}
+ .order.selected{padding:11px}
+ .order strong{font-size:14px}
+ .order .sub{font-size:12px}
+ .state{font-size:10px;white-space:normal;text-align:center}
+ .tools{padding:12px}
+ .tools label{font-size:13px}
+ .button{min-height:44px;font-size:13px}
+ body:not(.mobile-detail) .workspace>section{display:none}
+ body.mobile-detail .workspace>aside{display:none}
+ body.mobile-detail .metrics{display:none}
+ body.mobile-detail main{padding-top:8px}
+ .mobile-back{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 13px;border-bottom:1px solid var(--line);background:#f8fafc}
+ .mobile-back button{border:1px solid #c8d6e5;background:white;color:var(--navy);font-weight:800;font-size:13px;min-height:42px;padding:10px 13px;border-radius:9px}
+ .mobile-back span{color:var(--muted);font-size:11px}
+ .detail{padding:13px}
+ .title-line{gap:7px}
+ .detail h2{font-size:20px}
+ .summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:12px 0 17px}
+ .summary div{padding:11px}
+ .summary label{font-size:11px}
+ .summary strong{font-size:18px}
+ .detail-grid{gap:15px}
+ .step{padding:12px}
+ .step b{font-size:13px}
+ .step span{font-size:12px}
+ .actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ .actions .button{min-width:0;white-space:normal;line-height:1.25;padding:11px}
+ .actions #markPaid{grid-column:1/-1}
+ .actions #pdf{grid-column:1/-1}
+ .sheet-tools button{min-width:48px;min-height:43px;font-size:19px}
+ .sheet-tools b{font-size:13px}
+ .a4{width:min(100%,325px)}
+ .sheet-caption{font-size:12px}
+ .rule{font-size:12px}
+}
+@media(max-width:355px){
+ .demo-tag{max-width:79px;font-size:8px}
+ .summary strong{font-size:16px}
+ .actions{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
@@ -41,7 +104,7 @@ main{max-width:1450px;margin:auto;padding:19px 20px 45px}.metrics{display:grid;g
    <div id="orders" class="orders" aria-live="polite"></div>
    <div class="tools"><label for="newSheets">Simular nuevo pedido</label><select id="newSheets" class="qty-select"><option value="1">1 hoja · 6 Polaroids · $3.000</option><option value="2">2 hojas · 12 Polaroids · $6.000</option><option value="3">3 hojas · 18 Polaroids · $9.000</option></select><button class="button orange block" id="newOrder">+ Crear pedido de prueba</button><button class="button secondary block" id="reset">Restablecer ejemplos</button><p class="help">Los cambios de esta demostración se guardan únicamente en este navegador. Ningún pedido llega a Librería Saber.</p></div>
   </aside>
-  <section class="panel" aria-label="Detalle de pedido"><div id="empty" class="empty">Seleccioná un pedido de prueba para revisar sus hojas y el estado de la seña.</div>
+  <section class="panel" aria-label="Detalle de pedido"><div class="mobile-back"><button type="button" id="backToOrders">← Volver a pedidos</button><span>Panel de prueba</span></div><div id="empty" class="empty">Seleccioná un pedido de prueba para revisar sus hojas y el estado de la seña.</div>
    <div id="detail" class="detail" hidden>
     <div class="title-line"><div><h2 id="reference"></h2><p class="subtitle" id="created"></p></div><span class="state" id="state"></span></div>
     <div class="summary"><div><label>Hojas A4</label><strong id="sheetCount"></strong></div><div><label>Polaroids</label><strong id="photoCount"></strong></div><div><label>Total</label><strong id="total"></strong></div><div><label>Seña (50%)</label><strong id="deposit"></strong></div></div>
@@ -80,7 +143,7 @@ function renderMetrics(){const active=data.orders.filter(o=>o.status!=='discarde
 function renderOrders(){const term=$('search').value.toLocaleLowerCase('es-AR').trim(),filter=$('statusFilter').value,sort=$('sort').value;
  const list=data.orders.filter(o=>(filter==='all'||o.status===filter)&&(o.id+' '+o.client).toLocaleLowerCase('es-AR').includes(term)).sort((a,b)=>sort==='old'?a.createdAt-b.createdAt:b.createdAt-a.createdAt);
  $('orderCount').textContent=list.length+' trabajo'+(list.length===1?'':'s');const root=$('orders');root.replaceChildren();if(!list.length){const el=document.createElement('p');el.className='empty';el.textContent='No hay pedidos con ese filtro.';root.append(el);return}
- for(const o of list){const b=document.createElement('button');b.type='button';b.className='order'+(o.id===selected?' selected':'');b.setAttribute('aria-label','Abrir '+o.id);const top=document.createElement('div');top.className='order-top';const name=document.createElement('strong');name.textContent=o.id;const st=document.createElement('span');statusEl(st,o.status);top.append(name,st);const meta=document.createElement('div');meta.className='sub';meta.textContent=o.client+' · '+o.sheets+' hoja'+(o.sheets===1?'':'s')+' · '+fmt(o.sheets*PRICE);b.append(top,meta);b.onclick=()=>{selected=o.id;sheetIndex=0;render()};root.append(b)} }
+ for(const o of list){const b=document.createElement('button');b.type='button';b.className='order'+(o.id===selected?' selected':'');b.setAttribute('aria-label','Abrir '+o.id);const top=document.createElement('div');top.className='order-top';const name=document.createElement('strong');name.textContent=o.id;const st=document.createElement('span');statusEl(st,o.status);top.append(name,st);const meta=document.createElement('div');meta.className='sub';meta.textContent=o.client+' · '+o.sheets+' hoja'+(o.sheets===1?'':'s')+' · '+fmt(o.sheets*PRICE);b.append(top,meta);b.onclick=()=>{selected=o.id;sheetIndex=0;if(window.matchMedia('(max-width:720px)').matches){document.body.classList.add('mobile-detail');window.scrollTo(0,0)}render()};root.append(b)} }
 const colors=[['#56769e','#bbdec6'],['#aa7276','#e4b786'],['#6774a5','#b9d5ea'],['#638f86','#ead3a7'],['#b18a6c','#e3a8b9'],['#7272a7','#bbd4b5'],['#91736f','#c9d8ec']];
 function renderPose(o){$('sheetLabel').textContent='Hoja '+(sheetIndex+1)+' de '+o.sheets;$('prev').disabled=sheetIndex<=0;$('next').disabled=sheetIndex>=o.sheets-1;const root=$('pose');root.replaceChildren();for(let i=0;i<6;i++){const n=i+sheetIndex*6,frame=document.createElement('div');frame.className='frame';const pic=document.createElement('div');pic.className='photo';const c=colors[(n+o.id.length)%colors.length];pic.style.background='linear-gradient(145deg,'+c[0]+' 0%,'+c[1]+' 100%)';pic.textContent=(n+1).toString().padStart(2,'0');const sub=document.createElement('small');sub.textContent='POLAROID · DEMO';frame.append(pic,sub);root.append(frame)}}
 function renderDetail(){const o=selectedOrder();$('empty').hidden=!!o;$('detail').hidden=!o;if(!o)return;
@@ -101,7 +164,8 @@ $('markDelivered').onclick=()=>advance('ready','delivered','¿Simular que entreg
 $('discard').onclick=()=>{const o=selectedOrder();if(!o||['discarded','delivered'].includes(o.status))return;if(!confirm('¿Descartar el pedido ficticio '+o.id+'?'))return;o.status='discarded';render()};
 $('prev').onclick=()=>{const o=selectedOrder();if(o&&sheetIndex>0){sheetIndex--;renderPose(o)}};
 $('next').onclick=()=>{const o=selectedOrder();if(o&&sheetIndex<o.sheets-1){sheetIndex++;renderPose(o)}};
-$('newOrder').onclick=()=>{const n=Number($('newSheets').value);if(![1,2,3].includes(n))return;const id='DEMO-'+String(data.counter++).padStart(4,'0');data.orders.unshift({id,createdAt:Date.now(),client:'Cliente de ejemplo '+(data.counter-1),sheets:n,status:'pending_deposit'});selected=id;sheetIndex=0;$('search').value='';$('statusFilter').value='all';$('sort').value='new';render()};
+$('newOrder').onclick=()=>{const n=Number($('newSheets').value);if(![1,2,3].includes(n))return;const id='DEMO-'+String(data.counter++).padStart(4,'0');data.orders.unshift({id,createdAt:Date.now(),client:'Cliente de ejemplo '+(data.counter-1),sheets:n,status:'pending_deposit'});selected=id;sheetIndex=0;if(window.matchMedia('(max-width:720px)').matches){document.body.classList.add('mobile-detail');window.scrollTo(0,0)}$('search').value='';$('statusFilter').value='all';$('sort').value='new';render()};
+$('backToOrders').onclick=()=>{document.body.classList.remove('mobile-detail');window.scrollTo(0,0)};
 $('reset').onclick=()=>{if(!confirm('¿Restablecer todos los pedidos ficticios de la demostración?'))return;data=initial();selected=data.orders[0].id;sheetIndex=0;$('search').value='';$('statusFilter').value='all';$('sort').value='new';render()};
 for(const id of ['search','statusFilter','sort'])$(id).addEventListener(id==='search'?'input':'change',renderOrders);
 render();
