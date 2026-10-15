@@ -76,3 +76,21 @@ Se actualizaron **los mismos archivos** `Code.gs` e `Index.html`. Ya no es neces
 3. Abrir la URL existente desde el perfil Chrome dedicado, pulsar «Cargar prueba» para seis fotos ficticias y «Enviar 6 fotos a Drive». Verificar carpeta `PRUEBA_6_POLAROIDS_...` con `FOTO_1`–`FOTO_6` y `encuadres.json`.
 
 **No se han modificado precios ni cotizador público.** El piloto no recibe fotografías de clientes.
+
+## Versión PDF privado de imprenta — preparada 15/10/2026
+
+La prueba de recepción en Google Drive se confirmó **realmente**: las seis imágenes originales más `encuadres.json` llegaron a Drive. **Esa implementación NO produce aún PDF**.
+
+La **siguiente versión**, lista en este directorio GitHub, incorpora en `Index.html` recortes JPEG de 886×886 píxeles a partir de los encuadres del usuario. `Code.gs` guarda originales y recortes, y crea **en Apps Script privado** el archivo `POLAROIDS_A4_6_FOTOS_IMPRIMIR.pdf` con seis imágenes embebidas como JPEG, página A4 a escala real, Polaroids 85×90 mm, ventana de foto 75×75 mm, márgenes 5 mm a izquierda/derecha, 4 mm arriba y 11 mm abajo y marcas de guillotina fuera de las piezas.
+
+La salida esperada de una hoja completa en carpeta privada es:
+- `FOTO_1..6` originales JPG/PNG
+- `RECORTE_1..6_300DPI.jpg`, 886×886 px, JPEG
+- `encuadres.json` con coordenadas originales
+- `POLAROIDS_A4_6_FOTOS_IMPRIMIR.pdf`, formato A4 con seis piezas
+
+El PDF **no se devuelve a la web** ni se ofrece al cliente, solo se almacena en Drive privado. La app continúa con acceso **Solo yo** y valida propietario en servidor.
+
+**Verificaciones locales con simulación:** 17 comprobaciones aprobadas, incluida estructura PDF (`%PDF-1.4`, A4 MediaBox, seis objetos de imagen, posiciones, tabla de referencias cruzadas y archivo privado), seis fotografías con recorte y restricciones de propiedad. **Todavía no está probada la generación del PDF real en el Apps Script implementado**, ni se midió visualmente un PDF creado con fotografías reales y guillotina; antes de producir pedidos es imprescindible prueba de impresión a tamaño 100%, sin "ajustar al papel".
+
+Como actualización de código de una misma aplicación, se necesita reemplazar **ambos** `Code.gs`/`Index.html` y editar la implementación existente a `Nueva versión`. No modifica `main`, la web pública ni Cloudflare, no necesita R2.
