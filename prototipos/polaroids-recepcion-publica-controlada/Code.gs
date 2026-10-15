@@ -43,7 +43,8 @@ function privateConfig_(){
  const id=p.getProperty('RECEIPT_FOLDER_ID'),
        secret=p.getProperty('TURNSTILE_SECRET'),
        hostname=p.getProperty('TURNSTILE_HOSTNAME');
- if(!id||!secret||!hostname)throw new Error('La recepción pública no está configurada.');
+ if(!id||!secret||!hostname||!/^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/i.test(hostname))
+   throw new Error('La recepción pública no está configurada.');
  const root=DriveApp.getFolderById(id);
  if(root.getSharingAccess()!==DriveApp.Access.PRIVATE)
    throw new Error('La carpeta de trabajo debe ser privada.');
@@ -90,6 +91,21 @@ function usageDay_(p){
  const prev=JSON.parse(p.getProperty(k)||'{"orders":0,"files":0,"bytes":0}');
  return {key:k,value:prev};
 }
+
+function pruneOrderStates_(p) {
+ // Evitar llenar la cuota de 500 KB de PropertiesService con trabajos viejos.
+ // Solo retira el estado técnico, no borra carpetas ni fotos de clientes.
+ const now=Date.now(), props=p.getProperties();
+ Object.keys(props).forEach(k=>{
+   if(!k.startsWith('PUBLIC_ORDER_'))return;
+   try{
+     const st=JSON.parse(props[k]);
+     if(!Number.isFinite(st.created)||now-st.created>14*24*60*60*1000)
+       p.deleteProperty(k);
+   }catch(e){p.deleteProperty(k);}
+ });
+}
+
 function makeRandomHex_(bytes){
  // UUID se genera mediante el servicio de Google; nunca Math.random para claves.
  let text='';
@@ -103,13 +119,18 @@ function startPublicOrder(input){
  verifyChallenge_(input.turnstileToken,c.secret,c.hostname);
  const lock=LockService.getScriptLock();lock.waitLock(12000);
  try {
+   pruneOrderStates_(c.p);
    const day=usageDay_(c.p);
    if(day.value.orders>=PUBLIC_MAX_ORDERS_DAY)
      throw new Error('Cupo diario de recepción completo. Contactanos por WhatsApp.');
    const ref='POL-'+makeRandomHex_(12).toUpperCase();
    const key=makeRandomHex_(32);
    const folder=c.root.createFolder('PEDIDO_'+ref);
-   folder.setSharing(DriveApp.Access.PRIVATE,DriveApp.Permission.NONE);
+   // Las carpetas hijas de un directorio privado deben continuar restringidas.
+   if(folder.getSharingAccess()!==DriveApp.Access.PRIVATE) {
+     folder.setTrashed(true);
+     throw new Error('El directorio creado no es privado; se rechazó la recepción.');
+   }
    const st={created:Date.now(),folderId:folder.getId(),secretHash:secretHash_(key),
      photos:{},status:'receiving',sheets:1};
    c.p.setProperty('PUBLIC_ORDER_'+ref,JSON.stringify(st));
