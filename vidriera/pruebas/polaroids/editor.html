@@ -143,6 +143,16 @@ let editorIndex=-1;
 let beforeEdit=null;
 let replaceIndex=-1;
 let busy=false;
+let provisionalReference='';
+function nuevaReferenciaProvisional(){
+ const bytes=new Uint8Array(8);
+ if(window.crypto&&window.crypto.getRandomValues){
+   window.crypto.getRandomValues(bytes);
+   return 'POL-'+Array.from(bytes,n=>n.toString(16).padStart(2,'0')).join('').toUpperCase();
+ }
+ // Solo es un identificador visual de simulación, NO un token de acceso.
+ return 'POL-'+Date.now().toString(16).toUpperCase()+'-'+Math.floor(Math.random()*1000000);
+}
 const $=id=>document.getElementById(id);
 $('prevSheet').addEventListener('click',()=>showSheet(activeSheet-1));
 $('nextSheet').addEventListener('click',()=>showSheet(activeSheet+1));
@@ -223,13 +233,17 @@ document.addEventListener('keydown',e=>{if(editorIndex<0)return;if(e.key==='Esca
 // recibir un identificador de archivo y recién después agregar el ítem al carrito real.
 $('btnPdf').onclick=()=>{
  if(!orderComplete()){status('Completá las seis fotos de todas las hojas antes de continuar.','bad');return}
+ if(!provisionalReference)provisionalReference=nuevaReferenciaProvisional();
  if(window.parent!==window){
-   window.parent.postMessage({type:'SABER_POLAROID_DRAFT_READY',payload:{sheets:sheets.length,photos:sheets.length*6,format:'85x90',uploadsReceived:false}},window.location.origin);
-   status('Pedido simulado: '+sheets.length+' hoja(s). Las fotografías NO se enviaron.','ok');
+   window.parent.postMessage({type:'SABER_POLAROID_DRAFT_READY',payload:{
+     sheets:sheets.length,photos:sheets.length*6,format:'85x90',
+     uploadsReceived:false,reference:provisionalReference,referenceStatus:'provisional'
+   }},window.location.origin);
+   status('Referencia provisional: '+provisionalReference+' · Las fotografías NO se enviaron.','ok');
    return;
  }
- $('cartItem').textContent='Simulación completa: '+sheets.length+' hoja(s), '+(sheets.length*6)+' encuadres. Sin archivos enviados.';
- status('Simulación completa. No se envió ningún archivo.','ok');
+ $('cartItem').textContent='Simulación '+provisionalReference+': '+sheets.length+' hoja(s). Sin archivos enviados.';
+ status('Referencia provisional: '+provisionalReference+'. No se envió ningún archivo.','ok');
 };
 $('btnDemo').onclick=async()=>{let fs=[];for(let i=0;i<6;i++){const c=document.createElement('canvas');c.width=i%2?1250:1700;c.height=i%2?1700:1200;let ctx=c.getContext('2d'),g=ctx.createLinearGradient(0,0,c.width,c.height);const pair=[['#355f78','#e2a775'],['#6c8188','#c4d4bd'],['#98786b','#e6c3aa'],['#526e94','#cbbddd'],['#5f8d85','#e9c393'],['#8680a8','#d1b7a2']][i];g.addColorStop(0,pair[0]);g.addColorStop(1,pair[1]);ctx.fillStyle=g;ctx.fillRect(0,0,c.width,c.height);ctx.fillStyle='#ffffff44';ctx.beginPath();ctx.arc(c.width*(.25+.09*i),c.height*.4,c.height*.22,0,2*Math.PI);ctx.fill();ctx.strokeStyle='#ffffff77';ctx.lineWidth=18;ctx.beginPath();ctx.moveTo(-60,c.height*.9);ctx.lineTo(c.width*.75,c.height*.26);ctx.lineTo(c.width+30,c.height*.75);ctx.stroke();ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold '+Math.round(c.width*.075)+'px Segoe UI, Arial';ctx.fillText('FOTO DE PRUEBA',c.width/2,c.height*.70);ctx.font=Math.round(c.width*.05)+'px Segoe UI, Arial';ctx.fillText(String(i+1),c.width/2,c.height*.79);const b=await new Promise(r=>c.toBlob(r,'image/jpeg',.92));fs.push(new File([b],`Prueba_${i+1}.jpg`,{type:'image/jpeg'}))}for(let i=0;i<6;i++)dropPhoto(i);await acceptFiles(fs);status('Fotos de prueba cargadas. Podés practicar el encuadre y revisar el PDF antes de usar fotos reales.','ok')};
 renderAll();
