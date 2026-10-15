@@ -55,3 +55,24 @@ En la prueba real el HTML se abrió, pero Chrome mostró **"Form upload failed. 
 La solución es **un cambio de código**, no un cambio de configuración de Chrome. Ambas fuentes están en esta carpeta del repositorio. **Es necesario reemplazar los dos archivos en el proyecto Apps Script y luego actualizar su implementación existente**; cambiar GitHub por sí solo no modifica el Apps Script desplegado. Evitar crear otra implementación o abrir el acceso al público.
 
 Ocho pruebas locales con servicios simulados aprobadas: sintaxis de cliente, coincidencia entre las funciones, carga permitida, rechazo a datos inválidos, a usuario anónimo, a piloto deshabilitado, a carpeta compartida y a datos demasiado grandes. **Aún no se probó una carga real con el código V2.**
+
+## Piloto de 6 fotografías y recortes — 15/10/2026
+
+Se actualizaron **los mismos archivos** `Code.gs` e `Index.html`. Ya no es necesario crear otro proyecto ni otra aplicación web.
+
+- `Index.html`: editor aprobado de 6 fotos de 85×90 mm por hoja A4, con recorte manual, vista previa y marca de agua. En esta versión piloto es una sola hoja, JPG/PNG de hasta 5 MB por foto.
+- `Code.gs`: agrega `comenzarHojaPrueba`, `subirFotoDeHoja`, `finalizarHojaPrueba`. Crea una subcarpeta privada de prueba, recibe los 6 originales por separado, valida cada recorte en píxeles y guarda `encuadres.json`.
+- Los usuarios siguen restringidos al propietario por `TEST_OWNER_EMAIL`, `TEST_ENABLED` y a una aplicación web de acceso **Solo yo**. El navegador no recibe IDs de Drive; solo un identificador temporal de la hoja.
+- Cada fotografía se envía secuencialmente mediante `google.script.run` y base64, evitando el error anterior de envío del formulario `Form upload failed`.
+- El archivo final PDF no se genera ni se expone en el piloto; la recuperación profesional sigue pendiente.
+- Si falla una carga a mitad de las seis, puede quedar una subcarpeta `PRUEBA_6_POLAROIDS_...` incompleta; hay que revisarla y borrarla manualmente tras la prueba.
+
+**15 pruebas locales simuladas correctas** (seis cargas secuenciales, seis archivos, manifest con recortes, rechazo de incompletos, duplicados, usuario no autorizado, carpeta compartida, recorte inválido y recepción apagada). Todavía falta **probar la integración real en Apps Script con Drive**, no se ha publicado automáticamente desde GitHub.
+
+### Actualización del proyecto ya implementado
+
+1. Reemplazar el contenido de `Código.gs` y `Index.html` por las versiones de este directorio y guardar.
+2. **Implementar → Administrar implementaciones → Editar (lápiz) → Nueva versión → Implementar**. Conservar **Solo yo / Yo** y la misma dirección `/exec`.
+3. Abrir la URL existente desde el perfil Chrome dedicado, pulsar «Cargar prueba» para seis fotos ficticias y «Enviar 6 fotos a Drive». Verificar carpeta `PRUEBA_6_POLAROIDS_...` con `FOTO_1`–`FOTO_6` y `encuadres.json`.
+
+**No se han modificado precios ni cotizador público.** El piloto no recibe fotografías de clientes.
