@@ -239,7 +239,9 @@ function renderSlots(){const target=$('slots');target.replaceChildren();let tota
 function renderAll(){renderSlots();renderPreview()}
 function dropPhoto(i){if(photos[i]&&photos[i].url)URL.revokeObjectURL(photos[i].url);photos[i]=null}
 function loadImage(file){return new Promise((resolve,reject)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>resolve({name:file.name,img:im,url:u,file,zoom:1,cx:.5,cy:.5});im.onerror=()=>{URL.revokeObjectURL(u);reject(new Error('No se pudo abrir '+file.name+'. Usá JPG, PNG o WebP.'))};im.src=u})}
-async function acceptFiles(files,specific=-1){if(!files.length)return;const filtered=files.filter(f=>f.type.startsWith('image/')||/\.(jpe?g|png|webp|heic|heif)$/i.test(f.name));if(!filtered.length){status('No se reconocieron imágenes válidas.','bad');return}
+async function acceptFiles(files,specific=-1){if(!files.length)return;const filtered=files.filter(f=>receiverConfig&&receiverConfig.enabled
+ ?['image/jpeg','image/png'].includes(f.type)&&f.size>0&&f.size<=5*1024*1024
+ :f.type.startsWith('image/')||/\.(jpe?g|png|webp|heic|heif)$/i.test(f.name));if(!filtered.length){status('No se reconocieron imágenes válidas.','bad');return}
  let destinations=specific>=0?[specific]:photos.map((v,i)=>v?null:i).filter(v=>v!==null);if(filtered.length>destinations.length){status('Hay '+filtered.length+' fotos nuevas y solo '+destinations.length+' lugares disponibles. Se cargarán las que entren.','bad')}
  let errors=[];for(let j=0;j<Math.min(filtered.length,destinations.length);j++){try{const p=await loadImage(filtered[j]);dropPhoto(destinations[j]);photos[destinations[j]]=p}catch(e){errors.push(e.message)}}renderAll();if(errors.length)status(errors.join(' '),'bad')}
 $('inputPhotos').addEventListener('change',e=>{acceptFiles([...e.target.files]);e.target.value='' });$('inputReplace').addEventListener('change',e=>{acceptFiles([...e.target.files],replaceIndex);e.target.value='';replaceIndex=-1});
@@ -466,6 +468,8 @@ async function setupSecureReception(){
   receiverNonce=secureNonce();
   url.searchParams.set('bridgeNonce',receiverNonce);
   $('secureReceptionNotice').hidden=false;
+  $('inputPhotos').accept='image/jpeg,image/png';
+  $('inputReplace').accept='image/jpeg,image/png';
   $('btnPdf').disabled=true;
   updateSheetNav();
   const frame=document.createElement('iframe');
