@@ -55,7 +55,7 @@ footer{background:#071f36;color:#fff;padding:25px 0}.footerrow{display:flex;alig
       <h2 id="orderPreviewTitle">Mensaje de pedido · Simulación</h2>
       <button id="closeOrderPreview" type="button" aria-label="Cerrar resumen" onclick="closeOrderPreview()">×</button>
     </div>
-    <p class="order-preview-warning"><strong>PRUEBA:</strong> este mensaje no se envía por WhatsApp. Las fotos del editor público de pruebas tampoco llegan a Drive.</p>
+    <p class="order-preview-warning"><strong>PRUEBA:</strong> este mensaje no se envía por WhatsApp. Si se habilita una recepción protegida, comprobá los archivos en el panel privado antes de imprimir.</p>
     <p class="order-preview-label">Así se resumirán juntos los artículos y trabajos de impresión:</p>
     <textarea id="orderPreviewText" readonly rows="14" aria-label="Texto simulado del pedido"></textarea>
     <div class="order-preview-actions"><button type="button" class="checkout" onclick="copyOrderPreview()">Copiar texto de prueba</button><button type="button" class="secondary-preview" onclick="closeOrderPreview()">Cerrar</button></div>
@@ -83,8 +83,11 @@ footer{background:#071f36;color:#fff;padding:25px 0}.footerrow{display:flex;alig
  window.changeQty=function(id,delta){const i=cart.findIndex(x=>x.id===id);if(i<0||cart[i].type!=='product')return;cart[i].qty+=delta;if(cart[i].qty<=0)cart.splice(i,1);save()};window.removeItem=function(id){cart=cart.filter(x=>x.id!==id);save()};function save(){localStorage.setItem(cartKey,JSON.stringify(cart));renderCart()}
  function renderCart(){const body=document.getElementById('cartBody');const count=cart.reduce((a,b)=>a+(Number(b.qty)||1),0);document.getElementById('cartBadge').textContent=count;document.getElementById('mobileBadge').textContent=count;if(!cart.length){body.innerHTML='<div class="empty">Todavía no agregaste nada al pedido.</div>'}else{const groups=[['product','ARTÍCULOS'],['print','IMPRESIÓN Y GRÁFICA']];body.innerHTML=groups.map(([type,title])=>{const items=cart.filter(x=>x.type===type);if(!items.length)return '';return `<div class="cart-group"><div class="cart-group-title">${title}</div>${items.map(x=>{const refs=Array.isArray(x.draftReferences)
     ?x.draftReferences.filter(r=>/^POL-[A-F0-9-]{12,48}$/.test(String(r))).slice(0,10):[];
+    const real=Array.isArray(x.receivedReferences)&&x.filesReceived===true
+      ?x.receivedReferences.filter(r=>/^POL-[A-F0-9]{24}$/.test(String(r))).slice(0,10):[];
     const draftNote=refs.length?' · Referencia(s) provisional(es): '+refs.join(', ')+' · FOTOS NO RECIBIDAS':'';
-    const detail=x.type==='print'?(x.detail||'Trabajo cotizado')+draftNote:`${money(x.price)} c/u`;const controls=x.type==='product'?`<div class="qty"><button onclick="changeQty('${x.id}',-1)">−</button><span>${x.qty}</span><button onclick="changeQty('${x.id}',1)">+</button><button class="remove" onclick="removeItem('${x.id}')">Quitar</button></div>`:`<div class="qty"><button class="remove" onclick="removeItem('${x.id}')">Quitar trabajo</button></div>`;return `<div class="cart-item"><div class="cart-row"><div><b>${escapeHtml(x.name)}</b><small>${escapeHtml(detail)}</small></div><b>${money(x.price*(Number(x.qty)||1))}</b></div>${controls}</div>`}).join('')}</div>`}).join('')}const prod=cart.filter(x=>x.type==='product').reduce((s,x)=>s+x.price*x.qty,0);const prints=cart.filter(x=>x.type==='print');const pr=prints.reduce((s,x)=>s+x.price*(Number(x.qty)||1),0);const deposit=prints.reduce((s,x)=>s+(Number(x.deposit)||Math.round(Number(x.price||0)*.5)),0);document.getElementById('productsSubtotal').textContent=money(prod);document.getElementById('printsSubtotal').textContent=money(pr);document.getElementById('depositSubtotal').textContent=money(deposit);document.getElementById('grandTotal').textContent=money(prod+pr)}
+    const receivedNote=real.length?' · Recepción informada: '+real.join(', ')+' · Verificar en panel privado':'';
+    const detail=x.type==='print'?(x.detail||'Trabajo cotizado')+draftNote+receivedNote:`${money(x.price)} c/u`;const controls=x.type==='product'?`<div class="qty"><button onclick="changeQty('${x.id}',-1)">−</button><span>${x.qty}</span><button onclick="changeQty('${x.id}',1)">+</button><button class="remove" onclick="removeItem('${x.id}')">Quitar</button></div>`:`<div class="qty"><button class="remove" onclick="removeItem('${x.id}')">Quitar trabajo</button></div>`;return `<div class="cart-item"><div class="cart-row"><div><b>${escapeHtml(x.name)}</b><small>${escapeHtml(detail)}</small></div><b>${money(x.price*(Number(x.qty)||1))}</b></div>${controls}</div>`}).join('')}</div>`}).join('')}const prod=cart.filter(x=>x.type==='product').reduce((s,x)=>s+x.price*x.qty,0);const prints=cart.filter(x=>x.type==='print');const pr=prints.reduce((s,x)=>s+x.price*(Number(x.qty)||1),0);const deposit=prints.reduce((s,x)=>s+(Number(x.deposit)||Math.round(Number(x.price||0)*.5)),0);document.getElementById('productsSubtotal').textContent=money(prod);document.getElementById('printsSubtotal').textContent=money(pr);document.getElementById('depositSubtotal').textContent=money(deposit);document.getElementById('grandTotal').textContent=money(prod+pr)}
  window.openCart=function(){document.getElementById('cart').classList.add('open');document.getElementById('overlay').classList.add('open')};window.closeCart=function(){document.getElementById('cart').classList.remove('open');document.getElementById('overlay').classList.remove('open')};
  function itemQty(x){const q=Number(x.qty);return Number.isInteger(q)&&q>0?q:1}
  function amount(x){return (Number(x.price)||0)*itemQty(x)}
@@ -117,6 +120,12 @@ footer{background:#071f36;color:#fff;padding:25px 0}.footerrow{display:flex;alig
          lines.push('  Referencia(s) provisional(es): '+refs.join(', '));
          lines.push('  IMPORTANTE: Fotos todavía NO recibidas');
        }
+       const received=Array.isArray(x.receivedReferences)&&x.filesReceived===true?
+        x.receivedReferences.filter(r=>/^POL-[A-F0-9]{24}$/.test(String(r))).slice(0,10):[];
+       if(received.length){
+         lines.push('  Recepción informada: '+received.join(', '));
+         lines.push('  LIBRERÍA SABER: verificar en panel privado antes de imprimir');
+       }
      });
      lines.push('');
    }
@@ -127,8 +136,9 @@ footer{background:#071f36;color:#fff;padding:25px 0}.footerrow{display:flex;alig
    lines.push('');
    lines.push('El pedido puede enviarse por WhatsApp antes de abonar la seña.');
    lines.push('La impresión se realizará únicamente después de confirmar el pago del 50 % correspondiente.');
-   lines.push('SIMULACIÓN: Las referencias anteriores son identificadores del borrador, NO prueban recepción de fotos.');
-   lines.push('No se recibieron fotografías ni se registró un pedido real.');
+   lines.push('SIMULACIÓN DEL MENSAJE: no se ha enviado el pedido por WhatsApp.');
+   lines.push('Las referencias provisionales NO significan fotos recibidas.');
+   lines.push('Las referencias de recepción deben verificarse en el panel privado de Librería Saber.');
    return lines.join('\n');
  }
  window.sendWhatsApp=function(){
