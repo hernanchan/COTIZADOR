@@ -91,13 +91,19 @@ function renderPolaroidSandbox(){
  subheading.textContent='Seis fotos por hoja A4, con encuadre manual y vista previa protegida.';
  const price=Number(cfg.polaroidPack?.pricePerSheet)||0;
  if(price<=0){app.innerHTML=backButton()+'<div class="error">El precio de Polaroids no está configurado.</div>';bindBack();return;}
- app.innerHTML=backButton()+'<div class="stage-banner">PRUEBA SIN R2: ninguna foto saldrá del dispositivo. Precio regular: '+money(price)+' por hoja de 6 Polaroids. El pedido es simulado; no hagas transferencias.</div><iframe id="polaroidEditorFrame" class="pol-editor" title="Editor de seis Polaroids" src="editor.html?unitPrice='+encodeURIComponent(price)+'"></iframe>';
+ app.innerHTML=backButton()+'<div id="polaroidStageBanner" class="stage-banner">MODO PRUEBA: la recepción de fotografías permanece deshabilitada. Precio regular: '+money(price)+' por hoja de 6 Polaroids. El pedido es simulado; no hagas transferencias.</div><iframe id="polaroidEditorFrame" class="pol-editor" title="Editor de seis Polaroids" src="editor.html?unitPrice='+encodeURIComponent(price)+'"></iframe>';
  bindBack();
  const back=document.getElementById('backServices');back.textContent='← Volver a elegir servicios';
  const frame=document.getElementById('polaroidEditorFrame');
  // Ajustamos el alto del editor sin forzar largas zonas vacías en el cotizador.
  const handleEditorSize=(event)=>{
-   if(event.origin!==window.location.origin||event.source!==frame.contentWindow||event.data?.type!=='SABER_POLAROID_EDITOR_HEIGHT')return;
+   if(event.origin!==window.location.origin||event.source!==frame.contentWindow)return;
+   if(event.data?.type==='SABER_POLAROID_MODE'&&event.data.enabled===true){
+     const banner=document.getElementById('polaroidStageBanner');
+     if(banner)banner.textContent='Modo de recepción protegida configurado. Tus fotos solo se considerarán recibidas cuando aparezca la confirmación del servidor. Esta página sigue siendo un entorno de pruebas.';
+     return;
+   }
+   if(event.data?.type!=='SABER_POLAROID_EDITOR_HEIGHT')return;
    const height=Number(event.data.height);
    if(!Number.isFinite(height)||height<320||height>4000)return;
    const px=Math.ceil(height+4);
