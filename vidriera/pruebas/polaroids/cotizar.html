@@ -56,6 +56,9 @@
         const refs=Array.isArray(item.draftReferences)
           ?item.draftReferences.map(String).filter(v=>/^POL-[A-F0-9-]{12,48}$/.test(v)).slice(0,10)
           :[];
+        const receivedRefs=Array.isArray(item.receivedReferences)
+          ?item.receivedReferences.map(String).filter(v=>/^POL-[A-F0-9]{24}$/.test(v)).slice(0,10)
+          :[];
         cart.push({
           id:String(item.id||('PRINT-'+Date.now())),
           type:'print',
@@ -65,7 +68,8 @@
           detail:String(item.detail||''),
           deposit:Number(item.deposit)||0,
           draftReferences:refs,
-          filesReceived:false
+          receivedReferences:receivedRefs,
+          filesReceived:receivedRefs.length>0&&refs.length===0&&item.filesReceived===true
         });
         localStorage.setItem(key,JSON.stringify(cart));
         updateStatus();
