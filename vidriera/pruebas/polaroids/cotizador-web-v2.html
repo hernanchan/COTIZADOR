@@ -108,16 +108,38 @@ function renderPolaroidSandbox(){
  frame.addEventListener('load',()=>requestAnimationFrame(reportStageHeight));
 
  const handler=(event)=>{
-   if(event.source!==frame.contentWindow||event.origin!==window.location.origin||event.data?.type!=='SABER_POLAROID_DRAFT_READY')return;
+   if(event.source!==frame.contentWindow||event.origin!==window.location.origin)return;
+   const msg=event.data;
+   if(!msg||!['SABER_POLAROID_DRAFT_READY','SABER_POLAROID_RECEIVED'].includes(msg.type))return;
    if(!document.body.contains(frame))return;
-   const sheetCount=Number(event.data.payload?.sheets),photoCount=Number(event.data.payload?.photos);
-   const ref=String(event.data.payload?.reference||'');
-   if(!Number.isInteger(sheetCount)||sheetCount<1||sheetCount>10||
-      photoCount!==sheetCount*6||event.data.payload?.uploadsReceived!==false||
-      event.data.payload?.referenceStatus!=='provisional'||
-      !/^POL-[A-F0-9-]{12,48}$/.test(ref))return;
+   const sheetCount=Number(msg.payload?.sheets),photoCount=Number(msg.payload?.photos);
+   const ref=String(msg.payload?.reference||'');
+   const received=msg.type==='SABER_POLAROID_RECEIVED';
+   if(received){
+     if(msg.payload?.uploadsReceived!==true||
+        msg.payload?.referenceStatus!=='received'||
+        sheetCount!==1||photoCount!==6||
+        !/^POL-[A-F0-9]{24}$/.test(ref))return;
+   }else{
+     if(!Number.isInteger(sheetCount)||sheetCount<1||sheetCount>10||
+        photoCount!==sheetCount*6||msg.payload?.uploadsReceived!==false||
+        msg.payload?.referenceStatus!=='provisional'||
+        !/^POL-[A-F0-9-]{12,48}$/.test(ref))return;
+   }
    window.removeEventListener('message',handler);
-   finishItem({service:'polaroids',work:'Polaroids · Pack de 6 (PRUEBA, SIN ARCHIVOS RECIBIDOS)',qty:sheetCount+' hoja'+(sheetCount===1?'':'s')+' A4 · '+photoCount+' Polaroids',mode:'85 × 90 mm · PRUEBA SIN ENVÍO',binding:false,bindingCharge:0,baseTotal:price*sheetCount,meta:{q:sheetCount,photosCount:photoCount,unit:price,polaroidPack:true,testOnly:true,filesReceived:false,provisionalReference:ref}});
+   const note=received?'Fotos recibidas · Ref. '+ref:
+     'Referencia provisional '+ref+' · FOTOS NO RECIBIDAS';
+   finishItem({
+     service:'polaroids',
+     work:received?'Polaroids · Pack de 6':'Polaroids · Pack de 6 (PRUEBA)',
+     qty:sheetCount+' hoja'+(sheetCount===1?'':'s')+' A4 · '+photoCount+' Polaroids',
+     mode:'85 × 90 mm · '+note,binding:false,bindingCharge:0,
+     baseTotal:price*sheetCount,
+     meta:{q:sheetCount,photosCount:photoCount,unit:price,polaroidPack:true,
+       testOnly:true,filesReceived:received,
+       provisionalReference:received?'':ref,
+       receivedReference:received?ref:''}
+   });
  };
  window.addEventListener('message',handler);
 }
@@ -133,16 +155,18 @@ function renderResult(){heading.textContent='Tu presupuesto';subheading.textCont
 const sum=document.getElementById('summary');t.items.forEach((i,index)=>{const r=document.createElement('div');r.className='summary-row';r.innerHTML='<div class="summary-main"><b>'+i.work+'</b><span>'+i.qty+' · '+i.mode+(i.binding?' · Con anillado':'')+(i.promoLabel?' · '+i.promoLabel:'')+'</span></div><div class="summary-end">'+money(i.total)+(index<cart.length?'<button class="remove" data-remove="'+index+'">Quitar</button>':'')+'</div>';sum.appendChild(r)});document.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>{cart.splice(Number(b.dataset.remove),1);renderResult()});document.getElementById('addAnother').onclick=()=>{if(currentItem){cart.push(currentItem);currentItem=null}renderServices()};document.getElementById('changeData').onclick=renderForm;document.getElementById('applyCoupon').onclick=applyCoupon;document.getElementById('finalAction').onclick=finalize;if(!integrated){const a=document.getElementById('finalAction');a.target='_blank';a.rel='noopener';a.href=whatsAppHref(t)}}
 async function applyCoupon(){const status=document.getElementById('couponStatus'),code=document.getElementById('coupon').value.trim();if(!code){manualCoupon=null;renderResult();return}status.textContent='Comprobando promoción…';if(!extraPromos.length){const ok=await loadPromos();if(!ok){status.textContent='No pudimos consultar las promociones.';return}}const found=findCoupon(code);if(!found){manualCoupon=null;status.textContent='El código no existe, está desactivado o está fuera de fecha.';renderResult();return}manualCoupon=found;track('cupon_aplicado',{codigo:found.code,producto:found.product});renderResult()}
 function whatsAppHref(t){const lines=t.items.map(i=>'• '+i.work+'\n  '+i.qty+' · '+i.mode+(i.binding?' · Con anillado':'')+'\n  '+money(i.total)),discount=manualCoupon&&t.coupon>0?'\n• Cupón '+manualCoupon.code+': -'+money(t.coupon):'';const msg='Hola, quiero confirmar este pedido.\n\n*PEDIDO*\n'+lines.join('\n\n')+discount+'\n\n*TOTAL: '+money(t.grand)+'*\n*SEÑA 50%: '+money(t.deposit)+'*\n\n*DATOS PARA TRANSFERIR LA SEÑA*\n*Alias:* libreriasaber.mp\n*Titular:* Hernan Maximiliano Meichtry\n*CUIL:* 20-22792046-8\n\n*PARA CONFIRMAR, ENVÍO EN ESTE CHAT:*\n1. Los archivos definitivos.\n2. El comprobante de la seña.\n\nLa orden entra en producción después de recibir y revisar ambos.\n\n_Sujeto a revisión. Si hay diferencias, me contactarán antes de producir._';return 'https://api.whatsapp.com/send?phone=5493513110130&text='+encodeURIComponent(msg)}
-function finalize(ev){if(!integrated){ev.preventDefault();alert('SIMULACIÓN: no se enviará ningún pedido ni se abrirá WhatsApp desde esta página de prueba.');return;}const t=totals();if(!t.items.length){ev.preventDefault();return}if(!integrated){track('confirmar_whatsapp',{value:t.grand,currency:'ARS',cantidad_items:t.items.length});return}ev.preventDefault();const draftRefs=t.items.filter(i=>i.meta?.polaroidPack)
- .map(i=>i.meta.provisionalReference).filter(v=>/^POL-[A-F0-9-]{12,48}$/.test(String(v)));
+function finalize(ev){if(!integrated){ev.preventDefault();alert('SIMULACIÓN: no se enviará ningún pedido ni se abrirá WhatsApp desde esta página de prueba.');return;}const t=totals();if(!t.items.length){ev.preventDefault();return}if(!integrated){track('confirmar_whatsapp',{value:t.grand,currency:'ARS',cantidad_items:t.items.length});return}ev.preventDefault();const draftRefs=t.items.filter(i=>i.meta?.provisionalReference)
+  .map(i=>i.meta.provisionalReference).filter(v=>/^POL-[A-F0-9-]{12,48}$/.test(String(v)));
+ const receivedRefs=t.items.filter(i=>i.meta?.filesReceived===true)
+  .map(i=>i.meta.receivedReference).filter(v=>/^POL-[A-F0-9]{24}$/.test(String(v)));
  const detail=t.items.map(i=>i.work+' — '+i.qty+' · '+i.mode+
-  (i.meta?.provisionalReference?' · Ref. provisional '+i.meta.provisionalReference+' (FOTOS NO RECIBIDAS)':'')+
   (i.binding?' · Con anillado':'')+(i.promoLabel?' · '+i.promoLabel:'')).join(' | ');
  const title=t.items.length===1?t.items[0].work:'Pedido de impresión y gráfica';
  window.parent.postMessage({type:'SABER_ADD_PRINT',payload:{
    id:'PRINT-'+Date.now(),type:'print',name:title,price:t.grand,qty:1,
    detail,deposit:t.deposit,
-   draftReferences:draftRefs,filesReceived:false
+   draftReferences:draftRefs,receivedReferences:receivedRefs,
+   filesReceived:receivedRefs.length>0&&draftRefs.length===0
  }},window.location.origin);track('agregar_pedido_general',{value:t.grand,currency:'ARS',cantidad_items:t.items.length})}
 (async function(){const token=new URLSearchParams(location.search).get('cupon');if(!token)return;const loaded=await loadPromos();manualCoupon=loaded?findCoupon(token):null})();
 })();
