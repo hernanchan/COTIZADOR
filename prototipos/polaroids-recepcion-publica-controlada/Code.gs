@@ -18,6 +18,24 @@ const PUBLIC_MAX_FILES_DAY=48; // 6 fotos/orden, con originales y recortes
 const PUBLIC_MAX_DAILY_MB=250;
 const PUBLIC_TTL_MS=24*60*60*1000;
 
+/**
+ * Bridge de comunicación iframe. Solo se usa si PUBLIC_ENABLED=yes y
+ * TURNSTILE_HOSTNAME es un hostname exacto bajo nuestro control.
+ * El puente nunca devuelve URL de Drive ni expone funciones de administración.
+ */
+function doGet(){
+ const p=PropertiesService.getScriptProperties();
+ if(p.getProperty('PUBLIC_ENABLED')!=='yes')
+   return HtmlService.createHtmlOutput('Recepción de clientes deshabilitada.');
+ const c=privateConfig_();
+ const tpl=HtmlService.createTemplateFromFile('Bridge');
+ tpl.parentOrigin='https://'+c.hostname;
+ return tpl.evaluate()
+   .setTitle('Librería Saber — Recepción protegida de Polaroids')
+   .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+
 function privateConfig_(){
  const p=PropertiesService.getScriptProperties();
  if(p.getProperty('PUBLIC_ENABLED')!=='yes')
