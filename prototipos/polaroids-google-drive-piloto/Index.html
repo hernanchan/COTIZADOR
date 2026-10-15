@@ -363,18 +363,23 @@ function renderPrivateOrders(orders){
  orders.forEach(item=>{
    const card=adminText('article','admin-order','');
    card.append(adminText('h2','',dateAdmin(item.created)));
-   card.append(adminText('div','ref','Trabajo '+item.reference.slice(0,8)+' · 6 Polaroids'));
+   card.append(adminText('div','ref','Trabajo '+item.reference+
+    ' · '+(item.photos||0)+' Polaroids · '+(item.sheets||0)+' hoja(s)'));
    const state=item.status||'incompleto';
    card.append(adminText('span','admin-state'+
       (state==='pendiente_sena'||state==='incompleto'?' warning':
        state==='entregado'||state==='preparado'?' done':''),item.statusText));
-   card.append(adminText('p','','Originales: '+item.originals+'/6 · Recortes: '+item.crops+'/6 · PDF: '+(item.hasPdf?'Listo':'Pendiente')));
-   card.append(adminText('p','','Precio por hoja: $3.000 · Seña requerida: $1.500'));
+   card.append(adminText('p','','Originales: '+item.originals+' · Recortes: '+item.crops+' · PDF(s): '+(item.hasPdf?'Disponibles':'Pendientes')));
+   card.append(adminText('p','','Total: $'+Number(item.price||0).toLocaleString('es-AR')+
+    ' · Seña requerida: $'+Number(item.deposit||0).toLocaleString('es-AR')));
    const actions=adminText('div','admin-actions','');
-   if(item.pdfUrl && item.canPrint){
-     const link=adminText('a','pdf','Abrir PDF para imprimir');
-     link.href=item.pdfUrl;link.target='_blank';link.rel='noopener noreferrer';
-     actions.append(link);
+   if(item.canPrint&&Array.isArray(item.pdfUrls)&&item.pdfUrls.length){
+     item.pdfUrls.forEach((pdf,i)=>{
+       const link=adminText('a','pdf',item.pdfUrls.length===1?
+          'Abrir PDF para imprimir':'Imprimir hoja '+(i+1)+' de '+item.pdfUrls.length);
+       link.href=pdf.url;link.target='_blank';link.rel='noopener noreferrer';
+       actions.append(link);
+     });
    }else if(item.hasPdf){
      const btn=adminText('button','','PDF bloqueado hasta confirmar seña');
      btn.type='button';btn.disabled=true;actions.append(btn);
