@@ -123,3 +123,13 @@ Se distingue en todos los puntos del carrito **referencia provisional / fotos no
 La configuración está restringida al hostname de pruebas. **No cambiar `enabled` a `true`** sin autorización, configuración de Turnstile y Apps Script independiente y prueba controlada. Al activar, el MVP protegido acepta **una hoja por carga**: el editor seguirá permitiendo 1–10 hojas exclusivamente para simulación hasta que se amplíe el servidor.
 
 Validaciones: sintaxis de 7 archivos, 12 comprobaciones de integridad y dos simulaciones completas del envío de seis fotos (flujo normal y recuperación tras fallo transitorio): correctas. Prueba anónima auténtica y renderizado del puente en Google siguen pendientes; no hay afirmación de recepción real desde la web.
+
+## Estado técnico consolidado — 15/10/2026 (sustituye notas anteriores de «una hoja»)
+
+La recepción protegida de clientes está implementada en esta rama **únicamente como código**, apagada por defecto. El servidor y el editor soportan ahora de **una a diez hojas A4 (6 a 60 fotografías)**. Cada hoja genera un PDF A4 privado separado y se guarda un único `encuadres.json` por pedido. El cotizador/carro de pruebas diferencian referencias provisionales de referencias con recepción confirmada. Precio: ARS 3.000 por hoja, sin promociones; seña 50 % sobre trabajos de gráfica.
+
+**Configuración actual:** `recepcion-config.json.enabled=false`, sin `bridgeUrl` ni `turnstileSiteKey`. Por lo tanto la página de pruebas continúa **sin transmitir archivos reales**, y el botón WhatsApp solo muestra un texto de simulación. El piloto de Google que efectivamente recibió 14 archivos privados se mantiene intacto en su implementación actual.
+
+**Ensayos simulados:** servidor recibió 60 archivos originales y 60 recortes, produjo 10 PDF A4 y metadata JSON; reintento del cierre no creó PDFs extra. El panel privado reconoció las diez hojas, total ARS 30.000, seña ARS 15.000, y mantuvo los enlaces PDF ocultos hasta confirmar la seña. El editor envió 60 solicitudes y emitió referencia solo tras el cierre correcto. **No hay todavía ensayo real con un navegador público ni Apps Script público.**
+
+**Siguiente bloqueo:** crear nuevo Apps Script para recepción de clientes y widget Cloudflare Turnstile gratuito, ambas acciones con autenticación/autorización del dueño. Paso a paso en [README del receptor](../../../prototipos/polaroids-recepcion-publica-controlada/README.md). No modificar `main` ni el sitio público.
