@@ -111,3 +111,15 @@ Se incorporó una referencia provisional por lote `POL-...` que viaja por `edito
 Se preparó un módulo separado en `prototipos/polaroids-recepcion-publica-controlada/` con un receptor de cliente apagado por defecto: ver el README de esa carpeta para límites, protocolo `postMessage`, prueba de Turnstile en servidor y bloqueadores. El código aún **no está conectado a la página de pruebas** ni desplegado como aplicación web. No se ha autorizado el acceso anónimo a la carpeta; la prueba privada permanece en «Solo yo». El panel privado puede reconocer la futura carpeta `PEDIDO_POL-...` una vez que se actualice el código, sin permitir PDF sin seña marcada.
 
 Pruebas de la referencia y simulación: 11/11 controles aprobados (JavaScript y cálculos del carrito, acceso a las referencias, aviso explícito de fotos no recibidas). Receptor aislado: 20/20 pruebas con mocks aprobadas; panel receptor: 5/5 pruebas con mocks. Todos estos controles son simulaciones, sin carga anónima real.
+
+## Puente editor → recepción privada → carrito preparado (15/10/2026)
+
+Los archivos `editor.html`, `cotizador-web-v2.html`, `cotizar.html` e `index.html` ya incluyen el recorrido de envío protegido, **apagado por defecto** mediante `recepcion-config.json`. No hay ninguna URL de Apps Script, clave secreta ni sitekey en la configuración actual.
+
+Si un día se autoriza y configura el nuevo Apps Script receptor + Turnstile, el editor mostrará consentimiento para envío, validará una hoja de seis fotos JPG/PNG (máximo 5 MB cada una), solicitará una sesión con referencia/clave temporal, enviará originales y recortes de 886×886 píxeles de forma secuencial y esperará confirmación de la generación del PDF privado. La clave temporal queda en la memoria de la sesión, **nunca** en el carrito ni WhatsApp. El identificador definitivo `POL-...` se envía solo al confirmarse la recepción completa.
+
+Se distingue en todos los puntos del carrito **referencia provisional / fotos no recibidas** frente a **referencia informada como recibida**, que Librería Saber debe verificar en su panel. El botón WhatsApp continúa en modo de **vista previa simulada**, sin enviar mensajes reales.
+
+La configuración está restringida al hostname de pruebas. **No cambiar `enabled` a `true`** sin autorización, configuración de Turnstile y Apps Script independiente y prueba controlada. Al activar, el MVP protegido acepta **una hoja por carga**: el editor seguirá permitiendo 1–10 hojas exclusivamente para simulación hasta que se amplíe el servidor.
+
+Validaciones: sintaxis de 7 archivos, 12 comprobaciones de integridad y dos simulaciones completas del envío de seis fotos (flujo normal y recuperación tras fallo transitorio): correctas. Prueba anónima auténtica y renderizado del puente en Google siguen pendientes; no hay afirmación de recepción real desde la web.
