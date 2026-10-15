@@ -1,65 +1,55 @@
-# Polaroids Saber — recepción de clientes (prototipo NO IMPLEMENTADO)
+# Polaroids Saber · Receptor controlado (no publicado)
 
-**Estado: código preparado en GitHub, desactivado y no publicado.**
-No modifica el sitio público, el Web App privado que ya recibe seis fotos, ni permisos de Drive. No hay suscripción, claves privadas ni URL de una implementación pública en el repositorio.
+**Estado al 15/10/2026:** código preparado y verificado mediante simulaciones; **NO hay recepción pública activa**.
+La web `libreriasaber.com.ar`, la rama `main` y la aplicación privada que ya generó 14 archivos permanecen intactas. No se utiliza Cloudflare R2.
 
-## Por qué proyecto separado
+## Componentes
 
-La prueba en Apps Script con acceso "Solo yo" funciona y entrega seis originales, seis recortes y el PDF A4 privado. Los clientes sin sesión de Google **no pueden usarla**. Exponer esa misma aplicación habilitaría demasiadas funciones sobre Drive, incluidos los métodos de administración. Por eso la recepción anónima, si se aprueba, requiere **un proyecto nuevo aislado**, bajo la cuenta de Drive dedicada, que implementa únicamente `doGet`, `startPublicOrder`, `uploadPublicPhoto` y `finishPublicOrder`.
+- `Code.gs`: nuevo proyecto de Google Apps Script, **separado** del piloto privado de Librería Saber.
+- `Bridge.html`: canal de mensajes desde el editor en Cloudflare Pages. Solo acepta el origen explícito y un nonce aleatorio de sesión.
+- `../../vidriera/pruebas/polaroids/editor.html`: prepara las fotos, solicita Turnstile, envía las imágenes y espera confirmación del PDF.
+- `../../vidriera/pruebas/polaroids/recepcion-config.json`: configuración pública, actualmente `enabled: false` y sin URL ni clave de sitio.
 
-Los dos archivos preparados aquí son:
-- `Code.gs`: autenticación por capacidad temporal, validación, límites y generación del PDF A4 privado.
-- `Bridge.html`: puente seguro por `postMessage`, previsto para alojarse en un iframe controlado desde Cloudflare Pages y enviar las fotos mediante `google.script.run`. No responde mensajes que provengan de otro origen.
+**Nunca publicar el Code.gs del proyecto privado como «Cualquiera»**: contiene funciones de gestión de pedidos. El receptor público nuevo incluye únicamente funciones de recepción y cada una valida permisos, cuotas y claves.
 
-**Todavía no se conectó este puente al editor público de pruebas.** El editor de Cloudflare sigue simulando cargas. Tampoco se abrió ningún acceso anónimo.
+## Comportamiento previsto
 
-## Reglas incorporadas, sin instalar
+1. El cliente selecciona **de 1 a 10 hojas** A4, con seis Polaroids por hoja (6 a 60 fotos), las encuadra y acepta su envío.
+2. Cloudflare Turnstile verifica la sesión; Apps Script comprueba el token en el servidor, el hostname exacto y la acción `polaroids`.
+3. Apps Script crea una referencia `POL-<24 hex>` apta para carrito y WhatsApp y devuelve una clave privada de carga `<64 hex>`, independiente de la referencia. El servidor conserva solo el hash de la clave; el editor nunca la comunica al carrito.
+4. Se suben secuencialmente fotos originales JPG o PNG de hasta 5 MB y recortes de imprenta JPEG 886×886. Cada hoja genera su PDF privado A4 con guías de guillotina. Una hoja: `POLAROIDS_A4_6_FOTOS_IMPRIMIR.pdf`; varias: `POLAROIDS_A4_HOJA_01_DE_10.pdf`, etc.
+5. La carpeta `PEDIDO_POL-...` contiene originales, recortes, `encuadres.json` y los PDFs. La referencia se considera **recibida** y se transfiere al carrito únicamente cuando finalizó toda la recepción.
+6. El panel privado, al actualizar su código, mostrará las hojas, PDFs, precio total y seña del 50 %. La impresión queda condicionada a confirmar la seña manualmente.
 
-1. `PUBLIC_ENABLED` es **no por defecto**. Si no vale exactamente `yes`, el servidor devuelve recepción deshabilitada y no escribe archivos.
-2. El inicio exige un token Cloudflare Turnstile; se verifica en el servidor por Siteverify, incluyendo `success`, `hostname` exacto y `action=polaroids`. Sin un secret real configurado no funciona. El desafío deberá ejecutarse en la página de nuestro dominio autorizado.
-3. Se crea una referencia definitiva `POL-<24 caracteres hexadecimales>`, pública y apta para carrito/WhatsApp. La **clave privada de carga** es independiente, aleatoria, de 64 caracteres hexadecimales. Solo se guarda su hash SHA-256 en Script Properties; el navegador la conserva en memoria, no debe incorporarla al pedido, la URL ni localStorage.
-4. Se limita inicialmente a **una hoja de seis fotos** por orden, **8 pedidos por día**, **48 fotos por día**, **250 MB en originales + recortes al día**, **5 MB por archivo** y plazo de carga de **24 horas**. Son límites iniciales de seguridad, no la capacidad comercial definitiva de 10 hojas.
-5. Los archivos deben ser JPG o PNG originales y recortes JPEG de 886×886 píxeles. El servidor verifica firma de archivo, dimensiones, tamaño, rangos de los encuadres y duplicados. Las seis fotos se reciben secuencialmente.
-6. Solo se guardan originales, recortes, `encuadres.json` y el PDF dentro de la carpeta privada `PEDIDO_POL-...`. La respuesta pública contiene únicamente referencia y constancia de recepción, nunca URL ni ID de Drive.
-7. Las propiedades técnicas de trabajos caducados se depuran a los 14 días sin eliminar archivos. **Sigue pendiente definir con el usuario una política de conservación y eliminación de imágenes de clientes** para no agotar los 15 GB de Drive.
+Las operaciones `uploadPublicPhoto` y `finishPublicOrder` admiten reintentos tras perderse una respuesta, sin duplicar intencionalmente fotografías ni PDFs. La clave de carga solo existe en memoria: **no se recupera si se cierra o recarga el navegador**.
 
-## Contrato previsto entre la web y el iframe
+## Límites iniciales de seguridad
 
-Mensajes del padre al puente: `SABER_RECEIVER_REQUEST` con `id`, `op` = `start|photo|finish`, `payload`. Respuestas desde el puente: `SABER_RECEIVER_READY` y `SABER_RECEIVER_RESULT` con el mismo `id`. El iframe valida `window.parent` y origen exacto de la página Pages; el servidor valida Turnstile, el token temporal y todas las entradas.
+- Hasta 10 hojas por pedido, máximo 8 inicios de pedido al día y 240 fotografías subidas diariamente, siempre sujeto a 250 MB combinados (originales + recortes) por día.
+- Cada original y recorte: máximo 5 MB. Caducidad de la sesión de carga: 24 horas.
+- El servidor rechaza peticiones si `PUBLIC_ENABLED` no es `yes`, faltan secretos, Turnstile no verifica, las firmas o dimensiones son inválidas, o Drive no es privado.
+- No se entregan identificadores ni enlaces públicos de Drive.
+- El estado técnico de órdenes de más de 14 días puede limpiarse de Script Properties, **pero las fotografías NO se borran automáticamente**. Se requiere definir con el usuario una política de retención antes de atender a clientes reales.
+- Estas cuotas son defensivas y de prueba; no equivalen a una garantía de capacidad comercial. Google Apps Script y Drive tienen límites propios.
 
-- `start`: `{sheets:1,turnstileToken}` → `{reference,uploadKey,maxFiles:6}`.
-- `photo`: `{reference,uploadKey,index,original,printJpeg,crop}` → `{reference,received}`.
-- `finish`: `{reference,uploadKey}` → `{reference,received:true,sheets:1,photos:6}`.
+## Acciones necesarias ANTES de la prueba real
 
-La referencia generada por el servidor reemplazará la referencia **provisional** `POL-...` que hoy genera el editor simulado, y solo después de un `finish` exitoso podrá marcarse `filesReceived:true` y agregarse un ítem real al carrito.
+**Requieren autorización e inicio de sesión del dueño, no realizadas todavía.**
 
-## Configuración reservada para el futuro; NO hacer todavía
+1. Desde el perfil de Chrome **Polaroids Saber**, crear un proyecto Apps Script **nuevo**, bajo la cuenta dedicada, con los archivos `Code.gs` y `Bridge.html`. No modificar el Apps Script privado existente.
+2. En el panel de Cloudflare, crear un widget gratuito Turnstile restringido exactamente al dominio de **pruebas** y conservar la sitekey pública y la secret key privada. No activar servicios pagos.
+3. En las propiedades del nuevo Script cargar `PUBLIC_ENABLED=no`, `RECEIPT_FOLDER_ID` (la misma carpeta privada configurada en el piloto), `TURNSTILE_SECRET` (nunca en GitHub) y `TURNSTILE_HOSTNAME` (hostname del dominio de pruebas). Autorizar los permisos de Google solicitados.
+4. Crear implementación web separada ejecutada **como propietario**, acceso «Cualquiera» únicamente cuando sea posible dejar el servidor apagado con `PUBLIC_ENABLED=no`; comprobar primero que su URL muestra «Recepción de clientes deshabilitada».
+5. Registrar la URL de implementación en `recepcion-config.json`, la sitekey en ese mismo archivo; mantener `enabled:false` hasta que se autorice explícitamente la prueba controlada.
+6. Verificar la rama de pruebas en Cloudflare Pages; validar el iframe intermedio de Google, Turnstile, una carga de seis fotos ficticias, una de varias hojas, PDF privado y carrito; recién después decidir apertura al público. **No publicar cambios en main ni en libreriasaber.com.ar**.
 
-Solo cuando el usuario autorice explícitamente un ensayo privado de acceso anónimo:
-- Crear un proyecto separado de Apps Script bajo la cuenta exclusiva de Polaroids, sin copiar las funciones administrativas.
-- Configurar mediante Script Properties `PUBLIC_ENABLED=no`, `RECEIPT_FOLDER_ID`, `TURNSTILE_SECRET` y `TURNSTILE_HOSTNAME`. El sitio se deberá limitar al hostname propio del entorno de pruebas.
-- Crear la clave pública (sitekey) y secreta de un widget gratuito Cloudflare Turnstile para el hostname de pruebas y probar el flujo del iframe. La clave secreta se conserva **solo** en Apps Script; no en GitHub.
-- Revisar los riesgos de spam, cuotas de Apps Script y Drive, privacidad y almacenamiento; probar acceso anónimo con fotos **ficticias** antes de cambiar `PUBLIC_ENABLED` a `yes`.
-- Mantener la app privada anterior en **Solo yo**, el despliegue público independiente y `main` sin cambios.
+## Estado de validación
 
-Cloudflare Turnstile dispone de modalidad gratuita para aplicaciones pequeñas, pero Apps Script y Drive están sujetos a sus límites propios, que pueden cambiar. No se puede garantizar disponibilidad continua, ni protección total contra spam, ni operación de clientes reales hasta hacer estas pruebas.
+- Verificada la sintaxis del receptor y del editor; comprobado con simulaciones que el receptor puede recibir **60 fotografías** y crear **10 PDFs** y un `encuadres.json`. Comprobado el reintento idempotente y la ausencia de URL pública en las respuestas.
+- El panel privado reconoce pedidos de una y diez hojas y calcula $3.000 por hoja y 50 % de seña; los enlaces al PDF solo aparecen cuando se confirma la seña en el panel.
+- El editor pasó pruebas simuladas de envío de seis y de sesenta fotos y recuperación tras una interrupción.
+- **PENDIENTE:** prueba real del nuevo Apps Script expuesto de forma controlada, autenticación en Cloudflare Turnstile, comunicación cross-origin y permisos efectivos. No confundir pruebas simuladas con operación en producción.
 
-**Pruebas con mocks:** 20/20 aprobadas para el receptor público desactivado, captcha inválido, límites, token privado, seis archivos, PDF, cierre, privacidad, etc.; 5/5 aprobadas para que el panel privado de pruebas lea carpetas futuras `PEDIDO_POL-...`, bloquee PDF hasta marcar la seña y conserve referencia. Son pruebas técnicas locales, no carga anónima real ni impresión física.
+## Precios y pagos
 
-**Pendientes antes de liberar el producto:** probar HTML puente cross-origin, montar Turnstile real, probar en Android/iOS, pasar a 1–10 hojas de manera segura, vincular referencias con carrito/WhatsApp definitivo, validar registros y seña, limpieza y consentimiento para tratamiento de fotografías.
-
-## Integración con editor — preparada y bloqueada por configuración
-
-El editor del sitio de pruebas contiene un receptor opcional, controlado por `vidriera/pruebas/polaroids/recepcion-config.json`. Valores actuales:
-
-```json
-{"enabled":false,"allowedHost":"polaroids-integracion-sin-r2.libreriasaber.pages.dev","bridgeUrl":"","turnstileSiteKey":"","maxSheetsForRealUploads":1}
-```
-
-Sin `enabled=true`, URL de Apps Script distinta del proyecto privado y sitekey de Turnstile, la aplicación **solo simula**: no transmite fotos. El receptor exige que el host sea idéntico al de pruebas. Nunca colocar el Turnstile secret ni la clave temporal del pedido en este JSON, URL o GitHub.
-
-Para el iframe de Google se introduce un nonce aleatorio de 128 bits de un solo navegador, validado por la plantilla `Bridge.html` y por el editor. Los mensajes vienen de los ancestros de HTMLService, que puede introducir un iframe intermedio de Google. Las respuestas privadas se dirigen exclusivamente al `event.source` validado, y los mensajes públicos al dominio exacto. El editor acepta respuestas únicamente del origen autorizado del iframe Google, con nonce y request-id correlacionados. **Este comportamiento de frames de Google debe comprobarse en un navegador real antes de habilitarlo.**
-
-El editor conserva la imagen original JPG/PNG, genera recortes JPEG de 886×886 a calidad .94, manda posiciones originales del encuadre y no comunica datos del pedido al carrito antes de que `finishPublicOrder` confirme el PDF. Los reintentos de foto/cierre son idempotentes en servidor para recuperarse de una respuesta perdida, sin duplicar archivos intencionalmente. No se garantiza reanudar después de cerrar o recargar la pestaña, dado que la clave de carga no se persiste por privacidad.
-
-La prueba del sender en memoria pasó tanto el envío de las seis fotos como su reintento ante un fallo simulado en la tercera foto. El receptor público permanece sin implementar, sin conectar ni activar.
+Precio regular: **ARS 3.000 por hoja**, sin promociones. El carrito admite artículos de librería y trabajos de gráfica. El pedido de WhatsApp puede iniciarse antes de pagar; se imprime solamente tras confirmación de **seña del 50 %**. La versión de pruebas sigue sin enviar WhatsApp real.
