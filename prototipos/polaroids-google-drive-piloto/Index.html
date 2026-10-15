@@ -1,74 +1,269 @@
 <!doctype html>
-<html lang="es">
+<html lang="es-AR">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Polaroids Saber — Piloto privado</title>
-  <style>
-    :root{font-family:Arial,system-ui,sans-serif;color:#183249}
-    body{background:#f3f6f9;padding:22px;margin:0}
-    main{background:#fff;border:1px solid #dce4ec;border-radius:16px;max-width:520px;margin:3rem auto;padding:26px}
-    h1{font-size:24px;margin:0 0 12px} p{line-height:1.5;color:#506275}
-    input{width:100%;margin:14px 0;padding:10px;border:1px solid #b5c8d8;border-radius:9px;box-sizing:border-box}
-    button{border:0;background:#0a3158;color:#fff;padding:13px 20px;border-radius:9px;font-weight:700;width:100%}
-    button:disabled{opacity:.6}
-    .warning{padding:12px;border-radius:10px;background:#fff4df;color:#674d18}
-    #status{font-size:14px;font-weight:bold}
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Polaroids Saber · Prueba de seis fotos en Drive</title>
+<style>
+:root{font-family:Inter,Segoe UI,Arial,sans-serif;color:#263146;background:#f2f4f7;--ink:#263146;--muted:#67778d;--blue:#2365b9;--line:#dbe1e9;--paper:#fff}
+*{box-sizing:border-box}body{margin:0}button,input{font:inherit}button{cursor:pointer}button:disabled{opacity:.48;cursor:not-allowed}
+header{background:#ffffff;border-bottom:1px solid var(--line);padding:18px clamp(20px,3vw,44px);display:flex;justify-content:space-between;align-items:center;gap:16px}header .brand{font-size:22px;font-weight:850;letter-spacing:-.7px}header .brand em{font-style:normal;color:#e77934}.fixed-format{background:#f3f7fd;border:1px solid #cddded;border-radius:9px;padding:12px 13px;display:flex;flex-direction:column;gap:4px}.fixed-format strong{font-size:14px;color:#204d7f}.fixed-format span{font-size:11px;color:#596d85}.trim-tip{font-size:11px;line-height:1.5;color:#365b61;background:#eff9f7;border:1px solid #d7ebe6;border-radius:8px;padding:10px 11px;margin-top:9px}.tag{display:inline-block;margin-left:12px;padding:4px 8px;border:1px solid #c9d7ed;background:#eaf2ff;border-radius:5px;color:#3163a0;font-size:11px;font-weight:800;vertical-align:middle;letter-spacing:.6px}header p{font-size:12px;color:var(--muted);margin:4px 0 0}.app{display:grid;grid-template-columns:minmax(365px,465px) minmax(370px,1fr);gap:22px;margin:22px auto;padding:0 22px;max-width:1360px}.panel{background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 6px 22px #1b35500a}.left{padding:22px}.right{padding:16px 24px 24px;display:flex;flex-direction:column;align-items:center}.sect{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:0 0 12px}.sect h2{font-size:17px;letter-spacing:-.35px;margin:0}.sect small{color:var(--muted)}.drop{display:block;text-align:center;border:1.5px dashed #9ab1cf;border-radius:12px;background:#f6f9fe;padding:23px 10px;margin-bottom:15px;cursor:pointer;transition:all .15s}.drop.drag{background:#e6f0ff;border-color:var(--blue)}.drop strong{display:block;font-size:14px}.drop p{font-size:12px;color:var(--muted);margin:5px 0 0}.drop svg{width:31px;height:31px;color:#3069b1;margin-bottom:7px}.drop:hover{background:#eef5ff}.slots{display:grid;grid-template-columns:1fr 1fr;gap:10px}.slot{position:relative;padding:10px;display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;min-width:0;background:#fff}.slot.empty{background:#fafbfc}.slot-picture{flex:0 0 64px;height:73px;background:#edf0f5;padding:4px 4px 12px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px #0001}.slot-picture canvas{height:100%;width:100%;object-fit:cover}.slot-picture .emptyicon{font-size:22px;color:#a0adbd}.slot .inf{flex:1;min-width:0}.slot b{display:block;font-size:12px}.slot .name{display:block;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;color:#768397;font-size:10px;margin:4px 0}.slot .actions{display:flex;align-items:center;gap:5px}.slot button{border:0;background:#eef4fc;border-radius:5px;color:#265b9a;padding:5px;font-weight:750;font-size:10px;white-space:nowrap}.slot button.del{position:absolute;top:5px;right:5px;color:#a95353;background:#fff0ef;font-size:12px;padding:2px 5px}.slot button:hover{filter:brightness(.96)}.options{border-top:1px solid var(--line);margin-top:17px;padding-top:16px}.options label{font-size:12px;font-weight:800;display:block;margin-bottom:8px}.mode-list{display:flex;gap:8px}.mode{display:flex;gap:6px;align-items:center;flex:1;border:1px solid #dae1ea;border-radius:7px;padding:9px 8px;font-size:11px;cursor:pointer}.mode:has(input:checked){border-color:#5188c5;background:#edf5ff;color:#1b5798}.mode input{accent-color:var(--blue);margin:0}.details{font-size:11px;color:#6a778b;line-height:1.55;margin:10px 1px}.buttons{display:flex;gap:9px;margin-top:15px;flex-wrap:wrap}.primary{border:0;background:var(--blue);color:#fff;border-radius:9px;padding:13px 16px;font-weight:800;flex:1}.primary:not(:disabled):hover{background:#19549d}.secondary{background:#fff;color:#476079;border:1px solid #cdd8e5;border-radius:9px;padding:12px 13px;font-size:12px;font-weight:700}.status{font-size:12px;color:var(--muted);min-height:18px;margin-top:11px}.status.bad{color:#bc3d3d}.status.ok{color:#26754e}.sheet-title{align-self:stretch;display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:12px}.sheet-title h2{margin:0;font-size:17px}.sheet-title small{color:#728197}.paper-holder{width:min(100%,520px);background:#e4e8ec;padding:10px;border:1px solid #d6dce3;border-radius:6px;display:flex;justify-content:center}.paper{display:block;aspect-ratio:210/297;width:100%;background:white;box-shadow:0 2px 7px #0002;cursor:pointer}.legend{text-align:center;line-height:1.55;color:#6d7a8b;font-size:11px;margin:11px 4px 0;max-width:520px}.info{display:flex;gap:10px;width:100%;justify-content:center;margin-top:12px}.info span{font-size:11px;color:#4e6180;background:#edf2f7;border-radius:7px;padding:7px 9px}.tip{max-width:1360px;padding:0 25px 24px;margin:0 auto;font-size:11px;color:#63738a}.modal{position:fixed;inset:0;background:#1b263ac7;z-index:20;display:none;align-items:center;justify-content:center;padding:22px}.modal.show{display:flex}.editbox{background:white;border-radius:15px;width:min(96vw,630px);max-height:94vh;overflow:auto;padding:20px;box-shadow:0 15px 80px #0005}.editheader{display:flex;align-items:center;justify-content:space-between;margin-bottom:13px}.editheader h2{margin:0;font-size:19px}.editheader button{border:0;background:#eef1f6;color:#405673;border-radius:6px;padding:6px 10px;font-weight:800}.cropwrap{width:min(100%,490px);margin:auto;position:relative;background:#e8edf3;border:6px solid #f4f6f8;outline:1px solid #bdc8d4;touch-action:none;cursor:grab}.cropwrap:active{cursor:grabbing}.cropwrap canvas{display:block;width:100%;height:auto;touch-action:none}.cropwrap:after{content:"";position:absolute;inset:0;border:1px solid #ffffffb0;pointer-events:none}.slidebar{margin:18px auto 8px;max-width:490px;display:flex;align-items:center;gap:12px}.slidebar label{font-size:12px;font-weight:750}.slidebar input{flex:1;min-width:30px;accent-color:var(--blue)}.slidebar output{font-size:12px;min-width:40px;text-align:right}.modalnote{text-align:center;font-size:12px;color:#60718a;line-height:1.5;margin:8px}.modalfoot{display:flex;justify-content:space-between;gap:8px;margin-top:14px}.quality{font-size:12px;font-weight:700;padding-top:12px}.quality.good{color:#227443}.quality.mid{color:#a47715}.quality.low{color:#b03c3c}.key{background:#f1f3f7;border:1px solid #d7dce5;border-radius:4px;padding:0 4px;font-size:10px}
+@media(max-width:950px){.app{grid-template-columns:1fr}.right{order:2}.left{order:1}.paper-holder{max-width:520px}.slot-picture{flex-basis:55px;height:65px}.slot .actions{flex-wrap:wrap}}
+@media(max-width:440px){header{padding:13px}.app{padding:0 10px;gap:12px;margin:12px 0}.left{padding:14px}.slots{grid-template-columns:1fr 1fr;gap:7px}.slot{padding:7px;gap:6px}.slot-picture{flex-basis:47px;height:57px}.slot .actions{flex-wrap:wrap}.slot button{padding:4px 3px}.right{padding:12px}.mode-list{flex-direction:column}.info{flex-wrap:wrap}.tag{margin-left:4px}}
+
+.demo-cart{max-width:1316px;margin:0 auto 20px;padding:20px 22px}.demo-cart-title{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:16px;color:var(--ink)}.demo-cart-title span{font-size:11px;color:#9a641f;background:#fff5e7;padding:5px 7px;border-radius:5px;font-weight:700}.demo-cart-empty{color:var(--muted);font-size:13px;margin-top:12px}.demo-cart-ok{border:1px solid #c5dfce;background:#f2fbf5;padding:15px;border-radius:8px;margin-top:13px}.demo-cart-ok .name{font-size:15px;font-weight:800}.demo-cart-ok .desc{font-size:12px;color:#536578;margin-top:6px}.demo-cart-ok .warning{font-size:12px;color:#915c28;margin-top:10px}.paper{cursor:default}.preview-tag{display:block;font-size:11px;font-weight:700;color:#915c28;text-align:center;margin-top:7px}
+@media(max-width:540px){.app>.left{grid-row:1;order:0}.app>.right{grid-row:2;order:0}.slots{grid-template-columns:1fr}.slot{padding:9px;gap:12px}.slot-picture{flex-basis:60px;height:68px}.slot button{font-size:12px;padding:8px 11px}.slot button.del{padding:4px 9px}.drop{padding:20px}.app{grid-template-columns:minmax(0,1fr)}.modalfoot{flex-direction:column}.modalfoot .primary{flex:1!important}.demo-cart{margin:0 10px 18px;padding:15px}.sheet-title h2{font-size:15px}}
+
+/* Diseño compacto de producción: dos columnas reales en PC, una en móvil. */
+@media(min-width:951px){
+  header{padding:12px 18px}
+  .app{max-width:1200px;grid-template-columns:minmax(360px,425px) minmax(400px,1fr);gap:14px;margin:14px auto;padding:0 14px}
+  .left{padding:15px}.right{padding:14px 16px}
+  .drop{padding:10px;margin-bottom:10px}
+  .drop svg{width:24px;height:24px;margin-bottom:2px}
+  .slots{gap:7px}.slot{padding:7px;gap:7px}
+  .slot-picture{flex-basis:52px;height:59px;padding:3px 3px 9px}
+  .options{margin-top:11px;padding-top:10px}
+  .fixed-format{padding:9px}
+  .trim-tip{padding:7px 9px;margin-top:6px}
+  .details{margin:6px 0}
+  .buttons{margin-top:10px}
+  .status{margin-top:6px}
+  .paper-holder{width:min(100%,440px)}
+  .legend{margin-top:8px}.info{margin-top:7px}
+}
+html.embedded .demo-cart{display:none}
+@media(max-width:950px){html.embedded .app{margin-bottom:8px}}
+
+.sheetnav{border:1px solid #c5d4e4;background:#f4f8fe;border-radius:10px;padding:10px;margin-bottom:12px}
+.sheetnavtop{display:flex;justify-content:space-between;align-items:center;gap:8px;color:#204d7f;margin-bottom:9px;font-size:13px}
+.sheetnavtop strong{font-size:14px;color:#245f9d}.sheetnavbuttons{display:flex;gap:6px;flex-wrap:wrap}
+.sheetnavbuttons .secondary{padding:8px 10px;font-size:11px}.sheetnavbuttons .delete-sheet{margin-left:auto;color:#a44343}
+.sheetnav small{display:block;font-size:11px;color:#61768e;margin-top:8px}
+@media(min-width:951px){.app{grid-template-columns:minmax(390px,465px) minmax(400px,1fr)}.sheetnav{padding:9px}.sheetnavbuttons .secondary{padding:7px 9px}}
+@media(max-width:540px){.sheetnavbuttons .secondary{flex:1}.sheetnavbuttons .delete-sheet{flex:0 0 auto}}
+.sheetnav,.demo-cart{display:none!important}
+@media(min-width:951px){.app{max-width:1160px}}
+</style>
 </head>
 <body>
-<main>
-  <h1>Polaroids — Prueba privada de Drive</h1>
-  <p class="warning">Solo para Librería Saber. No es un formulario para clientes, no registra pedidos y no genera archivos de imprenta.</p>
-  <p>Seleccioná una única fotografía de prueba JPG o PNG, de hasta 5 MB. La imagen se guardará en una carpeta privada de Drive después de la autorización del titular.</p>
-  <form id="form" enctype="multipart/form-data">
-    <input name="foto" type="file" accept="image/jpeg,image/png" required>
-    <button type="submit" id="send">Guardar foto de prueba</button>
-  </form>
-  <p id="status" role="status" aria-live="polite">Sin fotografías enviadas.</p>
+<header><div><div class="brand">Polaroids<span style="color:#7990a8"> / </span><em>6 fotos</em><span class="tag">PRUEBA WEB</span></div><p>Piloto privado · 6 fotografías y encuadres a Drive</p></div><div style="font-size:12px;color:#62718a;text-align:right">2 columnas × 3 filas<br>Vista previa sin descarga</div></header>
+<main class="app">
+<section class="panel left">
+  <div class="sheetnav" aria-label="Hojas de seis fotos">
+<div class="sheetnavtop"><b id="sheetPosition">Hoja 1 de 1</b><strong id="sheetPrice">Total: $3.000</strong></div>
+<div class="sheetnavbuttons"><button type="button" class="secondary" id="prevSheet">← Anterior</button><button type="button" class="secondary" id="nextSheet">Siguiente →</button><button type="button" class="secondary" id="addSheet">+ Otra hoja de 6</button><button type="button" class="secondary delete-sheet" id="deleteSheet">Eliminar hoja</button></div>
+<small id="sheetProgress">6 Polaroids por hoja</small></div>
+<div class="sect"><h2>1. Cargá las seis fotos de esta hoja</h2><small id="count">0 de 6</small></div>
+  <label class="drop" id="drop" for="inputPhotos" title="Seleccioná seis imágenes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4h16v16H4zM7 16l4-4 3 3 2-2 2 3M8 8h.01"/><path d="M12 2v4M10 4h4"/></svg><strong>Elegí 6 fotos JPG o PNG</strong><p>Hasta 5 MB cada una · Se acomodan automáticamente</p></label>
+  <input id="inputPhotos" type="file" accept="image/jpeg,image/png" multiple hidden>
+  <input id="inputReplace" type="file" accept="image/jpeg,image/png" hidden>
+  <div class="slots" id="slots"></div>
+  <div class="options"><label>2. Tus Polaroids</label>
+  <div class="fixed-format"><strong>85 × 90 mm por fotografía</strong><span>Imagen interior 75 × 75 mm · borde blanco inferior de 11 mm</span></div>
+  <div class="details" id="measure"></div>
+  <div class="trim-tip"><strong>Las seis fotos se imprimirán y cortarán en Librería Saber. Vos podés ajustar cada encuadre, pero no necesitás ocuparte de las marcas de corte.</div></div>
+  <div class="buttons"><button class="primary" id="btnPdf" disabled>Enviar las seis fotos a Drive</button><button class="secondary" id="btnDemo" title="Para probar antes de usar fotos reales">Cargar prueba</button><button class="secondary" id="btnClear">Vaciar</button></div>
+  <div class="status" id="status" role="status" aria-live="polite">Faltan 6 fotografías para completar la pose.</div>
+</section>
+<section class="panel right">
+  <div class="sheet-title"><h2>Vista previa de la pose</h2><small id="previewSheetLabel">Hoja 1 · A4 vertical</small></div>
+  <div class="paper-holder"><canvas class="paper" id="preview" width="840" height="1188" title="Hacé clic en una foto para corregir su encuadre"></canvas></div>
+  <p class="legend"><b>VISTA PREVIA · LIBRERÍA SABER.</b> El cliente solo puede ver esta muestra. El archivo listo para imprimir será de acceso exclusivo del negocio cuando se implemente la recepción segura.</p>
+  <div class="info"><span>Fotos sin deformar</span><span>Marcos aprobados</span><span>Sin PDF descargable</span></div>
+</section>
 </main>
+<section class="demo-cart panel" id="demoCart"><div class="demo-cart-title"><b>Integración en pruebas</b></div><div id="cartItem" class="demo-cart-empty">Al pulsar «Agregar al carrito de prueba», se enviará únicamente un aviso de simulación al cotizador; las fotos no salen de tu dispositivo.</div></section>
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="editorTitle">
+ <div class="editbox"><div class="editheader"><h2 id="editorTitle">Corregir encuadre</h2><button id="closeEditor" aria-label="Cerrar editor">✕</button></div>
+  <div class="cropwrap" id="cropwrap"><canvas id="cropCanvas" width="840" height="840"></canvas></div>
+  <div class="slidebar"><label for="zoom">Zoom</label><input id="zoom" type="range" min="1" max="3.5" step="0.01" value="1"><output id="zoomValue">100 %</output></div>
+  <p class="modalnote">Arrastrá la foto con el dedo o el mouse. Para ampliar o achicar usá el control de zoom. En la PC también funciona la rueda del mouse.</p>
+  <div id="quality" class="quality good" style="text-align:center"></div>
+  <div class="modalfoot"><button class="secondary" id="resetCrop">Restablecer encuadre</button><button class="primary" id="saveCrop" style="flex:0 0 155px">Aplicar</button></div>
+ </div>
+</div>
 <script>
-const form=document.getElementById('form');
-const btn=document.getElementById('send');
-const statusEl=document.getElementById('status');
-const input=form.querySelector('input[name="foto"]');
-form.addEventListener('submit',async e=>{
- e.preventDefault();
- const file=input.files && input.files[0];
- if(!file || file.size===0 || file.size>5*1024*1024 ||
-    !['image/jpeg','image/png'].includes(file.type)){
-   statusEl.textContent='Elegí un JPG o PNG de hasta 5 MB.';
+'use strict';
+const PAGE={w:210,h:297};
+const FORMAT={w:85,h:90,photo:75,left:5,top:4,bottom:11,gapX:0,gapY:0,label:'Compacta · 85 × 90 mm'};
+const MAX_SHEETS=10;
+const sheets=[Array(6).fill(null)];
+let activeSheet=0;
+let photos=sheets[0];
+const configuredPrice=Number(new URLSearchParams(location.search).get('unitPrice'));
+const unitPrice=Number.isFinite(configuredPrice)&&configuredPrice>0?configuredPrice:3000;
+const formattedPrice=n=>'$'+n.toLocaleString('es-AR');
+const sheetComplete=arr=>arr.every(Boolean);
+const orderComplete=()=>sheets.every(sheetComplete);
+function updateSheetNav(){
+ const complete=sheets.filter(sheetComplete).length;
+ $('sheetPosition').textContent='Hoja '+(activeSheet+1)+' de '+sheets.length;
+ $('previewSheetLabel').textContent='Hoja '+(activeSheet+1)+' · A4 vertical';
+ $('sheetPrice').textContent='Total: '+formattedPrice(sheets.length*unitPrice);
+ $('sheetProgress').textContent=complete+' de '+sheets.length+' hojas completas · 6 fotos por hoja · '+formattedPrice(unitPrice)+' c/u';
+ $('prevSheet').disabled=activeSheet===0;
+ $('nextSheet').disabled=activeSheet===sheets.length-1;
+ $('addSheet').disabled=sheets.length>=MAX_SHEETS||!sheetComplete(photos);
+ $('deleteSheet').disabled=sheets.length===1;
+ $('btnPdf').disabled=!orderComplete()||busy;
+ $('btnPdf').textContent='Enviar 6 fotos a Drive (prueba)';
+}
+function showSheet(n){if(n<0||n>=sheets.length||editorIndex>=0)return;activeSheet=n;photos=sheets[n];renderAll()}
+function addNewSheet(){
+ if(!sheetComplete(photos)){status('Completá las 6 fotos antes de crear otra hoja.','bad');return}
+ if(sheets.length>=MAX_SHEETS){status('Máximo '+MAX_SHEETS+' hojas por pedido de prueba.','bad');return}
+ sheets.push(Array(6).fill(null));showSheet(sheets.length-1);
+}
+function deleteCurrentSheet(){
+ if(sheets.length<=1)return;
+ if(photos.some(Boolean)&&!confirm('¿Eliminar la hoja '+(activeSheet+1)+' y sus fotos?'))return;
+ for(const p of photos)if(p&&p.url)URL.revokeObjectURL(p.url);
+ sheets.splice(activeSheet,1);showSheet(Math.min(activeSheet,sheets.length-1));
+}
+
+let editorIndex=-1;
+let beforeEdit=null;
+let replaceIndex=-1;
+let busy=false;
+const $=id=>document.getElementById(id);
+$('prevSheet').addEventListener('click',()=>showSheet(activeSheet-1));
+$('nextSheet').addEventListener('click',()=>showSheet(activeSheet+1));
+$('addSheet').addEventListener('click',addNewSheet);
+$('deleteSheet').addEventListener('click',deleteCurrentSheet);
+
+const preview=$('preview'), pc=preview.getContext('2d',{alpha:false});
+const cropCanvas=$('cropCanvas'), ec=cropCanvas.getContext('2d',{alpha:false});
+const mm=72/25.4;
+function config(){return FORMAT}
+function layout(){const a=config(), W=2*a.w+a.gapX,H=3*a.h+2*a.gapY,x0=(PAGE.w-W)/2,y0=(PAGE.h-H)/2;return {a,x0,y0,frames:Array.from({length:6},(_,i)=>({x:x0+(i%2)*(a.w+a.gapX),y:y0+Math.floor(i/2)*(a.h+a.gapY)}))}}
+function cropBounds(p){const im=p.img;const s=Math.min(im.naturalWidth,im.naturalHeight)/(p.zoom||1);let x=Math.min(im.naturalWidth-s,Math.max(0,p.cx*im.naturalWidth-s/2)),y=Math.min(im.naturalHeight-s,Math.max(0,p.cy*im.naturalHeight-s/2));return {x,y,s}}
+function drawCrop(ctx,p,x,y,d){const r=cropBounds(p);ctx.drawImage(p.img,r.x,r.y,r.s,r.s,x,y,d,d)}
+// Marcas perimetrales, una por línea de corte. No se dibuja tinta dentro del bloque de seis fotos.
+// Guías exteriores para el único corte vertical central, dos horizontales y cuatro bordes.
+function cutGuides(ctx,x0,y0,a,k){
+ const left=x0,right=x0+2*a.w,top=y0,bottom=y0+3*a.h;
+ const xCuts=[left,left+a.w,right], yCuts=[top,top+a.h,top+2*a.h,bottom];
+ const gap=.8,span=2.7; // mm, dejan por lo menos 10 mm de margen no impreso arriba/abajo
+ ctx.save();ctx.strokeStyle='#111';ctx.lineWidth=.20*k;ctx.setLineDash([]);ctx.beginPath();
+ for(const x of xCuts){
+   ctx.moveTo(x*k,(top-gap-span)*k);ctx.lineTo(x*k,(top-gap)*k);
+   ctx.moveTo(x*k,(bottom+gap)*k);ctx.lineTo(x*k,(bottom+gap+span)*k);
+ }
+ for(const y of yCuts){
+   ctx.moveTo((left-gap-span)*k,y*k);ctx.lineTo((left-gap)*k,y*k);
+   ctx.moveTo((right+gap)*k,y*k);ctx.lineTo((right+gap+span)*k,y*k);
+ }
+ ctx.stroke();ctx.restore();
+}
+function renderPreview(){const k=preview.width/PAGE.w;const {a,frames,x0,y0}=layout();pc.fillStyle='#fff';pc.fillRect(0,0,preview.width,preview.height);
+ frames.forEach((f,i)=>{const p=photos[i];if(p)drawCrop(pc,p,(f.x+a.left)*k,(f.y+a.top)*k,a.photo*k);else{pc.fillStyle='#f7f9fb';pc.fillRect((f.x+a.left)*k,(f.y+a.top)*k,a.photo*k,a.photo*k);pc.fillStyle='#b7c2ce';pc.font='14px Segoe UI, Arial';pc.textAlign='center';pc.fillText('FOTO '+(i+1),(f.x+a.left+a.photo/2)*k,(f.y+a.top+a.photo/2)*k)}
+ });
+ // Las líneas del reticulado son exclusivas de la vista previa.
+ pc.save();pc.strokeStyle='#9ca9bb';pc.lineWidth=.15*k;pc.setLineDash([1.35*k,1.2*k]);pc.strokeRect(x0*k,y0*k,2*a.w*k,3*a.h*k);
+ for(let c=1;c<2;c++){const x=(x0+c*a.w)*k;pc.beginPath();pc.moveTo(x,y0*k);pc.lineTo(x,(y0+3*a.h)*k);pc.stroke()}
+ for(let r=1;r<3;r++){const y=(y0+r*a.h)*k;pc.beginPath();pc.moveTo(x0*k,y);pc.lineTo((x0+2*a.w)*k,y);pc.stroke()}
+ pc.restore();cutGuides(pc,x0,y0,a,k);
+ // Marca de agua repetida sobre la vista preliminar, nunca un PDF de impresión.
+ pc.save();pc.beginPath();pc.rect(x0*k,y0*k,2*a.w*k,3*a.h*k);pc.clip();
+ pc.translate((x0+a.w)*k,(y0+1.5*a.h)*k);pc.rotate(-Math.PI/5);
+ pc.fillStyle='rgba(22,52,94,.25)';pc.font=`900 ${18*k/4} px Arial, sans-serif`;pc.textAlign='center';
+ for(let row=-4;row<=4;row++) for(let col=-3;col<=3;col++)pc.fillText('LIBRERÍA SABER · VISTA PREVIA',col*185,row*84);
+ pc.restore();
+}
+function status(msg,type=''){const x=$('status');x.textContent=msg;x.className='status '+type}
+function dim(p){const a=config();const r=cropBounds(p);return Math.round(r.s/(a.photo/25.4))}
+function renderSlots(){const target=$('slots');target.replaceChildren();let total=0;
+ for(let i=0;i<6;i++){const p=photos[i], el=document.createElement('div');el.className='slot'+(!p?' empty':'');const pic=document.createElement('div');pic.className='slot-picture';if(p){total++;const c=document.createElement('canvas');c.width=140;c.height=140;drawCrop(c.getContext('2d'),p,0,0,140);pic.append(c)}else pic.innerHTML='<span class="emptyicon">＋</span>';el.append(pic);
+ const inf=document.createElement('div');inf.className='inf';const title=document.createElement('b');title.textContent='Foto '+(i+1);inf.append(title);
+ const name=document.createElement('span');name.className='name';name.title=p?p.name:'';name.textContent=p?p.name:'Sin cargar';inf.append(name);
+ const actions=document.createElement('div');actions.className='actions';if(p){const edit=document.createElement('button');edit.textContent='Ajustar';edit.title='Corregir el encuadre';edit.onclick=()=>openEditor(i);actions.append(edit);const change=document.createElement('button');change.textContent='Cambiar';change.onclick=()=>{replaceIndex=i;$('inputReplace').click()};actions.append(change);const del=document.createElement('button');del.className='del';del.textContent='✕';del.title='Quitar foto';del.onclick=()=>{dropPhoto(i);renderAll()};actions.append(del)}else{const add=document.createElement('button');add.textContent='+ Agregar';add.onclick=()=>{replaceIndex=i;$('inputReplace').click()};actions.append(add)}inf.append(actions);el.append(inf);target.append(el)
+ }$('count').textContent=total+' de 6';updateSheetNav();if(total===6)status('Hoja '+(activeSheet+1)+' completa. Podés agregar otra o continuar con el pedido.','ok');else status('Hoja '+(activeSheet+1)+': faltan '+(6-total)+' fotografía'+(6-total===1?'':'s')+'.');}
+function renderAll(){const a=config(),{x0,y0}=layout();$('measure').textContent=`Pose completa: ${a.w*2} × ${a.h*3} mm · Sin separación entre piezas · Margen de hoja: ${x0.toFixed(1)} mm laterales / ${y0.toFixed(1)} mm superior e inferior · Marcas perimetrales.`;renderSlots();renderPreview()}
+function dropPhoto(i){if(photos[i]&&photos[i].url)URL.revokeObjectURL(photos[i].url);photos[i]=null}
+function loadImage(file){return new Promise((resolve,reject)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>resolve({name:file.name,img:im,url:u,file,zoom:1,cx:.5,cy:.5});im.onerror=()=>{URL.revokeObjectURL(u);reject(new Error('No se pudo abrir '+file.name+'. Usá JPG, PNG o WebP.'))};im.src=u})}
+async function acceptFiles(files,specific=-1){if(!files.length)return;const filtered=files.filter(f=>f.type.startsWith('image/')||/\.(jpe?g|png|webp|heic|heif)$/i.test(f.name));if(!filtered.length){status('No se reconocieron imágenes válidas.','bad');return}
+ let destinations=specific>=0?[specific]:photos.map((v,i)=>v?null:i).filter(v=>v!==null);if(filtered.length>destinations.length){status('Hay '+filtered.length+' fotos nuevas y solo '+destinations.length+' lugares disponibles. Se cargarán las que entren.','bad')}
+ let errors=[];for(let j=0;j<Math.min(filtered.length,destinations.length);j++){try{const p=await loadImage(filtered[j]);dropPhoto(destinations[j]);photos[destinations[j]]=p}catch(e){errors.push(e.message)}}renderAll();if(errors.length)status(errors.join(' '),'bad')}
+$('inputPhotos').addEventListener('change',e=>{acceptFiles([...e.target.files]);e.target.value='' });$('inputReplace').addEventListener('change',e=>{acceptFiles([...e.target.files],replaceIndex);e.target.value='';replaceIndex=-1});
+const drop=$('drop');for(const eName of ['dragover','dragenter'])drop.addEventListener(eName,e=>{e.preventDefault();drop.classList.add('drag')});for(const eName of ['dragleave','drop'])drop.addEventListener(eName,e=>{e.preventDefault();drop.classList.remove('drag')});drop.addEventListener('drop',e=>acceptFiles([...e.dataTransfer.files]));
+$('btnClear').onclick=()=>{for(let i=0;i<6;i++)dropPhoto(i);renderAll()};
+preview.addEventListener('click',e=>{const box=preview.getBoundingClientRect(),x=(e.clientX-box.left)/box.width*PAGE.w,y=(e.clientY-box.top)/box.height*PAGE.h;const {a,frames}=layout();const i=frames.findIndex(f=>x>=f.x&&x<=f.x+a.w&&y>=f.y&&y<=f.y+a.h);if(i>=0&&photos[i])openEditor(i)});
+function openEditor(i){const p=photos[i];if(!p)return;editorIndex=i;beforeEdit={zoom:p.zoom,cx:p.cx,cy:p.cy};$('editorTitle').textContent='Encuadre de la foto '+(i+1);$('modal').classList.add('show');$('zoom').value=p.zoom;drawEditor()}
+function closeEditor(save){if(editorIndex<0)return;if(!save&&beforeEdit){const p=photos[editorIndex];Object.assign(p,beforeEdit)}editorIndex=-1;$('modal').classList.remove('show');renderAll()}
+$('closeEditor').onclick=()=>closeEditor(false);$('saveCrop').onclick=()=>closeEditor(true);$('modal').addEventListener('click',e=>{if(e.target===$('modal'))closeEditor(false)});
+function drawEditor(){if(editorIndex<0)return;const p=photos[editorIndex];ec.fillStyle='#fff';ec.fillRect(0,0,840,840);drawCrop(ec,p,0,0,840);$('zoom').value=p.zoom;$('zoomValue').textContent=Math.round(p.zoom*100)+' %';const ppi=dim(p),quality=$('quality');quality.textContent=`Resolución efectiva de impresión: ${ppi} ppp · `+(ppi>=250?'Muy buena':ppi>=160?'Aceptable; podría perder nitidez':'Baja; conviene usar otra foto');quality.className='quality '+(ppi>=250?'good':ppi>=160?'mid':'low')}
+$('zoom').addEventListener('input',e=>{if(editorIndex>=0){photos[editorIndex].zoom=Number(e.target.value);drawEditor()}});
+$('resetCrop').onclick=()=>{if(editorIndex>=0){Object.assign(photos[editorIndex],{zoom:1,cx:.5,cy:.5});drawEditor()}};
+let dragState=null;
+const cropwrap=$('cropwrap');cropwrap.addEventListener('pointerdown',e=>{if(editorIndex<0)return;e.preventDefault();cropwrap.setPointerCapture(e.pointerId);const p=photos[editorIndex],r=cropBounds(p);dragState={x:e.clientX,y:e.clientY,s:r.s,startX:r.x,startY:r.y,id:e.pointerId}});
+cropwrap.addEventListener('pointermove',e=>{if(!dragState||editorIndex<0||dragState.id!==e.pointerId)return;e.preventDefault();const p=photos[editorIndex],rect=cropwrap.getBoundingClientRect();const dx=(e.clientX-dragState.x)*dragState.s/rect.width,dy=(e.clientY-dragState.y)*dragState.s/rect.height;const x=Math.max(0,Math.min(p.img.naturalWidth-dragState.s,dragState.startX-dx)),y=Math.max(0,Math.min(p.img.naturalHeight-dragState.s,dragState.startY-dy));p.cx=(x+dragState.s/2)/p.img.naturalWidth;p.cy=(y+dragState.s/2)/p.img.naturalHeight;drawEditor()});
+cropwrap.addEventListener('pointerup',()=>dragState=null);cropwrap.addEventListener('pointercancel',()=>dragState=null);
+cropwrap.addEventListener('wheel',e=>{if(editorIndex<0)return;e.preventDefault();const p=photos[editorIndex];p.zoom=Math.min(3.5,Math.max(1,p.zoom*(e.deltaY<0?1.07:1/1.07)));drawEditor()},{passive:false});
+document.addEventListener('keydown',e=>{if(editorIndex<0)return;if(e.key==='Escape'){closeEditor(false);return}const p=photos[editorIndex];if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){e.preventDefault();const r=cropBounds(p),step=r.s*(e.shiftKey?.025:.008);if(e.key==='ArrowLeft')p.cx=Math.max(0,p.cx-step/p.img.naturalWidth);if(e.key==='ArrowRight')p.cx=Math.min(1,p.cx+step/p.img.naturalWidth);if(e.key==='ArrowUp')p.cy=Math.max(0,p.cy-step/p.img.naturalHeight);if(e.key==='ArrowDown')p.cy=Math.min(1,p.cy+step/p.img.naturalHeight);drawEditor()}});
+// DEMOSTRACIÓN: no transmite ni almacena los originales en un servidor.
+// La implementación definitiva deberá enviar originals + encuadres a almacenamiento privado,
+// recibir un identificador de archivo y recién después agregar el ítem al carrito real.
+function pilotCall(name,data) {
+ return new Promise((resolve,reject)=>{
+   const call=google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+   if(name==='begin')call.comenzarHojaPrueba();
+   if(name==='photo')call.subirFotoDeHoja(data);
+   if(name==='complete')call.finalizarHojaPrueba(data);
+ });
+}
+function readBase64(file){
+ return new Promise((resolve,reject)=>{
+   const r=new FileReader();
+   r.onload=()=>{
+     const t=String(r.result||'');
+     const comma=t.indexOf(',');
+     comma>=0?resolve(t.slice(comma+1)):reject(new Error('No se pudo preparar la imagen.'));
+   };
+   r.onerror=()=>reject(new Error('No se pudo leer la fotografía.'));
+   r.readAsDataURL(file);
+ });
+}
+$('btnPdf').onclick=async()=>{
+ if(busy||sheets.length!==1||photos.some(p=>!p))return;
+ if(!window.google||!google.script||!google.script.run){
+   status('Abrí esta página desde tu implementación privada de Google Apps Script.','bad');return;
+ }
+ for(let i=0;i<6;i++){
+   const f=photos[i].file;
+   if(!f||f.size===0||f.size>5*1024*1024||!['image/jpeg','image/png'].includes(f.type)){
+     status('La foto '+(i+1)+' debe ser JPG o PNG de hasta 5 MB.','bad');return;
+   }
+ }
+ busy=true;updateSheetNav();
+ let ticket='';
+ try {
+   status('Creando hoja privada de prueba…');
+   const begin=await pilotCall('begin');
+   ticket=begin.ticket;
+   for(let i=0;i<6;i++){
+     status('Enviando foto '+(i+1)+' de 6…');
+     const p=photos[i];
+     const b64=await readBase64(p.file);
+     const c=cropBounds(p);
+     await pilotCall('photo',{ticket,index:i,data:b64,crop:{
+       x:c.x,y:c.y,s:c.s,sourceWidth:p.img.naturalWidth,sourceHeight:p.img.naturalHeight
+     }});
+   }
+   const done=await pilotCall('complete',ticket);
+   status('¡Listo! '+done.received+' fotos y sus encuadres guardados en Drive privado.','ok');
+   $('btnPdf').textContent='Prueba enviada a Drive';
+   $('btnPdf').disabled=true;
+ }catch(error){
+   status('Falló la carga: '+(error&&error.message||'error desconocido')+
+     (ticket?' · Pueden quedar archivos parciales en PRUEBA_6_POLAROIDS_'+ticket+'.':''),'bad');
+   busy=false;updateSheetNav();
    return;
  }
- btn.disabled=true;
- statusEl.textContent='Preparando imagen…';
- try{
-   const dataUrl=await new Promise((resolve,reject)=>{
-     const reader=new FileReader();
-     reader.onload=()=>resolve(reader.result);
-     reader.onerror=()=>reject(new Error('No se pudo leer la foto.'));
-     reader.readAsDataURL(file);
-   });
-   const separator=dataUrl.indexOf(',');
-   if(separator<0)throw new Error('No se pudo preparar la foto.');
-   const base64=dataUrl.slice(separator+1);
-   // Enviar un objeto serializable. No enviar el formulario ni el objeto File.
-   statusEl.textContent='Enviando fotografía de prueba…';
-   google.script.run
-     .withSuccessHandler(result=>{
-       statusEl.textContent=result&&result.ok?result.message:'Respuesta inesperada del programa.';
-       btn.disabled=false;
-     })
-     .withFailureHandler(error=>{
-       statusEl.textContent='No se pudo guardar: '+(error&&error.message||'error desconocido');
-       btn.disabled=false;
-     })
-     .subirFotoBase64({data:base64});
- }catch(error){
-   statusEl.textContent='No se pudo preparar la imagen: '+(error&&error.message||'error desconocido');
-   btn.disabled=false;
- }
-});
+ busy=true; // no repetir el mismo envío, evitamos duplicados
+};
+$('btnDemo').onclick=async()=>{let fs=[];for(let i=0;i<6;i++){const c=document.createElement('canvas');c.width=i%2?1250:1700;c.height=i%2?1700:1200;let ctx=c.getContext('2d'),g=ctx.createLinearGradient(0,0,c.width,c.height);const pair=[['#355f78','#e2a775'],['#6c8188','#c4d4bd'],['#98786b','#e6c3aa'],['#526e94','#cbbddd'],['#5f8d85','#e9c393'],['#8680a8','#d1b7a2']][i];g.addColorStop(0,pair[0]);g.addColorStop(1,pair[1]);ctx.fillStyle=g;ctx.fillRect(0,0,c.width,c.height);ctx.fillStyle='#ffffff44';ctx.beginPath();ctx.arc(c.width*(.25+.09*i),c.height*.4,c.height*.22,0,2*Math.PI);ctx.fill();ctx.strokeStyle='#ffffff77';ctx.lineWidth=18;ctx.beginPath();ctx.moveTo(-60,c.height*.9);ctx.lineTo(c.width*.75,c.height*.26);ctx.lineTo(c.width+30,c.height*.75);ctx.stroke();ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold '+Math.round(c.width*.075)+'px Segoe UI, Arial';ctx.fillText('FOTO DE PRUEBA',c.width/2,c.height*.70);ctx.font=Math.round(c.width*.05)+'px Segoe UI, Arial';ctx.fillText(String(i+1),c.width/2,c.height*.79);const b=await new Promise(r=>c.toBlob(r,'image/jpeg',.92));fs.push(new File([b],`Prueba_${i+1}.jpg`,{type:'image/jpeg'}))}for(let i=0;i<6;i++)dropPhoto(i);await acceptFiles(fs);status('Fotos de prueba cargadas. Ajustá encuadres y enviá esta hoja al Drive privado.','ok')};
+renderAll();
 </script>
 </body>
 </html>
