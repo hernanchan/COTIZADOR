@@ -138,9 +138,10 @@ function updateSheetNav(){
  $('nextSheet').disabled=activeSheet===sheets.length-1;
  $('addSheet').disabled=sheets.length>=MAX_SHEETS||!sheetComplete(photos)||!!(receiverConfig&&receiverConfig.enabled);
  $('deleteSheet').disabled=sheets.length===1;
- $('btnPdf').disabled=!orderComplete()||busy;
- $('btnPdf').textContent=receiverConfig&&receiverConfig.enabled?'Enviar 6 fotos y agregar al carrito':
- 'Agregar '+sheets.length+' hoja'+(sheets.length===1?'':'s')+' al carrito de prueba';
+ $('btnPdf').disabled=!orderComplete()||busy||!!receivedReference;
+ $('btnPdf').textContent=receivedReference?'Fotos recibidas · '+receivedReference:
+  receiverConfig&&receiverConfig.enabled?'Enviar 6 fotos y agregar al carrito':
+  'Agregar '+sheets.length+' hoja'+(sheets.length===1?'':'s')+' al carrito de prueba';
 }
 function showSheet(n){if(n<0||n>=sheets.length||editorIndex>=0)return;activeSheet=n;photos=sheets[n];renderAll()}
 function addNewSheet(){
@@ -173,6 +174,7 @@ let turnstileToken='';
 let receiverRequestCount=0;
 const receiverPending=new Map();
 let receivingSession=null;
+let receivedReference='';
 let receiverInitError='';
 function nuevaReferenciaProvisional(){
  const bytes=new Uint8Array(8);
@@ -358,6 +360,7 @@ function resetChallenge(){
   turnstile.reset(turnstileWidget);
 }
 async function sendSecurePhotos(){
+ if(receivedReference)return;
  if(!receiverConfig||!receiverConfig.enabled||!orderComplete())return;
  if(sheets.length!==1)throw new Error('Esta primera prueba admite una hoja de seis fotografías.');
  if(!receiverTarget)throw new Error('Esperá a que se conecte la recepción protegida.');
@@ -411,6 +414,7 @@ async function sendSecurePhotos(){
   const payload={sheets:1,photos:6,format:'85x90',
    uploadsReceived:true,reference:result.reference,referenceStatus:'received'};
   // La clave de carga NUNCA se envía al carrito, WhatsApp ni localStorage.
+  receivedReference=result.reference;
   receivingSession=null;
   $('btnPdf').textContent='Fotos recibidas correctamente';
   $('btnPdf').disabled=true;
@@ -472,6 +476,8 @@ async function setupSecureReception(){
   $('receiverHolder').append(frame);
   await loadTurnstile(cfg.turnstileSiteKey);
   status('Prepará las seis fotos y verificá la seguridad para enviarlas.');
+  if(window.parent!==window)
+   window.parent.postMessage({type:'SABER_POLAROID_MODE',enabled:true},window.location.origin);
  }catch(e){
   if(receiverConfig&&receiverConfig.enabled){
    receiverInitError=String(e&&e.message||e);
