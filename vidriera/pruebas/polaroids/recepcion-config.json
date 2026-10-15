@@ -2,6 +2,6 @@
   "enabled": false,
   "allowedHost": "polaroids-integracion-sin-r2.libreriasaber.pages.dev",
   "bridgeUrl": "",
-  "turnstileSiteKey": "",
+  "turnstileSiteKey": "0x4AAAAAAFX-6YrJkh8ztokh",
   "maxSheetsForRealUploads": 10
 }
