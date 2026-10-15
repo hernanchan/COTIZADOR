@@ -73,7 +73,7 @@ html.embedded .demo-cart{display:none}
   <div class="trim-tip">Las seis fotos se imprimirán y cortarán en Librería Saber. Vos podés ajustar cada encuadre; del corte nos encargamos nosotros.</div></div>
   <div id="secureReceptionNotice" class="secure-reception-note" hidden>
    <strong>Recepción protegida de fotografías</strong>
-   <span>Versión controlada: por ahora se recibe una hoja de 6 Polaroids por pedido. Tus fotos se guardan en una carpeta privada y solamente Librería Saber accede al PDF.</span>
+   <span>Podés enviar entre 1 y 10 hojas de seis Polaroids (6 a 60 fotos). Las imágenes y los PDF se guardan en Drive privado, solo para Librería Saber.</span>
    <label class="consent-check"><input id="photoConsent" type="checkbox"> Acepto enviar mis fotografías únicamente para preparar este pedido en Librería Saber.</label>
    <div id="turnstileBox"></div>
   </div>
@@ -136,19 +136,17 @@ function updateSheetNav(){
  $('sheetProgress').textContent=complete+' de '+sheets.length+' hojas completas · 6 fotos por hoja · '+formattedPrice(unitPrice)+' c/u';
  $('prevSheet').disabled=activeSheet===0;
  $('nextSheet').disabled=activeSheet===sheets.length-1;
- $('addSheet').disabled=sheets.length>=MAX_SHEETS||!sheetComplete(photos)||!!(receiverConfig&&receiverConfig.enabled);
+ $('addSheet').disabled=sheets.length>=MAX_SHEETS||!sheetComplete(photos);
  $('deleteSheet').disabled=sheets.length===1;
  $('btnPdf').disabled=!orderComplete()||busy||!!receivedReference;
  $('btnPdf').textContent=receivedReference?'Fotos recibidas · '+receivedReference:
-  receiverConfig&&receiverConfig.enabled?'Enviar 6 fotos y agregar al carrito':
+  receiverConfig&&receiverConfig.enabled?
+    'Enviar '+sheets.length*6+' fotos y agregar al carrito':
   'Agregar '+sheets.length+' hoja'+(sheets.length===1?'':'s')+' al carrito de prueba';
 }
 function showSheet(n){if(n<0||n>=sheets.length||editorIndex>=0)return;activeSheet=n;photos=sheets[n];renderAll()}
 function addNewSheet(){
  if(!sheetComplete(photos)){status('Completá las 6 fotos antes de crear otra hoja.','bad');return}
- if(receiverConfig&&receiverConfig.enabled){
-  status('La recepción protegida de esta prueba admite una sola hoja de seis fotos.','bad');return;
- }
  if(sheets.length>=MAX_SHEETS){status('Máximo '+MAX_SHEETS+' hojas por pedido de prueba.','bad');return}
  sheets.push(Array(6).fill(null));showSheet(sheets.length-1);
 }
@@ -348,11 +346,11 @@ function imprimirRecorte(p){
  });
 }
 function photoFingerprint(){
- return JSON.stringify(sheets[0].map(p=>{
+ return JSON.stringify(sheets.map(sheet=>sheet.map(p=>{
   const c=cropBounds(p);
   return [p.file.name,p.file.size,p.file.lastModified,
     Number(c.x.toFixed(5)),Number(c.y.toFixed(5)),Number(c.s.toFixed(5))];
- }));
+ })));
 }
 function resetChallenge(){
  turnstileToken='';
@@ -362,11 +360,13 @@ function resetChallenge(){
 async function sendSecurePhotos(){
  if(receivedReference)return;
  if(!receiverConfig||!receiverConfig.enabled||!orderComplete())return;
- if(sheets.length!==1)throw new Error('Esta primera prueba admite una hoja de seis fotografías.');
+ if(sheets.length<1||sheets.length>10)
+  throw new Error('Podés preparar entre una y diez hojas A4.');
  if(!receiverTarget)throw new Error('Esperá a que se conecte la recepción protegida.');
  if(!$('photoConsent').checked)throw new Error('Confirmá primero que aceptás enviar las fotografías para preparar tu pedido.');
- for(let i=0;i<6;i++){
-  const f=sheets[0][i]&&sheets[0][i].file;
+ const allPhotos=sheets.flat();
+ for(let i=0;i<allPhotos.length;i++){
+  const f=allPhotos[i]&&allPhotos[i].file;
   if(!f||!['image/jpeg','image/png'].includes(f.type)||f.size>5*1024*1024||!f.size)
    throw new Error('La foto '+(i+1)+' debe ser JPG o PNG de hasta 5 MB.');
  }
@@ -379,7 +379,7 @@ async function sendSecurePhotos(){
  try{
   if(!receivingSession){
    status('Verificando seguridad y creando el pedido privado…');
-   const begin=await receiverCall('start',{sheets:1,turnstileToken});
+   const begin=await receiverCall('start',{sheets:sheets.length,turnstileToken});
    turnstileToken='';
    if(!begin||!/^POL-[A-F0-9]{24}$/.test(begin.reference)||
       !/^[a-f0-9]{64}$/.test(begin.uploadKey))
@@ -387,10 +387,10 @@ async function sendSecurePhotos(){
    receivingSession={reference:begin.reference,uploadKey:begin.uploadKey,
      uploaded:new Set(),fingerprint};
   }
-  for(let i=0;i<6;i++){
+  for(let i=0;i<allPhotos.length;i++){
    if(receivingSession.uploaded.has(i))continue;
-   status('Preparando y enviando la foto '+(i+1)+' de 6…');
-   const p=sheets[0][i],original=await readFileBase64(p.file);
+   status('Preparando y enviando la foto '+(i+1)+' de '+allPhotos.length+'…');
+   const p=allPhotos[i],original=await readFileBase64(p.file);
    const blob=await imprimirRecorte(p);
    const printJpeg=await readFileBase64(blob);
    const c=cropBounds(p);
@@ -408,10 +408,11 @@ async function sendSecurePhotos(){
   const result=await receiverCall('finish',{
    reference:receivingSession.reference,uploadKey:receivingSession.uploadKey
   });
-  if(!result||result.received!==true||result.reference!==receivingSession.reference)
-   throw new Error('El servidor todavía no confirmó las seis fotografías.');
-  status('¡Recibimos tus seis fotografías! Referencia '+result.reference+'.','ok');
-  const payload={sheets:1,photos:6,format:'85x90',
+  if(!result||result.received!==true||result.reference!==receivingSession.reference||
+     result.sheets!==sheets.length||result.photos!==allPhotos.length)
+   throw new Error('El servidor todavía no confirmó todas las fotografías.');
+  status('¡Recibimos '+allPhotos.length+' fotografías! Referencia '+result.reference+'.','ok');
+  const payload={sheets:sheets.length,photos:allPhotos.length,format:'85x90',
    uploadsReceived:true,reference:result.reference,referenceStatus:'received'};
   // La clave de carga NUNCA se envía al carrito, WhatsApp ni localStorage.
   receivedReference=result.reference;
@@ -454,7 +455,7 @@ async function setupSecureReception(){
   if(cfg.enabled!==true)return; // apagado: mantener el funcionamiento de simulación.
   receiverConfig={enabled:true};
   if(location.hostname!==cfg.allowedHost||
-     cfg.maxSheetsForRealUploads!==1||
+     cfg.maxSheetsForRealUploads!==10||
      typeof cfg.turnstileSiteKey!=='string'||
      !/^[a-zA-Z0-9_-]{5,100}$/.test(cfg.turnstileSiteKey))
    throw new Error('La recepción protegida no está configurada para este sitio.');
@@ -475,7 +476,7 @@ async function setupSecureReception(){
   receiverBridge=frame;
   $('receiverHolder').append(frame);
   await loadTurnstile(cfg.turnstileSiteKey);
-  status('Prepará las seis fotos y verificá la seguridad para enviarlas.');
+  status('Prepará las fotos de cada hoja y verificá la seguridad para enviarlas.');
   if(window.parent!==window)
    window.parent.postMessage({type:'SABER_POLAROID_MODE',enabled:true},window.location.origin);
  }catch(e){
