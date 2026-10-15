@@ -91,3 +91,15 @@ La vista previa NO abre WhatsApp ni envía/registrar pedidos. El texto lleva **S
 **Verificación técnica:** el JavaScript del carrito y del editor analiza sin errores de sintaxis; prueba de carrito mixto con dos cuadernos por ARS 8.000 + dos hojas Polaroids por ARS 6.000 genera total ARS 14.000 y seña ARS 3.000; contiene saltos de línea reales.
 
 **Bloqueador antes de habilitar clientes:** el Web App de Drive actual está restringido a «Solo yo». No se puede afirmar que los clientes anónimos puedan enviar fotografías; hace falta diseñar y probar un mecanismo público con control de abuso, identificación del pedido y separación entre el sitio y las fotos privadas. No aflojar permisos ni abrir la aplicación existente al público sin aprobación. La producción pública, la rama `main` y Cloudflare original no se modificaron.
+
+## Cotizador: Polaroids como categoría independiente (15/10/2026)
+
+El usuario aprobó separar Polaroids de «Imprimir fotos». Cambios realizados en `cotizador-web-v2.html` **de esta rama de pruebas**:
+
+- Nueva tarjeta propia `Polaroids`, con descripción «6 fotos por hoja A4 · $3.000 · Editor propio».
+- Al pulsarla se abre directamente el editor embebido, sin tener que entrar antes al menú Fotos ni calcular un tamaño.
+- `Imprimir fotos` deja de enumerar Polaroids y el selector excluye el producto de tamaño `POLAROID`; se conservan todos los otros tamaños y precios de fotografías.
+- La presentación del trabajo en el carrito sigue usando un solo ítem por lote de hojas, precio regular `polaroidPack.pricePerSheet`, sin promociones y seña del 50 %.
+- No habilita cargas públicas ni modifica `main` o el sitio de producción.
+
+Se verificó sintaxis JavaScript y ocho invariantes estáticas: categoría propia, acceso directo, cotización correcta, menú Fotos depurado, puente de carrito preservado y prohibición de uploads públicos en el prototipo.
