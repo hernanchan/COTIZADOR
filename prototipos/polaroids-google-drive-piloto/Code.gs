@@ -305,19 +305,32 @@ function estadosPanelPrueba_() {
   };
 }
 function enumerarArchivosPrueba_(folder) {
-  const files=folder.getFiles(),found={originales:0,recortes:0,pdfUrl:null,pdfId:null,json:false};
-  while(files.hasNext()) {
-    const file=files.next(),name=file.getName();
-    if(/^FOTO_[1-6]\.(jpg|png)$/i.test(name))found.originales++;
-    if(/^RECORTE_[1-6]_300DPI\.jpg$/i.test(name))found.recortes++;
-    if(name==='encuadres.json')found.json=true;
-    if(name==='POLAROIDS_A4_6_FOTOS_IMPRIMIR.pdf') {
-      found.pdfUrl=file.getUrl();
-      found.pdfId=file.getId();
-    }
-  }
-  return found;
+ const files=folder.getFiles(),orig=new Set(),cuts=new Set(),pdfs=[];
+ let json=false;
+ while(files.hasNext()){
+  const file=files.next(),name=file.getName();
+  const original=/^FOTO_([1-9]\d{0,1})\.(jpg|png)$/i.exec(name);
+  const recorte=/^RECORTE_([1-9]\d{0,1})_300DPI\.jpg$/i.exec(name);
+  if(original)orig.add(Number(original[1]));
+  if(recorte)cuts.add(Number(recorte[1]));
+  if(name==='encuadres.json')json=true;
+  if(name==='POLAROIDS_A4_6_FOTOS_IMPRIMIR.pdf'||
+     /^POLAROIDS_A4_HOJA_\d\d_DE_\d\d\.pdf$/.test(name))
+   pdfs.push({name,url:file.getUrl(),id:file.getId()});
+ }
+ const count=orig.size, sheets=Number.isInteger(count/6)?count/6:0;
+ const valid=sheets>=1&&sheets<=10&&cuts.size===count&&json&&
+  Array.from({length:count},(_,i)=>i+1).every(i=>orig.has(i)&&cuts.has(i))&&
+  pdfs.length===sheets&&Array.from({length:sheets},(_,i)=>{
+   const name=sheets===1?'POLAROIDS_A4_6_FOTOS_IMPRIMIR.pdf':
+    'POLAROIDS_A4_HOJA_'+String(i+1).padStart(2,'0')+
+    '_DE_'+String(sheets).padStart(2,'0')+'.pdf';
+   return pdfs.some(p=>p.name===name);
+  }).every(Boolean);
+ pdfs.sort((a,b)=>a.name.localeCompare(b.name));
+ return {originales:orig.size,recortes:cuts.size,pdfs,json,sheets:valid?sheets:0,complete:!!valid};
 }
+
 function listarPedidosPrueba() {
   const {cfg,root}=accesoPanelPrueba_(),folders=root.getFolders(),results=[];
   let truncated=false;
@@ -329,7 +342,7 @@ function listarPedidosPrueba() {
     if(results.length>=100){truncated=true;break;}
     const ticket=customer?customer[1].toUpperCase():pilot[1].toLowerCase();
     const files=enumerarArchivosPrueba_(folder);
-    const complete=files.originales===6&&files.recortes===6&&files.pdfId&&files.json;
+    const complete=files.complete;
     const states=estadosPanelPrueba_();
     const raw=cfg.getProperty('PILOT_ADMIN_'+ticket);
     const saved=raw?JSON.parse(raw):null;
@@ -341,16 +354,19 @@ function listarPedidosPrueba() {
       source:customer?'cliente':'prueba',
       statusText:states[status]||'Recepción incompleta',
       originals:files.originales,crops:files.recortes,hasJson:files.json,
-      hasPdf:!!files.pdfId,canPrint:!!files.pdfId&&
-        ['sena_confirmada','preparado','entregado'].includes(status),
-      // El link privado al PDF no se devuelve antes de confirmar la seña.
-      pdfUrl:files.pdfId&&['sena_confirmada','preparado','entregado'].includes(status)
-        ?files.pdfUrl:null,
-      price:3000,deposit:1500
+      sheets:files.sheets,photos:files.originales,
+      hasPdf:files.pdfs.length>0,
+      canPrint:complete&&['sena_confirmada','preparado','entregado'].includes(status),
+      // Los links privados al PDF se devuelven solo tras confirmar la seña.
+      pdfUrls:complete&&['sena_confirmada','preparado','entregado'].includes(status)
+        ?files.pdfs.map(p=>({name:p.name,url:p.url})):[],
+      pdfUrl:complete&&['sena_confirmada','preparado','entregado'].includes(status)
+        ?files.pdfs[0].url:null,
+      price:3000*files.sheets,deposit:1500*files.sheets
     });
   }
   results.sort((a,b)=>b.created-a.created);
-  return {orders:results,truncated,scope:'RECEPCIÓN PRIVADA · una hoja de 6 Polaroids por trabajo'};
+  return {orders:results,truncated,scope:'RECEPCIÓN PRIVADA · hasta diez hojas de 6 Polaroids por trabajo'};
 }
 function actualizarEstadoPedidoPrueba(reference,next) {
   const {cfg,root}=accesoPanelPrueba_();
@@ -375,7 +391,7 @@ function actualizarEstadoPedidoPrueba(reference,next) {
     const matches=root.getFoldersByName(folderName);
     if(!matches.hasNext())throw new Error('No existe ese trabajo en la carpeta privada.');
     const files=enumerarArchivosPrueba_(matches.next());
-    if(files.originales!==6||files.recortes!==6||!files.pdfId||!files.json)
+    if(!files.complete)
       throw new Error('No se puede cambiar el estado de una recepción incompleta.');
     const raw=cfg.getProperty('PILOT_ADMIN_'+ticket);
     const current=raw?JSON.parse(raw).status:'pendiente_sena';
