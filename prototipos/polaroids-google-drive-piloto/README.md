@@ -94,3 +94,18 @@ El PDF **no se devuelve a la web** ni se ofrece al cliente, solo se almacena en 
 **Verificaciones locales con simulación:** 17 comprobaciones aprobadas, incluida estructura PDF (`%PDF-1.4`, A4 MediaBox, seis objetos de imagen, posiciones, tabla de referencias cruzadas y archivo privado), seis fotografías con recorte y restricciones de propiedad. **Todavía no está probada la generación del PDF real en el Apps Script implementado**, ni se midió visualmente un PDF creado con fotografías reales y guillotina; antes de producir pedidos es imprescindible prueba de impresión a tamaño 100%, sin "ajustar al papel".
 
 Como actualización de código de una misma aplicación, se necesita reemplazar **ambos** `Code.gs`/`Index.html` y editar la implementación existente a `Nueva versión`. No modifica `main`, la web pública ni Cloudflare, no necesita R2.
+
+## Panel de pedidos y seña — preparado en rama de pruebas (15/10/2026)
+
+El mismo `Code.gs` e `Index.html` privado se ampliaron con botón **«Ver pedidos privados»**, sin añadir proyectos, carpetas ni propiedades de configuración.
+
+- Lee las subcarpetas `PRUEBA_6_POLAROIDS_<referencia>` de `TEST_FOLDER_ID`, sin escanear otras carpetas de Drive.
+- Muestra cada carpeta de prueba, fecha de recepción, cantidad de originales y recortes, existencia de PDF y estado.
+- Estado inicial **Pendiente de seña**; permite **Confirmar seña → Preparado → Entregado** y **Anular** antes de entregar. La confirmación es MANUAL y NO implica una verificación bancaria ni cobro.
+- Solo devuelve el link privado al PDF cuando se marcó **Seña confirmada** o un estado posterior. El PDF sigue en Drive privado y solo la cuenta autorizada puede acceder. No es una protección criptográfica contra el propio dueño, que puede abrir Drive directamente.
+- Rechaza intentos desde otra cuenta, carpetas compartidas, referencias inválidas, cambios de estado no permitidos, y trabajos incompletos. Mantiene registro de estados en propiedades `PILOT_ADMIN_<referencia>` del mismo script. La lista se limita a 100 trabajos de prueba; se avisa si quedan otros fuera.
+- Precio orientativo de este piloto de una hoja: ARS 3.000, seña ARS 1.500. Esta versión no recibe clientes públicos ni integra cobros y pedidos reales, por lo que no se debe usar como sistema definitivo de pedidos.
+
+**Verificaciones simuladas realizadas:** 15/15 correctas (listado privado, recepción incompleta, bloqueo del PDF antes de la seña, cambios de estado, rechazo de acceso ajeno/carpeta compartida, etc.). No se probó todavía con Google Drive real en la aplicación desplegada.
+
+Para probarlo, solo después de reemplazar `Code.gs` e `Index.html` en el proyecto Apps Script **ya existente**, crear **Nueva versión** en la implementación actual, abrir la misma URL desde el perfil propietario y pulsar **Ver pedidos privados**. No cambiar `Ejecutar como Yo` ni `Quién tiene acceso: Solo yo`.
