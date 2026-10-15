@@ -7,22 +7,35 @@
 <style>body{font:13px system-ui,Arial,sans-serif;color:#234666;background:#f7f9fc;margin:0;padding:12px}p{margin:0}</style>
 </head>
 <body>
-<p>Recepción segura de fotografías. Esta ventana está vinculada al editor de Librería Saber.</p>
+<p>Recepción protegida de fotografías.</p>
 <script>
 'use strict';
-// El origen autorizado viene de una propiedad del proyecto, NO del mensaje.
 const PARENT_ORIGIN=<?!= JSON.stringify(parentOrigin) ?>;
-function reply(data){
- if(window.parent!==window)window.parent.postMessage(data,PARENT_ORIGIN);
+const BRIDGE_NONCE=<?!= JSON.stringify(bridgeNonce) ?>;
+function announceReady(){
+ // Apps Script HTMLService puede contener un iframe intermedio de Google.
+ // Avisamos solo a los ancestros; las respuestas privadas van solo al solicitante.
+ let target=window.parent;
+ for(let i=0;i<6;i++){
+   if(target===window)break;
+   try{target.postMessage({type:'SABER_RECEIVER_READY',bridgeNonce:BRIDGE_NONCE},PARENT_ORIGIN);}
+   catch(e){/* no publicar a otros orígenes */}
+   if(target===window.top)break;
+   try{target=target.parent}catch(e){break}
+ }
 }
 window.addEventListener('message',event=>{
- if(event.source!==window.parent||event.origin!==PARENT_ORIGIN)return;
+ if(event.origin!==PARENT_ORIGIN)return;
  const msg=event.data;
  if(!msg||msg.type!=='SABER_RECEIVER_REQUEST'||
+    msg.bridgeNonce!==BRIDGE_NONCE||
     typeof msg.id!=='string'||!/^[a-zA-Z0-9_-]{8,80}$/.test(msg.id))return;
- const ok=value=>reply({type:'SABER_RECEIVER_RESULT',id:msg.id,ok:true,value});
- const fail=err=>reply({type:'SABER_RECEIVER_RESULT',id:msg.id,ok:false,
-   error:err&&err.message?String(err.message).slice(0,300):'Error de recepción'});
+ const reply=(ok,value,error)=>event.source.postMessage({
+   type:'SABER_RECEIVER_RESULT',bridgeNonce:BRIDGE_NONCE,
+   id:msg.id,ok,value,error
+ },PARENT_ORIGIN);
+ const ok=value=>reply(true,value,null);
+ const fail=err=>reply(false,null,err&&err.message?String(err.message).slice(0,300):'Error de recepción');
  const call=google.script.run.withSuccessHandler(ok).withFailureHandler(fail);
  if(msg.op==='start')call.startPublicOrder(msg.payload);
  else if(msg.op==='photo')call.uploadPublicPhoto(msg.payload);
@@ -31,7 +44,7 @@ window.addEventListener('message',event=>{
    call.finishPublicOrder(payload.reference,payload.uploadKey);
  }else fail(new Error('Operación no admitida.'));
 });
-window.addEventListener('load',()=>reply({type:'SABER_RECEIVER_READY'}));
+window.addEventListener('load',announceReady);
 </script>
 </body>
 </html>
