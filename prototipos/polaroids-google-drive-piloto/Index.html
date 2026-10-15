@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Polaroids Saber — Piloto privado</title>
+  <style>
+    :root{font-family:Arial,system-ui,sans-serif;color:#183249}
+    body{background:#f3f6f9;padding:22px;margin:0}
+    main{background:#fff;border:1px solid #dce4ec;border-radius:16px;max-width:520px;margin:3rem auto;padding:26px}
+    h1{font-size:24px;margin:0 0 12px} p{line-height:1.5;color:#506275}
+    input{width:100%;margin:14px 0;padding:10px;border:1px solid #b5c8d8;border-radius:9px;box-sizing:border-box}
+    button{border:0;background:#0a3158;color:#fff;padding:13px 20px;border-radius:9px;font-weight:700;width:100%}
+    button:disabled{opacity:.6}
+    .warning{padding:12px;border-radius:10px;background:#fff4df;color:#674d18}
+    #status{font-size:14px;font-weight:bold}
+  </style>
+</head>
+<body>
+<main>
+  <h1>Polaroids — Prueba privada de Drive</h1>
+  <p class="warning">Solo para Librería Saber. No es un formulario para clientes, no registra pedidos y no genera archivos de imprenta.</p>
+  <p>Seleccioná una única fotografía de prueba JPG o PNG, de hasta 5 MB. La imagen se guardará en una carpeta privada de Drive después de la autorización del titular.</p>
+  <form id="form" enctype="multipart/form-data">
+    <input name="foto" type="file" accept="image/jpeg,image/png" required>
+    <button type="submit" id="send">Guardar foto de prueba</button>
+  </form>
+  <p id="status" role="status" aria-live="polite">Sin fotografías enviadas.</p>
+</main>
+<script>
+const form=document.getElementById('form'),btn=document.getElementById('send'),statusEl=document.getElementById('status');
+form.addEventListener('submit',e=>{
+ e.preventDefault();
+ const file=form.foto.files[0];
+ if(!file||file.size>5*1024*1024||file.size===0){statusEl.textContent='Elegí un JPG o PNG de hasta 5 MB.';return;}
+ btn.disabled=true;statusEl.textContent='Enviando imagen de prueba…';
+ google.script.run
+  .withSuccessHandler(result=>{statusEl.textContent=result&&result.ok?result.message:'Respuesta inesperada.';btn.disabled=false;})
+  .withFailureHandler(err=>{statusEl.textContent='No se pudo guardar: '+(err&&err.message||'error desconocido');btn.disabled=false;})
+  .subirFotoPrueba(form);
+});
+</script>
+</body>
+</html>
