@@ -74,3 +74,20 @@ Archivo: `admin-demo.html` (también descargable como `Polaroids_Panel_Pedidos_D
 - PDF profesional deshabilitado; requiere recuperar imágenes originales desde el backend privado.
 - No confundir el panel de demostración con `web/polaroids-admin.html` del prototipo Worker/R2. Aquel panel técnico hoy solo admite una hoja, y **no está desplegado**.
 - La autenticación y el almacenamiento privados siguen pendientes. Este archivo nunca debe interpretarse como sistema de recepción seguro.
+
+
+## Avance de experiencia de compra y pedido mixto (15/10/2026)
+
+Se actualizó `editor.html` con el mismo mini tutorial de encuadre y zoom incorporado en el piloto privado de Apps Script, y se retiró de la columna izquierda el detalle técnico de imposición (pose, márgenes, marcas de corte). **No se alteraron ni las medidas de imprenta ni los recortes**.
+
+En `index.html` del entorno de pruebas, el carrito mixto permite revisar un **texto simulado de pedido** antes de enviarlo por WhatsApp. Contiene:
+- Artículos de librería, cantidades y subtotales.
+- Impresión/gráfica y Polaroids por cantidad de hojas (ARS 3.000 c/hoja).
+- Total conjunto y seña para los trabajos de producción, no sobre productos.
+- Aclaración de que el pedido puede enviarse antes de pagar, pero la impresión requiere confirmar la seña del 50 %.
+
+La vista previa NO abre WhatsApp ni envía/registrar pedidos. El texto lleva **SIMULACIÓN - NO ENVIAR** para evitar confundirlo con una orden real. Las fotos del `editor.html` de Cloudflare no se transfieren a Drive; el Apps Script privado sigue siendo una herramienta exclusiva de Librería Saber.
+
+**Verificación técnica:** el JavaScript del carrito y del editor analiza sin errores de sintaxis; prueba de carrito mixto con dos cuadernos por ARS 8.000 + dos hojas Polaroids por ARS 6.000 genera total ARS 14.000 y seña ARS 3.000; contiene saltos de línea reales.
+
+**Bloqueador antes de habilitar clientes:** el Web App de Drive actual está restringido a «Solo yo». No se puede afirmar que los clientes anónimos puedan enviar fotografías; hace falta diseñar y probar un mecanismo público con control de abuso, identificación del pedido y separación entre el sitio y las fotos privadas. No aflojar permisos ni abrir la aplicación existente al público sin aprobación. La producción pública, la rama `main` y Cloudflare original no se modificaron.
