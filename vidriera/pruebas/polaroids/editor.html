@@ -261,7 +261,232 @@ document.addEventListener('keydown',e=>{if(editorIndex<0)return;if(e.key==='Esca
 // DEMOSTRACIÓN: no transmite ni almacena los originales en un servidor.
 // La implementación definitiva deberá enviar originals + encuadres a almacenamiento privado,
 // recibir un identificador de archivo y recién después agregar el ítem al carrito real.
+
+/**
+ * Recepción desde el editor hacia una aplicación Apps Script SEPARADA del piloto.
+ * En esta rama queda APAGADA: recepcion-config.json.enabled=false.
+ * Al activarse, no se confunde una referencia provisional con fotos recibidas.
+ */
+function secureNonce(){
+ if(!window.crypto||!crypto.getRandomValues)throw new Error('Este navegador no permite generar una sesión segura.');
+ const bits=new Uint8Array(16);crypto.getRandomValues(bits);
+ return Array.from(bits,b=>b.toString(16).padStart(2,'0')).join('');
+}
+function originGoogleBridge(origin){
+ try{
+  const u=new URL(origin),h=u.hostname.toLowerCase();
+  return u.protocol==='https:'&&(
+   h==='script.google.com'||h==='script.googleusercontent.com'||
+   h.endsWith('.script.googleusercontent.com')||
+   h.endsWith('-script.googleusercontent.com')
+  );
+ }catch(e){return false}
+}
+function receiverMessages(e){
+ if(!receiverNonce||!originGoogleBridge(e.origin))return;
+ const m=e.data;
+ if(!m||m.bridgeNonce!==receiverNonce)return;
+ if(m.type==='SABER_RECEIVER_READY'){
+  if(receiverTarget)return;
+  receiverTarget=e.source;
+  receiverOrigin=e.origin;
+  status('Recepción protegida conectada. Resolvé la verificación de seguridad para enviar las fotos.');
+  return;
+ }
+ if(m.type!=='SABER_RECEIVER_RESULT'||e.source!==receiverTarget||
+   e.origin!==receiverOrigin||!receiverPending.has(m.id))return;
+ const pending=receiverPending.get(m.id);
+ receiverPending.delete(m.id);clearTimeout(pending.timer);
+ if(m.ok)pending.resolve(m.value);
+ else pending.reject(new Error(String(m.error||'Error de recepción').slice(0,300)));
+}
+window.addEventListener('message',receiverMessages);
+function receiverCall(op,payload){
+ if(!receiverTarget||!receiverOrigin||!receiverNonce)
+   return Promise.reject(new Error('El receptor protegido todavía no está conectado.'));
+ return new Promise((resolve,reject)=>{
+  const id='req_'+secureNonce();
+  const timer=setTimeout(()=>{
+   receiverPending.delete(id);
+   reject(new Error('Se agotó el tiempo de recepción. Podés reintentar sin volver a cargar las fotos.'));
+  },90000);
+  receiverPending.set(id,{resolve,reject,timer});
+  try{
+   receiverTarget.postMessage({
+    type:'SABER_RECEIVER_REQUEST',bridgeNonce:receiverNonce,id,op,payload
+   },receiverOrigin);
+  }catch(err){clearTimeout(timer);receiverPending.delete(id);reject(err);}
+ });
+}
+function readFileBase64(file){
+ return new Promise((resolve,reject)=>{
+  const r=new FileReader();
+  r.onload=()=>{
+   const data=String(r.result||'');
+   const comma=data.indexOf(',');
+   if(comma<0){reject(new Error('No se pudo codificar la fotografía.'));return}
+   resolve(data.slice(comma+1));
+  };
+  r.onerror=()=>reject(new Error('No se pudo leer el archivo original.'));
+  r.readAsDataURL(file);
+ });
+}
+function imprimirRecorte(p){
+ return new Promise((resolve,reject)=>{
+  const canvas=document.createElement('canvas');
+  canvas.width=886;canvas.height=886;
+  const ctx=canvas.getContext('2d',{alpha:false});
+  if(!ctx){reject(new Error('No se pudo preparar el recorte.'));return}
+  const crop=cropBounds(p);
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,886,886);
+  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+  ctx.drawImage(p.img,crop.x,crop.y,crop.s,crop.s,0,0,886,886);
+  canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('No se pudo generar la fotografía de imprenta.')),
+   'image/jpeg',0.94);
+ });
+}
+function photoFingerprint(){
+ return JSON.stringify(sheets[0].map(p=>{
+  const c=cropBounds(p);
+  return [p.file.name,p.file.size,p.file.lastModified,
+    Number(c.x.toFixed(5)),Number(c.y.toFixed(5)),Number(c.s.toFixed(5))];
+ }));
+}
+function resetChallenge(){
+ turnstileToken='';
+ if(turnstileWidget!==null&&window.turnstile&&typeof turnstile.reset==='function')
+  turnstile.reset(turnstileWidget);
+}
+async function sendSecurePhotos(){
+ if(!receiverConfig||!receiverConfig.enabled||!orderComplete())return;
+ if(sheets.length!==1)throw new Error('Esta primera prueba admite una hoja de seis fotografías.');
+ if(!receiverTarget)throw new Error('Esperá a que se conecte la recepción protegida.');
+ if(!$('photoConsent').checked)throw new Error('Confirmá primero que aceptás enviar las fotografías para preparar tu pedido.');
+ for(let i=0;i<6;i++){
+  const f=sheets[0][i]&&sheets[0][i].file;
+  if(!f||!['image/jpeg','image/png'].includes(f.type)||f.size>5*1024*1024||!f.size)
+   throw new Error('La foto '+(i+1)+' debe ser JPG o PNG de hasta 5 MB.');
+ }
+ const fingerprint=photoFingerprint();
+ if(receivingSession&&receivingSession.fingerprint!==fingerprint)
+  throw new Error('El encuadre cambió después de iniciar el envío. Recargá y comenzá una nueva recepción.');
+ if(!receivingSession&&!turnstileToken)
+  throw new Error('Completá la verificación de seguridad antes de enviar.');
+ busy=true;document.querySelector('.app').classList.add('uploading');updateSheetNav();
+ try{
+  if(!receivingSession){
+   status('Verificando seguridad y creando el pedido privado…');
+   const begin=await receiverCall('start',{sheets:1,turnstileToken});
+   turnstileToken='';
+   if(!begin||!/^POL-[A-F0-9]{24}$/.test(begin.reference)||
+      !/^[a-f0-9]{64}$/.test(begin.uploadKey))
+      throw new Error('La recepción no devolvió una referencia válida.');
+   receivingSession={reference:begin.reference,uploadKey:begin.uploadKey,
+     uploaded:new Set(),fingerprint};
+  }
+  for(let i=0;i<6;i++){
+   if(receivingSession.uploaded.has(i))continue;
+   status('Preparando y enviando la foto '+(i+1)+' de 6…');
+   const p=sheets[0][i],original=await readFileBase64(p.file);
+   const blob=await imprimirRecorte(p);
+   const printJpeg=await readFileBase64(blob);
+   const c=cropBounds(p);
+   const reply=await receiverCall('photo',{
+    reference:receivingSession.reference,
+    uploadKey:receivingSession.uploadKey,index:i,original,printJpeg,
+    crop:{x:c.x,y:c.y,s:c.s,sourceWidth:p.img.naturalWidth,
+      sourceHeight:p.img.naturalHeight}
+   });
+   if(!reply||reply.reference!==receivingSession.reference)
+    throw new Error('No pudimos confirmar la recepción de la foto '+(i+1)+'.');
+   receivingSession.uploaded.add(i);
+  }
+  status('Creando el PDF privado…');
+  const result=await receiverCall('finish',{
+   reference:receivingSession.reference,uploadKey:receivingSession.uploadKey
+  });
+  if(!result||result.received!==true||result.reference!==receivingSession.reference)
+   throw new Error('El servidor todavía no confirmó las seis fotografías.');
+  status('¡Recibimos tus seis fotografías! Referencia '+result.reference+'.','ok');
+  const payload={sheets:1,photos:6,format:'85x90',
+   uploadsReceived:true,reference:result.reference,referenceStatus:'received'};
+  // La clave de carga NUNCA se envía al carrito, WhatsApp ni localStorage.
+  receivingSession=null;
+  $('btnPdf').textContent='Fotos recibidas correctamente';
+  $('btnPdf').disabled=true;
+  if(window.parent!==window)
+   window.parent.postMessage({type:'SABER_POLAROID_RECEIVED',payload},window.location.origin);
+ }catch(error){
+  if(!receivingSession)resetChallenge();
+  status('No se completó el envío: '+(error&&error.message||'error desconocido')+'. Podés reintentar.','bad');
+ }finally{
+  busy=false;document.querySelector('.app').classList.remove('uploading');
+  updateSheetNav();
+ }
+}
+async function loadTurnstile(sitekey){
+ await new Promise((resolve,reject)=>{
+  if(window.turnstile){resolve();return}
+  const sc=document.createElement('script');
+  sc.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+  sc.async=true;sc.defer=true;sc.onload=resolve;
+  sc.onerror=()=>reject(new Error('No se pudo cargar la verificación de seguridad.'));
+  document.head.append(sc);
+ });
+ if(!window.turnstile||typeof turnstile.render!=='function')
+  throw new Error('La verificación Turnstile no está disponible.');
+ turnstileWidget=turnstile.render('#turnstileBox',{
+  sitekey,action:'polaroids',
+  callback:token=>{turnstileToken=token;status('Verificación completada. Ya podés enviar tus fotos.','ok')},
+  'expired-callback':()=>{turnstileToken='';status('La verificación venció. Completala nuevamente.','bad')},
+  'error-callback':()=>{turnstileToken='';status('Falló la verificación de seguridad. Volvé a intentarlo.','bad')}
+ });
+}
+async function setupSecureReception(){
+ try{
+  const res=await fetch('recepcion-config.json',{cache:'no-store'});
+  if(!res.ok)throw new Error('Configuración de recepción no encontrada.');
+  const cfg=await res.json();
+  if(cfg.enabled!==true)return; // apagado: mantener el funcionamiento de simulación.
+  receiverConfig={enabled:true};
+  if(location.hostname!==cfg.allowedHost||
+     cfg.maxSheetsForRealUploads!==1||
+     typeof cfg.turnstileSiteKey!=='string'||
+     !/^[a-zA-Z0-9_-]{5,100}$/.test(cfg.turnstileSiteKey))
+   throw new Error('La recepción protegida no está configurada para este sitio.');
+  const url=new URL(cfg.bridgeUrl);
+  if(url.protocol!=='https:'||url.hostname!=='script.google.com'||
+     !/^\/macros\/s\/[A-Za-z0-9_-]{20,}\/exec\/?$/.test(url.pathname))
+   throw new Error('La dirección del receptor es inválida.');
+  receiverNonce=secureNonce();
+  url.searchParams.set('bridgeNonce',receiverNonce);
+  $('secureReceptionNotice').hidden=false;
+  $('btnPdf').disabled=true;
+  updateSheetNav();
+  const frame=document.createElement('iframe');
+  frame.src=url.href;frame.title='Recepción segura de fotografías';
+  frame.setAttribute('aria-hidden','true');
+  frame.referrerPolicy='no-referrer';
+  frame.style.cssText='width:1px;height:1px;border:0;position:absolute;left:-10000px;top:0';
+  receiverBridge=frame;
+  $('receiverHolder').append(frame);
+  await loadTurnstile(cfg.turnstileSiteKey);
+  status('Prepará las seis fotos y verificá la seguridad para enviarlas.');
+ }catch(e){
+  if(receiverConfig&&receiverConfig.enabled){
+   receiverInitError=String(e&&e.message||e);
+   status('Recepción protegida no disponible: '+receiverInitError,'bad');
+  }
+ }
+}
+setupSecureReception();
+
 $('btnPdf').onclick=()=>{
+ if(busy)return;
+ if(receiverConfig&&receiverConfig.enabled){
+  sendSecurePhotos().catch(err=>status('No se pudo enviar: '+(err&&err.message||err),'bad'));
+  return;
+ }
  if(!orderComplete()){status('Completá las seis fotos de todas las hojas antes de continuar.','bad');return}
  if(!provisionalReference)provisionalReference=nuevaReferenciaProvisional();
  if(window.parent!==window){
