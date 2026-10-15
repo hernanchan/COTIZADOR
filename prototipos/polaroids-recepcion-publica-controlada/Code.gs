@@ -180,8 +180,10 @@ function uploadPublicPhoto(data){
  try {
    const st=orderState_(c.p,data.reference,data.uploadKey);
    if(st.status!=='receiving')throw new Error('La carga ya fue finalizada.');
+   // Reintento idempotente ante caída de red: no crear duplicados ni cobrar cuota.
    if(Object.prototype.hasOwnProperty.call(st.photos,data.index))
-     throw new Error('La foto ya está recibida.');
+     return {received:Object.keys(st.photos).length,reference:data.reference,
+       alreadyReceived:true};
    const day=usageDay_(c.p),sum=original.length+crop.length;
    if(day.value.files>=PUBLIC_MAX_FILES_DAY||
       day.value.bytes+sum>PUBLIC_MAX_DAILY_MB*1024*1024)
@@ -205,7 +207,11 @@ function finishPublicOrder(reference,uploadKey){
  const lock=LockService.getScriptLock();lock.waitLock(12000);
  try{
    const st=orderState_(c.p,reference,uploadKey);
-   if(st.status!=='receiving')throw new Error('El pedido ya está cerrado.');
+   // El PDF puede haberse guardado aun si se perdió la respuesta del navegador.
+   if(st.status==='received')
+     return {reference,received:true,sheets:1,photos:6,alreadyReceived:true,
+       message:'Las seis fotografías ya estaban recibidas.'};
+   if(st.status!=='receiving')throw new Error('El pedido no está abierto.');
    if([0,1,2,3,4,5].some(i=>!st.photos[i]))
      throw new Error('Faltan fotografías por recibir.');
    const bytes=[0,1,2,3,4,5].map(i=>
