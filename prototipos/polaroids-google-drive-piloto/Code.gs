@@ -274,3 +274,113 @@ function crearPdfImprenta_(jpgs) {
   ascii('trailer\n<< /Size 11 /Root 1 0 R >>\nstartxref\n'+offset+'\n%%EOF\n');
   return Utilities.newBlob(bytes,'application/pdf','POLAROIDS_A4_6_FOTOS_IMPRIMIR.pdf');
 }
+
+
+/**
+ * Panel de pedidos del PILOTO PRIVADO. Requiere cuenta propietaria.
+ * No es un endpoint para clientes; la Web App continúa en modo "Solo yo".
+ */
+function accesoPanelPrueba_() {
+  const cfg=PropertiesService.getScriptProperties();
+  const owner=(cfg.getProperty('TEST_OWNER_EMAIL')||'').trim().toLowerCase();
+  const active=(Session.getActiveUser().getEmail()||'').trim().toLowerCase();
+  if(!owner||!active||owner!==active) {
+    throw new Error('El panel es exclusivo de la cuenta autorizada.');
+  }
+  const rootId=cfg.getProperty('TEST_FOLDER_ID');
+  if(!rootId)throw new Error('No se configuró la carpeta privada.');
+  const root=DriveApp.getFolderById(rootId);
+  if(root.getSharingAccess()!==DriveApp.Access.PRIVATE) {
+    throw new Error('La carpeta debe continuar siendo privada.');
+  }
+  return {cfg,root};
+}
+function estadosPanelPrueba_() {
+  return {
+    pendiente_sena:'Pendiente de seña',
+    sena_confirmada:'Seña confirmada',
+    preparado:'Preparado',
+    entregado:'Entregado',
+    anulado:'Anulado'
+  };
+}
+function enumerarArchivosPrueba_(folder) {
+  const files=folder.getFiles(),found={originales:0,recortes:0,pdfUrl:null,pdfId:null,json:false};
+  while(files.hasNext()) {
+    const file=files.next(),name=file.getName();
+    if(/^FOTO_[1-6]\.(jpg|png)$/i.test(name))found.originales++;
+    if(/^RECORTE_[1-6]_300DPI\.jpg$/i.test(name))found.recortes++;
+    if(name==='encuadres.json')found.json=true;
+    if(name==='POLAROIDS_A4_6_FOTOS_IMPRIMIR.pdf') {
+      found.pdfUrl=file.getUrl();
+      found.pdfId=file.getId();
+    }
+  }
+  return found;
+}
+function listarPedidosPrueba() {
+  const {cfg,root}=accesoPanelPrueba_(),folders=root.getFolders(),results=[];
+  let truncated=false;
+  while(folders.hasNext()) {
+    const folder=folders.next();
+    const match=/^PRUEBA_6_POLAROIDS_([a-f0-9]{32})$/i.exec(folder.getName());
+    if(!match)continue;
+    if(results.length>=100){truncated=true;break;}
+    const ticket=match[1].toLowerCase();
+    const files=enumerarArchivosPrueba_(folder);
+    const complete=files.originales===6&&files.recortes===6&&files.pdfId&&files.json;
+    const states=estadosPanelPrueba_();
+    const raw=cfg.getProperty('PILOT_ADMIN_'+ticket);
+    const saved=raw?JSON.parse(raw):null;
+    const status=complete && saved && Object.prototype.hasOwnProperty.call(states,saved.status)
+      ?saved.status:(complete?'pendiente_sena':'incompleto');
+    const date=folder.getDateCreated();
+    results.push({
+      reference:ticket,created:date.getTime(),status,
+      statusText:states[status]||'Recepción incompleta',
+      originals:files.originales,crops:files.recortes,hasJson:files.json,
+      hasPdf:!!files.pdfId,canPrint:!!files.pdfId&&
+        ['sena_confirmada','preparado','entregado'].includes(status),
+      // El link privado al PDF no se devuelve antes de confirmar la seña.
+      pdfUrl:files.pdfId&&['sena_confirmada','preparado','entregado'].includes(status)
+        ?files.pdfUrl:null,
+      price:3000,deposit:1500
+    });
+  }
+  results.sort((a,b)=>b.created-a.created);
+  return {orders:results,truncated,scope:'PILOTO PRIVADO · una hoja de 6 Polaroids por trabajo'};
+}
+function actualizarEstadoPedidoPrueba(reference,next) {
+  const {cfg,root}=accesoPanelPrueba_();
+  if(typeof reference!=='string'||!/^[a-f0-9]{32}$/i.test(reference))
+    throw new Error('Referencia inválida.');
+  const ticket=reference.toLowerCase();
+  const transitions={
+    pendiente_sena:['sena_confirmada','anulado'],
+    sena_confirmada:['pendiente_sena','preparado','anulado'],
+    preparado:['sena_confirmada','entregado','anulado'],
+    entregado:[],
+    anulado:[]
+  };
+  if(!Object.prototype.hasOwnProperty.call(transitions,next))
+    throw new Error('Estado no admitido.');
+  const lock=LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const folderName='PRUEBA_6_POLAROIDS_'+ticket;
+    const matches=root.getFoldersByName(folderName);
+    if(!matches.hasNext())throw new Error('No existe ese trabajo en la carpeta privada.');
+    const files=enumerarArchivosPrueba_(matches.next());
+    if(files.originales!==6||files.recortes!==6||!files.pdfId||!files.json)
+      throw new Error('No se puede cambiar el estado de una recepción incompleta.');
+    const raw=cfg.getProperty('PILOT_ADMIN_'+ticket);
+    const current=raw?JSON.parse(raw).status:'pendiente_sena';
+    if(!Object.prototype.hasOwnProperty.call(transitions,current)
+       ||transitions[current].indexOf(next)<0)
+      throw new Error('La transición de estado no está permitida.');
+    cfg.setProperty('PILOT_ADMIN_'+ticket,JSON.stringify({
+      status:next,updated:Date.now()
+    }));
+    return {ok:true,reference:ticket,status:next,statusText:estadosPanelPrueba_()[next]};
+  } finally {lock.releaseLock();}
+}
