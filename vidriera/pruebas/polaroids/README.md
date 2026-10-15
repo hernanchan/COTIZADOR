@@ -103,3 +103,11 @@ El usuario aprobó separar Polaroids de «Imprimir fotos». Cambios realizados e
 - No habilita cargas públicas ni modifica `main` o el sitio de producción.
 
 Se verificó sintaxis JavaScript y ocho invariantes estáticas: categoría propia, acceso directo, cotización correcta, menú Fotos depurado, puente de carrito preservado y prohibición de uploads públicos en el prototipo.
+
+## Referencia compartida y receptor público protegido — código en rama de pruebas (15/10/2026)
+
+Se incorporó una referencia provisional por lote `POL-...` que viaja por `editor.html` → `cotizador-web-v2.html` → `cotizar.html` → `index.html`. El carrito y el texto de WhatsApp de prueba aclaran explícitamente **FOTOS NO RECIBIDAS**; la referencia provisional no sirve como prueba de recepción ni token secreto.
+
+Se preparó un módulo separado en `prototipos/polaroids-recepcion-publica-controlada/` con un receptor de cliente apagado por defecto: ver el README de esa carpeta para límites, protocolo `postMessage`, prueba de Turnstile en servidor y bloqueadores. El código aún **no está conectado a la página de pruebas** ni desplegado como aplicación web. No se ha autorizado el acceso anónimo a la carpeta; la prueba privada permanece en «Solo yo». El panel privado puede reconocer la futura carpeta `PEDIDO_POL-...` una vez que se actualice el código, sin permitir PDF sin seña marcada.
+
+Pruebas de la referencia y simulación: 11/11 controles aprobados (JavaScript y cálculos del carrito, acceso a las referencias, aviso explícito de fotos no recibidas). Receptor aislado: 20/20 pruebas con mocks aprobadas; panel receptor: 5/5 pruebas con mocks. Todos estos controles son simulaciones, sin carga anónima real.
