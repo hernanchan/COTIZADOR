@@ -124,7 +124,8 @@ function renderPolaroidSandbox(){
    if(received){
      if(msg.payload?.uploadsReceived!==true||
         msg.payload?.referenceStatus!=='received'||
-        sheetCount!==1||photoCount!==6||
+        !Number.isInteger(sheetCount)||sheetCount<1||sheetCount>10||
+        photoCount!==sheetCount*6||
         !/^POL-[A-F0-9]{24}$/.test(ref))return;
    }else{
      if(!Number.isInteger(sheetCount)||sheetCount<1||sheetCount>10||
