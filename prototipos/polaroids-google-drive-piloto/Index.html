@@ -53,10 +53,35 @@ html.embedded .demo-cart{display:none}
 .guide-num{display:flex;align-items:center;justify-content:center;flex:0 0 20px;height:20px;border-radius:50%;background:#e5edf8;color:#305b86;font-size:11px;font-weight:800}
 #preview{cursor:pointer}
 @media(max-width:540px){.preview-guide{margin-top:10px;padding:11px}.guide-step p{font-size:12px}}
+
+/* Panel de trabajo: disponible solo desde Apps Script privado y cuenta propietaria. */
+.admin-top{display:flex;align-items:center;gap:14px;font-size:11px;color:#62718a}.admin-top button{border:1px solid #a7c1db;border-radius:8px;background:#eef5fd;color:#164e84;padding:10px 12px;font-weight:800;cursor:pointer}
+#privateAdmin[hidden]{display:none!important}
+#privateAdmin{width:min(1120px,calc(100% - 30px));margin:20px auto 40px;display:block}
+.admin-mode .app{display:none!important}.admin-mode #privateAdmin{display:block}
+.admin-panel{background:#fff;border-radius:15px;border:1px solid #dde5ee;padding:20px;box-shadow:0 8px 20px #162e4a0b}
+.admin-panel h1{color:#164c78;margin:0 0 5px;font-size:22px}.admin-summary{color:#5b6c7d;font-size:12px;line-height:1.5}
+.admin-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.admin-controls{display:flex;gap:8px;flex-wrap:wrap}
+.admin-controls button{border:1px solid #bed0e2;border-radius:8px;background:#eef4fa;color:#1e547d;padding:10px 12px;cursor:pointer;font-size:12px;font-weight:800}
+#adminStatus{font-size:12px;color:#52677a;min-height:22px;margin:14px 0}
+#adminOrders{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.admin-order{border:1px solid #dde6ef;background:#fbfcfe;border-radius:12px;padding:15px;min-width:0}
+.admin-order h2{margin:0;font-size:15px;color:#243c54}
+.admin-state{display:inline-block;font-size:11px;font-weight:800;margin-top:8px;color:#2f5c80;background:#e8f1fa;padding:6px 9px;border-radius:6px}
+.admin-state.warning{background:#fff1d7;color:#875b24}.admin-state.done{background:#e3f6ea;color:#187246}
+.admin-order p{color:#5b6c7c;font-size:12px;line-height:1.5;margin:8px 0}
+.admin-order .ref{font-size:11px;color:#70849b;overflow-wrap:anywhere}
+.admin-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.admin-actions button,.admin-actions a{padding:9px 11px;border-radius:8px;border:1px solid #acc9e4;font-size:11px;font-weight:800;cursor:pointer;text-decoration:none;background:#eaf3fe;color:#1e588c}
+.admin-actions button:disabled{opacity:.4;cursor:not-allowed}
+.admin-actions .pdf{background:#1b7049;color:white;border-color:#1b7049}
+.admin-actions .cancel{background:#fff0ee;color:#a14537;border-color:#f3c8c3}
+.admin-warning{color:#805221;font-size:12px;line-height:1.4;border:1px solid #f0d6ab;background:#fff7e8;border-radius:8px;padding:10px;margin:10px 0}
+@media(max-width:730px){#adminOrders{grid-template-columns:1fr}.admin-top{flex-direction:column;align-items:flex-end;gap:5px}.admin-panel{padding:14px}}
 </style>
 </head>
 <body>
-<header><div><div class="brand">Polaroids<span style="color:#7990a8"> / </span><em>6 fotos</em><span class="tag">PRUEBA WEB</span></div><p>Piloto privado · 6 fotografías y encuadres a Drive</p></div><div style="font-size:12px;color:#62718a;text-align:right">2 columnas × 3 filas<br>Vista previa sin descarga</div></header>
+<header><div><div class="brand">Polaroids<span style="color:#7990a8"> / </span><em>6 fotos</em><span class="tag">PRUEBA WEB</span></div><p>Piloto privado · 6 fotografías y encuadres a Drive</p></div><div class="admin-top"><span>2 columnas × 3 filas</span><button id="openPrivateAdmin" type="button">Ver pedidos privados</button></div></header>
 <main class="app">
 <section class="panel left">
   <div class="sheetnav" aria-label="Hojas de seis fotos">
@@ -86,6 +111,18 @@ html.embedded .demo-cart{display:none}
 </section>
 </main>
 <section class="demo-cart panel" id="demoCart"><div class="demo-cart-title"><b>Integración en pruebas</b></div><div id="cartItem" class="demo-cart-empty">Al pulsar «Agregar al carrito de prueba», se enviará únicamente un aviso de simulación al cotizador; las fotos no salen de tu dispositivo.</div></section>
+
+<section id="privateAdmin" hidden aria-label="Panel de pedidos Polaroids">
+ <div class="admin-panel">
+  <div class="admin-heading">
+   <div><h1>Pedidos Polaroids · Privado</h1><p class="admin-summary">Carpeta privada de Librería Saber. Los pedidos de esta etapa son pruebas de una hoja A4 (6 fotografías).</p></div>
+   <div class="admin-controls"><button id="reloadAdmin" type="button">Actualizar listado</button><button id="backToEditor" type="button">Volver al editor</button></div>
+  </div>
+  <p class="admin-warning"><strong>Control de producción:</strong> confirmá manualmente la seña antes de abrir el PDF para imprimir. El panel no cobra ni verifica transferencias automáticamente.</p>
+  <p id="adminStatus" aria-live="polite">Abrí el panel para consultar tus trabajos.</p>
+  <div id="adminOrders"></div>
+ </div>
+</section>
 <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="editorTitle">
  <div class="editbox"><div class="editheader"><h2 id="editorTitle">Corregir encuadre</h2><button id="closeEditor" aria-label="Cerrar editor">✕</button></div>
   <div class="cropwrap" id="cropwrap"><canvas id="cropCanvas" width="840" height="840"></canvas></div>
@@ -292,6 +329,95 @@ $('btnPdf').onclick=async()=>{
  busy=true; // no repetir el mismo envío, evitamos duplicados
 };
 $('btnDemo').onclick=async()=>{let fs=[];for(let i=0;i<6;i++){const c=document.createElement('canvas');c.width=i%2?1250:1700;c.height=i%2?1700:1200;let ctx=c.getContext('2d'),g=ctx.createLinearGradient(0,0,c.width,c.height);const pair=[['#355f78','#e2a775'],['#6c8188','#c4d4bd'],['#98786b','#e6c3aa'],['#526e94','#cbbddd'],['#5f8d85','#e9c393'],['#8680a8','#d1b7a2']][i];g.addColorStop(0,pair[0]);g.addColorStop(1,pair[1]);ctx.fillStyle=g;ctx.fillRect(0,0,c.width,c.height);ctx.fillStyle='#ffffff44';ctx.beginPath();ctx.arc(c.width*(.25+.09*i),c.height*.4,c.height*.22,0,2*Math.PI);ctx.fill();ctx.strokeStyle='#ffffff77';ctx.lineWidth=18;ctx.beginPath();ctx.moveTo(-60,c.height*.9);ctx.lineTo(c.width*.75,c.height*.26);ctx.lineTo(c.width+30,c.height*.75);ctx.stroke();ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold '+Math.round(c.width*.075)+'px Segoe UI, Arial';ctx.fillText('FOTO DE PRUEBA',c.width/2,c.height*.70);ctx.font=Math.round(c.width*.05)+'px Segoe UI, Arial';ctx.fillText(String(i+1),c.width/2,c.height*.79);const b=await new Promise(r=>c.toBlob(r,'image/jpeg',.92));fs.push(new File([b],`Prueba_${i+1}.jpg`,{type:'image/jpeg'}))}for(let i=0;i<6;i++)dropPhoto(i);await acceptFiles(fs);status('Fotos de prueba cargadas. Ajustá encuadres y enviá esta hoja al Drive privado.','ok')};
+
+// Panel de pedidos: no altera el flujo de recepción ni comparte PDFs públicamente.
+const panel=$('privateAdmin'),ordersWrap=$('adminOrders'),adminStatus=$('adminStatus');
+const adminButton=$('openPrivateAdmin'),refreshButton=$('reloadAdmin');
+const permittedMoves={
+ pendiente_sena:[['sena_confirmada','Confirmar seña'],['anulado','Anular']],
+ sena_confirmada:[['preparado','Marcar preparado'],['pendiente_sena','Revertir seña'],['anulado','Anular']],
+ preparado:[['entregado','Marcar entregado'],['sena_confirmada','Volver a preparación'],['anulado','Anular']],
+ entregado:[],anulado:[]
+};
+function panelCall(method,...args){
+ return new Promise((resolve,reject)=>{
+   const fn=google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+   if(method==='list')fn.listarPedidosPrueba();
+   else if(method==='status')fn.actualizarEstadoPedidoPrueba(args[0],args[1]);
+   else reject(new Error('Acción no admitida.'));
+ });
+}
+function dateAdmin(ms){
+ try{return new Date(ms).toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'})}
+ catch(e){return 'Fecha no disponible'}
+}
+function adminText(tag,className,content){
+ const el=document.createElement(tag);
+ if(className)el.className=className;
+ el.textContent=content;
+ return el;
+}
+function renderPrivateOrders(orders){
+ ordersWrap.replaceChildren();
+ if(!orders.length){ordersWrap.append(adminText('p','admin-summary','Todavía no hay hojas de prueba recibidas.'));return;}
+ orders.forEach(item=>{
+   const card=adminText('article','admin-order','');
+   card.append(adminText('h2','',dateAdmin(item.created)));
+   card.append(adminText('div','ref','Trabajo '+item.reference.slice(0,8)+' · 6 Polaroids'));
+   const state=item.status||'incompleto';
+   card.append(adminText('span','admin-state'+
+      (state==='pendiente_sena'||state==='incompleto'?' warning':
+       state==='entregado'||state==='preparado'?' done':''),item.statusText));
+   card.append(adminText('p','','Originales: '+item.originals+'/6 · Recortes: '+item.crops+'/6 · PDF: '+(item.hasPdf?'Listo':'Pendiente')));
+   card.append(adminText('p','','Precio por hoja: $3.000 · Seña requerida: $1.500'));
+   const actions=adminText('div','admin-actions','');
+   if(item.pdfUrl && item.canPrint){
+     const link=adminText('a','pdf','Abrir PDF para imprimir');
+     link.href=item.pdfUrl;link.target='_blank';link.rel='noopener noreferrer';
+     actions.append(link);
+   }else if(item.hasPdf){
+     const btn=adminText('button','','PDF bloqueado hasta confirmar seña');
+     btn.type='button';btn.disabled=true;actions.append(btn);
+   }
+   const moves=permittedMoves[state]||[];
+   moves.forEach(([next,label])=>{
+     const button=adminText('button',next==='anulado'?'cancel':'',label);
+     button.type='button';
+     button.addEventListener('click',()=>changeAdminStatus(item.reference,next,label));
+     actions.append(button);
+   });
+   card.append(actions);ordersWrap.append(card);
+ });
+}
+async function loadPrivateOrders(){
+ if(!window.google||!google.script||!google.script.run){
+   adminStatus.textContent='Este panel solo funciona desde la aplicación privada de Google Apps Script.';
+   return;
+ }
+ adminStatus.textContent='Buscando trabajos en Drive privado…';
+ refreshButton.disabled=true;
+ try{
+   const response=await panelCall('list');
+   renderPrivateOrders(response.orders||[]);
+   adminStatus.textContent=(response.orders||[]).length+
+     ' trabajo(s) encontrado(s).'+(response.truncated?' Mostrando los primeros 100.':'');
+ }catch(error){adminStatus.textContent='No se pudo cargar: '+(error&&error.message||'error desconocido');}
+ finally{refreshButton.disabled=false;}
+}
+async function changeAdminStatus(reference,next,label){
+ if(next==='anulado'&&!confirm('¿Anular este trabajo de prueba?'))return;
+ if(next==='sena_confirmada'&&!confirm('¿Confirmaste realmente que ingresó la seña del 50 %?'))return;
+ adminStatus.textContent='Guardando: '+label+'…';
+ try{await panelCall('status',reference,next);await loadPrivateOrders();}
+ catch(error){adminStatus.textContent='No se pudo actualizar: '+(error&&error.message||'error desconocido');}
+}
+adminButton.addEventListener('click',()=>{
+ panel.hidden=false;document.documentElement.classList.add('admin-mode');loadPrivateOrders();window.scrollTo(0,0);
+});
+$('backToEditor').addEventListener('click',()=>{
+ document.documentElement.classList.remove('admin-mode');panel.hidden=true;window.scrollTo(0,0);
+});
+refreshButton.addEventListener('click',loadPrivateOrders);
 renderAll();
 </script>
 </body>
