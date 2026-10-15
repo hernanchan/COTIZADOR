@@ -45,6 +45,14 @@ html.embedded .demo-cart{display:none}
 .preview-guide{align-self:stretch;width:min(100%,520px);margin:12px auto 0;padding:12px 14px;border:1px solid #e0e8f2;border-radius:10px;background:#f8fafd}
 .preview-guide h3{margin:0 0 9px;font-size:13px;color:#294e74}.guide-step{display:flex;align-items:flex-start;gap:9px;margin-top:7px}.guide-step p{margin:0;font-size:11.5px;line-height:1.4;color:#526379}.guide-step strong{color:#263b51}.guide-num{display:flex;align-items:center;justify-content:center;flex:0 0 20px;height:20px;border-radius:50%;background:#e5edf8;color:#305b86;font-size:11px;font-weight:800}
 @media(max-width:540px){.preview-guide{margin-top:10px;padding:11px}.guide-step p{font-size:12px}}
+.secure-reception-note[hidden],#receiverHolder[hidden]{display:none!important}
+.secure-reception-note{border:1px solid #cbdde7;border-radius:10px;background:#f2f9fa;padding:11px;margin-top:12px;color:#335469;font-size:12px}
+.secure-reception-note strong{display:block;font-size:13px;margin-bottom:5px}
+.secure-reception-note span{display:block;line-height:1.5}
+.consent-check{display:flex!important;align-items:start;gap:7px;font-size:11px!important;line-height:1.45;margin:10px 0!important;cursor:pointer}
+.consent-check input{margin:2px 0 0;flex:0 0 auto}
+#turnstileBox{min-height:18px;margin:10px 0 4px}
+.uploading .drop,.uploading .slots,.uploading .sheetnav,.uploading .options{pointer-events:none;opacity:.62}
 </style>
 </head>
 <body>
@@ -63,6 +71,13 @@ html.embedded .demo-cart{display:none}
   <div class="options"><label>2. Tus Polaroids</label>
   <div class="fixed-format"><strong>85 × 90 mm por fotografía</strong><span>Imagen interior 75 × 75 mm · borde blanco inferior de 11 mm</span></div>
   <div class="trim-tip">Las seis fotos se imprimirán y cortarán en Librería Saber. Vos podés ajustar cada encuadre; del corte nos encargamos nosotros.</div></div>
+  <div id="secureReceptionNotice" class="secure-reception-note" hidden>
+   <strong>Recepción protegida de fotografías</strong>
+   <span>Versión controlada: por ahora se recibe una hoja de 6 Polaroids por pedido. Tus fotos se guardan en una carpeta privada y solamente Librería Saber accede al PDF.</span>
+   <label class="consent-check"><input id="photoConsent" type="checkbox"> Acepto enviar mis fotografías únicamente para preparar este pedido en Librería Saber.</label>
+   <div id="turnstileBox"></div>
+  </div>
+  <div id="receiverHolder" hidden></div>
   <div class="buttons"><button class="primary" id="btnPdf" disabled>Agregar al carrito de prueba</button><button class="secondary" id="btnDemo" title="Para probar antes de usar fotos reales">Cargar prueba</button><button class="secondary" id="btnClear">Vaciar</button></div>
   <div class="status" id="status" role="status" aria-live="polite">Cargá seis fotografías para completar tu hoja.</div>
 </section>
@@ -121,14 +136,18 @@ function updateSheetNav(){
  $('sheetProgress').textContent=complete+' de '+sheets.length+' hojas completas · 6 fotos por hoja · '+formattedPrice(unitPrice)+' c/u';
  $('prevSheet').disabled=activeSheet===0;
  $('nextSheet').disabled=activeSheet===sheets.length-1;
- $('addSheet').disabled=sheets.length>=MAX_SHEETS||!sheetComplete(photos);
+ $('addSheet').disabled=sheets.length>=MAX_SHEETS||!sheetComplete(photos)||!!(receiverConfig&&receiverConfig.enabled);
  $('deleteSheet').disabled=sheets.length===1;
  $('btnPdf').disabled=!orderComplete()||busy;
- $('btnPdf').textContent='Agregar '+sheets.length+' hoja'+(sheets.length===1?'':'s')+' al carrito de prueba';
+ $('btnPdf').textContent=receiverConfig&&receiverConfig.enabled?'Enviar 6 fotos y agregar al carrito':
+ 'Agregar '+sheets.length+' hoja'+(sheets.length===1?'':'s')+' al carrito de prueba';
 }
 function showSheet(n){if(n<0||n>=sheets.length||editorIndex>=0)return;activeSheet=n;photos=sheets[n];renderAll()}
 function addNewSheet(){
  if(!sheetComplete(photos)){status('Completá las 6 fotos antes de crear otra hoja.','bad');return}
+ if(receiverConfig&&receiverConfig.enabled){
+  status('La recepción protegida de esta prueba admite una sola hoja de seis fotos.','bad');return;
+ }
  if(sheets.length>=MAX_SHEETS){status('Máximo '+MAX_SHEETS+' hojas por pedido de prueba.','bad');return}
  sheets.push(Array(6).fill(null));showSheet(sheets.length-1);
 }
@@ -144,6 +163,17 @@ let beforeEdit=null;
 let replaceIndex=-1;
 let busy=false;
 let provisionalReference='';
+let receiverConfig=null;
+let receiverBridge=null;
+let receiverOrigin='';
+let receiverNonce='';
+let receiverTarget=null;
+let turnstileWidget=null;
+let turnstileToken='';
+let receiverRequestCount=0;
+const receiverPending=new Map();
+let receivingSession=null;
+let receiverInitError='';
 function nuevaReferenciaProvisional(){
  const bytes=new Uint8Array(8);
  if(window.crypto&&window.crypto.getRandomValues){
@@ -208,7 +238,7 @@ function renderSlots(){const target=$('slots');target.replaceChildren();let tota
  }$('count').textContent=total+' de 6';updateSheetNav();if(total===6)status('Hoja '+(activeSheet+1)+' completa. Podés agregar otra o continuar con el pedido.','ok');else status('Hoja '+(activeSheet+1)+': faltan '+(6-total)+' fotografía'+(6-total===1?'':'s')+'.');}
 function renderAll(){renderSlots();renderPreview()}
 function dropPhoto(i){if(photos[i]&&photos[i].url)URL.revokeObjectURL(photos[i].url);photos[i]=null}
-function loadImage(file){return new Promise((resolve,reject)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>resolve({name:file.name,img:im,url:u,zoom:1,cx:.5,cy:.5});im.onerror=()=>{URL.revokeObjectURL(u);reject(new Error('No se pudo abrir '+file.name+'. Usá JPG, PNG o WebP.'))};im.src=u})}
+function loadImage(file){return new Promise((resolve,reject)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>resolve({name:file.name,img:im,url:u,file,zoom:1,cx:.5,cy:.5});im.onerror=()=>{URL.revokeObjectURL(u);reject(new Error('No se pudo abrir '+file.name+'. Usá JPG, PNG o WebP.'))};im.src=u})}
 async function acceptFiles(files,specific=-1){if(!files.length)return;const filtered=files.filter(f=>f.type.startsWith('image/')||/\.(jpe?g|png|webp|heic|heif)$/i.test(f.name));if(!filtered.length){status('No se reconocieron imágenes válidas.','bad');return}
  let destinations=specific>=0?[specific]:photos.map((v,i)=>v?null:i).filter(v=>v!==null);if(filtered.length>destinations.length){status('Hay '+filtered.length+' fotos nuevas y solo '+destinations.length+' lugares disponibles. Se cargarán las que entren.','bad')}
  let errors=[];for(let j=0;j<Math.min(filtered.length,destinations.length);j++){try{const p=await loadImage(filtered[j]);dropPhoto(destinations[j]);photos[destinations[j]]=p}catch(e){errors.push(e.message)}}renderAll();if(errors.length)status(errors.join(' '),'bad')}
