@@ -109,3 +109,7 @@ El mismo `Code.gs` e `Index.html` privado se ampliaron con botón **«Ver pedido
 **Verificaciones simuladas realizadas:** 15/15 correctas (listado privado, recepción incompleta, bloqueo del PDF antes de la seña, cambios de estado, rechazo de acceso ajeno/carpeta compartida, etc.). No se probó todavía con Google Drive real en la aplicación desplegada.
 
 Para probarlo, solo después de reemplazar `Code.gs` e `Index.html` en el proyecto Apps Script **ya existente**, crear **Nueva versión** en la implementación actual, abrir la misma URL desde el perfil propietario y pulsar **Ver pedidos privados**. No cambiar `Ejecutar como Yo` ni `Quién tiene acceso: Solo yo`.
+
+## Compatibilidad con receptor de clientes multihoja — 15/10/2026
+
+La prueba privada actual (6 originales + 6 recortes + `encuadres.json` + PDF) fue validada con Google Drive real por el dueño. El nuevo receptor público, todavía **desactivado**, se desarrolla en `prototipos/polaroids-recepcion-publica-controlada/` y soporta de 1 a 10 hojas por pedido con PDFs individuales. El panel privado actualizado en esta rama ahora detecta tanto carpetas piloto `PRUEBA_6_POLAROIDS_...` como futuras carpetas `PEDIDO_POL-...`, cuenta sus hojas, calcula ARS 3.000 por A4, la seña del 50 % y habilita enlaces de PDF únicamente cuando se confirma manualmente la seña. Este panel **no está instalado aún en Apps Script**: no reemplazar por ahora el código del proyecto privado. Todo cambio en `main` o producción queda expresamente excluido.
