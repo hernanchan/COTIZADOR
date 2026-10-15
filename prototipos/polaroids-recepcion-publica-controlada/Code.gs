@@ -23,13 +23,17 @@ const PUBLIC_TTL_MS=24*60*60*1000;
  * TURNSTILE_HOSTNAME es un hostname exacto bajo nuestro control.
  * El puente nunca devuelve URL de Drive ni expone funciones de administración.
  */
-function doGet(){
+function doGet(e){
  const p=PropertiesService.getScriptProperties();
  if(p.getProperty('PUBLIC_ENABLED')!=='yes')
    return HtmlService.createHtmlOutput('Recepción de clientes deshabilitada.');
+ const nonce=String(e&&e.parameter&&e.parameter.bridgeNonce||'');
+ if(!/^[a-f0-9]{32}$/.test(nonce))
+   return HtmlService.createHtmlOutput('Falta identificador seguro del editor.');
  const c=privateConfig_();
  const tpl=HtmlService.createTemplateFromFile('Bridge');
  tpl.parentOrigin='https://'+c.hostname;
+ tpl.bridgeNonce=nonce;
  return tpl.evaluate()
    .setTitle('Librería Saber — Recepción protegida de Polaroids')
    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
