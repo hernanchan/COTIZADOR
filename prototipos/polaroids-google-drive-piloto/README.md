@@ -47,3 +47,11 @@ Es técnicamente posible guardar fotografías en Drive con un Apps Script web ap
 - Almacenamiento Google: https://support.google.com/mail/answer/9312312?hl=es-419
 
 **Pruebas realizadas:** cinco tests locales simulados del piloto (JPG, contenido falso, anónimo, carpeta compartida e interruptor desactivado), todos aprobados. NO se ha ejecutado el script dentro de Google Apps Script ni se ha subido fotografía alguna a Drive.
+
+## Corrección V2 del piloto (15/10/2026)
+
+En la prueba real el HTML se abrió, pero Chrome mostró **"Form upload failed. Please try again."** antes de ejecutar `subirFotoPrueba` en Apps Script. No hay prueba suficiente para atribuirlo exclusivamente a cookies de incógnito. En vez de subir el elemento `<form>`, el nuevo `Index.html` usa `FileReader.readAsDataURL()` y manda solamente una cadena base64 con `google.script.run.subirFotoBase64({data:base64})`. `Code.gs` valida la autorización, tamaño, cabecera de archivo y privacidad de la carpeta, decodifica con `Utilities.base64Decode` y crea el Blob mediante `Utilities.newBlob`. No se envía ningún archivo a servicios externos a Apps Script/Drive.
+
+La solución es **un cambio de código**, no un cambio de configuración de Chrome. Ambas fuentes están en esta carpeta del repositorio. **Es necesario reemplazar los dos archivos en el proyecto Apps Script y luego actualizar su implementación existente**; cambiar GitHub por sí solo no modifica el Apps Script desplegado. Evitar crear otra implementación o abrir el acceso al público.
+
+Ocho pruebas locales con servicios simulados aprobadas: sintaxis de cliente, coincidencia entre las funciones, carga permitida, rechazo a datos inválidos, a usuario anónimo, a piloto deshabilitado, a carpeta compartida y a datos demasiado grandes. **Aún no se probó una carga real con el código V2.**
