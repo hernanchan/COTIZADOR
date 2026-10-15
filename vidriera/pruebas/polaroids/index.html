@@ -116,7 +116,7 @@ footer{background:#071f36;color:#fff;padding:25px 0}.footerrow{display:flex;alig
    lines.push('El pedido puede enviarse por WhatsApp antes de abonar la seña.');
    lines.push('La impresión se realizará únicamente después de confirmar el pago del 50 % correspondiente.');
    lines.push('SIMULACIÓN: No se recibieron fotografías ni se registró un pedido real.');
-   return lines.join('\\n');
+   return lines.join('\n');
  }
  window.sendWhatsApp=function(){
    if(!cart.length){alert('Agregá algún producto o trabajo antes de continuar.');return;}
