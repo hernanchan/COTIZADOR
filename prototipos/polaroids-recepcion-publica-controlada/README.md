@@ -47,3 +47,19 @@ Cloudflare Turnstile dispone de modalidad gratuita para aplicaciones pequeñas, 
 **Pruebas con mocks:** 20/20 aprobadas para el receptor público desactivado, captcha inválido, límites, token privado, seis archivos, PDF, cierre, privacidad, etc.; 5/5 aprobadas para que el panel privado de pruebas lea carpetas futuras `PEDIDO_POL-...`, bloquee PDF hasta marcar la seña y conserve referencia. Son pruebas técnicas locales, no carga anónima real ni impresión física.
 
 **Pendientes antes de liberar el producto:** probar HTML puente cross-origin, montar Turnstile real, probar en Android/iOS, pasar a 1–10 hojas de manera segura, vincular referencias con carrito/WhatsApp definitivo, validar registros y seña, limpieza y consentimiento para tratamiento de fotografías.
+
+## Integración con editor — preparada y bloqueada por configuración
+
+El editor del sitio de pruebas contiene un receptor opcional, controlado por `vidriera/pruebas/polaroids/recepcion-config.json`. Valores actuales:
+
+```json
+{"enabled":false,"allowedHost":"polaroids-integracion-sin-r2.libreriasaber.pages.dev","bridgeUrl":"","turnstileSiteKey":"","maxSheetsForRealUploads":1}
+```
+
+Sin `enabled=true`, URL de Apps Script distinta del proyecto privado y sitekey de Turnstile, la aplicación **solo simula**: no transmite fotos. El receptor exige que el host sea idéntico al de pruebas. Nunca colocar el Turnstile secret ni la clave temporal del pedido en este JSON, URL o GitHub.
+
+Para el iframe de Google se introduce un nonce aleatorio de 128 bits de un solo navegador, validado por la plantilla `Bridge.html` y por el editor. Los mensajes vienen de los ancestros de HTMLService, que puede introducir un iframe intermedio de Google. Las respuestas privadas se dirigen exclusivamente al `event.source` validado, y los mensajes públicos al dominio exacto. El editor acepta respuestas únicamente del origen autorizado del iframe Google, con nonce y request-id correlacionados. **Este comportamiento de frames de Google debe comprobarse en un navegador real antes de habilitarlo.**
+
+El editor conserva la imagen original JPG/PNG, genera recortes JPEG de 886×886 a calidad .94, manda posiciones originales del encuadre y no comunica datos del pedido al carrito antes de que `finishPublicOrder` confirme el PDF. Los reintentos de foto/cierre son idempotentes en servidor para recuperarse de una respuesta perdida, sin duplicar archivos intencionalmente. No se garantiza reanudar después de cerrar o recargar la pestaña, dado que la clave de carga no se persiste por privacidad.
+
+La prueba del sender en memoria pasó tanto el envío de las seis fotos como su reintento ante un fallo simulado en la tercera foto. El receptor público permanece sin implementar, sin conectar ni activar.
