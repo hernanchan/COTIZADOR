@@ -12,9 +12,9 @@
  * y prueba controlada de accesos anónimos. Sin secretos = sin recepción.
  */
 const PUBLIC_MAX_BYTES=5*1024*1024;
-const PUBLIC_MAX_SHEETS=1;     // MVP seguro: una hoja, 6 Polaroids
+const PUBLIC_MAX_SHEETS=10;     // 1 a 10 hojas A4, 6 Polaroids por hoja
 const PUBLIC_MAX_ORDERS_DAY=8;
-const PUBLIC_MAX_FILES_DAY=48; // 6 fotos/orden, con originales y recortes
+const PUBLIC_MAX_FILES_DAY=240; // fotos diarias, en originales + recortes
 const PUBLIC_MAX_DAILY_MB=250;
 const PUBLIC_TTL_MS=24*60*60*1000;
 
@@ -118,8 +118,9 @@ function makeRandomHex_(bytes){
 }
 function startPublicOrder(input){
  const c=privateConfig_();
- if(!input||Number(input.sheets)!==PUBLIC_MAX_SHEETS)
-   throw new Error('La versión piloto admite una hoja de seis Polaroids.');
+ const sheetCount=Number(input&&input.sheets);
+ if(!Number.isInteger(sheetCount)||sheetCount<1||sheetCount>PUBLIC_MAX_SHEETS)
+   throw new Error('Podés encargar entre una y diez hojas de seis Polaroids.');
  verifyChallenge_(input.turnstileToken,c.secret,c.hostname);
  const lock=LockService.getScriptLock();lock.waitLock(12000);
  try {
@@ -136,12 +137,12 @@ function startPublicOrder(input){
      throw new Error('El directorio creado no es privado; se rechazó la recepción.');
    }
    const st={created:Date.now(),folderId:folder.getId(),secretHash:secretHash_(key),
-     photos:{},status:'receiving',sheets:1};
+     photos:{},status:'receiving',sheets:sheetCount};
    c.p.setProperty('PUBLIC_ORDER_'+ref,JSON.stringify(st));
    day.value.orders++;
    c.p.setProperty(day.key,JSON.stringify(day.value));
    // Clave solo al mismo navegador. No se incorpora a WhatsApp.
-   return {reference:ref,uploadKey:key,maxFiles:6};
+   return {reference:ref,uploadKey:key,maxFiles:sheetCount*6,sheets:sheetCount};
  }finally{lock.releaseLock();}
 }
 function checkedJpeg_(bytes) {
@@ -167,7 +168,7 @@ function verifyCrop_(crop){
 }
 function uploadPublicPhoto(data){
  const c=privateConfig_();
- if(!data||!Number.isInteger(data.index)||data.index<0||data.index>=6)
+ if(!data||!Number.isInteger(data.index)||data.index<0||data.index>=PUBLIC_MAX_SHEETS*6)
    throw new Error('Posición de foto incorrecta.');
  const original=rawFile_(data.original,PUBLIC_MAX_BYTES,'Original');
  const crop=rawFile_(data.printJpeg,PUBLIC_MAX_BYTES,'Recorte');
@@ -180,6 +181,8 @@ function uploadPublicPhoto(data){
  try {
    const st=orderState_(c.p,data.reference,data.uploadKey);
    if(st.status!=='receiving')throw new Error('La carga ya fue finalizada.');
+   if(data.index>=st.sheets*6)
+     throw new Error('Esta fotografía no pertenece al pedido.');
    // Reintento idempotente ante caída de red: no crear duplicados ni cobrar cuota.
    if(Object.prototype.hasOwnProperty.call(st.photos,data.index))
      return {received:Object.keys(st.photos).length,reference:data.reference,
@@ -207,25 +210,41 @@ function finishPublicOrder(reference,uploadKey){
  const lock=LockService.getScriptLock();lock.waitLock(12000);
  try{
    const st=orderState_(c.p,reference,uploadKey);
-   // El PDF puede haberse guardado aun si se perdió la respuesta del navegador.
+   const expected=st.sheets*6;
    if(st.status==='received')
-     return {reference,received:true,sheets:1,photos:6,alreadyReceived:true,
-       message:'Las seis fotografías ya estaban recibidas.'};
+     return {reference,received:true,sheets:st.sheets,photos:expected,alreadyReceived:true,
+       message:'Las fotografías ya estaban recibidas.'};
    if(st.status!=='receiving')throw new Error('El pedido no está abierto.');
-   if([0,1,2,3,4,5].some(i=>!st.photos[i]))
+   if(Array.from({length:expected},(_,i)=>i).some(i=>!st.photos[i]))
      throw new Error('Faltan fotografías por recibir.');
-   const bytes=[0,1,2,3,4,5].map(i=>
-     DriveApp.getFileById(st.photos[i].croppedId).getBlob().getBytes());
    const folder=DriveApp.getFolderById(st.folderId);
-   folder.createFile(crearPdfImprenta_(bytes));
-   folder.createFile('encuadres.json',JSON.stringify({
-     format:'85x90_6up_A4_v1.1',
-     photos:[0,1,2,3,4,5].map(i=>st.photos[i].crop)
-   }),'application/json');
+   // Se crea un PDF por hoja para no superar la memoria de Apps Script
+   // con 60 originales y un PDF grande. Retomar un cierre parcial no duplica PDFs.
+   for(let sheet=0;sheet<st.sheets;sheet++){
+     const name=st.sheets===1?'POLAROIDS_A4_6_FOTOS_IMPRIMIR.pdf':
+       'POLAROIDS_A4_HOJA_'+String(sheet+1).padStart(2,'0')+
+       '_DE_'+String(st.sheets).padStart(2,'0')+'.pdf';
+     const existing=folder.getFilesByName(name);
+     if(existing.hasNext())continue;
+     const jpgs=Array.from({length:6},(_,i)=>
+       DriveApp.getFileById(st.photos[sheet*6+i].croppedId).getBlob().getBytes());
+     const pdf=crearPdfImprenta_(jpgs);
+     pdf.setName(name);
+     folder.createFile(pdf);
+   }
+   const metadataName='encuadres.json';
+   if(!folder.getFilesByName(metadataName).hasNext()){
+     folder.createFile(metadataName,JSON.stringify({
+       reference,format:'85x90_6up_A4_v1.1',sheets:st.sheets,
+       photos:Array.from({length:expected},(_,i)=>({
+         sheet:Math.floor(i/6)+1,position:i%6+1,crop:st.photos[i].crop
+       }))
+     }),'application/json');
+   }
    st.status='received';st.receivedAt=Date.now();
    c.p.setProperty('PUBLIC_ORDER_'+reference,JSON.stringify(st));
-   return {reference,received:true,sheets:1,photos:6,
-     message:'Se recibieron las seis fotografías.'};
+   return {reference,received:true,sheets:st.sheets,photos:expected,
+     message:'Se recibieron todas las fotografías.'};
  }finally{lock.releaseLock();}
 }
 
