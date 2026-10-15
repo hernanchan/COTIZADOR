@@ -53,6 +53,9 @@
         var item=event.data.payload;
         if(!item||item.type!=='print'||!Number(item.price))return;
         var cart=readCart();
+        const refs=Array.isArray(item.draftReferences)
+          ?item.draftReferences.map(String).filter(v=>/^POL-[A-F0-9-]{12,48}$/.test(v)).slice(0,10)
+          :[];
         cart.push({
           id:String(item.id||('PRINT-'+Date.now())),
           type:'print',
@@ -60,7 +63,9 @@
           price:Number(item.price)||0,
           qty:1,
           detail:String(item.detail||''),
-          deposit:Number(item.deposit)||0
+          deposit:Number(item.deposit)||0,
+          draftReferences:refs,
+          filesReceived:false
         });
         localStorage.setItem(key,JSON.stringify(cart));
         updateStatus();
