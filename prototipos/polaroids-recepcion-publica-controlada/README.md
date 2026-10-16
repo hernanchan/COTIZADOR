@@ -61,6 +61,14 @@ Las operaciones `uploadPublicPhoto` y `finishPublicOrder` admiten reintentos tra
 - **SUPERADO:** prueba real con seis fotos, Turnstile, transmisión desde Cloudflare al servidor Google y PDF recibido en Drive privado.
 - **PENDIENTE:** comprobación real de 17 fotos/última hoja incompleta, integración de carrito y panel privado, retiro/retención de fotos, publicación de la nueva protección de bloqueo del proxy en Pages y eventual puesta en producción.
 
+## Carrito y WhatsApp de la rama de pruebas (16/10/2026)
+
+El cotizador enlaza el evento `SABER_POLAROID_RECEIVED` con la referencia de 24 caracteres, la cantidad verdadera de fotos y el número de hojas. `cotizar.html` evita incorporar dos veces la misma referencia y comprueba `precio = hojas × 3000` en trabajos exclusivamente Polaroids. El carrito agrupa productos de librería y trabajos de gráfica, calcula la seña del 50 % **solo de producción** y muestra la referencia privada sin enlaces al PDF.
+
+El checkout del entorno de pruebas ya **abre WhatsApp con un mensaje redactado**, pero exige un clic humano para enviarlo e identifica reiteradamente `PRUEBA - NO PRODUCIR`. Se rechaza el cierre de pedidos con fotografías provisionales/no recibidas. Incluye alias para seña, pero advierte que no se transfiera dinero durante pruebas. El panel de recepción privada y la confirmación manual de seña aún requieren validar acceso desde la cuenta propietaria antes de cualquier venta comercial. **No se publicó producción.**
+
+Prueba lógica del checkout: un producto de ARS 2.500 más 17 Polaroids / 3 hojas = ARS 11.500 total, ARS 4.500 de seña, referencia real conservada y fotografía provisional bloqueada.
+
 ## Precios y pagos
 
 Precio regular: **ARS 3.000 por hoja**, sin promociones. El carrito admite artículos de librería y trabajos de gráfica. El pedido de WhatsApp puede iniciarse antes de pagar; se imprime solamente tras confirmación de **seña del 50 %**. La versión de pruebas sigue sin enviar WhatsApp real.
