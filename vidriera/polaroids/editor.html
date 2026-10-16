@@ -410,7 +410,7 @@ async function publicPing(){
  const relay=await fetch('/api/polaroids-receiver',{cache:'no-store',credentials:'omit'});
  if(!relay.ok)throw new Error('El intermediario de fotos todavía no está publicado.');
  const info=await relay.json();
- if(info.ok!==true||info.route!=='polaroids-receiver'||info.testOnly!==true)
+ if(info.ok!==true||info.route!=='polaroids-receiver'||info.testOnly!==false)
   throw new Error('El intermediario de fotos no está listo.');
  return data;
 }
