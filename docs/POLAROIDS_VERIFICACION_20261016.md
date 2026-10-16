@@ -52,3 +52,18 @@ El navegador local no estaba instalado y su descarga falló. La prueba visual no
 - Definir conservación de fotos/PDF. `pruneOrderStates_` del piloto solo elimina estados técnicos mayores a 14 días: NO borra fotografías ni carpetas de Drive. No prometer borrado automático.
 - Aprobación explícita para fusionar; aprobación de activación por separado. Luego prueba real controlada antes de mostrar accesos comerciales.
 - Al recibir pedidos, verificar referencia y PDF en el panel privado. El carrito es local y no reemplaza esa comprobación de recepción.
+
+## Continuación: revisión visual en navegador remoto
+
+Se verificó la vista previa de la rama en `https://polaroids-preparacion-produc.libreriasaber.pages.dev/polaroids/editor` (URL final sin extensión).
+
+- Carga de seis fotos de prueba y segunda hoja con doce fotos: correcto; total $6.000.
+- Modal de encuadre visible sin superposiciones en la ventana de escritorio revisada.
+- Zoom al 350% actualiza la advertencia a calidad baja, 116 ppp, y permite aplicar el encuadre.
+- Vista general de ambas hojas y hoja ampliada correctas; envío permanece deshabilitado.
+- En tienda, categoría Impresión y gráfica sin acceso visible a Polaroids; en cotizador, acceso también oculto.
+- No se probaron en esta revisión tamaños móviles ni transmisión real de fotografías.
+- El navegador bloqueó la navegación al endpoint de diagnóstico: no se obtuvo evidencia de ejecución remota de la Function. No se intentó eludir ese bloqueo.
+- Cloudflare Dashboard requiere inicio de sesión en este navegador; revisión de la configuración de cuenta pendiente de acceso.
+
+Esta revisión resuelve la inspección visual de escritorio que antes estaba pendiente por falta de Chromium local; no sustituye la comprobación de configuración ni una prueba real autorizada.
