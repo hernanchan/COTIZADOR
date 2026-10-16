@@ -294,8 +294,8 @@ async function acceptFiles(files,specific=-1){
  renderAll();
  const excess=valid.length-selected.length,invalid=files.length-valid.length;
  if(excess||invalid||errors.length)
-  status('Se cargaron '+loaded+' fotos.'+(excess?' '+excess+' exceden el límite de 60.':'')+(invalid?' '+invalid+' rechazadas por formato/tamaño.':'')+(errors.length?' '+errors.join(' '):''),'bad');
- else if(loaded)status('Se cargaron '+loaded+' fotos. Total: '+photoCount()+'. Revisá los encuadres.','ok');
+  status('Se cargaron '+loaded+' foto'+(loaded===1?'':'s')+'.'+(excess?' '+excess+' foto'+(excess===1?'':'s')+' exceden el límite de 60.':'')+(invalid?' '+invalid+' rechazadas por formato/tamaño.':'')+(errors.length?' '+errors.join(' '):''),'bad');
+ else if(loaded)status('Se cargaron '+loaded+' foto'+(loaded===1?'':'s')+'. Total: '+photoCount()+'. Revisá los encuadres.','ok');
 }
 $('inputPhotos').addEventListener('change',e=>{acceptFiles([...e.target.files]);e.target.value='' });$('inputReplace').addEventListener('change',e=>{acceptFiles([...e.target.files],replaceIndex);e.target.value='';replaceIndex=-1});
 const drop=$('drop');for(const eName of ['dragover','dragenter'])drop.addEventListener(eName,e=>{e.preventDefault();drop.classList.add('drag')});for(const eName of ['dragleave','drop'])drop.addEventListener(eName,e=>{e.preventDefault();drop.classList.remove('drag')});drop.addEventListener('drop',e=>acceptFiles([...e.dataTransfer.files]));
