@@ -395,47 +395,39 @@ function secureOrderReference(){
  const bytes=new Uint8Array(12);crypto.getRandomValues(bytes);
  return 'POL-'+Array.from(bytes,n=>n.toString(16).padStart(2,'0')).join('').toUpperCase();
 }
-function publicApi(api,reference='',uploadKey=''){
- return new Promise((resolve,reject)=>{
-  if(!receiverApiUrl){reject(new Error('No hay receptor configurado.'));return;}
-  const name='saberStatus_'+secureNonce(),sc=document.createElement('script');
-  let finished=false;
-  const finish=(error,value)=>{
-   if(finished)return;
-   finished=true;clearTimeout(timer);sc.remove();delete window[name];
-   if(error)reject(error);else resolve(value);
-  };
-  const timer=setTimeout(()=>finish(new Error('Google no respondió la comprobación de recepción.')),16000);
-  window[name]=value=>finish(null,value);
-  const url=new URL(receiverApiUrl);
-  url.searchParams.set('api',api);
-  url.searchParams.set('callback',name);
-  url.searchParams.set('reference',reference);
-  url.searchParams.set('uploadKey',uploadKey);
-  url.searchParams.set('noCache',secureNonce());
-  sc.src=url.href;sc.async=true;sc.referrerPolicy='no-referrer';
-  sc.onerror=()=>finish(new Error('No se pudo consultar el estado del pedido en Google.'));
-  document.head.append(sc);
- });
-}
+// Same-origin: Chrome ya no ejecuta ni carga contenido de Google directamente.
 async function publicPing(){
- const data=await publicApi('ping');
- if(!data||data.ok!==true||data.apiVersion!=='v2-noframe')
-  throw new Error('Google todavía no tiene la versión de recepción sin iframe.');
+ const result=await fetch('/api/polaroids-ping',{cache:'no-store',credentials:'omit'});
+ if(!result.ok)throw new Error('Cloudflare no pudo conectarse con Google.');
+ const data=await result.json();
+ if(data.ok!==true||data.connection!=='cloudflare-to-google'||data.apiVersion!=='v2-noframe')
+  throw new Error('La versión del receptor no coincide con la esperada.');
  return data;
 }
-function publicStatus(reference,uploadKey){
- return publicApi('status',reference,uploadKey);
+async function publicStatus(reference,uploadKey){
+ if(!receiverApiUrl)throw new Error('No hay receptor configurado.');
+ const result=await fetch(receiverApiUrl+'?op=status',{
+  method:'POST',mode:'same-origin',credentials:'omit',cache:'no-store',
+  headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({reference,uploadKey})
+ });
+ const data=await result.json();
+ if(!result.ok||data.ok!==true)
+  throw new Error(data.error||'Google no respondió a la consulta.');
+ return data;
 }
 async function publicPost(op,payload){
- if(!receiverApiUrl)throw new Error('No está configurada la dirección de recepción.');
- // text/plain evita preflight CORS y la respuesta opaca nunca se interpreta como éxito.
- await fetch(receiverApiUrl,{
-  method:'POST',mode:'no-cors',credentials:'omit',redirect:'follow',
-  cache:'no-store',referrerPolicy:'no-referrer',
-  headers:{'Content-Type':'text/plain;charset=UTF-8'},
+ if(!receiverApiUrl)throw new Error('No está configurada la recepción.');
+ const result=await fetch(receiverApiUrl+'?op='+encodeURIComponent(op),{
+  method:'POST',mode:'same-origin',credentials:'omit',cache:'no-store',
+  headers:{'Content-Type':'application/json'},
   body:JSON.stringify({op,payload})
  });
+ const data=await result.json();
+ if(!result.ok||data.ok!==true)
+  throw new Error(data.error||'Cloudflare no pudo transmitir la solicitud.');
+ // dispatched no significa recibido: consultamos estado de Google después.
+ return data;
 }
 async function confirmServer(reference,uploadKey,valid,timeoutMs=90000){
  const end=Date.now()+timeoutMs;let error=null;
@@ -598,8 +590,8 @@ async function setupSecureReception(){
   if(url.protocol!=='https:'||url.hostname!=='script.google.com'||
      !/^\/macros\/s\/[A-Za-z0-9_-]{20,}\/exec\/?$/.test(url.pathname))
    throw new Error('La dirección del receptor es inválida.');
-  receiverApiUrl=url.href;
-  await publicPing(); // Evita solicitar fotos cuando Google todavía usa el script anterior.
+  await publicPing(); // Verifica por servidor; sin iframes ni JSONP en navegador.
+  receiverApiUrl=location.origin+'/api/polaroids-receiver';
   $('secureReceptionNotice').hidden=false;
   $('inputPhotos').accept='image/jpeg,image/png';
   $('inputReplace').accept='image/jpeg,image/png';
