@@ -148,8 +148,8 @@ const MAX_SHEETS=10;
 const sheets=[Array(6).fill(null)];
 let activeSheet=0;
 let photos=sheets[0];
-const configuredPrice=Number(new URLSearchParams(location.search).get('unitPrice'));
-const unitPrice=Number.isFinite(configuredPrice)&&configuredPrice>0?configuredPrice:3000;
+// Mismo importe mostrado y agregado al carrito; no aceptar precios por URL.
+const unitPrice=3000;
 const formattedPrice=n=>'$'+n.toLocaleString('es-AR');
 const sheetComplete=arr=>arr.every(Boolean);
 const photoCount=()=>sheets.reduce((n,a)=>n+a.filter(Boolean).length,0);
@@ -174,16 +174,18 @@ function showPartialNotice(){
  if(!agreed)$('acceptPartial').onclick=()=>{partialConfirmed=n;renderAll();status('Confirmaste '+n+' fotos en '+sheets.length+' hojas. Ya podés continuar.','ok');};
 }
 function updateSheetNav(){
- const n=photoCount();
+ const n=photoCount(),locked=editingLocked();
+ for(const id of ['inputPhotos','inputReplace','btnDemo','btnClear','addSheet','deleteSheet'])$(id).disabled=locked;
+ document.querySelectorAll('.slots button').forEach(button=>button.disabled=locked);
  $('sheetPosition').textContent='Hoja '+(activeSheet+1)+' de '+sheets.length;
  $('previewSheetLabel').textContent='Hoja '+(activeSheet+1)+' · A4 vertical';
  $('sheetPrice').textContent='Total: '+formattedPrice(sheets.length*unitPrice);
  $('sheetProgress').textContent=n+' foto'+(n===1?'':'s')+' · '+sheets.length+' hoja'+(sheets.length===1?'':'s')+' A4 · '+formattedPrice(unitPrice)+' por hoja';
  $('prevSheet').disabled=activeSheet===0;
  $('nextSheet').disabled=activeSheet===sheets.length-1;
- $('addSheet').disabled=sheets.length>=MAX_SHEETS||activeSheet!==sheets.length-1||!sheetComplete(photos);
- $('deleteSheet').disabled=sheets.length===1;
- $('btnPdf').disabled=!orderComplete()||busy||!!receivedReference||!receiverConfig?.enabled||!receiverApiUrl;
+ $('addSheet').disabled=locked||sheets.length>=MAX_SHEETS||activeSheet!==sheets.length-1||!sheetComplete(photos);
+ $('deleteSheet').disabled=locked||sheets.length===1;
+ $('btnPdf').disabled=loadingPhotos||!orderComplete()||busy||!!receivedReference||!receiverConfig?.enabled||!receiverApiUrl;
  $('afterReceipt').hidden=!receivedReference||window.parent!==window;
  $('btnPdf').textContent=receivedReference?'Fotos recibidas · '+receivedReference:
   receiverConfig&&receiverConfig.enabled?'Enviar '+n+' fotos y agregar al carrito':
@@ -191,6 +193,7 @@ function updateSheetNav(){
  showPartialNotice();
 }
 function packPhotos(){
+ if(editingLocked())return;
  const all=sheets.flat().filter(Boolean),result=[];
  for(let i=0;i<all.length;i+=6){const a=all.slice(i,i+6);result.push([...a,...Array(6-a.length).fill(null)]);}
  if(!result.length)result.push(Array(6).fill(null));
@@ -200,11 +203,13 @@ function packPhotos(){
 }
 function showSheet(n){if(n<0||n>=sheets.length||editorIndex>=0)return;activeSheet=n;photos=sheets[n];renderAll()}
 function addNewSheet(){
+ if(editingLocked())return;
  if(activeSheet!==sheets.length-1||!sheetComplete(photos)){status('Completá la última hoja antes de agregar otra.','bad');return}
  if(sheets.length>=MAX_SHEETS){status('Máximo '+MAX_SHEETS+' hojas por pedido de prueba.','bad');return}
  sheets.push(Array(6).fill(null));partialConfirmed=-1;showSheet(sheets.length-1);
 }
 function deleteCurrentSheet(){
+ if(editingLocked())return;
  if(sheets.length<=1)return;
  if(photos.some(Boolean)&&!confirm('¿Eliminar la hoja '+(activeSheet+1)+' y sus fotos?'))return;
  for(const p of photos)if(p&&p.url)URL.revokeObjectURL(p.url);
@@ -215,6 +220,8 @@ let editorIndex=-1;
 let beforeEdit=null;
 let replaceIndex=-1;
 let busy=false;
+let loadingPhotos=false;
+const editingLocked=()=>busy||loadingPhotos||!!receivingSession||!!receivedReference;
 let provisionalReference='';
 let receiverConfig=null;
 let receiverBridge=null;
@@ -227,6 +234,7 @@ let receiverRequestCount=0;
 const receiverPending=new Map();
 let receivingSession=null;
 let receivedReference='';
+let receivedOrder=null;
 let receiverInitError='';
 let receiverApiUrl='';
 function nuevaReferenciaProvisional(){
@@ -316,10 +324,10 @@ function renderSlots(){const target=$('slots');target.replaceChildren();let tota
  const actions=document.createElement('div');actions.className='actions';if(p){const edit=document.createElement('button');edit.textContent='Ajustar';edit.title='Corregir el encuadre';edit.onclick=()=>openEditor(i);actions.append(edit);const change=document.createElement('button');change.textContent='Cambiar';change.onclick=()=>{replaceIndex=i;$('inputReplace').click()};actions.append(change);const del=document.createElement('button');del.className='del';del.textContent='✕';del.title='Quitar foto';del.onclick=()=>{dropPhoto(i);packPhotos();renderAll()};actions.append(del)}else{const add=document.createElement('button');add.textContent='+ Agregar';add.onclick=()=>{replaceIndex=i;$('inputReplace').click()};actions.append(add)}inf.append(actions);el.append(inf);target.append(el)
  }$('count').textContent=total+' de 6';updateSheetNav();if(total===6)status('Hoja '+(activeSheet+1)+' completa. Podés agregar otra o continuar con el pedido.','ok');else status('Hoja '+(activeSheet+1)+': faltan '+(6-total)+' fotografía'+(6-total===1?'':'s')+'.');}
 function renderAll(){renderSlots();renderPreview();renderOverview()}
-function dropPhoto(i){if(photos[i]&&photos[i].url)URL.revokeObjectURL(photos[i].url);photos[i]=null}
+function dropPhoto(i){if(editingLocked())return;if(photos[i]&&photos[i].url)URL.revokeObjectURL(photos[i].url);photos[i]=null}
 function loadImage(file){return new Promise((resolve,reject)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>resolve({name:file.name,img:im,url:u,file,zoom:1,cx:.5,cy:.5});im.onerror=()=>{URL.revokeObjectURL(u);reject(new Error('No se pudo abrir '+file.name+'. Usá JPG, PNG o WebP.'))};im.src=u})}
 async function acceptFiles(files,specific=-1){
- if(!files.length)return;
+ if(editingLocked()||!files.length)return;
  const valid=files.filter(f=>receiverConfig&&receiverConfig.enabled
   ?['image/jpeg','image/png'].includes(f.type)&&f.size>0&&f.size<=5*1024*1024
   :f.type.startsWith('image/')||/\.(jpe?g|png|webp|heic|heif)$/i.test(f.name));
@@ -327,6 +335,7 @@ async function acceptFiles(files,specific=-1){
  const free=specific>=0?1:MAX_SHEETS*6-photoCount();
  if(free<=0){status('Máximo 60 fotos. Quitá alguna antes de añadir más.','bad');return;}
  const selected=valid.slice(0,free),errors=[];let loaded=0,last=activeSheet;
+ loadingPhotos=true;updateSheetNav();
  for(const file of selected){
   let page=activeSheet,pos=specific;
   if(specific<0){
@@ -336,10 +345,11 @@ async function acceptFiles(files,specific=-1){
   }
   try{
    const data=await loadImage(file);
-   if(specific>=0)dropPhoto(pos);
+   if(specific>=0&&sheets[page][pos]?.url)URL.revokeObjectURL(sheets[page][pos].url);
    sheets[page][pos]=data;loaded++;last=page;
   }catch(e){errors.push(e.message);}
  }
+ loadingPhotos=false;
  if(loaded){activeSheet=loaded>6?0:last;photos=sheets[activeSheet];partialConfirmed=-1;}
  renderAll();
  const excess=valid.length-selected.length,invalid=files.length-valid.length;
@@ -349,9 +359,9 @@ async function acceptFiles(files,specific=-1){
 }
 $('inputPhotos').addEventListener('change',e=>{acceptFiles([...e.target.files]);e.target.value='' });$('inputReplace').addEventListener('change',e=>{acceptFiles([...e.target.files],replaceIndex);e.target.value='';replaceIndex=-1});
 const drop=$('drop');for(const eName of ['dragover','dragenter'])drop.addEventListener(eName,e=>{e.preventDefault();drop.classList.add('drag')});for(const eName of ['dragleave','drop'])drop.addEventListener(eName,e=>{e.preventDefault();drop.classList.remove('drag')});drop.addEventListener('drop',e=>acceptFiles([...e.dataTransfer.files]));
-$('btnClear').onclick=()=>{for(let i=0;i<6;i++)dropPhoto(i);packPhotos();renderAll()};
+$('btnClear').onclick=()=>{if(editingLocked())return;for(let i=0;i<6;i++)dropPhoto(i);packPhotos();renderAll()};
 preview.addEventListener('click',e=>{const box=preview.getBoundingClientRect(),x=(e.clientX-box.left)/box.width*PAGE.w,y=(e.clientY-box.top)/box.height*PAGE.h;const {a,frames}=layout();const i=frames.findIndex(f=>x>=f.x&&x<=f.x+a.w&&y>=f.y&&y<=f.y+a.h);if(i>=0&&photos[i])openEditor(i)});
-function openEditor(i){const p=photos[i];if(!p)return;editorIndex=i;beforeEdit={zoom:p.zoom,cx:p.cx,cy:p.cy};$('editorTitle').textContent='Encuadre de la foto '+(i+1);$('modal').classList.add('show');$('zoom').value=p.zoom;drawEditor()}
+function openEditor(i){if(editingLocked())return;const p=photos[i];if(!p)return;editorIndex=i;beforeEdit={zoom:p.zoom,cx:p.cx,cy:p.cy};$('editorTitle').textContent='Encuadre de la foto '+(i+1);$('modal').classList.add('show');$('zoom').value=p.zoom;drawEditor()}
 function closeEditor(save){if(editorIndex<0)return;if(!save&&beforeEdit){const p=photos[editorIndex];Object.assign(p,beforeEdit)}editorIndex=-1;$('modal').classList.remove('show');renderAll()}
 $('closeEditor').onclick=()=>closeEditor(false);$('saveCrop').onclick=()=>closeEditor(true);$('modal').addEventListener('click',e=>{if(e.target===$('modal'))closeEditor(false)});
 function drawEditor(){
@@ -410,7 +420,7 @@ async function publicPing(){
  const relay=await fetch('/api/polaroids-receiver',{cache:'no-store',credentials:'omit'});
  if(!relay.ok)throw new Error('El intermediario de fotos todavía no está publicado.');
  const info=await relay.json();
- if(info.ok!==true||info.route!=='polaroids-receiver'||info.testOnly!==false)
+ if(info.ok!==true||info.route!=='polaroids-receiver'||info.testOnly!==false||info.receptionEnabled!==true)
   throw new Error('El intermediario de fotos no está listo.');
  return data;
 }
@@ -498,7 +508,7 @@ function resetChallenge(){
   turnstile.reset(turnstileWidget);
 }
 async function sendSecurePhotos(){
- if(receivedReference||!receiverConfig||!receiverConfig.enabled||!orderComplete())return;
+ if(busy||loadingPhotos||editorIndex>=0||receivedReference||!receiverConfig||!receiverConfig.enabled||!orderComplete())return;
  if(sheets.length<1||sheets.length>10)
   throw new Error('Podés preparar entre una y diez hojas A4.');
  if(!receiverApiUrl)throw new Error('La recepción segura todavía no está configurada.');
@@ -554,6 +564,7 @@ async function sendSecurePhotos(){
   const reference=receivingSession.reference;
   const cartPayload={sheets:sheets.length,photos:allPhotos.length,format:'85x90',
    uploadsReceived:true,reference,referenceStatus:'received'};
+  receivedOrder=Object.freeze({reference,sheets:sheets.length,photos:allPhotos.length,price:sheets.length*unitPrice});
   receivedReference=reference;receivingSession=null;
   status('¡Recibimos '+result.received+' fotografías! Referencia '+reference+'.','ok');
   updateSheetNav();
@@ -631,13 +642,14 @@ $('btnPdf').onclick=()=>{
 };
 $('goToCartAfterReceipt').onclick=()=>{
  if(window.parent!==window||!receivedReference||!/^POL-[A-F0-9]{24}$/.test(receivedReference))return;
- const n=photoCount(),count=sheets.length;
+ if(!receivedOrder||receivedOrder.reference!==receivedReference)return;
+ const n=receivedOrder.photos,count=receivedOrder.sheets;
  if(n<1||n>60||count!==Math.ceil(n/6)||count>10)return;
- const price=count*3000,key='saberCartV1';
+ const price=receivedOrder.price,key='saberCartV1';
  let items=[];
  try{items=JSON.parse(localStorage.getItem(key)||'[]')}catch(_){items=[]}
  if(!Array.isArray(items))items=[];
- if(!items.some(item=>Array.isArray(item.receivedReferences)&&
+ if(!items.some(item=>item&&Array.isArray(item.receivedReferences)&&
    item.receivedReferences.includes(receivedReference))){
   items.push({
    id:'PRINT-'+receivedReference,type:'print',photoOrder:true,name:'Polaroids 85 × 90 mm',
@@ -650,7 +662,7 @@ $('goToCartAfterReceipt').onclick=()=>{
  }
  window.location.assign('../index.html?carrito=1');
 };
-$('btnDemo').onclick=async()=>{let fs=[];for(let i=0;i<6;i++){const c=document.createElement('canvas');c.width=i%2?1250:1700;c.height=i%2?1700:1200;let ctx=c.getContext('2d'),g=ctx.createLinearGradient(0,0,c.width,c.height);const pair=[['#355f78','#e2a775'],['#6c8188','#c4d4bd'],['#98786b','#e6c3aa'],['#526e94','#cbbddd'],['#5f8d85','#e9c393'],['#8680a8','#d1b7a2']][i];g.addColorStop(0,pair[0]);g.addColorStop(1,pair[1]);ctx.fillStyle=g;ctx.fillRect(0,0,c.width,c.height);ctx.fillStyle='#ffffff44';ctx.beginPath();ctx.arc(c.width*(.25+.09*i),c.height*.4,c.height*.22,0,2*Math.PI);ctx.fill();ctx.strokeStyle='#ffffff77';ctx.lineWidth=18;ctx.beginPath();ctx.moveTo(-60,c.height*.9);ctx.lineTo(c.width*.75,c.height*.26);ctx.lineTo(c.width+30,c.height*.75);ctx.stroke();ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold '+Math.round(c.width*.075)+'px Segoe UI, Arial';ctx.fillText('FOTO DE PRUEBA',c.width/2,c.height*.70);ctx.font=Math.round(c.width*.05)+'px Segoe UI, Arial';ctx.fillText(String(i+1),c.width/2,c.height*.79);const b=await new Promise(r=>c.toBlob(r,'image/jpeg',.92));fs.push(new File([b],`Prueba_${i+1}.jpg`,{type:'image/jpeg'}))}for(let i=0;i<6;i++)dropPhoto(i);await acceptFiles(fs);status('Fotos de prueba cargadas. Podés practicar el encuadre y revisar el PDF antes de usar fotos reales.','ok')};
+$('btnDemo').onclick=async()=>{if(editingLocked())return;let fs=[];for(let i=0;i<6;i++){const c=document.createElement('canvas');c.width=i%2?1250:1700;c.height=i%2?1700:1200;let ctx=c.getContext('2d'),g=ctx.createLinearGradient(0,0,c.width,c.height);const pair=[['#355f78','#e2a775'],['#6c8188','#c4d4bd'],['#98786b','#e6c3aa'],['#526e94','#cbbddd'],['#5f8d85','#e9c393'],['#8680a8','#d1b7a2']][i];g.addColorStop(0,pair[0]);g.addColorStop(1,pair[1]);ctx.fillStyle=g;ctx.fillRect(0,0,c.width,c.height);ctx.fillStyle='#ffffff44';ctx.beginPath();ctx.arc(c.width*(.25+.09*i),c.height*.4,c.height*.22,0,2*Math.PI);ctx.fill();ctx.strokeStyle='#ffffff77';ctx.lineWidth=18;ctx.beginPath();ctx.moveTo(-60,c.height*.9);ctx.lineTo(c.width*.75,c.height*.26);ctx.lineTo(c.width+30,c.height*.75);ctx.stroke();ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold '+Math.round(c.width*.075)+'px Segoe UI, Arial';ctx.fillText('FOTO DE PRUEBA',c.width/2,c.height*.70);ctx.font=Math.round(c.width*.05)+'px Segoe UI, Arial';ctx.fillText(String(i+1),c.width/2,c.height*.79);const b=await new Promise(r=>c.toBlob(r,'image/jpeg',.92));fs.push(new File([b],`Prueba_${i+1}.jpg`,{type:'image/jpeg'}))}if(editingLocked())return;for(let i=0;i<6;i++)dropPhoto(i);await acceptFiles(fs);status('Fotos de prueba cargadas. Podés practicar el encuadre y revisar la vista previa antes de usar fotos reales.','ok')};
 renderAll();
 </script>
 </body>

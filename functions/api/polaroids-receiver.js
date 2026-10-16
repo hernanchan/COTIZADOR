@@ -81,7 +81,7 @@ async function testReceptionEnabled(request,env){
 export async function onRequestPost({request,env}){
  if(!permittedPost(request))return json({ok:false,error:'Origen no autorizado.'},403);
  if(!await testReceptionEnabled(request,env))
-  return json({ok:false,error:'Recepción de pruebas pausada.'},503);
+  return json({ok:false,error:'Recepción pausada.'},503);
  const type=request.headers.get('Content-Type')||'';
  if(!/^application\/json(?:;|$)/i.test(type))
   return json({ok:false,error:'Formato de solicitud no admitido.'},415);
@@ -94,11 +94,20 @@ export async function onRequestPost({request,env}){
  if(op==='status'){
   let input;
   try{
-   const raw=await request.text();
-   if(raw.length>2000)throw Error('Solicitud demasiado larga.');
+   const reader=request.body.getReader();
+   const chunks=[];let size=0;
+   while(true){
+    const {done,value}=await reader.read();if(done)break;
+    size+=value.byteLength;
+    if(size>2000){await reader.cancel();throw Error('Solicitud demasiado larga.');}
+    chunks.push(value);
+   }
+   const bytes=new Uint8Array(size);let offset=0;
+   for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength;}
+   const raw=new TextDecoder().decode(bytes);
    input=JSON.parse(raw);
   }catch(_){return json({ok:false,error:'Solicitud de consulta inválida.'},400)}
-  if(!REFERENCE.test(input.reference)||!UPLOAD_KEY.test(input.uploadKey))
+  if(!input||typeof input!=='object'||Array.isArray(input)||!REFERENCE.test(input.reference)||!UPLOAD_KEY.test(input.uploadKey))
    return json({ok:false,error:'Datos de pedido inválidos.'},400);
   try{
    const data=await upstreamStatus(input.reference,input.uploadKey);
@@ -141,3 +150,4 @@ export async function onRequestPost({request,env}){
    error:'No se pudo confirmar el envío a Google. Consultá el estado del pedido.'},502);
  }
 }
+
