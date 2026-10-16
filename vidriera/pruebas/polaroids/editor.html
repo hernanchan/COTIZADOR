@@ -54,6 +54,14 @@ html.embedded .demo-cart{display:none}
 #turnstileBox{min-height:18px;margin:10px 0 4px}
 .uploading .drop,.uploading .slots,.uploading .sheetnav,.uploading .options,.uploading .partial-notice{pointer-events:none;opacity:.62}
 .partial-notice{border:1px solid #e8ba78;background:#fff8e9;border-radius:10px;padding:12px;margin:11px 0;color:#604411;font-size:13px;line-height:1.4}.partial-notice[hidden]{display:none!important}.partial-notice strong{display:block}.partial-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.partial-actions button{padding:9px 11px;font-size:12px}
+.sheet-overview{align-self:stretch;width:100%;margin-bottom:17px;padding:13px 14px;border:1px solid #d3dfec;border-radius:11px;background:#f6f9fd}
+.sheet-overview[hidden]{display:none!important}.sheet-overview h3{margin:0;font-size:15px;color:#294e74}.sheet-overview p{margin:5px 0 12px;font-size:12px;color:#556b82;line-height:1.4}
+.sheet-overview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;width:100%}
+.sheet-overview-item{display:flex;flex-direction:column;align-items:center;gap:7px;min-width:0;background:#fff;border:2px solid #d2dce8;border-radius:9px;padding:9px;cursor:pointer;color:#31516d;transition:border-color .1s}
+.sheet-overview-item:hover{border-color:#5e9ac9}.sheet-overview-item[aria-pressed="true"]{border-color:#2365b9;box-shadow:0 0 0 2px #2365b91a}
+.sheet-overview-item canvas{display:block;width:min(100%,175px);height:auto;aspect-ratio:210/297;background:#fff;box-shadow:0 1px 5px #0002}
+.sheet-overview-item span{font-size:12px;font-weight:800}.sheet-overview-item small{font-size:11px;color:#687e93}
+@media(max-width:540px){.sheet-overview{padding:10px}.sheet-overview-grid{gap:8px}.sheet-overview-item{padding:7px}}
 </style>
 </head>
 <body>
@@ -83,7 +91,8 @@ html.embedded .demo-cart{display:none}
   <div class="status" id="status" role="status" aria-live="polite">Seleccioná tus fotografías. Podés cargarlas todas de una vez.</div>
 </section>
 <section class="panel right">
-  <div class="sheet-title"><h2>Vista previa de tus Polaroids</h2><small id="previewSheetLabel">Hoja 1 · A4 vertical</small></div>
+  <section id="sheetOverview" class="sheet-overview" hidden aria-label="Vista general de todas las hojas"><h3 id="overviewHeading">Todas tus hojas A4</h3><p>Tocá una hoja para verla más grande y ajustar sus fotografías.</p><div id="sheetOverviewGrid" class="sheet-overview-grid"></div></section>
+  <div class="sheet-title"><h2>Hoja seleccionada · vista ampliada</h2><small id="previewSheetLabel">Hoja 1 · A4 vertical</small></div>
   <div class="paper-holder"><canvas class="paper" id="preview" width="840" height="1188" title="Hacé clic en una foto para corregir su encuadre"></canvas></div>
   <section class="preview-guide" aria-label="Cómo ajustar tus fotografías">
     <h3>Cómo ajustar tus fotos</h3>
@@ -242,20 +251,44 @@ function cutGuides(ctx,x0,y0,a,k){
  }
  ctx.stroke();ctx.restore();
 }
-function renderPreview(){const k=preview.width/PAGE.w;const {a,frames,x0,y0}=layout();pc.fillStyle='#fff';pc.fillRect(0,0,preview.width,preview.height);
- frames.forEach((f,i)=>{const p=photos[i];if(p)drawCrop(pc,p,(f.x+a.left)*k,(f.y+a.top)*k,a.photo*k);else if(partialConfirmed!==photoCount()){pc.fillStyle='#f7f9fb';pc.fillRect((f.x+a.left)*k,(f.y+a.top)*k,a.photo*k,a.photo*k);pc.fillStyle='#b7c2ce';pc.font='14px Segoe UI, Arial';pc.textAlign='center';pc.fillText('FOTO '+(i+1),(f.x+a.left+a.photo/2)*k,(f.y+a.top+a.photo/2)*k)}
+function drawSheetPreview(canvas,sheet){const ctx=canvas.getContext('2d',{alpha:false});const k=canvas.width/PAGE.w;const {a,frames,x0,y0}=layout();ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
+ frames.forEach((f,i)=>{const p=sheet[i];if(p)drawCrop(ctx,p,(f.x+a.left)*k,(f.y+a.top)*k,a.photo*k);else if(partialConfirmed!==photoCount()){ctx.fillStyle='#f7f9fb';ctx.fillRect((f.x+a.left)*k,(f.y+a.top)*k,a.photo*k,a.photo*k);ctx.fillStyle='#b7c2ce';ctx.font='14px Segoe UI, Arial';ctx.textAlign='center';ctx.fillText('FOTO '+(i+1),(f.x+a.left+a.photo/2)*k,(f.y+a.top+a.photo/2)*k)}
  });
  // Las líneas del reticulado son exclusivas de la vista previa.
- pc.save();pc.strokeStyle='#9ca9bb';pc.lineWidth=.15*k;pc.setLineDash([1.35*k,1.2*k]);pc.strokeRect(x0*k,y0*k,2*a.w*k,3*a.h*k);
- for(let c=1;c<2;c++){const x=(x0+c*a.w)*k;pc.beginPath();pc.moveTo(x,y0*k);pc.lineTo(x,(y0+3*a.h)*k);pc.stroke()}
- for(let r=1;r<3;r++){const y=(y0+r*a.h)*k;pc.beginPath();pc.moveTo(x0*k,y);pc.lineTo((x0+2*a.w)*k,y);pc.stroke()}
- pc.restore();cutGuides(pc,x0,y0,a,k);
+ ctx.save();ctx.strokeStyle='#9ca9bb';ctx.lineWidth=.15*k;ctx.setLineDash([1.35*k,1.2*k]);ctx.strokeRect(x0*k,y0*k,2*a.w*k,3*a.h*k);
+ for(let c=1;c<2;c++){const x=(x0+c*a.w)*k;ctx.beginPath();ctx.moveTo(x,y0*k);ctx.lineTo(x,(y0+3*a.h)*k);ctx.stroke()}
+ for(let r=1;r<3;r++){const y=(y0+r*a.h)*k;ctx.beginPath();ctx.moveTo(x0*k,y);ctx.lineTo((x0+2*a.w)*k,y);ctx.stroke()}
+ ctx.restore();cutGuides(ctx,x0,y0,a,k);
  // Marca de agua repetida sobre la vista preliminar, nunca un PDF de impresión.
- pc.save();pc.beginPath();pc.rect(x0*k,y0*k,2*a.w*k,3*a.h*k);pc.clip();
- pc.translate((x0+a.w)*k,(y0+1.5*a.h)*k);pc.rotate(-Math.PI/5);
- pc.fillStyle='rgba(22,52,94,.25)';pc.font=`900 ${18*k/4} px Arial, sans-serif`;pc.textAlign='center';
- for(let row=-4;row<=4;row++) for(let col=-3;col<=3;col++)pc.fillText('LIBRERÍA SABER · VISTA PREVIA',col*185,row*84);
- pc.restore();
+ ctx.save();ctx.beginPath();ctx.rect(x0*k,y0*k,2*a.w*k,3*a.h*k);ctx.clip();
+ ctx.translate((x0+a.w)*k,(y0+1.5*a.h)*k);ctx.rotate(-Math.PI/5);
+ ctx.fillStyle='rgba(22,52,94,.25)';ctx.font=`900 ${18*k/4} px Arial, sans-serif`;ctx.textAlign='center';
+ for(let row=-4;row<=4;row++) for(let col=-3;col<=3;col++)ctx.fillText('LIBRERÍA SABER · VISTA PREVIA',col*185,row*84);
+ ctx.restore();
+}
+function renderPreview(){drawSheetPreview(preview,photos)}
+function renderOverview(){
+ const group=$('sheetOverview'),grid=$('sheetOverviewGrid');
+ group.hidden=sheets.length<2;
+ if(group.hidden){grid.replaceChildren();return;}
+ $('overviewHeading').textContent='Todas tus hojas A4 · '+sheets.length;
+ const frag=document.createDocumentFragment();
+ sheets.forEach((sheet,index)=>{
+  const btn=document.createElement('button');btn.type='button';
+  btn.className='sheet-overview-item';
+  btn.setAttribute('aria-label','Ver hoja '+(index+1)+' de '+sheets.length);
+  btn.setAttribute('aria-pressed',String(index===activeSheet));
+  const label=document.createElement('span');label.textContent='Hoja '+(index+1);
+  const canvas=document.createElement('canvas');
+  canvas.width=336;canvas.height=475;
+  drawSheetPreview(canvas,sheet);
+  const small=document.createElement('small');
+  small.textContent=sheet.filter(Boolean).length+' de 6 fotos';
+  btn.append(label,canvas,small);
+  btn.onclick=()=>showSheet(index);
+  frag.append(btn);
+ });
+ grid.replaceChildren(frag);
 }
 function status(msg,type=''){const x=$('status');x.textContent=msg;x.className='status '+type}
 function dim(p){const a=config();const r=cropBounds(p);return Math.round(r.s/(a.photo/25.4))}
@@ -265,7 +298,7 @@ function renderSlots(){const target=$('slots');target.replaceChildren();let tota
  const name=document.createElement('span');name.className='name';name.title=p?p.name:'';name.textContent=p?p.name:'Sin cargar';inf.append(name);
  const actions=document.createElement('div');actions.className='actions';if(p){const edit=document.createElement('button');edit.textContent='Ajustar';edit.title='Corregir el encuadre';edit.onclick=()=>openEditor(i);actions.append(edit);const change=document.createElement('button');change.textContent='Cambiar';change.onclick=()=>{replaceIndex=i;$('inputReplace').click()};actions.append(change);const del=document.createElement('button');del.className='del';del.textContent='✕';del.title='Quitar foto';del.onclick=()=>{dropPhoto(i);packPhotos();renderAll()};actions.append(del)}else{const add=document.createElement('button');add.textContent='+ Agregar';add.onclick=()=>{replaceIndex=i;$('inputReplace').click()};actions.append(add)}inf.append(actions);el.append(inf);target.append(el)
  }$('count').textContent=total+' de 6';updateSheetNav();if(total===6)status('Hoja '+(activeSheet+1)+' completa. Podés agregar otra o continuar con el pedido.','ok');else status('Hoja '+(activeSheet+1)+': faltan '+(6-total)+' fotografía'+(6-total===1?'':'s')+'.');}
-function renderAll(){renderSlots();renderPreview()}
+function renderAll(){renderSlots();renderPreview();renderOverview()}
 function dropPhoto(i){if(photos[i]&&photos[i].url)URL.revokeObjectURL(photos[i].url);photos[i]=null}
 function loadImage(file){return new Promise((resolve,reject)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>resolve({name:file.name,img:im,url:u,file,zoom:1,cx:.5,cy:.5});im.onerror=()=>{URL.revokeObjectURL(u);reject(new Error('No se pudo abrir '+file.name+'. Usá JPG, PNG o WebP.'))};im.src=u})}
 async function acceptFiles(files,specific=-1){
@@ -290,7 +323,7 @@ async function acceptFiles(files,specific=-1){
    sheets[page][pos]=data;loaded++;last=page;
   }catch(e){errors.push(e.message);}
  }
- if(loaded){activeSheet=last;photos=sheets[last];partialConfirmed=-1;}
+ if(loaded){activeSheet=loaded>6?0:last;photos=sheets[activeSheet];partialConfirmed=-1;}
  renderAll();
  const excess=valid.length-selected.length,invalid=files.length-valid.length;
  if(excess||invalid||errors.length)
