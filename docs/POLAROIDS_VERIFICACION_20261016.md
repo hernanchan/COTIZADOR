@@ -77,3 +77,19 @@ Esta revisión resuelve la inspección visual de escritorio que antes estaba pen
 - El titular confirmó que la propiedad actual `TURNSTILE_HOSTNAME` del receptor es `polaroids-integracion-sin-r2.libreriasaber.pages.dev`. Se conserva para no interrumpir el piloto.
 - Para la transición autorizada al dominio oficial, el receptor deberá aceptar `libreriasaber.com.ar`. Con la validación actual de un único hostname, sustituir la propiedad dejará de aceptar nuevas recepciones del piloto. No modificarla antes de coordinar la activación.
 - Permanecen pendientes ejecución real del relay preparado, comprobación móvil, redirección www, política de conservación y prueba completa sobre el dominio oficial después de autorización. No se fusionó ni se activó ningún acceso.
+
+## Cierre de revisión autónoma: teclado y transición
+
+- Error reproducido en la vista previa: ArrowRight sobre Zoom permanecía en 100 %, porque el manejador global de encuadre cancelaba el comportamiento del control.
+- Corregido en `78567c7bc6b7b2be5ba299e1bdf9ad98ef2838a0`: los controles de formulario conservan sus teclas; Escape sigue cerrando el editor.
+- Verificación del despliegue con `?revision=78567c7`: ArrowRight cambió de 100 % a 101 % y la resolución efectiva de 406 a 402 ppp. Ambas suites existentes de Node volvieron a pasar sobre el editor corregido.
+- La herramienta del navegador remoto no expone cambio de viewport ni emulación de dispositivo. El intento de zoom de navegador no cambió el ancho (1363 px). No declarar inspección visual móvil completada; solo se revisaron reglas CSS y eventos de puntero en el código.
+
+### Secuencia preparada, NO ejecutada
+
+1. Obtener autorización explícita de publicación. Revisar diferencias con main actual y conservar cualquier cambio ajeno al proyecto antes de fusionar el PR con recepción y accesos apagados.
+2. Verificar que el editor servido en el dominio oficial corresponde a la revisión aprobada, incluida adaptación móvil y redirección www. Comprobar que la recepción sigue apagada.
+3. En la ventana de activación aprobada, cambiar TURNSTILE_HOSTNAME a libreriasaber.com.ar (guardar el valor del piloto para reversión), habilitar recepción con showInShop todavía false y realizar un pedido controlado. Confirmar PDF privado, originales/recortes, referencia, precio y seña en carrito y panel. No enviar WhatsApp automáticamente.
+4. Solo después de esa prueba y de la aprobación de los accesos comerciales, activar showInShop. Si falla la prueba, apagar recepción y conservar accesos ocultos; restaurar hostname del piloto si se necesita volver a sus pruebas.
+
+La política de conservación de fotos sigue sin definir: no configurar eliminación automática sin decisión del titular. No se ha cambiado main, el despliegue oficial ni la propiedad de Apps Script.
