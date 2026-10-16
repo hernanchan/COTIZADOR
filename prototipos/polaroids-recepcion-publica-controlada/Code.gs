@@ -118,9 +118,10 @@ function makeRandomHex_(bytes){
 }
 function startPublicOrder(input){
  const c=privateConfig_();
- const sheetCount=Number(input&&input.sheets);
- if(!Number.isInteger(sheetCount)||sheetCount<1||sheetCount>PUBLIC_MAX_SHEETS)
-   throw new Error('Podés encargar entre una y diez hojas de seis Polaroids.');
+ const sheetCount=Number(input&&input.sheets),photoCount=Number(input&&input.photos);
+ if(!Number.isInteger(photoCount)||photoCount<1||photoCount>PUBLIC_MAX_SHEETS*6||
+    !Number.isInteger(sheetCount)||sheetCount!==Math.ceil(photoCount/6))
+   throw new Error('Podés enviar entre 1 y 60 fotos, en hasta diez hojas A4.');
  verifyChallenge_(input.turnstileToken,c.secret,c.hostname);
  const lock=LockService.getScriptLock();lock.waitLock(12000);
  try {
@@ -137,12 +138,12 @@ function startPublicOrder(input){
      throw new Error('El directorio creado no es privado; se rechazó la recepción.');
    }
    const st={created:Date.now(),folderId:folder.getId(),secretHash:secretHash_(key),
-     photos:{},status:'receiving',sheets:sheetCount};
+     photos:{},status:'receiving',sheets:sheetCount,photoCount:photoCount};
    c.p.setProperty('PUBLIC_ORDER_'+ref,JSON.stringify(st));
    day.value.orders++;
    c.p.setProperty(day.key,JSON.stringify(day.value));
    // Clave solo al mismo navegador. No se incorpora a WhatsApp.
-   return {reference:ref,uploadKey:key,maxFiles:sheetCount*6,sheets:sheetCount};
+   return {reference:ref,uploadKey:key,maxFiles:photoCount,sheets:sheetCount,photos:photoCount};
  }finally{lock.releaseLock();}
 }
 function checkedJpeg_(bytes) {
@@ -181,7 +182,7 @@ function uploadPublicPhoto(data){
  try {
    const st=orderState_(c.p,data.reference,data.uploadKey);
    if(st.status!=='receiving')throw new Error('La carga ya fue finalizada.');
-   if(data.index>=st.sheets*6)
+   if(data.index>=st.photoCount)
      throw new Error('Esta fotografía no pertenece al pedido.');
    // Reintento idempotente ante caída de red: no crear duplicados ni cobrar cuota.
    if(Object.prototype.hasOwnProperty.call(st.photos,data.index))
@@ -210,7 +211,7 @@ function finishPublicOrder(reference,uploadKey){
  const lock=LockService.getScriptLock();lock.waitLock(12000);
  try{
    const st=orderState_(c.p,reference,uploadKey);
-   const expected=st.sheets*6;
+   const expected=st.photoCount;
    if(st.status==='received')
      return {reference,received:true,sheets:st.sheets,photos:expected,alreadyReceived:true,
        message:'Las fotografías ya estaban recibidas.'};
@@ -221,12 +222,12 @@ function finishPublicOrder(reference,uploadKey){
    // Se crea un PDF por hoja para no superar la memoria de Apps Script
    // con 60 originales y un PDF grande. Retomar un cierre parcial no duplica PDFs.
    for(let sheet=0;sheet<st.sheets;sheet++){
-     const name=st.sheets===1?'POLAROIDS_A4_6_FOTOS_IMPRIMIR.pdf':
+     const name=st.sheets===1?'POLAROIDS_A4_'+expected+'_FOTOS_IMPRIMIR.pdf':
        'POLAROIDS_A4_HOJA_'+String(sheet+1).padStart(2,'0')+
        '_DE_'+String(st.sheets).padStart(2,'0')+'.pdf';
      const existing=folder.getFilesByName(name);
      if(existing.hasNext())continue;
-     const jpgs=Array.from({length:6},(_,i)=>
+     const jpgs=Array.from({length:Math.min(6,expected-sheet*6)},(_,i)=>
        DriveApp.getFileById(st.photos[sheet*6+i].croppedId).getBlob().getBytes());
      const pdf=crearPdfImprenta_(jpgs);
      pdf.setName(name);
@@ -235,7 +236,7 @@ function finishPublicOrder(reference,uploadKey){
    const metadataName='encuadres.json';
    if(!folder.getFilesByName(metadataName).hasNext()){
      folder.createFile(metadataName,JSON.stringify({
-       reference,format:'85x90_6up_A4_v1.1',sheets:st.sheets,
+       reference,format:'85x90_6up_A4_v1.1',sheets:st.sheets,photosCount:expected,
        photos:Array.from({length:expected},(_,i)=>({
          sheet:Math.floor(i/6)+1,position:i%6+1,crop:st.photos[i].crop
        }))
@@ -280,8 +281,8 @@ function jpegDimensions_(bytes) {
  * SIN biblioteca remota; solo Drive privado y Apps Script.
  */
 function crearPdfImprenta_(jpgs) {
-  if(!Array.isArray(jpgs)||jpgs.length!==6)
-    throw new Error('Se requieren exactamente seis recortes.');
+  if(!Array.isArray(jpgs)||jpgs.length<1||jpgs.length>6)
+    throw new Error('Se requieren entre uno y seis recortes por hoja.');
   for(const bytes of jpgs) {
     const dim=jpegDimensions_(bytes);
     if(dim.width!==886||dim.height!==886)
@@ -300,12 +301,12 @@ function crearPdfImprenta_(jpgs) {
   };
   let content='q\n';
   // En PDF el origen es abajo a la izquierda.
-  for(let i=0;i<6;i++){
+  for(let i=0;i<jpgs.length;i++){
     const x=25+(i%2)*85;
     const y=297-(13.5+Math.floor(i/2)*90+4+75);
     content+=a(75)+' 0 0 '+a(75)+' '+a(x)+' '+a(y)+' cm /I'+(i+1)+' Do\n';
     // Matriz y estado independientes por fotografía.
-    if(i!==5)content+='Q\nq\n';
+    if(i!==jpgs.length-1)content+='Q\nq\n';
   }
   content+='Q\n';
   content+='q\n0 G\n0.20 w\n';
@@ -341,9 +342,9 @@ function crearPdfImprenta_(jpgs) {
     ascii('\nendstream');
   }));
   const offset=bytes.length;
-  ascii('xref\n0 11\n0000000000 65535 f \n');
-  for(let i=1;i<=10;i++)ascii(String(xref[i]).padStart(10,'0')+' 00000 n \n');
-  ascii('trailer\n<< /Size 11 /Root 1 0 R >>\nstartxref\n'+offset+'\n%%EOF\n');
+  ascii('xref\n0 '+(5+jpgs.length)+'\n0000000000 65535 f \n');
+  for(let i=1;i<5+jpgs.length;i++)ascii(String(xref[i]).padStart(10,'0')+' 00000 n \n');
+  ascii('trailer\n<< /Size '+(5+jpgs.length)+' /Root 1 0 R >>\nstartxref\n'+offset+'\n%%EOF\n');
   return Utilities.newBlob(bytes,'application/pdf','POLAROIDS_A4_6_FOTOS_IMPRIMIR.pdf');
 }
 
