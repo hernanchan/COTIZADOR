@@ -138,7 +138,7 @@ function renderPolaroidSandbox(){
      'Referencia provisional '+ref+' · FOTOS NO RECIBIDAS';
    finishItem({
      service:'polaroids',
-     work:received?'Polaroids · Pack de 6':'Polaroids · Pack de 6 (PRUEBA)',
+     work:received?'Polaroids 85 × 90 mm':'Polaroids 85 × 90 mm (SIMULACIÓN)',
      qty:sheetCount+' hoja'+(sheetCount===1?'':'s')+' A4 · '+photoCount+' Polaroids',
      mode:'85 × 90 mm · '+note,binding:false,bindingCharge:0,
      baseTotal:price*sheetCount,
@@ -173,6 +173,9 @@ function finalize(ev){if(!integrated){ev.preventDefault();alert('SIMULACIÓN: no
    id:'PRINT-'+Date.now(),type:'print',name:title,price:t.grand,qty:1,
    detail,deposit:t.deposit,
    draftReferences:draftRefs,receivedReferences:receivedRefs,
+   polaroidsOnly:t.items.length===1&&t.items[0].meta?.polaroidPack===true,
+   photoCount:t.items.length===1&&t.items[0].meta?.polaroidPack?Number(t.items[0].meta.photosCount):undefined,
+   sheetCount:t.items.length===1&&t.items[0].meta?.polaroidPack?Number(t.items[0].meta.q):undefined,
    filesReceived:receivedRefs.length>0&&draftRefs.length===0
  }},window.location.origin);track('agregar_pedido_general',{value:t.grand,currency:'ARS',cantidad_items:t.items.length})}
 (async function(){const token=new URLSearchParams(location.search).get('cupon');if(!token)return;const loaded=await loadPromos();manualCoupon=loaded?findCoupon(token):null})();
