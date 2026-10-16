@@ -28,7 +28,7 @@
       <div class="cart-status" id="cartStatus">Carrito 0</div>
     </div>
   </header>
-  <div style="background:#fff0cd;color:#664b00;text-align:center;padding:12px;font:700 13px Arial">ENTORNO DE PRUEBA · Los archivos NO se envían · No se crean pedidos reales</div><main class="shell">
+  <div style="background:#fff0cd;color:#664b00;text-align:center;padding:12px;font:700 13px Arial">ENTORNO DE PRUEBA · Las fotos se guardan en Drive privado cuando la recepción está habilitada · No es la tienda pública</div><main class="shell">
     <iframe id="cotizadorFrame" src="cotizador-web-v2.html?integrado=1" title="Cotizador de Librería Saber"></iframe>
   </main>
   <script>
@@ -59,6 +59,17 @@
         const receivedRefs=Array.isArray(item.receivedReferences)
           ?item.receivedReferences.map(String).filter(v=>/^POL-[A-F0-9]{24}$/.test(v)).slice(0,10)
           :[];
+        if(item.polaroidsOnly===true){
+          const sheets=Number(item.sheetCount),photos=Number(item.photoCount);
+          if(!Number.isInteger(sheets)||sheets<1||sheets>10||
+             !Number.isInteger(photos)||photos<1||photos>60||
+             Math.ceil(photos/6)!==sheets||Number(item.price)!==sheets*3000||
+             receivedRefs.length>1||refs.length>1)return;
+        }
+        if(receivedRefs.some(ref=>cart.some(existing=>
+             Array.isArray(existing.receivedReferences)&&existing.receivedReferences.includes(ref)))){
+          location.href='index.html?carrito=1';return;
+        }
         cart.push({
           id:String(item.id||('PRINT-'+Date.now())),
           type:'print',
