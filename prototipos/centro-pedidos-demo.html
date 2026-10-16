@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Centro de Pedidos | Librería Saber — DEMO</title>
+<style>
+:root{font-family:system-ui,Arial,sans-serif;color:#17243d;background:#f4f6fa}*{box-sizing:border-box}body{margin:0}header{background:#123d76;color:white;padding:20px 24px}header h1{font-size:23px;margin:0 0 4px}main{max-width:1100px;margin:auto;padding:22px}button,input,select{font:inherit}button{cursor:pointer;background:#134d94;border:0;border-radius:8px;padding:10px 14px;color:white}button.secondary{background:#f1f4f9;color:#18365f;border:1px solid #cad5e5}.banner{background:#fff0d7;border:1px solid #edbd69;color:#704507;border-radius:10px;padding:12px;margin-bottom:17px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.stat,.panel{background:white;border-radius:12px;box-shadow:0 1px 4px #162c5014;padding:18px}.stat strong{display:block;font-size:25px}.stat small{color:#5f6a78}.filters{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}.filters input{flex:1;min-width:170px}.filters input,.filters select{padding:11px;border:1px solid #c7d0df;border-radius:8px;background:white}.orders{display:grid;gap:12px}.order{background:white;border:1px solid #dbe1eb;border-radius:12px;padding:17px}.top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}.pill{padding:5px 9px;border-radius:99px;font-size:12px;font-weight:700;background:#e9edf6}.paid{background:#ddf8e7;color:#146337}.partial{background:#fff0cb;color:#7c5304}.unpaid{background:#ffdde0;color:#a32232}.muted{color:#657084}.order p{margin:8px 0}.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}.actions select{padding:9px;border-radius:8px;border:1px solid #c7d0df}.footer{margin-top:24px;color:#657084;font-size:13px}@media(max-width:650px){.stats{grid-template-columns:1fr}.stat{padding:12px}main{padding:14px}}
+</style></head><body>
+<header><h1>Centro de Pedidos · Librería Saber</h1><div>Prueba privada de interfaz y flujo de trabajo</div></header>
+<main><div class="banner"><strong>DEMOSTRACIÓN SIN CONEXIONES:</strong> todos los clientes, pedidos y pagos son ficticios. No procesa pagos, no recibe archivos ni publica pedidos.</div>
+<div class="stats"><div class="stat"><small>Pedidos abiertos</small><strong id="open">—</strong></div><div class="stat"><small>Nuevos sin atender</small><strong id="new">—</strong></div><div class="stat"><small>Saldo pendiente</small><strong id="pending">—</strong></div></div>
+<div class="filters"><input id="search" placeholder="Buscar por nombre, número o trabajo" aria-label="Buscar pedidos"><select id="filter" aria-label="Filtrar estado"><option value="">Todos los estados</option><option>Nuevo</option><option>En producción</option><option>Listo</option><option>Entregado</option></select><button class="secondary" id="reset">Restaurar datos de prueba</button></div><section class="orders" id="orders" aria-live="polite"></section>
+<p class="footer">Versión demo local. Los cambios se guardan únicamente en este navegador (localStorage). No es un panel seguro ni un sistema operativo de pedidos: falta backend, autenticación y verificación de pagos.</p></main>
+<script>
+"use strict";
+const KEY="saber-centro-pedidos-demo-v1";
+const seed=[
+{id:"S-1004",client:"María González",job:"Polaroids · 12 fotografías",total:6000,paid:3000,confirmed:true,status:"Nuevo",date:"2026-10-16T11:15:00"},
+{id:"S-1003",client:"Carlos Pérez",job:"Impresiones color · 80 hojas",total:16000,paid:16000,confirmed:true,status:"En producción",date:"2026-10-16T10:05:00"},
+{id:"S-1002",client:"Ana Rodríguez",job:"Ploteo A0 · 2 planos",total:12000,paid:12000,confirmed:true,status:"Listo",date:"2026-10-15T16:30:00"},
+{id:"S-1001",client:"Lucía Torres",job:"Anillado · 3 unidades",total:9000,paid:4500,confirmed:true,status:"Entregado",date:"2026-10-14T12:00:00"}
+];
+const states=["Nuevo","En producción","Listo","Entregado"];
+const peso=n=>new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0}).format(n);
+function getOrders(){try{const val=JSON.parse(localStorage.getItem(KEY));return Array.isArray(val)?val:structuredClone(seed)}catch{return structuredClone(seed)}}
+let orders=getOrders();
+function save(){localStorage.setItem(KEY,JSON.stringify(orders))}
+function el(tag,attrs={},txt){const node=document.createElement(tag);for(const [k,v] of Object.entries(attrs))node.setAttribute(k,v);if(txt!==undefined)node.textContent=txt;return node}
+function render(){
+ const confirmed=orders.filter(o=>o.confirmed);
+ const active=confirmed.filter(o=>o.status!=="Entregado");
+ document.getElementById("open").textContent=active.length;
+ document.getElementById("new").textContent=active.filter(o=>o.status==="Nuevo").length;
+ document.getElementById("pending").textContent=peso(active.reduce((s,o)=>s+Math.max(0,o.total-o.paid),0));
+ const q=document.getElementById("search").value.toLocaleLowerCase("es");const f=document.getElementById("filter").value;
+ const target=document.getElementById("orders");target.replaceChildren();
+ const filtered=confirmed.filter(o=>(!f||o.status===f)&&[o.id,o.client,o.job].some(s=>s.toLocaleLowerCase("es").includes(q)));
+ if(!filtered.length){target.append(el("p",{class:"muted"},"No hay pedidos para este filtro."));return}
+ filtered.forEach(o=>{
+ const card=el("article",{class:"order"}),top=el("div",{class:"top"});
+ top.append(el("strong",{},o.id+" · "+o.client));
+ const payment=o.paid>=o.total?"Pagado":o.paid>0?"Con seña":"Sin pagar";
+ top.append(el("span",{class:"pill "+(o.paid>=o.total?"paid":o.paid>0?"partial":"unpaid")},payment));
+ card.append(top,el("p",{},o.job),el("p",{class:"muted"},"Confirmado: "+new Date(o.date).toLocaleString("es-AR")+" · Total: "+peso(o.total)+" · Cobrado: "+peso(o.paid)+" · Saldo: "+peso(Math.max(0,o.total-o.paid))));
+ const actions=el("div",{class:"actions"});
+ actions.append(el("span",{class:"muted"},"Estado del trabajo:"));
+ const select=el("select",{"aria-label":"Estado de "+o.id});
+ states.forEach(s=>{const opt=el("option",{value:s},s);if(o.status===s)opt.selected=true;select.append(opt)});
+ select.addEventListener("change",()=>{o.status=select.value;save();render()});actions.append(select);
+ card.append(actions);target.append(card);
+ });
+}
+document.getElementById("search").addEventListener("input",render);
+document.getElementById("filter").addEventListener("change",render);
+document.getElementById("reset").addEventListener("click",()=>{if(confirm("¿Restaurar los pedidos ficticios de prueba?")){orders=structuredClone(seed);save();render()}});
+render();
+</script></body></html>
