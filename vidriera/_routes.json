@@ -1,7 +1,8 @@
 {
   "version": 1,
   "include": [
-    "/api/polaroids-ping"
+    "/api/polaroids-ping",
+    "/api/polaroids-receiver"
   ],
   "exclude": []
 }
