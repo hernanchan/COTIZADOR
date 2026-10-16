@@ -33,7 +33,7 @@ function ownerContext_(){
 function doGet(){
  try{
   ownerContext_();
-  return HtmlService.createHtmlOutputFromFile('Panel')
+  return HtmlService.createHtmlOutputFromFile('panel')
    .setTitle('Librería Saber · Pedidos Polaroids');
  }catch(_){
   return HtmlService.createHtmlOutput('Acceso privado no disponible. Abrí el panel desde la cuenta autorizada.');
