@@ -36,6 +36,11 @@ function jsonpStatus_(e){
  let result;
  try{
   const c=privateConfig_();
+  if(q.api==='ping'){
+   result={ok:true,apiVersion:'v2-noframe'};
+   return ContentService.createTextOutput(callback+'('+JSON.stringify(result)+');')
+    .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
   reference_(String(q.reference||''));
   const key=String(q.uploadKey||'');
   const raw=c.p.getProperty('PUBLIC_ORDER_'+q.reference);
@@ -71,7 +76,7 @@ function doPost(e){
  return ContentService.createTextOutput(result).setMimeType(ContentService.MimeType.TEXT);
 }
 function doGet(e){
- if(e&&e.parameter&&e.parameter.api==='status')
+ if(e&&e.parameter&&['status','ping'].includes(e.parameter.api))
   return jsonpStatus_(e);
 
  const p=PropertiesService.getScriptProperties();
