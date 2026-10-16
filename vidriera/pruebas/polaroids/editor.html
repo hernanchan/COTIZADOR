@@ -100,6 +100,10 @@ html.embedded .demo-cart{display:none}
   <div id="receiverHolder" hidden></div><div id="receiverHealth" class="receiver-health" hidden role="status" aria-live="polite"><strong>Google todavía no confirmó la conexión.</strong><span id="receiverHealthText"></span> <a id="receiverHealthLink" target="_blank" rel="noopener noreferrer">Comprobar receptor de Google</a></div>
   <div class="buttons"><button class="primary" id="btnPdf" disabled>Agregar al carrito de prueba</button><button class="secondary" id="btnDemo" title="Para probar antes de usar fotos reales">Cargar prueba</button><button class="secondary" id="btnClear">Vaciar</button></div>
   <div class="status" id="status" role="status" aria-live="polite">Seleccioná tus fotografías. Podés cargarlas todas de una vez.</div>
+   <div id="afterReceipt" hidden style="margin-top:12px;padding:14px;background:#eaf8f0;border-radius:12px">
+     <strong style="display:block;color:#155c39;margin-bottom:10px">Fotografías recibidas y PDF listo en Drive privado.</strong>
+     <button type="button" class="primary" id="goToCartAfterReceipt">Continuar al carrito</button>
+   </div>
 </section>
 <section class="panel right">
   <section id="sheetOverview" class="sheet-overview" hidden aria-label="Vista general de todas las hojas"><h3 id="overviewHeading">Todas tus hojas A4</h3><p>Tocá una hoja para verla más grande y ajustar sus fotografías.</p><div id="sheetOverviewGrid" class="sheet-overview-grid"></div></section>
@@ -180,6 +184,7 @@ function updateSheetNav(){
  $('addSheet').disabled=sheets.length>=MAX_SHEETS||activeSheet!==sheets.length-1||!sheetComplete(photos);
  $('deleteSheet').disabled=sheets.length===1;
  $('btnPdf').disabled=!orderComplete()||busy||!!receivedReference||!!(receiverConfig&&receiverConfig.enabled&&!receiverApiUrl);
+ $('afterReceipt').hidden=!receivedReference||window.parent!==window;
  $('btnPdf').textContent=receivedReference?'Fotos recibidas · '+receivedReference:
   receiverConfig&&receiverConfig.enabled?'Enviar '+n+' fotos y agregar al carrito':
   'Agregar '+sheets.length+' hoja'+(sheets.length===1?'':'s')+' al carrito de prueba';
@@ -634,6 +639,27 @@ $('btnPdf').onclick=()=>{
  }
  $('cartItem').textContent='Simulación '+provisionalReference+': '+sheets.length+' hoja(s). Sin archivos enviados.';
  status('Referencia provisional: '+provisionalReference+'. No se envió ningún archivo.','ok');
+};
+$('goToCartAfterReceipt').onclick=()=>{
+ if(window.parent!==window||!receivedReference||!/^POL-[A-F0-9]{24}$/.test(receivedReference))return;
+ const n=photoCount(),count=sheets.length;
+ if(n<1||n>60||count!==Math.ceil(n/6)||count>10)return;
+ const price=count*3000,key='saberPolaroidsSandboxCartV1';
+ let items=[];
+ try{items=JSON.parse(localStorage.getItem(key)||'[]')}catch(_){items=[]}
+ if(!Array.isArray(items))items=[];
+ if(!items.some(item=>Array.isArray(item.receivedReferences)&&
+   item.receivedReferences.includes(receivedReference))){
+  items.push({
+   id:'PRINT-'+receivedReference,type:'print',name:'Polaroids 85 × 90 mm',
+   qty:1,price,deposit:price/2,
+   detail:count+' hoja'+(count===1?'':'s')+' A4 · '+n+' Polaroids · Ref. '+receivedReference,
+   draftReferences:[],receivedReferences:[receivedReference],filesReceived:true
+  });
+  try{localStorage.setItem(key,JSON.stringify(items))}
+  catch(_){status('No se pudo guardar el pedido en este navegador. Revisá el almacenamiento local.','bad');return}
+ }
+ window.location.assign('index.html?carrito=1');
 };
 $('btnDemo').onclick=async()=>{let fs=[];for(let i=0;i<6;i++){const c=document.createElement('canvas');c.width=i%2?1250:1700;c.height=i%2?1700:1200;let ctx=c.getContext('2d'),g=ctx.createLinearGradient(0,0,c.width,c.height);const pair=[['#355f78','#e2a775'],['#6c8188','#c4d4bd'],['#98786b','#e6c3aa'],['#526e94','#cbbddd'],['#5f8d85','#e9c393'],['#8680a8','#d1b7a2']][i];g.addColorStop(0,pair[0]);g.addColorStop(1,pair[1]);ctx.fillStyle=g;ctx.fillRect(0,0,c.width,c.height);ctx.fillStyle='#ffffff44';ctx.beginPath();ctx.arc(c.width*(.25+.09*i),c.height*.4,c.height*.22,0,2*Math.PI);ctx.fill();ctx.strokeStyle='#ffffff77';ctx.lineWidth=18;ctx.beginPath();ctx.moveTo(-60,c.height*.9);ctx.lineTo(c.width*.75,c.height*.26);ctx.lineTo(c.width+30,c.height*.75);ctx.stroke();ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold '+Math.round(c.width*.075)+'px Segoe UI, Arial';ctx.fillText('FOTO DE PRUEBA',c.width/2,c.height*.70);ctx.font=Math.round(c.width*.05)+'px Segoe UI, Arial';ctx.fillText(String(i+1),c.width/2,c.height*.79);const b=await new Promise(r=>c.toBlob(r,'image/jpeg',.92));fs.push(new File([b],`Prueba_${i+1}.jpg`,{type:'image/jpeg'}))}for(let i=0;i<6;i++)dropPhoto(i);await acceptFiles(fs);status('Fotos de prueba cargadas. Podés practicar el encuadre y revisar el PDF antes de usar fotos reales.','ok')};
 renderAll();
