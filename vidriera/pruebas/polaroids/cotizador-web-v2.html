@@ -125,11 +125,11 @@ function renderPolaroidSandbox(){
      if(msg.payload?.uploadsReceived!==true||
         msg.payload?.referenceStatus!=='received'||
         !Number.isInteger(sheetCount)||sheetCount<1||sheetCount>10||
-        photoCount!==sheetCount*6||
+        (photoCount<1||photoCount>sheetCount*6||photoCount<=(sheetCount-1)*6)||
         !/^POL-[A-F0-9]{24}$/.test(ref))return;
    }else{
      if(!Number.isInteger(sheetCount)||sheetCount<1||sheetCount>10||
-        photoCount!==sheetCount*6||msg.payload?.uploadsReceived!==false||
+        (photoCount<1||photoCount>sheetCount*6||photoCount<=(sheetCount-1)*6)||msg.payload?.uploadsReceived!==false||
         msg.payload?.referenceStatus!=='provisional'||
         !/^POL-[A-F0-9-]{12,48}$/.test(ref))return;
    }
