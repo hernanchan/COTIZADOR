@@ -23,7 +23,57 @@ const PUBLIC_TTL_MS=24*60*60*1000;
  * TURNSTILE_HOSTNAME es un hostname exacto bajo nuestro control.
  * El puente nunca devuelve URL de Drive ni expone funciones de administración.
  */
+/**
+ * API sin iframe, para navegadores que bloquean X-Frame-Options de Apps Script.
+ * GET status es estrictamente read-only. Usa JSONP sin datos sensibles.
+ * POST se autentica al iniciar con Turnstile y en cada operación con uploadKey.
+ */
+function jsonpStatus_(e){
+ const q=e&&e.parameter||{};
+ const callback=String(q.callback||'');
+ if(!/^saberStatus_[a-f0-9]{32}$/.test(callback))
+  return ContentService.createTextOutput('Callback inválido.');
+ let result;
+ try{
+  const c=privateConfig_();
+  reference_(String(q.reference||''));
+  const key=String(q.uploadKey||'');
+  const raw=c.p.getProperty('PUBLIC_ORDER_'+q.reference);
+  if(!raw){
+   result={ok:true,found:false};
+  }else{
+   const st=orderState_(c.p,q.reference,key);
+   const total=st.photoCount||st.sheets*6;
+   result={ok:true,found:true,status:st.status,received:Object.keys(st.photos).length,
+     photos:total,sheets:st.sheets};
+  }
+ }catch(ex){
+  result={ok:false,error:'La consulta de recepción no pudo validarse.'};
+ }
+ return ContentService.createTextOutput(callback+'('+JSON.stringify(result)+');')
+  .setMimeType(ContentService.MimeType.JAVASCRIPT);
+}
+function doPost(e){
+ let result='OK';
+ try{
+  if(!e||!e.postData||!e.postData.contents||
+     e.postData.contents.length>18*1024*1024)
+   throw new Error('Solicitud demasiado grande.');
+  const req=JSON.parse(e.postData.contents);
+  if(!req||typeof req!=='object')throw new Error('Solicitud inválida.');
+  const data=req.payload;
+  if(req.op==='start')startPublicOrder(data);
+  else if(req.op==='photo')uploadPublicPhoto(data);
+  else if(req.op==='finish')finishPublicOrder(data.reference,data.uploadKey);
+  else throw new Error('Operación no admitida.');
+ }catch(ex){result='ERROR';}
+ // El navegador no lee esta respuesta cross-origin; confirma con GET status.
+ return ContentService.createTextOutput(result).setMimeType(ContentService.MimeType.TEXT);
+}
 function doGet(e){
+ if(e&&e.parameter&&e.parameter.api==='status')
+  return jsonpStatus_(e);
+
  const p=PropertiesService.getScriptProperties();
  if(p.getProperty('PUBLIC_ENABLED')!=='yes')
    return HtmlService.createHtmlOutput('Recepción de clientes deshabilitada.');
@@ -119,9 +169,20 @@ function makeRandomHex_(bytes){
 function startPublicOrder(input){
  const c=privateConfig_();
  const sheetCount=Number(input&&input.sheets),photoCount=Number(input&&input.photos);
+ const clientRef=String(input&&input.reference||''),clientKey=String(input&&input.uploadKey||'');
+ reference_(clientRef);
+ if(!/^[a-f0-9]{64}$/.test(clientKey))throw new Error('Clave de pedido inválida.');
  if(!Number.isInteger(photoCount)||photoCount<1||photoCount>PUBLIC_MAX_SHEETS*6||
     !Number.isInteger(sheetCount)||sheetCount!==Math.ceil(photoCount/6))
    throw new Error('Podés enviar entre 1 y 60 fotos, en hasta diez hojas A4.');
+ const existing=c.p.getProperty('PUBLIC_ORDER_'+clientRef);
+ if(existing){
+  const st=orderState_(c.p,clientRef,clientKey);
+  if(st.sheets!==sheetCount||st.photoCount!==photoCount)
+   throw new Error('Los datos no coinciden con el pedido existente.');
+  return {reference:clientRef,uploadKey:clientKey,maxFiles:photoCount,
+    sheets:sheetCount,photos:photoCount,alreadyReceived:true};
+ }
  verifyChallenge_(input.turnstileToken,c.secret,c.hostname);
  const lock=LockService.getScriptLock();lock.waitLock(12000);
  try {
@@ -129,8 +190,14 @@ function startPublicOrder(input){
    const day=usageDay_(c.p);
    if(day.value.orders>=PUBLIC_MAX_ORDERS_DAY)
      throw new Error('Cupo diario de recepción completo. Contactanos por WhatsApp.');
-   const ref='POL-'+makeRandomHex_(12).toUpperCase();
-   const key=makeRandomHex_(32);
+   const ref=clientRef,key=clientKey;
+   if(c.p.getProperty('PUBLIC_ORDER_'+ref)){
+    const st=orderState_(c.p,ref,key);
+    if(st.sheets!==sheetCount||st.photoCount!==photoCount)
+     throw new Error('Datos inconsistentes en pedido repetido.');
+    return {reference:ref,uploadKey:key,maxFiles:photoCount,sheets:sheetCount,
+      photos:photoCount,alreadyReceived:true};
+   }
    const folder=c.root.createFolder('PEDIDO_'+ref);
    // Las carpetas hijas de un directorio privado deben continuar restringidas.
    if(folder.getSharingAccess()!==DriveApp.Access.PRIVATE) {
