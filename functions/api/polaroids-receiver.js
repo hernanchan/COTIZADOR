@@ -57,8 +57,27 @@ export async function onRequestGet({request}){
  if(!allowedUrl(request))return json({ok:false,error:'Host no autorizado.'},403);
  return json({ok:true,route:'polaroids-receiver',testOnly:true,photosSent:0});
 }
-export async function onRequestPost({request}){
+async function testReceptionEnabled(request,env){
+ // The client-side configuration is not a security gate by itself.
+ // Enforce the same switch at the Cloudflare relay before contacting Google.
+ // A missing asset binding, invalid JSON or a stale/wrong hostname fails closed.
+ if(!env||!env.ASSETS||typeof env.ASSETS.fetch!=='function')return false;
+ try{
+  const url=new URL('/pruebas/polaroids/recepcion-config.json',request.url);
+  const response=await env.ASSETS.fetch(new Request(url.toString(),{
+   method:'GET',cache:'no-store',headers:{Accept:'application/json'}
+  }));
+  if(!response.ok)return false;
+  const raw=await response.text();
+  if(raw.length>4096)return false;
+  const state=JSON.parse(raw);
+  return state.enabled===true&&state.allowedHost===HOST&&state.bridgeUrl===APPS_SCRIPT;
+ }catch(_){return false}
+}
+export async function onRequestPost({request,env}){
  if(!permittedPost(request))return json({ok:false,error:'Origen no autorizado.'},403);
+ if(!await testReceptionEnabled(request,env))
+  return json({ok:false,error:'Recepción de pruebas pausada.'},503);
  const type=request.headers.get('Content-Type')||'';
  if(!/^application\/json(?:;|$)/i.test(type))
   return json({ok:false,error:'Formato de solicitud no admitido.'},415);
