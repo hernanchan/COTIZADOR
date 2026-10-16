@@ -65,6 +65,12 @@ Las operaciones `uploadPublicPhoto` y `finishPublicOrder` admiten reintentos tra
 
 El panel completo se encuentra en `../polaroids-panel-privado/` con `Code.gs`, `Panel.html` e instrucciones. Debe instalarse como **otro proyecto Apps Script**, con acceso **Solo yo**, propietario autorizado y acceso a la carpeta `RECEIPT_FOLDER_ID`. Nunca agregar funciones del panel al receptor público. Valida integridad de archivos, lista pedidos y libera enlaces privados de PDF cuando se confirma manualmente la seña. El código pasó simulaciones, pero **todavía no está instalado ni verificado en la cuenta del usuario**.
 
+## Continuidad de compra desde el editor directo — 16/10/2026
+
+Se agregó botón **Continuar al carrito** después de una recepción real y confirmada en el editor independiente (no iframe). Inserta un único trabajo por referencia en el mismo carrito de la tienda de pruebas y lo abre automáticamente; no reutiliza ni reenvía fotografías. En editor embebido se conserva el circuito de mensajes `SABER_POLAROID_RECEIVED` hasta cotizador y carrito.
+
+**Pruebas lógicas realizadas:** escenarios de una hoja/seis fotografías y tres hojas/17 fotografías; importes ARS 3.000 y ARS 9.000, señas ARS 1.500 y ARS 4.500; confirmación del carrito con ambas referencias, suma ARS 12.000 y seña ARS 6.000; clic repetido no duplica trabajos. El panel privado del propietario está instalado y mostró el primer pedido pendiente de seña, con PDF oculto. El trabajo comercial sigue en el entorno de prueba; no autoriza publicación en el dominio público.
+
 ## Carrito y WhatsApp de la rama de pruebas (16/10/2026)
 
 El cotizador enlaza el evento `SABER_POLAROID_RECEIVED` con la referencia de 24 caracteres, la cantidad verdadera de fotos y el número de hojas. `cotizar.html` evita incorporar dos veces la misma referencia y comprueba `precio = hojas × 3000` en trabajos exclusivamente Polaroids. El carrito agrupa productos de librería y trabajos de gráfica, calcula la seña del 50 % **solo de producción** y muestra la referencia privada sin enlaces al PDF.
