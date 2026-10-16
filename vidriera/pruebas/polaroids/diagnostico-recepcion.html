@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<title>Diagnóstico de recepción Polaroids · Librería Saber</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;color:#1b334e;background:#f5f8fb}
+*{box-sizing:border-box}body{margin:0;padding:24px 14px}.wrap{max-width:690px;margin:auto;background:white;border:1px solid #dce5ef;border-radius:16px;padding:26px;box-shadow:0 12px 35px #162d430a}
+h1{font-size:24px;margin:0 0 12px}p{line-height:1.55}.result{border-radius:10px;padding:14px 16px;margin-top:16px;background:#eff4f9}
+.result.ok{background:#e8f6ef;color:#17613d}.result.bad{background:#fff2e6;color:#824419}
+ul{padding-left:20px;line-height:1.8}.mute{font-size:13px;color:#63758b}.tools{margin-top:18px;display:flex;gap:12px;flex-wrap:wrap}
+button,a.action{background:#0a3158;color:#fff;text-decoration:none;border:0;border-radius:9px;padding:10px 14px;font-weight:700;cursor:pointer;font-size:14px}
+a.action{background:#edf3f8;color:#1b537f}.statusline{font-size:13px;border-bottom:1px solid #e7eef5;padding:7px 0}
+</style>
+</head>
+<body><main class="wrap">
+<h1>Recepción Polaroids · Diagnóstico</h1>
+<p>Comprobación automática de la conexión del navegador con Google Apps Script. <strong>No carga ni transmite fotografías.</strong></p>
+<div id="result" class="result">Consultando Google, aguardá unos segundos…</div>
+<div id="details" aria-live="polite"></div>
+<div class="tools"><button id="retry" type="button">Volver a comprobar</button><a id="direct" class="action" target="_blank" rel="noopener noreferrer">Abrir respuesta directa de Google</a></div>
+<p class="mute">Este diagnóstico funciona aunque la recepción de fotografías esté desactivada. No solicita contraseñas ni claves privadas.</p>
+</main>
+<script>
+'use strict';
+const result=document.getElementById('result'),details=document.getElementById('details');
+const direct=document.getElementById('direct');
+let running=false;
+function stamp(){const a=new Uint8Array(16);crypto.getRandomValues(a);return Array.from(a,x=>x.toString(16).padStart(2,'0')).join('')}
+function delay(ms){return new Promise(resolve=>setTimeout(resolve,ms))}
+function checkOnce(url,attempt){
+ return new Promise(resolve=>{
+  const cb='saberStatus_'+stamp(),sc=document.createElement('script');
+  let settled=false;const start=performance.now();
+  const finish=(status,description)=>{
+   if(settled)return;settled=true;clearTimeout(timeout);delete window[cb];sc.remove();
+   const ms=Math.round(performance.now()-start);
+   details.insertAdjacentHTML('beforeend','<div class="statusline">Intento '+attempt+': '+status+' ('+ms+' ms). '+description+'</div>');
+   resolve(status==='CORRECTO');
+  };
+  const timeout=setTimeout(()=>finish('SIN RESPUESTA','Tiempo de espera agotado.'),16000);
+  window[cb]=data=>finish(data&&data.ok===true&&data.apiVersion==='v2-noframe'?'CORRECTO':'RESPUESTA INESPERADA',
+   data&&data.ok===true?'Apps Script respondió.':'Google devolvió una respuesta distinta.');
+  const test=new URL(url);
+  test.searchParams.set('api','ping');test.searchParams.set('callback',cb);
+  test.searchParams.set('noCache',stamp());
+  sc.src=test.href;sc.async=true;sc.referrerPolicy='no-referrer';
+  sc.onerror=()=>finish('BLOQUEADA','El navegador no pudo cargar o ejecutar la respuesta de Google.');
+  document.head.append(sc);
+ });
+}
+async function run(){
+ if(running)return;running=true;document.getElementById('retry').disabled=true;
+ result.className='result';result.textContent='Comprobando conexión. No cargues fotografías.';
+ details.replaceChildren();
+ try{
+  const res=await fetch('recepcion-config.json',{cache:'no-store'});
+  if(!res.ok)throw Error('No se pudo leer la configuración de la página.');
+  const cfg=await res.json(),url=new URL(cfg.bridgeUrl);
+  if(location.hostname!==cfg.allowedHost||url.protocol!=='https:'||url.hostname!=='script.google.com')
+   throw Error('El dominio de pruebas no coincide con la configuración.');
+  const simple=new URL(url.href);simple.searchParams.set('api','ping');
+  simple.searchParams.set('callback','saberStatus_'+'a'.repeat(32));
+  direct.href=simple.href;
+  let successes=0;
+  for(let i=1;i<=3;i++){
+   result.textContent='Verificando conexión: intento '+i+' de 3…';
+   if(await checkOnce(url.href,i))successes++;
+   if(i<3)await delay(700);
+  }
+  result.className='result '+(successes?'ok':'bad');
+  result.textContent=successes===3?'Conexión correcta en los 3 intentos.':
+    successes?'Conexión intermitente: '+successes+' de 3 intentos fueron correctos.':
+    'La consulta funciona al abrirla directamente, pero el navegador no logró ejecutarla desde esta página.';
+ }catch(e){result.className='result bad';result.textContent='No se pudo comprobar: '+(e&&e.message||e);}
+ finally{running=false;document.getElementById('retry').disabled=false}
+}
+document.getElementById('retry').onclick=run;
+run();
+</script></body></html>
