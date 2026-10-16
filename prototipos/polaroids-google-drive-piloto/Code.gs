@@ -314,15 +314,15 @@ function enumerarArchivosPrueba_(folder) {
   if(original)orig.add(Number(original[1]));
   if(recorte)cuts.add(Number(recorte[1]));
   if(name==='encuadres.json')json=true;
-  if(name==='POLAROIDS_A4_6_FOTOS_IMPRIMIR.pdf'||
+  if(/^POLAROIDS_A4_[1-6]_FOTOS_IMPRIMIR\.pdf$/.test(name)||
      /^POLAROIDS_A4_HOJA_\d\d_DE_\d\d\.pdf$/.test(name))
    pdfs.push({name,url:file.getUrl(),id:file.getId()});
  }
- const count=orig.size, sheets=Number.isInteger(count/6)?count/6:0;
+ const count=orig.size, sheets=count>=1&&count<=60?Math.ceil(count/6):0;
  const valid=sheets>=1&&sheets<=10&&cuts.size===count&&json&&
   Array.from({length:count},(_,i)=>i+1).every(i=>orig.has(i)&&cuts.has(i))&&
   pdfs.length===sheets&&Array.from({length:sheets},(_,i)=>{
-   const name=sheets===1?'POLAROIDS_A4_6_FOTOS_IMPRIMIR.pdf':
+   const name=sheets===1?'POLAROIDS_A4_'+count+'_FOTOS_IMPRIMIR.pdf':
     'POLAROIDS_A4_HOJA_'+String(i+1).padStart(2,'0')+
     '_DE_'+String(sheets).padStart(2,'0')+'.pdf';
    return pdfs.some(p=>p.name===name);
@@ -366,7 +366,7 @@ function listarPedidosPrueba() {
     });
   }
   results.sort((a,b)=>b.created-a.created);
-  return {orders:results,truncated,scope:'RECEPCIÓN PRIVADA · hasta diez hojas de 6 Polaroids por trabajo'};
+  return {orders:results,truncated,scope:'RECEPCIÓN PRIVADA · hasta 60 fotos por trabajo (seis espacios por hoja)'};
 }
 function actualizarEstadoPedidoPrueba(reference,next) {
   const {cfg,root}=accesoPanelPrueba_();
