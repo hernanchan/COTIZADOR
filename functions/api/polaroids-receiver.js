@@ -1,0 +1,120 @@
+/**
+ * Recepción Polaroids Saber, SOLO para la rama aislada de Cloudflare Pages.
+ * Proxy stateless. Fotos en tránsito directo a Google Apps Script privado.
+ * Sin R2, KV, D1, almacenamiento intermedio ni claves de Google en cliente.
+ *
+ * La verificación Turnstile del inicio, autenticación de pedido,
+ * cuotas y creación de PDF se ejecutan en Apps Script.
+ */
+const HOST='polaroids-integracion-sin-r2.libreriasaber.pages.dev';
+const ORIGIN='https://'+HOST;
+const APPS_SCRIPT='https://script.google.com/macros/s/AKfycbxH5hpSS0HjTLQtFIxmTluo7KHzxHj1FWpDkbIwW25_jKVdDq_EFnfBFyNO3XIJpv0TIg/exec';
+const CALLBACK='saberStatus_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const MAX_POST_BYTES=15*1024*1024;
+const REFERENCE=/^POL-[A-F0-9]{24}$/;
+const UPLOAD_KEY=/^[a-f0-9]{64}$/;
+const OPTIONS=new Set(['start','photo','finish','status']);
+
+function json(data,status=200){
+ return new Response(JSON.stringify(data),{status,headers:{
+  'Content-Type':'application/json; charset=utf-8',
+  'Cache-Control':'no-store, private',
+  'X-Content-Type-Options':'nosniff',
+  'Referrer-Policy':'no-referrer'
+ }});
+}
+function allowedUrl(request){
+ const url=new URL(request.url);
+ return url.hostname===HOST&&url.protocol==='https:';
+}
+function permittedPost(request){
+ if(!allowedUrl(request)||request.headers.get('Origin')!==ORIGIN)return false;
+ const site=request.headers.get('Sec-Fetch-Site');
+ return !site||site==='same-origin';
+}
+async function upstreamStatus(reference,uploadKey){
+ const url=new URL(APPS_SCRIPT);
+ url.searchParams.set('api','status');
+ url.searchParams.set('reference',reference);
+ url.searchParams.set('uploadKey',uploadKey);
+ url.searchParams.set('callback',CALLBACK);
+ const response=await fetch(url.toString(),{
+  method:'GET',redirect:'follow',cache:'no-store',
+  headers:{'Accept':'text/javascript'},
+  signal:AbortSignal.timeout(16000)
+ });
+ if(!response.ok)throw Error('Google status HTTP '+response.status);
+ const script=(await response.text()).trim();
+ const prefix=CALLBACK+'(';
+ if(!script.startsWith(prefix)||!script.endsWith(');')||script.length>1200)
+  throw Error('Respuesta inesperada desde Google.');
+ const data=JSON.parse(script.slice(prefix.length,-2));
+ if(!data||typeof data!=='object'||typeof data.ok!=='boolean')
+  throw Error('El estado de Google no es válido.');
+ return data;
+}
+export async function onRequestGet({request}){
+ if(!allowedUrl(request))return json({ok:false,error:'Host no autorizado.'},403);
+ return json({ok:true,route:'polaroids-receiver',testOnly:true,photosSent:0});
+}
+export async function onRequestPost({request}){
+ if(!permittedPost(request))return json({ok:false,error:'Origen no autorizado.'},403);
+ const type=request.headers.get('Content-Type')||'';
+ if(!/^application\/json(?:;|$)/i.test(type))
+  return json({ok:false,error:'Formato de solicitud no admitido.'},415);
+ const op=new URL(request.url).searchParams.get('op')||'';
+ if(!OPTIONS.has(op))return json({ok:false,error:'Operación no admitida.'},400);
+ const statedSize=Number(request.headers.get('Content-Length'));
+ if(statedSize>MAX_POST_BYTES)
+  return json({ok:false,error:'La foto excede el tamaño de transmisión permitido.'},413);
+ if(!request.body)return json({ok:false,error:'Faltan datos.'},400);
+ if(op==='status'){
+  let input;
+  try{
+   const raw=await request.text();
+   if(raw.length>2000)throw Error('Solicitud demasiado larga.');
+   input=JSON.parse(raw);
+  }catch(_){return json({ok:false,error:'Solicitud de consulta inválida.'},400)}
+  if(!REFERENCE.test(input.reference)||!UPLOAD_KEY.test(input.uploadKey))
+   return json({ok:false,error:'Datos de pedido inválidos.'},400);
+  try{
+   const data=await upstreamStatus(input.reference,input.uploadKey);
+   if(data.ok!==true)return json({ok:false,error:'No se pudo validar el pedido.'},403);
+   return json({
+    ok:true,found:data.found===true,
+    status:data.found?data.status:undefined,
+    received:data.found?data.received:undefined,
+    photos:data.found?data.photos:undefined,
+    sheets:data.found?data.sheets:undefined
+   });
+  }catch(_){return json({ok:false,error:'Google no respondió a la consulta de recepción.'},502)}
+ }
+ // Se preserva el cuerpo por streaming, sin leer ni almacenar fotos en Cloudflare.
+ // TransformStream corta cualquier transmisión que supere 15 MiB, aun sin
+ // Content-Length. No se necesitan datos persistentes ni planes pagos.
+ let transferred=0;
+ const limited=request.body.pipeThrough(new TransformStream({
+  transform(chunk,controller){
+   transferred+=chunk.byteLength;
+   if(transferred>MAX_POST_BYTES)throw Error('Carga demasiado grande.');
+   controller.enqueue(chunk);
+  }
+ }));
+ try{
+  const upstream=await fetch(APPS_SCRIPT,{
+   method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
+   body:limited,redirect:'manual',cache:'no-store',
+   signal:AbortSignal.timeout(40000)
+  });
+  // ContentService de Google suele devolver HTTP 302 para entregar "OK".
+  // El estado definitivo SIEMPRE se verifica por la consulta privada.
+  if(upstream.status===302||upstream.status===303||upstream.ok)
+   return json({ok:true,dispatched:true,confirmed:false},202);
+  return json({ok:false,error:'Google rechazó la transmisión (HTTP '+upstream.status+').'},502);
+ }catch(_){
+  // Una caída de red podría producirse después de que Google guardó la foto:
+  // no afirmar fallo definitivo; el navegador debe consultar estado.
+  return json({ok:false,dispatched:'unknown',
+   error:'No se pudo confirmar el envío a Google. Consultá el estado del pedido.'},502);
+ }
+}
