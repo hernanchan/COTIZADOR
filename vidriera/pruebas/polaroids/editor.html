@@ -402,6 +402,11 @@ async function publicPing(){
  const data=await result.json();
  if(data.ok!==true||data.connection!=='cloudflare-to-google'||data.apiVersion!=='v2-noframe')
   throw new Error('La versión del receptor no coincide con la esperada.');
+ const relay=await fetch('/api/polaroids-receiver',{cache:'no-store',credentials:'omit'});
+ if(!relay.ok)throw new Error('El intermediario de fotos todavía no está publicado.');
+ const info=await relay.json();
+ if(info.ok!==true||info.route!=='polaroids-receiver'||info.testOnly!==true)
+  throw new Error('El intermediario de fotos no está listo.');
  return data;
 }
 async function publicStatus(reference,uploadKey){
