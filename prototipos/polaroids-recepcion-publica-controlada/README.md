@@ -1,6 +1,6 @@
 # Polaroids Saber · Receptor controlado (no publicado)
 
-**Estado al 15/10/2026:** código preparado y verificado mediante simulaciones; **NO hay recepción pública activa**.
+**Estado al 16/10/2026:** receptor de Google implementado, URL y sitekey configuradas en la rama; **NO hay recepción pública activa**. La versión de Code.gs modificada en GitHub todavía debe copiarse al proyecto Apps Script y desplegar una nueva versión antes de probar recepción real.
 La web `libreriasaber.com.ar`, la rama `main` y la aplicación privada que ya generó 14 archivos permanecen intactas. No se utiliza Cloudflare R2.
 
 ## Componentes
@@ -8,16 +8,16 @@ La web `libreriasaber.com.ar`, la rama `main` y la aplicación privada que ya ge
 - `Code.gs`: nuevo proyecto de Google Apps Script, **separado** del piloto privado de Librería Saber.
 - `Bridge.html`: canal de mensajes desde el editor en Cloudflare Pages. Solo acepta el origen explícito y un nonce aleatorio de sesión.
 - `../../vidriera/pruebas/polaroids/editor.html`: prepara las fotos, solicita Turnstile, envía las imágenes y espera confirmación del PDF.
-- `../../vidriera/pruebas/polaroids/recepcion-config.json`: configuración pública, actualmente `enabled: false` y sin URL ni clave de sitio.
+- `../../vidriera/pruebas/polaroids/recepcion-config.json`: configuración pública, actualmente `enabled: false`, con URL del receptor y clave pública Turnstile configuradas.
 
 **Nunca publicar el Code.gs del proyecto privado como «Cualquiera»**: contiene funciones de gestión de pedidos. El receptor público nuevo incluye únicamente funciones de recepción y cada una valida permisos, cuotas y claves.
 
 ## Comportamiento previsto
 
-1. El cliente selecciona **de 1 a 10 hojas** A4, con seis Polaroids por hoja (6 a 60 fotos), las encuadra y acepta su envío.
+1. El cliente selecciona **de 1 a 60 fotografías** distribuidas automáticamente en una a diez hojas A4 (hasta seis por hoja), las encuadra y acepta su envío.
 2. Cloudflare Turnstile verifica la sesión; Apps Script comprueba el token en el servidor, el hostname exacto y la acción `polaroids`.
 3. Apps Script crea una referencia `POL-<24 hex>` apta para carrito y WhatsApp y devuelve una clave privada de carga `<64 hex>`, independiente de la referencia. El servidor conserva solo el hash de la clave; el editor nunca la comunica al carrito.
-4. Se suben secuencialmente fotos originales JPG o PNG de hasta 5 MB y recortes de imprenta JPEG 886×886. Cada hoja genera su PDF privado A4 con guías de guillotina. Una hoja: `POLAROIDS_A4_6_FOTOS_IMPRIMIR.pdf`; varias: `POLAROIDS_A4_HOJA_01_DE_10.pdf`, etc.
+4. Se suben secuencialmente fotos originales JPG o PNG de hasta 5 MB y recortes de imprenta JPEG 886×886. Cada hoja genera su PDF privado A4 con guías de guillotina. Si la última está incompleta, se genera el PDF con las fotos recibidas y los demás espacios quedan sin imagen. Una hoja: `POLAROIDS_A4_N_FOTOS_IMPRIMIR.pdf` (N = 1 a 6); varias: `POLAROIDS_A4_HOJA_01_DE_10.pdf`, etc.
 5. La carpeta `PEDIDO_POL-...` contiene originales, recortes, `encuadres.json` y los PDFs. La referencia se considera **recibida** y se transfiere al carrito únicamente cuando finalizó toda la recepción.
 6. El panel privado, al actualizar su código, mostrará las hojas, PDFs, precio total y seña del 50 %. La impresión queda condicionada a confirmar la seña manualmente.
 
@@ -53,3 +53,11 @@ Las operaciones `uploadPublicPhoto` y `finishPublicOrder` admiten reintentos tra
 ## Precios y pagos
 
 Precio regular: **ARS 3.000 por hoja**, sin promociones. El carrito admite artículos de librería y trabajos de gráfica. El pedido de WhatsApp puede iniciarse antes de pagar; se imprime solamente tras confirmación de **seña del 50 %**. La versión de pruebas sigue sin enviar WhatsApp real.
+
+## Carga múltiple y última hoja incompleta (16/10/2026)
+
+- En la rama de pruebas se pueden elegir **hasta 60 fotos juntas**. El editor las reparte de seis en seis en hojas A4.
+- Con **17 fotos**, aparecen tres hojas y un aviso explícito: **agregar una foto** para llegar a 18 o **continuar con 17**. Si continúa con 17, se factura **3 × ARS 3.000 = ARS 9.000**, se transmite el número real (17), y el último PDF contiene cinco fotos (sin imagen inventada en el sexto lugar).
+- Los ejemplos 1, 5, 6, 7, 12, 17, 18, 59 y 60 pasaron pruebas de reglas de conteo, confirmación y facturación en el código. PDF de 1, 5 y 6 fotos: estructura y referencias internas comprobadas con JPEG simulado. La prueba real anónima sigue pendiente.
+- Se actualizaron **editor**, **cotizador**, **Code.gs del receptor** y **panel privado de gestión (solo código de GitHub)**. Ninguna versión instalada en Apps Script se actualiza automáticamente desde GitHub.
+- Próximo paso para prueba real: actualizar manualmente el proyecto Apps Script **POLAROIDS SABER - RECEPCIÓN CLIENTES** con el Code.gs de esta rama y crear una nueva versión de la implementación, manteniendo inicialmente `PUBLIC_ENABLED=no`. El proyecto de panel privado sigue separado.
