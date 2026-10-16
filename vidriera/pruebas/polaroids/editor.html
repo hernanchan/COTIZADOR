@@ -183,11 +183,11 @@ function updateSheetNav(){
  $('nextSheet').disabled=activeSheet===sheets.length-1;
  $('addSheet').disabled=sheets.length>=MAX_SHEETS||activeSheet!==sheets.length-1||!sheetComplete(photos);
  $('deleteSheet').disabled=sheets.length===1;
- $('btnPdf').disabled=!orderComplete()||busy||!!receivedReference||!!(receiverConfig&&receiverConfig.enabled&&!receiverApiUrl);
+ $('btnPdf').disabled=!orderComplete()||busy||!!receivedReference||!receiverConfig?.enabled||!receiverApiUrl;
  $('afterReceipt').hidden=!receivedReference||window.parent!==window;
  $('btnPdf').textContent=receivedReference?'Fotos recibidas · '+receivedReference:
   receiverConfig&&receiverConfig.enabled?'Enviar '+n+' fotos y agregar al carrito':
-  'Agregar '+sheets.length+' hoja'+(sheets.length===1?'':'s')+' al carrito de prueba';
+  'Recepción de fotografías pausada';
  showPartialNotice();
 }
 function packPhotos(){
@@ -622,23 +622,12 @@ async function setupSecureReception(){
 setupSecureReception();
 
 $('btnPdf').onclick=()=>{
- if(busy)return;
- if(receiverConfig&&receiverConfig.enabled){
-  sendSecurePhotos().catch(err=>status('No se pudo enviar: '+(err&&err.message||err),'bad'));
+ if(busy||receivedReference)return;
+ if(!receiverConfig?.enabled||!receiverApiUrl){
+  status('La recepción está pausada. Podés practicar los encuadres, pero no agregar un pedido sin fotos recibidas.','bad');
   return;
  }
- if(!orderComplete()){status('Completá la hoja o elegí continuar con las fotos que cargaste.','bad');return}
- if(!provisionalReference)provisionalReference=nuevaReferenciaProvisional();
- if(window.parent!==window){
-   window.parent.postMessage({type:'SABER_POLAROID_DRAFT_READY',payload:{
-     sheets:sheets.length,photos:photoCount(),format:'85x90',
-     uploadsReceived:false,reference:provisionalReference,referenceStatus:'provisional'
-   }},window.location.origin);
-   status('Referencia provisional: '+provisionalReference+' · Las fotografías NO se enviaron.','ok');
-   return;
- }
- $('cartItem').textContent='Simulación '+provisionalReference+': '+sheets.length+' hoja(s). Sin archivos enviados.';
- status('Referencia provisional: '+provisionalReference+'. No se envió ningún archivo.','ok');
+ sendSecurePhotos().catch(err=>status('No se pudo enviar: '+(err&&err.message||err),'bad'));
 };
 $('goToCartAfterReceipt').onclick=()=>{
  if(window.parent!==window||!receivedReference||!/^POL-[A-F0-9]{24}$/.test(receivedReference))return;
