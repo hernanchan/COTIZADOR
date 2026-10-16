@@ -93,3 +93,12 @@ Esta revisión resuelve la inspección visual de escritorio que antes estaba pen
 4. Solo después de esa prueba y de la aprobación de los accesos comerciales, activar showInShop. Si falla la prueba, apagar recepción y conservar accesos ocultos; restaurar hostname del piloto si se necesita volver a sus pruebas.
 
 La política de conservación de fotos sigue sin definir: no configurar eliminación automática sin decisión del titular. No se ha cambiado main, el despliegue oficial ni la propiedad de Apps Script.
+
+## Publicación autorizada y verificada — 16/10/2026 19:48 ART
+
+El titular autorizó la publicación. PR #1 salió de borrador y fue fusionado en `0866197d2f5cb0ad80e1936e91d5d33654cea3ec`, con configuración apagada.
+
+- Editor visible en `https://libreriasaber.com.ar/polaroids/editor?revision=0866197`; botón de servicio deshabilitado. Zoom con teclado 100 → 101 % verificado en el dominio oficial.
+- Cotizador oficial carga su iframe real con menú de servicios y beneficio del viernes. Acceso nuevo Polaroids oculto.
+- Tienda en www carga y categoría Impresión y gráfica conserva acceso al cotizador sin mostrar Polaroids. La URL del navegador permanece en www: no se certifica redirección al dominio raíz. La activación actual está restringida al dominio raíz; no ampliar hosts ni trasladar carritos entre orígenes automáticamente.
+- Pendiente intervención del titular en Apps Script para cambiar TURNSTILE_HOSTNAME al dominio oficial antes de activar recepción. No hay acceso autenticado de este agente al proyecto Apps Script.
