@@ -640,7 +640,7 @@ $('goToCartAfterReceipt').onclick=()=>{
  if(!items.some(item=>Array.isArray(item.receivedReferences)&&
    item.receivedReferences.includes(receivedReference))){
   items.push({
-   id:'PRINT-'+receivedReference,type:'print',name:'Polaroids 85 × 90 mm',
+   id:'PRINT-'+receivedReference,type:'print',photoOrder:true,name:'Polaroids 85 × 90 mm',
    qty:1,price,deposit:price/2,
    detail:count+' hoja'+(count===1?'':'s')+' A4 · '+n+' Polaroids · Ref. '+receivedReference,
    draftReferences:[],receivedReferences:[receivedReference],filesReceived:true
