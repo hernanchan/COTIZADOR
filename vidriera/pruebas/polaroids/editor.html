@@ -272,7 +272,7 @@ async function acceptFiles(files,specific=-1){
  if(!files.length)return;
  const valid=files.filter(f=>receiverConfig&&receiverConfig.enabled
   ?['image/jpeg','image/png'].includes(f.type)&&f.size>0&&f.size<=5*1024*1024
-  :f.type.startsWith('image/')||/\\.(jpe?g|png|webp|heic|heif)$/i.test(f.name));
+  :f.type.startsWith('image/')||/\.(jpe?g|png|webp|heic|heif)$/i.test(f.name));
  if(!valid.length){status('No hay imágenes válidas.','bad');return;}
  const free=specific>=0?1:MAX_SHEETS*6-photoCount();
  if(free<=0){status('Máximo 60 fotos. Quitá alguna antes de añadir más.','bad');return;}
