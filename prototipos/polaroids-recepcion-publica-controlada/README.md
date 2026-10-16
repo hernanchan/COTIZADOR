@@ -61,6 +61,10 @@ Las operaciones `uploadPublicPhoto` y `finishPublicOrder` admiten reintentos tra
 - **SUPERADO:** prueba real con seis fotos, Turnstile, transmisión desde Cloudflare al servidor Google y PDF recibido en Drive privado.
 - **PENDIENTE:** comprobación real de 17 fotos/última hoja incompleta, integración de carrito y panel privado, retiro/retención de fotos, publicación de la nueva protección de bloqueo del proxy en Pages y eventual puesta en producción.
 
+## Panel propietario (proyecto separado)
+
+El panel completo se encuentra en `../polaroids-panel-privado/` con `Code.gs`, `Panel.html` e instrucciones. Debe instalarse como **otro proyecto Apps Script**, con acceso **Solo yo**, propietario autorizado y acceso a la carpeta `RECEIPT_FOLDER_ID`. Nunca agregar funciones del panel al receptor público. Valida integridad de archivos, lista pedidos y libera enlaces privados de PDF cuando se confirma manualmente la seña. El código pasó simulaciones, pero **todavía no está instalado ni verificado en la cuenta del usuario**.
+
 ## Carrito y WhatsApp de la rama de pruebas (16/10/2026)
 
 El cotizador enlaza el evento `SABER_POLAROID_RECEIVED` con la referencia de 24 caracteres, la cantidad verdadera de fotos y el número de hojas. `cotizar.html` evita incorporar dos veces la misma referencia y comprueba `precio = hojas × 3000` en trabajos exclusivamente Polaroids. El carrito agrupa productos de librería y trabajos de gráfica, calcula la seña del 50 % **solo de producción** y muestra la referencia privada sin enlaces al PDF.
