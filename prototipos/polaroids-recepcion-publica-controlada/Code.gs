@@ -1,5 +1,5 @@
 /**
- * Recepción pública de POLAROIDS — BORRADOR SIN IMPLEMENTAR.
+ * Recepción controlada de POLAROIDS — API de pruebas sin iframe.
  * PROYECTO INDEPENDIENTE del piloto privado para no exponer funciones del panel.
  *
  * Propiedades secretas (NUNCA en GitHub):
@@ -8,8 +8,8 @@
  * TURNSTILE_SECRET=<clave privada Cloudflare>
  * TURNSTILE_HOSTNAME=<host exacto de Pages>
  *
- * El script solo se habilitará con revisión, aprobación expresa
- * y prueba controlada de accesos anónimos. Sin secretos = sin recepción.
+ * Solo debe habilitarse durante pruebas autorizadas o tras revisión final.
+ * Sin propiedades secretas = sin recepción.
  */
 const PUBLIC_MAX_BYTES=5*1024*1024;
 const PUBLIC_MAX_SHEETS=10;     // 1 a 10 hojas A4, 6 Polaroids por hoja
@@ -19,9 +19,9 @@ const PUBLIC_MAX_DAILY_MB=250;
 const PUBLIC_TTL_MS=24*60*60*1000;
 
 /**
- * Bridge de comunicación iframe. Solo se usa si PUBLIC_ENABLED=yes y
- * TURNSTILE_HOSTNAME es un hostname exacto bajo nuestro control.
- * El puente nunca devuelve URL de Drive ni expone funciones de administración.
+ * Receptor separado de la aplicación privada.
+ * El acceso anónimo exige TURNSTILE_HOSTNAME exacto, token Turnstile y clave por pedido.
+ * Nunca expone enlaces ni funciones privadas de Drive.
  */
 /**
  * API sin iframe, para navegadores que bloquean X-Frame-Options de Apps Script.
