@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<base target="_blank">
+<title>Pedidos Polaroids · Librería Saber</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#18344d;background:#f3f6f9}
+*{box-sizing:border-box}body{margin:0;padding:18px 16px 55px}.shell{max-width:1100px;margin:0 auto}
+header{background:#10395e;color:white;border-radius:18px;padding:25px 28px;display:flex;align-items:center;justify-content:space-between;gap:15px}
+h1{font-size:clamp(23px,4vw,33px);margin:3px 0 6px}h2{font-size:17px;margin:0}
+header p{margin:0;color:#d8e8f4;font-size:13px;line-height:1.5}
+.hint{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:#94c4e9;font-weight:800}
+button{font:inherit;cursor:pointer;border:0;border-radius:10px;font-weight:700;padding:11px 15px}
+button:disabled{opacity:.55;cursor:not-allowed}
+button.refresh{background:#f4a43b;color:#102d49;min-width:130px}
+.info{border-left:4px solid #e69b24;background:#fff8e9;border-radius:8px;padding:14px 17px;margin:18px 0 14px;line-height:1.5;font-size:14px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:17px 0}
+.stat{border-radius:12px;background:white;border:1px solid #dce5ec;padding:16px}.stat strong{display:block;font-size:24px;margin-top:5px}.stat small{color:#5b6e80;font-size:12px;font-weight:650}
+.controls{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:20px 0}
+.controls label{font-size:13px;font-weight:750}.controls select{margin-left:8px;padding:8px 13px;border:1px solid #b7c8d7;border-radius:8px;background:white;font:inherit;color:#18344d}
+#status{font-size:13px;color:#46677e;min-height:20px}
+#orders{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+.order{min-width:0;background:white;border:1px solid #dce5ec;border-radius:15px;padding:19px;box-shadow:0 4px 16px #18344d0b}
+.orderTop{display:flex;justify-content:space-between;align-items:start;gap:9px;margin-bottom:12px}
+.ref{font-weight:850;overflow-wrap:anywhere;font-size:12px;color:#315d80;margin-top:5px}
+.date{font-size:12px;color:#6b7e8b}.pill{font-size:12px;font-weight:800;padding:7px 9px;border-radius:20px;background:#fff1db;color:#875100;white-space:nowrap}
+.pill.paid{background:#e5f5ea;color:#17733e}.pill.off{background:#ffe9e8;color:#a53333}
+.numbers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;background:#f3f7fa;padding:13px;border-radius:10px}
+.numbers div small{font-size:11px;color:#637b8f}.numbers div strong{font-size:16px;display:block;margin-top:3px}
+.details{margin:13px 0;color:#54677c;font-size:12px;line-height:1.55}
+.problem{color:#a52c23;font-weight:750}
+.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+.actions button{font-size:12px;flex:1;min-width:135px}
+.primary{background:#1468aa;color:white}.secondary{background:#e9f0f7;color:#204d76}.danger{background:#fff0ef;color:#aa3535}
+.print{display:block;padding:11px 14px;border-radius:9px;background:#e9f8ef;color:#166c42;font-weight:800;text-decoration:none;font-size:13px;margin:8px 0;text-align:center}
+.note{font-size:12px;margin:12px 0;color:#b34f21}
+.empty{border-radius:14px;padding:40px;background:white;text-align:center;color:#60778a;grid-column:1/-1}
+footer{font-size:12px;color:#687b8c;margin-top:22px;text-align:center}
+@media(max-width:750px){#orders{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}header{flex-direction:column;align-items:start;padding:22px}button.refresh{width:100%}}
+</style>
+</head>
+<body>
+<div class="shell">
+<header>
+ <div><span class="hint">Librería Saber · Acceso privado</span><h1>Pedidos Polaroids</h1><p>Control de recepción, seña y hojas A4 de impresión. Solo para la cuenta propietaria.</p></div>
+ <button id="refresh" class="refresh" type="button">↻ Actualizar pedidos</button>
+</header>
+<div class="info"><strong>Control de producción:</strong> comprobá en el banco o billetera que se acreditó la seña antes de marcarla como pagada. Este panel <strong>no cobra ni comprueba transferencias automáticamente</strong>. El botón de impresión aparece únicamente después de confirmarla.</div>
+<div class="stats" id="stats">
+ <div class="stat"><small>Pedidos recibidos</small><strong id="total">—</strong></div>
+ <div class="stat"><small>Pendientes de seña</small><strong id="pending">—</strong></div>
+ <div class="stat"><small>Habilitados para imprimir</small><strong id="ready">—</strong></div>
+ <div class="stat"><small>Por revisar</small><strong id="problems">—</strong></div>
+</div>
+<div class="controls">
+ <label for="filter">Mostrar <select id="filter"><option value="all">Todos los pedidos</option><option value="pendiente_sena">Pendientes de seña</option><option value="paid">Seña confirmada / listos</option><option value="incompleto">Incompletos</option><option value="entregado">Entregados</option><option value="anulado">Anulados</option></select></label>
+ <div id="status" role="status" aria-live="polite">Cargando pedidos…</div>
+</div>
+<div id="orders" aria-live="polite"></div>
+<footer>Precio de Polaroids: $3.000 por hoja A4 · Seña de producción: $1.500 por hoja · No incluye cobro online.</footer>
+</div>
+<script>
+'use strict';
+const el=id=>document.getElementById(id);
+let orders=[],loading=false;
+const money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(n||0);
+const transitions={
+ pendiente_sena:[['sena_confirmada','Confirmar seña'],['anulado','Anular']],
+ sena_confirmada:[['preparado','Marcar preparado'],['pendiente_sena','Revertir seña'],['anulado','Anular']],
+ preparado:[['entregado','Marcar entregado'],['sena_confirmada','Volver a preparación'],['anulado','Anular']],
+ entregado:[],anulado:[],incompleto:[]
+};
+function textNode(tag,text,css=''){
+ const n=document.createElement(tag);n.textContent=String(text);if(css)n.className=css;return n;
+}
+function request(method,...args){
+ return new Promise((resolve,reject)=>{
+  if(!window.google||!google.script||!google.script.run){
+   reject(new Error('Abrí el panel desde la aplicación privada de Google Apps Script.'));return;
+  }
+  const api=google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+  if(method==='list')api.listarPedidosPrivados();
+  else if(method==='status')api.cambiarEstadoPedidoPrivado(args[0],args[1]);
+  else reject(new Error('Acción no permitida.'));
+ });
+}
+function date(ms){
+ try{return new Date(ms).toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'})}
+ catch(_){return 'Fecha desconocida'}
+}
+function card(item){
+ const box=textNode('article','','order'),top=textNode('div','','orderTop');
+ const l=textNode('div','');
+ l.append(textNode('div',date(item.created),'date'),textNode('div',item.reference,'ref'));
+ const badge=textNode('span',item.statusText||'Sin estado','pill'+
+  (item.canPrint?' paid':item.status==='incompleto'||item.status==='anulado'?' off':''));
+ top.append(l,badge);box.append(top);
+ const numbers=textNode('div','','numbers');
+ [[item.photos||0,'Fotografías'],[item.sheets||0,'Hojas A4'],
+  [money(item.price),'Total'],[money(item.deposit),'Seña 50 %']].forEach(pair=>{
+   const cell=textNode('div','');cell.append(textNode('small',pair[1]),textNode('strong',pair[0]));numbers.append(cell);
+  });
+ box.append(numbers);
+ box.append(textNode('div','Originales: '+(item.originals||0)+
+  ' · Recortes: '+(item.crops||0)+' · PDFs: '+(item.pdfCount||0),'details'));
+ if(item.reason)box.append(textNode('p','Revisar antes de producir: '+item.reason,'problem'));
+ if(item.canPrint&&Array.isArray(item.pdfs)){
+  item.pdfs.forEach((pdf,index)=>{
+   const link=textNode('a',item.pdfs.length===1?'Abrir PDF para imprimir':'Imprimir hoja '+(index+1)+' de '+item.pdfs.length,'print');
+   link.href=pdf.url;link.target='_blank';link.rel='noopener noreferrer';box.append(link);
+  });
+ }else if(item.status==='pendiente_sena'){
+  box.append(textNode('p','PDF oculto hasta confirmar la seña.','note'));
+ }
+ const actions=textNode('div','','actions');
+ for(const [next,label] of transitions[item.status]||[]){
+  const btn=textNode('button',label,next==='anulado'?'danger':next==='sena_confirmada'?'primary':'secondary');
+  btn.type='button';btn.disabled=loading;
+  btn.onclick=()=>changeStatus(item.reference,next,label,item.deposit);
+  actions.append(btn);
+ }
+ box.append(actions);
+ return box;
+}
+function render(){
+ el('total').textContent=orders.length;
+ el('pending').textContent=orders.filter(o=>o.status==='pendiente_sena').length;
+ el('ready').textContent=orders.filter(o=>o.canPrint).length;
+ el('problems').textContent=orders.filter(o=>o.status==='incompleto').length;
+ const filter=el('filter').value;
+ const visible=orders.filter(item=>filter==='all'||(filter==='paid'?
+   ['sena_confirmada','preparado'].includes(item.status):item.status===filter));
+ const target=el('orders');target.replaceChildren();
+ if(!visible.length){target.append(textNode('div','No hay pedidos para este filtro.','empty'));return;}
+ for(const item of visible)target.append(card(item));
+}
+async function load(){
+ if(loading)return;loading=true;el('refresh').disabled=true;
+ el('status').textContent='Buscando pedidos en el Drive privado…';
+ try{
+  const result=await request('list');orders=result.orders||[];
+  el('status').textContent=orders.length+' pedido(s).'+
+    (result.truncated?' Se muestran los últimos 100 registros recuperados.':'');
+  render();
+ }catch(err){
+  el('status').textContent='Error: '+(err&&err.message||err);
+ }finally{loading=false;el('refresh').disabled=false;}
+}
+async function changeStatus(ref,next,label,amount){
+ if(loading)return;
+ const question=next==='sena_confirmada'
+  ?'¿Comprobaste que se acreditó realmente la seña de '+money(amount)+' para '+ref+'?'
+  :next==='anulado'?'¿Anular el pedido '+ref+'?'
+  :'¿Confirmás «'+label+'» para '+ref+'?';
+ if(!window.confirm(question))return;
+ loading=true;el('refresh').disabled=true;el('status').textContent='Guardando estado…';
+ try{
+  await request('status',ref,next);
+  loading=false;
+  await load();
+ }catch(err){
+  el('status').textContent='No se pudo cambiar el estado: '+(err&&err.message||err);
+  loading=false;
+  el('refresh').disabled=false;
+ }
+}
+el('filter').addEventListener('change',render);
+el('refresh').addEventListener('click',load);
+load();
+</script>
+</body>
+</html>
