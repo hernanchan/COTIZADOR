@@ -576,9 +576,9 @@ async function loadTurnstile(sitekey){
   throw new Error('La verificación Turnstile no está disponible.');
  turnstileWidget=turnstile.render('#turnstileBox',{
   sitekey,action:'polaroids',
-  callback:token=>{turnstileToken=token;status('Verificación completada. Ya podés enviar tus fotos.','ok')},
-  'expired-callback':()=>{turnstileToken='';status('La verificación venció. Completala nuevamente.','bad')},
-  'error-callback':()=>{turnstileToken='';status('Falló la verificación de seguridad. Volvé a intentarlo.','bad')}
+  callback:token=>{if(receivedReference||busy)return;turnstileToken=token;status('Verificación completada. Ya podés enviar tus fotos.','ok')},
+  'expired-callback':()=>{turnstileToken='';if(!receivedReference&&!busy)status('La verificación venció. Completala nuevamente.','bad')},
+  'error-callback':()=>{turnstileToken='';if(!receivedReference&&!busy)status('Falló la verificación de seguridad. Volvé a intentarlo.','bad')}
  });
 }
 async function setupSecureReception(){
