@@ -1,7 +1,15 @@
-# Polaroids Saber · Receptor controlado (no publicado)
+# Polaroids Saber · Receptor controlado (piloto aislado)
 
-**Estado al 16/10/2026:** receptor de Google implementado, URL y sitekey configuradas en la rama; **NO hay recepción pública activa**. La nueva versión API POST/JSONP todavía debe copiarse al proyecto Apps Script y desplegarse para probar recepción real.
+**Estado al 16/10/2026:** receptor de Google desplegado; prueba real de seis fotos completada. La recepción desde el editor se encuentra **pausada en la rama de pruebas** y aún no hay lanzamiento comercial.
 La web `libreriasaber.com.ar`, la rama `main` y la aplicación privada que ya generó 14 archivos permanecen intactas. No se utiliza Cloudflare R2.
+
+## Primera recepción real completada — 16/10/2026
+
+**Prueba aprobada por el dueño:** desde el editor público de pruebas se enviaron **6 fotografías** y Google confirmó la referencia `POL-664B0B45776E023B08D43F46`. Se verificó manualmente en el Drive privado que la carpeta del pedido contiene **14 archivos** (6 originales, 6 recortes JPEG, `encuadres.json`, PDF de impresión A4) y que **el PDF se ve correctamente**. Se probó el camino real navegador → Cloudflare Pages Function → Apps Script → Drive, no únicamente simulaciones.
+
+**Estado tras la prueba:** `recepcion-config.json.enabled=false`. La API Cloudflare `functions/api/polaroids-receiver.js` se actualizó para consultar también el mismo interruptor del servidor mediante `env.ASSETS.fetch` y **rechazar envíos si está desactivado**. Se comprobó con simulaciones que devuelve 503 cuando el interruptor está apagado o falta el servicio de assets. Falta validar la publicación de esa modificación en Cloudflare; **Google Apps Script sigue con `PUBLIC_ENABLED=yes` hasta que su propietario lo desactive**, por lo tanto no tratar el corte del front-end como una desactivación total del endpoint de Google.
+
+Próxima etapa: validar un pedido real de última hoja incompleta (por ejemplo 17 fotos) y después integrar/validar el carrito, la seña y el acceso privado del dueño a PDFs. **No publicar en la web productiva** sin completar esas comprobaciones y resolver la política de conservación y borrado de fotos.
 
 ## Componentes
 
@@ -50,7 +58,8 @@ Las operaciones `uploadPublicPhoto` y `finishPublicOrder` admiten reintentos tra
 - Verificada la sintaxis del receptor y del editor; comprobado con simulaciones que el receptor puede recibir **60 fotografías** y crear **10 PDFs** y un `encuadres.json`. Comprobado el reintento idempotente y la ausencia de URL pública en las respuestas.
 - El panel privado reconoce pedidos de una y diez hojas y calcula $3.000 por hoja y 50 % de seña; los enlaces al PDF solo aparecen cuando se confirma la seña en el panel.
 - El editor pasó pruebas simuladas de envío de seis y de sesenta fotos y recuperación tras una interrupción.
-- **PENDIENTE:** prueba real del nuevo Apps Script expuesto de forma controlada, autenticación en Cloudflare Turnstile, comunicación cross-origin y permisos efectivos. No confundir pruebas simuladas con operación en producción.
+- **SUPERADO:** prueba real con seis fotos, Turnstile, transmisión desde Cloudflare al servidor Google y PDF recibido en Drive privado.
+- **PENDIENTE:** comprobación real de 17 fotos/última hoja incompleta, integración de carrito y panel privado, retiro/retención de fotos, publicación de la nueva protección de bloqueo del proxy en Pages y eventual puesta en producción.
 
 ## Precios y pagos
 
