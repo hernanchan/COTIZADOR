@@ -1,6 +1,6 @@
 # Polaroids Saber · Receptor controlado (no publicado)
 
-**Estado al 16/10/2026:** receptor de Google implementado, URL y sitekey configuradas en la rama; **NO hay recepción pública activa**. La versión de Code.gs modificada en GitHub todavía debe copiarse al proyecto Apps Script y desplegar una nueva versión antes de probar recepción real.
+**Estado al 16/10/2026:** receptor de Google implementado, URL y sitekey configuradas en la rama; **NO hay recepción pública activa**. La nueva versión API POST/JSONP todavía debe copiarse al proyecto Apps Script y desplegarse para probar recepción real.
 La web `libreriasaber.com.ar`, la rama `main` y la aplicación privada que ya generó 14 archivos permanecen intactas. No se utiliza Cloudflare R2.
 
 ## Componentes
@@ -32,16 +32,18 @@ Las operaciones `uploadPublicPhoto` y `finishPublicOrder` admiten reintentos tra
 - El estado técnico de órdenes de más de 14 días puede limpiarse de Script Properties, **pero las fotografías NO se borran automáticamente**. Se requiere definir con el usuario una política de retención antes de atender a clientes reales.
 - Estas cuotas son defensivas y de prueba; no equivalen a una garantía de capacidad comercial. Google Apps Script y Drive tienen límites propios.
 
-## Acciones necesarias ANTES de la prueba real
+## Acciones para retomar la prueba real (16/10/2026)
 
-**Requieren autorización e inicio de sesión del dueño, no realizadas todavía.**
+**Se identificó un bloqueo en el iframe de Apps Script que coincide con incidentes conocidos de Google durante 2026.** El enlace /exec sí muestra «Recepción protegida de fotografías» en incógnito. Se abandona el iframe y se usa un endpoint `doPost` con JSON de origen autenticado (sin CORS) más una consulta JSONP estrictamente **de solo lectura** y autenticada con la clave de pedido; no se expone información de Drive ni secretos en la respuesta.
 
-1. Desde el perfil de Chrome **Polaroids Saber**, crear un proyecto Apps Script **nuevo**, bajo la cuenta dedicada, con los archivos `Code.gs` y `Bridge.html`. No modificar el Apps Script privado existente.
-2. En el panel de Cloudflare, crear un widget gratuito Turnstile restringido exactamente al dominio de **pruebas** y conservar la sitekey pública y la secret key privada. No activar servicios pagos.
-3. En las propiedades del nuevo Script cargar `PUBLIC_ENABLED=no`, `RECEIPT_FOLDER_ID` (la misma carpeta privada configurada en el piloto), `TURNSTILE_SECRET` (nunca en GitHub) y `TURNSTILE_HOSTNAME` (hostname del dominio de pruebas). Autorizar los permisos de Google solicitados.
-4. Crear implementación web separada ejecutada **como propietario**, acceso «Cualquiera» únicamente cuando sea posible dejar el servidor apagado con `PUBLIC_ENABLED=no`; comprobar primero que su URL muestra «Recepción de clientes deshabilitada».
-5. Registrar la URL de implementación en `recepcion-config.json`, la sitekey en ese mismo archivo; mantener `enabled:false` hasta que se autorice explícitamente la prueba controlada.
-6. Verificar la rama de pruebas en Cloudflare Pages; validar el iframe intermedio de Google, Turnstile, una carga de seis fotos ficticias, una de varias hojas, PDF privado y carrito; recién después decidir apertura al público. **No publicar cambios en main ni en libreriasaber.com.ar**.
+1. El propietario actualiza el archivo **Code.gs** del proyecto **POLAROIDS SABER - RECEPCIÓN CLIENTES** con la versión completa en esta rama. **Bridge.html** puede permanecer sin cambios: ya no se usa.
+2. En Apps Script el propietario debe elegir **Implementar → Administrar implementaciones → Editar → Nueva versión → Implementar** para actualizar el mismo /exec.
+3. En la rama de pruebas `recepcion-config.json` permanece **`enabled:false`** hasta que se confirme que la nueva versión se implementó; luego activar exclusivamente esta rama.
+4. El editor realiza automáticamente una consulta JSONP `api=ping` antes de solicitar fotos; si el servidor sigue usando la versión vieja o hay un bloqueo no deja continuar con los envíos. Respuesta esperada: `{ok:true,apiVersion:"v2-noframe"}`.
+5. Con Turnstile y consentimiento, subir solo **seis fotos ficticias**; verificar cada original, recorte y PDF en Drive privado y la referencia de pedido. Repetir un caso de 17 fotos solo después de que funcione el de seis.
+6. Confirmar la gestión en el panel privado, la política de retención de fotos y el flujo de depósito antes de abrir ventas reales. No tocar `main` ni la web pública.
+
+**Seguridad:** la operación de inicio exige Cloudflare Turnstile validado en servidor; las operaciones posteriores exigen referencia aleatoria y clave de carga secreta de 256 bits; JSONP solo consulta conteos/estado y no modifica pedidos ni retorna ninguna clave. No se creó infraestructura paga. La clave secreta de Turnstile permanece únicamente en Script Properties.
 
 ## Estado de validación
 
