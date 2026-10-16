@@ -34,7 +34,7 @@ footer{background:#071f36;color:#fff;padding:25px 0}.footerrow{display:flex;alig
 @media(max-width:650px){.container{width:min(100% - 22px,1220px)}.topbar .container{padding:8px 0}.topinfo{gap:8px}.topinfo span:nth-child(2){display:none}.head{min-height:68px}.brand img{width:46px;height:46px}.brand small{display:none}.nav .quote{padding:11px 13px;font-size:11px}.hero{padding-top:12px}.hero-copy{padding:38px 27px;min-height:420px;border-radius:24px}.hero h1{font-size:45px}.hero p{font-size:15px}.hero-actions .btn{width:100%}.hero-visual{min-height:350px;border-radius:24px}.visual-card{left:14px;right:14px;bottom:14px;padding:15px}.visual-card b{font-size:17px}.visual-card a{display:none}.quick{padding:18px 0 52px}.quick-head{display:block}.quick-head p{margin-top:8px}.category-tabs{grid-template-columns:1fr}.catbtn{padding:16px}.panel{padding:12px;border-radius:22px}.panel-head{display:block}.panel-head p{margin-top:7px}.product{grid-template-columns:110px 1fr}.product-body{padding:14px}.bottom{padding-bottom:18px}.promo-now,.contact-card{padding:25px;border-radius:22px}.footerrow{display:block}.footerrow small{display:block;margin-top:7px}.mobilebar{display:grid}body{padding-bottom:78px}}
 </style>
 </head>
-<body><div style="padding:12px;text-align:center;background:#fff0cd;border-bottom:2px solid #f7931e;color:#594007;font:bold 13px Arial;position:sticky;top:0;z-index:999">ENTORNO DE PRUEBA · No se envían archivos ni pedidos · No es la tienda pública</div>
+<body><div style="padding:12px;text-align:center;background:#fff0cd;border-bottom:2px solid #f7931e;color:#594007;font:bold 13px Arial;position:sticky;top:0;z-index:999">ENTORNO DE PRUEBA · Se pueden enviar fotos al Drive privado cuando se habilita la recepción · WhatsApp identifica los mensajes de prueba · No es la tienda pública</div>
 <div class="topbar"><div class="container"><div class="topinfo"><span><b>35 años junto a vos</b></span><span>Poeta Lugones · Córdoba</span><span>Lunes a viernes · 7:00 a 13:30 y 16:30 a 20:00</span></div><span>WhatsApp 351 311-0130</span></div></div>
 <header><div class="container head"><a class="brand" href="#inicio"><img src="https://cdn.jsdelivr.net/gh/hernanchan/COTIZADOR@50b47daecfd3b1490bab03c235d47b7285f9f49e/assets/logo-sbr.png" alt="Logo Librería Saber"><span><strong>LIBRERÍA SABER</strong><small>Escolar · Oficina · Impresiones</small></span></a><nav class="nav"><a href="#categorias">Categorías</a><a href="#beneficio">Beneficio de hoy</a><a href="#contacto">Contacto</a><button class="cart-open" type="button" onclick="openCart()">Carrito <span class="cart-badge" id="cartBadge">0</span></button><a class="quote" href="cotizar.html">Cotizar impresiones</a></nav></div></header>
 <main>
@@ -48,17 +48,17 @@ footer{background:#071f36;color:#fff;padding:25px 0}.footerrow{display:flex;alig
 <section class="bottom" id="beneficio"><div class="container bottom-grid"><article class="promo-now"><small id="promoDay">Beneficio de hoy</small><h3 id="promoTitle">Promoción semanal</h3><p id="promoText">El cotizador aplica automáticamente el beneficio correspondiente al día.</p><a href="cotizar.html">Cotizar con el beneficio</a></article><article class="contact-card" id="contacto"><h3>Estamos en el barrio</h3><p>Más de 35 años acompañando a estudiantes, familias, comercios y profesionales.</p><div class="contact-line"><div>Javier Lascano Colodrero · Poeta Lugones</div><div>Lunes a viernes · 7:00 a 13:30 y 16:30 a 20:00</div></div><div class="contact-actions"><a href="#" title="Deshabilitado en la prueba" target="_blank" rel="noopener">WhatsApp</a><a href="https://maps.app.goo.gl/xZTZycc15UEd1TJB8" target="_blank" rel="noopener">Cómo llegar</a><a href="mailto:libreriasaber@gmail.com">Correo</a></div></article></div></section>
 </main>
 <footer><div class="container footerrow"><b>LIBRERÍA SABER</b><small>35 años junto a vos · Córdoba Capital</small></div></footer>
-<div class="overlay" id="overlay" onclick="closeCart()"></div><aside class="cart" id="cart"><div class="cart-head"><h3>Tu pedido</h3><button class="close" onclick="closeCart()">×</button></div><div class="cart-body" id="cartBody"></div><div class="cart-footer"><div class="subtotal"><span>Artículos</span><b id="productsSubtotal">$ 0</b></div><div class="subtotal"><span>Impresión y gráfica</span><b id="printsSubtotal">$ 0</b></div><div class="deposit"><span>Seña trabajos de producción</span><span id="depositSubtotal">$ 0</span></div><div class="total"><span>Total pedido</span><span id="grandTotal">$ 0</span></div><button class="checkout" onclick="sendWhatsApp()">Ver mensaje del pedido · Prueba</button><div class="cart-hint">La seña corresponde únicamente a impresión y gráfica, no a artículos de librería. <strong>El pedido puede enviarse antes de pagar; la producción comienza luego de confirmar la seña.</strong> En este entorno solo se prepara una simulación.</div></div></aside>
+<div class="overlay" id="overlay" onclick="closeCart()"></div><aside class="cart" id="cart"><div class="cart-head"><h3>Tu pedido</h3><button class="close" onclick="closeCart()">×</button></div><div class="cart-body" id="cartBody"></div><div class="cart-footer"><div class="subtotal"><span>Artículos</span><b id="productsSubtotal">$ 0</b></div><div class="subtotal"><span>Impresión y gráfica</span><b id="printsSubtotal">$ 0</b></div><div class="deposit"><span>Seña trabajos de producción</span><span id="depositSubtotal">$ 0</span></div><div class="total"><span>Total pedido</span><span id="grandTotal">$ 0</span></div><button class="checkout" onclick="sendWhatsApp()">Revisar pedido para WhatsApp</button><div class="cart-hint">La seña corresponde únicamente a impresión y gráfica, no a artículos de librería. <strong>El pedido puede enviarse antes de pagar; la producción comienza luego de confirmar la seña.</strong> En esta página los mensajes de WhatsApp se identifican como prueba.</div></div></aside>
 <section id="orderPreviewOverlay" class="order-preview-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="orderPreviewTitle">
   <div class="order-preview-panel">
     <div class="order-preview-head">
-      <h2 id="orderPreviewTitle">Mensaje de pedido · Simulación</h2>
+      <h2 id="orderPreviewTitle">Revisar pedido para WhatsApp</h2>
       <button id="closeOrderPreview" type="button" aria-label="Cerrar resumen" onclick="closeOrderPreview()">×</button>
     </div>
-    <p class="order-preview-warning"><strong>PRUEBA:</strong> este mensaje no se envía por WhatsApp. Si se habilita una recepción protegida, comprobá los archivos en el panel privado antes de imprimir.</p>
-    <p class="order-preview-label">Así se resumirán juntos los artículos y trabajos de impresión:</p>
+    <p class="order-preview-warning"><strong>ENTORNO DE PRUEBA:</strong> el mensaje llevará la leyenda «NO PRODUCIR». No se envía automáticamente: confirmalo en WhatsApp si querés hacer la prueba.</p>
+    <p class="order-preview-label">El mensaje incluirá artículos, trabajos, importes y referencias de fotos:</p>
     <textarea id="orderPreviewText" readonly rows="14" aria-label="Texto simulado del pedido"></textarea>
-    <div class="order-preview-actions"><button type="button" class="checkout" onclick="copyOrderPreview()">Copiar texto de prueba</button><button type="button" class="secondary-preview" onclick="closeOrderPreview()">Cerrar</button></div>
+    <div class="order-preview-actions"><button type="button" class="checkout" onclick="openWhatsAppPreview()">Abrir WhatsApp · Prueba</button><button type="button" class="secondary-preview" onclick="copyOrderPreview()">Copiar</button><button type="button" class="secondary-preview" onclick="closeOrderPreview()">Cerrar</button></div>
     <div id="orderPreviewStatus" class="order-preview-feedback" aria-live="polite"></div>
   </div>
 </section>
@@ -86,7 +86,7 @@ footer{background:#071f36;color:#fff;padding:25px 0}.footerrow{display:flex;alig
     const real=Array.isArray(x.receivedReferences)&&x.filesReceived===true
       ?x.receivedReferences.filter(r=>/^POL-[A-F0-9]{24}$/.test(String(r))).slice(0,10):[];
     const draftNote=refs.length?' · Referencia(s) provisional(es): '+refs.join(', ')+' · FOTOS NO RECIBIDAS':'';
-    const receivedNote=real.length?' · Recepción informada: '+real.join(', ')+' · Verificar en panel privado':'';
+    const receivedNote=real.length?' · Fotos recibidas · referencia: '+real.join(', ')+' · Verificar en panel privado':'';
     const detail=x.type==='print'?(x.detail||'Trabajo cotizado')+draftNote+receivedNote:`${money(x.price)} c/u`;const controls=x.type==='product'?`<div class="qty"><button onclick="changeQty('${x.id}',-1)">−</button><span>${x.qty}</span><button onclick="changeQty('${x.id}',1)">+</button><button class="remove" onclick="removeItem('${x.id}')">Quitar</button></div>`:`<div class="qty"><button class="remove" onclick="removeItem('${x.id}')">Quitar trabajo</button></div>`;return `<div class="cart-item"><div class="cart-row"><div><b>${escapeHtml(x.name)}</b><small>${escapeHtml(detail)}</small></div><b>${money(x.price*(Number(x.qty)||1))}</b></div>${controls}</div>`}).join('')}</div>`}).join('')}const prod=cart.filter(x=>x.type==='product').reduce((s,x)=>s+x.price*x.qty,0);const prints=cart.filter(x=>x.type==='print');const pr=prints.reduce((s,x)=>s+x.price*(Number(x.qty)||1),0);const deposit=prints.reduce((s,x)=>s+(Number(x.deposit)||Math.round(Number(x.price||0)*.5)),0);document.getElementById('productsSubtotal').textContent=money(prod);document.getElementById('printsSubtotal').textContent=money(pr);document.getElementById('depositSubtotal').textContent=money(deposit);document.getElementById('grandTotal').textContent=money(prod+pr)}
  window.openCart=function(){document.getElementById('cart').classList.add('open');document.getElementById('overlay').classList.add('open')};window.closeCart=function(){document.getElementById('cart').classList.remove('open');document.getElementById('overlay').classList.remove('open')};
  function itemQty(x){const q=Number(x.qty);return Number.isInteger(q)&&q>0?q:1}
@@ -103,7 +103,7 @@ footer{background:#071f36;color:#fff;padding:25px 0}.footerrow{display:flex;alig
    const productTotal=products.reduce((a,x)=>a+amount(x),0);
    const workTotal=works.reduce((a,x)=>a+amount(x),0);
    const deposit=works.reduce((a,x)=>a+productionDeposit(x),0);
-   const lines=['SIMULACIÓN - NO ENVIAR','PEDIDO DE PRUEBA - LIBRERÍA SABER',''];
+   const lines=['PRUEBA - NO PRODUCIR','PEDIDO POLAROIDS · LIBRERÍA SABER',''];
    if(products.length){
      lines.push('ARTÍCULOS:');
      products.forEach(x=>lines.push('- '+x.name+' · '+itemQty(x)+' u. · '+money(amount(x))));
@@ -123,8 +123,8 @@ footer{background:#071f36;color:#fff;padding:25px 0}.footerrow{display:flex;alig
        const received=Array.isArray(x.receivedReferences)&&x.filesReceived===true?
         x.receivedReferences.filter(r=>/^POL-[A-F0-9]{24}$/.test(String(r))).slice(0,10):[];
        if(received.length){
-         lines.push('  Recepción informada: '+received.join(', '));
-         lines.push('  LIBRERÍA SABER: verificar en panel privado antes de imprimir');
+         lines.push('  Fotos recibidas · referencia: '+received.join(', '));
+         lines.push('  Librería Saber: verificar seña antes de imprimir');
        }
      });
      lines.push('');
@@ -132,33 +132,52 @@ footer{background:#071f36;color:#fff;padding:25px 0}.footerrow{display:flex;alig
    lines.push('Artículos: '+money(productTotal));
    lines.push('Impresión y gráfica: '+money(workTotal));
    lines.push('TOTAL: '+money(productTotal+workTotal));
-   lines.push('Seña requerida para producción: '+money(deposit));
+   lines.push('Seña 50% solamente de impresión y gráfica: '+money(deposit));
    lines.push('');
    lines.push('El pedido puede enviarse por WhatsApp antes de abonar la seña.');
    lines.push('La impresión se realizará únicamente después de confirmar el pago del 50 % correspondiente.');
-   lines.push('SIMULACIÓN DEL MENSAJE: no se ha enviado el pedido por WhatsApp.');
+   lines.push('PRUEBA - NO PRODUCIR NI PREPARAR UN PEDIDO REAL.');
    lines.push('Las referencias provisionales NO significan fotos recibidas.');
    lines.push('Las referencias de recepción deben verificarse en el panel privado de Librería Saber.');
    return lines.join('\n');
  }
+ const orderWhatsapp='5493513110130';
+ const hasReceivedPhotos=x=>x.filesReceived===true&&Array.isArray(x.receivedReferences)&&
+  x.receivedReferences.some(ref=>/^POL-[A-F0-9]{24}$/.test(String(ref)));
+ const pendingPhotoItems=()=>cart.filter(x=>x.type==='print'&&Array.isArray(x.draftReferences)&&
+  x.draftReferences.length>0&&!hasReceivedPhotos(x));
  window.sendWhatsApp=function(){
    if(!cart.length){alert('Agregá algún producto o trabajo antes de continuar.');return;}
+   if(pendingPhotoItems().length){
+     alert('Hay Polaroids con fotos todavía no recibidas. Quitá ese trabajo provisional y completá el envío antes de finalizar.');
+     return;
+   }
    document.getElementById('orderPreviewText').value=createOrderPreview();
    document.getElementById('orderPreviewStatus').textContent='';
    document.getElementById('orderPreviewOverlay').hidden=false;
    document.getElementById('closeOrderPreview').focus();
  };
- window.closeOrderPreview=function(){
+ window.openWhatsAppPreview=function(){
+   if(!cart.length||pendingPhotoItems().length)return;
+   const msg=document.getElementById('orderPreviewText').value;
+   if(!msg)return;
+   const url='https://api.whatsapp.com/send?phone='+orderWhatsapp+'&text='+encodeURIComponent(msg);
+   const link=document.createElement('a');
+   link.href=url;link.target='_blank';link.rel='noopener noreferrer';
+   document.body.append(link);link.click();link.remove();
+   document.getElementById('orderPreviewStatus').textContent='WhatsApp abierto con el pedido marcado como PRUEBA. Confirmá el envío desde WhatsApp.';
+ };
+  window.closeOrderPreview=function(){
    document.getElementById('orderPreviewOverlay').hidden=true;
  };
  window.copyOrderPreview=async function(){
    const field=document.getElementById('orderPreviewText');
    try{
      await navigator.clipboard.writeText(field.value);
-     document.getElementById('orderPreviewStatus').textContent='Texto de simulación copiado. Ningún pedido fue enviado.';
+     document.getElementById('orderPreviewStatus').textContent='Texto copiado.';
    }catch(e){
      field.focus();field.select();
-     document.getElementById('orderPreviewStatus').textContent='Seleccioná y copiá el texto con Ctrl + C. Ningún pedido fue enviado.';
+     document.getElementById('orderPreviewStatus').textContent='Seleccioná y copiá el texto con Ctrl + C.';
    }
  };
  document.getElementById('orderPreviewOverlay').addEventListener('click',e=>{if(e.target.id==='orderPreviewOverlay')closeOrderPreview()});
