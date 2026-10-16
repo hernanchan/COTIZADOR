@@ -6,7 +6,7 @@ Base revisada: `a2908f52e9897f3e86bb9cf54d48f34841ca629b`.
 
 ## Estado conservado
 
-- `enabled:false`, `showInShop:false`, `rollout:PENDIENTE_DE_APROBACION`, clave Turnstile vacía.
+- `enabled:false`, `showInShop:false`, `rollout:PENDIENTE_DE_APROBACION`. Clave pública Turnstile configurada en `608b8adeeb623c507ed436ba69200b6696066854`.
 - No se fusiona a main ni se activa recepción ni acceso comercial.
 - Sin R2 ni nuevos servicios, bindings de almacenamiento o contrataciones.
 - El PR tiene despliegues automáticos de vista previa de Cloudflare. Eso no equivale a publicar en el dominio oficial.
@@ -67,3 +67,13 @@ Se verificó la vista previa de la rama en `https://polaroids-preparacion-produc
 - Cloudflare Dashboard requiere inicio de sesión en este navegador; revisión de la configuración de cuenta pendiente de acceso.
 
 Esta revisión resuelve la inspección visual de escritorio que antes estaba pendiente por falta de Chromium local; no sustituye la comprobación de configuración ni una prueba real autorizada.
+
+## Confirmaciones desde la cuenta del titular (16/10/2026)
+
+- Capturas de Pages: producción sigue en main `6a7d284`; raíz y comando de compilación vacíos, salida `vidriera`. Preview `f5f0c591-5dee-4d88-8e27-740c981df64c` corresponde a `4694a2a`.
+- La pestaña Funciones confirma GET `/api/polaroids-ping`, GET y POST `/api/polaroids-receiver`. Rutas de invocación limitadas a ambos endpoints. Esto confirma registro, no ejecución ni disponibilidad de ASSETS durante una solicitud real.
+- Widget existente LIBRERÍA SABER - POLAROIDS, modo Gestionado. Originalmente solo autorizaba `polaroids-integracion-sin-r2.libreriasaber.pages.dev`. El titular confirmó haber agregado y guardado `libreriasaber.com.ar` conservando el piloto; no se inspeccionó una captura posterior al guardado.
+- Clave pública suministrada por el titular e incorporada en el JSON de preparación. No se solicitó ni almacenó la clave secreta.
+- El titular confirmó que la propiedad actual `TURNSTILE_HOSTNAME` del receptor es `polaroids-integracion-sin-r2.libreriasaber.pages.dev`. Se conserva para no interrumpir el piloto.
+- Para la transición autorizada al dominio oficial, el receptor deberá aceptar `libreriasaber.com.ar`. Con la validación actual de un único hostname, sustituir la propiedad dejará de aceptar nuevas recepciones del piloto. No modificarla antes de coordinar la activación.
+- Permanecen pendientes ejecución real del relay preparado, comprobación móvil, redirección www, política de conservación y prueba completa sobre el dominio oficial después de autorización. No se fusionó ni se activó ningún acceso.
