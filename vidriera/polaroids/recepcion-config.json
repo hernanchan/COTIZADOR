@@ -1,0 +1,9 @@
+{
+  "enabled": false,
+  "showInShop": false,
+  "allowedHost": "libreriasaber.com.ar",
+  "bridgeUrl": "https://script.google.com/macros/s/AKfycbxH5hpSS0HjTLQtFIxmTluo7KHzxHj1FWpDkbIwW25_jKVdDq_EFnfBFyNO3XIJpv0TIg/exec",
+  "turnstileSiteKey": "0x4AAAAAAFX-6YrJkh8ztokh",
+  "maxSheetsForRealUploads": 10,
+  "rollout": "PENDIENTE_DE_APROBACION"
+}

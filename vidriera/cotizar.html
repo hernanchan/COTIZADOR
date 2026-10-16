@@ -28,6 +28,9 @@
       <div class="cart-status" id="cartStatus">Carrito 0</div>
     </div>
   </header>
+  <div id="polaroidsQuoteEntry" hidden style="width:min(1180px,calc(100% - 20px));margin:16px auto 0;padding:14px 20px;background:#fff4e1;border:1px solid #f4c484;border-radius:12px;text-align:center">
+    <a href="polaroids/editor.html" style="color:#163e67;font-weight:800;text-decoration:none">Preparar Polaroids · 6 por hoja A4, con encuadre personalizado →</a>
+  </div>
   <main class="shell">
     <iframe id="cotizadorFrame" src="https://hernanchan.github.io/COTIZADOR/cotizador-web-v2.html?integrado=1" title="Cotizador de Librería Saber"></iframe>
   </main>
@@ -36,6 +39,14 @@
       var key='saberCartV1';
       function readCart(){try{return JSON.parse(localStorage.getItem(key)||'[]')}catch(e){return []}}
       function updateStatus(){var cart=readCart();var count=cart.reduce(function(sum,item){return sum+(Number(item.qty)||1)},0);document.getElementById('cartStatus').textContent='Carrito '+count}
+      // Se mantiene invisible hasta un lanzamiento expresamente aprobado.
+      fetch('polaroids/recepcion-config.json',{cache:'no-store'}).then(r=>{
+        if(!r.ok)throw Error('Config no disponible');return r.json();
+      }).then(cfg=>{
+        if(cfg.showInShop===true&&cfg.enabled===true&&cfg.rollout==='APROBADO'&&
+           location.hostname===cfg.allowedHost&&/^0x[A-Za-z0-9_-]{8,}$/.test(String(cfg.turnstileSiteKey||'')))
+          document.getElementById('polaroidsQuoteEntry').hidden=false;
+      }).catch(()=>{});
       updateStatus();
       window.addEventListener('storage',updateStatus);
       window.addEventListener('message',function(event){

@@ -1,0 +1,669 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Polaroids · Librería Saber</title>
+<style>
+:root{font-family:Inter,Segoe UI,Arial,sans-serif;color:#263146;background:#f2f4f7;--ink:#263146;--muted:#67778d;--blue:#2365b9;--line:#dbe1e9;--paper:#fff}
+*{box-sizing:border-box}body{margin:0}button,input{font:inherit}button{cursor:pointer}button:disabled{opacity:.48;cursor:not-allowed}
+header{background:#ffffff;border-bottom:1px solid var(--line);padding:18px clamp(20px,3vw,44px);display:flex;justify-content:space-between;align-items:center;gap:16px}header .brand{font-size:22px;font-weight:850;letter-spacing:-.7px}header .brand em{font-style:normal;color:#e77934}.fixed-format{background:#f3f7fd;border:1px solid #cddded;border-radius:9px;padding:12px 13px;display:flex;flex-direction:column;gap:4px}.fixed-format strong{font-size:14px;color:#204d7f}.fixed-format span{font-size:11px;color:#596d85}.trim-tip{font-size:11px;line-height:1.5;color:#365b61;background:#eff9f7;border:1px solid #d7ebe6;border-radius:8px;padding:10px 11px;margin-top:9px}.tag{display:inline-block;margin-left:12px;padding:4px 8px;border:1px solid #c9d7ed;background:#eaf2ff;border-radius:5px;color:#3163a0;font-size:11px;font-weight:800;vertical-align:middle;letter-spacing:.6px}header p{font-size:12px;color:var(--muted);margin:4px 0 0}.app{display:grid;grid-template-columns:minmax(365px,465px) minmax(370px,1fr);gap:22px;margin:22px auto;padding:0 22px;max-width:1360px}.panel{background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 6px 22px #1b35500a}.left{padding:22px}.right{padding:16px 24px 24px;display:flex;flex-direction:column;align-items:center}.sect{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:0 0 12px}.sect h2{font-size:17px;letter-spacing:-.35px;margin:0}.sect small{color:var(--muted)}.drop{display:block;text-align:center;border:1.5px dashed #9ab1cf;border-radius:12px;background:#f6f9fe;padding:23px 10px;margin-bottom:15px;cursor:pointer;transition:all .15s}.drop.drag{background:#e6f0ff;border-color:var(--blue)}.drop strong{display:block;font-size:14px}.drop p{font-size:12px;color:var(--muted);margin:5px 0 0}.drop svg{width:31px;height:31px;color:#3069b1;margin-bottom:7px}.drop:hover{background:#eef5ff}.slots{display:grid;grid-template-columns:1fr 1fr;gap:10px}.slot{position:relative;padding:10px;display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;min-width:0;background:#fff}.slot.empty{background:#fafbfc}.slot-picture{flex:0 0 64px;height:73px;background:#edf0f5;padding:4px 4px 12px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px #0001}.slot-picture canvas{height:100%;width:100%;object-fit:cover}.slot-picture .emptyicon{font-size:22px;color:#a0adbd}.slot .inf{flex:1;min-width:0}.slot b{display:block;font-size:12px}.slot .name{display:block;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;color:#768397;font-size:10px;margin:4px 0}.slot .actions{display:flex;align-items:center;gap:5px}.slot button{border:0;background:#eef4fc;border-radius:5px;color:#265b9a;padding:5px;font-weight:750;font-size:10px;white-space:nowrap}.slot button.del{position:absolute;top:5px;right:5px;color:#a95353;background:#fff0ef;font-size:12px;padding:2px 5px}.slot button:hover{filter:brightness(.96)}.options{border-top:1px solid var(--line);margin-top:17px;padding-top:16px}.options label{font-size:12px;font-weight:800;display:block;margin-bottom:8px}.mode-list{display:flex;gap:8px}.mode{display:flex;gap:6px;align-items:center;flex:1;border:1px solid #dae1ea;border-radius:7px;padding:9px 8px;font-size:11px;cursor:pointer}.mode:has(input:checked){border-color:#5188c5;background:#edf5ff;color:#1b5798}.mode input{accent-color:var(--blue);margin:0}.details{font-size:11px;color:#6a778b;line-height:1.55;margin:10px 1px}.buttons{display:flex;gap:9px;margin-top:15px;flex-wrap:wrap}.primary{border:0;background:var(--blue);color:#fff;border-radius:9px;padding:13px 16px;font-weight:800;flex:1}.primary:not(:disabled):hover{background:#19549d}.secondary{background:#fff;color:#476079;border:1px solid #cdd8e5;border-radius:9px;padding:12px 13px;font-size:12px;font-weight:700}.status{font-size:12px;color:var(--muted);min-height:18px;margin-top:11px}.status.bad{color:#bc3d3d}.status.ok{color:#26754e}.sheet-title{align-self:stretch;display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:12px}.sheet-title h2{margin:0;font-size:17px}.sheet-title small{color:#728197}.paper-holder{width:min(100%,520px);background:#e4e8ec;padding:10px;border:1px solid #d6dce3;border-radius:6px;display:flex;justify-content:center}.paper{display:block;aspect-ratio:210/297;width:100%;background:white;box-shadow:0 2px 7px #0002;cursor:pointer}.legend{text-align:center;line-height:1.55;color:#6d7a8b;font-size:11px;margin:11px 4px 0;max-width:520px}.info{display:flex;gap:10px;width:100%;justify-content:center;margin-top:12px}.info span{font-size:11px;color:#4e6180;background:#edf2f7;border-radius:7px;padding:7px 9px}.tip{max-width:1360px;padding:0 25px 24px;margin:0 auto;font-size:11px;color:#63738a}.modal{position:fixed;inset:0;background:#1b263ac7;z-index:20;display:none;align-items:center;justify-content:center;padding:22px}.modal.show{display:flex}.editbox{background:white;border-radius:15px;width:min(96vw,630px);max-height:94vh;overflow:auto;padding:20px;box-shadow:0 15px 80px #0005}.editheader{display:flex;align-items:center;justify-content:space-between;margin-bottom:13px}.editheader h2{margin:0;font-size:19px}.editheader button{border:0;background:#eef1f6;color:#405673;border-radius:6px;padding:6px 10px;font-weight:800}.cropwrap{width:min(100%,490px);margin:auto;position:relative;background:#e8edf3;border:6px solid #f4f6f8;outline:1px solid #bdc8d4;touch-action:none;cursor:grab}.cropwrap:active{cursor:grabbing}.cropwrap canvas{display:block;width:100%;height:auto;touch-action:none}.cropwrap:after{content:"";position:absolute;inset:0;border:1px solid #ffffffb0;pointer-events:none}.slidebar{margin:18px auto 8px;max-width:490px;display:flex;align-items:center;gap:12px}.slidebar label{font-size:12px;font-weight:750}.slidebar input{flex:1;min-width:30px;accent-color:var(--blue)}.slidebar output{font-size:12px;min-width:40px;text-align:right}.modalnote{text-align:center;font-size:12px;color:#60718a;line-height:1.5;margin:8px}.modalfoot{display:flex;justify-content:space-between;gap:8px;margin-top:14px}.quality{font-size:12px;font-weight:700;padding-top:12px}.quality.good{color:#227443}.quality.mid{color:#a47715}.quality.low{color:#b03c3c}.key{background:#f1f3f7;border:1px solid #d7dce5;border-radius:4px;padding:0 4px;font-size:10px}
+@media(max-width:950px){.app{grid-template-columns:1fr}.right{order:2}.left{order:1}.paper-holder{max-width:520px}.slot-picture{flex-basis:55px;height:65px}.slot .actions{flex-wrap:wrap}}
+@media(max-width:440px){header{padding:13px}.app{padding:0 10px;gap:12px;margin:12px 0}.left{padding:14px}.slots{grid-template-columns:1fr 1fr;gap:7px}.slot{padding:7px;gap:6px}.slot-picture{flex-basis:47px;height:57px}.slot .actions{flex-wrap:wrap}.slot button{padding:4px 3px}.right{padding:12px}.mode-list{flex-direction:column}.info{flex-wrap:wrap}.tag{margin-left:4px}}
+
+.demo-cart{max-width:1316px;margin:0 auto 20px;padding:20px 22px}.demo-cart-title{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:16px;color:var(--ink)}.demo-cart-title span{font-size:11px;color:#9a641f;background:#fff5e7;padding:5px 7px;border-radius:5px;font-weight:700}.demo-cart-empty{color:var(--muted);font-size:13px;margin-top:12px}.demo-cart-ok{border:1px solid #c5dfce;background:#f2fbf5;padding:15px;border-radius:8px;margin-top:13px}.demo-cart-ok .name{font-size:15px;font-weight:800}.demo-cart-ok .desc{font-size:12px;color:#536578;margin-top:6px}.demo-cart-ok .warning{font-size:12px;color:#915c28;margin-top:10px}.paper{cursor:default}.preview-tag{display:block;font-size:11px;font-weight:700;color:#915c28;text-align:center;margin-top:7px}
+@media(max-width:540px){.app>.left{grid-row:1;order:0}.app>.right{grid-row:2;order:0}.slots{grid-template-columns:1fr}.slot{padding:9px;gap:12px}.slot-picture{flex-basis:60px;height:68px}.slot button{font-size:12px;padding:8px 11px}.slot button.del{padding:4px 9px}.drop{padding:20px}.app{grid-template-columns:minmax(0,1fr)}.modalfoot{flex-direction:column}.modalfoot .primary{flex:1!important}.demo-cart{margin:0 10px 18px;padding:15px}.sheet-title h2{font-size:15px}}
+
+/* Diseño compacto de producción: dos columnas reales en PC, una en móvil. */
+@media(min-width:951px){
+  header{padding:12px 18px}
+  .app{max-width:1200px;grid-template-columns:minmax(360px,425px) minmax(400px,1fr);gap:14px;margin:14px auto;padding:0 14px}
+  .left{padding:15px}.right{padding:14px 16px}
+  .drop{padding:10px;margin-bottom:10px}
+  .drop svg{width:24px;height:24px;margin-bottom:2px}
+  .slots{gap:7px}.slot{padding:7px;gap:7px}
+  .slot-picture{flex-basis:52px;height:59px;padding:3px 3px 9px}
+  .options{margin-top:11px;padding-top:10px}
+  .fixed-format{padding:9px}
+  .trim-tip{padding:7px 9px;margin-top:6px}
+  .details{margin:6px 0}
+  .buttons{margin-top:10px}
+  .status{margin-top:6px}
+  .paper-holder{width:min(100%,440px)}
+  .legend{margin-top:8px}.info{margin-top:7px}
+}
+html.embedded .demo-cart{display:none}
+@media(max-width:950px){html.embedded .app{margin-bottom:8px}}
+
+.sheetnav{border:1px solid #c5d4e4;background:#f4f8fe;border-radius:10px;padding:10px;margin-bottom:12px}
+.sheetnavtop{display:flex;justify-content:space-between;align-items:center;gap:8px;color:#204d7f;margin-bottom:9px;font-size:13px}
+.sheetnavtop strong{font-size:14px;color:#245f9d}.sheetnavbuttons{display:flex;gap:6px;flex-wrap:wrap}
+.sheetnavbuttons .secondary{padding:8px 10px;font-size:11px}.sheetnavbuttons .delete-sheet{margin-left:auto;color:#a44343}
+.sheetnav small{display:block;font-size:11px;color:#61768e;margin-top:8px}
+@media(min-width:951px){.app{grid-template-columns:minmax(390px,465px) minmax(400px,1fr)}.sheetnav{padding:9px}.sheetnavbuttons .secondary{padding:7px 9px}}
+@media(max-width:540px){.sheetnavbuttons .secondary{flex:1}.sheetnavbuttons .delete-sheet{flex:0 0 auto}}
+.preview-guide{align-self:stretch;width:min(100%,520px);margin:12px auto 0;padding:12px 14px;border:1px solid #e0e8f2;border-radius:10px;background:#f8fafd}
+.preview-guide h3{margin:0 0 9px;font-size:13px;color:#294e74}.guide-step{display:flex;align-items:flex-start;gap:9px;margin-top:7px}.guide-step p{margin:0;font-size:11.5px;line-height:1.4;color:#526379}.guide-step strong{color:#263b51}.guide-num{display:flex;align-items:center;justify-content:center;flex:0 0 20px;height:20px;border-radius:50%;background:#e5edf8;color:#305b86;font-size:11px;font-weight:800}
+@media(max-width:540px){.preview-guide{margin-top:10px;padding:11px}.guide-step p{font-size:12px}}
+.secure-reception-note[hidden],#receiverHolder[hidden]{display:none!important}
+.secure-reception-note{border:1px solid #cbdde7;border-radius:10px;background:#f2f9fa;padding:11px;margin-top:12px;color:#335469;font-size:12px}
+.secure-reception-note strong{display:block;font-size:13px;margin-bottom:5px}
+.secure-reception-note span{display:block;line-height:1.5}
+.consent-check{display:flex!important;align-items:start;gap:7px;font-size:11px!important;line-height:1.45;margin:10px 0!important;cursor:pointer}
+.consent-check input{margin:2px 0 0;flex:0 0 auto}
+#turnstileBox{min-height:18px;margin:10px 0 4px}
+.uploading .drop,.uploading .slots,.uploading .sheetnav,.uploading .options,.uploading .partial-notice{pointer-events:none;opacity:.62}
+.partial-notice{border:1px solid #e8ba78;background:#fff8e9;border-radius:10px;padding:12px;margin:11px 0;color:#604411;font-size:13px;line-height:1.4}.partial-notice[hidden]{display:none!important}.partial-notice strong{display:block}.partial-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.partial-actions button{padding:9px 11px;font-size:12px}
+.sheet-overview{align-self:stretch;width:100%;margin-bottom:17px;padding:13px 14px;border:1px solid #d3dfec;border-radius:11px;background:#f6f9fd}
+.sheet-overview[hidden]{display:none!important}.sheet-overview h3{margin:0;font-size:15px;color:#294e74}.sheet-overview p{margin:5px 0 12px;font-size:12px;color:#556b82;line-height:1.4}
+.sheet-overview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;width:100%}
+.sheet-overview-item{display:flex;flex-direction:column;align-items:center;gap:7px;min-width:0;background:#fff;border:2px solid #d2dce8;border-radius:9px;padding:9px;cursor:pointer;color:#31516d;transition:border-color .1s}
+.sheet-overview-item:hover{border-color:#5e9ac9}.sheet-overview-item[aria-pressed="true"]{border-color:#2365b9;box-shadow:0 0 0 2px #2365b91a}
+.sheet-overview-item canvas{display:block;width:min(100%,175px);height:auto;aspect-ratio:210/297;background:#fff;box-shadow:0 1px 5px #0002}
+.sheet-overview-item span{font-size:12px;font-weight:800}.sheet-overview-item small{font-size:11px;color:#687e93}
+@media(max-width:540px){.sheet-overview{padding:10px}.sheet-overview-grid{gap:8px}.sheet-overview-item{padding:7px}}
+.quality{margin:15px 0 5px;padding:14px 16px;border-radius:11px;border:2px solid transparent;text-align:left;font-size:16px;font-weight:600;line-height:1.45}
+.quality strong{display:block;font-size:19px;line-height:1.3;font-weight:850;margin-bottom:5px}
+.quality span{display:block;font-size:15px;font-weight:750}
+.quality small{display:block;font-size:13px;font-weight:500;line-height:1.5;margin-top:7px}
+.quality.good{color:#175634;background:#eaf8ef;border-color:#aed8bd}
+.quality.mid{color:#78500c;background:#fff4d9;border-color:#eabf69}
+.quality.low{color:#8a2222;background:#fff0ef;border-color:#e9a09b}
+@media(max-width:540px){.quality{padding:14px}.quality strong{font-size:18px}.quality span{font-size:15px}.quality small{font-size:13px}}
+.receiver-health{border:1px solid #dfba72;background:#fff8ec;color:#6f521f;border-radius:10px;padding:12px 14px;margin-top:12px;font-size:13px;line-height:1.5}
+.receiver-health[hidden]{display:none!important}.receiver-health strong{display:block;margin-bottom:5px}
+.receiver-health a{font-weight:800;color:#16538c;text-decoration:underline}
+</style>
+</head>
+<body>
+<header><div><div class="brand">Polaroids<span style="color:#7990a8"> / </span><em>hasta 60 fotos</em><span class="tag">Librería Saber</span></div><p>Editor Polaroids · fotos privadas, sin descarga pública</p></div><div style="font-size:12px;color:#62718a;text-align:right">2 columnas × 3 filas<br>Vista previa sin descarga</div></header>
+<main class="app">
+<section class="panel left">
+  <div class="sheetnav" aria-label="Hojas de seis fotos">
+<div class="sheetnavtop"><b id="sheetPosition">Hoja 1 de 1</b><strong id="sheetPrice">Total: $3.000</strong></div>
+<div class="sheetnavbuttons"><button type="button" class="secondary" id="prevSheet">← Anterior</button><button type="button" class="secondary" id="nextSheet">Siguiente →</button><button type="button" class="secondary" id="addSheet">+ Otra hoja de 6</button><button type="button" class="secondary delete-sheet" id="deleteSheet">Eliminar hoja</button></div>
+<small id="sheetProgress">Hasta 60 fotos por pedido</small></div><div class="partial-notice" id="partialNotice" hidden aria-live="polite"></div>
+<div class="sect"><h2>1. Seleccioná tus fotos (hasta 60 juntas)</h2><small id="count">0 de 6</small></div>
+  <label class="drop" id="drop" for="inputPhotos" title="Seleccioná hasta 60 imágenes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4h16v16H4zM7 16l4-4 3 3 2-2 2 3M8 8h.01"/><path d="M12 2v4M10 4h4"/></svg><strong>Elegí hasta 60 fotos juntas o arrastralas acá</strong><p>JPG, PNG o WebP · Se distribuyen de a seis por hoja A4</p></label>
+  <input id="inputPhotos" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden>
+  <input id="inputReplace" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" hidden>
+  <div class="slots" id="slots"></div>
+  <div class="options"><label>2. Tus Polaroids</label>
+  <div class="fixed-format"><strong>85 × 90 mm por fotografía</strong><span>Imagen interior 75 × 75 mm · borde blanco inferior de 11 mm</span></div>
+  <div class="trim-tip">Las seis fotos se imprimirán y cortarán en Librería Saber. Vos podés ajustar cada encuadre; del corte nos encargamos nosotros.</div></div>
+  <div id="secureReceptionNotice" class="secure-reception-note" hidden>
+   <strong>Recepción protegida de fotografías</strong>
+   <span>Podés enviar entre 1 y 60 fotos, en hasta 10 hojas A4 (máximo seis por hoja). Las imágenes y los PDF se guardan en Drive privado, solo para Librería Saber.</span>
+   <label class="consent-check"><input id="photoConsent" type="checkbox"> Acepto enviar mis fotografías únicamente para preparar este pedido en Librería Saber.</label>
+   <div id="turnstileBox"></div>
+  </div>
+  <div id="receiverHolder" hidden></div><div id="receiverHealth" class="receiver-health" hidden role="status" aria-live="polite"><strong>Google todavía no confirmó la conexión.</strong><span id="receiverHealthText"></span> <a id="receiverHealthLink" target="_blank" rel="noopener noreferrer">Comprobar receptor de Google</a></div>
+  <div class="buttons"><button class="primary" id="btnPdf" disabled>Recepción no disponible</button><button class="secondary" id="btnDemo" title="Para probar antes de usar fotos reales">Cargar prueba</button><button class="secondary" id="btnClear">Vaciar</button></div>
+  <div class="status" id="status" role="status" aria-live="polite">Seleccioná tus fotografías. Podés cargarlas todas de una vez.</div>
+   <div id="afterReceipt" hidden style="margin-top:12px;padding:14px;background:#eaf8f0;border-radius:12px">
+     <strong style="display:block;color:#155c39;margin-bottom:10px">Fotografías recibidas y PDF listo en Drive privado.</strong>
+     <button type="button" class="primary" id="goToCartAfterReceipt">Continuar al carrito</button>
+   </div>
+</section>
+<section class="panel right">
+  <section id="sheetOverview" class="sheet-overview" hidden aria-label="Vista general de todas las hojas"><h3 id="overviewHeading">Todas tus hojas A4</h3><p>Tocá una hoja para verla más grande y ajustar sus fotografías.</p><div id="sheetOverviewGrid" class="sheet-overview-grid"></div></section>
+  <div class="sheet-title"><h2>Hoja seleccionada · vista ampliada</h2><small id="previewSheetLabel">Hoja 1 · A4 vertical</small></div>
+  <div class="paper-holder"><canvas class="paper" id="preview" width="840" height="1188" title="Hacé clic en una foto para corregir su encuadre"></canvas></div>
+  <section class="preview-guide" aria-label="Cómo ajustar tus fotografías">
+    <h3>Cómo ajustar tus fotos</h3>
+    <div class="guide-step"><span class="guide-num">1</span><p><strong>Elegí una foto.</strong> Tocala en la vista previa o pulsá «Ajustar» a la izquierda.</p></div>
+    <div class="guide-step"><span class="guide-num">2</span><p><strong>Elegí el encuadre.</strong> Arrastrá la imagen con el dedo o el mouse para acomodarla.</p></div>
+    <div class="guide-step"><span class="guide-num">3</span><p><strong>Usá el zoom.</strong> Acercá o alejá con el control y pulsá «Aplicar» para guardar.</p></div>
+  </section>
+</section>
+</main>
+<section class="demo-cart panel" id="demoCart"><div class="demo-cart-title"><b>Polaroids · preparación</b></div><div id="cartItem" class="demo-cart-empty">Para agregar este trabajo al carrito, primero debe confirmarse su recepción privada. Mientras esté desactivado, podés ajustar encuadres sin enviar fotos.</div></section>
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="editorTitle">
+ <div class="editbox"><div class="editheader"><h2 id="editorTitle">Corregir encuadre</h2><button id="closeEditor" aria-label="Cerrar editor">✕</button></div>
+  <div class="cropwrap" id="cropwrap"><canvas id="cropCanvas" width="840" height="840"></canvas></div>
+  <div class="slidebar"><label for="zoom">Zoom</label><input id="zoom" type="range" min="1" max="3.5" step="0.01" value="1"><output id="zoomValue">100 %</output></div>
+  <p class="modalnote">Arrastrá la foto con el dedo o el mouse. Para ampliar o achicar usá el control de zoom. En la PC también funciona la rueda del mouse.</p>
+  <div id="quality" class="quality good" role="status" aria-live="polite" aria-atomic="true"></div>
+  <div class="modalfoot"><button class="secondary" id="resetCrop">Restablecer encuadre</button><button class="primary" id="saveCrop" style="flex:0 0 155px">Aplicar</button></div>
+ </div>
+</div>
+<script>
+if(window.parent!==window){
+ document.documentElement.classList.add('embedded');
+ function reportEditorHeight(){
+   const area=document.querySelector('.app');
+   if(!area)return;
+   const height=Math.ceil(area.getBoundingClientRect().bottom+window.scrollY+22);
+   window.parent.postMessage({type:'SABER_POLAROID_EDITOR_HEIGHT',height},window.location.origin);
+ }
+ if(window.ResizeObserver)new ResizeObserver(reportEditorHeight).observe(document.querySelector('.app'));
+ window.addEventListener('load',reportEditorHeight);
+ requestAnimationFrame(reportEditorHeight);
+}
+
+'use strict';
+const PAGE={w:210,h:297};
+const FORMAT={w:85,h:90,photo:75,left:5,top:4,bottom:11,gapX:0,gapY:0,label:'Compacta · 85 × 90 mm'};
+const MAX_SHEETS=10;
+const sheets=[Array(6).fill(null)];
+let activeSheet=0;
+let photos=sheets[0];
+// Mismo importe mostrado y agregado al carrito; no aceptar precios por URL.
+const unitPrice=3000;
+const formattedPrice=n=>'$'+n.toLocaleString('es-AR');
+const sheetComplete=arr=>arr.every(Boolean);
+const photoCount=()=>sheets.reduce((n,a)=>n+a.filter(Boolean).length,0);
+let partialConfirmed=-1;
+function packed(){
+ const n=photoCount();
+ return n>0&&sheets.length===Math.ceil(n/6)&&sheets.every((a,k)=>a.every((p,i)=>Boolean(p)===(k*6+i<n)));
+}
+const orderComplete=()=>packed()&&(photoCount()%6===0||partialConfirmed===photoCount());
+function showPartialNotice(){
+ const n=photoCount(),need=(6-n%6)%6,el=$('partialNotice');
+ if(!n||!need||receivedReference){el.hidden=true;return;}
+ const agreed=partialConfirmed===n;
+ el.hidden=false;
+ el.innerHTML='<strong>Tenés '+n+' fotos para '+sheets.length+' hoja'+(sheets.length===1?'':'s')+' A4.</strong>'+
+  (agreed?'Continuaremos con '+n+' fotos; los lugares sin foto quedarán en blanco.':
+   'Con '+need+' foto'+(need===1?'':'s')+' más completás la última hoja. ¿Querés agregarlas o continuar con '+n+'?')+
+  ' Total '+formattedPrice(sheets.length*unitPrice)+'.'+
+  '<div class="partial-actions"><button class="secondary" type="button" id="addMissing">+ Agregar '+need+' foto'+(need===1?'':'s')+'</button>'+
+  (agreed?'':'<button class="primary" type="button" id="acceptPartial">Continuar con '+n+' fotos</button>')+'</div>';
+ $('addMissing').onclick=()=>$('inputPhotos').click();
+ if(!agreed)$('acceptPartial').onclick=()=>{partialConfirmed=n;renderAll();status('Confirmaste '+n+' fotos en '+sheets.length+' hojas. Ya podés continuar.','ok');};
+}
+function updateSheetNav(){
+ const n=photoCount(),locked=editingLocked();
+ for(const id of ['inputPhotos','inputReplace','btnDemo','btnClear','addSheet','deleteSheet'])$(id).disabled=locked;
+ document.querySelectorAll('.slots button').forEach(button=>button.disabled=locked);
+ $('sheetPosition').textContent='Hoja '+(activeSheet+1)+' de '+sheets.length;
+ $('previewSheetLabel').textContent='Hoja '+(activeSheet+1)+' · A4 vertical';
+ $('sheetPrice').textContent='Total: '+formattedPrice(sheets.length*unitPrice);
+ $('sheetProgress').textContent=n+' foto'+(n===1?'':'s')+' · '+sheets.length+' hoja'+(sheets.length===1?'':'s')+' A4 · '+formattedPrice(unitPrice)+' por hoja';
+ $('prevSheet').disabled=activeSheet===0;
+ $('nextSheet').disabled=activeSheet===sheets.length-1;
+ $('addSheet').disabled=locked||sheets.length>=MAX_SHEETS||activeSheet!==sheets.length-1||!sheetComplete(photos);
+ $('deleteSheet').disabled=locked||sheets.length===1;
+ $('btnPdf').disabled=loadingPhotos||!orderComplete()||busy||!!receivedReference||!receiverConfig?.enabled||!receiverApiUrl;
+ $('afterReceipt').hidden=!receivedReference||window.parent!==window;
+ $('btnPdf').textContent=receivedReference?'Fotos recibidas · '+receivedReference:
+  receiverConfig&&receiverConfig.enabled?'Enviar '+n+' fotos y agregar al carrito':
+  'Servicio próximamente disponible';
+ showPartialNotice();
+}
+function packPhotos(){
+ if(editingLocked())return;
+ const all=sheets.flat().filter(Boolean),result=[];
+ for(let i=0;i<all.length;i+=6){const a=all.slice(i,i+6);result.push([...a,...Array(6-a.length).fill(null)]);}
+ if(!result.length)result.push(Array(6).fill(null));
+ sheets.splice(0,sheets.length,...result);
+ activeSheet=Math.min(activeSheet,sheets.length-1);
+ photos=sheets[activeSheet];partialConfirmed=-1;
+}
+function showSheet(n){if(n<0||n>=sheets.length||editorIndex>=0)return;activeSheet=n;photos=sheets[n];renderAll()}
+function addNewSheet(){
+ if(editingLocked())return;
+ if(activeSheet!==sheets.length-1||!sheetComplete(photos)){status('Completá la última hoja antes de agregar otra.','bad');return}
+ if(sheets.length>=MAX_SHEETS){status('Máximo '+MAX_SHEETS+' hojas por pedido de prueba.','bad');return}
+ sheets.push(Array(6).fill(null));partialConfirmed=-1;showSheet(sheets.length-1);
+}
+function deleteCurrentSheet(){
+ if(editingLocked())return;
+ if(sheets.length<=1)return;
+ if(photos.some(Boolean)&&!confirm('¿Eliminar la hoja '+(activeSheet+1)+' y sus fotos?'))return;
+ for(const p of photos)if(p&&p.url)URL.revokeObjectURL(p.url);
+ sheets.splice(activeSheet,1);partialConfirmed=-1;showSheet(Math.min(activeSheet,sheets.length-1));
+}
+
+let editorIndex=-1;
+let beforeEdit=null;
+let replaceIndex=-1;
+let busy=false;
+let loadingPhotos=false;
+const editingLocked=()=>busy||loadingPhotos||!!receivingSession||!!receivedReference;
+let provisionalReference='';
+let receiverConfig=null;
+let receiverBridge=null;
+let receiverOrigin='';
+let receiverNonce='';
+let receiverTarget=null;
+let turnstileWidget=null;
+let turnstileToken='';
+let receiverRequestCount=0;
+const receiverPending=new Map();
+let receivingSession=null;
+let receivedReference='';
+let receivedOrder=null;
+let receiverInitError='';
+let receiverApiUrl='';
+function nuevaReferenciaProvisional(){
+ const bytes=new Uint8Array(8);
+ if(window.crypto&&window.crypto.getRandomValues){
+   window.crypto.getRandomValues(bytes);
+   return 'POL-'+Array.from(bytes,n=>n.toString(16).padStart(2,'0')).join('').toUpperCase();
+ }
+ // Solo es un identificador visual de simulación, NO un token de acceso.
+ return 'POL-'+Date.now().toString(16).toUpperCase()+'-'+Math.floor(Math.random()*1000000);
+}
+const $=id=>document.getElementById(id);
+$('prevSheet').addEventListener('click',()=>showSheet(activeSheet-1));
+$('nextSheet').addEventListener('click',()=>showSheet(activeSheet+1));
+$('addSheet').addEventListener('click',addNewSheet);
+$('deleteSheet').addEventListener('click',deleteCurrentSheet);
+
+const preview=$('preview'), pc=preview.getContext('2d',{alpha:false});
+const cropCanvas=$('cropCanvas'), ec=cropCanvas.getContext('2d',{alpha:false});
+const mm=72/25.4;
+function config(){return FORMAT}
+function layout(){const a=config(), W=2*a.w+a.gapX,H=3*a.h+2*a.gapY,x0=(PAGE.w-W)/2,y0=(PAGE.h-H)/2;return {a,x0,y0,frames:Array.from({length:6},(_,i)=>({x:x0+(i%2)*(a.w+a.gapX),y:y0+Math.floor(i/2)*(a.h+a.gapY)}))}}
+function cropBounds(p){const im=p.img;const s=Math.min(im.naturalWidth,im.naturalHeight)/(p.zoom||1);let x=Math.min(im.naturalWidth-s,Math.max(0,p.cx*im.naturalWidth-s/2)),y=Math.min(im.naturalHeight-s,Math.max(0,p.cy*im.naturalHeight-s/2));return {x,y,s}}
+function drawCrop(ctx,p,x,y,d){const r=cropBounds(p);ctx.drawImage(p.img,r.x,r.y,r.s,r.s,x,y,d,d)}
+// Marcas perimetrales, una por línea de corte. No se dibuja tinta dentro del bloque de seis fotos.
+// Guías exteriores para el único corte vertical central, dos horizontales y cuatro bordes.
+function cutGuides(ctx,x0,y0,a,k){
+ const left=x0,right=x0+2*a.w,top=y0,bottom=y0+3*a.h;
+ const xCuts=[left,left+a.w,right], yCuts=[top,top+a.h,top+2*a.h,bottom];
+ const gap=.8,span=2.7; // mm, dejan por lo menos 10 mm de margen no impreso arriba/abajo
+ ctx.save();ctx.strokeStyle='#111';ctx.lineWidth=.20*k;ctx.setLineDash([]);ctx.beginPath();
+ for(const x of xCuts){
+   ctx.moveTo(x*k,(top-gap-span)*k);ctx.lineTo(x*k,(top-gap)*k);
+   ctx.moveTo(x*k,(bottom+gap)*k);ctx.lineTo(x*k,(bottom+gap+span)*k);
+ }
+ for(const y of yCuts){
+   ctx.moveTo((left-gap-span)*k,y*k);ctx.lineTo((left-gap)*k,y*k);
+   ctx.moveTo((right+gap)*k,y*k);ctx.lineTo((right+gap+span)*k,y*k);
+ }
+ ctx.stroke();ctx.restore();
+}
+function drawSheetPreview(canvas,sheet){const ctx=canvas.getContext('2d',{alpha:false});const k=canvas.width/PAGE.w;const {a,frames,x0,y0}=layout();ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
+ frames.forEach((f,i)=>{const p=sheet[i];if(p)drawCrop(ctx,p,(f.x+a.left)*k,(f.y+a.top)*k,a.photo*k);else if(partialConfirmed!==photoCount()){ctx.fillStyle='#f7f9fb';ctx.fillRect((f.x+a.left)*k,(f.y+a.top)*k,a.photo*k,a.photo*k);ctx.fillStyle='#b7c2ce';ctx.font='14px Segoe UI, Arial';ctx.textAlign='center';ctx.fillText('FOTO '+(i+1),(f.x+a.left+a.photo/2)*k,(f.y+a.top+a.photo/2)*k)}
+ });
+ // Las líneas del reticulado son exclusivas de la vista previa.
+ ctx.save();ctx.strokeStyle='#9ca9bb';ctx.lineWidth=.15*k;ctx.setLineDash([1.35*k,1.2*k]);ctx.strokeRect(x0*k,y0*k,2*a.w*k,3*a.h*k);
+ for(let c=1;c<2;c++){const x=(x0+c*a.w)*k;ctx.beginPath();ctx.moveTo(x,y0*k);ctx.lineTo(x,(y0+3*a.h)*k);ctx.stroke()}
+ for(let r=1;r<3;r++){const y=(y0+r*a.h)*k;ctx.beginPath();ctx.moveTo(x0*k,y);ctx.lineTo((x0+2*a.w)*k,y);ctx.stroke()}
+ ctx.restore();cutGuides(ctx,x0,y0,a,k);
+ // Marca de agua repetida sobre la vista preliminar, nunca un PDF de impresión.
+ ctx.save();ctx.beginPath();ctx.rect(x0*k,y0*k,2*a.w*k,3*a.h*k);ctx.clip();
+ ctx.translate((x0+a.w)*k,(y0+1.5*a.h)*k);ctx.rotate(-Math.PI/5);
+ ctx.fillStyle='rgba(22,52,94,.25)';ctx.font=`900 ${18*k/4} px Arial, sans-serif`;ctx.textAlign='center';
+ for(let row=-4;row<=4;row++) for(let col=-3;col<=3;col++)ctx.fillText('LIBRERÍA SABER · VISTA PREVIA',col*185,row*84);
+ ctx.restore();
+}
+function renderPreview(){drawSheetPreview(preview,photos)}
+function renderOverview(){
+ const group=$('sheetOverview'),grid=$('sheetOverviewGrid');
+ group.hidden=sheets.length<2;
+ if(group.hidden){grid.replaceChildren();return;}
+ $('overviewHeading').textContent='Todas tus hojas A4 · '+sheets.length;
+ const frag=document.createDocumentFragment();
+ sheets.forEach((sheet,index)=>{
+  const btn=document.createElement('button');btn.type='button';
+  btn.className='sheet-overview-item';
+  btn.setAttribute('aria-label','Ver hoja '+(index+1)+' de '+sheets.length);
+  btn.setAttribute('aria-pressed',String(index===activeSheet));
+  const label=document.createElement('span');label.textContent='Hoja '+(index+1);
+  const canvas=document.createElement('canvas');
+  canvas.width=336;canvas.height=475;
+  drawSheetPreview(canvas,sheet);
+  const small=document.createElement('small');
+  small.textContent=sheet.filter(Boolean).length+' de 6 fotos';
+  btn.append(label,canvas,small);
+  btn.onclick=()=>showSheet(index);
+  frag.append(btn);
+ });
+ grid.replaceChildren(frag);
+}
+function status(msg,type=''){const x=$('status');x.textContent=msg;x.className='status '+type}
+function dim(p){const a=config();const r=cropBounds(p);return Math.round(r.s/(a.photo/25.4))}
+function renderSlots(){const target=$('slots');target.replaceChildren();let total=0;
+ for(let i=0;i<6;i++){const p=photos[i], el=document.createElement('div');el.className='slot'+(!p?' empty':'');const pic=document.createElement('div');pic.className='slot-picture';if(p){total++;const c=document.createElement('canvas');c.width=140;c.height=140;drawCrop(c.getContext('2d'),p,0,0,140);pic.append(c)}else pic.innerHTML='<span class="emptyicon">＋</span>';el.append(pic);
+ const inf=document.createElement('div');inf.className='inf';const title=document.createElement('b');title.textContent='Foto '+(i+1);inf.append(title);
+ const name=document.createElement('span');name.className='name';name.title=p?p.name:'';name.textContent=p?p.name:'Sin cargar';inf.append(name);
+ const actions=document.createElement('div');actions.className='actions';if(p){const edit=document.createElement('button');edit.textContent='Ajustar';edit.title='Corregir el encuadre';edit.onclick=()=>openEditor(i);actions.append(edit);const change=document.createElement('button');change.textContent='Cambiar';change.onclick=()=>{replaceIndex=i;$('inputReplace').click()};actions.append(change);const del=document.createElement('button');del.className='del';del.textContent='✕';del.title='Quitar foto';del.onclick=()=>{dropPhoto(i);packPhotos();renderAll()};actions.append(del)}else{const add=document.createElement('button');add.textContent='+ Agregar';add.onclick=()=>{replaceIndex=i;$('inputReplace').click()};actions.append(add)}inf.append(actions);el.append(inf);target.append(el)
+ }$('count').textContent=total+' de 6';updateSheetNav();if(total===6)status('Hoja '+(activeSheet+1)+' completa. Podés agregar otra o continuar con el pedido.','ok');else status('Hoja '+(activeSheet+1)+': faltan '+(6-total)+' fotografía'+(6-total===1?'':'s')+'.');}
+function renderAll(){renderSlots();renderPreview();renderOverview()}
+function dropPhoto(i){if(editingLocked())return;if(photos[i]&&photos[i].url)URL.revokeObjectURL(photos[i].url);photos[i]=null}
+function loadImage(file){return new Promise((resolve,reject)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>resolve({name:file.name,img:im,url:u,file,zoom:1,cx:.5,cy:.5});im.onerror=()=>{URL.revokeObjectURL(u);reject(new Error('No se pudo abrir '+file.name+'. Usá JPG, PNG o WebP.'))};im.src=u})}
+async function acceptFiles(files,specific=-1){
+ if(editingLocked()||!files.length)return;
+ const valid=files.filter(f=>receiverConfig&&receiverConfig.enabled
+  ?['image/jpeg','image/png'].includes(f.type)&&f.size>0&&f.size<=5*1024*1024
+  :f.type.startsWith('image/')||/\.(jpe?g|png|webp|heic|heif)$/i.test(f.name));
+ if(!valid.length){status('No hay imágenes válidas.','bad');return;}
+ const free=specific>=0?1:MAX_SHEETS*6-photoCount();
+ if(free<=0){status('Máximo 60 fotos. Quitá alguna antes de añadir más.','bad');return;}
+ const selected=valid.slice(0,free),errors=[];let loaded=0,last=activeSheet;
+ loadingPhotos=true;updateSheetNav();
+ for(const file of selected){
+  let page=activeSheet,pos=specific;
+  if(specific<0){
+   page=sheets.findIndex(a=>a.some(p=>!p));
+   if(page<0){if(sheets.length>=MAX_SHEETS)break;sheets.push(Array(6).fill(null));page=sheets.length-1;}
+   pos=sheets[page].findIndex(p=>!p);
+  }
+  try{
+   const data=await loadImage(file);
+   if(specific>=0&&sheets[page][pos]?.url)URL.revokeObjectURL(sheets[page][pos].url);
+   sheets[page][pos]=data;loaded++;last=page;
+  }catch(e){errors.push(e.message);}
+ }
+ loadingPhotos=false;
+ if(loaded){activeSheet=loaded>6?0:last;photos=sheets[activeSheet];partialConfirmed=-1;}
+ renderAll();
+ const excess=valid.length-selected.length,invalid=files.length-valid.length;
+ if(excess||invalid||errors.length)
+  status('Se cargaron '+loaded+' foto'+(loaded===1?'':'s')+'.'+(excess?' '+excess+' foto'+(excess===1?'':'s')+' exceden el límite de 60.':'')+(invalid?' '+invalid+' rechazadas por formato/tamaño.':'')+(errors.length?' '+errors.join(' '):''),'bad');
+ else if(loaded)status('Se cargaron '+loaded+' foto'+(loaded===1?'':'s')+'. Total: '+photoCount()+'. Revisá los encuadres.','ok');
+}
+$('inputPhotos').addEventListener('change',e=>{acceptFiles([...e.target.files]);e.target.value='' });$('inputReplace').addEventListener('change',e=>{acceptFiles([...e.target.files],replaceIndex);e.target.value='';replaceIndex=-1});
+const drop=$('drop');for(const eName of ['dragover','dragenter'])drop.addEventListener(eName,e=>{e.preventDefault();drop.classList.add('drag')});for(const eName of ['dragleave','drop'])drop.addEventListener(eName,e=>{e.preventDefault();drop.classList.remove('drag')});drop.addEventListener('drop',e=>acceptFiles([...e.dataTransfer.files]));
+$('btnClear').onclick=()=>{if(editingLocked())return;for(let i=0;i<6;i++)dropPhoto(i);packPhotos();renderAll()};
+preview.addEventListener('click',e=>{const box=preview.getBoundingClientRect(),x=(e.clientX-box.left)/box.width*PAGE.w,y=(e.clientY-box.top)/box.height*PAGE.h;const {a,frames}=layout();const i=frames.findIndex(f=>x>=f.x&&x<=f.x+a.w&&y>=f.y&&y<=f.y+a.h);if(i>=0&&photos[i])openEditor(i)});
+function openEditor(i){if(editingLocked())return;const p=photos[i];if(!p)return;editorIndex=i;beforeEdit={zoom:p.zoom,cx:p.cx,cy:p.cy};$('editorTitle').textContent='Encuadre de la foto '+(i+1);$('modal').classList.add('show');$('zoom').value=p.zoom;drawEditor()}
+function closeEditor(save){if(editorIndex<0)return;if(!save&&beforeEdit){const p=photos[editorIndex];Object.assign(p,beforeEdit)}editorIndex=-1;$('modal').classList.remove('show');renderAll()}
+$('closeEditor').onclick=()=>closeEditor(false);$('saveCrop').onclick=()=>closeEditor(true);$('modal').addEventListener('click',e=>{if(e.target===$('modal'))closeEditor(false)});
+function drawEditor(){
+ if(editorIndex<0)return;
+ const p=photos[editorIndex];
+ ec.fillStyle='#fff';ec.fillRect(0,0,840,840);drawCrop(ec,p,0,0,840);
+ $('zoom').value=p.zoom;
+ $('zoomValue').textContent=Math.round(p.zoom*100)+' %';
+ const ppi=dim(p),quality=$('quality');
+ const level=ppi>=250?'good':ppi>=160?'mid':'low';
+ quality.className='quality '+level;
+ quality.innerHTML=level==='good'
+  ?'<strong>✓ Buena resolución para imprimir</strong><span>'+ppi+' ppp de resolución efectiva</span><small>La foto tiene buena definición para el tamaño elegido.</small>'
+  :level==='mid'
+  ?'<strong>⚠ Atención: la foto puede perder nitidez</strong><span>'+ppi+' ppp de resolución efectiva</span><small>Probá reducir el zoom o usar una foto de mayor resolución.</small>'
+  :'<strong>⚠ Calidad baja: puede salir pixelada</strong><span>'+ppi+' ppp de resolución efectiva</span><small>Te recomendamos usar otra foto con más resolución o reducir el zoom antes de continuar.</small>';
+}
+$('zoom').addEventListener('input',e=>{if(editorIndex>=0){photos[editorIndex].zoom=Number(e.target.value);drawEditor()}});
+$('resetCrop').onclick=()=>{if(editorIndex>=0){Object.assign(photos[editorIndex],{zoom:1,cx:.5,cy:.5});drawEditor()}};
+let dragState=null;
+const cropwrap=$('cropwrap');cropwrap.addEventListener('pointerdown',e=>{if(editorIndex<0)return;e.preventDefault();cropwrap.setPointerCapture(e.pointerId);const p=photos[editorIndex],r=cropBounds(p);dragState={x:e.clientX,y:e.clientY,s:r.s,startX:r.x,startY:r.y,id:e.pointerId}});
+cropwrap.addEventListener('pointermove',e=>{if(!dragState||editorIndex<0||dragState.id!==e.pointerId)return;e.preventDefault();const p=photos[editorIndex],rect=cropwrap.getBoundingClientRect();const dx=(e.clientX-dragState.x)*dragState.s/rect.width,dy=(e.clientY-dragState.y)*dragState.s/rect.height;const x=Math.max(0,Math.min(p.img.naturalWidth-dragState.s,dragState.startX-dx)),y=Math.max(0,Math.min(p.img.naturalHeight-dragState.s,dragState.startY-dy));p.cx=(x+dragState.s/2)/p.img.naturalWidth;p.cy=(y+dragState.s/2)/p.img.naturalHeight;drawEditor()});
+cropwrap.addEventListener('pointerup',()=>dragState=null);cropwrap.addEventListener('pointercancel',()=>dragState=null);
+cropwrap.addEventListener('wheel',e=>{if(editorIndex<0)return;e.preventDefault();const p=photos[editorIndex];p.zoom=Math.min(3.5,Math.max(1,p.zoom*(e.deltaY<0?1.07:1/1.07)));drawEditor()},{passive:false});
+document.addEventListener('keydown',e=>{if(editorIndex<0)return;if(e.key==='Escape'){closeEditor(false);return}if(e.target instanceof Element&&e.target.matches('input, textarea, select, [contenteditable="true"]'))return;const p=photos[editorIndex];if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){e.preventDefault();const r=cropBounds(p),step=r.s*(e.shiftKey?.025:.008);if(e.key==='ArrowLeft')p.cx=Math.max(0,p.cx-step/p.img.naturalWidth);if(e.key==='ArrowRight')p.cx=Math.min(1,p.cx+step/p.img.naturalWidth);if(e.key==='ArrowUp')p.cy=Math.max(0,p.cy-step/p.img.naturalHeight);if(e.key==='ArrowDown')p.cy=Math.min(1,p.cy+step/p.img.naturalHeight);drawEditor()}});
+// DEMOSTRACIÓN: no transmite ni almacena los originales en un servidor.
+// La implementación definitiva deberá enviar originals + encuadres a almacenamiento privado,
+// recibir un identificador de archivo y recién después agregar el ítem al carrito real.
+
+/**
+ * Recepción desde el editor hacia una aplicación Apps Script SEPARADA del piloto.
+ * En esta rama queda APAGADA: recepcion-config.json.enabled=false.
+ * Al activarse, no se confunde una referencia provisional con fotos recibidas.
+ */
+function secureNonce(){
+ if(!window.crypto||!crypto.getRandomValues)throw new Error('Este navegador no permite generar una sesión segura.');
+ const bits=new Uint8Array(16);crypto.getRandomValues(bits);
+ return Array.from(bits,b=>b.toString(16).padStart(2,'0')).join('');
+}
+// Conexión sin iframe: POST sin CORS y consulta de estado por JSONP de solo lectura.
+function secureOrderKey(){
+ const bytes=new Uint8Array(32);crypto.getRandomValues(bytes);
+ return Array.from(bytes,n=>n.toString(16).padStart(2,'0')).join('');
+}
+function secureOrderReference(){
+ const bytes=new Uint8Array(12);crypto.getRandomValues(bytes);
+ return 'POL-'+Array.from(bytes,n=>n.toString(16).padStart(2,'0')).join('').toUpperCase();
+}
+// Same-origin: Chrome ya no ejecuta ni carga contenido de Google directamente.
+async function publicPing(){
+ const result=await fetch('/api/polaroids-ping',{cache:'no-store',credentials:'omit'});
+ if(!result.ok)throw new Error('Cloudflare no pudo conectarse con Google.');
+ const data=await result.json();
+ if(data.ok!==true||data.connection!=='cloudflare-to-google'||data.apiVersion!=='v2-noframe')
+  throw new Error('La versión del receptor no coincide con la esperada.');
+ const relay=await fetch('/api/polaroids-receiver',{cache:'no-store',credentials:'omit'});
+ if(!relay.ok)throw new Error('El intermediario de fotos todavía no está publicado.');
+ const info=await relay.json();
+ if(info.ok!==true||info.route!=='polaroids-receiver'||info.testOnly!==false||info.receptionEnabled!==true)
+  throw new Error('El intermediario de fotos no está listo.');
+ return data;
+}
+async function publicStatus(reference,uploadKey){
+ if(!receiverApiUrl)throw new Error('No hay receptor configurado.');
+ const result=await fetch(receiverApiUrl+'?op=status',{
+  method:'POST',mode:'same-origin',credentials:'omit',cache:'no-store',
+  headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({reference,uploadKey})
+ });
+ const data=await result.json();
+ if(!result.ok||data.ok!==true)
+  throw new Error(data.error||'Google no respondió a la consulta.');
+ return data;
+}
+async function publicPost(op,payload){
+ if(!receiverApiUrl)throw new Error('No está configurada la recepción.');
+ const result=await fetch(receiverApiUrl+'?op='+encodeURIComponent(op),{
+  method:'POST',mode:'same-origin',credentials:'omit',cache:'no-store',
+  headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({op,payload})
+ });
+ const data=await result.json();
+ if(!result.ok||data.ok!==true)
+  throw new Error(data.error||'Cloudflare no pudo transmitir la solicitud.');
+ // dispatched no significa recibido: consultamos estado de Google después.
+ return data;
+}
+async function confirmServer(reference,uploadKey,valid,timeoutMs=90000){
+ const end=Date.now()+timeoutMs;let error=null;
+ while(Date.now()<end){
+  try{
+   const result=await publicStatus(reference,uploadKey);
+   if(result&&result.ok===false)
+    throw new Error('Google rechazó la verificación privada del pedido.');
+   if(result&&result.ok===true&&result.found&&valid(result))return result;
+   error=null;
+  }catch(e){
+   if(/rechazó la verificación privada/.test(String(e.message)))throw e;
+   error=e;
+  }
+  if(Date.now()>=end)break;
+  await new Promise(resolve=>setTimeout(resolve,1800));
+ }
+ throw new Error('Google no confirmó la recepción dentro del tiempo esperado.'+
+   (error?' Revisá la conexión a Google.':'')+' Podés volver a intentar sin cargar las fotos nuevamente.');
+}
+function readFileBase64(file){
+ return new Promise((resolve,reject)=>{
+  const r=new FileReader();
+  r.onload=()=>{
+   const data=String(r.result||'');
+   const comma=data.indexOf(',');
+   if(comma<0){reject(new Error('No se pudo codificar la fotografía.'));return}
+   resolve(data.slice(comma+1));
+  };
+  r.onerror=()=>reject(new Error('No se pudo leer el archivo original.'));
+  r.readAsDataURL(file);
+ });
+}
+function imprimirRecorte(p){
+ return new Promise((resolve,reject)=>{
+  const canvas=document.createElement('canvas');
+  canvas.width=886;canvas.height=886;
+  const ctx=canvas.getContext('2d',{alpha:false});
+  if(!ctx){reject(new Error('No se pudo preparar el recorte.'));return}
+  const crop=cropBounds(p);
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,886,886);
+  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+  ctx.drawImage(p.img,crop.x,crop.y,crop.s,crop.s,0,0,886,886);
+  canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('No se pudo generar la fotografía de imprenta.')),
+   'image/jpeg',0.94);
+ });
+}
+function photoFingerprint(){
+ return JSON.stringify(sheets.flat().filter(Boolean).map(p=>{
+  const c=cropBounds(p);
+  return [p.file.name,p.file.size,p.file.lastModified,
+   Number(c.x.toFixed(5)),Number(c.y.toFixed(5)),Number(c.s.toFixed(5))];
+ }));
+}
+function resetChallenge(){
+ turnstileToken='';
+ if(turnstileWidget!==null&&window.turnstile&&typeof turnstile.reset==='function')
+  turnstile.reset(turnstileWidget);
+}
+async function sendSecurePhotos(){
+ if(busy||loadingPhotos||editorIndex>=0||receivedReference||!receiverConfig||!receiverConfig.enabled||!orderComplete())return;
+ if(sheets.length<1||sheets.length>10)
+  throw new Error('Podés preparar entre una y diez hojas A4.');
+ if(!receiverApiUrl)throw new Error('La recepción segura todavía no está configurada.');
+ if(!$('photoConsent').checked)throw new Error('Aceptá primero el envío de fotografías para este pedido.');
+ const allPhotos=sheets.flat().filter(Boolean);
+ for(let i=0;i<allPhotos.length;i++){
+  const f=allPhotos[i]&&allPhotos[i].file;
+  if(!f||!['image/jpeg','image/png'].includes(f.type)||f.size>5*1024*1024||!f.size)
+   throw new Error('La foto '+(i+1)+' debe ser JPG o PNG de hasta 5 MB.');
+ }
+ const fingerprint=photoFingerprint();
+ if(receivingSession&&receivingSession.fingerprint!==fingerprint)
+  throw new Error('El encuadre cambió después de iniciar el envío. Recargá para comenzar un pedido nuevo.');
+ if(!receivingSession&&!turnstileToken)
+  throw new Error('Completá la verificación de seguridad antes de enviar.');
+ busy=true;document.querySelector('.app').classList.add('uploading');updateSheetNav();
+ try{
+  if(!receivingSession){
+   status('Validando seguridad y creando el pedido privado…');
+   const reference=secureOrderReference(),uploadKey=secureOrderKey();
+   const token=turnstileToken;turnstileToken='';
+   receivingSession={reference,uploadKey,uploaded:new Set(),fingerprint,started:false};
+   try{await publicPost('start',{reference,uploadKey,sheets:sheets.length,photos:allPhotos.length,turnstileToken:token});}
+   catch(e){/* verificar por estado: la solicitud pudo completarse antes de un error de red */ }
+   await confirmServer(reference,uploadKey,x=>x.status==='receiving'&&x.photos===allPhotos.length&&x.sheets===sheets.length);
+   receivingSession.started=true;
+  }else if(!receivingSession.started){
+   await confirmServer(receivingSession.reference,receivingSession.uploadKey,
+    x=>x.status==='receiving'&&x.photos===allPhotos.length&&x.sheets===sheets.length,20000);
+   receivingSession.started=true;
+  }
+  for(let i=0;i<allPhotos.length;i++){
+   if(receivingSession.uploaded.has(i))continue;
+   const p=allPhotos[i];
+   status('Preparando y enviando la foto '+(i+1)+' de '+allPhotos.length+'…');
+   const original=await readFileBase64(p.file);
+   const blob=await imprimirRecorte(p);
+   const printJpeg=await readFileBase64(blob),c=cropBounds(p);
+   const payload={reference:receivingSession.reference,
+    uploadKey:receivingSession.uploadKey,index:i,original,printJpeg,
+    crop:{x:c.x,y:c.y,s:c.s,sourceWidth:p.img.naturalWidth,
+     sourceHeight:p.img.naturalHeight}};
+   try{await publicPost('photo',payload);}catch(e){/* confirmar por consulta */ }
+   await confirmServer(receivingSession.reference,receivingSession.uploadKey,
+    x=>x.received>=i+1&&['receiving','received'].includes(x.status));
+   receivingSession.uploaded.add(i);
+  }
+  status('Creando el PDF privado…');
+  try{await publicPost('finish',{reference:receivingSession.reference,uploadKey:receivingSession.uploadKey});}
+  catch(e){/* confirmar por consulta */ }
+  const result=await confirmServer(receivingSession.reference,receivingSession.uploadKey,
+   x=>x.status==='received'&&x.received===allPhotos.length&&x.photos===allPhotos.length,120000);
+  const reference=receivingSession.reference;
+  const cartPayload={sheets:sheets.length,photos:allPhotos.length,format:'85x90',
+   uploadsReceived:true,reference,referenceStatus:'received'};
+  receivedOrder=Object.freeze({reference,sheets:sheets.length,photos:allPhotos.length,price:sheets.length*unitPrice});
+  receivedReference=reference;receivingSession=null;
+  status('¡Recibimos '+result.received+' fotografías! Referencia '+reference+'.','ok');
+  updateSheetNav();
+  if(window.parent!==window)
+   window.parent.postMessage({type:'SABER_POLAROID_RECEIVED',payload:cartPayload},window.location.origin);
+ }catch(error){
+  if(receivingSession&&!receivingSession.started){
+   receivingSession=null;resetChallenge();
+  }
+  status('No se completó el envío: '+(error&&error.message||'error desconocido'),'bad');
+ }finally{
+  busy=false;document.querySelector('.app').classList.remove('uploading');updateSheetNav();
+ }
+}
+async function loadTurnstile(sitekey){
+ await new Promise((resolve,reject)=>{
+  if(window.turnstile){resolve();return}
+  const sc=document.createElement('script');
+  sc.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+  sc.async=true;sc.defer=true;sc.onload=resolve;
+  sc.onerror=()=>reject(new Error('No se pudo cargar la verificación de seguridad.'));
+  document.head.append(sc);
+ });
+ if(!window.turnstile||typeof turnstile.render!=='function')
+  throw new Error('La verificación Turnstile no está disponible.');
+ turnstileWidget=turnstile.render('#turnstileBox',{
+  sitekey,action:'polaroids',
+  callback:token=>{if(receivedReference||busy)return;turnstileToken=token;status('Verificación completada. Ya podés enviar tus fotos.','ok')},
+  'expired-callback':()=>{turnstileToken='';if(!receivedReference&&!busy)status('La verificación venció. Completala nuevamente.','bad')},
+  'error-callback':()=>{turnstileToken='';if(!receivedReference&&!busy)status('Falló la verificación de seguridad. Volvé a intentarlo.','bad')}
+ });
+}
+async function setupSecureReception(){
+ try{
+  const res=await fetch('recepcion-config.json',{cache:'no-store'});
+  if(!res.ok)throw new Error('Configuración de recepción no encontrada.');
+  const cfg=await res.json();
+  if(cfg.enabled!==true||cfg.rollout!=='APROBADO')return;
+  receiverConfig={enabled:true};
+  if(location.hostname!==cfg.allowedHost||cfg.maxSheetsForRealUploads!==10||
+     typeof cfg.turnstileSiteKey!=='string'||!/^[a-zA-Z0-9_-]{5,100}$/.test(cfg.turnstileSiteKey))
+   throw new Error('La recepción protegida no está configurada para este sitio.');
+  const url=new URL(cfg.bridgeUrl);
+  if(url.protocol!=='https:'||url.hostname!=='script.google.com'||
+     !/^\/macros\/s\/[A-Za-z0-9_-]{20,}\/exec\/?$/.test(url.pathname))
+   throw new Error('La dirección del receptor es inválida.');
+  await publicPing(); // Verifica por servidor; sin iframes ni JSONP en navegador.
+  receiverApiUrl=location.origin+'/api/polaroids-receiver';
+  $('secureReceptionNotice').hidden=false;
+  $('inputPhotos').accept='image/jpeg,image/png';
+  $('inputReplace').accept='image/jpeg,image/png';
+  await loadTurnstile(cfg.turnstileSiteKey);
+  updateSheetNav();
+  status('Recepción protegida lista. Verificá la seguridad antes de enviar las fotos.');
+  if(window.parent!==window)
+   window.parent.postMessage({type:'SABER_POLAROID_MODE',enabled:true},window.location.origin);
+ }catch(e){
+  if(receiverConfig&&receiverConfig.enabled){
+   receiverInitError=String(e&&e.message||e);
+   receiverApiUrl='';
+   updateSheetNav();
+   status('Recepción protegida no disponible: '+receiverInitError,'bad');
+  }
+ }
+}
+setupSecureReception();
+
+$('btnPdf').onclick=()=>{
+ if(busy||receivedReference)return;
+ if(!receiverConfig?.enabled||!receiverApiUrl){
+  status('La recepción está pausada. Podés practicar los encuadres, pero no agregar un pedido sin fotos recibidas.','bad');
+  return;
+ }
+ sendSecurePhotos().catch(err=>status('No se pudo enviar: '+(err&&err.message||err),'bad'));
+};
+$('goToCartAfterReceipt').onclick=()=>{
+ if(window.parent!==window||!receivedReference||!/^POL-[A-F0-9]{24}$/.test(receivedReference))return;
+ if(!receivedOrder||receivedOrder.reference!==receivedReference)return;
+ const n=receivedOrder.photos,count=receivedOrder.sheets;
+ if(n<1||n>60||count!==Math.ceil(n/6)||count>10)return;
+ const price=receivedOrder.price,key='saberCartV1';
+ let items=[];
+ try{items=JSON.parse(localStorage.getItem(key)||'[]')}catch(_){items=[]}
+ if(!Array.isArray(items))items=[];
+ if(!items.some(item=>item&&Array.isArray(item.receivedReferences)&&
+   item.receivedReferences.includes(receivedReference))){
+  items.push({
+   id:'PRINT-'+receivedReference,type:'print',photoOrder:true,name:'Polaroids 85 × 90 mm',
+   qty:1,price,deposit:price/2,
+   detail:count+' hoja'+(count===1?'':'s')+' A4 · '+n+' Polaroids · Ref. '+receivedReference,
+   draftReferences:[],receivedReferences:[receivedReference],filesReceived:true
+  });
+  try{localStorage.setItem(key,JSON.stringify(items))}
+  catch(_){status('No se pudo guardar el pedido en este navegador. Revisá el almacenamiento local.','bad');return}
+ }
+ window.location.assign('../index.html?carrito=1');
+};
+$('btnDemo').onclick=async()=>{if(editingLocked())return;let fs=[];for(let i=0;i<6;i++){const c=document.createElement('canvas');c.width=i%2?1250:1700;c.height=i%2?1700:1200;let ctx=c.getContext('2d'),g=ctx.createLinearGradient(0,0,c.width,c.height);const pair=[['#355f78','#e2a775'],['#6c8188','#c4d4bd'],['#98786b','#e6c3aa'],['#526e94','#cbbddd'],['#5f8d85','#e9c393'],['#8680a8','#d1b7a2']][i];g.addColorStop(0,pair[0]);g.addColorStop(1,pair[1]);ctx.fillStyle=g;ctx.fillRect(0,0,c.width,c.height);ctx.fillStyle='#ffffff44';ctx.beginPath();ctx.arc(c.width*(.25+.09*i),c.height*.4,c.height*.22,0,2*Math.PI);ctx.fill();ctx.strokeStyle='#ffffff77';ctx.lineWidth=18;ctx.beginPath();ctx.moveTo(-60,c.height*.9);ctx.lineTo(c.width*.75,c.height*.26);ctx.lineTo(c.width+30,c.height*.75);ctx.stroke();ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold '+Math.round(c.width*.075)+'px Segoe UI, Arial';ctx.fillText('FOTO DE PRUEBA',c.width/2,c.height*.70);ctx.font=Math.round(c.width*.05)+'px Segoe UI, Arial';ctx.fillText(String(i+1),c.width/2,c.height*.79);const b=await new Promise(r=>c.toBlob(r,'image/jpeg',.92));fs.push(new File([b],`Prueba_${i+1}.jpg`,{type:'image/jpeg'}))}if(editingLocked())return;for(let i=0;i<6;i++)dropPhoto(i);await acceptFiles(fs);status('Fotos de prueba cargadas. Podés practicar el encuadre y revisar la vista previa antes de usar fotos reales.','ok')};
+renderAll();
+</script>
+</body>
+</html>
