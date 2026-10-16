@@ -53,9 +53,11 @@ async function upstreamStatus(reference,uploadKey){
   throw Error('El estado de Google no es válido.');
  return data;
 }
-export async function onRequestGet({request}){
+export async function onRequestGet({request,env}){
  if(!allowedUrl(request))return json({ok:false,error:'Host no autorizado.'},403);
- return json({ok:true,route:'polaroids-receiver',testOnly:true,photosSent:0});
+ const receptionEnabled=await testReceptionEnabled(request,env);
+ return json({ok:true,route:'polaroids-receiver',testOnly:true,
+  photosSent:0,receptionEnabled});
 }
 async function testReceptionEnabled(request,env){
  // The client-side configuration is not a security gate by itself.
