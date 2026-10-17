@@ -82,8 +82,8 @@ footer{background:#071f36;color:#fff;padding:25px 0}.footerrow{display:flex;alig
   if(x.photoOrder===true&&x.filesReceived===true&&Array.isArray(x.receivedReferences)){
    for(const reference of x.receivedReferences){
     if(/^POL-[A-F0-9]{24}$/.test(String(reference))&&
-       !String(x.detail||'').includes(String(reference)))
-      lines.push('  Fotos recibidas · Ref. '+reference);
+       !String(x.detail||'').includes(String(reference).slice(0,12)))
+      lines.push('  Pedido '+String(reference).slice(0,12));
    }
   }
  });lines.push('')}const total=cart.reduce((s,x)=>s+x.price*(Number(x.qty)||1),0);const deposit=printsCart.reduce((s,x)=>s+(Number(x.deposit)||Math.round(Number(x.price||0)*.5)),0);lines.push(`*TOTAL PEDIDO: ${money(total)}*`);if(printsCart.length){lines.push(`*SEÑA TRABAJOS DE PRODUCCIÓN: ${money(deposit)}*`);lines.push('');lines.push('*DATOS PARA TRANSFERIR LA SEÑA*');lines.push('*Alias:* libreriasaber.mp');lines.push('*Titular:* Hernan Maximiliano Meichtry');lines.push('*CUIL:* 20-22792046-8');lines.push('');lines.push('*PARA CONFIRMAR EL TRABAJO, ENVIÁ EN ESTE CHAT:*');lines.push(printsCart.some(x=>x.photoOrder===true)
