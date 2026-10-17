@@ -102,3 +102,11 @@ El titular autorizó la publicación. PR #1 salió de borrador y fue fusionado e
 - Cotizador oficial carga su iframe real con menú de servicios y beneficio del viernes. Acceso nuevo Polaroids oculto.
 - Tienda en www carga y categoría Impresión y gráfica conserva acceso al cotizador sin mostrar Polaroids. La URL del navegador permanece en www: no se certifica redirección al dominio raíz. La activación actual está restringida al dominio raíz; no ampliar hosts ni trasladar carritos entre orígenes automáticamente.
 - Pendiente intervención del titular en Apps Script para cambiar TURNSTILE_HOSTNAME al dominio oficial antes de activar recepción. No hay acceso autenticado de este agente al proyecto Apps Script.
+
+## Recepción productiva y acceso comercial — 17/10/2026
+
+- Titular confirmó cambio de TURNSTILE_HOSTNAME al dominio oficial. Recepción habilitada en cf6db8f, inicialmente sin accesos comerciales.
+- Prueba real del 16/10 en el dominio oficial con las seis imágenes de muestra del editor: verificación Turnstile autorizada y exitosa, subida completa, confirmación del receptor: POL-4940569A6B59F8EEF2A7483A. Interfaz indicó «Fotografías recibidas y PDF listo en Drive privado». No se abrió el PDF desde el panel privado ni se envió WhatsApp.
+- El 17/10 el titular solicitó terminar y dejar funcionando sin más pruebas manuales. showInShop:true publicado en 83f80ba5c0089c6a49e722a7549decd12398511f; enabled:true, rollout:APROBADO.
+- Suite de carrito nuevamente aprobada: 19 fotos, cuatro hojas, total/seña, carrito mixto sin duplicación y mensaje sin secretos. La sesión del navegador anterior ya no estaba disponible; no se afirma haber observado su carrito final real.
+- Se conservan límites conocidos: no inspección visual en celular real, no revisión autenticada del PDF productivo desde el panel en esta sesión; www mantiene origen separado y accesos se habilitan únicamente en libreriasaber.com.ar. No hay eliminación automática de fotos ni nuevos servicios pagos/R2.
