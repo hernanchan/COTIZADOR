@@ -93,7 +93,7 @@ html.embedded .demo-cart{display:none}
   <div class="trim-tip">Las seis fotos se imprimirán y cortarán en Librería Saber. Vos podés ajustar cada encuadre; del corte nos encargamos nosotros.</div></div>
   <div id="secureReceptionNotice" class="secure-reception-note" hidden>
    <strong>Recepción protegida de fotografías</strong>
-   <span>Podés enviar entre 1 y 60 fotos, en hasta 10 hojas A4 (máximo seis por hoja). Las imágenes y los PDF se guardan en Drive privado, solo para Librería Saber.</span>
+   <span>Podés enviar entre 1 y 60 fotos, en hasta 10 hojas A4 (máximo seis por hoja). Usaremos tus fotos únicamente para preparar tu pedido.</span>
    <label class="consent-check"><input id="photoConsent" type="checkbox"> Acepto enviar mis fotografías únicamente para preparar este pedido en Librería Saber.</label>
    <div id="turnstileBox"></div>
   </div>
@@ -101,7 +101,7 @@ html.embedded .demo-cart{display:none}
   <div class="buttons"><button class="primary" id="btnPdf" disabled>Recepción no disponible</button><button class="secondary" id="btnDemo" title="Para probar antes de usar fotos reales">Cargar prueba</button><button class="secondary" id="btnClear">Vaciar</button></div>
   <div class="status" id="status" role="status" aria-live="polite">Seleccioná tus fotografías. Podés cargarlas todas de una vez.</div>
    <div id="afterReceipt" hidden style="margin-top:12px;padding:14px;background:#eaf8f0;border-radius:12px">
-     <strong style="display:block;color:#155c39;margin-bottom:10px">Fotografías recibidas y PDF listo en Drive privado.</strong>
+     <strong style="display:block;color:#155c39;margin-bottom:10px">¡Tus fotos ya están listas! Continuá al carrito para completar tu pedido.</strong>
      <button type="button" class="primary" id="goToCartAfterReceipt">Continuar al carrito</button>
    </div>
 </section>
@@ -187,7 +187,7 @@ function updateSheetNav(){
  $('deleteSheet').disabled=locked||sheets.length===1;
  $('btnPdf').disabled=loadingPhotos||!orderComplete()||busy||!!receivedReference||!receiverConfig?.enabled||!receiverApiUrl;
  $('afterReceipt').hidden=!receivedReference||window.parent!==window;
- $('btnPdf').textContent=receivedReference?'Fotos recibidas · '+receivedReference:
+ $('btnPdf').textContent=receivedReference?'Pedido '+customerOrderNumber(receivedReference):
   receiverConfig&&receiverConfig.enabled?'Enviar '+n+' fotos y agregar al carrito':
   'Servicio próximamente disponible';
  showPartialNotice();
@@ -233,6 +233,7 @@ let turnstileToken='';
 let receiverRequestCount=0;
 const receiverPending=new Map();
 let receivingSession=null;
+function customerOrderNumber(reference){return String(reference).slice(0,12)}
 let receivedReference='';
 let receivedOrder=null;
 let receiverInitError='';
@@ -566,7 +567,7 @@ async function sendSecurePhotos(){
    uploadsReceived:true,reference,referenceStatus:'received'};
   receivedOrder=Object.freeze({reference,sheets:sheets.length,photos:allPhotos.length,price:sheets.length*unitPrice});
   receivedReference=reference;receivingSession=null;
-  status('¡Recibimos '+result.received+' fotografías! Referencia '+reference+'.','ok');
+  status('¡Recibimos '+result.received+' fotografías! Pedido '+customerOrderNumber(reference)+'.','ok');
   updateSheetNav();
   if(window.parent!==window)
    window.parent.postMessage({type:'SABER_POLAROID_RECEIVED',payload:cartPayload},window.location.origin);
@@ -654,7 +655,7 @@ $('goToCartAfterReceipt').onclick=()=>{
   items.push({
    id:'PRINT-'+receivedReference,type:'print',photoOrder:true,name:'Polaroids 85 × 90 mm',
    qty:1,price,deposit:price/2,
-   detail:count+' hoja'+(count===1?'':'s')+' A4 · '+n+' Polaroids · Ref. '+receivedReference,
+   detail:count+' hoja'+(count===1?'':'s')+' A4 · '+n+' Polaroids · Pedido '+customerOrderNumber(receivedReference),
    draftReferences:[],receivedReferences:[receivedReference],filesReceived:true
   });
   try{localStorage.setItem(key,JSON.stringify(items))}
