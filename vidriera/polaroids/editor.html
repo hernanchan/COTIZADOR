@@ -326,7 +326,14 @@ function renderSlots(){const target=$('slots');target.replaceChildren();let tota
  }$('count').textContent=total+' de 6';updateSheetNav();if(total===6)status('Hoja '+(activeSheet+1)+' completa. Podés agregar otra o continuar con el pedido.','ok');else status('Hoja '+(activeSheet+1)+': faltan '+(6-total)+' fotografía'+(6-total===1?'':'s')+'.');}
 function renderAll(){renderSlots();renderPreview();renderOverview()}
 function dropPhoto(i){if(editingLocked())return;if(photos[i]&&photos[i].url)URL.revokeObjectURL(photos[i].url);photos[i]=null}
-function loadImage(file){return new Promise((resolve,reject)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>resolve({name:file.name,img:im,url:u,file,zoom:1,cx:.5,cy:.5});im.onerror=()=>{URL.revokeObjectURL(u);reject(new Error('No se pudo abrir '+file.name+'. Usá JPG, PNG o WebP.'))};im.src=u})}
+async function loadImage(source){
+ let file;
+ try{
+  const bytes=await source.arrayBuffer();
+  if(!bytes.byteLength||bytes.byteLength!==source.size)throw new Error('Lectura incompleta');
+  file=new File([bytes],source.name,{type:source.type,lastModified:source.lastModified});
+ }catch(_){throw new Error('No se pudo preparar '+source.name+'. Descargá esa foto en el teléfono y volvé a seleccionarla.')}
+ return new Promise((resolve,reject)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>resolve({name:file.name,img:im,url:u,file,zoom:1,cx:.5,cy:.5});im.onerror=()=>{URL.revokeObjectURL(u);reject(new Error('No se pudo abrir '+file.name+'. Usá JPG, PNG o WebP.'))};im.src=u})}
 async function acceptFiles(files,specific=-1){
  if(editingLocked()||!files.length)return;
  const valid=files.filter(f=>receiverConfig&&receiverConfig.enabled
@@ -545,7 +552,9 @@ async function sendSecurePhotos(){
    if(receivingSession.uploaded.has(i))continue;
    const p=allPhotos[i];
    status('Preparando y enviando la foto '+(i+1)+' de '+allPhotos.length+'…');
-   const original=await readFileBase64(p.file);
+   let original;
+   try{original=await readFileBase64(p.file);}
+   catch(_){throw new Error('No pudimos leer la foto '+(i+1)+' ('+p.file.name+'). Las fotos ya enviadas se conservan; pulsá Enviar para reintentar.');}
    const blob=await imprimirRecorte(p);
    const printJpeg=await readFileBase64(blob),c=cropBounds(p);
    const payload={reference:receivingSession.reference,
