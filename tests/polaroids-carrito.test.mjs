@@ -42,5 +42,5 @@ const shop=vm.createContext({...sandbox,fetch:async()=>new Response('{"enabled":
 shop.window=shop;shop.parent=shop;
 for(const [,script] of (await read('vidriera/index.html')).matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))vm.runInContext(script,shop);
 vm.runInContext('sendWhatsApp()',shop);
-const message=decodeURIComponent(opened);assert.match(message,/19 Polaroids/);assert.match(message,/POL-[A-F0-9]{24}/);assert.match(message,/Cuaderno/);assert.equal(/uploadKey|base64/.test(message),false);
+const message=decodeURIComponent(opened);assert.match(message,/19 Polaroids/);assert.match(message,/POL-[A-F0-9]{8}/);assert.doesNotMatch(message,/POL-[A-F0-9]{24}/);assert.match(cart[1].receivedReferences[0],/^POL-[A-F0-9]{24}$/);assert.match(message,/Cuaderno/);assert.equal(/uploadKey|base64/.test(message),false);
 console.log('PASS: scripts reales con DOM/red simulados: precio único, 19 fotos/4 hojas, estado confirmado, edición bloqueada, carrito mixto sin duplicados y WhatsApp sin secretos.');
