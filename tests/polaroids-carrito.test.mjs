@@ -18,7 +18,7 @@ const html=await read('vidriera/polaroids/editor.html');
 for(const [,script] of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))run(script);
 await new Promise(r=>setTimeout(r,0));
 assert.equal(calls,1);assert.equal(run('unitPrice'),3000);assert.equal(nodes.get('btnPdf').disabled,true);
-run(`sheets.splice(0,sheets.length,...Array.from({length:4},(_,k)=>Array.from({length:6},(_,i)=>k*6+i<19?{file:{name:'foto'+(k*6+i),size:100,type:'image/jpeg',lastModified:1},img:{naturalWidth:1000,naturalHeight:1000},zoom:1,cx:.5,cy:.5}:null)));photos=sheets[0];partialConfirmed=19;receiverConfig={enabled:true};receiverApiUrl=location.origin+'/api/polaroids-receiver';turnstileToken='test';readFileBase64=async()=> 'mock-base64';imprimirRecorte=async()=>({});`);
+run(`saveRecovery=async()=>{};recoveryStore=async()=>{};sheets.splice(0,sheets.length,...Array.from({length:4},(_,k)=>Array.from({length:6},(_,i)=>k*6+i<19?{file:{name:'foto'+(k*6+i),size:100,type:'image/jpeg',lastModified:1},img:{naturalWidth:1000,naturalHeight:1000},zoom:1,cx:.5,cy:.5}:null)));photos=sheets[0];partialConfirmed=19;receiverConfig={enabled:true};receiverApiUrl=location.origin+'/api/polaroids-receiver';turnstileToken='test';readFileBase64=async()=> 'mock-base64';imprimirRecorte=async()=>({});`);
 sandbox.fetch=async(url,options)=>{
  const op=new URL(url).searchParams.get('op'),input=JSON.parse(options.body);
  if(op==='status')return new Response(JSON.stringify({ok:true,found:!!server,...server}));
@@ -33,7 +33,7 @@ assert.equal(run('receivedOrder.price'),12000);assert.equal(nodes.get('btnClear'
 run('dropPhoto(0);deleteCurrentSheet();addNewSheet();openEditor(0)');
 assert.equal(run('photoCount()'),19);assert.equal(run('editorIndex'),-1);
 storage.set('saberCartV1',JSON.stringify([{id:'PRODUCT-1',type:'product',name:'Cuaderno',qty:2,price:1000}]));
-nodes.get('goToCartAfterReceipt').onclick();nodes.get('goToCartAfterReceipt').onclick();
+await nodes.get('goToCartAfterReceipt').onclick();await nodes.get('goToCartAfterReceipt').onclick();
 const cart=JSON.parse(storage.get('saberCartV1'));
 assert.equal(cart.length,2);assert.equal(cart[1].price,12000);assert.equal(cart[1].deposit,6000);assert.match(cart[1].detail,/19 Polaroids/);
 assert.equal(destination,'../index.html?carrito=1');assert.equal(/uploadKey|base64/.test(storage.get('saberCartV1')),false);
