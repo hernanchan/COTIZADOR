@@ -9,10 +9,24 @@ async function mp(env,path,opts={}){
  if(!r.ok)throw Error("Mercado Pago respondió "+r.status+" "+String(data.message||""));
  return data;
 }
+async function verifySignature(req,url,secret){
+ if(!secret)return false;
+ const hdr=req.headers.get("x-signature")||"", requestId=req.headers.get("x-request-id")||"";
+ const parts=Object.fromEntries(hdr.split(",").map(p=>p.trim().split("=")));
+ const ts=parts.ts, hex=parts.v1;
+ const id=url.searchParams.get("data.id");
+ if(!requestId||!ts||!/^\\d{9,16}$/.test(ts)||!id||!/^[a-f0-9]{64}$/i.test(hex||""))return false;
+ const manifest="id:"+id.toLowerCase()+";request-id:"+requestId+";ts:"+ts+";";
+ const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign"]);
+ const signed=await crypto.subtle.sign("HMAC",key,new TextEncoder().encode(manifest));
+ const digest=Array.from(new Uint8Array(signed),v=>v.toString(16).padStart(2,"0")).join("");
+ let mismatch=0;for(let i=0;i<64;i++)mismatch|=digest.charCodeAt(i)^hex.toLowerCase().charCodeAt(i);
+ return mismatch===0;
+}
 export default {
  async fetch(req,env){
   const url=new URL(req.url);
-  if(url.pathname==="/health"&&req.method==="GET")return json({ok:true,environment:"test",payments:"NOT_DEPLOYED_BY_THIS_COMMIT"});
+  if(url.pathname==="/health"&&req.method==="GET")return json({ok:true,environment:"test",payments:"TEST_ONLY_SIGNATURE_REQUIRED"});
   if(!env.DB || !env.MP_TEST_ACCESS_TOKEN || !env.DEMO_ADMIN_KEY)return json({error:"Falta configuración privada de pruebas"},503);
   try {
    // Solo un operador que conoce DEMO_ADMIN_KEY puede preparar un pedido ficticio.
@@ -40,9 +54,9 @@ export default {
     return json({order_id:order.id,checkout_url:preference.sandbox_init_point || preference.init_point,preference_id:preference.id});
    }
    if(url.pathname==="/webhooks/mercadopago"&&req.method==="POST"){
-    // Las notificaciones son avisos, NO pruebas de pago. Verificamos por API con token privado.
+    // Fallar cerrado: sin firma válida no se consulta ni confirma ningún pago.\n    if(!await verifySignature(req,url,env.MP_WEBHOOK_SECRET))return json({error:"Notificación no autenticada"},401);\n    // La firma valida el origen; la API verifica el estado y el importe.
     const message=await req.json().catch(()=>({}));
-    const paymentId=message?.data?.id || url.searchParams.get("data.id");
+    const paymentId=url.searchParams.get("data.id");
     const kind=message.type||message.topic||url.searchParams.get("type");
     if(kind!=="payment" || !/^[0-9]{1,30}$/.test(String(paymentId||"")))return json({received:true});
     const pay=await mp(env,"/v1/payments/"+esc(String(paymentId)));
