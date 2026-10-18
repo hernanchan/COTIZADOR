@@ -1,0 +1,67 @@
+// Librería Saber: integración AISLADA para Checkout Pro de Mercado Pago.
+// No desplegar ni agregar secretos reales hasta revisar y aprobar la prueba.
+const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
+const esc=s=>encodeURIComponent(s);
+const tokenOK=(req,env)=>{const expected=env.DEMO_ADMIN_KEY;if(!expected)return false;return req.headers.get("Authorization")==="Bearer "+expected};
+async function mp(env,path,opts={}){
+ const r=await fetch("https://api.mercadopago.com"+path,{...opts,headers:{Authorization:"Bearer "+env.MP_TEST_ACCESS_TOKEN,"Content-Type":"application/json",...(opts.headers||{})}});
+ const t=await r.text();let data;try{data=JSON.parse(t)}catch{data={message:"Respuesta inválida de Mercado Pago"}}
+ if(!r.ok)throw Error("Mercado Pago respondió "+r.status+" "+String(data.message||""));
+ return data;
+}
+export default {
+ async fetch(req,env){
+  const url=new URL(req.url);
+  if(url.pathname==="/health"&&req.method==="GET")return json({ok:true,environment:"test",payments:"NOT_DEPLOYED_BY_THIS_COMMIT"});
+  if(!env.DB || !env.MP_TEST_ACCESS_TOKEN || !env.DEMO_ADMIN_KEY)return json({error:"Falta configuración privada de pruebas"},503);
+  try {
+   // Solo un operador que conoce DEMO_ADMIN_KEY puede preparar un pedido ficticio.
+   if(url.pathname==="/demo/order"&&req.method==="POST"){
+    if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+    const id=crypto.randomUUID();
+    await env.DB.prepare("INSERT INTO orders(id,description,amount_ars,deposit_ars) VALUES(?,?,?,?)").bind(id,"Pedido ficticio de prueba",10000,5000).run();
+    return json({id,total:10000,deposit:5000},201);
+   }
+   if(url.pathname==="/demo/checkout"&&req.method==="POST"){
+    if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+    const {order_id}=await req.json();
+    if(typeof order_id!=="string")return json({error:"order_id inválido"},400);
+    const order=await env.DB.prepare("SELECT * FROM orders WHERE id=?").bind(order_id).first();
+    if(!order)return json({error:"Pedido no encontrado"},404);
+    if(order.status!=="awaiting_payment")return json({error:"El pedido ya está pago"},409);
+    if(order.preference_id)return json({error:"Ya existe una preferencia para este pedido; reutilizarla o revisar su estado"},409);
+    const preference=await mp(env,"/checkout/preferences",{method:"POST",headers:{"X-Idempotency-Key":order.id},body:JSON.stringify({
+      items:[{id:order.id,title:"Seña - Pedido de prueba Librería Saber",quantity:1,currency_id:"ARS",unit_price:order.deposit_ars}],
+      external_reference:order.id,
+      notification_url:env.TEST_WEBHOOK_URL,
+      metadata:{purpose:"libreria_saber_demo"}
+    })});
+    await env.DB.prepare("UPDATE orders SET preference_id=? WHERE id=? AND preference_id IS NULL AND status='awaiting_payment'").bind(preference.id,order.id).run();
+    return json({order_id:order.id,checkout_url:preference.sandbox_init_point || preference.init_point,preference_id:preference.id});
+   }
+   if(url.pathname==="/webhooks/mercadopago"&&req.method==="POST"){
+    // Las notificaciones son avisos, NO pruebas de pago. Verificamos por API con token privado.
+    const message=await req.json().catch(()=>({}));
+    const paymentId=message?.data?.id || url.searchParams.get("data.id");
+    const kind=message.type||message.topic||url.searchParams.get("type");
+    if(kind!=="payment" || !/^[0-9]{1,30}$/.test(String(paymentId||"")))return json({received:true});
+    const pay=await mp(env,"/v1/payments/"+esc(String(paymentId)));
+    if(pay.status!=="approved" || pay.currency_id!=="ARS")return json({received:true,registered:false});
+    const orderId=String(pay.external_reference||"");
+    const order=await env.DB.prepare("SELECT * FROM orders WHERE id=?").bind(orderId).first();
+    if(!order || !order.preference_id)return json({received:true,registered:false});
+    // El importe, preferencia y cuenta receptora deben corresponder exactamente al pedido.
+    if(String(pay.preference_id)!==order.preference_id || Number(pay.transaction_amount)!==order.deposit_ars || String(pay.collector_id)!==String(env.MP_TEST_SELLER_ID))
+      return json({received:true,registered:false});
+    await env.DB.prepare("UPDATE orders SET status='paid',payment_id=?,paid_at=datetime('now') WHERE id=? AND status='awaiting_payment' AND payment_id IS NULL").bind(String(paymentId),orderId).run();
+    return json({received:true});
+   }
+   if(url.pathname==="/demo/paid-orders"&&req.method==="GET"){
+    if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+    const rows=await env.DB.prepare("SELECT id,description,amount_ars,deposit_ars,status,paid_at FROM orders WHERE status='paid' ORDER BY paid_at DESC LIMIT 100").all();
+    return json({orders:rows.results});
+   }
+   return json({error:"No encontrado"},404);
+  }catch(e){return json({error:"Error de integración; consultar registros privados"},502)}
+ }
+};
