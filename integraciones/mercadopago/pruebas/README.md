@@ -29,3 +29,8 @@ Rama: `pagos/mercadopago-checkout-pro-pruebas-20261017`.
 
 ## Regla de negocio final
 No mostrar pedidos en producción hasta que tanto los archivos estén recibidos íntegramente como el pago (seña o total) esté aprobado y verificado. El registro de pedido debe persistir aunque el webhook se repita o el usuario cierre la página.
+
+## Estado de conexión a Cloudflare
+- Worker de pruebas: `saber-pagos-pruebas`.
+- Conectado a esta rama para comprobar que los cambios en GitHub ejecuten el comando de despliegue aislado.
+- El despliegue exitoso y las pruebas de API aún requieren verificación independiente.
