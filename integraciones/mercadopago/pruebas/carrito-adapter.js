@@ -26,6 +26,15 @@
   return {schema:"saber-cart-v1",currency:"ARS",paymentMode:"FULL",items,
    displayTotal:items.reduce((sum,x)=>sum+x.displayUnitPrice*x.qty,0)};
  }
- function fromLocalStorage(){return snapshot(JSON.parse(global.localStorage.getItem("saberCartV1")||"[]"))}
+ function fromLocalStorage(){
+  const cart=snapshot(JSON.parse(global.localStorage.getItem("saberCartV1")||"[]"));
+  const fingerprint=JSON.stringify(cart.items);
+  let existing=null;
+  try{existing=JSON.parse(global.localStorage.getItem("saberCartCheckoutIntentV1")||"null")}catch{}
+  const valid=existing&&existing.fingerprint===fingerprint&&/^[0-9a-f-]{36}$/i.test(String(existing.id||""));
+  const id=valid?existing.id:global.crypto.randomUUID();
+  if(!valid)global.localStorage.setItem("saberCartCheckoutIntentV1",JSON.stringify({fingerprint,id}));
+  return {...cart,client_order_id:id};
+ }
  global.SaberCartPaymentAdapter=Object.freeze({snapshot,fromLocalStorage});
 })(window);
