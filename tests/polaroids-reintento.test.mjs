@@ -35,7 +35,7 @@ assert.equal(starts.length,2);assert.equal(starts[0].reference,starts[1].referen
 assert.equal(run('receivedReference'),previousReference);assert.equal(server.received,6);
 // Verificar el relay real de esta revisión: Google ERROR nunca se interpreta como recepción aceptada.
 const relay=await import('data:text/javascript;base64,'+Buffer.from(await read('prototipos/pagos-piloto/receiver-con-respuesta.js')).toString('base64'));
-const cfg={enabled:true,allowedHost:host,bridgeUrl:'https://script.google.com/macros/s/AKfycbxH5hpSS0HjTLQtFIxmTluo7KHzxHj1FWpDkbIwW25_jKVdDq_EFnfBFyNO3XIJpv0TIg/exec'};
+const cfg={enabled:true,allowedHost:host,bridgeUrl:'https://script.google.com/macros/s/AKfycbzF2lx1Q0qmVOoshCigtQQaMmR4IF0kiT8vK_3fwBGgwXgpUW8CixpDJoprhLuOxv20/exec'};
 const env={ASSETS:{fetch:async()=>Response.json(cfg)}};
 const request=()=>new Request('https://'+host+'/api/polaroids-receiver?op=start',{method:'POST',headers:{Origin:'https://'+host,'Content-Type':'application/json'},body:'{"op":"start","payload":{}}'});
 const savedFetch=globalThis.fetch;
