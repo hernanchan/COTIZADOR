@@ -97,7 +97,7 @@ export default {
         queryDataId:Boolean(url.searchParams.get("data.id")),
         queryId:Boolean(url.searchParams.get("id")),
         queryType:url.searchParams.get("type")||null,
-        secretConfigured:Boolean(env.MP_WEBHOOK_SECRET)
+        secretConfigured:Boolean(env.MP_WEBHOOK_SECRET),secretHasWhitespace:typeof env.MP_WEBHOOK_SECRET==="string"&&env.MP_WEBHOOK_SECRET!==env.MP_WEBHOOK_SECRET.trim(),timestampPresent:Boolean((req.headers.get("x-signature")||"").includes("ts="))
       });
       await audit(env,"rejected_signature",detail.slice(0,400));
       return json({error:"Notificación no autenticada"},401)
