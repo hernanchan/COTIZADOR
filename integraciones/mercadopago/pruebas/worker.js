@@ -89,7 +89,19 @@ export default {
    }
    if(url.pathname==="/webhooks/mercadopago"&&req.method==="POST"){
     const valid=await verifySignature(req,url,env.MP_WEBHOOK_SECRET);
-    if(!valid){await audit(env,"rejected_signature","No signature match");return json({error:"Notificación no autenticada"},401)}
+    if(!valid){
+      const hdr=req.headers.get("x-signature")||"";
+      const detail=JSON.stringify({
+        signatureHeader:hdr.includes("v1="),
+        requestIdHeader:Boolean(req.headers.get("x-request-id")),
+        queryDataId:Boolean(url.searchParams.get("data.id")),
+        queryId:Boolean(url.searchParams.get("id")),
+        queryType:url.searchParams.get("type")||null,
+        secretConfigured:Boolean(env.MP_WEBHOOK_SECRET)
+      });
+      await audit(env,"rejected_signature",detail.slice(0,400));
+      return json({error:"Notificación no autenticada"},401)
+    }
     const message=await req.json().catch(()=>({}));
     const paymentId=url.searchParams.get("data.id");
     const kind=message.type||message.topic||url.searchParams.get("type");
