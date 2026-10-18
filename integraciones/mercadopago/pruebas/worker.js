@@ -34,7 +34,15 @@ export default {
    if(env.DB){try{const r=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='orders'").first();databaseReady=r?.name==="orders"}catch{}}
    return json({ok:true,environment:"test",configured,databaseReady,paymentsEnabled:false});
   }
-  if(!env.DB || !env.MP_TEST_ACCESS_TOKEN || !env.DEMO_ADMIN_KEY || !env.MP_TEST_SELLER_ID || !env.TEST_WEBHOOK_URL)return json({error:"Falta configuración privada de pruebas"},503);
+  if(url.pathname==="/demo/diagnostic"&&req.method==="GET"){
+   if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+   const required=["DB","MP_TEST_ACCESS_TOKEN","DEMO_ADMIN_KEY","MP_TEST_SELLER_ID","TEST_WEBHOOK_URL","MP_WEBHOOK_SECRET"];
+   const missing=required.filter(k=>!env[k]);
+   let table=false;
+   if(env.DB){try{table=Boolean(await env.DB.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='orders'").first())}catch{}}
+   return json({ok:missing.length===0&&table,missing,ordersTableReady:table});
+  }
+  if(!env.DB || !env.MP_TEST_ACCESS_TOKEN || !env.DEMO_ADMIN_KEY || !env.MP_TEST_SELLER_ID || !env.TEST_WEBHOOK_URL)return json({error:"Falta configuración privada de pruebas. Consultar diagnóstico autorizado."},503);
   try {
    // Solo un operador que conoce DEMO_ADMIN_KEY puede preparar un pedido ficticio.
    if(url.pathname==="/demo/order"&&req.method==="POST"){
