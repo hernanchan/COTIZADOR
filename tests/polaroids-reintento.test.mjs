@@ -41,9 +41,26 @@ const request=()=>new Request('https://'+host+'/api/polaroids-receiver?op=start'
 const savedFetch=globalThis.fetch;
 try{
  for(const [reply,status]of [['ERROR',422],['OK',202],['<html>unexpected</html>',502]]){
-  globalThis.fetch=async(url,opts)=>{assert.equal(opts.redirect,'follow');return new Response(reply)};
+  globalThis.fetch=async(url,opts)=>{assert.equal(opts.redirect,'manual');return new Response(reply)};
   const r=await relay.onRequestPost({request:request(),env});assert.equal(r.status,status);
   const data=await r.json();if(reply==='ERROR')assert.equal(data.rejected,true);if(reply==='OK')assert.equal(data.confirmed,false);
+ }
+ let calls=[];
+ globalThis.fetch=async(url,opts)=>{
+  calls.push({url,opts});
+  if(opts.method==='POST'){
+   assert.equal(opts.redirect,'manual');
+   const body=await new Response(opts.body).text();assert.match(body,/start/);
+   return new Response(null,{status:302,headers:{Location:'https://script.googleusercontent.com/macros/echo?user_content_key=test'}});
+  }
+  assert.equal(opts.method,'GET');assert.equal(opts.body,undefined);assert.equal(opts.redirect,'error');
+  return new Response('OK');
+ };
+ assert.equal((await relay.onRequestPost({request:request(),env})).status,202);
+ assert.equal(calls.length,2);
+ for(const location of ['https://attacker.example/macros/echo','https://accounts.google.com/login','https://script.googleusercontent.com/other']){
+  let count=0;globalThis.fetch=async()=>{count++;return new Response(null,{status:302,headers:{Location:location}})};
+  assert.equal((await relay.onRequestPost({request:request(),env})).status,502);assert.equal(count,1);
  }
 }finally{globalThis.fetch=savedFetch}
 console.log('PASS reintento: error visible, sin espera en rechazo explícito, referencia/clave conservadas, doble clic bloqueado y Google ERROR rechazado.');

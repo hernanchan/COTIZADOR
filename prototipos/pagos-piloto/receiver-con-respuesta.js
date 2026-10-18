@@ -122,11 +122,22 @@ export async function onRequestPost({request,env}){
   }
  }));
  try{
-  const upstream=await fetch(APPS_SCRIPT,{
+  let upstream=await fetch(APPS_SCRIPT,{
    method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
-   body:limited,redirect:'follow',cache:'no-store',
+   body:limited,redirect:'manual',cache:'no-store',
    signal:AbortSignal.timeout(40000)
   });
+  // El stream POST no es reutilizable. Google ContentService responde con
+  // 302/303: recuperar SOLO la respuesta con GET, nunca reenviar las fotos.
+  if([302,303].includes(upstream.status)){
+   const location=upstream.headers.get('Location');
+   const target=location?new URL(location,APPS_SCRIPT):null;
+   if(!target||target.protocol!=='https:'||target.hostname!=='script.googleusercontent.com'||
+      target.pathname!=='/macros/echo'||target.username||target.password||target.port)
+    return json({ok:false,error:'Google devolvió una redirección de recepción no admitida.'},502);
+   upstream=await fetch(target.toString(),{method:'GET',redirect:'error',cache:'no-store',
+    headers:{Accept:'text/plain'},signal:AbortSignal.timeout(16000)});
+  }
   // Leer ContentService permite distinguir OK de ERROR; 302/200 no confirma aceptación.
   if(upstream.ok){
    const reply=(await upstream.text()).trim();
