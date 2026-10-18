@@ -18,7 +18,14 @@
    const refs=Array.isArray(x.receivedReferences)?x.receivedReferences:[];
    if(type==="print"&&x.photoOrder===true&&!(x.filesReceived===true&&refs.length===1&&REF.test(String(refs[0]))))throw Error("Faltan fotos recibidas en el trabajo "+(i+1));
    if(Array.isArray(x.draftReferences)&&x.draftReferences.length)throw Error("Hay archivos sin recepción confirmada.");
-   return {type,code:type==="product"?String(x.id||"").slice(0,80):null,name:String(x.name||"").slice(0,180),qty,
+   const isPolaroid=type==="print"&&x.photoOrder===true;
+   const proof=String(x.receiptProofToken||"");
+   if(isPolaroid&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(proof))
+    throw Error("Las Polaroids necesitan una constancia de recepción verificada antes del pago.");
+   if(type==="print"&&!isPolaroid)
+    throw Error("Los trabajos de impresión todavía requieren un precio validado por el servidor.");
+   return {type,code:type==="product"?String(x.id||"").slice(0,80):"POLAROID_A4",
+    proof_token:isPolaroid?proof:undefined,name:String(x.name||"").slice(0,180),qty,
     // Solo referencia visual. El backend JAMÁS debe usar este importe como fuente de verdad.
     displayUnitPrice:price,detail:type==="print"?String(x.detail||"").slice(0,1500):"",
     photoReferences:type==="print"?refs.filter(r=>REF.test(String(r))).map(String):[]};
