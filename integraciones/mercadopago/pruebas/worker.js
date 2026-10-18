@@ -27,7 +27,7 @@ export default {
  async fetch(req,env){
   const url=new URL(req.url);
   if(url.pathname==="/health"&&req.method==="GET")return json({ok:true,environment:"test",payments:"TEST_ONLY_SIGNATURE_REQUIRED"});
-  if(!env.DB || !env.MP_TEST_ACCESS_TOKEN || !env.DEMO_ADMIN_KEY)return json({error:"Falta configuración privada de pruebas"},503);
+  if(!env.DB || !env.MP_TEST_ACCESS_TOKEN || !env.DEMO_ADMIN_KEY || !env.MP_TEST_SELLER_ID || !env.TEST_WEBHOOK_URL)return json({error:"Falta configuración privada de pruebas"},503);
   try {
    // Solo un operador que conoce DEMO_ADMIN_KEY puede preparar un pedido ficticio.
    if(url.pathname==="/demo/order"&&req.method==="POST"){
@@ -60,7 +60,7 @@ export default {
     const kind=message.type||message.topic||url.searchParams.get("type");
     if(kind!=="payment" || !/^[0-9]{1,30}$/.test(String(paymentId||"")))return json({received:true});
     const pay=await mp(env,"/v1/payments/"+esc(String(paymentId)));
-    if(pay.status!=="approved" || pay.currency_id!=="ARS")return json({received:true,registered:false});
+    if(pay.status!=="approved" || pay.currency_id!=="ARS" || pay.live_mode!==false)return json({received:true,registered:false});
     const orderId=String(pay.external_reference||"");
     const order=await env.DB.prepare("SELECT * FROM orders WHERE id=?").bind(orderId).first();
     if(!order || !order.preference_id)return json({received:true,registered:false});
