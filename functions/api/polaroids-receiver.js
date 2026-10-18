@@ -8,7 +8,7 @@
  */
 const HOST='polaroids-integracion-sin-r2.libreriasaber.pages.dev';
 const ORIGIN='https://'+HOST;
-const APPS_SCRIPT='https://script.google.com/macros/s/AKfycbxH5hpSS0HjTLQtFIxmTluo7KHzxHj1FWpDkbIwW25_jKVdDq_EFnfBFyNO3XIJpv0TIg/exec';
+const APPS_SCRIPT='https://script.google.com/macros/s/AKfycbzF2lx1Q0qmVOoshCigtQQaMmR4IF0kiT8vK_3fwBGgwXgpUW8CixpDJoprhLuOxv20/exec';
 const CALLBACK='saberStatus_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const MAX_POST_BYTES=15*1024*1024;
 const REFERENCE=/^POL-[A-F0-9]{24}$/;

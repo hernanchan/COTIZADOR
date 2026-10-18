@@ -5,7 +5,7 @@
  * navegador contra JavaScript cross-origin de Google ContentService.
  */
 const HOST = 'polaroids-integracion-sin-r2.libreriasaber.pages.dev';
-const APPS_SCRIPT = 'https://script.google.com/macros/s/AKfycbxH5hpSS0HjTLQtFIxmTluo7KHzxHj1FWpDkbIwW25_jKVdDq_EFnfBFyNO3XIJpv0TIg/exec';
+const APPS_SCRIPT = 'https://script.google.com/macros/s/AKfycbzF2lx1Q0qmVOoshCigtQQaMmR4IF0kiT8vK_3fwBGgwXgpUW8CixpDJoprhLuOxv20/exec';
 const CALLBACK = 'saberStatus_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
 function output(data, status = 200) {
