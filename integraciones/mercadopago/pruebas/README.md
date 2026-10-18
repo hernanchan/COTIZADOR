@@ -3,12 +3,12 @@
 Rama: `pagos/mercadopago-checkout-pro-pruebas-20261017`.
 
 ## Alcance
-- Pago de una seña ficticia de ARS 5.000 sobre un pedido ficticio de ARS 10.000.
+- Pago **total** ficticio de ARS 10.000 sobre un pedido de ARS 10.000; las pruebas de señas anteriores permanecen como histórico.
 - La preferencia de pago se crea desde el servidor, nunca usando un importe enviado por el navegador.
 - Al llegar un aviso `payment`, se consulta directamente a la API de Mercado Pago y solo se confirma cuando el pago es `approved`, es ARS, coincide el importe, la preferencia y el vendedor de pruebas.
 - `/demo/paid-orders` devuelve solo pedidos pagos, con acceso restringido.
 - No modifica el carrito, el panel existente, los Workers ni Polaroids.
-- Esta carpeta **no despliega nada automáticamente**.
+- El Worker de pruebas está vinculado a esta rama por Cloudflare Builds; los cambios del Worker de pruebas pueden desplegarse automáticamente **solo en el subdominio workers.dev**, no en la web pública.
 
 ## Antes de ejecutar
 1. Auditar el backend existente y elegir un entorno Cloudflare de ensayo completamente separado. No asociarlo al dominio público.
@@ -20,7 +20,7 @@ Rama: `pagos/mercadopago-checkout-pro-pruebas-20261017`.
 7. Consultar `GET /demo/paid-orders` con autorización y confirmar que el pedido figura **solo** luego de un pago aprobado.
 
 ## No está listo para producción
-- Todavía no hay automatización de despliegue, UI de panel ni conexión con el carrito.
+- Existe un panel privado inicial en `/admin`, con datos de pagos íntegros aprobados; está pendiente su comprobación desplegada y la conexión real con el carrito.
 - Falta inspeccionar el Worker activo de Polaroids y cualquier backend adicional.
 - Falta manejo de pagos devueltos, cancelaciones y conciliación, firma de webhook, monitoreo, control antiabuso/rate limiting, trazabilidad y pruebas integrales.
 - El demo usa un importe fijo y no acepta nuevos montos desde el cliente.
@@ -28,7 +28,7 @@ Rama: `pagos/mercadopago-checkout-pro-pruebas-20261017`.
 - El secreto de Mercado Pago **jamás** se agrega a código, capturas ni chats.
 
 ## Regla de negocio final
-No mostrar pedidos en producción hasta que tanto los archivos estén recibidos íntegramente como el pago (seña o total) esté aprobado y verificado. El registro de pedido debe persistir aunque el webhook se repita o el usuario cierre la página.
+No mostrar pedidos en producción hasta que los archivos necesarios estén recibidos íntegramente y el pago **total** esté aprobado y verificado. El registro de pedido debe persistir aunque el webhook se repita o el usuario cierre la página.
 
 ## Estado de conexión a Cloudflare
 - Worker de pruebas: `saber-pagos-pruebas`.
@@ -50,3 +50,10 @@ No mostrar pedidos en producción hasta que tanto los archivos estén recibidos 
 - Preparar plan de publicación coordinada y de reversión; última acción únicamente con aprobación expresa.
 
 **Estado:** desarrollo aislado en rama de pruebas; no equivale a integración terminada. El botón del carrito público sigue sin conectarse a este checkout.
+
+### Avance 2026-10-18 · Centro de Pedidos privado (rama de pruebas)
+
+- Nueva ruta `/admin`: requiere clave del panel para mostrar datos; consulta únicamente pedidos con `status='paid'` y `deposit_ars=amount_ars`, excluyendo señas históricas.
+- `/admin/api/orders` y `/admin/api/order?id=...`: exigen autenticación. Detalles de líneas y referencias se almacenarán en `order_items` (esquema añadido; su escritura desde el carrito aún no está implementada).
+- El listado de pedidos del demo no se convierte automáticamente en una venta real.
+- **Pendiente de comprobar el despliegue** del panel nuevo, la validación de precios del lado servidor, recepción y asociación completa de archivos y el flujo de pago definitivo. El cambio no autoriza a publicar.
