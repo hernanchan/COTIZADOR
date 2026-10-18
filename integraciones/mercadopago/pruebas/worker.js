@@ -24,6 +24,19 @@ async function verifySignature(req,url,secret){
  return mismatch===0;
 }
 const demoHtml="<!doctype html><html lang=\"es\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Saber pagos prueba</title><style>body{font:16px system-ui;max-width:650px;margin:35px auto;padding:18px}input{padding:10px;width:95%}button{padding:12px;margin:8px 3px}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style><h2>Librería Saber | Prueba de pagos</h2><p>Solo pruebas: pedido $10.000, seña $5.000. No introduzcas tokens de Mercado Pago.</p><input type=\"password\" id=\"key\" placeholder=\"Clave del demo (no se guarda)\"><p><button id=\"start\">Crear pedido y preparar pago</button><button id=\"list\">Consultar pagos aprobados</button><button id=\"diag\">Diagnosticar configuración</button><p><input id=\"paymentId\" inputmode=\"numeric\" placeholder=\"Número de operación de prueba\"><button id=\"paymentCheck\">Analizar pago de prueba</button></p></p><pre id=\"output\"></pre><script>\nconst o=document.querySelector('#output');\nasync function api(p,m='GET',b){const r=await fetch(p,{method:m,headers:{'Authorization':'Bearer '+document.querySelector('#key').value,'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});const d=await r.json();if(!r.ok)throw Error(d.error||r.status);return d}\ndocument.querySelector('#start').onclick=async()=>{try{o.textContent='Preparando...';const x=await api('/demo/order','POST');const y=await api('/demo/checkout','POST',{order_id:x.id});o.textContent='Pedido '+x.id+' creado. ';const a=document.createElement('a');a.href=y.checkout_url;a.target='_blank';a.rel='noopener noreferrer';a.textContent='Abrir pago de prueba';o.append(a)}catch(e){o.textContent=e.message}};\ndocument.querySelector('#list').onclick=async()=>{try{o.textContent=JSON.stringify(await api('/demo/paid-orders'),null,2)}catch(e){o.textContent=e.message}};\ndocument.querySelector('#diag').onclick=async()=>{try{o.textContent=JSON.stringify(await api('/demo/diagnostic'),null,2)}catch(e){o.textContent=e.message}};\ndocument.querySelector('#paymentCheck').onclick=async()=>{try{o.textContent=JSON.stringify(await api('/demo/payment-check','POST',{payment_id:document.querySelector('#paymentId').value.trim()}),null,2)}catch(e){o.textContent='Error: '+e.message}};\n</script></html>";
+async function reconcilePayment(env,paymentId){
+ const pay=await mp(env,"/v1/payments/"+esc(paymentId));
+ if(pay.status!=="approved"||pay.currency_id!=="ARS"||String(pay.collector_id)!==String(env.MP_TEST_SELLER_ID))return {registered:false,reason:"payment_checks"};
+ const order=await env.DB.prepare("SELECT * FROM orders WHERE id=?").bind(String(pay.external_reference||"")).first();
+ if(!order||!order.preference_id||Number(pay.transaction_amount)!==order.deposit_ars)return {registered:false,reason:"order_checks"};
+ if(!pay.order?.id)return {registered:false,reason:"merchant_order_missing"};
+ const mo=await mp(env,"/merchant_orders/"+esc(String(pay.order.id)));
+ if(String(mo.preference_id)!==String(order.preference_id)||String(mo.external_reference)!==String(order.id)||!mo.payments?.some(p=>String(p.id)===String(pay.id)&&p.status==="approved"))return {registered:false,reason:"merchant_order_checks"};
+ // Exclusivo de la cuenta de vendedor de prueba; no se procesan cobros productivos.
+ if(order.status==="paid")return {registered:true,alreadyRegistered:true};
+ const res=await env.DB.prepare("UPDATE orders SET status='paid',payment_id=?,paid_at=datetime('now') WHERE id=? AND status='awaiting_payment' AND payment_id IS NULL").bind(String(pay.id),order.id).run();
+ return {registered:Boolean(res.meta?.changes)};
+}
 export default {
  async fetch(req,env){
   const url=new URL(req.url);
@@ -69,21 +82,18 @@ export default {
     return json({order_id:order.id,checkout_url:preference.sandbox_init_point || preference.init_point,preference_id:preference.id});
    }
    if(url.pathname==="/webhooks/mercadopago"&&req.method==="POST"){
-    // Fallar cerrado: sin firma válida no se consulta ni confirma ningún pago.\n    if(!await verifySignature(req,url,env.MP_WEBHOOK_SECRET))return json({error:"Notificación no autenticada"},401);\n    // La firma valida el origen; la API verifica el estado y el importe.
+    if(!await verifySignature(req,url,env.MP_WEBHOOK_SECRET))return json({error:"Notificación no autenticada"},401);
     const message=await req.json().catch(()=>({}));
     const paymentId=url.searchParams.get("data.id");
     const kind=message.type||message.topic||url.searchParams.get("type");
-    if(kind!=="payment" || !/^[0-9]{1,30}$/.test(String(paymentId||"")))return json({received:true});
-    const pay=await mp(env,"/v1/payments/"+esc(String(paymentId)));
-    if(pay.status!=="approved" || pay.currency_id!=="ARS" || pay.live_mode!==false)return json({received:true,registered:false});
-    const orderId=String(pay.external_reference||"");
-    const order=await env.DB.prepare("SELECT * FROM orders WHERE id=?").bind(orderId).first();
-    if(!order || !order.preference_id)return json({received:true,registered:false});
-    // El importe, preferencia y cuenta receptora deben corresponder exactamente al pedido.
-    if(String(pay.preference_id)!==order.preference_id || Number(pay.transaction_amount)!==order.deposit_ars || String(pay.collector_id)!==String(env.MP_TEST_SELLER_ID))
-      return json({received:true,registered:false});
-    await env.DB.prepare("UPDATE orders SET status='paid',payment_id=?,paid_at=datetime('now') WHERE id=? AND status='awaiting_payment' AND payment_id IS NULL").bind(String(paymentId),orderId).run();
-    return json({received:true});
+    if(kind!=="payment"||!/^[0-9]{1,30}$/.test(String(paymentId||"")))return json({received:true});
+    return json({received:true,...await reconcilePayment(env,String(paymentId))});
+   }
+   if(url.pathname==="/demo/reconcile"&&req.method==="POST"){
+    if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+    const body=await req.json().catch(()=>({}));
+    if(!/^[0-9]{1,30}$/.test(String(body.payment_id||"")))return json({error:"ID inválido"},400);
+    return json(await reconcilePayment(env,String(body.payment_id)));
    }
    if(url.pathname==="/demo/payment-check"&&req.method==="POST"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
