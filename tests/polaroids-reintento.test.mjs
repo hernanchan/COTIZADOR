@@ -68,5 +68,14 @@ try{
  let contacted=false;globalThis.fetch=async()=>{contacted=true;return new Response('OK')};
  const oversized=new Request('https://'+host+'/api/polaroids-receiver?op=photo',{method:'POST',headers:{Origin:'https://'+host,'Content-Type':'application/json'},body:new Uint8Array(15*1024*1024+1)});
  assert.equal((await relay.onRequestPost({request:oversized,env})).status,413);assert.equal(contacted,false);
+ // Estado: cuerpos malformados o excesivos deben fallar sin contactar Google.
+ const statusReq=body=>new Request('https://'+host+'/api/polaroids-receiver?op=status',{
+  method:'POST',headers:{Origin:'https://'+host,'Content-Type':'application/json'},body
+ });
+ assert.equal((await relay.onRequestPost({request:statusReq('null'),env})).status,400);
+ assert.equal((await relay.onRequestPost({request:statusReq('[]'),env})).status,400);
+ assert.equal((await relay.onRequestPost({request:statusReq('x'.repeat(2001)),env})).status,400);
+ assert.equal(contacted,false);
+
 }finally{globalThis.fetch=savedFetch}
 console.log('PASS reintento: error visible, sin espera en rechazo explícito, referencia/clave conservadas, doble clic bloqueado y Google ERROR rechazado.');
