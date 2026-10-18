@@ -12,3 +12,20 @@ CREATE TABLE IF NOT EXISTS orders (
  paid_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+
+-- Líneas de pedido: detalle únicamente accesible desde el Centro de Pedidos privado.
+-- Los importes deben proceder de un presupuesto validado en el backend.
+CREATE TABLE IF NOT EXISTS order_items (
+ order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+ line_number INTEGER NOT NULL CHECK(line_number>=1 AND line_number<=100),
+ item_type TEXT NOT NULL CHECK(item_type IN ('product','print')),
+ sku TEXT,
+ title TEXT NOT NULL,
+ quantity INTEGER NOT NULL CHECK(quantity>0),
+ unit_price_ars INTEGER NOT NULL CHECK(unit_price_ars>0),
+ line_total_ars INTEGER NOT NULL CHECK(line_total_ars>0),
+ detail_json TEXT NOT NULL DEFAULT '{}',
+ file_references_json TEXT NOT NULL DEFAULT '[]',
+ PRIMARY KEY(order_id,line_number)
+);
+CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
