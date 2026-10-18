@@ -38,6 +38,23 @@ async function reconcilePayment(env,paymentId){
  const res=await env.DB.prepare("UPDATE orders SET status='paid',payment_id=?,paid_at=datetime('now') WHERE id=? AND status='awaiting_payment' AND payment_id IS NULL").bind(String(pay.id),order.id).run();
  return {registered:Boolean(res.meta?.changes)};
 }
+async function syncPendingPayments(env){
+ const pending=await env.DB.prepare("SELECT id FROM orders WHERE status='awaiting_payment' AND preference_id IS NOT NULL ORDER BY created_at DESC LIMIT 20").all();
+ const summary={checked:0,registered:0,errors:0};
+ for(const order of pending.results||[]){
+  summary.checked++;
+  try{
+   const search=await mp(env,"/v1/payments/search?"+new URLSearchParams({external_reference:order.id,limit:"20",sort:"date_created",criteria:"desc"}));
+   for(const payment of search.results||[]){
+    if(payment.status!=="approved"||String(payment.external_reference||"")!==order.id)continue;
+    const result=await reconcilePayment(env,String(payment.id));
+    if(result.registered){if(!result.alreadyRegistered)summary.registered++;break}
+   }
+  }catch(e){summary.errors++;console.error("Pending payment verification failed",order.id,String(e?.message||"error").slice(0,100))}
+ }
+ if(summary.registered||summary.errors)await audit(env,"payment_sync",JSON.stringify(summary));
+ return summary;
+}
 async function audit(env,event,detail){
  try{
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS webhook_audit (id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT NOT NULL DEFAULT (datetime('now')), event TEXT NOT NULL, detail TEXT NOT NULL)").run();
@@ -45,6 +62,9 @@ async function audit(env,event,detail){
  }catch(e){console.error("Webhook audit failed",e?.message||"unknown")}
 }
 export default {
+ async scheduled(event,env,ctx){
+  ctx.waitUntil(syncPendingPayments(env).catch(e=>console.error("Scheduled payment sync failed",e?.message||"unknown")));
+ },
  async fetch(req,env){
   const url=new URL(req.url);
   if(url.pathname==="/demo"&&req.method==="GET")return new Response(demoHtml,{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store"}});
@@ -161,6 +181,10 @@ export default {
       sellerMatches:String(pay.collector_id)===String(env.MP_TEST_SELLER_ID)
     };
     return json({checks,paymentPreferencePresent:Boolean(pay.preference_id),merchantOrderPresent:Boolean(merchantOrder),merchantOrderError,orderStatus:order?.status||null,note:"Solo diagnóstico: no altera el estado del pedido."});
+   }
+   if(url.pathname==="/demo/sync-pending"&&req.method==="POST"){
+    if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+    return json(await syncPendingPayments(env));
    }
    if(url.pathname==="/demo/paid-orders"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"La clave de acceso del demo no coincide con DEMO_ADMIN_KEY en Cloudflare. No ingreses el nombre de la variable."},401);
