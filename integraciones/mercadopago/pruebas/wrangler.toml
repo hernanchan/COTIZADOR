@@ -2,6 +2,7 @@ name = "saber-pagos-pruebas"
 main = "worker.js"
 compatibility_date = "2026-10-17"
 workers_dev = true
+keep_vars = true
 
 [[d1_databases]]
 binding = "DB"
