@@ -34,3 +34,19 @@ No mostrar pedidos en producción hasta que tanto los archivos estén recibidos 
 - Worker de pruebas: `saber-pagos-pruebas`.
 - Conectado a esta rama para comprobar que los cambios en GitHub ejecuten el comando de despliegue aislado.
 - El despliegue exitoso y las pruebas de API aún requieren verificación independiente.
+
+
+## Regla de publicación acordada — 2026-10-18
+
+**No publicar la integración en producción sin autorización expresa del propietario.** Preparar y probar el checkout del **100 % del pedido**, validación de precios en el servidor, catálogo y promociones, carrito mixto de librería/gráfica, referencias Polaroids, archivos asociados y Centro de Pedidos privado exclusivamente con pagos aprobados. Mantener la web pública, las rutas del cotizador y los accesos públicos de Polaroids inalterados durante el desarrollo.
+
+### Criterios de salida (prepublicación)
+
+- Pago íntegro por Mercado Pago y reconciliación idempotente probados con un pedido realista; conservar la validación HMAC y la conciliación alternativa.
+- Importe recalculado en backend usando datos confiables; nunca cobrar basándose exclusivamente en los precios recibidos del navegador.
+- Detalle completo y referencias de archivos visibles solo con autenticación administrativa; no almacenar información sensible de tarjetas.
+- Errores, cancelaciones, vencimientos, doble clic y recargas tratados sin duplicar pedidos ni cobros.
+- Mensajes, textos legales y flujo de WhatsApp revisados y aprobados antes de habilitar al público.
+- Preparar plan de publicación coordinada y de reversión; última acción únicamente con aprobación expresa.
+
+**Estado:** desarrollo aislado en rama de pruebas; no equivale a integración terminada. El botón del carrito público sigue sin conectarse a este checkout.
