@@ -68,3 +68,12 @@ No mostrar pedidos en producción hasta que los archivos necesarios estén recib
 - Las líneas de tipo gráfica/impresión permanecen **bloqueadas**: se requiere una fuente confiable de cotizaciones calculadas en el backend y vinculación/validación de archivos antes de habilitar el checkout de esos trabajos.
 - La reserva o existencia de stock no está confirmada por el CSV; contemplar revisión de disponibilidad.
 - **Pendiente**: probar desplegado el nuevo endpoint y su conectividad con la planilla, cotizaciones de gráfica, conexión real de la tienda y Polaroids, validación integral y aprobación de mensajes de WhatsApp. No publicar.
+
+
+### Reintentos y comprobaciones de código (2026-10-18)
+
+- Se reutiliza el pedido original cuando el comprador repite exactamente el mismo intento (`client_order_id` y SKU/cantidades), aunque hayan cambiado los precios de la planilla; se conserva el importe fijado al crear el pedido. Si cambia el contenido, se exige otro identificador de intento.
+- Si un pedido ya tiene una preferencia en Mercado Pago, el Worker recupera ese enlace en vez de crear otro. En concurrencia devuelve exclusivamente la preferencia que quedó guardada en D1.
+- La ruta de prueba sigue protegida por `DEMO_ADMIN_KEY`, **no habilitada para clientes públicos**.
+- Pruebas de regresión incorporadas en `tests/mercadopago-carrito.test.mjs`. Ejecutar con Node 20+: `node tests/mercadopago-carrito.test.mjs`. Se hizo una comprobación lógica equivalente con D1 y Mercado Pago simulados; no supone una prueba de extremo a extremo en Cloudflare.
+- **Pendiente para salir al público:** validación de cotizaciones de impresión/gráfica en el backend, habilitación segura del endpoint para clientes (sin exponer `DEMO_ADMIN_KEY`), políticas de precios y vencimiento, control de abuso, asociación de documentos y Polaroids, pruebas reales de la ejecución automática, aprobación comercial de mensajes y credenciales productivas.
