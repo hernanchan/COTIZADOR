@@ -62,6 +62,15 @@ async function refresh(){try{status.textContent="Consultando...";const x=await a
 document.querySelector("#refresh").addEventListener("click",refresh);
 document.querySelector("#sync").addEventListener("click",async()=>{try{status.textContent="Verificando pagos en Mercado Pago...";const x=await api("/demo/sync-pending","POST");await refresh();status.textContent+=" · Sincronizados: "+x.registered+" · Errores: "+x.errors}catch(e){status.textContent=e.message}});
 </script></body></html>`;
+async function paymentEnvironmentAllowed(env,pay){
+ if(pay.live_mode===false)return true;
+ if(pay.live_mode!==true)return false;
+ // Checkout Pro con cuentas TEST puede informar live_mode=true.
+ // Nunca aceptar ese flag por sí solo: consultar la identidad del token en servidor.
+ const seller=await mp(env,"/users/me");
+ return String(seller.id)===String(env.MP_TEST_SELLER_ID)&&
+  String(seller.id)===String(pay.collector_id)&&Array.isArray(seller.tags)&&seller.tags.includes("test_user");
+}
 async function reconcilePayment(env,paymentId){
  const pay=await mp(env,"/v1/payments/"+esc(paymentId));
  await ensurePaymentReviews(env);
@@ -70,7 +79,8 @@ async function reconcilePayment(env,paymentId){
   await env.DB.prepare("INSERT INTO payment_reviews(order_id,state,checked_at) VALUES(?,'revoked',datetime('now')) ON CONFLICT(order_id) DO UPDATE SET state='revoked',checked_at=datetime('now')").bind(recorded.id).run();
   return {registered:false,reason:"payment_revoked"};
  }
- if(pay.live_mode!==false||Number(pay.transaction_amount_refunded||0)>0||pay.status!=="approved"||pay.currency_id!=="ARS"||String(pay.collector_id)!==String(env.MP_TEST_SELLER_ID))return {registered:false,reason:"payment_checks"};
+ if(Number(pay.transaction_amount_refunded||0)>0||pay.status!=="approved"||pay.currency_id!=="ARS"||String(pay.collector_id)!==String(env.MP_TEST_SELLER_ID))return {registered:false,reason:"payment_checks"};
+ if(!await paymentEnvironmentAllowed(env,pay))return {registered:false,reason:"test_seller_unverified"};
  const order=await env.DB.prepare("SELECT * FROM orders WHERE id=?").bind(String(pay.external_reference||"")).first();
  if(!order||!order.preference_id||Number(pay.transaction_amount)!==Number(order.amount_ars)||Number(order.deposit_ars)!==Number(order.amount_ars))return {registered:false,reason:"order_checks"};
  if(!pay.order?.id)return {registered:false,reason:"merchant_order_missing"};
@@ -475,6 +485,7 @@ export default {
     const checks={
       approved:pay.status==="approved",
       paymentLiveModeFalse:pay.live_mode===false,
+      paymentEnvironmentAllowed:await paymentEnvironmentAllowed(env,pay).catch(()=>false),
       currency:pay.currency_id==="ARS",
       orderExists:Boolean(order),
       paymentPreferenceMatches:Boolean(order&&pay.preference_id&&String(pay.preference_id)===String(order.preference_id)),
@@ -484,7 +495,7 @@ export default {
       amountMatches:Boolean(order&&Number(pay.transaction_amount)===order.deposit_ars),
       sellerMatches:String(pay.collector_id)===String(env.MP_TEST_SELLER_ID)
     };
-    return json({checks,paymentPreferencePresent:Boolean(pay.preference_id),merchantOrderPresent:Boolean(merchantOrder),merchantOrderError,orderStatus:order?.status||null,note:"Solo diagnóstico: no altera el estado del pedido."});
+    return json({checks,paymentPreferencePresent:Boolean(pay.preference_id),merchantOrderPresent:Boolean(merchantOrder),merchantOrderError,orderStatus:order?.status||null,note:"Solo diagnóstico. La preferencia se valida con la orden comercial; live_mode=true requiere vendedor marcado test_user por la API. No altera el pedido."});
    }
    if(url.pathname==="/demo/sync-pending"&&req.method==="POST"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);

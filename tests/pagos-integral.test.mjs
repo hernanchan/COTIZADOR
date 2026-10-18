@@ -11,13 +11,14 @@ const DB={prepare(sql){let args=[];return {bind(...a){args=a;return this},
  async first(){return sqlite.prepare(sql).get(...args)||null},async all(){return {results:sqlite.prepare(sql).all(...args)}},
  async run(){const r=sqlite.prepare(sql).run(...args);return {meta:{changes:Number(r.changes)}}}}},
  async batch(stmts){sqlite.exec('BEGIN');try{const r=[];for(const stmt of stmts)r.push(await stmt.run());sqlite.exec('COMMIT');return r}catch(e){sqlite.exec('ROLLBACK');throw e}}};
-const preferences=new Map(),payments=new Map();let received=12,price='3.500,00',posts=0,cfOK=true,dropResponse=false;
+const preferences=new Map(),payments=new Map();let received=12,price='3.500,00',posts=0,cfOK=true,dropResponse=false,sellerIsTest=true;
 const net=async(url,opts={})=>{
  const u=new URL(url),body=opts.body?JSON.parse(opts.body):null;
  if(u.hostname==='challenges.cloudflare.com')return Response.json({success:cfOK,hostname:'shop.test',action:'checkout'});
  if(u.hostname==='docs.google.com')return new Response('Activo,Código,Producto,Precio,Oferta\nSI,SKU-1,Cuaderno,"'+price+'",0\n');
  if(u.pathname==='/api/polaroids-receiver')return Response.json({ok:true,found:true,status:'received',photos:12,sheets:2,received});
  assert.equal(u.hostname,'api.mercadopago.com','Red no autorizada en pruebas: '+url);
+ if(u.pathname==='/users/me')return Response.json({id:123,tags:sellerIsTest?['test_user']:['normal']});
  if(u.pathname==='/checkout/preferences'&&opts.method==='POST'){
   posts++;assert.equal(body.notification_url,env.TEST_WEBHOOK_URL);assert.equal(body.items[0].unit_price,13000);assert.equal(body.expires,true);
   const pref={...body,id:'PREF-'+posts,sandbox_init_point:'https://sandbox.mercadopago.com/checkout/'+posts};preferences.set(pref.id,pref);if(dropResponse){dropResponse=false;throw Error('Respuesta perdida después de crear preferencia')}return Response.json(pref);
@@ -66,7 +67,13 @@ const payment={id:100,status:'approved',live_mode:false,currency_id:'ARS',collec
 payments.set('100',{...payment,transaction_amount:1});assert.equal((await admin('/demo/reconcile',{payment_id:'100'})).data.registered,false);
 payments.set('100',{...payment,collector_id:999});assert.equal((await admin('/demo/reconcile',{payment_id:'100'})).data.registered,false);
 payments.set('100',{...payment,status:'pending'});assert.equal((await admin('/demo/reconcile',{payment_id:'100'})).data.registered,false);
-payments.set('100',payment);
+// Con cuentas de test, live_mode puede ser true: exigir confirmación de test_user desde la API.
+payment.live_mode=true;sellerIsTest=false;payments.set('100',payment);
+assert.equal((await admin('/demo/reconcile',{payment_id:'100'})).data.reason,'test_seller_unverified');
+assert.equal((await admin('/admin/api/orders')).data.orders.length,0);
+sellerIsTest=true;
+assert.equal((await admin('/demo/payment-check',{payment_id:'100'})).data.checks.paymentEnvironmentAllowed,true);
+
 async function webhook(valid=true,age=0){const ts=String(Math.floor(Date.now()/1000)-age),requestId='request-1';const sig=createHmac('sha256',env.MP_WEBHOOK_SECRET).update('id:100;request-id:'+requestId+';ts:'+ts+';').digest('hex');
  return ctx.worker.fetch(new Request('https://worker.test/webhooks/mercadopago?data.id=100&type=payment',{method:'POST',headers:{'x-signature':'ts='+ts+',v1='+(valid?sig:'0'.repeat(64)),'x-request-id':requestId,'Content-Type':'application/json'},body:'{"type":"payment"}'}),env)}
 assert.equal((await webhook(false)).status,401);assert.equal((await admin('/admin/api/orders')).data.orders.length,0);

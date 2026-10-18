@@ -14,7 +14,7 @@ Los cambios de esta revisión son **locales y no desplegados**. Esta rama tiene 
 - Frontend de ensayo generado fuera de los HTML públicos, incluido retorno que consulta el servidor y no confía en parámetros enviados por Mercado Pago. No manda mensajes de WhatsApp.
 - Un intento conserva su ID antes y después de cargar fotos. Doble clic comparte operación en cliente; bloqueo SQL coordina creación concurrente de preferencia. Reintentos usan la preferencia persistida. El importe vence a 24 horas y se configura expiración en Mercado Pago.
 - `notification_url` explícita en preferencias y retorno configurable. HMAC exige ID, request-id y timestamp de hasta 15 minutos; conciliación alternativa recorre pendientes sin dejar permanentemente atrás los antiguos.
-- Registro de pago solo si es aprobado, ARS, importe completo, cuenta vendedora y orden comercial coincidentes; esta versión de ensayo exige `live_mode=false`.
+- Registro de pago solo si es aprobado, ARS, importe completo, cuenta vendedora y orden comercial coincidentes; se admiten `live_mode=false` o, si informa `true`, únicamente identidad de vendedor confirmada con `tags` que contiene `test_user` mediante `GET /users/me` autenticado y coincidencia con el vendedor configurado.
 - Revisión de pagos previamente aprobados. Una devolución parcial/total o cambio de estado retira el pedido del listado apto para producción y marca el estado de cliente como `review`. No se emiten devoluciones automáticamente. No se vuelve a habilitar automáticamente un pedido observado.
 - Lectura de importes argentinos `3.500,00` sin concatenar centavos. Se rechazan formatos ambiguos o importes fraccionarios: este esquema trabaja en pesos enteros.
 - Centro privado: detalle de líneas/referencias solo autenticado, pago íntegro y sin revisión negativa. No se guardan fotografías, tarjetas ni uploadKey en D1.
@@ -64,7 +64,7 @@ No añadir R2. No crear D1, planes ni servicios nuevos sin autorización. Si el 
 
 ## Impedimentos concretos para declarar listo para publicar
 
-- Falta desplegar y ensayar con las cuentas y credenciales reales de **prueba**, comprobar hostname de Turnstile, comunicación entre Workers y Google, PDF privado y verificación del pago. Confirmar el valor real de `live_mode` que devuelve la modalidad de prueba usada; esta revisión rechaza `true` y no se debe relajar para admitir cobros reales en el piloto.
+- Falta desplegar y ensayar con las cuentas y credenciales reales de **prueba**, comprobar hostname de Turnstile, comunicación entre Workers y Google, PDF privado y verificación del pago. El piloto informó `live_mode=true` aun en Sandbox: se agregó comprobación de `test_user` del vendedor autenticado. Falta comprobar esa consulta real; sin confirmación el pago continúa bloqueado. Nunca se admite una cuenta real por el solo hecho de coincidir su ID.
 - El Centro muestra referencias de archivos, no enlaces de descarga ni el PDF. Debe comprobarse su localización en el panel privado de Drive y definir el acceso administrativo sin exponerlos al cliente.
 - Otros trabajos de gráfica/impresión permanecen bloqueados: todavía no tienen presupuesto de servidor ni constancia de todos sus archivos. El catálogo y Polaroids sí tienen validación. No afirmar que el carrito de todos los servicios está completo.
 - El catálogo CSV no confirma ni reserva stock. Requiere decisión comercial antes de cobrar artículos sin confirmación de existencia.
@@ -79,3 +79,9 @@ No añadir R2. No crear D1, planes ni servicios nuevos sin autorización. Si el 
 3. Resolver impedimentos anteriores y revisar WhatsApp/textos. Mantener accesos públicos cerrados.
 4. Presentar resultado verificable y pedir autorización expresa para la activación pública coordinada.
 5. Reversión: apagar CHECKOUT_ENABLED en proxy y Worker, volver al frontend anterior y conservar órdenes, pagos y auditoría. No borrar D1 ni Drive. Conciliar pagos que lleguen después del cierre.
+
+## Corrección durante piloto · 18:39 ART
+
+La captura del diagnóstico del pago de catálogo $4.500 mostró approved, moneda, importe, vendedor y orden comercial correctos, pero `paymentLiveModeFalse=false`. Se reemplazó la exigencia absoluta de `live_mode=false` por `paymentEnvironmentAllowed`: false es válido; true requiere consultar /users/me con el token servidor y confirmar ID del vendedor y etiqueta test_user. La preferencia sigue validándose desde merchant_order, pues el pago observado no incluye preference_id directo. Prueba SQL añadida: vendedor real con live_mode=true se rechaza; cuenta con etiqueta test_user se admite. El pago existente se puede conciliar sin volver a cobrar.
+
+Referencias primarias: https://github.com/mercadopago/sdk-go/tree/master/pkg/user y https://developers.mercadolibre.com.ar/consulta-usuarios (campo tags/test_user). No se guardan ni se muestran datos personales devueltos por /users/me.
