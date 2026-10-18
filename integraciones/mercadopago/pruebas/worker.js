@@ -26,7 +26,12 @@ async function verifySignature(req,url,secret){
 export default {
  async fetch(req,env){
   const url=new URL(req.url);
-  if(url.pathname==="/health"&&req.method==="GET")return json({ok:true,environment:"test",payments:"TEST_ONLY_SIGNATURE_REQUIRED"});
+  if(url.pathname==="/health"&&req.method==="GET"){
+   const configured=Boolean(env.DB&&env.MP_TEST_ACCESS_TOKEN&&env.DEMO_ADMIN_KEY&&env.MP_TEST_SELLER_ID&&env.TEST_WEBHOOK_URL&&env.MP_WEBHOOK_SECRET);
+   let databaseReady=false;
+   if(env.DB){try{const r=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='orders'").first();databaseReady=r?.name==="orders"}catch{}}
+   return json({ok:true,environment:"test",configured,databaseReady,paymentsEnabled:false});
+  }
   if(!env.DB || !env.MP_TEST_ACCESS_TOKEN || !env.DEMO_ADMIN_KEY || !env.MP_TEST_SELLER_ID || !env.TEST_WEBHOOK_URL)return json({error:"Falta configuración privada de pruebas"},503);
   try {
    // Solo un operador que conoce DEMO_ADMIN_KEY puede preparar un pedido ficticio.
