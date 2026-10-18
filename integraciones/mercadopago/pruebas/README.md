@@ -57,3 +57,14 @@ No mostrar pedidos en producción hasta que los archivos necesarios estén recib
 - `/admin/api/orders` y `/admin/api/order?id=...`: exigen autenticación. Detalles de líneas y referencias se almacenarán en `order_items` (esquema añadido; su escritura desde el carrito aún no está implementada).
 - El listado de pedidos del demo no se convierte automáticamente en una venta real.
 - **Pendiente de comprobar el despliegue** del panel nuevo, la validación de precios del lado servidor, recepción y asociación completa de archivos y el flujo de pago definitivo. El cambio no autoriza a publicar.
+
+
+### Avance · carrito con precios validados (solo pruebas)
+
+- Se incorporó `POST /demo/cart-order`, protegido por `DEMO_ADMIN_KEY`; recibe `client_order_id` y líneas del carrito en formato `saber-cart-v1`, **sin aceptar importes como fuente de verdad**.
+- Los artículos activos se verifican nuevamente en el servidor contra el CSV publicado de la planilla de productos; el Worker calcula el **100 % del precio vigente** (incluidas ofertas activas de la planilla), lo persiste en `orders` y guarda las líneas en `order_items`.
+- Se agregó `cart_requests` para rechazar reutilizaciones indebidas de la misma clave con un contenido cambiado; repetir el mismo carrito devuelve el mismo pedido. El adaptador conserva el identificador de intento al recargar.
+- `GET /demo/catalog` lista una muestra de artículos únicamente al operador autenticado. El demo dispone de una prueba de pedido de catálogo que **no cobra hasta abrir y completar Checkout Pro**.
+- Las líneas de tipo gráfica/impresión permanecen **bloqueadas**: se requiere una fuente confiable de cotizaciones calculadas en el backend y vinculación/validación de archivos antes de habilitar el checkout de esos trabajos.
+- La reserva o existencia de stock no está confirmada por el CSV; contemplar revisión de disponibilidad.
+- **Pendiente**: probar desplegado el nuevo endpoint y su conectividad con la planilla, cotizaciones de gráfica, conexión real de la tienda y Polaroids, validación integral y aprobación de mensajes de WhatsApp. No publicar.
