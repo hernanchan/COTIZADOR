@@ -110,21 +110,25 @@ export async function onRequestPost({request,env}){
    });
   }catch(_){return json({ok:false,error:'Google no respondió a la consulta de recepción.'},502)}
  }
- // Se preserva el cuerpo por streaming, sin leer ni almacenar fotos en Cloudflare.
- // TransformStream corta cualquier transmisión que supere 15 MiB, aun sin
- // Content-Length. No se necesitan datos persistentes ni planes pagos.
- let transferred=0;
- const limited=request.body.pipeThrough(new TransformStream({
-  transform(chunk,controller){
-   transferred+=chunk.byteLength;
-   if(transferred>MAX_POST_BYTES)throw Error('Carga demasiado grande.');
-   controller.enqueue(chunk);
+ // Google debe recibir un cuerpo con longitud conocida. Se limita la lectura
+ // antes de transmitir; memoria transitoria por foto, sin persistencia ni R2.
+ const reader=request.body.getReader(),chunks=[];let transferred=0;
+ try{
+  while(true){
+   const {done,value}=await reader.read();if(done)break;
+   transferred+=value.byteLength;
+   if(transferred>MAX_POST_BYTES){await reader.cancel();return json({ok:false,error:'La foto excede el tamaño de transmisión permitido.'},413)}
+   chunks.push(value);
   }
- }));
+ }catch(_){return json({ok:false,error:'No se pudo leer la carga del navegador.'},400)}
+ const body=new Uint8Array(transferred);let offset=0;
+ for(const chunk of chunks){body.set(chunk,offset);offset+=chunk.byteLength}
+ chunks.length=0;
+ let stage='post';
  try{
   let upstream=await fetch(APPS_SCRIPT,{
    method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
-   body:limited,redirect:'manual',cache:'no-store',
+   body,redirect:'manual',cache:'no-store',
    signal:AbortSignal.timeout(40000)
   });
   // El stream POST no es reutilizable. Google ContentService responde con
@@ -135,11 +139,13 @@ export async function onRequestPost({request,env}){
    if(!target||target.protocol!=='https:'||target.hostname!=='script.googleusercontent.com'||
       target.pathname!=='/macros/echo'||target.username||target.password||target.port)
     return json({ok:false,error:'Google devolvió una redirección de recepción no admitida.'},502);
+   stage='response-get';
    upstream=await fetch(target.toString(),{method:'GET',redirect:'error',cache:'no-store',
     headers:{Accept:'text/plain'},signal:AbortSignal.timeout(16000)});
   }
   // Leer ContentService permite distinguir OK de ERROR; 302/200 no confirma aceptación.
   if(upstream.ok){
+   stage='response-read';
    const reply=(await upstream.text()).trim();
    if(reply==='OK')return json({ok:true,dispatched:true,confirmed:false},202);
    if(reply==='ERROR')return json({ok:false,rejected:true,
@@ -147,11 +153,15 @@ export async function onRequestPost({request,env}){
    return json({ok:false,error:'Google devolvió una respuesta inesperada para '+op+'. No se confirmó la operación.'},502);
   }
   return json({ok:false,error:'Google rechazó la transmisión (HTTP '+upstream.status+').'},502);
- }catch(_){
+ }catch(ex){
+  // Solo categorías fijas: nunca exponer mensaje, URL ni cuerpo con secretos.
+  const category=ex&&['AbortError','TimeoutError'].includes(ex.name)?'timeout':
+   /length|stream|body|duplex|chunk/i.test(String(ex&&ex.message||''))?'body':
+   /redirect/i.test(String(ex&&ex.message||''))?'redirect':'network';
   // Una caída de red podría producirse después de que Google guardó la foto:
   // no afirmar fallo definitivo; el navegador debe consultar estado.
-  return json({ok:false,dispatched:'unknown',
-   error:'No se pudo confirmar el envío a Google. Consultá el estado del pedido.'},502);
+  return json({ok:false,dispatched:'unknown',diagnostic:stage+'-'+category,
+   error:'No se pudo confirmar el envío a Google ('+stage+'-'+category+'). Consultá el estado del pedido.'},502);
  }
 }
 

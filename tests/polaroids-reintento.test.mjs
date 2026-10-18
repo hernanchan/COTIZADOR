@@ -49,7 +49,7 @@ try{
  globalThis.fetch=async(url,opts)=>{
   calls.push({url,opts});
   if(opts.method==='POST'){
-   assert.equal(opts.redirect,'manual');
+   assert.equal(opts.redirect,'manual');assert.ok(opts.body instanceof Uint8Array);
    const body=await new Response(opts.body).text();assert.match(body,/start/);
    return new Response(null,{status:302,headers:{Location:'https://script.googleusercontent.com/macros/echo?user_content_key=test'}});
   }
@@ -62,5 +62,11 @@ try{
   let count=0;globalThis.fetch=async()=>{count++;return new Response(null,{status:302,headers:{Location:location}})};
   assert.equal((await relay.onRequestPost({request:request(),env})).status,502);assert.equal(count,1);
  }
+ globalThis.fetch=async()=>{throw new TypeError('sensitive URL stream failure')};
+ const failure=await relay.onRequestPost({request:request(),env});const detail=await failure.json();
+ assert.equal(detail.diagnostic,'post-body');assert.equal(JSON.stringify(detail).includes('sensitive'),false);
+ let contacted=false;globalThis.fetch=async()=>{contacted=true;return new Response('OK')};
+ const oversized=new Request('https://'+host+'/api/polaroids-receiver?op=photo',{method:'POST',headers:{Origin:'https://'+host,'Content-Type':'application/json'},body:new Uint8Array(15*1024*1024+1)});
+ assert.equal((await relay.onRequestPost({request:oversized,env})).status,413);assert.equal(contacted,false);
 }finally{globalThis.fetch=savedFetch}
 console.log('PASS reintento: error visible, sin espera en rechazo explícito, referencia/clave conservadas, doble clic bloqueado y Google ERROR rechazado.');
