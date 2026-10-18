@@ -91,16 +91,24 @@ export default {
     if(!/^[0-9]{1,30}$/.test(String(body.payment_id||"")))return json({error:"Identificador de pago inválido"},400);
     const pay=await mp(env,"/v1/payments/"+esc(String(body.payment_id)));
     const order=await env.DB.prepare("SELECT * FROM orders WHERE id=?").bind(String(pay.external_reference||"")).first();
+    let merchantOrder=null,merchantOrderError=null;
+    if(pay.order?.id){
+      try{merchantOrder=await mp(env,"/merchant_orders/"+esc(String(pay.order.id)))}
+      catch{merchantOrderError="No se pudo consultar la orden comercial"}
+    }
     const checks={
       approved:pay.status==="approved",
-      sandbox:pay.live_mode===false,
+      paymentLiveModeFalse:pay.live_mode===false,
       currency:pay.currency_id==="ARS",
       orderExists:Boolean(order),
-      preferenceMatches:Boolean(order&&String(pay.preference_id)===String(order.preference_id)),
+      paymentPreferenceMatches:Boolean(order&&pay.preference_id&&String(pay.preference_id)===String(order.preference_id)),
+      merchantOrderPreferenceMatches:Boolean(order&&merchantOrder&&String(merchantOrder.preference_id)===String(order.preference_id)),
+      merchantOrderReferencesPedido:Boolean(order&&merchantOrder&&String(merchantOrder.external_reference)===String(order.id)),
+      merchantOrderContainsPayment:Boolean(merchantOrder?.payments?.some(p=>String(p.id)===String(pay.id))),
       amountMatches:Boolean(order&&Number(pay.transaction_amount)===order.deposit_ars),
       sellerMatches:String(pay.collector_id)===String(env.MP_TEST_SELLER_ID)
     };
-    return json({checks,allChecksPass:Object.values(checks).every(Boolean),orderStatus:order?.status||null});
+    return json({checks,paymentPreferencePresent:Boolean(pay.preference_id),merchantOrderPresent:Boolean(merchantOrder),merchantOrderError,orderStatus:order?.status||null,note:"Solo diagnóstico: no altera el estado del pedido."});
    }
    if(url.pathname==="/demo/paid-orders"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"La clave de acceso del demo no coincide con DEMO_ADMIN_KEY en Cloudflare. No ingreses el nombre de la variable."},401);
