@@ -267,21 +267,39 @@ export default {
     return json({id,total:10000,amount_to_pay:10000},201);
    }
    if(url.pathname==="/demo/checkout"&&req.method==="POST"){
-    if(!tokenOK(req,env))return json({error:"La clave de acceso del demo no coincide con DEMO_ADMIN_KEY en Cloudflare. No ingreses el nombre de la variable."},401);
-    const {order_id}=await req.json();
-    if(typeof order_id!=="string")return json({error:"order_id inválido"},400);
-    const order=await env.DB.prepare("SELECT * FROM orders WHERE id=?").bind(order_id).first();
+    if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+    const body=await req.json().catch(()=>null);
+    const orderId=body?.order_id;
+    if(!isUUID(orderId))return json({error:"order_id inválido"},400);
+    const order=await env.DB.prepare("SELECT * FROM orders WHERE id=?").bind(orderId).first();
     if(!order)return json({error:"Pedido no encontrado"},404);
     if(order.status!=="awaiting_payment")return json({error:"El pedido ya está pago"},409);
-    if(order.preference_id)return json({error:"Ya existe una preferencia para este pedido; reutilizarla o revisar su estado"},409);
+    if(order.deposit_ars!==order.amount_ars)return json({error:"El pedido anterior no corresponde a la modalidad de pago total"},409);
+    async function returnPreference(id,reused){
+     const preference=await mp(env,"/checkout/preferences/"+esc(id));
+     if(String(preference.external_reference||"")!==order.id)return json({error:"Preferencia incompatible con este pedido"},409);
+     const checkoutUrl=preference.sandbox_init_point||preference.init_point;
+     if(!/^https:\/\//.test(String(checkoutUrl||"")))return json({error:"Mercado Pago no devolvió un enlace válido"},502);
+     return json({order_id:order.id,checkout_url:checkoutUrl,preference_id:id,reused});
+    }
+    if(order.preference_id)return returnPreference(order.preference_id,true);
     const preference=await mp(env,"/checkout/preferences",{method:"POST",headers:{"X-Idempotency-Key":order.id},body:JSON.stringify({
-      items:[{id:order.id,title:String(order.description||"Pago total Librería Saber").slice(0,120),quantity:1,currency_id:"ARS",unit_price:order.deposit_ars}],
+      items:[{id:order.id,title:String(order.description||"Pago total Librería Saber").slice(0,120),quantity:1,currency_id:"ARS",unit_price:order.amount_ars}],
       external_reference:order.id,
-      // El webhook se configura desde Mercado Pago Developers (modo de prueba).
-      metadata:{purpose:"libreria_saber_demo"}
+      metadata:{purpose:"libreria_saber_demo",payment_mode:"full"}
     })});
-    await env.DB.prepare("UPDATE orders SET preference_id=? WHERE id=? AND preference_id IS NULL AND status='awaiting_payment'").bind(preference.id,order.id).run();
-    return json({order_id:order.id,checkout_url:preference.sandbox_init_point || preference.init_point,preference_id:preference.id});
+    if(!preference.id)return json({error:"Mercado Pago no devolvió el identificador de preferencia"},502);
+    const updated=await env.DB.prepare("UPDATE orders SET preference_id=? WHERE id=? AND preference_id IS NULL AND status='awaiting_payment'").bind(preference.id,order.id).run();
+    // Si dos pestañas prepararon un checkout al mismo tiempo, usar siempre
+    // la preferencia que quedó persistida, nunca ofrecer la descartada.
+    if(!updated.meta?.changes){
+     const saved=await env.DB.prepare("SELECT preference_id,status FROM orders WHERE id=?").bind(order.id).first();
+     if(saved?.status!=="awaiting_payment"||!saved.preference_id)return json({error:"El estado del pedido cambió; actualizá la pantalla"},409);
+     return returnPreference(saved.preference_id,true);
+    }
+    const checkoutUrl=preference.sandbox_init_point||preference.init_point;
+    if(!/^https:\/\//.test(String(checkoutUrl||"")))return json({error:"Mercado Pago no devolvió un enlace válido"},502);
+    return json({order_id:order.id,checkout_url:checkoutUrl,preference_id:preference.id,reused:false});
    }
    if(url.pathname==="/webhooks/mercadopago"&&req.method==="POST"){
     const valid=await verifySignature(req,url,env.MP_WEBHOOK_SECRET);
