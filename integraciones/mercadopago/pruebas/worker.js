@@ -90,6 +90,85 @@ async function syncPendingPayments(env){
  if(summary.registered||summary.errors)await audit(env,"payment_sync",JSON.stringify(summary));
  return summary;
 }
+
+const catalogUrl="https://docs.google.com/spreadsheets/d/e/2PACX-1vQx2zW0YP23ZjZMvLwkX_mkbPQgVPL_aUUtcI_n1ApZ6P9F4fBuKFOl-jB4qFmxwoeYsszAZSKbaUVn/pub?gid=419356696&single=true&output=csv";
+function parseCSV(csv){
+ const rows=[];let row=[],value="",quoted=false;
+ for(let i=0;i<csv.length;i++){
+  const c=csv[i],next=csv[i+1];
+  if(c==='"'&&quoted&&next==='"'){value+='"';i++}
+  else if(c==='"'){quoted=!quoted}
+  else if(c===","&&!quoted){row.push(value);value=""}
+  else if((c==="\n"||c==="\r")&&!quoted){
+   if(c==="\r"&&next==="\n")i++;
+   row.push(value);if(row.some(x=>x.trim()!==""))rows.push(row);
+   row=[];value="";
+  }else value+=c;
+ }
+ row.push(value);if(row.some(x=>x.trim()!==""))rows.push(row);
+ if(quoted)throw Error("CSV del catálogo incompleto");
+ return rows;
+}
+const normalizedCell=v=>String(v||"").trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+const amountFromCell=v=>{const digits=String(v||"").replace(/[^0-9-]/g,"");return digits?Number(digits):0};
+async function getCatalog(){
+ const r=await fetch(catalogUrl,{headers:{"Accept":"text/csv"},redirect:"follow",cf:{cacheTtl:0}});
+ if(!r.ok)throw Error("No se pudo verificar el catálogo de precios");
+ const csv=await r.text();
+ if(csv.length>1500000)throw Error("Catálogo demasiado extenso");
+ const rows=parseCSV(csv);if(rows.length<2)throw Error("El catálogo está vacío");
+ const header=rows[0].map(normalizedCell),col=n=>header.indexOf(normalizedCell(n));
+ const idx={active:col("Activo"),code:col("Código"),name:col("Producto"),price:col("Precio"),offer:col("Oferta")};
+ if(Object.values(idx).some(i=>i<0))throw Error("Faltan columnas del catálogo");
+ const catalog=new Map();
+ for(const row of rows.slice(1)){
+  const active=["SI","TRUE","1","X"].includes(normalizedCell(row[idx.active]));
+  const code=String(row[idx.code]||"").trim();
+  const name=String(row[idx.name]||"").trim();
+  const regular=amountFromCell(row[idx.price]),offer=amountFromCell(row[idx.offer]);
+  const current=offer>0?offer:regular;
+  if(!active||!code||!name||!Number.isSafeInteger(current)||current<=0)continue;
+  if(catalog.has(code))throw Error("Código duplicado en catálogo");
+  catalog.set(code,{code,name,price:current});
+ }
+ if(catalog.size===0)throw Error("No hay artículos activos");
+ return catalog;
+}
+const isUUID=v=>typeof v==="string"&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+async function createCatalogCartOrder(env,body){
+ if(!body||body.schema!=="saber-cart-v1"||body.currency!=="ARS"||body.paymentMode!=="FULL"||!Array.isArray(body.items)||body.items.length<1||body.items.length>100||!isUUID(body.client_order_id))return {error:"Carrito o identificador inválido",status:400};
+ if(body.items.some(x=>!x||x.type!=="product"))return {error:"Los trabajos de gráfica requieren cotización validada por el servidor; todavía no están habilitados para cobro.",status:422};
+ const catalog=await getCatalog();
+ let total=0;const items=[];
+ for(const item of body.items){
+  const code=String(item.code||"").trim(),qty=Number(item.qty);
+  const p=catalog.get(code);
+  if(!p)return {error:"Artículo inexistente o inactivo en el catálogo vigente",status:422};
+  if(!Number.isSafeInteger(qty)||qty<1||qty>500)return {error:"Cantidad inválida",status:422};
+  const subtotal=p.price*qty;
+  if(!Number.isSafeInteger(subtotal)||subtotal>50000000)return {error:"Importe fuera del límite de pruebas",status:422};
+  total+=subtotal;
+  if(!Number.isSafeInteger(total)||total>50000000)return {error:"Importe fuera del límite de pruebas",status:422};
+  items.push({type:"product",code,title:p.name,qty,price:p.price,subtotal});
+ }
+ const canon=JSON.stringify(items);
+ const digest=new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(canon)));
+ const hash=Array.from(digest,x=>x.toString(16).padStart(2,"0")).join("");
+ await ensureOrderItems(env);
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS cart_requests (client_order_id TEXT PRIMARY KEY, request_hash TEXT NOT NULL, order_id TEXT NOT NULL UNIQUE)").run();
+ const existing=await env.DB.prepare("SELECT client_order_id,request_hash,order_id FROM cart_requests WHERE client_order_id=?").bind(body.client_order_id).first();
+ if(existing){
+  if(existing.request_hash!==hash)return {error:"El identificador ya se utilizó con otro carrito",status:409};
+  return {order_id:existing.order_id,total_ars:total,currency:"ARS",idempotent:true};
+ }
+ const orderId=crypto.randomUUID();
+ const statements=[env.DB.prepare("INSERT INTO orders(id,description,amount_ars,deposit_ars) VALUES(?,?,?,?)").bind(orderId,"Carrito de librería · "+items.length+" artículo(s)",total,total)];
+ items.forEach((item,i)=>statements.push(env.DB.prepare("INSERT INTO order_items(order_id,line_number,item_type,sku,title,quantity,unit_price_ars,line_total_ars,detail_json,file_references_json) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(orderId,i+1,"product",item.code,item.title,item.qty,item.price,item.subtotal,"{}","[]")));
+ statements.push(env.DB.prepare("INSERT INTO cart_requests(client_order_id,request_hash,order_id) VALUES(?,?,?)").bind(body.client_order_id,hash,orderId));
+ await env.DB.batch(statements);
+ return {order_id:orderId,total_ars:total,currency:"ARS",idempotent:false};
+}
+
 async function ensureOrderItems(env){
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS order_items (order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,line_number INTEGER NOT NULL CHECK(line_number>=1 AND line_number<=100),item_type TEXT NOT NULL CHECK(item_type IN ('product','print')),sku TEXT,title TEXT NOT NULL,quantity INTEGER NOT NULL CHECK(quantity>0),unit_price_ars INTEGER NOT NULL CHECK(unit_price_ars>0),line_total_ars INTEGER NOT NULL CHECK(line_total_ars>0),detail_json TEXT NOT NULL DEFAULT '{}',file_references_json TEXT NOT NULL DEFAULT '[]',PRIMARY KEY(order_id,line_number))").run();
 }
@@ -151,6 +230,13 @@ export default {
     await ensureOrderItems(env);
     const rows=await env.DB.prepare("SELECT line_number,item_type,sku,title,quantity,unit_price_ars,line_total_ars,detail_json,file_references_json FROM order_items WHERE order_id=? ORDER BY line_number").bind(id).all();
     return json({order,items:rows.results});
+   }
+   if(url.pathname==="/demo/cart-order"&&req.method==="POST"){
+    if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+    const data=await req.json().catch(()=>null);
+    const result=await createCatalogCartOrder(env,data);
+    if(result.error)return json({error:result.error},result.status);
+    return json(result,result.idempotent?200:201);
    }
    if(url.pathname==="/demo/order"&&req.method==="POST"){
     if(!tokenOK(req,env))return json({error:"La clave de acceso del demo no coincide con DEMO_ADMIN_KEY en Cloudflare. No ingreses el nombre de la variable."},401);
