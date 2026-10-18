@@ -130,3 +130,16 @@ node tools/verificar-piloto-sin-publicar.mjs
 ```
 
 No solicita contraseñas, no crea pedidos ni sube fotos, no escribe en Drive ni D1, no cobra y no despliega cambios. Una salida PASS prueba únicamente conectividad y coherencia de las rutas GET; la carga y PDF siguen pendientes de pruebas de extremo a extremo. La red de este entorno de chat no permitió obtener las respuestas de los dominios `pages.dev` y `workers.dev`, por lo que **aún no hay un resultado PASS remoto**.
+
+
+## Diagnóstico del rechazo Google start · origen Turnstile (continuación)
+
+Se recuperó del análisis del piloto en Work (18/10/2026, aproximadamente 19:30 ART) una causa más precisa que `ERROR`: el receptor de Google verificaba el hostname `libreriasaber.com.ar`, pero el desafío completado en el editor de pruebas provenía de `polaroids-integracion-sin-r2.libreriasaber.pages.dev`. `op=status` ya había contestado `ok:true,found:false`, y el rechazo de `start` ocurrió antes de crear el pedido. Work informó carpeta correcta y cupo disponible (1/8). Estas observaciones pertenecen a ese ensayo; volver a verificar la configuración vigente antes de aplicarlas.
+
+Se preparó en `integraciones/polaroids/apps-script/validacion-turnstile-dominios-piloto.gs` una función segura que acepta **exactamente** el hostname del piloto y el del sitio público, **solo cuando** `siteverify.success === true` y la acción es `polaroids`. No acepta sufijos, comodines ni un hostname entregado por el navegador.
+
+**NO está instalado ni desplegado en Google Apps Script:** `Code.gs` no se encuentra en GitHub ni disponible a través de la conexión de Drive. Para aplicarlo correctamente se necesita revisar el bloque existente de `Code.gs` que llama a `https://challenges.cloudflare.com/turnstile/v0/siteverify` o que compara `TURNSTILE_HOSTNAME`. No basta con subir el helper a GitHub; tampoco cambiar una única propiedad al hostname de pruebas, porque podría romper la recepción pública.
+
+Se añadió `tests/polaroids-hosts-siteverify.test.mjs`, con casos positivos y negativos; se comprobó la función propuesta ejecutando nueve casos en JS sin acceso externo. Falta ejecutar la prueba formal Node y la prueba real de `start/photo/finish` después de revisar y autorizar la integración en Apps Script. Mantener el flujo apagado si la comprobación falla.
+
+**Prohibido** dar por resuelto Google, modificar la recepción pública o la propiedad global de Turnstile, cobrar, publicar, crear servicios o contratar infraestructura hasta autorización del titular.
