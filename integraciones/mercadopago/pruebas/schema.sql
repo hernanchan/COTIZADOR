@@ -29,3 +29,10 @@ CREATE TABLE IF NOT EXISTS order_items (
  PRIMARY KEY(order_id,line_number)
 );
 CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
+
+-- Idempotencia: repetir el envío de un mismo carrito no debe crear otra orden.
+CREATE TABLE IF NOT EXISTS cart_requests (
+ client_order_id TEXT PRIMARY KEY,
+ request_hash TEXT NOT NULL,
+ order_id TEXT NOT NULL UNIQUE REFERENCES orders(id) ON DELETE CASCADE
+);
