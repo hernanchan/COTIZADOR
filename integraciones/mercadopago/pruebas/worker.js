@@ -35,7 +35,7 @@ export default {
    return json({ok:true,environment:"test",configured,databaseReady,paymentsEnabled:false});
   }
   if(url.pathname==="/demo/diagnostic"&&req.method==="GET"){
-   if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+   if(!tokenOK(req,env))return json({error:"La clave de acceso del demo no coincide con DEMO_ADMIN_KEY en Cloudflare. No ingreses el nombre de la variable."},401);
    const required=["DB","MP_TEST_ACCESS_TOKEN","DEMO_ADMIN_KEY","MP_TEST_SELLER_ID","TEST_WEBHOOK_URL","MP_WEBHOOK_SECRET"];
    const missing=required.filter(k=>!env[k]);
    let table=false;
@@ -46,13 +46,13 @@ export default {
   try {
    // Solo un operador que conoce DEMO_ADMIN_KEY puede preparar un pedido ficticio.
    if(url.pathname==="/demo/order"&&req.method==="POST"){
-    if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+    if(!tokenOK(req,env))return json({error:"La clave de acceso del demo no coincide con DEMO_ADMIN_KEY en Cloudflare. No ingreses el nombre de la variable."},401);
     const id=crypto.randomUUID();
     await env.DB.prepare("INSERT INTO orders(id,description,amount_ars,deposit_ars) VALUES(?,?,?,?)").bind(id,"Pedido ficticio de prueba",10000,5000).run();
     return json({id,total:10000,deposit:5000},201);
    }
    if(url.pathname==="/demo/checkout"&&req.method==="POST"){
-    if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+    if(!tokenOK(req,env))return json({error:"La clave de acceso del demo no coincide con DEMO_ADMIN_KEY en Cloudflare. No ingreses el nombre de la variable."},401);
     const {order_id}=await req.json();
     if(typeof order_id!=="string")return json({error:"order_id inválido"},400);
     const order=await env.DB.prepare("SELECT * FROM orders WHERE id=?").bind(order_id).first();
@@ -86,7 +86,7 @@ export default {
     return json({received:true});
    }
    if(url.pathname==="/demo/paid-orders"&&req.method==="GET"){
-    if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+    if(!tokenOK(req,env))return json({error:"La clave de acceso del demo no coincide con DEMO_ADMIN_KEY en Cloudflare. No ingreses el nombre de la variable."},401);
     const rows=await env.DB.prepare("SELECT id,description,amount_ars,deposit_ars,status,paid_at FROM orders WHERE status='paid' ORDER BY paid_at DESC LIMIT 100").all();
     return json({orders:rows.results});
    }
