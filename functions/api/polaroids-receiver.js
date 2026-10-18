@@ -140,7 +140,7 @@ export async function onRequestPost({request,env}){
       target.pathname!=='/macros/echo'||target.username||target.password||target.port)
     return json({ok:false,error:'Google devolvió una redirección de recepción no admitida.'},502);
    stage='response-get';
-   upstream=await fetch(target.toString(),{method:'GET',redirect:'error',cache:'no-store',
+   upstream=await fetch(target.toString(),{method:'GET',redirect:'follow',cache:'no-store',
     headers:{Accept:'text/plain'},signal:AbortSignal.timeout(16000)});
   }
   // Leer ContentService permite distinguir OK de ERROR; 302/200 no confirma aceptación.
