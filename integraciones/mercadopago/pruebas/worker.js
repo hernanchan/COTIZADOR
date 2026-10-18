@@ -85,6 +85,23 @@ export default {
     await env.DB.prepare("UPDATE orders SET status='paid',payment_id=?,paid_at=datetime('now') WHERE id=? AND status='awaiting_payment' AND payment_id IS NULL").bind(String(paymentId),orderId).run();
     return json({received:true});
    }
+   if(url.pathname==="/demo/payment-check"&&req.method==="POST"){
+    if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+    const body=await req.json().catch(()=>({}));
+    if(!/^[0-9]{1,30}$/.test(String(body.payment_id||"")))return json({error:"Identificador de pago inválido"},400);
+    const pay=await mp(env,"/v1/payments/"+esc(String(body.payment_id)));
+    const order=await env.DB.prepare("SELECT * FROM orders WHERE id=?").bind(String(pay.external_reference||"")).first();
+    const checks={
+      approved:pay.status==="approved",
+      sandbox:pay.live_mode===false,
+      currency:pay.currency_id==="ARS",
+      orderExists:Boolean(order),
+      preferenceMatches:Boolean(order&&String(pay.preference_id)===String(order.preference_id)),
+      amountMatches:Boolean(order&&Number(pay.transaction_amount)===order.deposit_ars),
+      sellerMatches:String(pay.collector_id)===String(env.MP_TEST_SELLER_ID)
+    };
+    return json({checks,allChecksPass:Object.values(checks).every(Boolean),orderStatus:order?.status||null});
+   }
    if(url.pathname==="/demo/paid-orders"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"La clave de acceso del demo no coincide con DEMO_ADMIN_KEY en Cloudflare. No ingreses el nombre de la variable."},401);
     const rows=await env.DB.prepare("SELECT id,description,amount_ars,deposit_ars,status,paid_at FROM orders WHERE status='paid' ORDER BY paid_at DESC LIMIT 100").all();
