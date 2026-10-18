@@ -124,13 +124,17 @@ export async function onRequestPost({request,env}){
  try{
   const upstream=await fetch(APPS_SCRIPT,{
    method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
-   body:limited,redirect:'manual',cache:'no-store',
+   body:limited,redirect:'follow',cache:'no-store',
    signal:AbortSignal.timeout(40000)
   });
-  // ContentService de Google suele devolver HTTP 302 para entregar "OK".
-  // El estado definitivo SIEMPRE se verifica por la consulta privada.
-  if(upstream.status===302||upstream.status===303||upstream.ok)
-   return json({ok:true,dispatched:true,confirmed:false},202);
+  // Leer ContentService permite distinguir OK de ERROR; 302/200 no confirma aceptación.
+  if(upstream.ok){
+   const reply=(await upstream.text()).trim();
+   if(reply==='OK')return json({ok:true,dispatched:true,confirmed:false},202);
+   if(reply==='ERROR')return json({ok:false,rejected:true,
+    error:'Google rechazó la operación '+op+'. Revisar seguridad, configuración o cupo del receptor; las fotos siguen en el navegador.'},422);
+   return json({ok:false,error:'Google devolvió una respuesta inesperada para '+op+'. No se confirmó la operación.'},502);
+  }
   return json({ok:false,error:'Google rechazó la transmisión (HTTP '+upstream.status+').'},502);
  }catch(_){
   // Una caída de red podría producirse después de que Google guardó la foto:

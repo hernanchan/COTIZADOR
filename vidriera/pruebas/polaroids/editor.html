@@ -226,6 +226,7 @@ let turnstileToken='';
 let receiverRequestCount=0;
 const receiverPending=new Map();
 let receivingSession=null;
+let receptionFailure='';
 let receivedReference='';
 let receiverInitError='';
 let receiverApiUrl='';
@@ -422,8 +423,11 @@ async function publicStatus(reference,uploadKey){
   body:JSON.stringify({reference,uploadKey})
  });
  const data=await result.json();
- if(!result.ok||data.ok!==true)
-  throw new Error(data.error||'Google no respondió a la consulta.');
+ if(!result.ok||data.ok!==true){
+  const error=new Error(data.error||'Google no respondió a la consulta.');
+  error.definitive=[400,401,403,413,415,422,503].includes(result.status);
+  throw error;
+ }
  return data;
 }
 async function publicPost(op,payload){
@@ -434,8 +438,11 @@ async function publicPost(op,payload){
   body:JSON.stringify({op,payload})
  });
  const data=await result.json();
- if(!result.ok||data.ok!==true)
-  throw new Error(data.error||'Cloudflare no pudo transmitir la solicitud.');
+ if(!result.ok||data.ok!==true){
+  const error=new Error(data.error||'Cloudflare no pudo transmitir la solicitud.');
+  error.definitive=data.rejected===true||[400,401,403,413,415,422,503].includes(result.status);
+  throw error;
+ }
  // dispatched no significa recibido: consultamos estado de Google después.
  return data;
 }
@@ -449,7 +456,7 @@ async function confirmServer(reference,uploadKey,valid,timeoutMs=90000){
    if(result&&result.ok===true&&result.found&&valid(result))return result;
    error=null;
   }catch(e){
-   if(/rechazó la verificación privada/.test(String(e.message)))throw e;
+   if(e.definitive||/rechazó la verificación privada/.test(String(e.message)))throw e;
    error=e;
   }
   if(Date.now()>=end)break;
@@ -498,7 +505,7 @@ function resetChallenge(){
   turnstile.reset(turnstileWidget);
 }
 async function sendSecurePhotos(){
- if(receivedReference||!receiverConfig||!receiverConfig.enabled||!orderComplete())return;
+ if(busy||receivedReference||!receiverConfig||!receiverConfig.enabled||!orderComplete())return;
  if(sheets.length<1||sheets.length>10)
   throw new Error('Podés preparar entre una y diez hojas A4.');
  if(!receiverApiUrl)throw new Error('La recepción segura todavía no está configurada.');
@@ -514,6 +521,7 @@ async function sendSecurePhotos(){
   throw new Error('El encuadre cambió después de iniciar el envío. Recargá para comenzar un pedido nuevo.');
  if(!receivingSession&&!turnstileToken)
   throw new Error('Completá la verificación de seguridad antes de enviar.');
+ receptionFailure='';
  busy=true;document.querySelector('.app').classList.add('uploading');updateSheetNav();
  try{
   if(!receivingSession){
@@ -522,14 +530,23 @@ async function sendSecurePhotos(){
    const token=turnstileToken;turnstileToken='';
    receivingSession={reference,uploadKey,uploaded:new Set(),fingerprint,started:false};
    try{await publicPost('start',{reference,uploadKey,sheets:sheets.length,photos:allPhotos.length,turnstileToken:token});}
-   catch(e){/* verificar por estado: la solicitud pudo completarse antes de un error de red */ }
-   await confirmServer(reference,uploadKey,x=>x.status==='receiving'&&x.photos===allPhotos.length&&x.sheets===sheets.length);
+   catch(e){if(e.definitive)throw e;/* El inicio puede haberse creado pese al corte. */}
+   await confirmServer(reference,uploadKey,x=>['receiving','received'].includes(x.status)&&x.photos===allPhotos.length&&x.sheets===sheets.length,25000);
    receivingSession.started=true;
   }else if(!receivingSession.started){
-   await confirmServer(receivingSession.reference,receivingSession.uploadKey,
-    x=>x.status==='receiving'&&x.photos===allPhotos.length&&x.sheets===sheets.length,20000);
-   receivingSession.started=true;
-  }
+    // Reusar referencia y clave: una respuesta perdida no debe crear otro pedido.
+    const previous=await publicStatus(receivingSession.reference,receivingSession.uploadKey);
+    if(!previous.found){
+     if(!turnstileToken)throw new Error('El inicio no se confirmó. Renová la verificación de seguridad y reintentá este mismo pedido.');
+     const token=turnstileToken;turnstileToken='';
+     try{await publicPost('start',{reference:receivingSession.reference,uploadKey:receivingSession.uploadKey,
+      sheets:sheets.length,photos:allPhotos.length,turnstileToken:token})}
+     catch(e){if(e.definitive)throw e}
+    }
+    await confirmServer(receivingSession.reference,receivingSession.uploadKey,
+     x=>['receiving','received'].includes(x.status)&&x.photos===allPhotos.length&&x.sheets===sheets.length,25000);
+    receivingSession.started=true;
+   }
   for(let i=0;i<allPhotos.length;i++){
    if(receivingSession.uploaded.has(i))continue;
    const p=allPhotos[i];
@@ -541,14 +558,14 @@ async function sendSecurePhotos(){
     uploadKey:receivingSession.uploadKey,index:i,original,printJpeg,
     crop:{x:c.x,y:c.y,s:c.s,sourceWidth:p.img.naturalWidth,
      sourceHeight:p.img.naturalHeight}};
-   try{await publicPost('photo',payload);}catch(e){/* confirmar por consulta */ }
+   try{await publicPost('photo',payload);}catch(e){if(e.definitive)throw e;/* confirmar por consulta */ }
    await confirmServer(receivingSession.reference,receivingSession.uploadKey,
     x=>x.received>=i+1&&['receiving','received'].includes(x.status));
    receivingSession.uploaded.add(i);
   }
   status('Creando el PDF privado…');
   try{await publicPost('finish',{reference:receivingSession.reference,uploadKey:receivingSession.uploadKey});}
-  catch(e){/* confirmar por consulta */ }
+  catch(e){if(e.definitive)throw e;/* confirmar por consulta */ }
   const result=await confirmServer(receivingSession.reference,receivingSession.uploadKey,
    x=>x.status==='received'&&x.received===allPhotos.length&&x.photos===allPhotos.length,120000);
   const reference=receivingSession.reference;
@@ -561,10 +578,9 @@ async function sendSecurePhotos(){
   if(window.parent!==window)
    window.parent.postMessage({type:'SABER_POLAROID_RECEIVED',payload:cartPayload},window.location.origin);
  }catch(error){
-  if(receivingSession&&!receivingSession.started){
-   receivingSession=null;resetChallenge();
-  }
-  status('No se completó el envío: '+(error&&error.message||'error desconocido'),'bad');
+  receptionFailure=String(error&&error.message||'error desconocido');
+   if(receivingSession&&!receivingSession.started)resetChallenge();
+   status('No se completó el envío: '+receptionFailure+' Las fotos siguen cargadas.','bad');
  }finally{
   busy=false;document.querySelector('.app').classList.remove('uploading');updateSheetNav();
  }
@@ -582,9 +598,9 @@ async function loadTurnstile(sitekey){
   throw new Error('La verificación Turnstile no está disponible.');
  turnstileWidget=turnstile.render('#turnstileBox',{
   sitekey,action:'polaroids',
-  callback:token=>{if(receivedReference||busy)return;turnstileToken=token;status('Verificación completada. Ya podés enviar tus fotos.','ok')},
-  'expired-callback':()=>{turnstileToken='';if(!receivedReference&&!busy)status('La verificación venció. Completala nuevamente.','bad')},
-  'error-callback':()=>{turnstileToken='';if(!receivedReference&&!busy)status('Falló la verificación de seguridad. Volvé a intentarlo.','bad')}
+  callback:token=>{turnstileToken=token;if(receivedReference||busy)return;if(receptionFailure){status('El envío anterior no se confirmó: '+receptionFailure+' Verificación renovada; el pedido conserva las fotos.','bad');return}status('Verificación completada. Ya podés enviar tus fotos.','ok')},
+  'expired-callback':()=>{turnstileToken='';if(!receivedReference&&!busy&&!receptionFailure)status('La verificación venció. Completala nuevamente.','bad')},
+  'error-callback':()=>{turnstileToken='';if(!receivedReference&&!busy&&!receptionFailure)status('Falló la verificación de seguridad. Volvé a intentarlo.','bad')}
  });
 }
 async function setupSecureReception(){
