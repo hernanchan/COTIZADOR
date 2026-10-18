@@ -99,3 +99,11 @@ El panel valida origen, ventana emisora y nonce; llama al endpoint administrativ
 El ensayo permite solo Polaroids o agregar un código de catálogo. Para 6 fotos y ESC001 x1, el backend debe calcular $3.000 + $4.500 = $7.500; el total se muestra antes de abrir Mercado Pago. Mantener ambas pestañas abiertas. Refrescar/cerrar el panel de ensayo pierde su contexto en memoria: no reintentar un pago aprobado ni suponer que se eliminaron sus fotos. Verificar por Centro de Pedidos.
 
 La página y el puente requieren despliegues en las dos ramas de ensayo; no alteran main, accesos comerciales ni propiedades de Apps Script. Falta completar y observar recepción real, constancia, pago total, referencia y PDF privado de este ensayo.
+
+## Incidencia de recepción · 18:58 ART
+
+El titular informó que el editor volvía a “ya podés enviar” sin completar la recepción. Se comprobó por HTTP que el relay estaba habilitado y que el ping con Google funcionaba. Se encontró y reprodujo que: (1) la renovación de Turnstile reemplazaba el error por un mensaje de disponibilidad; (2) una falla antes de confirmar el inicio descartaba referencia/clave; (3) el relay aceptaba cualquier 302/200 sin leer si ContentService devolvía OK o ERROR.
+
+El piloto conserva el error visible, mantiene referencia y clave para reintentar el mismo inicio, bloquea doble ejecución y propaga rechazos definitivos sin esperar el timeout. El relay sigue la redirección de ContentService y solo reconoce el texto OK como despacho aceptado, manteniendo la comprobación de recepción por estado. ERROR se devuelve como rechazo explícito sin exponer la clave. Se mantiene el puente de constancias anterior.
+
+Prueba añadida: rechazo de inicio → callback de seguridad renovada sin ocultar fallo → reintento con misma referencia/clave → seis fotos recibidas, y respuestas reales del módulo del relay simuladas como ERROR/OK/HTML inesperado. El motivo del rechazo concreto de Google no puede deducirse del ping: el Code.gs actual responde ERROR genérico y absorbe el detalle. No afirmar que seguridad o cupo es la causa sin verificar el resultado del intento real.
