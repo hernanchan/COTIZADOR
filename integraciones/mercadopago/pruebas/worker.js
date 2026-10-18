@@ -160,6 +160,8 @@ async function createPolaroidProof(env,body){
  if(previous){
   if(previous.client_order_id!==body.client_order_id||previous.photos!==photos||previous.sheets!==sheets)
    return {error:"Esta recepción está asociada a otro intento de pedido",status:409};
+  // Renovar vigencia solo después de volver a verificar la recepción en Google.
+  await env.DB.prepare("UPDATE polaroid_proofs SET created_at=datetime('now') WHERE proof_token=?").bind(previous.proof_token).run();
   return {proof_token:previous.proof_token,reference:body.reference,photos,sheets,total_ars:sheets*POLAROID_SHEET_PRICE_ARS,idempotent:true};
  }
  const token=crypto.randomUUID();
