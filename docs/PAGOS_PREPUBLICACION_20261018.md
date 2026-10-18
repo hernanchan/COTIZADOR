@@ -85,3 +85,17 @@ No añadir R2. No crear D1, planes ni servicios nuevos sin autorización. Si el 
 La captura del diagnóstico del pago de catálogo $4.500 mostró approved, moneda, importe, vendedor y orden comercial correctos, pero `paymentLiveModeFalse=false`. Se reemplazó la exigencia absoluta de `live_mode=false` por `paymentEnvironmentAllowed`: false es válido; true requiere consultar /users/me con el token servidor y confirmar ID del vendedor y etiqueta test_user. La preferencia sigue validándose desde merchant_order, pues el pago observado no incluye preference_id directo. Prueba SQL añadida: vendedor real con live_mode=true se rechaza; cuenta con etiqueta test_user se admite. El pago existente se puede conciliar sin volver a cobrar.
 
 Referencias primarias: https://github.com/mercadopago/sdk-go/tree/master/pkg/user y https://developers.mercadolibre.com.ar/consulta-usuarios (campo tags/test_user). No se guardan ni se muestran datos personales devueltos por /users/me.
+
+## Piloto observado · 18:43–18:44 ART
+
+El titular completó el pago Sandbox de ESC001 ($4.500). Tras desplegar 9f1c27a, la conciliación manual registró un pedido nuevo sin errores. El detalle privado muestra 1 × Resaltador Filgo x4 pastel, total $4.500, pedido 01023bbb-97ed-4700-8bd4-1c5305d0580b. Esto verifica catálogo → preferencia → pago de prueba → conciliación → detalle privado. No demuestra entrega automática del webhook ni Polaroids.
+
+## Próximo ensayo privado de Polaroids
+
+Nueva pantalla `/demo/polaroids` del Worker de pagos, protegida en sus operaciones por la clave administrativa existente. Abre el editor del piloto `polaroids-integracion-sin-r2.libreriasaber.pages.dev/pruebas/polaroids/editor.html` con un nonce aleatorio. El editor tiene un puente opcional: únicamente con ese nonce y un opener transmite referencia/clave temporal al origen fijo del Worker, espera constancia verificada y recién entonces descarta la clave. Fuera de esta opción, el piloto conserva su recorrido.
+
+El panel valida origen, ventana emisora y nonce; llama al endpoint administrativo `/demo/polaroid-proof-pilot`. El servidor comprueba la recepción usando el relay del piloto (origen y destino constantes), no el relay productivo apagado. El endpoint de clientes continúa usando el verificador de producción; no se habilitó para público. La clave de subida no se guarda ni se imprime en el panel. La prueba local del puente valida respuestas ajenas, handshake, conservación de la clave hasta confirmación y ausencia de almacenamiento.
+
+El ensayo permite solo Polaroids o agregar un código de catálogo. Para 6 fotos y ESC001 x1, el backend debe calcular $3.000 + $4.500 = $7.500; el total se muestra antes de abrir Mercado Pago. Mantener ambas pestañas abiertas. Refrescar/cerrar el panel de ensayo pierde su contexto en memoria: no reintentar un pago aprobado ni suponer que se eliminaron sus fotos. Verificar por Centro de Pedidos.
+
+La página y el puente requieren despliegues en las dos ramas de ensayo; no alteran main, accesos comerciales ni propiedades de Apps Script. Falta completar y observar recepción real, constancia, pago total, referencia y PDF privado de este ensayo.

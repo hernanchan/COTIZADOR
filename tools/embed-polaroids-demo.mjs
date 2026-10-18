@@ -1,0 +1,10 @@
+import {readFile,writeFile} from 'node:fs/promises';
+const root=new URL('../',import.meta.url),path=new URL('integraciones/mercadopago/pruebas/worker.js',root);
+let worker=await readFile(path,'utf8');
+const html=await readFile(new URL('integraciones/mercadopago/pruebas/polaroids-demo.html',root),'utf8');
+const block='// BEGIN POLAROID DEMO HTML\nconst polaroidDemoHtml='+JSON.stringify(html)+';\n// END POLAROID DEMO HTML';
+if(worker.includes('// BEGIN POLAROID DEMO HTML'))worker=worker.replace(/\/\/ BEGIN POLAROID DEMO HTML[\s\S]*?\/\/ END POLAROID DEMO HTML/,block);
+else worker=block+'\n'+worker;
+const route='  if(url.pathname==="/demo/polaroids"&&req.method==="GET")return new Response(polaroidDemoHtml,{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","referrer-policy":"no-referrer","x-robots-tag":"noindex,nofollow"}});';
+if(!worker.includes('url.pathname==="/demo/polaroids"'))worker=worker.replace('  if(url.pathname==="/demo"',route+'\n  if(url.pathname==="/demo"');
+await writeFile(path,worker);

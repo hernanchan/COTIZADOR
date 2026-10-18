@@ -1,0 +1,54 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><title>Polaroids y pago total | Ensayo privado</title>
+<style>*{box-sizing:border-box}body{font:16px system-ui;color:#173b68;background:#f6f8fb;max-width:850px;margin:28px auto;padding:18px}section{background:white;border:1px solid #dce3ed;padding:20px;border-radius:12px;margin:18px 0}input,button{font:inherit;padding:11px;margin:5px 4px 5px 0;max-width:100%}button{background:#174b8f;color:white;border:0;border-radius:8px;cursor:pointer}button:disabled{opacity:.5}label{display:block;margin-top:10px}#message{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6}a{color:#174b8f}small{display:block;line-height:1.6;color:#53657b}</style></head>
+<body><h1>Polaroids + pago total · Pruebas</h1><p>Ensayo privado con fotos en Google Drive. Sin conexión a la tienda pública.</p>
+<section><h2>1. Acceso del operador</h2><label>Clave privada del demo <input type="password" id="key" autocomplete="off"></label><small>Se usa únicamente en esta pestaña. No ingresar tokens de Mercado Pago.</small></section>
+<section><h2>2. Fotografías</h2><button id="photos">Abrir editor de Polaroids de pruebas</button><p id="receipt">Todavía no hay fotos verificadas para este ensayo.</p><small>En el editor podés cargar las seis fotos de demostración y enviarlas. Conservá abiertas ambas pestañas hasta confirmar la recepción. La clave temporal de subida se elimina del mensaje una vez verificada; no se guarda ni se imprime.</small></section>
+<section><h2>3. Carrito y Mercado Pago</h2><label>Artículo opcional del catálogo <input id="code" placeholder="Ej.: ESC001; vacío para solo Polaroids"></label><label>Cantidad del artículo <input type="number" id="qty" value="1" min="1" max="500"></label><button id="prepare" disabled>Preparar pedido y enlace de pago total</button><p id="message" role="status" aria-live="polite"></p><p id="payment"></p></section>
+<p><a href="/admin" target="_blank" rel="noopener">Abrir Centro de Pedidos privado</a></p>
+<script>
+const $=id=>document.getElementById(id),pilot='https://polaroids-integracion-sin-r2.libreriasaber.pages.dev';
+const clientOrderId=crypto.randomUUID(),nonce=crypto.randomUUID();let popup,proof=null,working=false;
+async function api(path,body){const key=$('key').value;if(!key)throw Error('Ingresá la clave privada del demo.');
+ const r=await fetch(path,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
+ const data=await r.json();if(!r.ok)throw Error(data.error||'Error '+r.status);return data;}
+$('photos').onclick=async()=>{if(working||proof)return;
+ try{
+  // Abrir durante el gesto del usuario para evitar que el navegador bloquee el popup.
+  if(!$('key').value)throw Error('Ingresá la clave privada del demo.');
+  popup=window.open('about:blank','saber-polaroid-'+nonce);
+  if(!popup)throw Error('Permití abrir la pestaña del editor para continuar.');
+  const check=await api('/demo/diagnostic');if(!check.ok)throw Error('Revisá la configuración del entorno de pruebas.');
+  popup.location=pilot+'/pruebas/polaroids/editor.html?pagosNonce='+encodeURIComponent(nonce);
+  $('message').textContent='Completá y enviá las fotos en la pestaña del editor.';
+ }catch(e){if(popup)popup.close();$('message').textContent=e.message;}
+};
+window.addEventListener('message',async event=>{
+ if(event.origin!==pilot||event.source!==popup||event.data?.type!=='SABER_PAYMENT_RECEIPT'||event.data?.nonce!==nonce)return;
+ const msg=event.data;let reply;
+ try{
+  if(working)throw Error('Hay otra operación en curso. Reintentá al terminar.');
+  working=true;$('message').textContent='Verificando la recepción en Google desde el servidor…';
+  proof=await api('/demo/polaroid-proof-pilot',{reference:msg.reference,uploadKey:msg.uploadKey,client_order_id:clientOrderId});
+  $('receipt').textContent=proof.photos+' fotos · '+proof.sheets+' hoja(s) A4 · $ '+proof.total_ars.toLocaleString('es-AR')+' · '+proof.reference;
+  $('prepare').disabled=false;$('photos').disabled=true;$('message').textContent='Recepción verificada. Ya podés preparar el pago total.';reply={ok:true};
+ }catch(e){$('message').textContent=e.message;reply={ok:false,error:e.message}}
+ finally{delete msg.uploadKey;working=false}
+ popup.postMessage({type:'SABER_PAYMENT_PROOF_RESULT',nonce,...reply},pilot);
+});
+$('prepare').onclick=async()=>{
+ if(working||!proof)return;working=true;$('prepare').disabled=true;$('payment').replaceChildren();
+ try{
+  const items=[{type:'print',code:'POLAROID_A4',qty:1,proof_token:proof.proof_token}];
+  const code=$('code').value.trim(),qty=Number($('qty').value);
+  if(code){if(!Number.isSafeInteger(qty)||qty<1||qty>500)throw Error('Cantidad inválida.');items.push({type:'product',code,qty})}
+  const order=await api('/demo/cart-order',{schema:'saber-cart-v1',currency:'ARS',paymentMode:'FULL',client_order_id:clientOrderId,items});
+  $('code').disabled=true;$('qty').disabled=true;
+  $('message').textContent='Pedido '+order.order_id+' · Total validado: $ '+order.total_ars.toLocaleString('es-AR')+'.';
+  if(order.paid){$('message').textContent+=' Pago ya confirmado.';return;}
+  const pay=await api('/demo/checkout',{order_id:order.order_id});const url=new URL(pay.checkout_url);
+  if(url.protocol!=='https:'||!/(^|\.)(mercadopago\.com|mercadopago\.com\.ar)$/.test(url.hostname))throw Error('Enlace de pago inválido.');
+  const link=document.createElement('a');link.href=url.href;link.target='_blank';link.rel='noopener noreferrer';link.textContent='Abrir Mercado Pago de prueba';$('payment').append(link);
+  $('message').textContent+=' Todavía sin cobrar. Usá únicamente el comprador y medio de pago de pruebas.';
+ }catch(e){$('message').textContent=e.message}finally{working=false;$('prepare').disabled=false}
+};
+</script></body></html>

@@ -51,6 +51,7 @@ assert.equal((await customer('status',{},crypto.randomUUID())).status,401);
 received=11;const proofInput={reference:'POL-'+'A'.repeat(24),uploadKey:'a'.repeat(64)};
 assert.equal((await customer('polaroid-proof',proofInput)).status,422);received=12;
 const proof=await customer('polaroid-proof',proofInput);assert.equal(proof.status,201);
+assert.equal((await admin('/demo/polaroid-proof-pilot',{...proofInput,client_order_id:intent})).data.proof_token,proof.data.proof_token);
 assert.equal((await customer('polaroid-proof',proofInput)).data.proof_token,proof.data.proof_token);
 assert.equal(/uploadKey|aaaaaaaa/.test(JSON.stringify(proof.data)),false);
 const cart={schema:'saber-cart-v1',currency:'ARS',paymentMode:'FULL',displayTotal:1,items:[{type:'product',code:'SKU-1',qty:2,displayUnitPrice:1},{type:'print',code:'POLAROID_A4',qty:1,proof_token:proof.data.proof_token}]};
