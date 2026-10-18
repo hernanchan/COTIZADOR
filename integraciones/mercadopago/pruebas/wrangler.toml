@@ -1,0 +1,9 @@
+name = "saber-pagos-pruebas"
+main = "worker.js"
+compatibility_date = "2026-10-17"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "saber-pagos-pruebas"
+database_id = "60124ac5-1941-44ba-96e5-ea3165b65ec9"
