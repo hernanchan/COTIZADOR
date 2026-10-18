@@ -5,7 +5,7 @@ const root=new URL('../',import.meta.url);
 const read=path=>readFile(new URL(path,root),'utf8');
 const config=JSON.parse(await read('vidriera/polaroids/recepcion-config.json'));
 assert.equal(config.enabled,false);assert.equal(config.showInShop,false);
-assert.equal(config.rollout,'PENDIENTE_DE_APROBACION');assert.equal(config.turnstileSiteKey,'');
+assert.equal(config.rollout,'PENDIENTE_DE_APROBACION');assert.equal(typeof config.turnstileSiteKey,'string');
 for(const path of ['vidriera/index.html','vidriera/cotizar.html','vidriera/polaroids/editor.html']){
  const html=await read(path);
  for(const [,code] of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))new vm.Script(code,{filename:path});

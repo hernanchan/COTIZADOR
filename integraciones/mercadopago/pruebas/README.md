@@ -88,3 +88,7 @@ No mostrar pedidos en producción hasta que los archivos necesarios estén recib
 - Se ejecutó una simulación lógica del Worker con D1, recepción Google y Mercado Pago reemplazados por respuestas de prueba: 12 fotos/2 hojas → ARS 6.000; dos artículos de ARS 3.500 → ARS 7.000; total de carrito → **ARS 13.000**. Reintentos idénticos devolvieron la misma orden/preferencia; una recepción incompleta y una constancia de otro carrito fueron rechazadas.
 - **No habilitar públicamente** todavía: la ruta para crear la constancia requiere una clave privada de administrador y por diseño el editor del cliente no puede utilizarla. Se necesita un flujo público controlado (Turnstile/rate-limit/origen) que entregue la constancia desde la sesión de subida *antes de borrar* el `uploadKey` temporal, sin guardarlo ni transmitirlo al carrito.
 - Pendiente verificar la comunicación real entre Workers y la recepción protegida de Google, cotizaciones de otros servicios gráficos, automatización por calendario y pruebas integrales antes de autorizar una publicación.
+
+### Revisión local posterior · 18/10/2026
+
+Se prepararon una pasarela de clientes apagada, cliente y vista de ensayo, correcciones de preferencias/conciliación y pruebas con SQLite real. **No se hizo push ni despliegue**: Cloudflare Builds está asociado a esta rama. El detalle vigente, las pruebas reproducibles y los impedimentos de salida están en `docs/PAGOS_PREPUBLICACION_20261018.md`. No interpretar los avances como integración productiva terminada ni como autorización para publicar.

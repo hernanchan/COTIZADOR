@@ -52,3 +52,26 @@ CREATE TABLE IF NOT EXISTS polaroid_redemptions (
  order_id TEXT NOT NULL REFERENCES orders(id)
 );
 CREATE INDEX IF NOT EXISTS idx_polaroid_proofs_client ON polaroid_proofs(client_order_id);
+
+CREATE TABLE IF NOT EXISTS payment_reviews (
+ order_id TEXT PRIMARY KEY REFERENCES orders(id),
+ state TEXT NOT NULL CHECK(state IN ('verified','revoked')),
+ checked_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS checkout_sessions (
+ token_hash TEXT PRIMARY KEY,
+ client_order_id TEXT NOT NULL,
+ created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS checkout_locks (
+ order_id TEXT PRIMARY KEY,
+ expires_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS reconciliation_checks (
+ order_id TEXT PRIMARY KEY,
+ checked_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS checkout_attempts (
+ order_id TEXT PRIMARY KEY,
+ started_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

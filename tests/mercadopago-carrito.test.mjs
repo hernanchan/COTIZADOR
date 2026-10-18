@@ -22,10 +22,12 @@ const DB={
     return {results:[]};
    },
    async run(){
+    if(sql.startsWith('INSERT OR IGNORE INTO checkout_attempts'))return {meta:{changes:1}};
+    if(sql.startsWith('INSERT INTO checkout_locks'))return {meta:{changes:1}};
     if(sql.startsWith('INSERT INTO orders')){
      const [id,description,amount_ars,deposit_ars]=args;
      if(orders.has(id))throw Error('duplicate order');
-     orders.set(id,{id,description,amount_ars,deposit_ars,status:'awaiting_payment',preference_id:null,created_at:'2026-10-18 10:00:00'});
+     orders.set(id,{id,description,amount_ars,deposit_ars,status:'awaiting_payment',preference_id:null,created_at:new Date().toISOString().slice(0,19).replace('T',' ')});
      return {meta:{changes:1}};
     }
     if(sql.startsWith('INSERT INTO order_items')){
@@ -69,7 +71,7 @@ const fakeFetch=async(url,options={})=>{
  }
  throw Error('Unexpected mock network access: '+address);
 };
-const sandbox={Response,Request,URL,URLSearchParams,TextEncoder,crypto:webcrypto,console,fetch:fakeFetch};
+const sandbox={AbortSignal,Response,Request,URL,URLSearchParams,TextEncoder,crypto:webcrypto,console,fetch:fakeFetch};
 sandbox.globalThis=sandbox;
 vm.createContext(sandbox);
 const source=await readFile(new URL('../integraciones/mercadopago/pruebas/worker.js',import.meta.url),'utf8');

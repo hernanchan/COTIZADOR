@@ -33,15 +33,16 @@
   return {schema:"saber-cart-v1",currency:"ARS",paymentMode:"FULL",items,
    displayTotal:items.reduce((sum,x)=>sum+x.displayUnitPrice*x.qty,0)};
  }
+ function intentId(){
+  const key="saberCheckoutIntentV2";
+  const saved=global.localStorage.getItem(key);
+  if(/^[0-9a-f-]{36}$/i.test(saved||""))return saved;
+  const id=global.crypto.randomUUID();global.localStorage.setItem(key,id);return id;
+ }
  function fromLocalStorage(){
   const cart=snapshot(JSON.parse(global.localStorage.getItem("saberCartV1")||"[]"));
-  const fingerprint=JSON.stringify(cart.items);
-  let existing=null;
-  try{existing=JSON.parse(global.localStorage.getItem("saberCartCheckoutIntentV1")||"null")}catch{}
-  const valid=existing&&existing.fingerprint===fingerprint&&/^[0-9a-f-]{36}$/i.test(String(existing.id||""));
-  const id=valid?existing.id:global.crypto.randomUUID();
-  if(!valid)global.localStorage.setItem("saberCartCheckoutIntentV1",JSON.stringify({fingerprint,id}));
-  return {...cart,client_order_id:id};
+  return {...cart,client_order_id:intentId()};
  }
- global.SaberCartPaymentAdapter=Object.freeze({snapshot,fromLocalStorage});
+
+ global.SaberCartPaymentAdapter=Object.freeze({snapshot,fromLocalStorage,intentId});
 })(window);

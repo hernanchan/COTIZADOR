@@ -4,7 +4,7 @@ const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:
 const esc=s=>encodeURIComponent(s);
 const tokenOK=(req,env)=>{const expected=env.DEMO_ADMIN_KEY;if(typeof expected!=="string"||!expected)return false;const actual=req.headers.get("Authorization")||"";return actual.startsWith("Bearer ") && actual.slice(7).trim()===expected.trim()};
 async function mp(env,path,opts={}){
- const r=await fetch("https://api.mercadopago.com"+path,{...opts,headers:{Authorization:"Bearer "+env.MP_TEST_ACCESS_TOKEN,"Content-Type":"application/json",...(opts.headers||{})}});
+ const r=await fetch("https://api.mercadopago.com"+path,{signal:AbortSignal.timeout(15000),...opts,headers:{Authorization:"Bearer "+env.MP_TEST_ACCESS_TOKEN,"Content-Type":"application/json",...(opts.headers||{})}});
  const t=await r.text();let data;try{data=JSON.parse(t)}catch{data={message:"Respuesta inválida de Mercado Pago"}}
  if(!r.ok)throw Error("Mercado Pago respondió "+r.status+" "+String(data.message||""));
  return data;
@@ -15,7 +15,9 @@ async function verifySignature(req,url,secret){
  const ts=parts.ts, supplied=parts.v1;
  const id=url.searchParams.get("data.id")||url.searchParams.get("data_id");
  const requestId=req.headers.get("x-request-id");
- if(!ts||!/^[0-9]{9,16}$/.test(ts)||!/^[a-fA-F0-9]{64}$/.test(supplied||""))return false;
+ if(!id||!requestId||!ts||!/^[0-9]{10,13}$/.test(ts)||!/^[a-fA-F0-9]{64}$/.test(supplied||""))return false;
+ const timestamp=Number(ts)*(ts.length===13?1:1000);
+ if(Math.abs(Date.now()-timestamp)>15*60*1000)return false;
  const manifest=(id?"id:"+id.toLowerCase()+";":"")+(requestId?"request-id:"+requestId+";":"")+"ts:"+ts+";";
  const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign"]);
  const result=new Uint8Array(await crypto.subtle.sign("HMAC",key,new TextEncoder().encode(manifest)));
@@ -62,20 +64,34 @@ document.querySelector("#sync").addEventListener("click",async()=>{try{status.te
 </script></body></html>`;
 async function reconcilePayment(env,paymentId){
  const pay=await mp(env,"/v1/payments/"+esc(paymentId));
- if(pay.status!=="approved"||pay.currency_id!=="ARS"||String(pay.collector_id)!==String(env.MP_TEST_SELLER_ID))return {registered:false,reason:"payment_checks"};
+ await ensurePaymentReviews(env);
+ const recorded=await env.DB.prepare("SELECT id FROM orders WHERE payment_id=? AND status='paid'").bind(String(pay.id)).first();
+ if(recorded&&(pay.status!=="approved"||Number(pay.transaction_amount_refunded||0)>0)){
+  await env.DB.prepare("INSERT INTO payment_reviews(order_id,state,checked_at) VALUES(?,'revoked',datetime('now')) ON CONFLICT(order_id) DO UPDATE SET state='revoked',checked_at=datetime('now')").bind(recorded.id).run();
+  return {registered:false,reason:"payment_revoked"};
+ }
+ if(pay.live_mode!==false||Number(pay.transaction_amount_refunded||0)>0||pay.status!=="approved"||pay.currency_id!=="ARS"||String(pay.collector_id)!==String(env.MP_TEST_SELLER_ID))return {registered:false,reason:"payment_checks"};
  const order=await env.DB.prepare("SELECT * FROM orders WHERE id=?").bind(String(pay.external_reference||"")).first();
  if(!order||!order.preference_id||Number(pay.transaction_amount)!==Number(order.amount_ars)||Number(order.deposit_ars)!==Number(order.amount_ars))return {registered:false,reason:"order_checks"};
  if(!pay.order?.id)return {registered:false,reason:"merchant_order_missing"};
  const mo=await mp(env,"/merchant_orders/"+esc(String(pay.order.id)));
  if(String(mo.preference_id)!==String(order.preference_id)||String(mo.external_reference)!==String(order.id)||!mo.payments?.some(p=>String(p.id)===String(pay.id)&&p.status==="approved"))return {registered:false,reason:"merchant_order_checks"};
  // Exclusivo de la cuenta de vendedor de prueba; no se procesan cobros productivos.
- if(order.status==="paid")return {registered:true,alreadyRegistered:true};
+ if(order.status==="paid")return {registered:String(order.payment_id)===String(pay.id),alreadyRegistered:true};
  const res=await env.DB.prepare("UPDATE orders SET status='paid',payment_id=?,paid_at=datetime('now') WHERE id=? AND status='awaiting_payment' AND payment_id IS NULL").bind(String(pay.id),order.id).run();
  return {registered:Boolean(res.meta?.changes)};
 }
 async function syncPendingPayments(env){
- const pending=await env.DB.prepare("SELECT id FROM orders WHERE status='awaiting_payment' AND preference_id IS NOT NULL ORDER BY created_at DESC LIMIT 20").all();
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS reconciliation_checks(order_id TEXT PRIMARY KEY,checked_at TEXT NOT NULL)").run();
+ const pending=await env.DB.prepare("SELECT id FROM orders WHERE status='awaiting_payment' AND preference_id IS NOT NULL ORDER BY COALESCE((SELECT checked_at FROM reconciliation_checks WHERE order_id=orders.id),'') ASC,created_at ASC LIMIT 20").all();
+ await ensurePaymentReviews(env);
+ const paid=await env.DB.prepare("SELECT id,payment_id FROM orders WHERE status='paid' AND payment_id IS NOT NULL ORDER BY COALESCE((SELECT checked_at FROM payment_reviews WHERE order_id=orders.id),'') ASC LIMIT 20").all();
  const summary={checked:0,registered:0,errors:0};
+ for(const order of paid.results||[]){
+  try{await reconcilePayment(env,order.payment_id);
+   await env.DB.prepare("INSERT INTO payment_reviews(order_id,state,checked_at) VALUES(?,'verified',datetime('now')) ON CONFLICT(order_id) DO UPDATE SET checked_at=datetime('now')").bind(order.id).run();
+  }catch{summary.errors++}
+ }
  for(const order of pending.results||[]){
   summary.checked++;
   try{
@@ -86,6 +102,7 @@ async function syncPendingPayments(env){
     if(result.registered){if(!result.alreadyRegistered)summary.registered++;break}
    }
   }catch(e){summary.errors++;console.error("Pending payment verification failed",order.id,String(e?.message||"error").slice(0,100))}
+  finally{await env.DB.prepare("INSERT INTO reconciliation_checks(order_id,checked_at) VALUES(?,datetime('now')) ON CONFLICT(order_id) DO UPDATE SET checked_at=datetime('now')").bind(order.id).run()}
  }
  if(summary.registered||summary.errors)await audit(env,"payment_sync",JSON.stringify(summary));
  return summary;
@@ -110,7 +127,12 @@ function parseCSV(csv){
  return rows;
 }
 const normalizedCell=v=>String(v||"").trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
-const amountFromCell=v=>{const digits=String(v||"").replace(/[^0-9-]/g,"");return digits?Number(digits):0};
+const amountFromCell=v=>{
+ const raw=String(v||"").trim().replace(/^\$\s*/,""),clean=raw.replace(/\./g,"");
+ if(!/^-?(?:\d+|\d{1,3}(?:\.\d{3})+)(?:,\d{1,2})?$/.test(raw))return 0;
+ const amount=Number(clean.replace(",","."));
+ return Number.isSafeInteger(amount)?amount:0; // D1 y el catálogo actual trabajan en pesos enteros; jamás concatenar centavos.
+};
 async function getCatalog(){
  const r=await fetch(catalogUrl,{headers:{"Accept":"text/csv"},redirect:"follow",cf:{cacheTtl:0}});
  if(!r.ok)throw Error("No se pudo verificar el catálogo de precios");
@@ -197,6 +219,7 @@ async function createCatalogCartOrder(env,body){
  const digest=new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(JSON.stringify(intent))));
  const hash=Array.from(digest,x=>x.toString(16).padStart(2,"0")).join("");
  await ensureOrderItems(env);
+ await ensurePaymentReviews(env);
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS cart_requests (client_order_id TEXT PRIMARY KEY, request_hash TEXT NOT NULL, order_id TEXT NOT NULL UNIQUE)").run();
  async function existingOrder(){
   const found=await env.DB.prepare("SELECT request_hash,order_id FROM cart_requests WHERE client_order_id=?").bind(body.client_order_id).first();
@@ -204,6 +227,8 @@ async function createCatalogCartOrder(env,body){
   if(found.request_hash!==hash)return {error:"Este identificador ya se utilizó con un carrito distinto",status:409};
   const order=await env.DB.prepare("SELECT amount_ars,status FROM orders WHERE id=?").bind(found.order_id).first();
   if(!order)return {error:"Inconsistencia de pedido",status:409};
+  const review=await env.DB.prepare("SELECT state FROM payment_reviews WHERE order_id=?").bind(found.order_id).first();
+  if(review?.state==="revoked")return {error:"El pago de este pedido requiere revisión privada",status:409};
   return {order_id:found.order_id,total_ars:order.amount_ars,currency:"ARS",idempotent:true,paid:order.status==="paid"};
  }
  const prior=await existingOrder();if(prior)return prior;
@@ -246,6 +271,9 @@ async function createCatalogCartOrder(env,body){
  return {order_id:orderId,total_ars:total,currency:"ARS",idempotent:false,paid:false};
 }
 
+async function ensurePaymentReviews(env){
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS payment_reviews(order_id TEXT PRIMARY KEY REFERENCES orders(id),state TEXT NOT NULL CHECK(state IN ('verified','revoked')),checked_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+}
 async function ensureOrderItems(env){
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS order_items (order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,line_number INTEGER NOT NULL CHECK(line_number>=1 AND line_number<=100),item_type TEXT NOT NULL CHECK(item_type IN ('product','print')),sku TEXT,title TEXT NOT NULL,quantity INTEGER NOT NULL CHECK(quantity>0),unit_price_ars INTEGER NOT NULL CHECK(unit_price_ars>0),line_total_ars INTEGER NOT NULL CHECK(line_total_ars>0),detail_json TEXT NOT NULL DEFAULT '{}',file_references_json TEXT NOT NULL DEFAULT '[]',PRIMARY KEY(order_id,line_number))").run();
 }
@@ -290,19 +318,22 @@ export default {
    if(env.DB){try{table=Boolean(await env.DB.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='orders'").first())}catch{}}
    return json({ok:missing.length===0&&table,missing,ordersTableReady:table});
   }
-  if(!env.DB || !env.MP_TEST_ACCESS_TOKEN || !env.DEMO_ADMIN_KEY || !env.MP_TEST_SELLER_ID || !env.TEST_WEBHOOK_URL)return json({error:"Falta configuración privada de pruebas. Consultar diagnóstico autorizado."},503);
+  if(!env.DB || !env.MP_TEST_ACCESS_TOKEN || !env.DEMO_ADMIN_KEY || !env.MP_TEST_SELLER_ID || !env.TEST_WEBHOOK_URL || !env.MP_WEBHOOK_SECRET)return json({error:"Falta configuración privada de pruebas. Consultar diagnóstico autorizado."},503);
   try {
+   if(url.pathname.startsWith("/checkout/"))return await customerCheckout(req,env,this);
    // Solo un operador que conoce DEMO_ADMIN_KEY puede preparar un pedido ficticio.
    if(url.pathname==="/admin/api/orders"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
-    const rows=await env.DB.prepare("SELECT id,description,amount_ars,status,paid_at,created_at FROM orders WHERE status='paid' AND deposit_ars=amount_ars ORDER BY paid_at DESC LIMIT 100").all();
+    await ensurePaymentReviews(env);
+    const rows=await env.DB.prepare("SELECT id,description,amount_ars,status,paid_at,created_at FROM orders WHERE status='paid' AND deposit_ars=amount_ars AND NOT EXISTS (SELECT 1 FROM payment_reviews WHERE order_id=orders.id AND state='revoked') ORDER BY paid_at DESC LIMIT 100").all();
     return json({orders:rows.results});
    }
    if(url.pathname==="/admin/api/order"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
     const id=url.searchParams.get("id")||"";
     if(!/^[a-f0-9-]{36}$/i.test(id))return json({error:"ID de pedido inválido"},400);
-    const order=await env.DB.prepare("SELECT id,description,amount_ars,status,paid_at,created_at,payment_id FROM orders WHERE id=? AND status='paid' AND deposit_ars=amount_ars").bind(id).first();
+    await ensurePaymentReviews(env);
+    const order=await env.DB.prepare("SELECT id,description,amount_ars,status,paid_at,created_at,payment_id FROM orders WHERE id=? AND status='paid' AND deposit_ars=amount_ars AND NOT EXISTS (SELECT 1 FROM payment_reviews WHERE order_id=orders.id AND state='revoked')").bind(id).first();
     if(!order)return json({error:"Pedido pagado no encontrado"},404);
     await ensureOrderItems(env);
     const rows=await env.DB.prepare("SELECT line_number,item_type,sku,title,quantity,unit_price_ars,line_total_ars,detail_json,file_references_json FROM order_items WHERE order_id=? ORDER BY line_number").bind(id).all();
@@ -341,6 +372,8 @@ export default {
     const order=await env.DB.prepare("SELECT * FROM orders WHERE id=?").bind(orderId).first();
     if(!order)return json({error:"Pedido no encontrado"},404);
     if(order.status!=="awaiting_payment")return json({error:"El pedido ya está pago"},409);
+    const expiresAt=new Date(String(order.created_at).replace(" ","T")+"Z").getTime()+24*60*60*1000;
+    if(!Number.isFinite(expiresAt)||Date.now()>=expiresAt)return json({error:"La cotización venció; prepará un nuevo pedido"},409);
     if(order.deposit_ars!==order.amount_ars)return json({error:"El pedido anterior no corresponde a la modalidad de pago total"},409);
     async function returnPreference(id,reused){
      const preference=await mp(env,"/checkout/preferences/"+esc(id));
@@ -350,9 +383,32 @@ export default {
      return json({order_id:order.id,checkout_url:checkoutUrl,preference_id:id,reused});
     }
     if(order.preference_id)return returnPreference(order.preference_id,true);
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS checkout_locks(order_id TEXT PRIMARY KEY,expires_at TEXT NOT NULL)").run();
+    const lock=await env.DB.prepare("INSERT INTO checkout_locks(order_id,expires_at) VALUES(?,datetime('now','+90 seconds')) ON CONFLICT(order_id) DO UPDATE SET expires_at=excluded.expires_at WHERE checkout_locks.expires_at<datetime('now')").bind(order.id).run();
+    if(!lock.meta?.changes)return json({error:"El pago se está preparando. Esperá unos segundos y reintentá."},409);
+    try{
+    const latest=await env.DB.prepare("SELECT preference_id,status FROM orders WHERE id=?").bind(order.id).first();
+    if(latest?.preference_id)return returnPreference(latest.preference_id,true);
+    // Persistir el intento ANTES de salir a Mercado Pago. Si la respuesta se pierde,
+    // buscar la preferencia remota; jamás volver a crearla a ciegas.
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS checkout_attempts(order_id TEXT PRIMARY KEY,started_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+    const attempted=await env.DB.prepare("INSERT OR IGNORE INTO checkout_attempts(order_id) VALUES(?)").bind(order.id).run();
+    if(!attempted.meta?.changes){
+     const found=await mp(env,"/checkout/preferences/search?"+new URLSearchParams({external_reference:order.id}));
+     const candidates=(found.elements||[]).filter(p=>String(p.external_reference||"")===order.id);
+     if(candidates.length!==1||!candidates[0].id)return json({error:"El intento de pago requiere conciliación. No se generará otro enlace hasta verificarlo."},409);
+     const recovered=await mp(env,"/checkout/preferences/"+esc(candidates[0].id));
+     const amount=(recovered.items||[]).reduce((sum,p)=>sum+Number(p.unit_price)*Number(p.quantity),0);
+     if(String(recovered.external_reference)!==order.id||amount!==order.amount_ars||!recovered.items?.every(p=>p.currency_id==="ARS"))return json({error:"La preferencia recuperada requiere revisión privada"},409);
+     await env.DB.prepare("UPDATE orders SET preference_id=? WHERE id=? AND preference_id IS NULL AND status='awaiting_payment'").bind(recovered.id,order.id).run();
+     return returnPreference(recovered.id,true);
+    }
     const preference=await mp(env,"/checkout/preferences",{method:"POST",headers:{"X-Idempotency-Key":order.id},body:JSON.stringify({
       items:[{id:order.id,title:String(order.description||"Pago total Librería Saber").slice(0,120),quantity:1,currency_id:"ARS",unit_price:order.amount_ars}],
       external_reference:order.id,
+      notification_url:env.TEST_WEBHOOK_URL,
+      ...(env.CHECKOUT_RETURN_URL?{back_urls:{success:env.CHECKOUT_RETURN_URL,pending:env.CHECKOUT_RETURN_URL,failure:env.CHECKOUT_RETURN_URL}}:{}),
+      expires:true,expiration_date_to:new Date(expiresAt).toISOString(),
       metadata:{purpose:"libreria_saber_demo",payment_mode:"full"}
     })});
     if(!preference.id)return json({error:"Mercado Pago no devolvió el identificador de preferencia"},502);
@@ -367,6 +423,7 @@ export default {
     const checkoutUrl=preference.sandbox_init_point||preference.init_point;
     if(!/^https:\/\//.test(String(checkoutUrl||"")))return json({error:"Mercado Pago no devolvió un enlace válido"},502);
     return json({order_id:order.id,checkout_url:checkoutUrl,preference_id:preference.id,reused:false});
+    }finally{await env.DB.prepare("DELETE FROM checkout_locks WHERE order_id=?").bind(order.id).run()}
    }
    if(url.pathname==="/webhooks/mercadopago"&&req.method==="POST"){
     const valid=await verifySignature(req,url,env.MP_WEBHOOK_SECRET);
@@ -435,10 +492,67 @@ export default {
    }
    if(url.pathname==="/demo/paid-orders"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"La clave de acceso del demo no coincide con DEMO_ADMIN_KEY en Cloudflare. No ingreses el nombre de la variable."},401);
-    const rows=await env.DB.prepare("SELECT id,description,amount_ars,deposit_ars,status,paid_at FROM orders WHERE status='paid' ORDER BY paid_at DESC LIMIT 100").all();
+    await ensurePaymentReviews(env);
+    const rows=await env.DB.prepare("SELECT id,description,amount_ars,deposit_ars,status,paid_at FROM orders WHERE status='paid' AND NOT EXISTS (SELECT 1 FROM payment_reviews WHERE order_id=orders.id AND state='revoked') ORDER BY paid_at DESC LIMIT 100").all();
     return json({orders:rows.results});
    }
    return json({error:"No encontrado"},404);
   }catch(e){return json({error:"Error de integración; consultar registros privados"},502)}
  }
 };
+
+// Pasarela preparada, APAGADA por defecto. Solo accesible desde el proxy con secreto de servicio.
+// La clave administrativa nunca llega al navegador. Cada sesión queda ligada a un intento.
+async function customerCheckout(req,env,worker){
+ if(env.CHECKOUT_RETURN_URL){
+  try{const u=new URL(env.CHECKOUT_RETURN_URL);if(u.origin!=="https://"+env.CHECKOUT_HOST||u.pathname!=="/pedido-pago.html")return json({error:"Retorno de pago no configurado"},503)}catch{return json({error:"Retorno de pago no configurado"},503)}
+ }
+ if(!env.CHECKOUT_RETURN_URL||env.CHECKOUT_ENABLED!=="APROBADO"||!env.CHECKOUT_GATEWAY_KEY||!env.TURNSTILE_SECRET_KEY||
+    !env.CHECKOUT_HOST||!env.CHECKOUT_RATE_LIMIT||req.headers.get("x-checkout-gateway")!==env.CHECKOUT_GATEWAY_KEY)
+  return json({error:"Pagos online todavía no habilitados"},503);
+ if(req.method!=="POST")return json({error:"Método no admitido"},405);
+ const ip=req.headers.get("x-checkout-client-ip");
+ if(!ip)return json({error:"Origen de sesión no comprobable"},403);
+ const limit=await env.CHECKOUT_RATE_LIMIT.limit({key:ip});
+ if(!limit.success)return json({error:"Demasiados intentos. Esperá un momento."},429);
+ let raw=await req.text();if(raw.length>64000)return json({error:"Solicitud demasiado extensa"},413);
+ let body;try{body=JSON.parse(raw)}catch{return json({error:"Solicitud inválida"},400)}
+ if(!body||!isUUID(body.client_order_id))return json({error:"Intento de pedido inválido"},400);
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS checkout_sessions(token_hash TEXT PRIMARY KEY,client_order_id TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+ const hash=async value=>Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value))),n=>n.toString(16).padStart(2,"0")).join("");
+ const path=new URL(req.url).pathname;
+ if(path==="/checkout/session"){
+  if(typeof body.turnstileToken!=="string"||body.turnstileToken.length>4096)return json({error:"Completá la verificación de seguridad"},400);
+  const r=await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify",{method:"POST",headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({secret:env.TURNSTILE_SECRET_KEY,response:body.turnstileToken,remoteip:ip}),signal:AbortSignal.timeout(10000)});
+  if(!r.ok)return json({error:"Verificación de seguridad no disponible"},502);
+  const check=await r.json();
+  if(check.success!==true||check.hostname!==env.CHECKOUT_HOST||check.action!=="checkout")return json({error:"Verificación de seguridad rechazada"},403);
+  const token=crypto.randomUUID()+crypto.randomUUID();
+  await env.DB.batch([
+   env.DB.prepare("DELETE FROM checkout_sessions WHERE created_at<datetime('now','-24 hours')"),
+   env.DB.prepare("INSERT INTO checkout_sessions(token_hash,client_order_id) VALUES(?,?)").bind(await hash(token),body.client_order_id)
+  ]);
+  return json({session_token:token},201);
+ }
+ const bearer=(req.headers.get("Authorization")||"").replace(/^Bearer /,"");
+ if(!/^[0-9a-f-]{72}$/i.test(bearer))return json({error:"Sesión de compra requerida"},401);
+ const session=await env.DB.prepare("SELECT client_order_id FROM checkout_sessions WHERE token_hash=? AND created_at>=datetime('now','-24 hours')").bind(await hash(bearer)).first();
+ if(!session||session.client_order_id!==body.client_order_id)return json({error:"Sesión vencida o ajena al pedido"},401);
+ const cart=await env.DB.prepare("SELECT order_id FROM cart_requests WHERE client_order_id=?").bind(body.client_order_id).first();
+ if(path==="/checkout/status"){
+  if(!cart)return json({state:"draft"});
+  await ensurePaymentReviews(env);
+  const order=await env.DB.prepare("SELECT amount_ars,status FROM orders WHERE id=?").bind(cart.order_id).first();
+  const review=await env.DB.prepare("SELECT state FROM payment_reviews WHERE order_id=?").bind(cart.order_id).first();
+  return json({order_id:cart.order_id,total_ars:order.amount_ars,state:review?.state==="revoked"?"review":order.status});
+ }
+ let target;
+ if(path==="/checkout/polaroid-proof")target="/demo/polaroid-proof";
+ else if(path==="/checkout/cart-order")target="/demo/cart-order";
+ else if(path==="/checkout/pay"){
+  if(!cart||cart.order_id!==body.order_id)return json({error:"Pedido ajeno a esta sesión"},403);
+  target="/demo/checkout";
+ }else return json({error:"Operación desconocida"},404);
+ return worker.fetch(new Request(new URL(target,req.url),{method:"POST",headers:{Authorization:"Bearer "+env.DEMO_ADMIN_KEY,"Content-Type":"application/json"},body:JSON.stringify(body)}),env);
+}

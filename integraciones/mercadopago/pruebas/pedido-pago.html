@@ -1,0 +1,17 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><title>Tu pedido | Librería Saber</title>
+<style>body{font:17px system-ui;color:#173a64;max-width:620px;margin:60px auto;padding:24px;background:#f7f9fc}main{background:white;padding:26px;border:1px solid #d9e3ed;border-radius:16px}button,a{display:inline-block;padding:12px;margin:8px 8px 0 0}button{background:#174b8f;border:0;border-radius:8px;color:white;font:inherit}p{line-height:1.6}</style></head>
+<body><main><h1>Tu pedido</h1><p id="state" role="status" aria-live="polite">Verificá el estado de tu pago.</p><p id="reference"></p><button id="refresh">Verificar pago</button><button id="retry" hidden>Volver al pago</button><button id="new" hidden>Iniciar otro pedido</button><a href="index.html?carrito=1">Volver al carrito</a></main>
+<!--CHECKOUT_BOOT-->
+<script>
+// Nunca se confía en status, collection_status ni payment_id de la URL de regreso.
+history.replaceState(null,'',location.pathname);
+const state=document.querySelector('#state'),reference=document.querySelector('#reference');
+async function refresh(){try{state.textContent='Consultando la confirmación del pago…';const result=await SaberCheckout.status();
+ state.textContent=({paid:'Pago total confirmado. Recibimos tu pedido.',awaiting_payment:'El pago todavía no está confirmado. Si ya pagaste, esperá y volvé a verificar.',review:'El pago requiere revisión. No volveremos a cobrarlo automáticamente.',draft:'Todavía no hay un pedido preparado para pagar.'})[result.state]||'No se pudo comprobar el pedido.';
+ reference.textContent=result.order_id?'Pedido: '+result.order_id:'';
+ document.querySelector('#retry').hidden=result.state!=='awaiting_payment';document.querySelector('#new').hidden=result.state!=='paid';
+ }catch(e){state.textContent=e.message}}
+document.querySelector('#refresh').onclick=refresh;
+document.querySelector('#retry').onclick=async()=>{try{await SaberCheckout.checkout()}catch(e){state.textContent=e.message}};
+document.querySelector('#new').onclick=async()=>{try{await SaberCheckout.newOrder();location.assign('index.html')}catch(e){state.textContent=e.message}};
+</script></body></html>
