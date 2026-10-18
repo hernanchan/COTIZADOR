@@ -53,7 +53,7 @@ try{
    const body=await new Response(opts.body).text();assert.match(body,/start/);
    return new Response(null,{status:302,headers:{Location:'https://script.googleusercontent.com/macros/echo?user_content_key=test'}});
   }
-  assert.equal(opts.method,'GET');assert.equal(opts.body,undefined);assert.equal(opts.redirect,'error');
+  assert.equal(opts.method,'GET');assert.equal(opts.body,undefined);assert.equal(opts.redirect,'follow');
   return new Response('OK');
  };
  assert.equal((await relay.onRequestPost({request:request(),env})).status,202);
