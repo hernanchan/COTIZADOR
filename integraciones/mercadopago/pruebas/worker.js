@@ -138,35 +138,52 @@ const isUUID=v=>typeof v==="string"&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-
 async function createCatalogCartOrder(env,body){
  if(!body||body.schema!=="saber-cart-v1"||body.currency!=="ARS"||body.paymentMode!=="FULL"||!Array.isArray(body.items)||body.items.length<1||body.items.length>100||!isUUID(body.client_order_id))return {error:"Carrito o identificador inválido",status:400};
  if(body.items.some(x=>!x||x.type!=="product"))return {error:"Los trabajos de gráfica requieren cotización validada por el servidor; todavía no están habilitados para cobro.",status:422};
- const catalog=await getCatalog();
- let total=0;const items=[];
+ // La idempotencia se calcula sobre la intención del comprador (SKU/cantidad),
+ // NO sobre precios que pueden cambiar cuando se vuelve a consultar la planilla.
+ const intent=[];
  for(const item of body.items){
   const code=String(item.code||"").trim(),qty=Number(item.qty);
+  if(!code||code.length>80||!Number.isSafeInteger(qty)||qty<1||qty>500)return {error:"Artículo o cantidad inválidos",status:422};
+  intent.push({code,qty});
+ }
+ const bytes=new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(JSON.stringify(intent))));
+ const hash=Array.from(bytes,x=>x.toString(16).padStart(2,"0")).join("");
+ await ensureOrderItems(env);
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS cart_requests (client_order_id TEXT PRIMARY KEY, request_hash TEXT NOT NULL, order_id TEXT NOT NULL UNIQUE)").run();
+ async function findExisting(){
+  const existing=await env.DB.prepare("SELECT request_hash,order_id FROM cart_requests WHERE client_order_id=?").bind(body.client_order_id).first();
+  if(!existing)return null;
+  if(existing.request_hash!==hash)return {error:"Este identificador ya se usó con un carrito distinto",status:409};
+  const order=await env.DB.prepare("SELECT amount_ars,status FROM orders WHERE id=?").bind(existing.order_id).first();
+  if(!order)return {error:"Inconsistencia de pedido",status:409};
+  return {order_id:existing.order_id,total_ars:order.amount_ars,currency:"ARS",idempotent:true,paid:order.status==="paid"};
+ }
+ const prior=await findExisting();
+ if(prior)return prior;
+ // La planilla se vuelve a consultar exclusivamente al crear una orden nueva.
+ const catalog=await getCatalog();
+ let total=0;const items=[];
+ for(const {code,qty} of intent){
   const p=catalog.get(code);
   if(!p)return {error:"Artículo inexistente o inactivo en el catálogo vigente",status:422};
-  if(!Number.isSafeInteger(qty)||qty<1||qty>500)return {error:"Cantidad inválida",status:422};
   const subtotal=p.price*qty;
   if(!Number.isSafeInteger(subtotal)||subtotal>50000000)return {error:"Importe fuera del límite de pruebas",status:422};
   total+=subtotal;
   if(!Number.isSafeInteger(total)||total>50000000)return {error:"Importe fuera del límite de pruebas",status:422};
   items.push({type:"product",code,title:p.name,qty,price:p.price,subtotal});
  }
- const canon=JSON.stringify(items);
- const digest=new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(canon)));
- const hash=Array.from(digest,x=>x.toString(16).padStart(2,"0")).join("");
- await ensureOrderItems(env);
- await env.DB.prepare("CREATE TABLE IF NOT EXISTS cart_requests (client_order_id TEXT PRIMARY KEY, request_hash TEXT NOT NULL, order_id TEXT NOT NULL UNIQUE)").run();
- const existing=await env.DB.prepare("SELECT client_order_id,request_hash,order_id FROM cart_requests WHERE client_order_id=?").bind(body.client_order_id).first();
- if(existing){
-  if(existing.request_hash!==hash)return {error:"El identificador ya se utilizó con otro carrito",status:409};
-  return {order_id:existing.order_id,total_ars:total,currency:"ARS",idempotent:true};
- }
  const orderId=crypto.randomUUID();
  const statements=[env.DB.prepare("INSERT INTO orders(id,description,amount_ars,deposit_ars) VALUES(?,?,?,?)").bind(orderId,"Carrito de librería · "+items.length+" artículo(s)",total,total)];
  items.forEach((item,i)=>statements.push(env.DB.prepare("INSERT INTO order_items(order_id,line_number,item_type,sku,title,quantity,unit_price_ars,line_total_ars,detail_json,file_references_json) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(orderId,i+1,"product",item.code,item.title,item.qty,item.price,item.subtotal,"{}","[]")));
  statements.push(env.DB.prepare("INSERT INTO cart_requests(client_order_id,request_hash,order_id) VALUES(?,?,?)").bind(body.client_order_id,hash,orderId));
- await env.DB.batch(statements);
- return {order_id:orderId,total_ars:total,currency:"ARS",idempotent:false};
+ try{await env.DB.batch(statements)}
+ catch(e){
+  // Otro envío simultáneo pudo insertar primero el mismo pedido.
+  const concurrent=await findExisting();
+  if(concurrent)return concurrent;
+  throw e;
+ }
+ return {order_id:orderId,total_ars:total,currency:"ARS",idempotent:false,paid:false};
 }
 
 async function ensureOrderItems(env){
