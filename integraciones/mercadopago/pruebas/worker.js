@@ -14,9 +14,9 @@ async function verifySignature(req,url,secret){
  const hdr=req.headers.get("x-signature")||"", requestId=req.headers.get("x-request-id")||"";
  const parts=Object.fromEntries(hdr.split(",").map(p=>p.trim().split("=")));
  const ts=parts.ts, hex=parts.v1;
- const id=url.searchParams.get("data.id");
- if(!requestId||!ts||!/^[0-9]{9,16}$/.test(ts)||!id||!/^[a-f0-9]{64}$/i.test(hex||""))return false;
- const manifest="id:"+id.toLowerCase()+";request-id:"+requestId+";ts:"+ts+";";
+ const id=url.searchParams.get("data.id")||url.searchParams.get("data_id");
+ if(!ts||!/^[0-9]{9,16}$/.test(ts)||!/^[a-f0-9]{64}$/i.test(hex||""))return false;
+ const manifest=(id?"id:"+id.toLowerCase()+";":"")+(requestId?"request-id:"+requestId+";":"")+"ts:"+ts+";";
  const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign"]);
  const signed=await crypto.subtle.sign("HMAC",key,new TextEncoder().encode(manifest));
  const digest=Array.from(new Uint8Array(signed),v=>v.toString(16).padStart(2,"0")).join("");
