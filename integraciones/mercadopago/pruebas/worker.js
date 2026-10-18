@@ -10,17 +10,18 @@ async function mp(env,path,opts={}){
  return data;
 }
 async function verifySignature(req,url,secret){
- if(!secret)return false;
- const hdr=req.headers.get("x-signature")||"", requestId=req.headers.get("x-request-id")||"";
- const parts=Object.fromEntries(hdr.split(",").map(p=>p.trim().split("=")));
- const ts=parts.ts, hex=parts.v1;
+ if(typeof secret!=="string"||!secret)return false;
+ const parts=Object.fromEntries((req.headers.get("x-signature")||"").split(",").map(v=>{const i=v.indexOf("=");return i<0?["", ""]:[v.slice(0,i).trim(),v.slice(i+1).trim()]}));
+ const ts=parts.ts, supplied=parts.v1;
  const id=url.searchParams.get("data.id")||url.searchParams.get("data_id");
- if(!ts||!/^[0-9]{9,16}$/.test(ts)||!/^[a-f0-9]{64}$/i.test(hex||""))return false;
+ const requestId=req.headers.get("x-request-id");
+ if(!ts||!/^[0-9]{9,16}$/.test(ts)||!/^[a-fA-F0-9]{64}$/.test(supplied||""))return false;
  const manifest=(id?"id:"+id.toLowerCase()+";":"")+(requestId?"request-id:"+requestId+";":"")+"ts:"+ts+";";
  const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign"]);
- const signed=await crypto.subtle.sign("HMAC",key,new TextEncoder().encode(manifest));
- const digest=Array.from(new Uint8Array(signed),v=>v.toString(16).padStart(2,"0")).join("");
- let mismatch=0;for(let i=0;i<64;i++)mismatch|=digest.charCodeAt(i)^hex.toLowerCase().charCodeAt(i);
+ const result=new Uint8Array(await crypto.subtle.sign("HMAC",key,new TextEncoder().encode(manifest)));
+ const received=new Uint8Array(32);
+ for(let i=0;i<32;i++)received[i]=parseInt(supplied.slice(i*2,i*2+2),16);
+ let mismatch=0;for(let i=0;i<32;i++)mismatch|=result[i]^received[i];
  return mismatch===0;
 }
 const demoHtml="<!doctype html><html lang=\"es\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Saber pagos prueba</title><style>body{font:16px system-ui;max-width:650px;margin:35px auto;padding:18px}input{padding:10px;width:95%}button{padding:12px;margin:8px 3px}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style><h2>Librería Saber | Prueba de pagos</h2><p>Solo pruebas: pedido $10.000, seña $5.000. No introduzcas tokens de Mercado Pago.</p><input type=\"password\" id=\"key\" placeholder=\"Clave del demo (no se guarda)\"><p><button id=\"start\">Crear pedido y preparar pago</button><button id=\"list\">Consultar pagos aprobados</button><button id=\"diag\">Diagnosticar configuración</button><button id=\"audit\">Ver eventos automáticos</button><p><input id=\"paymentId\" inputmode=\"numeric\" placeholder=\"Número de operación de prueba\"><button id=\"paymentCheck\">Analizar pago de prueba</button><button id=\"reconcile\">Verificar y registrar pago aprobado</button></p></p><pre id=\"output\"></pre><script>\nconst o=document.querySelector('#output');\nasync function api(p,m='GET',b){const r=await fetch(p,{method:m,headers:{'Authorization':'Bearer '+document.querySelector('#key').value,'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});const d=await r.json();if(!r.ok)throw Error(d.error||r.status);return d}\ndocument.querySelector('#start').onclick=async()=>{try{o.textContent='Preparando...';const x=await api('/demo/order','POST');const y=await api('/demo/checkout','POST',{order_id:x.id});o.textContent='Pedido '+x.id+' creado. ';const a=document.createElement('a');a.href=y.checkout_url;a.target='_blank';a.rel='noopener noreferrer';a.textContent='Abrir pago de prueba';o.append(a)}catch(e){o.textContent=e.message}};\ndocument.querySelector('#list').onclick=async()=>{try{o.textContent=JSON.stringify(await api('/demo/paid-orders'),null,2)}catch(e){o.textContent=e.message}};\ndocument.querySelector('#diag').onclick=async()=>{try{o.textContent=JSON.stringify(await api('/demo/diagnostic'),null,2)}catch(e){o.textContent=e.message}};\ndocument.querySelector('#audit').onclick=async()=>{try{o.textContent=JSON.stringify(await api('/demo/webhook-audit'),null,2)}catch(e){o.textContent=e.message}};\ndocument.querySelector('#paymentCheck').onclick=async()=>{try{o.textContent=JSON.stringify(await api('/demo/payment-check','POST',{payment_id:document.querySelector('#paymentId').value.trim()}),null,2)}catch(e){o.textContent='Error: '+e.message}};\ndocument.querySelector('#reconcile').onclick=async()=>{try{o.textContent=JSON.stringify(await api('/demo/reconcile','POST',{payment_id:document.querySelector('#paymentId').value.trim()}),null,2)}catch(e){o.textContent='Error: '+e.message}};\n</script></html>";
