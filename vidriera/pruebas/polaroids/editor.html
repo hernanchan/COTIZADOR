@@ -552,6 +552,7 @@ async function sendSecurePhotos(){
   const result=await confirmServer(receivingSession.reference,receivingSession.uploadKey,
    x=>x.status==='received'&&x.received===allPhotos.length&&x.photos===allPhotos.length,120000);
   const reference=receivingSession.reference;
+  if(window.saberPaymentReceipt)await window.saberPaymentReceipt({reference,uploadKey:receivingSession.uploadKey});
   const cartPayload={sheets:sheets.length,photos:allPhotos.length,format:'85x90',
    uploadsReceived:true,reference,referenceStatus:'received'};
   receivedReference=reference;receivingSession=null;
@@ -652,6 +653,23 @@ $('goToCartAfterReceipt').onclick=()=>{
 };
 $('btnDemo').onclick=async()=>{let fs=[];for(let i=0;i<6;i++){const c=document.createElement('canvas');c.width=i%2?1250:1700;c.height=i%2?1700:1200;let ctx=c.getContext('2d'),g=ctx.createLinearGradient(0,0,c.width,c.height);const pair=[['#355f78','#e2a775'],['#6c8188','#c4d4bd'],['#98786b','#e6c3aa'],['#526e94','#cbbddd'],['#5f8d85','#e9c393'],['#8680a8','#d1b7a2']][i];g.addColorStop(0,pair[0]);g.addColorStop(1,pair[1]);ctx.fillStyle=g;ctx.fillRect(0,0,c.width,c.height);ctx.fillStyle='#ffffff44';ctx.beginPath();ctx.arc(c.width*(.25+.09*i),c.height*.4,c.height*.22,0,2*Math.PI);ctx.fill();ctx.strokeStyle='#ffffff77';ctx.lineWidth=18;ctx.beginPath();ctx.moveTo(-60,c.height*.9);ctx.lineTo(c.width*.75,c.height*.26);ctx.lineTo(c.width+30,c.height*.75);ctx.stroke();ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold '+Math.round(c.width*.075)+'px Segoe UI, Arial';ctx.fillText('FOTO DE PRUEBA',c.width/2,c.height*.70);ctx.font=Math.round(c.width*.05)+'px Segoe UI, Arial';ctx.fillText(String(i+1),c.width/2,c.height*.79);const b=await new Promise(r=>c.toBlob(r,'image/jpeg',.92));fs.push(new File([b],`Prueba_${i+1}.jpg`,{type:'image/jpeg'}))}for(let i=0;i<6;i++)dropPhoto(i);await acceptFiles(fs);status('Fotos de prueba cargadas. Podés practicar el encuadre y revisar el PDF antes de usar fotos reales.','ok')};
 renderAll();
+</script>
+<script>
+// Puente opcional EXCLUSIVO del piloto de pagos. Sin claves en URL ni almacenamiento.
+window.saberPaymentReceipt=async function(receipt){
+ const nonce=new URLSearchParams(location.search).get('pagosNonce');
+ if(!nonce)return;
+ if(!/^[a-f0-9-]{36}$/i.test(nonce)||!window.opener)throw Error('Abrí este ensayo desde el panel de pagos.');
+ const origin='https://saber-pagos-pruebas.libreriasaber.workers.dev';
+ await new Promise((resolve,reject)=>{
+  const timer=setTimeout(()=>{cleanup();reject(Error('La verificación del pago no respondió. Volvé al panel y reintentá el envío.'));},45000);
+  function cleanup(){clearTimeout(timer);window.removeEventListener('message',onMessage)}
+  function onMessage(event){if(event.origin!==origin||event.source!==window.opener||event.data?.nonce!==nonce||event.data?.type!=='SABER_PAYMENT_PROOF_RESULT')return;
+   cleanup();event.data.ok?resolve():reject(Error(event.data.error||'No se confirmó la recepción para el pago.'));}
+  window.addEventListener('message',onMessage);
+  window.opener.postMessage({type:'SABER_PAYMENT_RECEIPT',nonce,...receipt},origin);
+ });
+};
 </script>
 </body>
 </html>
