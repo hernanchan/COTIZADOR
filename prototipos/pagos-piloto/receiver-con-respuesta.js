@@ -91,12 +91,21 @@ export async function onRequestPost({request,env}){
  if(!request.body)return json({ok:false,error:'Faltan datos.'},400);
  if(op==='status'){
   let input;
+  // Rechazar durante la lectura, no después de almacenar un cuerpo completo.
+  const reader=request.body.getReader(),chunks=[];let size=0;
   try{
-   const raw=await request.text();
-   if(raw.length>2000)throw Error('Solicitud demasiado larga.');
-   input=JSON.parse(raw);
+   while(true){
+    const {done,value}=await reader.read();if(done)break;
+    size+=value.byteLength;
+    if(size>2000){await reader.cancel();throw Error('Solicitud demasiado larga.')}
+    chunks.push(value);
+   }
+   const bytes=new Uint8Array(size);let offset=0;
+   for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength}
+   input=JSON.parse(new TextDecoder().decode(bytes));
   }catch(_){return json({ok:false,error:'Solicitud de consulta inválida.'},400)}
-  if(!REFERENCE.test(input.reference)||!UPLOAD_KEY.test(input.uploadKey))
+  if(!input||typeof input!=='object'||Array.isArray(input)||
+     !REFERENCE.test(String(input.reference||''))||!UPLOAD_KEY.test(String(input.uploadKey||'')))
    return json({ok:false,error:'Datos de pedido inválidos.'},400);
   try{
    const data=await upstreamStatus(input.reference,input.uploadKey);
