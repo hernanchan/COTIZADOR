@@ -36,3 +36,19 @@ CREATE TABLE IF NOT EXISTS cart_requests (
  request_hash TEXT NOT NULL,
  order_id TEXT NOT NULL UNIQUE REFERENCES orders(id) ON DELETE CASCADE
 );
+
+-- Constancias emitidas tras verificar Google Drive mediante uploadKey (no se guarda la clave).
+-- Solo pruebas y sin almacenamiento de fotografías en esta base.
+CREATE TABLE IF NOT EXISTS polaroid_proofs (
+ proof_token TEXT PRIMARY KEY,
+ reference TEXT NOT NULL UNIQUE,
+ client_order_id TEXT NOT NULL,
+ photos INTEGER NOT NULL CHECK(photos BETWEEN 1 AND 60),
+ sheets INTEGER NOT NULL CHECK(sheets BETWEEN 1 AND 10),
+ created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS polaroid_redemptions (
+ proof_token TEXT PRIMARY KEY REFERENCES polaroid_proofs(proof_token),
+ order_id TEXT NOT NULL REFERENCES orders(id)
+);
+CREATE INDEX IF NOT EXISTS idx_polaroid_proofs_client ON polaroid_proofs(client_order_id);
