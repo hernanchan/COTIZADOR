@@ -135,53 +135,111 @@ async function getCatalog(){
  return catalog;
 }
 const isUUID=v=>typeof v==="string"&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
-async function createCatalogCartOrder(env,body){
- if(!body||body.schema!=="saber-cart-v1"||body.currency!=="ARS"||body.paymentMode!=="FULL"||!Array.isArray(body.items)||body.items.length<1||body.items.length>100||!isUUID(body.client_order_id))return {error:"Carrito o identificador inválido",status:400};
- if(body.items.some(x=>!x||x.type!=="product"))return {error:"Los trabajos de gráfica requieren cotización validada por el servidor; todavía no están habilitados para cobro.",status:422};
- // La idempotencia se calcula sobre la intención del comprador (SKU/cantidad),
- // NO sobre precios que pueden cambiar cuando se vuelve a consultar la planilla.
- const intent=[];
- for(const item of body.items){
-  const code=String(item.code||"").trim(),qty=Number(item.qty);
-  if(!code||code.length>80||!Number.isSafeInteger(qty)||qty<1||qty>500)return {error:"Artículo o cantidad inválidos",status:422};
-  intent.push({code,qty});
+const POLAROID_SHEET_PRICE_ARS=3000;
+async function ensurePolaroidProofs(env){
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS polaroid_proofs (proof_token TEXT PRIMARY KEY,reference TEXT NOT NULL UNIQUE,client_order_id TEXT NOT NULL,photos INTEGER NOT NULL CHECK(photos BETWEEN 1 AND 60),sheets INTEGER NOT NULL CHECK(sheets BETWEEN 1 AND 10),created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS polaroid_redemptions (proof_token TEXT PRIMARY KEY REFERENCES polaroid_proofs(proof_token),order_id TEXT NOT NULL REFERENCES orders(id))").run();
+}
+async function createPolaroidProof(env,body){
+ if(!body||!isUUID(body.client_order_id)||!/^POL-[A-F0-9]{24}$/.test(String(body.reference||""))||!/^[a-f0-9]{64}$/.test(String(body.uploadKey||"")))return {error:"Datos de recepción inválidos",status:400};
+ // Validación de la recepción real, sin persistir ni devolver uploadKey.
+ const upstream=await fetch("https://libreriasaber.com.ar/api/polaroids-receiver?op=status",{
+  method:"POST",headers:{"Origin":"https://libreriasaber.com.ar","Content-Type":"application/json"},
+  body:JSON.stringify({reference:body.reference,uploadKey:body.uploadKey}),redirect:"manual",
+  signal:AbortSignal.timeout(22000)
+ });
+ if(!upstream.ok)return {error:"No se pudo comprobar la recepción protegida de Polaroids",status:502};
+ const status=await upstream.json();
+ const photos=Number(status.photos),sheets=Number(status.sheets),received=Number(status.received);
+ if(status.ok!==true||status.found!==true||status.status!=="received"||
+    !Number.isInteger(photos)||photos<1||photos>60||!Number.isInteger(sheets)||sheets!==Math.ceil(photos/6)||
+    sheets<1||sheets>10||received!==photos)
+  return {error:"La recepción de fotografías todavía no está completa o confirmada",status:422};
+ await ensurePolaroidProofs(env);
+ const previous=await env.DB.prepare("SELECT proof_token,client_order_id,photos,sheets FROM polaroid_proofs WHERE reference=?").bind(body.reference).first();
+ if(previous){
+  if(previous.client_order_id!==body.client_order_id||previous.photos!==photos||previous.sheets!==sheets)
+   return {error:"Esta recepción está asociada a otro intento de pedido",status:409};
+  return {proof_token:previous.proof_token,reference:body.reference,photos,sheets,total_ars:sheets*POLAROID_SHEET_PRICE_ARS,idempotent:true};
  }
- const bytes=new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(JSON.stringify(intent))));
- const hash=Array.from(bytes,x=>x.toString(16).padStart(2,"0")).join("");
+ const token=crypto.randomUUID();
+ try{
+  await env.DB.prepare("INSERT INTO polaroid_proofs(proof_token,reference,client_order_id,photos,sheets) VALUES(?,?,?,?,?)")
+   .bind(token,body.reference,body.client_order_id,photos,sheets).run();
+ }catch(e){
+  // Una pestaña paralela pudo acreditar la misma recepción.
+  const row=await env.DB.prepare("SELECT proof_token,client_order_id,photos,sheets FROM polaroid_proofs WHERE reference=?").bind(body.reference).first();
+  if(!row||row.client_order_id!==body.client_order_id||row.photos!==photos||row.sheets!==sheets)throw e;
+  return {proof_token:row.proof_token,reference:body.reference,photos,sheets,total_ars:sheets*POLAROID_SHEET_PRICE_ARS,idempotent:true};
+ }
+ return {proof_token:token,reference:body.reference,photos,sheets,total_ars:sheets*POLAROID_SHEET_PRICE_ARS,idempotent:false};
+}
+async function createCatalogCartOrder(env,body){
+ if(!body||body.schema!=="saber-cart-v1"||body.currency!=="ARS"||body.paymentMode!=="FULL"||
+    !Array.isArray(body.items)||body.items.length<1||body.items.length>100||!isUUID(body.client_order_id))
+  return {error:"Carrito o identificador inválido",status:400};
+ const intent=[],usedProofs=new Set();
+ for(const item of body.items){
+  if(!item||typeof item!=="object")return {error:"Artículo inválido",status:422};
+  if(item.type==="product"){
+   const code=String(item.code||"").trim(),qty=Number(item.qty);
+   if(!code||code.length>80||!Number.isSafeInteger(qty)||qty<1||qty>500)return {error:"Código o cantidad inválidos",status:422};
+   intent.push({type:"product",code,qty});
+  }else if(item.type==="print"&&item.code==="POLAROID_A4"&&isUUID(item.proof_token)&&Number(item.qty)===1){
+   if(usedProofs.has(item.proof_token))return {error:"Una misma recepción no puede incluirse dos veces",status:422};
+   usedProofs.add(item.proof_token);
+   intent.push({type:"polaroid",proof_token:item.proof_token,qty:1});
+  }else return {error:"Este trabajo de gráfica requiere cotización o recepción validada por el servidor",status:422};
+ }
+ // Se fija la intención (SKU, cantidad y comprobante), no el precio mostrado en el dispositivo.
+ const digest=new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(JSON.stringify(intent))));
+ const hash=Array.from(digest,x=>x.toString(16).padStart(2,"0")).join("");
  await ensureOrderItems(env);
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS cart_requests (client_order_id TEXT PRIMARY KEY, request_hash TEXT NOT NULL, order_id TEXT NOT NULL UNIQUE)").run();
- async function findExisting(){
-  const existing=await env.DB.prepare("SELECT request_hash,order_id FROM cart_requests WHERE client_order_id=?").bind(body.client_order_id).first();
-  if(!existing)return null;
-  if(existing.request_hash!==hash)return {error:"Este identificador ya se usó con un carrito distinto",status:409};
-  const order=await env.DB.prepare("SELECT amount_ars,status FROM orders WHERE id=?").bind(existing.order_id).first();
+ async function existingOrder(){
+  const found=await env.DB.prepare("SELECT request_hash,order_id FROM cart_requests WHERE client_order_id=?").bind(body.client_order_id).first();
+  if(!found)return null;
+  if(found.request_hash!==hash)return {error:"Este identificador ya se utilizó con un carrito distinto",status:409};
+  const order=await env.DB.prepare("SELECT amount_ars,status FROM orders WHERE id=?").bind(found.order_id).first();
   if(!order)return {error:"Inconsistencia de pedido",status:409};
-  return {order_id:existing.order_id,total_ars:order.amount_ars,currency:"ARS",idempotent:true,paid:order.status==="paid"};
+  return {order_id:found.order_id,total_ars:order.amount_ars,currency:"ARS",idempotent:true,paid:order.status==="paid"};
  }
- const prior=await findExisting();
- if(prior)return prior;
- // La planilla se vuelve a consultar exclusivamente al crear una orden nueva.
- const catalog=await getCatalog();
+ const prior=await existingOrder();if(prior)return prior;
+ if(usedProofs.size)await ensurePolaroidProofs(env);
+ const catalog=intent.some(it=>it.type==="product")?await getCatalog():new Map();
  let total=0;const items=[];
- for(const {code,qty} of intent){
-  const p=catalog.get(code);
-  if(!p)return {error:"Artículo inexistente o inactivo en el catálogo vigente",status:422};
-  const subtotal=p.price*qty;
-  if(!Number.isSafeInteger(subtotal)||subtotal>50000000)return {error:"Importe fuera del límite de pruebas",status:422};
-  total+=subtotal;
-  if(!Number.isSafeInteger(total)||total>50000000)return {error:"Importe fuera del límite de pruebas",status:422};
-  items.push({type:"product",code,title:p.name,qty,price:p.price,subtotal});
+ for(const item of intent){
+  if(item.type==="product"){
+   const p=catalog.get(item.code);
+   if(!p)return {error:"Artículo inexistente o inactivo en el catálogo vigente",status:422};
+   const subtotal=p.price*item.qty;
+   if(!Number.isSafeInteger(subtotal)||subtotal>50000000)return {error:"Importe de prueba excedido",status:422};
+   total+=subtotal;
+   items.push({type:"product",code:p.code,title:p.name,qty:item.qty,price:p.price,subtotal,detail:"{}",references:"[]"});
+  }else{
+   const proof=await env.DB.prepare("SELECT reference,client_order_id,photos,sheets FROM polaroid_proofs WHERE proof_token=? AND created_at>=datetime('now','-24 hours')").bind(item.proof_token).first();
+   if(!proof||proof.client_order_id!==body.client_order_id)return {error:"Constancia de recepción inexistente, vencida o ajena a este carrito",status:422};
+   const subtotal=proof.sheets*POLAROID_SHEET_PRICE_ARS;
+   total+=subtotal;
+   items.push({type:"print",code:"POLAROID_A4",title:"Polaroids 85 × 90 mm · A4",qty:proof.sheets,
+     price:POLAROID_SHEET_PRICE_ARS,subtotal,detail:JSON.stringify({photos:proof.photos,sheets:proof.sheets}),
+     references:JSON.stringify([proof.reference]),proof_token:item.proof_token});
+  }
+  if(!Number.isSafeInteger(total)||total<=0||total>50000000)return {error:"Importe de prueba excedido",status:422};
  }
  const orderId=crypto.randomUUID();
- const statements=[env.DB.prepare("INSERT INTO orders(id,description,amount_ars,deposit_ars) VALUES(?,?,?,?)").bind(orderId,"Carrito de librería · "+items.length+" artículo(s)",total,total)];
- items.forEach((item,i)=>statements.push(env.DB.prepare("INSERT INTO order_items(order_id,line_number,item_type,sku,title,quantity,unit_price_ars,line_total_ars,detail_json,file_references_json) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(orderId,i+1,"product",item.code,item.title,item.qty,item.price,item.subtotal,"{}","[]")));
- statements.push(env.DB.prepare("INSERT INTO cart_requests(client_order_id,request_hash,order_id) VALUES(?,?,?)").bind(body.client_order_id,hash,orderId));
- try{await env.DB.batch(statements)}
+ const stmts=[env.DB.prepare("INSERT INTO orders(id,description,amount_ars,deposit_ars) VALUES(?,?,?,?)").bind(orderId,"Carrito Librería Saber · "+items.length+" trabajo(s)/artículo(s)",total,total)];
+ items.forEach((it,i)=>{
+  stmts.push(env.DB.prepare("INSERT INTO order_items(order_id,line_number,item_type,sku,title,quantity,unit_price_ars,line_total_ars,detail_json,file_references_json) VALUES(?,?,?,?,?,?,?,?,?,?)")
+   .bind(orderId,i+1,it.type,it.code,it.title,it.qty,it.price,it.subtotal,it.detail,it.references));
+  if(it.proof_token)stmts.push(env.DB.prepare("INSERT INTO polaroid_redemptions(proof_token,order_id) VALUES(?,?)").bind(it.proof_token,orderId));
+ });
+ stmts.push(env.DB.prepare("INSERT INTO cart_requests(client_order_id,request_hash,order_id) VALUES(?,?,?)").bind(body.client_order_id,hash,orderId));
+ try{await env.DB.batch(stmts)}
  catch(e){
-  // Otro envío simultáneo pudo insertar primero el mismo pedido.
-  const concurrent=await findExisting();
-  if(concurrent)return concurrent;
-  throw e;
+  // Idempotencia ante reintentos concurrentes; UNIQUE evita volver a cobrar la misma recepción.
+  const concurrent=await existingOrder();if(concurrent)return concurrent;
+  return {error:"Recepción ya utilizada o pedido simultáneo; verificá el estado",status:409};
  }
  return {order_id:orderId,total_ars:total,currency:"ARS",idempotent:false,paid:false};
 }
@@ -252,6 +310,13 @@ export default {
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
     const products=Array.from((await getCatalog()).values()).slice(0,30);
     return json({currency:"ARS",products,note:"Catálogo vigente; disponibilidad sujeta a confirmación."});
+   }
+   if(url.pathname==="/demo/polaroid-proof"&&req.method==="POST"){
+    if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+    const body=await req.json().catch(()=>null);
+    const proof=await createPolaroidProof(env,body);
+    if(proof.error)return json({error:proof.error},proof.status);
+    return json(proof,proof.idempotent?200:201);
    }
    if(url.pathname==="/demo/cart-order"&&req.method==="POST"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
