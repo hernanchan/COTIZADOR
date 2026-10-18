@@ -95,7 +95,7 @@ export default {
     const preference=await mp(env,"/checkout/preferences",{method:"POST",headers:{"X-Idempotency-Key":order.id},body:JSON.stringify({
       items:[{id:order.id,title:"Seña - Pedido de prueba Librería Saber",quantity:1,currency_id:"ARS",unit_price:order.deposit_ars}],
       external_reference:order.id,
-      notification_url:env.TEST_WEBHOOK_URL,
+      // El webhook se configura desde Mercado Pago Developers (modo de prueba).
       metadata:{purpose:"libreria_saber_demo"}
     })});
     await env.DB.prepare("UPDATE orders SET preference_id=? WHERE id=? AND preference_id IS NULL AND status='awaiting_payment'").bind(preference.id,order.id).run();
