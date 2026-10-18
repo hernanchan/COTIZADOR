@@ -117,3 +117,16 @@ Prueba añadida: rechazo de inicio → callback de seguridad renovada sin oculta
 - Se amplió `tests/polaroids-reintento.test.mjs` con casos de rechazo; ejecutar la suite Node real antes de desplegar.
 - **La corrección sigue solo en el prototipo de la rama de pagos**. No fue sincronizada ni desplegada en `polaroids/integracion-sin-r2-20261014`, porque esta rama está vinculada a Cloudflare Pages y cualquier push podría actualizar el entorno de ensayo. Requiere una decisión expresa de prueba/despliegue antes de pasarla.
 - No fue posible consultar la respuesta HTTP de los endpoints externos de Cloudflare o Apps Script desde este entorno. La última falla real de Google sigue sin causa determinada. No afirmar resolución hasta observar una carga completa con `start`, 6 fotos, `finish`, PDF privado y constancia, seguida de checkout completo.
+
+
+## Comprobación sin publicación · lectura de Cloudflare
+
+Se añadió `tools/verificar-piloto-sin-publicar.mjs`, un diagnóstico de **solo tres solicitudes HTTP GET**. Consulta la configuración JSON y la ruta de salud del receptor Polaroids del piloto, y `/health` en el Worker de pagos. Verifica que la recepción esté activada únicamente en el piloto, que el host y el Apps Script coincidan y que el Worker/D1 de ensayos respondan.
+
+Comando cuando exista salida a Internet desde un entorno Node 20+:
+
+```sh
+node tools/verificar-piloto-sin-publicar.mjs
+```
+
+No solicita contraseñas, no crea pedidos ni sube fotos, no escribe en Drive ni D1, no cobra y no despliega cambios. Una salida PASS prueba únicamente conectividad y coherencia de las rutas GET; la carga y PDF siguen pendientes de pruebas de extremo a extremo. La red de este entorno de chat no permitió obtener las respuestas de los dominios `pages.dev` y `workers.dev`, por lo que **aún no hay un resultado PASS remoto**.
