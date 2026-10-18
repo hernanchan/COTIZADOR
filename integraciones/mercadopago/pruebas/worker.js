@@ -2,7 +2,7 @@
 // No desplegar ni agregar secretos reales hasta revisar y aprobar la prueba.
 const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
 const esc=s=>encodeURIComponent(s);
-const tokenOK=(req,env)=>{const expected=env.DEMO_ADMIN_KEY;if(!expected)return false;return req.headers.get("Authorization")==="Bearer "+expected};
+const tokenOK=(req,env)=>{const expected=env.DEMO_ADMIN_KEY;if(typeof expected!=="string"||!expected)return false;const actual=req.headers.get("Authorization")||"";return actual.startsWith("Bearer ") && actual.slice(7).trim()===expected.trim()};
 async function mp(env,path,opts={}){
  const r=await fetch("https://api.mercadopago.com"+path,{...opts,headers:{Authorization:"Bearer "+env.MP_TEST_ACCESS_TOKEN,"Content-Type":"application/json",...(opts.headers||{})}});
  const t=await r.text();let data;try{data=JSON.parse(t)}catch{data={message:"Respuesta inválida de Mercado Pago"}}
