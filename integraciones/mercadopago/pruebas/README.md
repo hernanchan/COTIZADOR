@@ -77,3 +77,14 @@ No mostrar pedidos en producción hasta que los archivos necesarios estén recib
 - La ruta de prueba sigue protegida por `DEMO_ADMIN_KEY`, **no habilitada para clientes públicos**.
 - Pruebas de regresión incorporadas en `tests/mercadopago-carrito.test.mjs`. Ejecutar con Node 20+: `node tests/mercadopago-carrito.test.mjs`. Se hizo una comprobación lógica equivalente con D1 y Mercado Pago simulados; no supone una prueba de extremo a extremo en Cloudflare.
 - **Pendiente para salir al público:** validación de cotizaciones de impresión/gráfica en el backend, habilitación segura del endpoint para clientes (sin exponer `DEMO_ADMIN_KEY`), políticas de precios y vencimiento, control de abuso, asociación de documentos y Polaroids, pruebas reales de la ejecución automática, aprobación comercial de mensajes y credenciales productivas.
+
+
+### Integración de Polaroids · verificación previa al cobro (2026-10-18)
+
+- El Worker de **pruebas** admite ahora `POST /demo/polaroid-proof`, protegido por la clave administrativa del demo. Recibe `reference`, `uploadKey` y `client_order_id`; consulta la API de recepción protegida de `libreriasaber.com.ar` para verificar, desde el servidor, que Google confirme `status=received`, `received=photos` y cantidad de hojas consistente. **No guarda ni devuelve `uploadKey`.**
+- D1 guarda una constancia aleatoria `proof_token`, la referencia de Drive, número de fotos y hojas. El precio confiable se fija en el backend: **ARS 3.000 por hoja A4**.
+- `POST /demo/cart-order` ahora puede preparar carritos mixtos de artículos de catálogo y trabajos `POLAROID_A4` con esa constancia, rechazando precios enviados desde el navegador, pruebas vencidas o asociadas a otro intento y duplicaciones de una misma constancia.
+- El panel privado muestra las líneas y referencias de los pedidos **después** de verificar el pago total. El token de subida no debe incluirse en el pedido ni en los mensajes de WhatsApp.
+- Se ejecutó una simulación lógica del Worker con D1, recepción Google y Mercado Pago reemplazados por respuestas de prueba: 12 fotos/2 hojas → ARS 6.000; dos artículos de ARS 3.500 → ARS 7.000; total de carrito → **ARS 13.000**. Reintentos idénticos devolvieron la misma orden/preferencia; una recepción incompleta y una constancia de otro carrito fueron rechazadas.
+- **No habilitar públicamente** todavía: la ruta para crear la constancia requiere una clave privada de administrador y por diseño el editor del cliente no puede utilizarla. Se necesita un flujo público controlado (Turnstile/rate-limit/origen) que entregue la constancia desde la sesión de subida *antes de borrar* el `uploadKey` temporal, sin guardarlo ni transmitirlo al carrito.
+- Pendiente verificar la comunicación real entre Workers y la recepción protegida de Google, cotizaciones de otros servicios gráficos, automatización por calendario y pruebas integrales antes de autorizar una publicación.
