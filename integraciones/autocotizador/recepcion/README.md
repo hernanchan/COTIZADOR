@@ -8,6 +8,14 @@ Este receptor **no** forma parte del Apps Script de Polaroids. No se instaló, n
 - `../pruebas/gateway-documentos-http.mjs`: adaptador de cliente HTTP; sólo ruta relativa protegida `/api/documentos-receiver`.
 - `../pruebas/subida-reanudable.mjs`: envía fragmentos de 512KiB con SHA-256 y reanuda mediante `status`.
 
+## Estado del entorno privado — 19/10/2026
+
+- El titular autorizó preparar el entorno privado de pruebas para **documentos**, sin publicar y sin gastos.
+- Se confirmó que la cuenta de Google Drive conectada es la cuenta comercial de Librería Saber.
+- **Carpeta creada y verificada:** `Librería Saber - Documentos WEB - PRUEBAS`, dentro de Mi unidad, sin compartir con terceros (solo propietario). El ID y enlace de carpeta se mantienen fuera del repositorio y deberán asignarse a la propiedad privada `DOCS_ROOT_FOLDER_ID` una vez creado el proyecto de Apps Script.
+- No se ha verificado cuál es el ID/carpeta exacta que utiliza el receptor piloto de Polaroids. **No mover ni reorganizar fotografías existentes.** La estructura propuesta de carpeta general compartida es lógica, no un cambio físico ya efectuado.
+- **Pendiente:** crear proyecto independiente de Google Apps Script, configurar credenciales privadas y relay piloto, probar una transmisión real y luego validador de páginas en servidor. El conector Drive disponible crea carpetas, pero no expone creación/despliegue de Apps Script; no declarar instalados scripts ni rutas.
+
 ## Preparación requerida para un ensayo real autorizado
 
 1. **Crear un proyecto nuevo de Google Apps Script**, sin copiar encima del existente de Polaroids. Pegar `DocumentosReceiver.gs` y revisar `appsscript.json`. Se deberá ejecutar como titular de Librería Saber y permitir las llamadas HTTP de UrlFetchApp y acceso a Drive. El Web App usa acceso anónimo pero **rechaza todas las llamadas sin firma HMAC del Worker**. Evaluar las restricciones de la cuenta Google antes de instalar.
