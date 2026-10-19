@@ -4,7 +4,7 @@ Estado: definición funcional y técnica, **no implementación publicada**. Regi
 
 ## Decisión comercial definitiva (corrección de alcance)
 
-**MIGRACIÓN TOTAL DEL COTIZADOR EXISTENTE, NO DOS COTIZADORES EN PARALELO.**
+**MIGRACIÓN TOTAL DEL COTIZADOR EXISTENTE, NO DOS COTIZADORES EN PARALELO.** El cliente podrá cargar PDF, JPG, PNG y, sujeto a conversión/validación, Word; todo desde una sola interfaz.
 
 - Mantener una sola entrada, interfaz y carrito de cotización. En el módulo de **impresión de documentos**, reemplazar obligatoriamente «Páginas del documento» (dato manual que los clientes suelen desconocer) por **«Subí tus archivos PDF»**. El sistema cuenta las páginas de cada archivo y permite elegir las opciones de impresión; no se ofrece a los clientes una versión antigua y otra nueva para esta operación.
 - **Reutilizar el motor de precios, servicios, promociones y experiencia existente**; migrar la aplicación que ya funciona, no crear un producto comercial duplicado. Los módulos que no usan PDF (fotos, stickers, ploteo, etc.) no se eliminan por esta decisión; definir su tratamiento e integración caso por caso para mantener un único cotizador.
@@ -19,6 +19,20 @@ Estado: definición funcional y técnica, **no implementación publicada**. Regi
 - `cotizador-web-v2.html` (main): `renderPrint()`, `calcPrint()`, `finishItem()`. Hoy el campo `pages` se escribe manualmente; opciones de A4/A3, B/N/color, simple/doble faz, material, copias, anillado y promoción.
 - `precios-web.json` (main): `bnA4`, `bnA3`, `colorA4`, `colorA3`, `bindings`, escalas por volumen, materiales, descuentos. Archivo marcado `generatedAt: 2026-08-21T13:50:37.427Z`; **confirmar que los valores están vigentes** y preparar una única fuente de precios para mostrador, web y servidor.
 - El flujo aislado de Mercado Pago ya prueba pago completo, pedidos idempotentes, recibos Polaroids y Centro privado; reutilizar infraestructura y controles donde sean aplicables. No usar los importes calculados en el navegador como fuente de cobro.
+
+## Ampliación de formatos propuesta (18/10/2026)
+
+La migración será de **un solo cotizador**, sin alternativa pública paralela. La entrada de impresiones debe presentar «Subí tus archivos para imprimir» y poder procesar una mezcla de:
+
+- **PDF**: leer conteo de páginas y tamaños, validar otra vez la versión efectivamente recibida en el backend.
+- **JPG/JPEG y PNG**: una imagen equivale inicialmente a una unidad/página de impresión, con opción de seleccionar formato final A4/A3, copias, escala/ajuste y papel; advertencia de baja resolución (PPI efectivo). Si se admite imponer varias imágenes en una misma hoja, debe ser una modalidad explícita con vista previa y cotización separada, sin suponer que «una imagen = una hoja» para siempre.
+- **Word DOCX**: convertir en entorno controlado a PDF para contar las páginas **renderizadas**. No prometer que un DOCX contiene un número fijo de páginas ni contar párrafos/saltos como páginas. El cliente revisa una vista previa de la versión convertida (fuentes, tablas, saltos, márgenes) y aprueba explícitamente esa versión de impresión ANTES del pago total.
+- **DOC antiguo**: compatibilidad deseable, condicionada a prueba de conversión fiel; si no se puede procesar de forma confiable, mostrar un mensaje claro y pedir DOCX/PDF en el mismo cotizador. Rechazar macros/documentos con contenido activo y archivos ilegibles o cifrados.
+- **Almacenamiento y privacidad**: originales y versiones imprimibles solo en recepción privada; no utilizar convertidores públicos ajenos sin aprobación. Evaluar viabilidad de conversión con la infraestructura Google ya disponible, límites/cuotas reales y fidelidad; no inventar una conversión DOCX a PDF dentro de Cloudflare Workers si no puede ejecutarse allí.
+- **Cotización confiable**: el backend vuelve a verificar dimensiones/páginas de los archivos recibidos y calcula con precios vigentes; guarda el manifiesto de originales, PDF renderizado aprobado y parámetros de impresión. No habilitar pago si falta PDF convertido o hay error de lectura.
+- **Pruebas**: PDF de una/muchas páginas, imágenes verticales/horizontales de baja resolución, DOCX con encabezados, fuentes faltantes, tablas y saltos de página, varios archivos heterogéneos, teléfono en reposo, subida interrumpida, edición y reintento sin doble cobro.
+
+Este bloque amplía el alcance funcional **sin desplegar ni autorizar ningún servicio adicional**. La política de ubicación de varias imágenes por hoja debe definirse comercialmente.
 
 ## Secuencia nueva: pedido de PDF con impresión autocalculada
 
