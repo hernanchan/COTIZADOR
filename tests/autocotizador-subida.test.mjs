@@ -57,7 +57,7 @@ function server({lostReplyPart=-1,failedPart=-1,finishOverride=null}={}){
 const file=fakePdf();
 const progress=[];
 const reliable=server({lostReplyPart:0});
-const receipt=await uploadPdfResumable({file,orderId:'WEB-123456',
+const receipt=await uploadPdfResumable({file,orderId:'WEB-123456',fileId:'archivo-1',
  mode:'bn',gateway:reliable.gateway,subtle:webcrypto.subtle,onProgress:p=>progress.push(p)});
 assert.equal(receipt.status,'verified');
 assert.equal(receipt.pages,3);
@@ -67,7 +67,7 @@ assert.equal(reliable.stats().partsAttempted,3); // no reenvía el fragmento que
 assert.equal(progress.at(-1).finishedBytes,file.size);
 
 const interrupted=server({failedPart:1});
-await assert.rejects(()=>uploadPdfResumable({file,orderId:'WEB-123457',
+await assert.rejects(()=>uploadPdfResumable({file,orderId:'WEB-123457',fileId:'archivo-1',
  mode:'color',gateway:interrupted.gateway,subtle:webcrypto.subtle,wait:async()=>{}}),
  /No se pudo confirmar el fragmento 2/);
 assert.equal(interrupted.stats().storedParts,1);
@@ -79,18 +79,18 @@ restartServer.gateway.part=async data=>{
  if(data.index===1&&failOnce){failOnce=false;throw Error('Corte temporal');}
  return originalPart(data);
 };
-const resumeReceipt=await uploadPdfResumable({file,orderId:'WEB-123458',
+const resumeReceipt=await uploadPdfResumable({file,orderId:'WEB-123458',fileId:'archivo-1',
  mode:'bn',gateway:restartServer.gateway,subtle:webcrypto.subtle,wait:async()=>{}});
 assert.equal(resumeReceipt.status,'verified');
 assert.equal(restartServer.stats().storedParts,3);
 
 const notVerified=server({finishOverride:{verified:false,sha256:'no',bytes:file.size,pdfPages:3}});
-await assert.rejects(()=>uploadPdfResumable({file,orderId:'WEB-123459',
+await assert.rejects(()=>uploadPdfResumable({file,orderId:'WEB-123459',fileId:'archivo-1',
  mode:'bn',gateway:notVerified.gateway,subtle:webcrypto.subtle}),
  /no verificó el PDF completo/);
 const bad=new File(['soy un documento word'],'informe.pdf',{type:'application/pdf'});
-await assert.rejects(()=>uploadPdfResumable({file:bad,orderId:'WEB-123460',
+await assert.rejects(()=>uploadPdfResumable({file:bad,orderId:'WEB-123460',fileId:'archivo-1',
  mode:'bn',gateway:server().gateway,subtle:webcrypto.subtle}),/encabezado PDF válido/);
-await assert.rejects(()=>uploadPdfResumable({file,orderId:'WEB-123461',
+await assert.rejects(()=>uploadPdfResumable({file,orderId:'WEB-123461',fileId:'archivo-1',
  mode:'mixto',gateway:server().gateway,subtle:webcrypto.subtle}),/Modalidad de impresión/);
 console.log('OK: fragmentos íntegros, respuesta perdida, reintentos, bloqueo sin verificación y archivos inválidos.');
