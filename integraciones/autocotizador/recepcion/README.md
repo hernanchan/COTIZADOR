@@ -49,6 +49,13 @@ Este receptor **no** forma parte del Apps Script de Polaroids. No se instaló, n
 - El titular reemplazó el código del Worker `saber-documentos-pruebas` por `worker-cloudflare-ensayo-bloqueado.mjs` y confirmó en su URL la respuesta exacta: `{"ok":false,"service":"saber-documentos-pruebas","receptionEnabled":false,"message":"Recepcion de documentos desactivada"}`. **Es una verificación del bloqueo publicada en el Worker, no una conexión comprobada a Google.**
 - Próxima prueba segura: autocontrol de firma HMAC positiva, alterada y vencida ejecutado manualmente en Apps Script con `docsVerifyEnvelope`, sin subir archivos ni exponer secreto. Luego se evaluará el acceso externo con HMAC, autorización de pedidos y límites antes de modificar `Solo yo`.
  
+### Verificación de firmas en Apps Script — confirmación del titular (19/10/2026)
+
+- El titular informó que terminó de ejecutar `probarFirmasDocumentos`, que comprueba en Google Apps Script: firma HMAC-SHA256 correcta aceptada, firma falsificada rechazada y firma con marca de tiempo vencida rechazada. El resultado se conoce por su confirmación «listo»; **no se dispone de los registros de ejecución para auditoría independiente**.
+- Esta prueba usa la propiedad privada `DOCS_RELAY_KEY` en Apps Script, no revela la clave ni prueba aún que el secreto guardado en Cloudflare coincida efectivamente con ella. También **no** demuestra conectividad Worker → Apps Script.
+- Estado operativo conservado: `worker-cloudflare-ensayo-bloqueado.mjs` instalado y devolviendo `receptionEnabled:false`; Apps Script continúa restringido a «Solo yo»; sin cargas externas ni pagos.
+- Próximo componente: widget Turnstile **exclusivo** de documentos (no reutilizar el de Polaroids) en el hostname exacto del ensayo. Instalar su secreto como variable privada `DOCS_TURNSTILE_SECRET` del Worker; la clave pública se incorporará al cliente del ensayo cuando exista esa interfaz. Mantener bloqueos.
+
 ## Preparación requerida para un ensayo real autorizado
 
 1. **Crear un proyecto nuevo de Google Apps Script**, sin copiar encima del existente de Polaroids. Pegar `DocumentosReceiver.gs` y revisar `appsscript.json`. Se deberá ejecutar como titular de Librería Saber y permitir las llamadas HTTP de UrlFetchApp y acceso a Drive. El Web App usa acceso anónimo pero **rechaza todas las llamadas sin firma HMAC del Worker**. Evaluar las restricciones de la cuenta Google antes de instalar.
