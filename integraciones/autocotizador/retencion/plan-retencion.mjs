@@ -69,7 +69,7 @@ export function evaluarRetencionPedido(p,{now=Date.now(),policy=POLITICA_PROPUES
   const due=entregado+policy.diasTrasEntrega*86400000;
   if(nowMs<due)return noBorrar('periodo_de_conservacion',p.orderId);
   if(purged.length)return noBorrar('estado_de_archivos_inconsistente',p.orderId);
-  return {pedido:p.orderId,accion:'papelera',razon:'entregado_y_plazo_cumplido',
+  return {pedido:p.orderId,servicio:p.servicio,accion:'papelera',razon:'entregado_y_plazo_cumplido',
           archivos:active.map(f=>f.id),fechaReferencia:p.deliveredAt};
  }
  if(trashed.length){
@@ -79,7 +79,7 @@ export function evaluarRetencionPedido(p,{now=Date.now(),policy=POLITICA_PROPUES
    return noBorrar('fechas_de_papelera_invalidas',p.orderId);
   if(fechas.some(t=>nowMs<t+policy.diasRecuperacion*86400000))
    return noBorrar('periodo_de_recuperacion',p.orderId);
-  return {pedido:p.orderId,accion:'borrado_definitivo',razon:'plazo_de_resguardo_cumplido',
+  return {pedido:p.orderId,servicio:p.servicio,accion:'borrado_definitivo',razon:'plazo_de_resguardo_cumplido',
           archivos:trashed.map(f=>f.id),fechaReferencia:p.deliveredAt};
  }
  return noBorrar('sin_archivos_que_eliminar',p.orderId);
