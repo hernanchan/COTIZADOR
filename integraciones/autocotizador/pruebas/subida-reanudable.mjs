@@ -5,7 +5,7 @@
  * La implementación de "gateway" debe autenticar orden y subida, verificar hashes
  * de cada fragmento, conservar confirmaciones y validar íntegramente el PDF final.
  */
-export const PDF_UPLOAD_MAX_BYTES = 80 * 1024 * 1024;
+export const PDF_UPLOAD_MAX_BYTES = 20 * 1024 * 1024;
 export const PDF_PART_BYTES = 512 * 1024;
 const HEX = n => n.toString(16).padStart(2, '0');
 export function hexDigest(bytes) {
@@ -55,7 +55,7 @@ export async function uploadPdfResumable({
   if (!file || typeof file.slice !== 'function' ||
       !Number.isSafeInteger(file.size) || file.size < 5 ||
       file.size > PDF_UPLOAD_MAX_BYTES || !/\.pdf$/i.test(file.name||''))
-    throw Error('Seleccioná un PDF válido de hasta 80 MB.');
+    throw Error('Seleccioná un PDF válido de hasta 20 MB.');
   if (typeof orderId !== 'string' || !/^[a-zA-Z0-9_-]{6,100}$/.test(orderId))
     throw Error('Referencia de pedido inválida.');
   if (typeof fileId !== 'string' || !/^[A-Za-z0-9_-]{1,80}$/.test(fileId))
