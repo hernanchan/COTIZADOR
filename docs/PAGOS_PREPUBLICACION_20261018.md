@@ -143,3 +143,20 @@ Se preparó en `integraciones/polaroids/apps-script/validacion-turnstile-dominio
 Se añadió `tests/polaroids-hosts-siteverify.test.mjs`, con casos positivos y negativos; se comprobó la función propuesta ejecutando nueve casos en JS sin acceso externo. Falta ejecutar la prueba formal Node y la prueba real de `start/photo/finish` después de revisar y autorizar la integración en Apps Script. Mantener el flujo apagado si la comprobación falla.
 
 **Prohibido** dar por resuelto Google, modificar la recepción pública o la propiedad global de Turnstile, cobrar, publicar, crear servicios o contratar infraestructura hasta autorización del titular.
+
+## Prueba real confirmada · pedido Polaroids por $3.000
+
+El titular comprobó desde el entorno aislado:
+
+- Recepción de 3 fotos con referencia `POL-1F98C4EF3BEDCCBD14B617EB`; PDF localizado en Drive privado y carrito antiguo de una hoja A4 por $3.000.
+- En el demo separado `/demo/polaroids`, el editor abrió mediante clave de operador y envió 3 fotos; constancia verificada; `/demo/cart-order` calculó $3.000 y `/demo/checkout` generó enlace de Mercado Pago.
+- Pedido de pagos `6d464251-04ea-4c32-b6d8-29c9f287191c`. El operador efectuó pago con comprador de pruebas y no apareció al consultar el Centro de Pedidos inmediatamente.
+- Tras pulsar `Verificar pagos pendientes`, apareció el pedido en el Centro y el operador confirmó que el detalle es correcto. **Pago, conciliación manual, referencia y panel funcionaron en ese ensayo.**
+
+### Conciliación autónoma: estado y siguiente verificación
+
+- `integraciones/mercadopago/pruebas/wrangler.toml` incluye `[triggers] crons = ["*/10 * * * *"]`; `worker.js` tiene `scheduled()` y llama a `syncPendingPayments()`. La cadencia **es cada 10 minutos**, no instantánea.
+- Que el pago no se viera inicialmente NO demuestra por sí solo un fallo del cron: la ejecución pudo no haber llegado aún, el trigger podría no estar instalado, o la notificación webhook podría haberse demorado o rechazado.
+- Se amplió `tests/pagos-integral.test.mjs` para ejercitar `scheduled()` en una base y API simuladas ante ausencia de webhook, y comprobar luego que el botón manual no duplica el registro. **La suite Node debe ejecutarse para confirmar el cambio de prueba**; esto no verifica la programación instalada remotamente.
+- Verificación remota **de solo lectura**: abrir Cloudflare Dashboard → Workers & Pages → Worker `saber-pagos-pruebas` → Settings → Triggers → Cron Triggers y confirmar `*/10 * * * *`; después ver en Observability/Logs invocaciones cron y errores. No desplegar, reconfigurar ni cambiar secretos sin aprobación. El demo `/demo` dispone de auditoría de notificaciones con `DEMO_ADMIN_KEY`; evitar divulgar claves.
+- No efectuar otro cobro para diagnosticar la activación. Si el cron está ausente o falla, documentar primero el hecho; habilitarlo será una acción separada de la futura publicación al público.
