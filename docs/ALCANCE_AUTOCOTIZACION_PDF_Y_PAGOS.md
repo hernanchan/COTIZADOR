@@ -2,13 +2,17 @@
 
 Estado: definición funcional y técnica, **no implementación publicada**. Registrar esta decisión antes de continuar la integración. Rama aislada `pagos/mercadopago-checkout-pro-pruebas-20261017`.
 
-## Decisión comercial principal
+## Decisión comercial definitiva (corrección de alcance)
 
-**Preservar el circuito que ya funciona.** El cotizador habitual y el editor Polaroids podrán seguir con presupuesto actual, **seña del 50 %** y envío de comprobante por WhatsApp como hasta ahora. No forzar el checkout de Mercado Pago sobre los servicios tradicionales hasta que exista una alternativa de autoservicio completamente verificada.
+**MIGRACIÓN TOTAL DEL COTIZADOR EXISTENTE, NO DOS COTIZADORES EN PARALELO.**
 
-**Nueva modalidad específica:** el cliente sube uno o más **archivos PDF**, el sistema **lee y verifica el número de páginas**, hace las preguntas necesarias sobre cómo imprimirlos, calcula una cotización exacta con las reglas comerciales vigentes y, una vez aprobada por el cliente y recibidos de forma segura los archivos, ofrece **pago del 100 % a través de Mercado Pago**. Solo un pago confirmado por el backend habilita la orden para producción en el Centro de Pedidos.
-
-No tratar esta distinción como seña vs. pago completo del mismo botón: son **dos flujos de compra distintos**. No cambiar `main`, el carrito público ni mensajes de WhatsApp sin autorización expresa.
+- Mantener una sola entrada, interfaz y carrito de cotización. En el módulo de **impresión de documentos**, reemplazar obligatoriamente «Páginas del documento» (dato manual que los clientes suelen desconocer) por **«Subí tus archivos PDF»**. El sistema cuenta las páginas de cada archivo y permite elegir las opciones de impresión; no se ofrece a los clientes una versión antigua y otra nueva para esta operación.
+- **Reutilizar el motor de precios, servicios, promociones y experiencia existente**; migrar la aplicación que ya funciona, no crear un producto comercial duplicado. Los módulos que no usan PDF (fotos, stickers, ploteo, etc.) no se eliminan por esta decisión; definir su tratamiento e integración caso por caso para mantener un único cotizador.
+- Después de contar páginas, el sistema solicita **los requisitos que alteran la cotización** (A4/A3, B/N/color, papel, simple/doble faz, número de copias, anillado y otras condiciones vigentes); calcula y detalla el precio de manera automática y requiere confirmación.
+- Para el pedido automático de PDF con archivos recibidos y validados, se prepara **pago del 100 % mediante Mercado Pago**. No se cobra con base en el número de páginas ni importes declarados desde el navegador: validación y cálculo final del lado servidor.
+- La operativa anterior de seña/comprobante por WhatsApp solo podrá mantenerse **temporalmente mientras el nuevo cotizador permanezca apagado**, o para servicios/escenarios expresamente acordados; **no debe aparecer como otro cotizador alternativo al publicar la migración**. No imponer una migración de precio o pago a los demás servicios sin acordar sus reglas.
+- Para archivos problemáticos o trabajos sin reglas automáticas verificables, se muestra una **salida asistida desde el mismo cotizador** (por ejemplo, revisión humana), sin inventar un monto ni derivar al «cotizador viejo».
+- La sustitución en `main` será **atómica y reversible** al final de las pruebas, con autorización expresa. Durante el desarrollo mantener el cotizador público funcionando como hoy; la prohibición de coexistencia aplica al **lanzamiento final**, no a la necesidad de una rama de pruebas.
 
 ## Código y reglas existentes a reutilizar
 
@@ -18,7 +22,7 @@ No tratar esta distinción como seña vs. pago completo del mismo botón: son **
 
 ## Secuencia nueva: pedido de PDF con impresión autocalculada
 
-1. El cliente selecciona «Imprimir mis PDF» y carga uno o más documentos. Se muestran nombre, páginas verificadas por archivo, total, progreso y advertencias si un PDF está cifrado, dañado, protegido o presenta dimensiones/páginas mixtas.
+1. Desde el **cotizador único** de Librería Saber, el cliente entra en «Impresiones», encuentra «Subí tus archivos PDF» en lugar de «Páginas del documento» y carga uno o más documentos. Se muestran nombre, páginas verificadas por archivo, total, progreso y advertencias si un PDF está cifrado, dañado, protegido o presenta dimensiones/páginas mixtas.
 2. Preguntar **tamaño de salida (A4/A3)**, **B/N o color**, **papel/material** cuando corresponda, **simple o doble faz**, **cantidad de copias**, **anillado** y cualquier opción que cambie el presupuesto. Considerar opción de selección por archivo cuando se suben varios; no inferir automáticamente color comercial por una imagen que parezca color.
 3. Aplicar las escalas, promociones y condiciones vigentes del cotizador. Páginas por archivo y de impresión calculadas; separar páginas de **hojas físicas** cuando es doble faz; anillado por ejemplar y límites por servicio deben verificarse contra reglas vigentes.
 4. Mostrar detalle: archivo, páginas, copias, formato, papel, caras, extras, tarifa/escala, descuento, total. Confirmación explícita antes de pasar a pagar el 100 %.
@@ -29,7 +33,7 @@ No tratar esta distinción como seña vs. pago completo del mismo botón: son **
 
 ## Alcance inicial razonable
 
-Empezar con **PDF de documentos comunes A4/A3**, B/N o color completo por documento, simple/doble faz, copias, papeles compatibles y anillado. Considerar luego impresiones con mezcla de color por páginas, rangos diferentes, archivo muy grande o tamaño mixto, folletos, ploteos, materiales especiales. Para casos fuera de reglas confiables, derivar al **cotizador/WhatsApp existente**, nunca cobrar una cifra inventada.
+Migrar primero **impresión de documentos PDF A4/A3** (B/N o color completo por documento, simple/doble faz, copias, papel, anillado) **dentro del mismo cotizador**. Después completar la integración de los otros servicios en la misma interfaz. Para impresiones fuera de reglas confiables, ofrecer **revisión humana dentro del mismo proceso**; nunca pedir páginas manualmente como sustituto silencioso ni derivar a otro cotizador.
 
 ## Riesgos/criterios de salida
 
@@ -39,8 +43,8 @@ Empezar con **PDF de documentos comunes A4/A3**, B/N o color completo por docume
 - Manejar interrupciones de carga y teléfono en reposo; no prometer recepción hasta obtener confirmación de Google/servidor. Proteger archivos privados (sin URL pública para clientes) y definir plazo de conservación.
 - Probar múltiples PDF, 1/2/3/60/200+ páginas, archivos corruptos, tamaño mixto, doble faz con páginas impares, anillado, reintentos, pagos repetidos, errores de Google, Mercado Pago y recepción de PDFs, desde celular.
 - Configuración/aprobación de créditos y funciones Cloudflare, Turnstile, implementación de prueba y planes sin costos no autorizados. Hacer una prueba completa en piloto antes de permitir flujo público.
-- **No publicar** ni cambiar 50 % por 100 % para cotizador actual o Polaroids por el mero hecho de añadir el nuevo módulo. Todos los cambios comerciales y de WhatsApp se coordinarán para el lanzamiento y requerirán aprobación expresa.
+- **No publicar** cambios parciales en la web. El lanzamiento reemplaza la experiencia pública del cotizador como una migración única, con reversión preparada. Modalidades de pago de otros servicios y Polaroids deben acordarse antes de activarlas; no imponer 100 % universal por inferencia. Cambios comerciales y de WhatsApp requieren aprobación expresa.
 
 ## Próxima tarea de ingeniería
 
-Extraer/compartir motor de cotización actual como función pura testeable y configurar catálogo/precios de servidor; desarrollar un prototipo aislado que lea y liste las páginas de PDFs y reciba los parámetros de impresión sin cargar documentos en producción; añadir validación segura y almacenamiento privado, unir a sesión/checkout ya probado. **No desplegar automáticamente, no modificar main**.
+Extraer/compartir motor de cotización actual como función pura testeable y precios validados en servidor; **migrar el mismo módulo `renderPrint()`** desde el campo manual `pages` hacia carga y conteo PDF, manteniendo el resto de la interfaz y carrito. Prototipar aislado, incorporar recepción protegida de PDF y comprobación servidor, unir al checkout ya probado y ejecutar ensayos de extremo a extremo. Antes del despliegue final definir el flujo de todos los módulos y el cambio coordinado. **No desplegar automáticamente ni modificar `main` sin aprobación**.
