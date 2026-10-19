@@ -64,6 +64,13 @@ Este receptor **no** forma parte del Apps Script de Polaroids. El titular instal
 - Pruebas en simulación con API externa falsificada: rutas de documentos GET/POST/DELETE **503**; GET `/prueba-turnstile` **200** con página HTML; POST con token verificado simulado **200** `{ok:true,receptionEnabled:false}`; POST con origen indebido **403**. Falta implementar en la cuenta del titular y comprobar un token Turnstile real en el navegador.
 - Se mantiene sin cambios `DOCS_UPLOAD_ENABLED=false`, Apps Script «Solo yo», `DOCS_RELAY_KEY`, Polaroids, pagos y web pública. No habilitar recepción externa ni cobro por esta prueba.
 
+### Resultado real de primer intento Turnstile y diagnóstico pendiente — 19/10/2026
+
+- El titular instaló `worker-cloudflare-prueba-turnstile-bloqueado.mjs`, comprobó que la página `/prueba-turnstile` carga y mostró captura donde el **widget Turnstile indica «¡Operación exitosa!»**, pero tras pulsar `Comprobar verificación` el Worker respondió **«La prueba no se pudo validar»**. La comprobación del navegador no equivale a verificación Siteverify; **no se puede afirmar que Turnstile funcione de extremo a extremo**.
+- Se revisó el Worker y se actualizó el mismo archivo de la rama de pruebas para agregar diagnósticos seguros sin exponer secretos, tokens, payloads de Turnstile ni URLs de Google: códigos `origin_or_content_type`, `turnstile_secret_missing`, `token_body_invalid`, `cloudflare_http_error`, `cloudflare_rejected` (con error-codes públicos acotados), `hostname_mismatch`, `action_mismatch`, `cloudflare_unavailable`.
+- La actualización fue validada **por simulación**, con respuestas Siteverify falsas: bloqueo HTTP 503 de GET/POST/DELETE en la raíz, prueba HTML 200, rechazo 403 a origen ajeno, rechazo por secreto inválido, hostname incorrecto y acción incorrecta, aceptación 200 sólo cuando los tres controles coinciden. **Falta que el titular reinstale este archivo actualizado y confirme el diagnóstico real**.
+- La variable `DOCS_UPLOAD_ENABLED` sigue `false`, el bloqueo fijo `INTERNAL_ALLOW_UPLOADS=false` sigue inalterado, Apps Script aún tiene «Solo yo» y no hay subidas externas a Drive.
+
 ## Preparación requerida para un ensayo real autorizado
 
 1. **Crear un proyecto nuevo de Google Apps Script**, sin copiar encima del existente de Polaroids. Pegar `DocumentosReceiver.gs` y revisar `appsscript.json`. Se deberá ejecutar como titular de Librería Saber y permitir las llamadas HTTP de UrlFetchApp y acceso a Drive. El Web App usa acceso anónimo pero **rechaza todas las llamadas sin firma HMAC del Worker**. Evaluar las restricciones de la cuenta Google antes de instalar.
