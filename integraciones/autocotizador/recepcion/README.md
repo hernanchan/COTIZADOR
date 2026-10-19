@@ -100,6 +100,12 @@ Este receptor **no** forma parte del Apps Script de Polaroids. El titular instal
 - **Siguiente paso:** actualizar la versión de la **misma implementación** de Apps Script, conservando «Ejecutar como: Yo» y «Quién tiene acceso: Solo yo». No crear otro receptor, no cambiar a «Cualquiera», no tocar Apps Script de Polaroids. No se espera un ping a través de Cloudflare mientras el acceso siga cerrado.
 - El Worker de documentos conserva `INTERNAL_ALLOW_UPLOADS=false` y `DOCS_UPLOAD_ENABLED=false`. El webhook real y el flujo de pagos todavía no están verificados ni habilitados.
 
+### Cloudflare `/prueba-google` bloqueado correctamente (19/10/2026)
+
+- El titular instaló `worker-cloudflare-ping-google-bloqueado.mjs` en el Worker aislado y configuró `DOCS_PING_ENABLED=false`, conservando `DOCS_UPLOAD_ENABLED=false`.
+- Captura real de `https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-google` con Turnstile verde y respuesta **«NO VALIDADO — diagnóstico: google_ping_disabled. La recepción de PDF continúa desactivada.»**. Se verificó el bloqueo de inicio del `ping`, **no la comunicación desde Worker a Apps Script**.
+- Por diseño, el Apps Script de documentos sigue con «Quién tiene acceso: Solo yo»; Cloudflare sin sesión de Google no puede invocar ese receptor. Para probar un ping firmado se debe habilitar `DOCS_PING_ENABLED=true`, pero además hará falta autorización explícita del titular para modificar únicamente el acceso de **esta implementación de pruebas** a «Cualquiera». El receptor Apps Script sólo admite operación `ping` con HMAC válida, y todas las cargas permanecen bloqueadas; antes de solicitar autorización explicar que el endpoint sería alcanzable públicamente, aunque responda denegación a operaciones no firmadas. No tocar Polaroids ni la web pública.
+
 ## Preparación requerida para un ensayo real autorizado
 
 1. **Crear un proyecto nuevo de Google Apps Script**, sin copiar encima del existente de Polaroids. Pegar `DocumentosReceiver.gs` y revisar `appsscript.json`. Se deberá ejecutar como titular de Librería Saber y permitir las llamadas HTTP de UrlFetchApp y acceso a Drive. El Web App usa acceso anónimo pero **rechaza todas las llamadas sin firma HMAC del Worker**. Evaluar las restricciones de la cuenta Google antes de instalar.
