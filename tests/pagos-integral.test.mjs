@@ -79,8 +79,17 @@ async function webhook(valid=true,age=0){const ts=String(Math.floor(Date.now()/1
  return ctx.worker.fetch(new Request('https://worker.test/webhooks/mercadopago?data.id=100&type=payment',{method:'POST',headers:{'x-signature':'ts='+ts+',v1='+(valid?sig:'0'.repeat(64)),'x-request-id':requestId,'Content-Type':'application/json'},body:'{"type":"payment"}'}),env)}
 assert.equal((await webhook(false)).status,401);assert.equal((await admin('/admin/api/orders')).data.orders.length,0);
 assert.equal((await webhook(true,3600)).status,401);
-// Recuperación si no llegó el webhook: conciliación consulta el pago y registra el mismo pedido.
-const sync=await admin('/demo/sync-pending',{});assert.equal(sync.status,200);assert.equal(sync.data.registered,1);
+// Recuperación SIN botón administrativo: el handler programado procesa el pago aprobado
+// cuando el webhook no llegó. Esta prueba ejercita scheduled(), no confirma el trigger remoto.
+let scheduledTask=null;
+ctx.worker.scheduled({cron:'*/10 * * * *',scheduledTime:Date.now()},env,{
+ waitUntil(promise){scheduledTask=promise}
+});
+assert.ok(scheduledTask&&typeof scheduledTask.then==='function','El evento programado debe registrar su promesa con waitUntil');
+await scheduledTask;
+assert.equal((await admin('/admin/api/orders')).data.orders.length,1);
+// Pulsar el botón después no vuelve a registrar ni duplica el cobro.
+const sync=await admin('/demo/sync-pending',{});assert.equal(sync.status,200);assert.equal(sync.data.registered,0);
 assert.equal((await webhook()).status,200);assert.equal((await webhook()).status,200);
 assert.equal((await customer('status')).data.state,'paid');
 const detail=await admin('/admin/api/order?id='+order.id);assert.equal(detail.data.items.length,2);
@@ -111,5 +120,5 @@ sqlite.prepare('INSERT INTO orders(id,description,amount_ars,deposit_ars) VALUES
 dropResponse=true;assert.equal((await admin('/demo/checkout',{order_id:uncertain})).status,502);
 const createdBefore=posts;const recovered=await admin('/demo/checkout',{order_id:uncertain});
 assert.equal(recovered.status,200);assert.equal(recovered.data.reused,true);assert.equal(posts,createdBefore);
-console.log('PASS integral: proxy → sesión Turnstile → recepción → carrito $13.000 → preferencia única → webhook HMAC → panel privado → devolución; SQL real, aislamiento y rollback.');
+console.log('PASS integral: proxy → sesión Turnstile → recepción → carrito $13.000 → preferencia única → cron automático + webhook HMAC → panel privado → devolución; SQL real, aislamiento y rollback.');
 sqlite.close();
