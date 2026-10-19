@@ -11,10 +11,10 @@ Este receptor **no** forma parte del Apps Script de Polaroids. No se instaló, n
 ## Estado del entorno privado — 19/10/2026
 
 - El titular autorizó preparar el entorno privado de pruebas para **documentos**, sin publicar y sin gastos.
-- Se confirmó que la cuenta de Google Drive conectada es la cuenta comercial de Librería Saber.
-- **Carpeta creada y verificada:** `Librería Saber - Documentos WEB - PRUEBAS`, dentro de Mi unidad, sin compartir con terceros (solo propietario). El ID y enlace de carpeta se mantienen fuera del repositorio y deberán asignarse a la propiedad privada `DOCS_ROOT_FOLDER_ID` una vez creado el proyecto de Apps Script.
+- Se confirmó que el conector Drive de ChatGPT está asociado a `libreriasaber@gmail.com`, **pero el entorno operativo de Polaroids y el nuevo Apps Script de documentos se ejecutan en `dragonesdepoeta@gmail.com`**. No confundir ambas cuentas.
+- Se creó inicialmente una carpeta de documentos en el Drive conectado de `libreriasaber@gmail.com`; **no se utiliza** porque el Apps Script ejecutado por la cuenta operativa no tenía acceso. El titular creó manualmente otra carpeta `LIBRERÍA SABER - DOCUMENTOS WEB - PRUEBAS` en el Drive operativo de `dragonesdepoeta@gmail.com`. Actualizó la propiedad privada `DOCS_ROOT_FOLDER_ID` con el ID correcto. No guardar el identificador operativo ni el secreto en código público.
 - No se ha verificado cuál es el ID/carpeta exacta que utiliza el receptor piloto de Polaroids. **No mover ni reorganizar fotografías existentes.** La estructura propuesta de carpeta general compartida es lógica, no un cambio físico ya efectuado.
-- **Pendiente:** crear proyecto independiente de Google Apps Script, configurar credenciales privadas y relay piloto, probar una transmisión real y luego validador de páginas en servidor. El conector Drive disponible crea carpetas, pero no expone creación/despliegue de Apps Script; no declarar instalados scripts ni rutas.
+- **Comprobación real del titular (19/10, 09:49):** proyecto Apps Script independiente `SABER — RECEPCIÓN DOCUMENTOS — PRUEBAS` creado y `DocumentosReceiver.gs` pegado; manifiesto OAuth preparado; propiedades privadas `DOCS_ROOT_FOLDER_ID` y `DOCS_RELAY_KEY` guardadas. Función local `probarCarpetaDocumentos` terminó correctamente y registró «Carpeta accesible: LIBRERÍA SABER - DOCUMENTOS WEB - PRUEBAS» y «Clave de seguridad configurada correctamente». Esto demuestra **lectura de carpeta y presencia de secreto**, NO escritura, firma validada, subida de archivos ni servicio web desplegado.
 
 ## Preparación requerida para un ensayo real autorizado
 
