@@ -68,13 +68,17 @@ function probarPingDocumentosLocal(){
    throw Error('Se aceptó una firma inválida');
  Logger.log('PRUEBA 2 OK: firma inválida rechazada');
  envelope.timestamp=timestamp-360000;
+ envelope.signature=docsHex(Utilities.computeHmacSha256Signature(
+   envelope.timestamp+'\n'+payloadJson,k));
  var expired=JSON.parse(doPost({postData:{contents:JSON.stringify(envelope)}}).getContent());
  if(expired.ok||expired.receptionEnabled!==false)
    throw Error('Se aceptó una firma vencida');
  Logger.log('PRUEBA 3 OK: firma vencida rechazada');
+ var uploadPayload=JSON.stringify({op:'start'});
+ var uploadSignature=docsHex(Utilities.computeHmacSha256Signature(
+   timestamp+'\n'+uploadPayload,k));
  var blockedUpload=JSON.parse(doPost({postData:{contents:JSON.stringify({
-   timestamp:timestamp,payloadJson:JSON.stringify({op:'start'}),
-   signature:signature
+   timestamp:timestamp,payloadJson:uploadPayload,signature:uploadSignature
  })}}).getContent());
  if(blockedUpload.ok||blockedUpload.receptionEnabled!==false)
    throw Error('Se aceptó una operación de documentos');
