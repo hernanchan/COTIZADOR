@@ -28,7 +28,7 @@ La web pública y el flujo actual de seña por WhatsApp no se interrumpen durant
 
 1. **Carga** — uno o varios archivos PDF, JPG/JPEG o PNG. Mostrar nombre, tamaño, páginas o imágenes detectadas, progreso y error específico si es corrupto/protegido. Si el usuario intenta subir DOC/DOCX, explicar cómo exportarlo a PDF en Word y pedir que revise el PDF antes de subirlo; no convertir Word dentro del sitio.
 2. **Identificación del servicio** — el usuario elige documento, foto/composición, CAD/planos, póster u otro servicio; sugerir formato desde el archivo pero **no decidir sin consentimiento el tamaño final** ni el tipo CAD vs. póster.
-3. **Preguntas de impresión** — pedir solo parámetros aplicables. A4/A3 y ploteo; B/N/color; papel compatible; simple/doble faz; distribución de imágenes 1/2/4/9; orientación; ajuste sin recortar o rellenar/recortar, con vista previa; cantidad de copias/juegos; extras como anillado.
+3. **Preguntas de impresión** — pedir solo parámetros aplicables. Para documentos comenzar con tamaño A4/A3, papel, simple/doble faz y copias; después solicitar por separado los PDF íntegros B/N y los PDF íntegros color, y **recién entonces** el anillado juntos/separados/mixto, con orden de montaje explícito. Para imágenes, distribución 1/2/4/9, orientación y ajuste/recorte con vista previa. Cambios de opciones pueden recalcular automáticamente.
 4. **Previsualización fiel** — mostrar hojas finales, páginas por cara, orden, recortes, bordes/márgenes, cantidad de hojas y calidad de imágenes. Si el PDF proviene de Word, mostrar las páginas del propio PDF que el cliente exportó y revisó; no crear otra conversión. En documentos vectoriales grandes, mostrar dimensiones finales.
 5. **Cotización** — mostrar **precio detallado por producto/trabajo**, escala por cantidad, material, extras, promociones compatibles, subtotal e importe total. El cliente confirma diseño, calidad y precio.
 6. **Recepción privada confirmada** — conservar originales, archivo listo para imprimir (PDF original subido por el cliente o PDF compuesto de imágenes cuando corresponda), parámetros, referencia y manifiesto de integridad. Validación en backend; si el dispositivo duerme/se desconecta, no perder lo que ya llegó. No afirmar «recibido» hasta que el servidor termine.
@@ -44,6 +44,39 @@ La web pública y el flujo actual de seña por WhatsApp no se interrumpen durant
 - **Word (.doc/.docx): no se admite directamente en el cotizador.** El cliente debe abrirlo en su programa, seleccionar «Archivo → Guardar como / Exportar → PDF», revisar tipografías, saltos de página, márgenes, tablas y cantidad de páginas en el PDF generado y **subir ese PDF**. Mostrar una ayuda breve en la interfaz. Si no consigue exportarlo, podrá solicitar asistencia desde el mismo cotizador; nunca cobrar automáticamente un Word sin convertir.
 - **Copias, caras y hojas:** diferenciar **páginas de archivo**, **caras impresas** y **hojas físicas**. En simple faz, hojas por juego = caras. En doble faz, hojas por juego = techo(caras/2). Los juegos deben conservarse separados si se requiere. La tarifa del cotizador actual debe validarse según la base efectiva usada por cada producto antes de automatizar el cobro.
 - **Extras:** anillado según límites por ejemplar y tamaño, y otras opciones únicamente cuando existan tarifas verificadas. Mantener las promociones legítimas sin aplicarlas dos veces.
+
+### 4.1 bis. Subida por tandas B/N y color; anillado conjunto, separado o mixto (decisión del 18/10/2026)
+
+**Regla comercial obligatoria:** se admite una mezcla de trabajos B/N y color en **un mismo pedido**, pero **cada PDF completo se imprime en una sola modalidad**: o B/N o color. Nunca presupuestar «páginas 1 a 5 B/N y 6 a 10 color» dentro de un solo PDF de forma implícita. Si el cliente quiere modalidades diferentes para páginas de un documento, debe preparar y subir **archivos PDF separados** para cada modalidad. No inferir modalidad automáticamente por el contenido ni tratar como color solo las páginas que parezcan coloreadas.
+
+**Recorrido guiado para documentos:**
+
+1. Preguntar tamaño final (A4/A3, o medidas y ruta de ploteo), papel compatible, simple/doble faz y cantidad de copias. Estas son las **opciones iniciales de una tanda**, reutilizables para todos los documentos de la tanda. Permitir abrir una nueva tanda con otras opciones cuando sea necesario, sin salir del cotizador ni crear un carrito paralelo.
+2. Preguntar **«¿Qué archivos querés imprimir en blanco y negro?»** y aceptar uno o varios PDF. Mostrar nombre, páginas detectadas y copias. Si no tiene documentos B/N, puede omitir ese paso.
+3. Preguntar **«¿Qué archivos querés imprimir a color?»** con otro conjunto de uno o varios PDF; también opcional. Especificar color **para todo ese PDF**, incluso si internamente alguna página resulta sin tinta de color.
+4. Mostrar lista única de documentos con etiquetas **B/N** y **Color**, número de páginas, opciones, copias y cantidad física estimada. El cliente puede pasar un archivo completo de B/N a Color (o viceversa), borrarlo, agregar más archivos o ajustar orden; una modificación de modalidad puede obligar a recalcular.
+5. Preguntar al final: **«¿Cómo querés que preparemos el anillado?»** Opciones: **Todos juntos**, **Cada documento por separado**, **Personalizado (mixto)** y **Sin anillar**. En personalizado, el cliente arrastra/asigna archivos a **grupos de anillado** de forma explícita (por ejemplo: archivos 1 y 3 juntos, archivo 2 separado). Debe elegir **el orden de montaje dentro de cada anillado**. Permitir también documentos sueltos no anillados dentro del mismo pedido.
+6. Revisar composición, hojas físicas por juego, límites del anillado, cantidad de anillados/copias, subtotales B/N, color, materiales, acabados y total del carrito. Recalcular en el servidor antes de Mercado Pago.
+7. Al Centro de Pedidos debe llegar un **manifiesto de producción legible, ordenado y sin ambigüedad**, además de originales y PDFs imprimibles por modalidad. No ofrecer un PDF único para imprimir de golpe cuando contiene mezclas de modalidades que requieren pasadas por equipos distintos.
+
+**Invariantes de producción**:
+
+- Cada `documento` incluye identificador estable, PDF recibido y validado, páginas, modo único `bn|color`, tamaño de salida, papel, caras `simple|double`, copias, posición dentro del anillado y referencia al archivo privado.
+- Cada `tanda` agrupa documentos por parámetros de impresión compatibles (tamaño, material, caras, copias) y genera subtrabajos reales separados por modo B/N / Color para impresión eficiente; el modo no se mezcla en un mismo trabajo de impresora.
+- Cada `grupo de anillado` contiene una **lista ordenada de documentos** que puede combinar tandas B/N y color físicamente después de imprimir. Una agrupación «mixta» significa varios grupos personalizados, incluso con documentos sueltos; **no** significa que dentro de un archivo PDF unas páginas sean B/N y otras color.
+- La opción «Todos juntos» exige confirmar el orden de archivos y que las cantidades de copias sean compatibles: por ejemplo, 3 juegos de cada archivo = 3 anillados iguales. Si las cantidades difieren o contienen tamaños/papeles no compatibles, se solicita ajustar la agrupación o revisión asistida antes de cobrar.
+- **Doble faz y transiciones:** para un anillado conjunto B/N + Color, **no cruzar automáticamente** un archivo/tanda a la cara posterior de otro. Insertar separaciones/hojas vacías necesarias solo conforme a una imposición confirmada y visible; no perder la alineación ni alterar el orden del documento. Registrar hojas físicas reales por documento, por ejemplar y por anillado, evitando cobrar caras impresas inexistentes.
+- **Anillados:** tarifar por tamaño y capacidad del grupo terminado, contabilizando la cantidad total de ejemplares a anillar y hojas físicas efectivas, no una tarifa única por pedido. Revisar capacidades/tapas y casos especiales con fuente comercial vigente; no inventar precio.
+- Con varias tandas o módulos en el carrito, la pantalla de pago muestra las líneas de producción y permite una **única operación por el importe total**. Archivos incompletos, agrupaciones indefinidas o cambios de cantidad que invaliden el anillado impiden el cobro hasta que se resuelvan.
+- La ficha del Centro de Pedidos debe distinguir **A. imprimir** (archivos en cada tanda B/N/color y sus parámetros) y **B. armar** (grupos de anillado y orden de intercalado), además de las referencias privadas. El negocio no debe tener que adivinar cuáles archivos se intercalan.
+- Para imágenes JPG/PNG, composición 1/2/4/9 y ploteos, aplicar el mismo principio de configuración por subtrabajo y agrupaciones solo cuando las reglas materiales/técnicas lo permitan.
+
+**Ejemplo de control:**
+Cliente carga `Apunte-A.pdf` B/N 12 págs., `Apunte-B.pdf` B/N 10 págs., `Láminas.pdf` color 4 págs., todo A4 simple faz, una copia.
+- **Impresión:** 22 caras B/N + 4 caras color (dos trabajos de impresora). **Armado conjunto:** 26 hojas físicas, **un anillado**, en el orden que elija el cliente.
+- **Armado separado:** 3 anillados, con 12, 10 y 4 hojas respectivamente.
+- **Personalizado:** puede reunir `Apunte-A` y `Láminas` en un anillado de 16 hojas y entregar `Apunte-B` sin anillar, por ejemplo.
+- El total B/N + color se calcula por sus propias escalas; el acabado cambia según cuántos grupos/ejemplares se confeccionen.
 
 ### 4.2 JPG/PNG: ejemplo que define el producto
 
