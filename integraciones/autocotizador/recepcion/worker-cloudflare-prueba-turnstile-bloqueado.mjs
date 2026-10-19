@@ -206,6 +206,8 @@ function testPage(env){
         ? 'PRUEBA EXITOSA: Turnstile validado por Cloudflare. La recepción continúa desactivada.'
         : 'NO VALIDADO — diagnóstico: '+String(value.reason || 'sin_diagnostico')+
           (Array.isArray(value.codes)&&value.codes.length ? ' ('+value.codes.join(', ')+')' : '')+
+          (value.kind ? ' ['+value.kind+']' : '')+
+          (value.httpStatus ? ' [HTTP '+value.httpStatus+']' : '')+
           '. La recepción de PDF continúa desactivada.';
     }catch(_){out.textContent='No se pudo completar la consulta.';}
     window.turnstile?.reset();
@@ -241,28 +243,45 @@ async function testTurnstilePost(request,env){
     if(typeof data.token!=='string'||data.token.length<10||data.token.length>2048)
       throw Error('token');
   }catch(_){return testResponse({ok:false,reason:'token_body_invalid',receptionEnabled:false},400);}
+  // Igual que el ejemplo oficial Cloudflare Workers: FormData y POST Siteverify.
+  // Diagnósticos por etapas; nunca mostrar datos del token ni del secreto.
+  const form=new FormData();
+  form.append('secret',env.DOCS_TURNSTILE_SECRET);
+  form.append('response',data.token);
+  let r;
   try{
-    const form=new URLSearchParams({secret:env.DOCS_TURNSTILE_SECRET,response:data.token});
-    const r=await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify',{
-      method:'POST',body:form,redirect:'error',signal:AbortSignal.timeout(15000)
+    r=await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify',{
+      method:'POST',body:form
     });
-    if(!r.ok)return testResponse({ok:false,reason:'cloudflare_http_error',receptionEnabled:false},403);
-    const v=await r.json();
-    if(v?.success!==true){
-      const allowedCodes=['missing-input-secret','invalid-input-secret',
-        'missing-input-response','invalid-input-response',
-        'bad-request','timeout-or-duplicate','internal-error'];
-      const codes=Array.isArray(v?.['error-codes'])
-        ? v['error-codes'].filter(x=>allowedCodes.includes(x)).slice(0,3) : [];
-      return testResponse({ok:false,reason:'cloudflare_rejected',codes,receptionEnabled:false},403);
-    }
-    const permitted=new URL(env.DOCS_ALLOWED_ORIGIN).hostname;
-    if(v.hostname!==permitted)return testResponse({
-      ok:false,reason:'hostname_mismatch',receptionEnabled:false},403);
-    if(v.action!=='documentos')return testResponse({
-      ok:false,reason:'action_mismatch',receptionEnabled:false},403);
-    return testResponse({ok:true,receptionEnabled:false},200);
-  }catch(_){return testResponse({ok:false,reason:'cloudflare_unavailable',receptionEnabled:false},403);}
+  }catch(error){
+    const kind=(error&&error.name==='TypeError')?'type_error':
+      (error&&error.name==='AbortError')?'aborted':'other';
+    return testResponse({ok:false,reason:'siteverify_fetch_failed',kind,receptionEnabled:false},403);
+  }
+  if(!r.ok)return testResponse({
+    ok:false,reason:'siteverify_http_error',httpStatus:r.status,receptionEnabled:false
+  },403);
+  let v;
+  try{v=await r.json();}
+  catch(_){return testResponse({ok:false,reason:'siteverify_invalid_json',receptionEnabled:false},403);}
+  if(!v||typeof v.success!=='boolean')
+    return testResponse({ok:false,reason:'siteverify_unexpected_json',receptionEnabled:false},403);
+  if(v.success!==true){
+    const allowedCodes=['missing-input-secret','invalid-input-secret',
+      'missing-input-response','invalid-input-response',
+      'bad-request','timeout-or-duplicate','internal-error'];
+    const codes=Array.isArray(v['error-codes'])
+      ? v['error-codes'].filter(x=>allowedCodes.includes(x)).slice(0,3) : [];
+    return testResponse({ok:false,reason:'cloudflare_rejected',codes,receptionEnabled:false},403);
+  }
+  let permitted;
+  try{permitted=new URL(env.DOCS_ALLOWED_ORIGIN).hostname;}
+  catch(_){return testResponse({ok:false,reason:'allowed_origin_invalid',receptionEnabled:false},503);}
+  if(v.hostname!==permitted)return testResponse({
+    ok:false,reason:'hostname_mismatch',receptionEnabled:false},403);
+  if(v.action!=='documentos')return testResponse({
+    ok:false,reason:'action_mismatch',receptionEnabled:false},403);
+  return testResponse({ok:true,receptionEnabled:false},200);
 }
 
 export default {
