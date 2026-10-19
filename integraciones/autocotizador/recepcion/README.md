@@ -27,6 +27,14 @@ Este receptor **no** forma parte del Apps Script de Polaroids. No se instaló, n
 - **Inspección visual adicional confirmada por el titular:** abrió el PDF dentro de la subcarpeta `WEB-PRUEBA-...` en el Drive de `dragonesdepoeta@gmail.com` y confirmó que se ve correctamente. No se inspeccionó directamente desde este conector: la cuenta de Drive conectada a ChatGPT es distinta.
 - **Siguiente paso**: configurar relay piloto separado en Cloudflare, inicialmente apagado. No cambiar todavía acceso «Solo yo» de Apps Script ni tocar el receptor de Polaroids. Antes de probar una llamada externa habrá que revisar autorización, aislamiento, límites y protección del endpoint.
 
+### Cloudflare: entorno aislado creado y bloqueado — 19/10/2026
+
+- El titular creó un Worker independiente llamado `saber-documentos-pruebas`, sin conexión a la web pública ni a los Workers de Polaroids o pagos.
+- Inicialmente fue implementado con el ejemplo `Hello World`; luego, siguiendo instrucciones, sustituyó el código por un receptor **cerrado** que devuelve siempre HTTP 503 con JSON `{"ok":false,"service":"saber-documentos-pruebas","receptionEnabled":false,"message":"Recepcion de documentos desactivada"}`.
+- El titular abrió la URL de Worker y **confirmó exactamente esa respuesta**. Eso verifica bloqueo de recepción en el Worker de prueba, **no** conectividad Worker–Apps Script ni subida a través del navegador.
+- Siguiente paso: instalar `DOCS_RELAY_KEY` como **secreto privado de Cloudflare** usando la misma clave ya guardada en las propiedades del Apps Script de `dragonesdepoeta@gmail.com`, **sin enviarla al chat ni a GitHub**. Mantener el código del Worker desactivado y el Apps Script con acceso `Solo yo` por ahora.
+- No cambiar el acceso de Apps Script a público antes de revisar el puente firmado de extremo a extremo y la configuración de seguridad; no introducir pagos ni publicación del cotizador en esta etapa.
+
 ## Preparación requerida para un ensayo real autorizado
 
 1. **Crear un proyecto nuevo de Google Apps Script**, sin copiar encima del existente de Polaroids. Pegar `DocumentosReceiver.gs` y revisar `appsscript.json`. Se deberá ejecutar como titular de Librería Saber y permitir las llamadas HTTP de UrlFetchApp y acceso a Drive. El Web App usa acceso anónimo pero **rechaza todas las llamadas sin firma HMAC del Worker**. Evaluar las restricciones de la cuenta Google antes de instalar.
