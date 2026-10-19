@@ -29,6 +29,20 @@ Para verificar precios con Node moderno:
 
 El cálculo puro se ejecutó con las tablas del repositorio: (a) 12 + 10 páginas B/N y 4 a color, juntas, (b) las mismas separadas y con dos juegos, (c) combinación mixta con doble faz, (d) solo B/N en A3, (e) rechazos por archivos duplicados, modalidad B/N/color inválida, páginas nulas y anillado mayor que la capacidad. Pasaron 8 escenarios, además de comprobarse que los scripts de la página son sintácticamente válidos. **No equivale a prueba de navegador ni de subida real de PDF.**
 
+## Tercera iteración: receptor independiente preparado, SIN ACTIVAR
+
+El 19/10/2026 se añadieron componentes para un receptor **nuevo**, independiente del Apps Script y del proxy de Polaroids:
+
+- `integraciones/autocotizador/recepcion/DocumentosReceiver.gs`: Google Apps Script con mensajes firmados HMAC, carpeta privada por pedido, sesión Drive resumable de 512 KiB, relectura del PDF recibido y comparación de bytes/SHA-256. **No instalado**.
+- `integraciones/autocotizador/recepcion/worker-documentos.mjs`: relay Cloudflare **sin ruta activa**, que por defecto responde «Recepción desactivada» y exige origen piloto, Turnstile e integridad HMAC. **No desplegado**.
+- `integraciones/autocotizador/pruebas/gateway-documentos-http.mjs`: adaptador HTTP para llamadas de inicio, estado, partes y cierre. **No conectado al editor todavía**.
+- `tests/autocotizador-documentos-receptor.test.mjs`: regresión Node con Drive y Apps Script simulados. Se realizó **separadamente** una prueba equivalente en memoria que pasó inicio idempotente, una parte, consulta de estado, SHA de los bytes recibidos y rechazo de sesión incorrecta; este archivo Node debe ejecutarse en el repo antes de instalación.
+- Piloto limitado a **20 MiB por PDF**, durante pruebas; no son todavía las condiciones comerciales finales. Configuración y advertencia en la página de ensayo alineadas con este límite.
+
+**Corte de seguridad importante:** el cierre solo devuelve `received:true, verified:false, pdfPages:null` hasta que se incorpore un lector de PDF fiable **en servidor**. Por tanto esta fase **no permite cobrar ni liberar pedidos**. Es una medida intencional, no un fallo de la conexión. No atribuir pruebas de Google reales a simulaciones.
+
+Antes del ensayo autorizado se necesita un proyecto Apps Script NUEVO, carpeta privada de documentos y secretos nuevos que no se compartan con Polaroids, junto con una ruta Worker piloto. No se requiere R2 ni ninguna contratación. Ver `integraciones/autocotizador/recepcion/README.md` para el procedimiento completo.
+
 ## Segunda iteración: transporte recuperable y ficha de recepción (19/10/2026)
 
 Código preparado en esta misma rama, sin conexión externa y sin ningún despliegue:
