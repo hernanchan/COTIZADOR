@@ -75,3 +75,15 @@ CREATE TABLE IF NOT EXISTS checkout_attempts (
  order_id TEXT PRIMARY KEY,
  started_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Estado del último disparo AUTOMÁTICO. No cuenta sincronizaciones manuales.
+-- Una sola fila, sin guardar tokens ni datos personales.
+CREATE TABLE IF NOT EXISTS cron_health (
+ id INTEGER PRIMARY KEY CHECK(id=1),
+ started_at TEXT,
+ finished_at TEXT,
+ status TEXT NOT NULL CHECK(status IN ('running','ok','errors','failed')),
+ checked INTEGER NOT NULL DEFAULT 0,
+ registered INTEGER NOT NULL DEFAULT 0,
+ errors INTEGER NOT NULL DEFAULT 0
+);
