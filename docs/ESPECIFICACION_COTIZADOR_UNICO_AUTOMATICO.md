@@ -143,6 +143,16 @@ Para **cuatro imágenes distintas**:
 - Falta una recepción genérica para PDF/JPG/PNG con manifiesto y carpeta por pedido; enlace privado del panel a Drive (o descarga autenticada), agrupación B/N/color y ficha imprimible. Probar acceso con cuenta operador autorizada; jamás publicar enlaces privados en el carrito.
 - Esta sección es **especificación, no implementación**, y no autoriza tocar producción, habilitar recepción pública ni incurrir en gastos.
 
+### Actualización del Centro de Pedidos y tolerancia operativa a demoras
+
+**Decisión comercial (18/10/2026):** la confirmación en tiempo real es deseable, **pero no condición excluyente para publicar** si el mecanismo más fiable exige demoras. Orden de recuperación:
+1. **Webhook Mercado Pago**, autenticado y verificado contra la API de pagos del proveedor, para registrar pronto los cobros aprobados.
+2. **Conciliación automática cada 10 minutos** como respaldo cuando la notificación no llega. La programación está configurada en el piloto, pero su ejecución autónoma debe verificarse técnicamente, sin prometer una demora exacta hasta completar la prueba.
+3. **Acción administrativa «Verificar pagos pendientes»** para forzar una conciliación cuando el negocio quiera comprobar un pedido antes del siguiente ciclo; esta opción ya se probó manualmente en el piloto.
+4. **Actualización de pantalla automática opcional** con consulta del estado cada 20–30 segundos mientras el panel esté abierto. **Refrescar la lista NO equivale a verificar el pago ante Mercado Pago**: se debe distinguir «Actualizar lista» de «Verificar pagos pendientes» y comunicarlo al operador.
+
+Requisitos no negociables: no marcar como pagado un pedido por la pantalla de retorno del cliente, por un simple webhook no validado ni por un comprobante; no enviar a producción hasta **pago confirmado por servidor** Y **archivos completos/verificados**. Mostrar claramente `pendiente de verificación` si el comprador pagó pero todavía no tenemos confirmación. No bloquear la migración solo por no lograr latencia de segundos; validar que cron y verificación manual sean **fiables y operables**.
+
 ## 5. Casos límite / reglas de atención
 
 | Caso | Comportamiento esperado |
