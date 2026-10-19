@@ -51,7 +51,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px ui-monospace,monospace
 <fieldset><legend>Acceso privado</legend><div class="toolbar">
 <input type="password" autocomplete="off" id="secret" placeholder="Clave privada del panel" aria-label="Clave privada">
 <button id="refresh">Consultar pedidos</button><button id="sync" class="outline">Verificar pagos pendientes</button>
-</div><p id="status" role="status" aria-live="polite"></p></fieldset>
+</div><p id="status" role="status" aria-live="polite"></p><p id="cronState" class="note">Conciliación automática: sin consultar.</p></fieldset>
 <div class="grid"><fieldset><legend>Pedidos pagados</legend><ol id="orders"></ol></fieldset><fieldset><legend>Detalle del pedido</legend>
 <div id="details">Seleccioná un pedido para ver sus datos y archivos referenciados.</div></fieldset></div>
 <script>
@@ -61,7 +61,17 @@ async function api(path,method="GET"){const r=await fetch(path,{method,headers:{
 function node(tag,txt){const x=document.createElement(tag);x.textContent=String(txt);return x}
 async function showOrder(id){try{status.textContent="Consultando detalle...";const x=await api("/admin/api/order?id="+encodeURIComponent(id));details.replaceChildren();details.append(node("h3","Pedido "+x.order.id));details.append(node("p","Total: "+money(x.order.amount_ars)+" · Aprobado: "+(x.order.paid_at||"sin fecha")));if(!x.items.length){details.append(node("p","Este pedido de prueba anterior no tiene detalle de artículos guardado."))}
 for(const i of x.items){details.append(node("h4",i.quantity+" × "+i.title+" — "+money(i.line_total_ars)));if(i.detail_json)details.append(node("pre",i.detail_json));if(i.file_references_json)details.append(node("pre","Archivos / referencias: "+i.file_references_json))}status.textContent=""}catch(e){status.textContent=e.message}}
-async function refresh(){try{status.textContent="Consultando...";const x=await api("/admin/api/orders");orders.replaceChildren();if(!x.orders.length)orders.append(node("li","Aún no hay pedidos con pago total confirmado."));for(const o of x.orders){const li=node("li",o.description+" · "+money(o.amount_ars)+" · "+(o.paid_at||"sin fecha"));li.append(node("div",o.id));const b=node("button","Ver detalle");b.addEventListener("click",()=>showOrder(o.id));li.append(b);orders.append(li)}status.textContent=x.orders.length+" pedido(s) pagado(s) encontrado(s)"}catch(e){status.textContent=e.message}}
+async function refreshCronState(){
+ const el=document.querySelector("#cronState");
+ try{
+  const info=await api("/admin/api/cron-status");
+  const x=info.lastRun;
+  if(!x){el.textContent="Conciliación automática: todavía sin ejecuciones registradas por esta versión.";return}
+  const fecha=x.finished_at||x.started_at||"sin fecha";
+  el.textContent="Última ejecución automática: "+fecha+" UTC · "+x.status+" · pedidos revisados: "+x.checked+" · registrados: "+x.registered+" · errores: "+x.errors;
+ }catch(e){el.textContent="Conciliación automática: no se pudo consultar el registro."}
+}
+async function refresh(){try{status.textContent="Consultando...";await refreshCronState();const x=await api("/admin/api/orders");orders.replaceChildren();if(!x.orders.length)orders.append(node("li","Aún no hay pedidos con pago total confirmado."));for(const o of x.orders){const li=node("li",o.description+" · "+money(o.amount_ars)+" · "+(o.paid_at||"sin fecha"));li.append(node("div",o.id));const b=node("button","Ver detalle");b.addEventListener("click",()=>showOrder(o.id));li.append(b);orders.append(li)}status.textContent=x.orders.length+" pedido(s) pagado(s) encontrado(s)"}catch(e){status.textContent=e.message}}
 document.querySelector("#refresh").addEventListener("click",refresh);
 document.querySelector("#sync").addEventListener("click",async()=>{try{status.textContent="Verificando pagos en Mercado Pago...";const x=await api("/demo/sync-pending","POST");await refresh();status.textContent+=" · Sincronizados: "+x.registered+" · Errores: "+x.errors}catch(e){status.textContent=e.message}});
 </script></body></html>`;
@@ -291,6 +301,24 @@ async function ensurePaymentReviews(env){
 async function ensureOrderItems(env){
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS order_items (order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,line_number INTEGER NOT NULL CHECK(line_number>=1 AND line_number<=100),item_type TEXT NOT NULL CHECK(item_type IN ('product','print')),sku TEXT,title TEXT NOT NULL,quantity INTEGER NOT NULL CHECK(quantity>0),unit_price_ars INTEGER NOT NULL CHECK(unit_price_ars>0),line_total_ars INTEGER NOT NULL CHECK(line_total_ars>0),detail_json TEXT NOT NULL DEFAULT '{}',file_references_json TEXT NOT NULL DEFAULT '[]',PRIMARY KEY(order_id,line_number))").run();
 }
+// Un solo registro para comprobar la ejecucion automatica, sin Observability ni historial indefinido.
+async function ensureCronHealth(env){
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS cron_health (id INTEGER PRIMARY KEY CHECK(id=1),started_at TEXT,finished_at TEXT,status TEXT NOT NULL CHECK(status IN ('running','ok','errors','failed')),checked INTEGER NOT NULL DEFAULT 0,registered INTEGER NOT NULL DEFAULT 0,errors INTEGER NOT NULL DEFAULT 0)").run();
+}
+async function runScheduledReconciliation(env){
+ await ensureCronHealth(env);
+ await env.DB.prepare("INSERT INTO cron_health(id,started_at,finished_at,status,checked,registered,errors) VALUES(1,datetime('now'),NULL,'running',0,0,0) ON CONFLICT(id) DO UPDATE SET started_at=datetime('now'),finished_at=NULL,status='running',checked=0,registered=0,errors=0").run();
+ try{
+  const summary=await syncPendingPayments(env);
+  await env.DB.prepare("UPDATE cron_health SET finished_at=datetime('now'),status=?,checked=?,registered=?,errors=? WHERE id=1")
+   .bind(summary.errors?"errors":"ok",summary.checked,summary.registered,summary.errors).run();
+  return summary;
+ }catch(error){
+  try{await env.DB.prepare("UPDATE cron_health SET finished_at=datetime('now'),status='failed',errors=1 WHERE id=1").run()}
+  catch(e){console.error("Cron health update failed",String(e?.message||"unknown").slice(0,120))}
+  throw error;
+ }
+}
 async function audit(env,event,detail){
  try{
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS webhook_audit (id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT NOT NULL DEFAULT (datetime('now')), event TEXT NOT NULL, detail TEXT NOT NULL)").run();
@@ -299,7 +327,7 @@ async function audit(env,event,detail){
 }
 export default {
  async scheduled(event,env,ctx){
-  ctx.waitUntil(syncPendingPayments(env).catch(e=>console.error("Scheduled payment sync failed",e?.message||"unknown")));
+  ctx.waitUntil(runScheduledReconciliation(env).catch(e=>console.error("Scheduled payment sync failed",String(e?.message||"unknown").slice(0,120))));
  },
  async fetch(req,env){
   const url=new URL(req.url);
@@ -337,6 +365,12 @@ export default {
   try {
    if(url.pathname.startsWith("/checkout/"))return await customerCheckout(req,env,this);
    // Solo un operador que conoce DEMO_ADMIN_KEY puede preparar un pedido ficticio.
+   if(url.pathname==="/admin/api/cron-status"&&req.method==="GET"){
+    if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+    await ensureCronHealth(env);
+    const lastRun=await env.DB.prepare("SELECT started_at,finished_at,status,checked,registered,errors FROM cron_health WHERE id=1").first();
+    return json({lastRun,periodMinutes:10,note:"Solo ejecuciones programadas; no cuenta las verificaciones manuales."});
+   }
    if(url.pathname==="/admin/api/orders"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
     await ensurePaymentReviews(env);
