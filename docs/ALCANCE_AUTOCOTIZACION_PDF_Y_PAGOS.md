@@ -25,18 +25,48 @@ Estado: definición funcional y técnica, **no implementación publicada**. Regi
 La migración será de **un solo cotizador**, sin alternativa pública paralela. La entrada de impresiones debe presentar «Subí tus archivos para imprimir» y poder procesar una mezcla de:
 
 - **PDF**: leer conteo de páginas y tamaños, validar otra vez la versión efectivamente recibida en el backend.
-- **JPG/JPEG y PNG**: una imagen equivale inicialmente a una unidad/página de impresión, con opción de seleccionar formato final A4/A3, copias, escala/ajuste y papel; advertencia de baja resolución (PPI efectivo). Si se admite imponer varias imágenes en una misma hoja, debe ser una modalidad explícita con vista previa y cotización separada, sin suponer que «una imagen = una hoja» para siempre.
+- **JPG/JPEG y PNG**: el cliente elige formato A4 o A3, papel compatible con ese formato, cantidad de imágenes por hoja **1 (base), 2, 4 o 9**, cantidad de copias y encuadre/ajuste. La aplicación compone y muestra vista previa del PDF de impresión, con alerta de resolución efectiva baja; no cobrar una imagen como si fuera una hoja.
 - **Word DOCX**: convertir en entorno controlado a PDF para contar las páginas **renderizadas**. No prometer que un DOCX contiene un número fijo de páginas ni contar párrafos/saltos como páginas. El cliente revisa una vista previa de la versión convertida (fuentes, tablas, saltos, márgenes) y aprueba explícitamente esa versión de impresión ANTES del pago total.
 - **DOC antiguo**: compatibilidad deseable, condicionada a prueba de conversión fiel; si no se puede procesar de forma confiable, mostrar un mensaje claro y pedir DOCX/PDF en el mismo cotizador. Rechazar macros/documentos con contenido activo y archivos ilegibles o cifrados.
 - **Almacenamiento y privacidad**: originales y versiones imprimibles solo en recepción privada; no utilizar convertidores públicos ajenos sin aprobación. Evaluar viabilidad de conversión con la infraestructura Google ya disponible, límites/cuotas reales y fidelidad; no inventar una conversión DOCX a PDF dentro de Cloudflare Workers si no puede ejecutarse allí.
 - **Cotización confiable**: el backend vuelve a verificar dimensiones/páginas de los archivos recibidos y calcula con precios vigentes; guarda el manifiesto de originales, PDF renderizado aprobado y parámetros de impresión. No habilitar pago si falta PDF convertido o hay error de lectura.
 - **Pruebas**: PDF de una/muchas páginas, imágenes verticales/horizontales de baja resolución, DOCX con encabezados, fuentes faltantes, tablas y saltos de página, varios archivos heterogéneos, teléfono en reposo, subida interrumpida, edición y reintento sin doble cobro.
 
-Este bloque amplía el alcance funcional **sin desplegar ni autorizar ningún servicio adicional**. La política de ubicación de varias imágenes por hoja debe definirse comercialmente.
+Este bloque amplía el alcance funcional **sin desplegar ni autorizar ningún servicio adicional**.
+
+## Integración única: JPG/PNG por hoja y ploteo por tamaño de salida
+
+**Regla principal:** el usuario elige **cómo quiere recibir la impresión**, no el equipo. Se mantienen servicios comerciales separados en el motor tarifario pero unidos en un solo recorrido de carga → opciones → vista previa → precio → pago.
+
+### Imposición de imágenes en A4 / A3
+
+- Formato: A4 (21 × 29,7 cm) o A3 (29,7 × 42 cm), vertical u horizontal.
+- Papel: lista filtrada por disponibilidad y combinaciones reales del cotizador actual; precio extraído de una fuente única validada por servidor.
+- Cantidad por cara: **1, 2, 4 o 9**; 2 = 1×2 o 2×1 según orientación, 4 = 2×2, 9 = 3×3. Vista previa con límites, márgenes, orientación y orden de las imágenes. Se debe permitir **ajustar sin recortar** inicialmente; variante «llenar y recortar» solo si el cliente la aprueba. No deformar las fotos.
+- El cliente elige cantidad de juegos/copias y, si corresponde, doble faz, manteniendo la distinción entre páginas de origen, caras impresas, hojas físicas y juegos. Cuando una impresión incluye 9 imágenes en un A4, el material a cotizar es **una hoja A4**, no nueve.
+- Cálculo de imposición: para N imágenes en una cara, P = imágenes por hoja (1/2/4/9), J = juegos, **caras A4/A3 = techo(N/P) × J**. Si se imprime simple faz, hojas = caras; para doble faz, hojas por juego = techo((techo(N/P))/2), sin juntar el final de un juego con el inicio del siguiente salvo elección expresa. Tarifa vigente **según caras/hojas y material**: confirmar unidades que espera el motor de precios antes de cobrar.
+- Preservar archivos originales en privado y generar un PDF final de imprenta con la composición exacta confirmada. En fotos con resolución insuficiente, mostrar advertencia clara antes de que el cliente apruebe.
+- Definir orden de imágenes, repetición de una imagen en la hoja, rotación y márgenes de corte durante el diseño; nunca asumir que «2/4/9» significa copias idénticas en lugar de imágenes distintas.
+
+### Paso a ploteo: solicitado más grande que A3
+
+- Si las **medidas finales solicitadas** no entran en ninguna orientación de A3 (es decir, no cumplen lado menor ≤ 29,7 cm y mayor ≤ 42 cm), cambiar internamente a **servicio de ploteo**. No decidir por los píxeles del JPG/PNG ni por el tamaño interno del PDF sin consultar al cliente.
+- En el mismo flujo solicitar ancho y alto de impresión en cm, número de copias, material compatible y «Plano / líneas» vs «Póster / imagen plena», según la naturaleza declarada del trabajo.
+- Reutilizar el cálculo vigente de `renderPlot()` y `cfg.plotter.supports`: rollos disponibles 42/60/90 cm y recubiertos cuando aplique, orientación y largo lineal factible, redondeo y promociones correspondientes. Si excede el rollo disponible, no inventar un precio; ofrecer revisión humana **dentro del cotizador único**.
+- Vista previa con proporción y escala, resolución de imagen efectiva a tamaño real y orientación elegida; conservar el archivo recibido para impresión privada.
+- **No aplicar automáticamente el modo 2/4/9 imágenes por hoja a ploteos de gran formato:** requiere lógica específica de imposición en rollo y tarifas antes de habilitarse.
+- Todas las cotizaciones y conversiones deben validarse de nuevo **en servidor** antes del pago del 100 % por Mercado Pago.
+
+### Criterios de prueba nuevos
+
+- Imágenes: 1, 2, 3, 4, 5, 8, 9, 10, 18 y 19 JPG/PNG; cantidades por hoja 1/2/4/9; A4/A3, orientaciones, bordes, tamaños mixtos, DPI advertido y copias repetidas. Una imagen nunca debe contabilizarse accidentalmente como una hoja entera cuando se eligió imposición.
+- Plotter: A3 exacto (todavía A3), apenas mayor que A3, A2/A1/A0, papel obra/recubierto, CAD/póster, cambio de orientación, largo y ancho máximos. Comprobar que el precio de rollo coincide con `renderPlot()` y que los límites físicos se cumplen.
+- Archivos mixtos PDF/JPG/PNG/Word: separar unidades y páginas por producto, presentación del presupuesto conjunto y conservación de originales/derivados.
+
 
 ## Secuencia nueva: pedido de PDF con impresión autocalculada
 
-1. Desde el **cotizador único** de Librería Saber, el cliente entra en «Impresiones», encuentra «Subí tus archivos PDF» en lugar de «Páginas del documento» y carga uno o más documentos. Se muestran nombre, páginas verificadas por archivo, total, progreso y advertencias si un PDF está cifrado, dañado, protegido o presenta dimensiones/páginas mixtas.
+1. Desde el **cotizador único** de Librería Saber, el cliente entra en «Impresiones», encuentra «Subí tus archivos para imprimir» en lugar de «Páginas del documento» y carga uno o más documentos. Se muestran nombre, páginas verificadas por archivo, total, progreso y advertencias si un PDF está cifrado, dañado, protegido o presenta dimensiones/páginas mixtas.
 2. Preguntar **tamaño de salida (A4/A3)**, **B/N o color**, **papel/material** cuando corresponda, **simple o doble faz**, **cantidad de copias**, **anillado** y cualquier opción que cambie el presupuesto. Considerar opción de selección por archivo cuando se suben varios; no inferir automáticamente color comercial por una imagen que parezca color.
 3. Aplicar las escalas, promociones y condiciones vigentes del cotizador. Páginas por archivo y de impresión calculadas; separar páginas de **hojas físicas** cuando es doble faz; anillado por ejemplar y límites por servicio deben verificarse contra reglas vigentes.
 4. Mostrar detalle: archivo, páginas, copias, formato, papel, caras, extras, tarifa/escala, descuento, total. Confirmación explícita antes de pasar a pagar el 100 %.
