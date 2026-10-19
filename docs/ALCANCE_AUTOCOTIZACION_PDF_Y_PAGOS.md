@@ -4,7 +4,7 @@ Estado: definición funcional y técnica, **no implementación publicada**. Regi
 
 ## Decisión comercial definitiva (corrección de alcance)
 
-**MIGRACIÓN TOTAL DEL COTIZADOR EXISTENTE, NO DOS COTIZADORES EN PARALELO.** El cliente podrá cargar PDF, JPG, PNG y, sujeto a conversión/validación, Word; todo desde una sola interfaz.
+**MIGRACIÓN TOTAL DEL COTIZADOR EXISTENTE, NO DOS COTIZADORES EN PARALELO.** El cliente podrá cargar PDF, JPG y PNG desde una sola interfaz. Si tiene Word (DOC/DOCX), deberá exportarlo a PDF y revisarlo antes de subirlo; no se admite Word directamente.
 
 - Mantener una sola entrada, interfaz y carrito de cotización. En el módulo de **impresión de documentos**, reemplazar obligatoriamente «Páginas del documento» (dato manual que los clientes suelen desconocer) por **«Subí tus archivos PDF»**. El sistema cuenta las páginas de cada archivo y permite elegir las opciones de impresión; no se ofrece a los clientes una versión antigua y otra nueva para esta operación.
 - **Reutilizar el motor de precios, servicios, promociones y experiencia existente**; migrar la aplicación que ya funciona, no crear un producto comercial duplicado. Los módulos que no usan PDF (fotos, stickers, ploteo, etc.) no se eliminan por esta decisión; definir su tratamiento e integración caso por caso para mantener un único cotizador.
@@ -26,11 +26,11 @@ La migración será de **un solo cotizador**, sin alternativa pública paralela.
 
 - **PDF**: leer conteo de páginas y tamaños, validar otra vez la versión efectivamente recibida en el backend.
 - **JPG/JPEG y PNG**: el cliente elige formato A4 o A3, papel compatible con ese formato, cantidad de imágenes por hoja **1 (base), 2, 4 o 9**, cantidad de copias y encuadre/ajuste. La aplicación compone y muestra vista previa del PDF de impresión, con alerta de resolución efectiva baja; no cobrar una imagen como si fuera una hoja.
-- **Word DOCX**: convertir en entorno controlado a PDF para contar las páginas **renderizadas**. No prometer que un DOCX contiene un número fijo de páginas ni contar párrafos/saltos como páginas. El cliente revisa una vista previa de la versión convertida (fuentes, tablas, saltos, márgenes) y aprueba explícitamente esa versión de impresión ANTES del pago total.
-- **DOC antiguo**: compatibilidad deseable, condicionada a prueba de conversión fiel; si no se puede procesar de forma confiable, mostrar un mensaje claro y pedir DOCX/PDF en el mismo cotizador. Rechazar macros/documentos con contenido activo y archivos ilegibles o cifrados.
-- **Almacenamiento y privacidad**: originales y versiones imprimibles solo en recepción privada; no utilizar convertidores públicos ajenos sin aprobación. Evaluar viabilidad de conversión con la infraestructura Google ya disponible, límites/cuotas reales y fidelidad; no inventar una conversión DOCX a PDF dentro de Cloudflare Workers si no puede ejecutarse allí.
-- **Cotización confiable**: el backend vuelve a verificar dimensiones/páginas de los archivos recibidos y calcula con precios vigentes; guarda el manifiesto de originales, PDF renderizado aprobado y parámetros de impresión. No habilitar pago si falta PDF convertido o hay error de lectura.
-- **Pruebas**: PDF de una/muchas páginas, imágenes verticales/horizontales de baja resolución, DOCX con encabezados, fuentes faltantes, tablas y saltos de página, varios archivos heterogéneos, teléfono en reposo, subida interrumpida, edición y reintento sin doble cobro.
+- **Word DOCX**: **NO subir ni convertir automáticamente**. La interfaz debe indicar: «En Word: Archivo → Guardar como / Exportar → PDF. Revisá el PDF y después subilo para cotizar». El sistema contará solamente las páginas del PDF que el cliente exportó y revisó.
+- **DOC antiguo**: mismo criterio. No aceptar DOC/DOCX para cálculo automático; si el cliente intenta subirlo, explicar que debe convertirlo a PDF en su programa o solicitar ayuda dentro del mismo cotizador.
+- **Almacenamiento y privacidad**: conservar los PDF e imágenes efectivamente enviados y sus versiones imprimibles solo en recepción privada. No contratar ni integrar convertidores Word; las transformaciones necesarias se limitan a la composición de imágenes para impresión y otras funciones aprobadas.
+- **Cotización confiable**: el backend vuelve a verificar dimensiones/páginas de los PDF realmente recibidos y calcula con precios vigentes; guarda el manifiesto de archivos, versiones compuestas cuando aplique y parámetros de impresión. No habilitar pago si el PDF es inválido, no coincide con la recepción o hay error de lectura.
+- **Pruebas**: PDF de una/muchas páginas, imágenes verticales/horizontales de baja resolución, rechazo amable de DOC/DOCX con guía de exportación a PDF, varios archivos heterogéneos, teléfono en reposo, subida interrumpida, edición y reintento sin doble cobro.
 
 Este bloque amplía el alcance funcional **sin desplegar ni autorizar ningún servicio adicional**.
 
@@ -61,7 +61,7 @@ Este bloque amplía el alcance funcional **sin desplegar ni autorizar ningún se
 
 - Imágenes: 1, 2, 3, 4, 5, 8, 9, 10, 18 y 19 JPG/PNG; cantidades por hoja 1/2/4/9; A4/A3, orientaciones, bordes, tamaños mixtos, DPI advertido y copias repetidas. Una imagen nunca debe contabilizarse accidentalmente como una hoja entera cuando se eligió imposición.
 - Plotter: A3 exacto (todavía A3), apenas mayor que A3, A2/A1/A0, papel obra/recubierto, CAD/póster, cambio de orientación, largo y ancho máximos. Comprobar que el precio de rollo coincide con `renderPlot()` y que los límites físicos se cumplen.
-- Archivos mixtos PDF/JPG/PNG/Word: separar unidades y páginas por producto, presentación del presupuesto conjunto y conservación de originales/derivados.
+- Archivos mixtos PDF/JPG/PNG: separar unidades y páginas por producto, presentar presupuesto conjunto y conservar archivos originales y compuestos. Word se recibe únicamente una vez exportado por el cliente como PDF.
 
 
 ## Secuencia nueva: pedido de PDF con impresión autocalculada
