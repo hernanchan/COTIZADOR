@@ -29,6 +29,26 @@ Para verificar precios con Node moderno:
 
 El cálculo puro se ejecutó con las tablas del repositorio: (a) 12 + 10 páginas B/N y 4 a color, juntas, (b) las mismas separadas y con dos juegos, (c) combinación mixta con doble faz, (d) solo B/N en A3, (e) rechazos por archivos duplicados, modalidad B/N/color inválida, páginas nulas y anillado mayor que la capacidad. Pasaron 8 escenarios, además de comprobarse que los scripts de la página son sintácticamente válidos. **No equivale a prueba de navegador ni de subida real de PDF.**
 
+## Segunda iteración: transporte recuperable y ficha de recepción (19/10/2026)
+
+Código preparado en esta misma rama, sin conexión externa y sin ningún despliegue:
+
+- \`integraciones/autocotizador/pruebas/subida-reanudable.mjs\`: contrato de cliente para subir un PDF en partes de **512 KiB**, con SHA-256 del archivo completo y de cada fragmento. Antes de enviar consulta \`status\` al servidor; si se pierde la respuesta de un envío, consulta de nuevo antes de reintentar. Sólo termina con recibo \`verified:true\`, tamaño y SHA iguales y cantidad de páginas **validada por backend**. No permite usar una respuesta \`202 Dispatched\` como comprobante de recepción.
+- \`integraciones/autocotizador/pruebas/manifiesto-documentos.mjs\`: arma el manifiesto lógico por \`orderId\` vinculando cada PDF con su recibo confirmado, grupo B/N o color, copias, hojas físicas, orden de montaje y grupos de anillado conjuntos, separados o mixtos. Un mismo pedido puede traer 12+10 páginas B/N y 4 color, con las láminas intercaladas en el armado. Rechaza discrepancias de páginas, recibos duplicados/no verificados o pertenecientes a otro pedido.
+- \`tests/autocotizador-subida.test.mjs\`: cliente frente a un **servidor simulado en memoria**, incluyendo respuestas perdidas, reintentos, fragmentos íntegros, prohibición de completar sin verificación y formatos falsos.
+- \`tests/autocotizador-manifiesto.test.mjs\`: tandas separadas y estructura de anillados y recibos.
+
+**Comprobación del protocolo hecha en esta fase:** mediante simulación aislada, un PDF de 512 KiB + resto se transmitió sin reenviar el fragmento cuya respuesta se perdió, y se bloqueó la confirmación cuando el servidor respondió \`verified:false\`. También se comprobó el manifiesto con dos tandas y mezcla de anillados.
+
+**Limitaciones:** todavía no existe \`gateway\` real asociado a Google; estas funciones **no envían archivos** y no se conectaron a la pantalla para no simular una recepción real. Tampoco existe aún una verificación autoritativa de páginas en Apps Script / Worker ni descarga desde Centro de Pedidos. El ensayo de transporte demuestra el protocolo, **no** el funcionamiento en red, cuotas de Google ni navegador móvil.
+
+### Integración pendiente con Google, sin R2
+
+1. Reutilizar el patrón del relay de Polaroids, pero **crear receptor de documentos independiente**, con sus propias operaciones \`start/status/part/finish\`, tamaño máximo, control antiabuso y autenticación de sesión/orden. El receptor anterior acepta fotos y está apagado en producción; no ampliar sus permisos ni sustituir sus claves a ciegas.
+2. En Google Drive privado, crear carpeta o referencias por pedido y usar **carga reanudable de Google Drive** para evitar juntar en memoria un PDF de decenas de megabytes dentro de Apps Script. Comprobar sus cuotas, límites y compatibilidad con la versión efectiva del Script antes de instalarlo. Confirmar realmente la integridad y la lectura del PDF del lado servidor.
+3. Exigir recibo de todos los archivos y manifiesto verificado para habilitar cualquier medio de pago. La aplicación **no puede cobrar** un documento si sólo conocemos la página calculada en el navegador.
+4. Integrar la ficha de B/N, color y anillados y descargas PDF en Centro de Pedidos, con autenticación de operador y vínculo a archivos privados. Confirmar pago total Mercado Pago o transferencia validada manualmente, como ya se acordó.
+
 ## No implementado todavía — exigencias antes de cobrar
 
 1. Leer y validar la misma cantidad de páginas **en backend** del PDF recibido, no confiar en el navegador.
