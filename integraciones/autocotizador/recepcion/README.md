@@ -35,6 +35,8 @@ Este receptor **no** forma parte del Apps Script de Polaroids. No se instaló, n
 - Siguiente paso: instalar `DOCS_RELAY_KEY` como **secreto privado de Cloudflare** usando la misma clave ya guardada en las propiedades del Apps Script de `dragonesdepoeta@gmail.com`, **sin enviarla al chat ni a GitHub**. Mantener el código del Worker desactivado y el Apps Script con acceso `Solo yo` por ahora.
 - No cambiar el acceso de Apps Script a público antes de revisar el puente firmado de extremo a extremo y la configuración de seguridad; no introducir pagos ni publicación del cotizador en esta etapa.
 
+- El titular confirmó que guardó `DOCS_RELAY_KEY` como secreto de Cloudflare en `saber-documentos-pruebas`. El contenido del secreto no fue suministrado ni verificado por ChatGPT; el Worker sigue respondiendo recepción desactivada. **No publicar ni registrar el valor del secreto.**
+
 ## Preparación requerida para un ensayo real autorizado
 
 1. **Crear un proyecto nuevo de Google Apps Script**, sin copiar encima del existente de Polaroids. Pegar `DocumentosReceiver.gs` y revisar `appsscript.json`. Se deberá ejecutar como titular de Librería Saber y permitir las llamadas HTTP de UrlFetchApp y acceso a Drive. El Web App usa acceso anónimo pero **rechaza todas las llamadas sin firma HMAC del Worker**. Evaluar las restricciones de la cuenta Google antes de instalar.
