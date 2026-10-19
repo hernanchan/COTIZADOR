@@ -63,6 +63,12 @@ Código preparado en esta misma rama, sin conexión externa y sin ningún despli
 3. Exigir recibo de todos los archivos y manifiesto verificado para habilitar cualquier medio de pago. La aplicación **no puede cobrar** un documento si sólo conocemos la página calculada en el navegador.
 4. Integrar la ficha de B/N, color y anillados y descargas PDF en Centro de Pedidos, con autenticación de operador y vínculo a archivos privados. Confirmar pago total Mercado Pago o transferencia validada manualmente, como ya se acordó.
 
+## Verificación de continuidad — 19/10/2026
+
+- Comparación en GitHub entre la rama de migración y su rama base: **sin diferencias** en `functions/api/polaroids-receiver.js`, `vidriera/polaroids/editor.html` ni `vidriera/polaroids/recepcion-config.json`. Esta verificación es del código fuente, no del estado de despliegue.
+- Ejecución aislada en JavaScript del cliente de PDF con servidor simulado: archivo de 512 KiB + 37 bytes, dos fragmentos; se simuló pérdida de confirmación del primer fragmento. El cliente consultó `status`, evitó reenviar el fragmento ya recibido y completó con recibo que conserva `orderId` y `fileId`. Un `fileId` vacío se rechazó antes de subir.
+- Estos controles **no son una prueba real de la cuenta Google ni de Apps Script**. La carpeta de documentos existe en Drive y no está compartida; el receptor independiente aún no ha sido instalado ni desplegado.
+
 ## No implementado todavía — exigencias antes de cobrar
 
 1. Leer y validar la misma cantidad de páginas **en backend** del PDF recibido, no confiar en el navegador.
