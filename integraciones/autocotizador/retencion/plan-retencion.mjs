@@ -89,8 +89,9 @@ export function planificarRetencion(pedidos,{now=Date.now(),policy=POLITICA_PROP
  const ids=new Set(),archivos=new Set(),acciones=[];
  for(const p of pedidos){
   const r=evaluarRetencionPedido(p,{now,policy,roots});
-  if(r.pedido&&ids.has(r.pedido))throw Error('Pedido duplicado en inventario.');
-  if(r.pedido)ids.add(r.pedido);
+  const groupId=r.pedido+':'+String(p?.servicio||'desconocido');
+  if(r.pedido&&ids.has(groupId))throw Error('Pedido y servicio duplicados en inventario.');
+  if(r.pedido)ids.add(groupId);
   for(const id of p?.files||[]){
    if(typeof id?.id!=='string')continue;
    if(archivos.has(id.id))throw Error('Archivo asignado a más de un pedido.');
