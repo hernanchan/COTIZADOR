@@ -71,16 +71,7 @@ await assert.rejects(()=>uploadPdfResumable({file,orderId:'WEB-123457',
  mode:'color',gateway:interrupted.gateway,subtle:webcrypto.subtle,wait:async()=>{}}),
  /No se pudo confirmar el fragmento 2/);
 assert.equal(interrupted.stats().storedParts,1);
-interrupted.gateway.part=async data=>{
- const buf=Buffer.from(data.dataBase64,'base64');
- assert.equal(await hex(buf),data.sha256);
- interrupted.gateway.__unused=true;
- // Ésta es una simulación de recuperación; el servidor mantiene los fragmentos anteriores.
- recoveredParts.set(data.index,buf);
- return {accepted:true};
-};
 // Rehacer la prueba de reanudación con servidor común y una caída temporal.
-const recoveredParts=new Map();
 const restartServer=server();
 const originalPart=restartServer.gateway.part;
 let failOnce=true;
