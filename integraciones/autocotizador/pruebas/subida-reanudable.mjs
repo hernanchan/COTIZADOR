@@ -47,7 +47,7 @@ function retryDelay(attempt) {
   return Math.min(2000, 250 * 2 ** attempt);
 }
 export async function uploadPdfResumable({
-  file, orderId, mode, gateway, onProgress = () => {},
+  file, orderId, fileId, mode, gateway, onProgress = () => {},
   signal, subtle = globalThis.crypto?.subtle,
   encoder = globalThis.btoa,
   wait = ms => new Promise(resolve => setTimeout(resolve, ms))
@@ -58,6 +58,8 @@ export async function uploadPdfResumable({
     throw Error('Seleccioná un PDF válido de hasta 80 MB.');
   if (typeof orderId !== 'string' || !/^[a-zA-Z0-9_-]{6,100}$/.test(orderId))
     throw Error('Referencia de pedido inválida.');
+  if (typeof fileId !== 'string' || !/^[A-Za-z0-9_-]{1,80}$/.test(fileId))
+    throw Error('Identificador del archivo inválido.');
   if (!['bn','color','cad','poster'].includes(mode))
     throw Error('Modalidad de impresión inválida.');
   if (!gateway || ['start','status','part','finish'].some(k => typeof gateway[k] !== 'function'))
@@ -72,7 +74,7 @@ export async function uploadPdfResumable({
   // Una petición start repetida debe devolver la MISMA sesión para igual
   // (pedido, SHA, tamaño, modalidad). Si el archivo cambia, el servidor debe
   // abrir una sesión nueva sin mezclar fragmentos anteriores.
-  const meta = {orderId, name:file.name, bytes:file.size,
+  const meta = {orderId, fileId, name:file.name, bytes:file.size,
     sha256:wholeSha, mode, parts, partBytes:PDF_PART_BYTES, mime:'application/pdf'};
   const session = await gateway.start(meta);
   checkSession(session);
@@ -114,7 +116,7 @@ export async function uploadPdfResumable({
   if (completed?.verified !== true || completed.sha256 !== wholeSha ||
       completed.bytes !== file.size || !Number.isSafeInteger(completed.pdfPages) || completed.pdfPages < 1)
     throw Error('El servidor todavía no verificó el PDF completo. No se puede cobrar.');
-  return Object.freeze({orderId, uploadId:session.uploadId,
+  return Object.freeze({orderId, fileId, uploadId:session.uploadId,
     name:file.name, sha256:wholeSha, bytes:file.size, pages:completed.pdfPages,
     receiptId:completed.receiptId||null,status:'verified'});
 }
