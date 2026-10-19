@@ -153,6 +153,26 @@ Para **cuatro imágenes distintas**:
 
 Requisitos no negociables: no marcar como pagado un pedido por la pantalla de retorno del cliente, por un simple webhook no validado ni por un comprobante; no enviar a producción hasta **pago confirmado por servidor** Y **archivos completos/verificados**. Mostrar claramente `pendiente de verificación` si el comprador pagó pero todavía no tenemos confirmación. No bloquear la migración solo por no lograr latencia de segundos; validar que cron y verificación manual sean **fiables y operables**.
 
+### Pago por transferencia bancaria (alternativa en evaluación, no implementada)
+
+**Idea a incorporar si el titular la aprueba:** el cotizador —no Mercado Pago— genera y persiste la orden de compra **antes de presentar cualquier forma de pago**. Tanto Mercado Pago como la transferencia bancaria corresponden a **un único pedido y los mismos archivos**. Las instrucciones y archivos se reciben primero, se validan y quedan en almacenamiento privado, nunca dependientes de una notificación de Mercado Pago.
+
+**Flujo de transferencia bancaria a cuenta propia:**
+1. Cotizar y guardar orden, manifestaciones de archivos PDF/JPG/PNG y composición, detalles de B/N, color, ploteo, anillados y el precio final validado **en servidor**. Asignar ID de pedido no reutilizable.
+2. El cliente elige «Transferencia bancaria» y ve exclusivamente los datos bancarios oficiales confirmados por Librería Saber (alias/CBU/CVU, titular, importe), referencia de pedido e instrucciones. Puede adjuntar un comprobante opcional; un comprobante nunca valida la acreditación.
+3. Estado del sistema: **pendiente de transferencia**, con archivos conservados y orden visible en una **sección administrativa de pendientes**. No mezclar con la lista de **pedidos pagados listos para producir**.
+4. El operador revisa **la acreditación real** en el banco/billetera receptora: importe, moneda, fecha, identificador de operación/remitente cuando estén disponibles y posible duplicado. Solo entonces usa acción administrativa **«Confirmar transferencia recibida»** protegida por autenticación, dejando auditoría de usuario, fecha, importe e identificador de movimiento. No confiar en imágenes/PDF del comprobante.
+5. Tras confirmación administrativa, y solo si los archivos están completos y validados, el pedido cambia a **pagado / listo para producción**; el Centro de Pedidos habilita las descargas PDF, ficha de impresión y anillado como con Mercado Pago.
+6. Para transferencias no recibidas, pagos por importe incorrecto, movimientos ambiguos, duplicados, vencimientos, pedidos cancelados o conciliaciones tardías: **revisión administrativa**, sin autorización automática de producción. Definir plazos de reserva/caducidad y de conservación de archivos antes del lanzamiento.
+7. No obligar al cliente a reenviar archivos ni a usar WhatsApp para avisar o demostrar el pago. Puede ver «Pedido recibido, aguardando acreditación» y recibir aviso cuando se confirme. No prometer confirmación instantánea en transferencias interbancarias.
+8. Evitar dos cobros por el mismo pedido: elección/estado del medio de pago, intentos y transiciones idempotentes. Si el cliente cambia a Mercado Pago tras transferir o paga doble por error, suspender flujo de producción y abrir revisión/reintegro.
+
+**Invariante de datos:** `order_id`, `payment_method=mercadopago|bank_transfer`, `payment_status=pending|confirmed|review|cancelled`, `files_status=receiving|verified|invalid`, `production_status=blocked|ready|printing|completed`. Nunca derivar «pagado» de `receipt_uploaded` o `checkout_return`; no aceptar cambio de estado sin verificación de servidor y, para transferencias, confirmación bancaria del operador. Registrar quién confirma y evitar doble confirmación.
+
+**Opcional futuro:** conciliación bancaria automática **solo si existe integración oficial disponible, segura, fiable y aprobada**; no asumir que un envío directo a un alias bancario genera un webhook de Checkout Pro. No contratar aplicaciones nuevas ni generar cargos sin permiso.
+
+**No ha sido aprobado ni construido este método de pago.** La confirmación de la modalidad exacta, interfaz administrativa y políticas bancarias requiere autorización antes del lanzamiento. No modificar producción.
+
 ## 5. Casos límite / reglas de atención
 
 | Caso | Comportamiento esperado |
