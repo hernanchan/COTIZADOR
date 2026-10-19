@@ -88,8 +88,19 @@ ctx.worker.scheduled({cron:'*/10 * * * *',scheduledTime:Date.now()},env,{
 assert.ok(scheduledTask&&typeof scheduledTask.then==='function','El evento programado debe registrar su promesa con waitUntil');
 await scheduledTask;
 assert.equal((await admin('/admin/api/orders')).data.orders.length,1);
+// Solo el evento scheduled() debe actualizar este estado (nunca el botón manual).
+const cronBefore=(await admin('/admin/api/cron-status')).data;
+assert.equal(cronBefore.periodMinutes,10);
+assert.equal(cronBefore.lastRun.status,'ok');
+assert.equal(cronBefore.lastRun.registered,1);
+assert.equal(cronBefore.lastRun.errors,0);
+assert.ok(cronBefore.lastRun.started_at);
+assert.ok(cronBefore.lastRun.finished_at);
+assert.equal((await ctx.worker.fetch(new Request('https://worker.test/admin/api/cron-status'),env)).status,401);
 // Pulsar el botón después no vuelve a registrar ni duplica el cobro.
 const sync=await admin('/demo/sync-pending',{});assert.equal(sync.status,200);assert.equal(sync.data.registered,0);
+const cronAfter=(await admin('/admin/api/cron-status')).data;
+assert.deepEqual(JSON.parse(JSON.stringify(cronAfter.lastRun)),JSON.parse(JSON.stringify(cronBefore.lastRun)));
 assert.equal((await webhook()).status,200);assert.equal((await webhook()).status,200);
 assert.equal((await customer('status')).data.state,'paid');
 const detail=await admin('/admin/api/order?id='+order.id);assert.equal(detail.data.items.length,2);
