@@ -94,6 +94,12 @@ Este receptor **no** forma parte del Apps Script de Polaroids. El titular instal
 - Importante: **no cambiar la implementación actual a acceso «Cualquiera» todavía**. Antes se debe reemplazar código del receptor, ejecutar autocontrol local y actualizar versión del despliegue conservando acceso «Solo yo». El original `DocumentosReceiver.gs` permanece en GitHub como respaldo; las funciones de prueba locales que el titular pegó aparte no están necesariamente en GitHub y se perderían si reemplaza todo `Código.gs` sin copiarlas.
 - **No se ha comprobado aún Cloudflare → Apps Script externo**; tal prueba requerirá revisión y autorización explícita antes de cualquier cambio de acceso del webapp.
 
+### Cuatro pruebas Apps Script de ping confirmadas por el titular (19/10/2026)
+
+- El titular respondió **«LISTO»** a la solicitud de instalar `DocumentosReceiver_SOLO_PING_PRUEBAS.gs` en el Apps Script exclusivo de documentos y ejecutar `probarPingDocumentosLocal`. La confirmación se interpreta como las cuatro pruebas locales superadas: ping HMAC correcto aceptado, firma inválida rechazada, firma vencida rechazada y operación de recepción `start` incluso firmada **bloqueada**. No se recibió captura de registros, por lo que se documenta como resultado **reportado por el titular**, no una auditoría independiente.
+- **Siguiente paso:** actualizar la versión de la **misma implementación** de Apps Script, conservando «Ejecutar como: Yo» y «Quién tiene acceso: Solo yo». No crear otro receptor, no cambiar a «Cualquiera», no tocar Apps Script de Polaroids. No se espera un ping a través de Cloudflare mientras el acceso siga cerrado.
+- El Worker de documentos conserva `INTERNAL_ALLOW_UPLOADS=false` y `DOCS_UPLOAD_ENABLED=false`. El webhook real y el flujo de pagos todavía no están verificados ni habilitados.
+
 ## Preparación requerida para un ensayo real autorizado
 
 1. **Crear un proyecto nuevo de Google Apps Script**, sin copiar encima del existente de Polaroids. Pegar `DocumentosReceiver.gs` y revisar `appsscript.json`. Se deberá ejecutar como titular de Librería Saber y permitir las llamadas HTTP de UrlFetchApp y acceso a Drive. El Web App usa acceso anónimo pero **rechaza todas las llamadas sin firma HMAC del Worker**. Evaluar las restricciones de la cuenta Google antes de instalar.
