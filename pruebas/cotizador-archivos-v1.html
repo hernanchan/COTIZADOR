@@ -174,7 +174,7 @@ async function readPrintFiles(input,modo){
    const file=files[n];document.getElementById('pdfStatus').textContent='Leyendo '+(n+1)+' de '+files.length+': '+file.name;
    try{
     if(!/\.pdf$/i.test(file.name))throw Error('El archivo no es PDF.');
-    if(file.size>80*1024*1024)throw Error('Supera 80 MB. Requiere tratamiento especial.');
+    if(file.size>20*1024*1024)throw Error('Supera 20 MB para el ensayo. Requiere tratamiento especial.');
     if(!file.size)throw Error('Archivo vacío.');
     const buffer=await file.arrayBuffer();
     const task=api.getDocument({data:new Uint8Array(buffer)});
