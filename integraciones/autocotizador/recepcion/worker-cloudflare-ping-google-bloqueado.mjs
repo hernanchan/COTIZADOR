@@ -122,16 +122,23 @@ async function postToScript(env,payload,fetcher){
  const envelope=JSON.stringify({
    payloadJson,timestamp,signature:await signature(payloadJson,timestamp,env.DOCS_RELAY_KEY)
  });
+ let stage='script_post';
  let r=await fetcher(env.DOCS_SCRIPT_URL,{
   method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
   body:envelope,redirect:'manual',signal:AbortSignal.timeout(55000)});
  if([302,303].includes(r.status)){
+  stage='googleusercontent_get';
   const location=r.headers.get('Location')||'';
   if(!/^https:\/\/script\.googleusercontent\.com\/macros\//.test(location))
     throw Error('Redirección de Google no autorizada.');
   r=await fetcher(location,{method:'GET',redirect:'error',signal:AbortSignal.timeout(15000)});
  }
- if(!r.ok)throw Error('Google no confirmó la operación.');
+ if(!r.ok){
+  const failure=new Error('Google no confirmó la operación.');
+  failure.stage=stage;
+  if(Number.isInteger(r.status)&&r.status>=100&&r.status<=599)failure.httpStatus=r.status;
+  throw failure;
+ }
  const data=await r.text();
  if(data.length>5000)throw Error('Respuesta Google inesperada.');
  let json;
@@ -219,6 +226,7 @@ function testPage(env,mode='turnstile'){
           (Array.isArray(value.codes)&&value.codes.length ? ' ('+value.codes.join(', ')+')' : '')+
           (value.kind ? ' ['+value.kind+']' : '')+
           (value.httpStatus ? ' [HTTP '+value.httpStatus+']' : '')+
+          (value.stage ? ' [etapa '+value.stage+']' : '')+
           '. La recepción de PDF continúa desactivada.';
     }catch(_){out.textContent='No se pudo completar la consulta.';}
     window.turnstile?.reset();
@@ -317,7 +325,13 @@ async function testGooglePing(request,env){
       msg==='Respuesta Google inválida.'?'google_response_invalid':
       msg==='Conexión privada no configurada.'?'google_config_incomplete':
       'google_transport_error';
-    return testResponse({ok:false,reason,receptionEnabled:false},502);
+    const diagnostic={ok:false,reason,receptionEnabled:false};
+    if(reason==='google_http_or_access_error'){
+      diagnostic.stage=err?.stage==='googleusercontent_get'?'googleusercontent_get':'script_post';
+      if(Number.isInteger(err?.httpStatus)&&err.httpStatus>=100&&err.httpStatus<=599)
+        diagnostic.httpStatus=err.httpStatus;
+    }
+    return testResponse(diagnostic,502);
   }
   if(googleReply?.ok===true&&
     googleReply?.service==='saber-docs-handshake'&&
