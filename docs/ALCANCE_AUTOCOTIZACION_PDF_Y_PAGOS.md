@@ -75,6 +75,20 @@ Este bloque amplía el alcance funcional **sin desplegar ni autorizar ningún se
 7. Preparar una única preferencia Checkout Pro con total íntegro del pedido. Revisar automáticamente el estado mediante webhook autenticado y conciliación alternativa por Cron. Solo pedidos pagados y con PDF recibido se muestran como listos para producción en el Centro privado, con archivos y parámetros de impresión.
 8. El cliente puede ver estados «recibiendo PDF», «recibido», «presupuesto confirmado», «pendiente de pago», «pagado», «en revisión». Pago fallido/rechazado no se registra como confirmado; no hace falta volver a subir si la recepción persiste.
 
+## Regla de impresión y acabado: tandas separadas B/N / Color, anillados al final
+
+**Decisión del cliente (18/10/2026):** en el mismo cotizador preguntar primero tamaño/papel/caras/copias de una tanda de impresión, después invitar a cargar los PDF enteros **en blanco y negro**, a continuación los PDF enteros **a color**, y recién después preguntar **cómo anillar**: juntos, separados, «mixto» (grupos personalizados con orden explícito) o sin anillado. Los pasos de carga B/N y color son opcionales individualmente. Se puede agregar otra tanda con distinta configuración manteniendo el carrito único. No cotizar un mismo PDF parcialmente B/N y parcialmente color: si el cliente quiere mezclar modalidades dentro de un documento debe separar él mismo las páginas en PDF independientes.
+
+**La responsabilidad del sistema no termina en la cotización**: Centro de Pedidos debe mostrar en una ficha legible:
+- **Impresión:** archivos y páginas B/N y color por separado, hojas físicas, tamaño, papel, simple/doble faz, copias, orden e instrucciones por tanda.
+- **Terminación:** grupos de anillado, lista de documentos de cada grupo en orden de armado, cantidad de ejemplares y casos sueltos. Un grupo puede contener PDF B/N y color aunque se hayan impreso por separado.
+- **Archivos originales y archivos listos para producir**, con recepción privada confirmada; nunca mezclar instrucciones de trabajos B/N y color de forma que el operador tenga que adivinar el orden.
+- La tarifa de anillado se calcula por **grupo terminado y cantidad de ejemplares**, usando cantidad real de hojas y limitaciones del papel/encuadernado, no una vez por pedido. Cuando una combinación sea físicamente inviable se detiene el cobro para revisión.
+- Doble faz: no cruzar automáticamente el final de un documento o una tanda con el reverso de otro; explicar separaciones necesarias y validar cantidad de hojas antes de cobrar.
+- Ejemplo simple faz A4: `12 páginas B/N + 10 páginas B/N + 4 páginas color` → dos modalidades, 26 caras, 26 hojas por juego. Todos juntos = **un anillado**, separados = **tres anillados**, personalizado = grupos elegidos por el cliente.
+
+Para las reglas de datos, agrupación, precio e instrucciones del Centro de Pedidos consultar `docs/ESPECIFICACION_COTIZADOR_UNICO_AUTOMATICO.md`, sección **4.1 bis**. No cambiar el cotizador público ni exigir una cuenta/servicio pago para desarrollar esto.
+
 ## Alcance inicial razonable
 
 Migrar primero **impresión de documentos PDF A4/A3** (B/N o color completo por documento, simple/doble faz, copias, papel, anillado) **dentro del mismo cotizador**. Después completar la integración de los otros servicios en la misma interfaz. Para impresiones fuera de reglas confiables, ofrecer **revisión humana dentro del mismo proceso**; nunca pedir páginas manualmente como sustituto silencioso ni derivar a otro cotizador.
