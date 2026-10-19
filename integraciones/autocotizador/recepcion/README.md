@@ -126,6 +126,12 @@ Este receptor **no** forma parte del Apps Script de Polaroids. El titular instal
 - Siguiente diagnóstico sin tocar código: **volver a `DOCS_PING_ENABLED=false`** (mantener `DOCS_UPLOAD_ENABLED=false`), revisar en Apps Script la pestaña `Ejecuciones` en la hora exacta del ping para ver si hay una ejecución `doPost`; cotejar la URL `/exec` del despliegue con el valor de `DOCS_SCRIPT_URL` almacenado en Cloudflare, sin publicar capturas con secretos. Si no hay ejecución `doPost`, investigar el acceso/URL/capa HTTP de Google antes de modificar HMAC.
 - Google documenta que las solicitudes `POST` a Apps Script invocan `doPost(e)`: https://developers.google.com/apps-script/guides/web. No habilitar cargas, pagos ni frontend hasta diagnosticar la autenticación.
 
+### Corrección de acceso a implementación correcta — confirmación del titular (19/10/2026)
+
+- En la captura de **Administrar implementaciones** de Apps Script se observaron **dos implementaciones activas**. La seleccionada **«PRUEBA 2 - SOLO PING...» (versión 2)**, con URL cuyo prefijo coincide con `DOCS_SCRIPT_URL` mostrado en Cloudflare, tenía **«Quién tiene acceso: Solo yo»**, aunque antes se había habilitado `Cualquiera` en otra implementación o no se guardó el cambio en esta.
+- Esto es causa probable de HTTP 401 en `script_post` sin ejecución `doPost`: el titular vio la configuración exacta, recibió instrucciones de cambiar **sólo esa implementación PRUEBA 2** a **«Cualquiera»**, conservando **Ejecutar como: Yo**, **Versión 2** y bloqueo de cargas, y respondió **«LISTO»**. No se recibió nueva captura de permisos, por lo que el cambio está **reportado por el titular**, no comprobado directamente.
+- Siguiente paso: habilitar temporalmente `DOCS_PING_ENABLED=true` en el Worker de documentos (mantener `DOCS_UPLOAD_ENABLED=false`); refrescar `/prueba-google` y pulsar sólo una vez tras validar Turnstile. Registrar resultado, luego restablecer `DOCS_PING_ENABLED=false` y evaluar revertir el acceso público del Apps Script al cerrar el ensayo. No modificar Polaroids, pagos, ni web pública.
+
 ## Preparación requerida para un ensayo real autorizado
 
 1. **Crear un proyecto nuevo de Google Apps Script**, sin copiar encima del existente de Polaroids. Pegar `DocumentosReceiver.gs` y revisar `appsscript.json`. Se deberá ejecutar como titular de Librería Saber y permitir las llamadas HTTP de UrlFetchApp y acceso a Drive. El Web App usa acceso anónimo pero **rechaza todas las llamadas sin firma HMAC del Worker**. Evaluar las restricciones de la cuenta Google antes de instalar.
