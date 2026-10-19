@@ -106,6 +106,12 @@ Este receptor **no** forma parte del Apps Script de Polaroids. El titular instal
 - Captura real de `https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-google` con Turnstile verde y respuesta **«NO VALIDADO — diagnóstico: google_ping_disabled. La recepción de PDF continúa desactivada.»**. Se verificó el bloqueo de inicio del `ping`, **no la comunicación desde Worker a Apps Script**.
 - Por diseño, el Apps Script de documentos sigue con «Quién tiene acceso: Solo yo»; Cloudflare sin sesión de Google no puede invocar ese receptor. Para probar un ping firmado se debe habilitar `DOCS_PING_ENABLED=true`, pero además hará falta autorización explícita del titular para modificar únicamente el acceso de **esta implementación de pruebas** a «Cualquiera». El receptor Apps Script sólo admite operación `ping` con HMAC válida, y todas las cargas permanecen bloqueadas; antes de solicitar autorización explicar que el endpoint sería alcanzable públicamente, aunque responda denegación a operaciones no firmadas. No tocar Polaroids ni la web pública.
 
+### Implementación de Google accesible desde incógnito, ping pendiente (19/10/2026)
+
+- Tras autorizar explícitamente el cambio de acceso **únicamente al receptor de documentos de pruebas**, el titular indicó que al abrir la URL `/exec` de Google Apps Script en una ventana de incógnito obtuvo `{"ok":false,"error":"Servicio privado de documentos"}`. Esto confirma accesibilidad anónima de `doGet` y denegación de esa consulta, **no** verifica `doPost` ni autenticación HMAC entre Worker y Google.
+- Se indicó habilitar temporalmente `DOCS_PING_ENABLED=true` en el Worker `saber-documentos-pruebas`, dejar `DOCS_UPLOAD_ENABLED=false`, y ejecutar una sola prueba con Turnstile desde `/prueba-google`. A la fecha del registro **no se ha recibido respuesta del ping real**.
+- Después del ensayo se debe restablecer `DOCS_PING_ENABLED=false` y evaluar cerrar el permiso anónimo de Google Apps Script hasta completar autorización de pedidos, cupos y recepción real. No tocar Polaroids ni web pública.
+
 ## Preparación requerida para un ensayo real autorizado
 
 1. **Crear un proyecto nuevo de Google Apps Script**, sin copiar encima del existente de Polaroids. Pegar `DocumentosReceiver.gs` y revisar `appsscript.json`. Se deberá ejecutar como titular de Librería Saber y permitir las llamadas HTTP de UrlFetchApp y acceso a Drive. El Web App usa acceso anónimo pero **rechaza todas las llamadas sin firma HMAC del Worker**. Evaluar las restricciones de la cuenta Google antes de instalar.
