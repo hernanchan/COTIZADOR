@@ -120,6 +120,29 @@ Para **cuatro imágenes distintas**:
 - En Cloudflare Worker ya existe prueba de preferencia Checkout Pro, conciliación manual y activador cron cada 10 minutos. Aún falta verificar la conciliación autónoma y hacer integración real con el cotizador y recepción genérica de archivos.
 - Centro privado: mostrar solo pagos íntegros confirmados y documentos realmente recibidos. Webhook seguro + conciliación de respaldo; identificar pagos revocados/reembolsados y poner en revisión, no enviar a producción.
 
+## 4.6 Acceso a archivos desde Centro de Pedidos (regla de producción)
+
+**Objetivo del operador:** después de que el backend valide la recepción completa **y confirme el pago total**, entrar al Centro de Pedidos privado, abrir el pedido y acceder a los archivos sin buscar conversaciones de WhatsApp, interpretar códigos de referencia ni navegar manualmente por Drive.
+
+### Organización del pedido
+- Cada pedido tiene un identificador estable idéntico entre carrito, cobro, base de datos y su **carpeta privada en Google Drive**. La carpeta se crea/vincula durante la recepción; nunca depender del nombre del comprador como clave.
+- Conservar **Originales** (PDF/JPG/PNG recibidos exactamente), **Listos para imprimir** (PDF compuestos 1/2/4/9, hojas Polaroids, documentos con orientación/escala si aplica), **Tandas B/N** y **Tandas color** claramente separadas, **Ploteos CAD / póster** separados según instrucciones, y una **Ficha de producción** (preferiblemente PDF o HTML imprimible) con todo el detalle técnico y orden de armado/anillado.
+- Un documento no debe cambiar de B/N a color sin una confirmación registrada. Para anillado mixto, la ficha contiene los grupos y secuencia de PDF B/N y color; no generar un PDF de impresión combinado que lleve a una sola pasada con modalidad ambigua.
+- Referencias a carpetas/archivos en D1 incluyen IDs internos de Drive y un manifiesto validado; no duplicar binarios en D1 ni guardar claves temporales del cliente allí.
+
+### Interfaz privada operativa
+- Desde `/admin`, **Pedidos pagados** → `Ver detalle` → mostrar resumen e instrucciones y accesos: **Abrir carpeta privada en Drive**, **Originales**, **Imprimir B/N**, **Imprimir color**, **Ploteos / composiciones**, **Ficha de armado/anillado**; cuando haya varios documentos, cada uno con nombre identificable, páginas, copias, papel, caras y orden.
+- La carpeta de Drive solo debe abrir para cuentas de Librería Saber autorizadas; no configurar **«Cualquiera con el enlace»**, ni entregar links de almacenamiento o PDF final al cliente. El panel debe verificar autenticación administrativa y pago real aprobado antes de facilitar referencias o acciones de descarga.
+- Si se agregan botones para **descargar dentro del panel** sin pasar por Drive, las descargas requieren un endpoint autorizado y de alcance limitado al pedido; no exponer tokens permanentes, claves de Apps Script ni URLs públicas. Evaluar los límites de transferencia de Cloudflare/Google con archivos grandes antes de comprometer esa modalidad. «Descargar todo» como ZIP es una mejora útil, pero solo si se prueba su generación y tamaño sin contratar servicios.
+- El operador puede marcar internamente **pendiente / en impresión / en anillado / listo para retirar / entregado** (estos estados y notificaciones necesitarán desarrollo y aprobación; no confundir pago con finalización).
+- Ante discrepancia, archivos incompletos o reversión/reembolso, **no ofrecer «Listo para producir»**; registrar estado `en revisión`, mantener trazabilidad y acceso administrativo controlado.
+
+### Situación verificada vs. trabajo pendiente
+- Polaroids ya envía fotos y PDF a **Drive privado** en el piloto, y el Centro de Pedidos mostró la referencia correcta de un pago de ensayo.
+- Actualmente `/admin/api/order` y `showOrder()` muestran `file_references_json` en texto; **no existen todavía botones de descarga por archivo ni apertura verificada de la carpeta Drive desde el panel**.
+- Falta una recepción genérica para PDF/JPG/PNG con manifiesto y carpeta por pedido; enlace privado del panel a Drive (o descarga autenticada), agrupación B/N/color y ficha imprimible. Probar acceso con cuenta operador autorizada; jamás publicar enlaces privados en el carrito.
+- Esta sección es **especificación, no implementación**, y no autoriza tocar producción, habilitar recepción pública ni incurrir en gastos.
+
 ## 5. Casos límite / reglas de atención
 
 | Caso | Comportamiento esperado |
