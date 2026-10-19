@@ -11,7 +11,7 @@
  * Atención: NO hay validador fiable de páginas en backend todavía.
  * Por ello finish confirma bytes, pero NUNCA devuelve verified:true ni permite cobrar.
  */
-var DOCS_MAX=20*1024*1024, DOCS_PART=512*1024, DOCS_TTL=14*86400000;
+var DOCS_MAX=20*1024*1024, DOCS_PART=512*1024, DOCS_TTL=6*86400000;
 function docsJson(x){return ContentService.createTextOutput(JSON.stringify(x)).setMimeType(ContentService.MimeType.JSON);}
 function docsHex(a){return Array.from(a,function(b){return ('0'+(b&255).toString(16)).slice(-2)}).join('');}
 function docsSha(a){return docsHex(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,a));}
