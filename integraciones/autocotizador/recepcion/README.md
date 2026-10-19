@@ -71,6 +71,14 @@ Este receptor **no** forma parte del Apps Script de Polaroids. El titular instal
 - La actualización fue validada **por simulación**, con respuestas Siteverify falsas: bloqueo HTTP 503 de GET/POST/DELETE en la raíz, prueba HTML 200, rechazo 403 a origen ajeno, rechazo por secreto inválido, hostname incorrecto y acción incorrecta, aceptación 200 sólo cuando los tres controles coinciden. **Falta que el titular reinstale este archivo actualizado y confirme el diagnóstico real**.
 - La variable `DOCS_UPLOAD_ENABLED` sigue `false`, el bloqueo fijo `INTERNAL_ALLOW_UPLOADS=false` sigue inalterado, Apps Script aún tiene «Solo yo» y no hay subidas externas a Drive.
 
+### Diagnóstico real Turnstile `cloudflare_unavailable` y reparación del ensayo (19/10/2026)
+
+- El titular aportó primero captura con el widget verde, pero mensaje «Completá primero la verificación» (sin token disponible en esa interacción), y luego otra con el mismo widget verde y `NO VALIDADO — diagnóstico: cloudflare_unavailable`. La segunda evidencia demuestra que llegó una solicitud con token a nuestro Worker, pero un error interno fue atrapado por un `catch` demasiado amplio. **No atribuir el fallo a una caída de Cloudflare, al secreto, ni al token sin comprobación.**
+- Se modificó solamente el archivo de ensayo `worker-cloudflare-prueba-turnstile-bloqueado.mjs` para usar la llamada Siteverify recomendada por Cloudflare Workers: `fetch` `POST` con `FormData`. Ya no depende de `AbortSignal.timeout()` ni de `redirect:'error'` en esa ruta.
+- Diagnósticos desglosados sin publicar información sensible: `siteverify_fetch_failed` (clase de error restringida), `siteverify_http_error` (código HTTP), `siteverify_invalid_json`, `siteverify_unexpected_json`, `cloudflare_rejected` (error codes permitidos), `allowed_origin_invalid`, `hostname_mismatch` y `action_mismatch`. El ensayo sigue cerrado con `INTERNAL_ALLOW_UPLOADS=false` y `DOCS_UPLOAD_ENABLED=false`.
+- Validación simulada del archivo actualizado: bloqueos GET/POST/DELETE en / → 503; página /prueba-turnstile → 200; Siteverify simulado válido → 200 con `receptionEnabled:false`; respuesta denegada, HTTP erróneo, JSON inválido, error de red y origen no autorizado → denegados. **Falta reinstalar en Cloudflare y comprobar con un token real; no hay un resultado positivo de extremo a extremo todavía**.
+- Documentación oficial utilizada: https://developers.cloudflare.com/workers/examples/turnstile-html-rewriter/
+
 ## Preparación requerida para un ensayo real autorizado
 
 1. **Crear un proyecto nuevo de Google Apps Script**, sin copiar encima del existente de Polaroids. Pegar `DocumentosReceiver.gs` y revisar `appsscript.json`. Se deberá ejecutar como titular de Librería Saber y permitir las llamadas HTTP de UrlFetchApp y acceso a Drive. El Web App usa acceso anónimo pero **rechaza todas las llamadas sin firma HMAC del Worker**. Evaluar las restricciones de la cuenta Google antes de instalar.
