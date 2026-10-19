@@ -16,6 +16,16 @@ Este receptor **no** forma parte del Apps Script de Polaroids. No se instaló, n
 - No se ha verificado cuál es el ID/carpeta exacta que utiliza el receptor piloto de Polaroids. **No mover ni reorganizar fotografías existentes.** La estructura propuesta de carpeta general compartida es lógica, no un cambio físico ya efectuado.
 - **Comprobación real del titular (19/10, 09:49):** proyecto Apps Script independiente `SABER — RECEPCIÓN DOCUMENTOS — PRUEBAS` creado y `DocumentosReceiver.gs` pegado; manifiesto OAuth preparado; propiedades privadas `DOCS_ROOT_FOLDER_ID` y `DOCS_RELAY_KEY` guardadas. Función local `probarCarpetaDocumentos` terminó correctamente y registró «Carpeta accesible: LIBRERÍA SABER - DOCUMENTOS WEB - PRUEBAS» y «Clave de seguridad configurada correctamente». Esto demuestra **lectura de carpeta y presencia de secreto**, NO escritura, firma validada, subida de archivos ni servicio web desplegado.
 
+
+### Avance confirmado por el titular — prueba de PDF real en Apps Script (19/10/2026)
+
+- El propietario confirmó **escritura real** de un archivo de prueba en la carpeta operativa de Drive y respuesta `HTTP 200` de la API de Google Drive mediante `UrlFetchApp`.
+- Confirmó que creó una implementación web de Apps Script con acceso **«Solo yo»** y que al visitar su URL obtuvo el JSON esperado de bloqueo de solicitudes no autenticadas; eso **no equivale** a conectividad desde Cloudflare.
+- Ejecutó manualmente `probarRecepcionPDFReal`, que genera un PDF A4 mínimo, invoca `docsStart`, `docsPart` y `docsFinish` dentro del mismo proyecto y compara la huella SHA-256 de los bytes descargados desde Drive. El usuario informó «todo perfecto»; **no se recibió el registro completo ni se inspeccionó directamente el PDF creado en la cuenta operativa**, por lo que consignamos «prueba real reportada exitosa», no auditoría independiente.
+- La llamada directa del editor **no comprueba** la validación HMAC del `doPost` con una solicitud externa ni los límites de Chrome/Cloudflare/Turnstile; con «Solo yo» el relay aún no puede usar el endpoint anónimamente.
+- Sigue deshabilitado el cobro de documentos: el receptor responde `verified:false` hasta contar páginas y validar el PDF del lado servidor, aunque los bytes estén íntegros.
+- Próxima verificación: abrir el PDF de prueba dentro de la carpeta `WEB-PRUEBA-...` en el Drive de `dragonesdepoeta@gmail.com` y comprobar visualmente que muestra una página correcta; después preparar la conectividad segura del relay piloto sin habilitar el sitio público.
+
 ## Preparación requerida para un ensayo real autorizado
 
 1. **Crear un proyecto nuevo de Google Apps Script**, sin copiar encima del existente de Polaroids. Pegar `DocumentosReceiver.gs` y revisar `appsscript.json`. Se deberá ejecutar como titular de Librería Saber y permitir las llamadas HTTP de UrlFetchApp y acceso a Drive. El Web App usa acceso anónimo pero **rechaza todas las llamadas sin firma HMAC del Worker**. Evaluar las restricciones de la cuenta Google antes de instalar.
