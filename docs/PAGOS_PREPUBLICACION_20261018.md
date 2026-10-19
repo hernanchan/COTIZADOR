@@ -160,3 +160,16 @@ El titular comprobó desde el entorno aislado:
 - Se amplió `tests/pagos-integral.test.mjs` para ejercitar `scheduled()` en una base y API simuladas ante ausencia de webhook, y comprobar luego que el botón manual no duplica el registro. **La suite Node debe ejecutarse para confirmar el cambio de prueba**; esto no verifica la programación instalada remotamente.
 - Verificación remota **de solo lectura**: abrir Cloudflare Dashboard → Workers & Pages → Worker `saber-pagos-pruebas` → Settings → Triggers → Cron Triggers y confirmar `*/10 * * * *`; después ver en Observability/Logs invocaciones cron y errores. No desplegar, reconfigurar ni cambiar secretos sin aprobación. El demo `/demo` dispone de auditoría de notificaciones con `DEMO_ADMIN_KEY`; evitar divulgar claves.
 - No efectuar otro cobro para diagnosticar la activación. Si el cron está ausente o falla, documentar primero el hecho; habilitarlo será una acción separada de la futura publicación al público.
+
+
+## Confirmación del cron sin Workers Observability
+
+El titular mostró en Cloudflare Dashboard → Worker de pruebas `saber-pagos-pruebas` → **Eventos de activación** que está instalado un Cron **«Every 10 minutes»**. En «Observabilidad» aparece «Workers Observability está desactivado»; la página del activador **no tiene** un botón de «Ver eventos». No habilitar Observability ni crear nuevas suscripciones para este diagnóstico.
+
+En la rama de pruebas se preparó una instrumentación mínima en `worker.js` y `schema.sql`:
+- `scheduled()` registra en D1 **únicamente el último disparo automático**, fecha inicial/final, estado (`running`, `ok`, `errors`, `failed`) y conteos de pagos revisados/registrados/errores. Una sola fila; no almacena claves ni fotografías.
+- `GET /admin/api/cron-status` está restringido a `DEMO_ADMIN_KEY`; el Centro de Pedidos puede mostrar ese estado al pulsar **Consultar pedidos**, aparte de la consulta manual.
+- Los clics en «Verificar pagos pendientes» **no alteran** el registro de Cron. Así se puede observar directamente si hubo una ejecución programada posterior, sin otra transacción y sin activar el producto Observability.
+- Se amplió `tests/pagos-integral.test.mjs` para comparar registros antes/después de la conciliación manual. Sintaxis del Worker y del script del panel verificadas y se ejecutó una simulación aislada de `scheduled()` con D1 ficticia (estado `ok`, sin pedidos, 1 inicio y 1 final). La suite Node completa está **pendiente de ejecución**, y no se ha confirmado el despliegue remoto de esta versión.
+- **No confundir** Cron configurado con Cron comprobado. Aunque aparezca un registro exitoso, no demuestra que los avisos webhook lleguen; ambos mecanismos deben mantenerse separados.
+- Rama de ensayos únicamente. No alterar `main`, la web pública, las credenciales, ni activar nuevas herramientas de Cloudflare.
