@@ -47,13 +47,14 @@ function bindBack(){const b=document.getElementById('backServices');if(b)b.oncli
 function dailyBenefitHtml(){const p=scheduledPromo();return p?'<div class="daily-benefit"><div class="daily-benefit-mark">●</div><div><b>Beneficio de hoy</b><span>'+p.label+'. Se aplica automáticamente cuando cotices un trabajo alcanzado por la promoción.</span></div></div>':''}
 function renderServices(){heading.textContent='¿Qué necesitás cotizar?';subheading.textContent='Elegí una opción. Solo te preguntaremos lo necesario.';app.innerHTML=dailyBenefitHtml()+'<div class="service-grid">'+[
 ['impresiones','Imprimir documentos','A4/A3 · B/N y color · todos los materiales'],['fotos','Imprimir fotos','10×15, 13×18, A4, A3, Polaroid y carnet'],['stickers','Stickers','Planchas A4/A3 con precorte'],['ploteos','Ploteos','Planos CAD y pósteres'],['corte','Ploteo de corte','Vinilo · piezas grandes, chicas o corte solo'],['grafica','Gráfica comercial','Tarjetas, recetarios y folletos']].map(r=>'<button class="service" data-service="'+r[0]+'"><b>'+r[1]+'</b><span>'+r[2]+'</span></button>').join('')+'</div><div class="card"><button class="service" style="width:100%;min-height:auto" id="help"><b>No estoy seguro</b><span>Te ayudamos por WhatsApp.</span></button></div>';
-document.querySelectorAll('[data-service]').forEach(b=>b.onclick=()=>{service=b.dataset.service;track('iniciar_cotizacion',{servicio:service});renderForm()});document.getElementById('help').onclick=()=>window.open('https://wa.me/5493513110130?text='+encodeURIComponent('Hola, necesito ayuda para cotizar un trabajo.'),'_blank','noopener')}
+document.querySelectorAll('[data-service]').forEach(b=>b.onclick=()=>{service=b.dataset.service;if(service==='impresiones'){printUploads=[];printPrefs={copies:1,binding:'ninguno',materialColor:''};state.size='a4';state.face='simple'}track('iniciar_cotizacion',{servicio:service});renderForm()});document.getElementById('help').onclick=()=>window.open('https://wa.me/5493513110130?text='+encodeURIComponent('Hola, necesito ayuda para cotizar un trabajo.'),'_blank','noopener')}
 function renderForm(){heading.textContent='Contanos el trabajo';subheading.textContent='Completá los datos y calculamos el precio.';if(service==='impresiones')return renderPrint();if(service==='fotos')return renderPhotos();if(service==='stickers')return renderStickers();if(service==='ploteos')return renderPlot();if(service==='corte')return renderCut();if(service==='grafica')return renderGraphic()}
 
 /* Fase 1 de la migración: archivos analizados en este navegador.
  * No hay recepción, generación de PDF ni pago en esta pantalla aislada.
  */
 let printUploads=[],printReading=false,printSerial=0,pdfScriptLoad;
+let printPrefs={copies:1,binding:'ninguno',materialColor:''};
 async function loadPdfJs(){
  if(window.pdfjsLib)return window.pdfjsLib;
  if(!pdfScriptLoad)pdfScriptLoad=new Promise((resolve,reject)=>{
@@ -72,8 +73,8 @@ async function loadPdfJs(){
 function renderPrint(){
  heading.textContent='Impresiones de documentos — prueba';
  subheading.textContent='Cargá los PDF; contamos las páginas sin enviarlos. Esta pantalla no acepta pedidos ni pagos.';
- printUploads=[];printReading=false;
- state.size='a4';state.face='simple';state.mode='bn';
+ // Al volver desde el resultado, conservar archivos y todas las opciones.
+ printReading=false;
  app.innerHTML=backButton()+[
  '<div class="notice"><strong>ENSAYO PRIVADO:</strong> los archivos se analizan en tu navegador. Todavía no se envían a Drive ni al Centro de Pedidos. No realices pagos.</div>',
  '<div class="card"><span class="label">1. Elegí tamaño y caras</span>',
@@ -91,7 +92,7 @@ function renderPrint(){
  '<div id="pdfStatus" role="status" aria-live="polite" class="plot-hint">Esperando documentos PDF…</div>',
  '<div id="pdfRows"></div></div>',
  '<div class="card"><span class="label">4. Copias y armado</span>',
- '<div class="grid"><label class="field">Cantidad de juegos iguales<input type="number" min="1" max="500" step="1" value="1" id="copies"></label>',
+ '<div class="grid"><label class="field">Cantidad de juegos iguales<input type="number" min="1" max="500" step="1" value="'+printPrefs.copies+'" id="copies"></label>',
  '<label class="field">Anillado<select id="bindingMode"><option value="ninguno">Sin anillar</option><option value="juntos">Todos juntos</option><option value="separados">Cada PDF por separado</option><option value="mixto">Personalizado / mixto</option></select></label></div>',
  '<div class="plot-hint">En «personalizado» indicá el grupo de cada archivo: 0 = sin anillar, 1 = primer anillado, 2 = segundo, etc. Podés modificar el orden de armado.</div>',
  '<div class="error" id="printError" style="display:none;margin-top:12px" role="alert"></div>',
@@ -99,10 +100,15 @@ function renderPrint(){
  ].join('');
  bindBack();
  const mat=document.getElementById('material');
+ document.getElementById('bindingMode').value=printPrefs.binding;
+ document.querySelectorAll('[data-size]').forEach(b=>b.classList.toggle('active',b.dataset.size===state.size));
+ document.querySelectorAll('[data-face]').forEach(b=>b.classList.toggle('active',b.dataset.face===state.face));
+ document.getElementById('copies').addEventListener('change',e=>{printPrefs.copies=Number(e.target.value)});
  function selectMaterial(){
-  const sec=state.size==='a4'?cfg.colorA4:cfg.colorA3,previous=mat.value;
+  const sec=state.size==='a4'?cfg.colorA4:cfg.colorA3,previous=printPrefs.materialColor||mat.value;
   mat.innerHTML=materialOptions(sec.materials);
   if([...mat.options].some(x=>x.value===previous))mat.value=previous;
+  printPrefs.materialColor=mat.value;
  }
  function active(group,key,value){
   document.querySelectorAll('#'+group+' .choice').forEach(b=>b.classList.toggle('active',b.dataset[key]===value));
@@ -110,9 +116,10 @@ function renderPrint(){
  document.querySelectorAll('[data-size]').forEach(b=>b.onclick=()=>{state.size=b.dataset.size;active('sizeChoices','size',state.size);selectMaterial()});
  document.querySelectorAll('[data-face]').forEach(b=>b.onclick=()=>{state.face=b.dataset.face;active('faceChoices','face',state.face)});
  selectMaterial();
+ mat.addEventListener('change',()=>{printPrefs.materialColor=mat.value});
  document.getElementById('pdfBn').addEventListener('change',e=>readPrintFiles(e.target,'bn'));
  document.getElementById('pdfColor').addEventListener('change',e=>readPrintFiles(e.target,'color'));
- document.getElementById('bindingMode').addEventListener('change',renderPrintFileRows);
+ document.getElementById('bindingMode').addEventListener('change',e=>{printPrefs.binding=e.target.value;renderPrintFileRows()});
  document.getElementById('calc').onclick=calcPrint;
  renderPrintFileRows();
 }
