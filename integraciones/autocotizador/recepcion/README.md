@@ -79,6 +79,13 @@ Este receptor **no** forma parte del Apps Script de Polaroids. El titular instal
 - Validación simulada del archivo actualizado: bloqueos GET/POST/DELETE en / → 503; página /prueba-turnstile → 200; Siteverify simulado válido → 200 con `receptionEnabled:false`; respuesta denegada, HTTP erróneo, JSON inválido, error de red y origen no autorizado → denegados. **Falta reinstalar en Cloudflare y comprobar con un token real; no hay un resultado positivo de extremo a extremo todavía**.
 - Documentación oficial utilizada: https://developers.cloudflare.com/workers/examples/turnstile-html-rewriter/
 
+### Turnstile validado realmente, de extremo a extremo (19/10/2026)
+
+- El titular compartió captura real de `https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-turnstile` con widget «¡Operación exitosa!» y mensaje final **«PRUEBA EXITOSA: Turnstile validado por Cloudflare. La recepción continúa desactivada.»**
+- Queda comprobado en el entorno real **navegador → Worker → Siteverify de Cloudflare → navegador**, incluidos el token, hostname y acción `documentos`; ya no hacen falta más pruebas Turnstile.
+- El resultado **NO** comprueba Worker → Apps Script, firma compartida Worker/Google, autorización de un pedido, envío de PDF por HTTP ni conteo de páginas servidor. La recepción de documentos permanece cerrada mediante `INTERNAL_ALLOW_UPLOADS=false` y `DOCS_UPLOAD_ENABLED=false`; Apps Script continúa «Solo yo».
+- Próximo paso de desarrollo: preparar y comprobar en rama de pruebas un procedimiento de *handshake* HMAC mínimo con un Apps Script aislado y bloqueado para documentos, sin habilitar cargas ni modificar la web pública, y resolver antes de abrir ninguna recepción las deficiencias de autorización de pedido y cuotas. Cualquier cambio del permiso «Solo yo» exige autorización explícita del titular.
+
 ## Preparación requerida para un ensayo real autorizado
 
 1. **Crear un proyecto nuevo de Google Apps Script**, sin copiar encima del existente de Polaroids. Pegar `DocumentosReceiver.gs` y revisar `appsscript.json`. Se deberá ejecutar como titular de Librería Saber y permitir las llamadas HTTP de UrlFetchApp y acceso a Drive. El Web App usa acceso anónimo pero **rechaza todas las llamadas sin firma HMAC del Worker**. Evaluar las restricciones de la cuenta Google antes de instalar.
