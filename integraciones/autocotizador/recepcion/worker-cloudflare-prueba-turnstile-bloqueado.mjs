@@ -204,7 +204,9 @@ function testPage(env){
       const value=await res.json();
       out.textContent=value.ok
         ? 'PRUEBA EXITOSA: Turnstile validado por Cloudflare. La recepción continúa desactivada.'
-        : 'La prueba no se pudo validar. Revisaremos la configuración.';
+        : 'NO VALIDADO — diagnóstico: '+String(value.reason || 'sin_diagnostico')+
+          (Array.isArray(value.codes)&&value.codes.length ? ' ('+value.codes.join(', ')+')' : '')+
+          '. La recepción de PDF continúa desactivada.';
     }catch(_){out.textContent='No se pudo completar la consulta.';}
     window.turnstile?.reset();
   });
@@ -219,9 +221,9 @@ async function testTurnstilePost(request,env){
   if(request.headers.get('Origin')!==new URL(request.url).origin||
     (request.headers.get('Sec-Fetch-Site')&&request.headers.get('Sec-Fetch-Site')!=='same-origin')||
     !/^application\/json(?:;|$)/i.test(request.headers.get('Content-Type')||''))
-    return testResponse({ok:false,receptionEnabled:false},403);
+    return testResponse({ok:false,reason:'origin_or_content_type',receptionEnabled:false},403);
   if(typeof env?.DOCS_TURNSTILE_SECRET!=='string'||!env.DOCS_TURNSTILE_SECRET)
-    return testResponse({ok:false,receptionEnabled:false},503);
+    return testResponse({ok:false,reason:'turnstile_secret_missing',receptionEnabled:false},503);
   let data;
   try{
     if(Number(request.headers.get('Content-Length'))>4096)throw Error('size');
@@ -238,18 +240,29 @@ async function testTurnstilePost(request,env){
     data=JSON.parse(new TextDecoder().decode(bytes));
     if(typeof data.token!=='string'||data.token.length<10||data.token.length>2048)
       throw Error('token');
-  }catch(_){return testResponse({ok:false,receptionEnabled:false},400);}
+  }catch(_){return testResponse({ok:false,reason:'token_body_invalid',receptionEnabled:false},400);}
   try{
     const form=new URLSearchParams({secret:env.DOCS_TURNSTILE_SECRET,response:data.token});
     const r=await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify',{
       method:'POST',body:form,redirect:'error',signal:AbortSignal.timeout(15000)
     });
-    if(!r.ok)throw Error('siteverify');
+    if(!r.ok)return testResponse({ok:false,reason:'cloudflare_http_error',receptionEnabled:false},403);
     const v=await r.json();
+    if(v?.success!==true){
+      const allowedCodes=['missing-input-secret','invalid-input-secret',
+        'missing-input-response','invalid-input-response',
+        'bad-request','timeout-or-duplicate','internal-error'];
+      const codes=Array.isArray(v?.['error-codes'])
+        ? v['error-codes'].filter(x=>allowedCodes.includes(x)).slice(0,3) : [];
+      return testResponse({ok:false,reason:'cloudflare_rejected',codes,receptionEnabled:false},403);
+    }
     const permitted=new URL(env.DOCS_ALLOWED_ORIGIN).hostname;
-    const verified=v.success===true&&v.hostname===permitted&&v.action==='documentos';
-    return testResponse({ok:verified,receptionEnabled:false},verified?200:403);
-  }catch(_){return testResponse({ok:false,receptionEnabled:false},403);}
+    if(v.hostname!==permitted)return testResponse({
+      ok:false,reason:'hostname_mismatch',receptionEnabled:false},403);
+    if(v.action!=='documentos')return testResponse({
+      ok:false,reason:'action_mismatch',receptionEnabled:false},403);
+    return testResponse({ok:true,receptionEnabled:false},200);
+  }catch(_){return testResponse({ok:false,reason:'cloudflare_unavailable',receptionEnabled:false},403);}
 }
 
 export default {
