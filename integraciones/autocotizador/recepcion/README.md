@@ -1,6 +1,6 @@
 # Receptor privado de PDF — Librería Saber (ensayo SIN ACTIVAR)
 
-Este receptor **no** forma parte del Apps Script de Polaroids. No se instaló, no se desplegó, no se creó un Worker ni se activó la recepción. Todo permanece en `cotizador/migracion-carga-archivos-20261018`. No modificar la web pública ni el servicio de fotografías.
+Este receptor **no** forma parte del Apps Script de Polaroids. El titular instaló un Apps Script independiente para documentos, con acceso web **«Solo yo»**, y un Worker independiente `saber-documentos-pruebas` que devuelve **HTTP 503 con recepción desactivada**. El código de desarrollo permanece en `cotizador/migracion-carga-archivos-20261018`. **No se habilitaron cargas externas ni se modificó la web pública o Polaroids.**
 
 ## Archivos preparados
 - `DocumentosReceiver.gs`: servidor Apps Script independiente, firmado con HMAC-SHA256. Guarda PDF en carpeta privada por pedido mediante **Drive API v3 resumable upload** y confirma los bytes recibidos comparando SHA-256 contra el archivo **ya almacenado en Drive**.
@@ -55,6 +55,14 @@ Este receptor **no** forma parte del Apps Script de Polaroids. No se instaló, n
 - Esta prueba usa la propiedad privada `DOCS_RELAY_KEY` en Apps Script, no revela la clave ni prueba aún que el secreto guardado en Cloudflare coincida efectivamente con ella. También **no** demuestra conectividad Worker → Apps Script.
 - Estado operativo conservado: `worker-cloudflare-ensayo-bloqueado.mjs` instalado y devolviendo `receptionEnabled:false`; Apps Script continúa restringido a «Solo yo»; sin cargas externas ni pagos.
 - Próximo componente: widget Turnstile **exclusivo** de documentos (no reutilizar el de Polaroids) en el hostname exacto del ensayo. Instalar su secreto como variable privada `DOCS_TURNSTILE_SECRET` del Worker; la clave pública se incorporará al cliente del ensayo cuando exista esa interfaz. Mantener bloqueos.
+
+### Turnstile confirmado y prueba web aislada preparada — 19/10/2026
+
+- El titular informó «sí sí todo ok» tras crear el widget de Turnstile separado para documentos y configurar `DOCS_TURNSTILE_SECRET` como secreto en Cloudflare. **La cuenta Cloudflare y las claves privadas no fueron leídas ni verificadas directamente desde ChatGPT**.
+- Se creó `worker-cloudflare-prueba-turnstile-bloqueado.mjs` como **archivo completo alternativo para el Worker de ensayo**. Mantiene `INTERNAL_ALLOW_UPLOADS=false` en todo momento y sólo habilita una página sin cargas en `GET /prueba-turnstile` y validación de token en `POST /prueba-turnstile`. No contacta Apps Script ni Drive.
+- El nuevo archivo exige adicionalmente `DOCS_TURNSTILE_SITE_KEY` (clave **pública** del mismo widget) como variable de tipo Texto en el Worker. El navegador solicita un desafío con `data-action="documentos"`; el Worker comprueba en Cloudflare Siteverify `success`, `hostname` y `action`. No se devuelven credenciales en las respuestas.
+- Pruebas en simulación con API externa falsificada: rutas de documentos GET/POST/DELETE **503**; GET `/prueba-turnstile` **200** con página HTML; POST con token verificado simulado **200** `{ok:true,receptionEnabled:false}`; POST con origen indebido **403**. Falta implementar en la cuenta del titular y comprobar un token Turnstile real en el navegador.
+- Se mantiene sin cambios `DOCS_UPLOAD_ENABLED=false`, Apps Script «Solo yo», `DOCS_RELAY_KEY`, Polaroids, pagos y web pública. No habilitar recepción externa ni cobro por esta prueba.
 
 ## Preparación requerida para un ensayo real autorizado
 
