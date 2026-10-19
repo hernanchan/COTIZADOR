@@ -44,6 +44,11 @@ Este receptor **no** forma parte del Apps Script de Polaroids. No se instaló, n
 - La lógica de exportación fue comprobada sintácticamente y con seis peticiones simuladas (GET/POST/DELETE con variable de entorno tanto `true` como `false`): **todas respondieron HTTP 503, `receptionEnabled:false`**. No equivale a prueba de despliegue; el titular deberá reemplazar `Hello World`/bloqueo provisional en Cloudflare, implementar y verificar la misma respuesta.
 - **No cambiar el Apps Script «Solo yo» ni habilitar cargas todavía.** Antes de permitir cargas vía Cloudflare faltan: aceptación segura de llamadas firmadas por Apps Script, autorización real de los pedidos, antia-buso/cupo, Turnstile de documentos y comprobación de precio/páginas del lado servidor. La implantación del archivo bloqueado no completa esos trabajos.
 
+### Confirmación del Worker con doble bloqueo (19/10/2026)
+
+- El titular reemplazó el código del Worker `saber-documentos-pruebas` por `worker-cloudflare-ensayo-bloqueado.mjs` y confirmó en su URL la respuesta exacta: `{"ok":false,"service":"saber-documentos-pruebas","receptionEnabled":false,"message":"Recepcion de documentos desactivada"}`. **Es una verificación del bloqueo publicada en el Worker, no una conexión comprobada a Google.**
+- Próxima prueba segura: autocontrol de firma HMAC positiva, alterada y vencida ejecutado manualmente en Apps Script con `docsVerifyEnvelope`, sin subir archivos ni exponer secreto. Luego se evaluará el acceso externo con HMAC, autorización de pedidos y límites antes de modificar `Solo yo`.
+ 
 ## Preparación requerida para un ensayo real autorizado
 
 1. **Crear un proyecto nuevo de Google Apps Script**, sin copiar encima del existente de Polaroids. Pegar `DocumentosReceiver.gs` y revisar `appsscript.json`. Se deberá ejecutar como titular de Librería Saber y permitir las llamadas HTTP de UrlFetchApp y acceso a Drive. El Web App usa acceso anónimo pero **rechaza todas las llamadas sin firma HMAC del Worker**. Evaluar las restricciones de la cuenta Google antes de instalar.
