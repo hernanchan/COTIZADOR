@@ -7,7 +7,7 @@
 
 ## 1. Propósito
 
-Una única experiencia donde el comprador carga archivos (PDF/JPG/PNG/Word), elige el resultado final de impresión, obtiene el presupuesto conforme a las tarifas de Librería Saber y, si el trabajo puede cotizarse automáticamente y la recepción es íntegra, paga el **100 % a través de Mercado Pago**. En la misma experiencia se preservan las categorías comerciales de impresión, ploteo CAD/planos, ploteo póster, Polaroids y otros servicios que actualmente ofrece el cotizador.
+Una única experiencia donde el comprador carga archivos (PDF/JPG/PNG). Los archivos de Word (DOC/DOCX) deben convertirse previamente a PDF por el cliente, elige el resultado final de impresión, obtiene el presupuesto conforme a las tarifas de Librería Saber y, si el trabajo puede cotizarse automáticamente y la recepción es íntegra, paga el **100 % a través de Mercado Pago**. En la misma experiencia se preservan las categorías comerciales de impresión, ploteo CAD/planos, ploteo póster, Polaroids y otros servicios que actualmente ofrece el cotizador.
 
 **Regla de UX:** el cliente **no tiene que contar páginas ni identificar qué máquina imprime el pedido**. Sí debe poder especificar tamaño final, material, caras, cantidad, distribución y acabado. La categoría CAD/planos permanece visible para quien busca específicamente ese servicio.
 
@@ -16,7 +16,7 @@ La web pública y el flujo actual de seña por WhatsApp no se interrumpen durant
 ## 2. Pantalla única de entrada y módulos
 
 **Pantalla principal:** «¿Qué querés imprimir?» con acceso a:
-1. **Documentos e impresiones** — PDF y Word convertidos y verificados. Carga de documentos de varias páginas; impresión A4/A3, B/N o color, papel, simple/doble faz, copias y anillado.
+1. **Documentos e impresiones** — PDF verificados. Los clientes que tengan documentos Word deberán exportarlos ellos mismos a PDF, revisar el resultado y luego subirlo. Carga de documentos de varias páginas; impresión A4/A3, B/N o color, papel, simple/doble faz, copias y anillado.
 2. **Imágenes y fotografías** — JPG, PNG y, si corresponde, PDF de una página. Hoja A4/A3; tipo de papel, 1, 2, 4 o 9 **imágenes por cara de hoja**, orden de fotos, orientación, ajuste, copias/juegos. Vista previa del armado y calidad de cada imagen según su tamaño final.
 3. **Ploteos** — acceso directo a «CAD / Planos» o «Póster / imagen plena», conservando tarifas diferenciadas. Se ingresa tamaño final en centímetros o se sugiere desde el documento, con confirmación; opciones de rollo, papel, cantidad y orientación. Si en otro módulo el cliente elige un tamaño mayor que A3, la interfaz lo conduce a esta modalidad **sin perder el archivo**.
 4. **Polaroids** — mantener el editor específico actual de **seis fotos por A4**, sus encuadres, revisión de calidad, recepción privada y marcas de corte para guillotina. Precio de referencia actual **$3.000/hoja**, sujeto a verificación de tarifas; no mezclar la grilla específica de seis con la opción genérica de 1/2/4/9 por hoja. Integrar su pedido al **mismo carrito** y al sistema de pagos acordado antes de publicarlo.
@@ -26,22 +26,22 @@ La web pública y el flujo actual de seña por WhatsApp no se interrumpen durant
 
 ## 3. Recorrido del comprador
 
-1. **Carga** — uno o varios archivos PDF, JPG/JPEG, PNG, Word DOCX (DOC antiguo solamente cuando haya conversión fiel). Mostrar nombre, tamaño, páginas o imágenes detectadas, progreso y error específico si es corrupto/protegido.
+1. **Carga** — uno o varios archivos PDF, JPG/JPEG o PNG. Mostrar nombre, tamaño, páginas o imágenes detectadas, progreso y error específico si es corrupto/protegido. Si el usuario intenta subir DOC/DOCX, explicar cómo exportarlo a PDF en Word y pedir que revise el PDF antes de subirlo; no convertir Word dentro del sitio.
 2. **Identificación del servicio** — el usuario elige documento, foto/composición, CAD/planos, póster u otro servicio; sugerir formato desde el archivo pero **no decidir sin consentimiento el tamaño final** ni el tipo CAD vs. póster.
 3. **Preguntas de impresión** — pedir solo parámetros aplicables. A4/A3 y ploteo; B/N/color; papel compatible; simple/doble faz; distribución de imágenes 1/2/4/9; orientación; ajuste sin recortar o rellenar/recortar, con vista previa; cantidad de copias/juegos; extras como anillado.
-4. **Previsualización fiel** — mostrar hojas finales, páginas por cara, orden, recortes, bordes/márgenes, cantidad de hojas y calidad de imágenes. En Word mostrar PDF resultante de la conversión para aprobación. En documentos vectoriales grandes, mostrar dimensiones finales.
+4. **Previsualización fiel** — mostrar hojas finales, páginas por cara, orden, recortes, bordes/márgenes, cantidad de hojas y calidad de imágenes. Si el PDF proviene de Word, mostrar las páginas del propio PDF que el cliente exportó y revisó; no crear otra conversión. En documentos vectoriales grandes, mostrar dimensiones finales.
 5. **Cotización** — mostrar **precio detallado por producto/trabajo**, escala por cantidad, material, extras, promociones compatibles, subtotal e importe total. El cliente confirma diseño, calidad y precio.
-6. **Recepción privada confirmada** — conservar originales, archivo listo para imprimir (PDF compuesto/convertido cuando corresponda), parámetros, referencia y manifiesto de integridad. Validación en backend; si el dispositivo duerme/se desconecta, no perder lo que ya llegó. No afirmar «recibido» hasta que el servidor termine.
+6. **Recepción privada confirmada** — conservar originales, archivo listo para imprimir (PDF original subido por el cliente o PDF compuesto de imágenes cuando corresponda), parámetros, referencia y manifiesto de integridad. Validación en backend; si el dispositivo duerme/se desconecta, no perder lo que ya llegó. No afirmar «recibido» hasta que el servidor termine.
 7. **Pago único** — Checkout Pro Mercado Pago, **100 % del carrito**; importe recomputado por servidor desde tarifas vigentes y archivos verificados. Una preferencia por intento, sin duplicar pagos. No cobrar trabajos ambiguos o incompletos.
 8. **Centro de Pedidos privado** — solo pedidos con pago total realmente aprobado, comprobaciones antifraude/conciliación y archivos completos. Mostrar detalle, cantidades, material, medidas, instrucciones, referencias y acceso privado al PDF final para producción; nunca facilitar archivos finales ni secretos de recepción públicamente.
 9. **Comunicación** — definir y aprobar texto de confirmación, entrega/retiro y mensajes WhatsApp antes de habilitar público. No enviar mensajes automáticos sin revisión comercial.
 
 ## 4. Reglas precisas de cálculo y ruteo
 
-### 4.1 Documentos PDF y Word
+### 4.1 Documentos PDF (incluidos los exportados de Word)
 
 - **PDF:** contar páginas de cada documento; mostrar desglose por archivo y permitir diferentes configuraciones por grupo de archivos cuando sea necesario. Si su contenido mezcla formatos, preguntar cómo se adaptan al papel final y advertir sobre escala.
-- **Word:** convertir DOCX a PDF con herramientas bajo control y permisos del negocio, comprobar fidelidad de fuente, saltos y márgenes; contar las páginas **del PDF convertido**, nunca de una estimación de Word; aprobación del cliente de esa versión. DOC antiguo sujeto a prueba. Si no hay conversión confiable, revisión asistida o solicitud de PDF.
+- **Word (.doc/.docx): no se admite directamente en el cotizador.** El cliente debe abrirlo en su programa, seleccionar «Archivo → Guardar como / Exportar → PDF», revisar tipografías, saltos de página, márgenes, tablas y cantidad de páginas en el PDF generado y **subir ese PDF**. Mostrar una ayuda breve en la interfaz. Si no consigue exportarlo, podrá solicitar asistencia desde el mismo cotizador; nunca cobrar automáticamente un Word sin convertir.
 - **Copias, caras y hojas:** diferenciar **páginas de archivo**, **caras impresas** y **hojas físicas**. En simple faz, hojas por juego = caras. En doble faz, hojas por juego = techo(caras/2). Los juegos deben conservarse separados si se requiere. La tarifa del cotizador actual debe validarse según la base efectiva usada por cada producto antes de automatizar el cobro.
 - **Extras:** anillado según límites por ejemplar y tamaño, y otras opciones únicamente cuando existan tarifas verificadas. Mantener las promociones legítimas sin aplicarlas dos veces.
 
@@ -83,7 +83,7 @@ Para **cuatro imágenes distintas**:
 
 - El cliente puede comprar varias líneas con productos distintos y configuraciones independientes, pero **un solo carrito y un único cobro del 100 %** para los trabajos automáticamente validados.
 - El precio del navegador solo se muestra como simulación; el **servidor recalcula** precios, beneficios, cantidades, formatos, integridad y conteo real de páginas antes de generar preferencia.
-- No cobrar por falta de archivos, conversión fallida, inconsistencia entre preview y resultado recibido, opción no disponible o presupuesto desactualizado. Confirmación explícita si el total cambia.
+- No cobrar por falta de archivos, PDF inválido, inconsistencia entre preview y resultado recibido, opción no disponible o presupuesto desactualizado. Confirmación explícita si el total cambia.
 - En Cloudflare Worker ya existe prueba de preferencia Checkout Pro, conciliación manual y activador cron cada 10 minutos. Aún falta verificar la conciliación autónoma y hacer integración real con el cotizador y recepción genérica de archivos.
 - Centro privado: mostrar solo pagos íntegros confirmados y documentos realmente recibidos. Webhook seguro + conciliación de respaldo; identificar pagos revocados/reembolsados y poner en revisión, no enviar a producción.
 
@@ -92,7 +92,7 @@ Para **cuatro imágenes distintas**:
 | Caso | Comportamiento esperado |
 | --- | --- |
 | PDF cifrado/corrupto | No cotizar a ciegas; pedir archivo legible |
-| DOCX con tipografías ausentes o formato distinto | Mostrar PDF convertido y exigir conformidad |
+| Cliente intenta subir DOC/DOCX | Informar que debe exportarlo a PDF desde Word, revisar el resultado y cargar ese PDF; no aceptar el DOC/DOCX para cobro automático |
 | 4 fotos con opción «2 por hoja» | Dos hojas por juego, no cuatro |
 | 10 fotos «9 por hoja» | Dos hojas por juego; segunda hoja incompleta |
 | Una foto de baja resolución en A3 o A0 | Advertir PPI efectivo y mostrar el tamaño real |
@@ -109,7 +109,7 @@ Para **cuatro imágenes distintas**:
 
 1. **Tarifas:** `precios-web.json` indica `generatedAt=2026-08-21`. Confirmar vigencia y crear **una única fuente de verdad** para los cálculos cliente/servidor, incluidos cupones, promociones por día, papel A4/A3, CAD vs. póster y extras.
 2. **Unidad de cobro:** validar comercialmente impresión simple/doble faz; caras impresas ≠ hojas físicas y se mantiene la escala real del cotizador. Confirmar criterio para **9 espacios y solo 4 fotos**: huecos en blanco por defecto o repetir fotos por decisión explícita del cliente.
-3. **Word:** viabilidad real de conversión DOCX a PDF bajo control privado, sin terceros públicos o infraestructura paga nueva sin aprobación. Solo ofrecer el formato cuando sea confiable.
+3. **Word:** no desarrollar ni contratar conversor. Rechazar DOC/DOCX con instrucciones sencillas para que el cliente exporte a PDF y compruebe el resultado. Una vez recibido, contar y validar ese PDF como cualquier documento.
 4. **Archivos:** confirmar arquitectura de recepción privada sin R2 usando la infraestructura actual (Google Drive/Apps Script/Cloudflare), cuotas, tamaño máximo, subida fragmentada y recuperación tras reposo. Guardar originales, PDF de imprenta y manifiesto.
 5. **Panel privado:** adaptar Centro de Pedidos para documentos y composiciones, acceso real al PDF listo para imprimir, notas técnicas e integridad verificada; conservar el flujo Polaroids de seis fotos/A4.
 6. **Polaroids y otros servicios:** integrar al único carrito sin romper el editor ni asumir que automáticamente todos tienen cotización backend terminada.
@@ -125,11 +125,11 @@ Para **cuatro imágenes distintas**:
 | **B. Carga y lectura** | Un solo uploader PDF/JPG/PNG; contar páginas PDF, resolución/medidas de imágenes y validación de tipos; previsualizar | Archivos múltiples y errores controlados, sin exigir páginas manuales |
 | **C. Composición y calidad** | Grillas 1/2/4/9, orientación, márgenes, orden, zoom/recorte, PPI reutilizado de Polaroids; PDF final privado listo para imprimir | 4 fotos = 4/2/1 hojas según opción; 9/10/19, A4/A3, advertencias y conteo correctos |
 | **D. CAD y gran formato** | Unir impresiones y ploteo según medida final y tipo CAD/póster; leer tamaños de PDF | Planos A2/A1/A0 y personalizados bien presupuestados; límite de rollo respetado |
-| **E. Word** | Conversor privado DOCX → PDF, vista previa y revisión de páginas/formatos | El cliente aprueba la versión exactamente imprimible; incompatibles no se cobran |
+| **E. Entrada Word** | Ayuda para exportar DOC/DOCX a PDF y manejo amable del formato no admitido | El cliente sube el PDF revisado por él; no hay conversión automática ni diferencias por exportación del servidor |
 | **F. Recepción y cobro** | Subida privada robusta y reanudable sin R2, verificación servidor, checkout 100 %, sincronización con Centro privado | PDF terminado, referencia, precio íntegro, pago aprobado; ningún pedido incompleto listo para producir |
 | **G. Integración, regresiones y migración** | Un solo carrito, Polaroids y categorías actuales, ensayos móviles de desconexión, políticas/WhatsApp, plan de reversión | Aprobación comercial + ensayos completos + autorización expresa para publicar |
 
-**No hay fecha de publicación garantizada:** esta definición agrega composición 1/2/4/9, conversión de Word y recepción de documentos, además del checkout ya ensayado. No confundir documentación con funcionalidades entregadas. La primera entrega será una vista de ensayo del **mismo cotizador migrado**, no una segunda herramienta pública.
+**No hay fecha de publicación garantizada:** esta definición agrega composición 1/2/4/9, validación de los PDF recibidos y recepción de documentos, además del checkout ya ensayado. No confundir documentación con funcionalidades entregadas. La primera entrega será una vista de ensayo del **mismo cotizador migrado**, no una segunda herramienta pública.
 
 ## 8. Estado real de los componentes reutilizables (verificado en repositorio)
 
