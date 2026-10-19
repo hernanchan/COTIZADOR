@@ -24,7 +24,8 @@ Este receptor **no** forma parte del Apps Script de Polaroids. No se instaló, n
 - Ejecutó manualmente `probarRecepcionPDFReal`, que genera un PDF A4 mínimo, invoca `docsStart`, `docsPart` y `docsFinish` dentro del mismo proyecto y compara la huella SHA-256 de los bytes descargados desde Drive. El usuario informó «todo perfecto»; **no se recibió el registro completo ni se inspeccionó directamente el PDF creado en la cuenta operativa**, por lo que consignamos «prueba real reportada exitosa», no auditoría independiente.
 - La llamada directa del editor **no comprueba** la validación HMAC del `doPost` con una solicitud externa ni los límites de Chrome/Cloudflare/Turnstile; con «Solo yo» el relay aún no puede usar el endpoint anónimamente.
 - Sigue deshabilitado el cobro de documentos: el receptor responde `verified:false` hasta contar páginas y validar el PDF del lado servidor, aunque los bytes estén íntegros.
-- Próxima verificación: abrir el PDF de prueba dentro de la carpeta `WEB-PRUEBA-...` en el Drive de `dragonesdepoeta@gmail.com` y comprobar visualmente que muestra una página correcta; después preparar la conectividad segura del relay piloto sin habilitar el sitio público.
+- **Inspección visual adicional confirmada por el titular:** abrió el PDF dentro de la subcarpeta `WEB-PRUEBA-...` en el Drive de `dragonesdepoeta@gmail.com` y confirmó que se ve correctamente. No se inspeccionó directamente desde este conector: la cuenta de Drive conectada a ChatGPT es distinta.
+- **Siguiente paso**: configurar relay piloto separado en Cloudflare, inicialmente apagado. No cambiar todavía acceso «Solo yo» de Apps Script ni tocar el receptor de Polaroids. Antes de probar una llamada externa habrá que revisar autorización, aislamiento, límites y protección del endpoint.
 
 ## Preparación requerida para un ensayo real autorizado
 
