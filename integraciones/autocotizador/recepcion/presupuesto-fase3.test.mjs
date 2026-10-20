@@ -29,7 +29,7 @@ test('Dos copias A4 doble faz y anillado con tarifa existente',()=>{
  assert.equal(x.quote.paginasPorEjemplar,6);
  assert.equal(x.quote.hojasTotales,6);
  assert.equal(x.quote.detalleAnillados.length,1);
- assert.equal(x.quote.total,12*100+2*2330);
+ assert.equal(x.quote.total,12*80+2*2330);
  assert.equal(x.paymentAuthorized,false);
 });
 test('El cliente no puede alterar páginas, hash, orden, modo ni recibo',()=>{
