@@ -56,6 +56,12 @@ Cada vez que surja una propuesta: agregar nueva entrada o actualizar la correspo
 - **Bloqueante inmediato**: mecanismo firmado y por fragmentos para que el Worker de validación obtenga el PDF **privadamente de Drive**, biblioteca PDF empaquetada, y actualización autoritativa del estado del recibo antes de cotización. Después, una única prueba integral de cotización real. Mantener aislada la web pública y sin volver a pedir cambio de claves.
 - **Prioridad de ejecución**: cerrar un flujo integral sencillo (PDF B/N/color A4/A3 → páginas del servidor → precio aprobado → carrito → pago confirmado → Centro de Pedidos), antes de ampliar ploteos y otras categorías. No reducir alcance funcional sin conformidad del titular.
 
+## Validación fase 2 compilada y comprobada — 20/10/2026
+
+- **CI real en GitHub (rama aislada):** ejecución exitosa <https://github.com/hernanchan/COTIZADOR/actions/runs/39453996039>. Ejecutó `npm test` contra `pdf-lib@1.17.1`, compiló el Worker con `esbuild` y lo guardó dentro de la propia rama de pruebas, sin implementar cambios en Cloudflare ni Google. Archivo de instalación: `integraciones/autocotizador/recepcion/dist/saber-documentos-validacion-fase2.mjs`.
+- **Ensayo adicional aislado del archivo final:** se importó el Worker empaquetado en Node, se generó un PDF auténtico de **tres páginas** con ReportLab, se simuló la respuesta firmada de Apps Script y un retorno de bytes desde Drive, y el bundle real de `pdf-lib` contó **3 páginas**. La prueba también verificó idempotencia de una validación repetida, rechazo de Turnstile, conservación de `paymentAuthorized:false` y bloqueo de la ruta general de uploads (HTTP 503).
+- **Importante:** las llamadas a Google se SIMULARON en este último ensayo. Todavía falta que el titular instale la versión `DocumentosReceiver_VALIDACION_FASE2.gs` en el Apps Script de documentos y el Worker compilado en `saber-documentos-pruebas`, conservando la misma implementación de Google, las variables y las claves. Entonces debe visitar `/prueba-validacion` para verificar páginas del **PDF real que ya se subió a Drive**, sin cargar otro PDF. Los archivos de Polaroids y la web pública no se tocan. No cobrar por este resultado piloto.
+
 ## Referencias técnicas
 
 - [Especificación principal](ESPECIFICACION_COTIZADOR_UNICO_AUTOMATICO.md)
