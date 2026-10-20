@@ -1,6 +1,12 @@
-# Compilación EXCLUSIVAMENTE MANUAL. No despliega Workers, Apps Script ni la web pública.
+# CI sólo de la rama de pruebas. Compila y prueba; NO despliega Workers, Apps Script ni web pública.
 name: Compilar validador PDF (solo artefacto de pruebas)
 on:
+  push:
+    branches:
+      - cotizador/migracion-carga-archivos-20261018
+    paths:
+      - '.github/workflows/compilar-pdf-validacion-fase2.yml'
+      - 'integraciones/autocotizador/recepcion/**'
   workflow_dispatch:
 permissions:
   contents: read
