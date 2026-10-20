@@ -32,7 +32,7 @@ function docsVerifyEnvelope(env){
  var calculated=docsHex(Utilities.computeHmacSha256Signature(env.timestamp+'\n'+env.payloadJson,docsProp('DOCS_RELAY_KEY')));
  if(!docsEq(calculated,env.signature))throw Error('Firma inválida');
  var p=JSON.parse(env.payloadJson);
- if(!p||typeof p!=='object'||Array.isArray(p)||!['ping','start','status','part','finish','privateReadPart','privateCommitPages','privateVerifiedStatus'].includes(p.op))throw Error('Operación inválida');
+ if(!p||typeof p!=='object'||Array.isArray(p)||!['ping','start','status','part','finish','privatePilotInfo','privateReadPart','privateCommitPages','privateVerifiedStatus'].includes(p.op))throw Error('Operación inválida');
  return p;
 }
 function doGet(){return docsJson({ok:false,error:'Servicio privado de documentos'});}
@@ -47,6 +47,7 @@ function docsPilotDispatch(p){
   return {service:'saber-docs-handshake',signed:true,
           receptionEnabled:false,apiVersion:'ping-v1'};
  }
+ if(p.op==='privatePilotInfo')return docsPrivatePilotInfo(p);
  if(p.op==='privateReadPart')return docsPrivateReadPart(p);
  if(p.op==='privateCommitPages')return docsPrivateCommitPages(p);
  if(p.op==='privateVerifiedStatus')return docsPrivateVerifiedStatus(p);
@@ -117,6 +118,14 @@ function docsPilotBlob(s){
  if(bytes.length!==s.bytes||docsSha(bytes)!==s.sha256)
    throw Error('El contenido de Drive cambió o no coincide');
  return bytes;
+}
+function docsPrivatePilotInfo(p){
+ var s=docsPilotState();
+ return {receiptId:s.uploadId,orderId:s.orderId,fileId:s.fileId,
+   name:s.name,mode:s.mode,bytes:s.bytes,sha256:s.sha256,
+   receiptState:s.receiptState,
+   pageVerification:s.pageVerification||null,
+   pages:s.pdfPages||null,privateChunkBytes:DOCS_PRIVATE_CHUNK_BYTES};
 }
 function docsPrivateReadPart(p){
  var s=docsPilotState(),offset=p.offset;
