@@ -97,7 +97,7 @@ async function turnstileValid(input,env,fetcher){
  f.set('response',input.turnstileToken);
  let r;
  try{r=await fetcher('https://challenges.cloudflare.com/turnstile/v0/siteverify',
-  {method:'POST',body:f,redirect:'error',signal:AbortSignal.timeout(15000)});}
+  {method:'POST',body:f,redirect:'manual',signal:AbortSignal.timeout(15000)});}
  catch(_){return false}
  if(!r.ok)return false;
  const v=await r.json().catch(()=>null);
@@ -131,7 +131,8 @@ async function postToScript(env,payload,fetcher){
   const location=r.headers.get('Location')||'';
   if(!/^https:\/\/script\.googleusercontent\.com\/macros\//.test(location))
     throw Error('Redirección de Google no autorizada.');
-  r=await fetcher(location,{method:'GET',redirect:'error',signal:AbortSignal.timeout(15000)});
+  // Cloudflare Workers NO admite redirect:'error': se usa manual y se rechaza cualquier 3xx adicional.
+  r=await fetcher(location,{method:'GET',redirect:'manual',signal:AbortSignal.timeout(15000)});
  }
  if(!r.ok){
   const failure=new Error('Google no confirmó la operación.');
