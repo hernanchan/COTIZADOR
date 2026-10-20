@@ -1,5 +1,17 @@
 # Receptor privado de PDF — Librería Saber (piloto de un PDF validado en pruebas) 
 
+## Hito real — conteo autoritativo de páginas, 20/10/2026
+
+El titular implementó el Apps Script `DocumentosReceiver_VALIDACION_FASE2.gs` sobre **PRUEBA 3** y el Worker compilado `dist/saber-documentos-validacion-fase2.mjs` en `saber-documentos-pruebas`, sin alterar sitio público ni Polaroids. Tras abrir `/prueba-validacion`, confirmó literalmente:
+
+> PDF VERIFICADO EN SERVIDOR: 6 página(s).  
+> Recibo: DOC-da162bf3-5b63-48d5-81fe-0f20bd7d02d9  
+> Pagos: desactivados.
+
+**Resultado confirmado en entorno real a partir del mensaje de la interfaz:** el Worker obtuvo por conexión firmada los bytes del mismo PDF previamente recibido de Drive, verificó SHA-256 y empleó el lector PDF empaquetado (`pdf-lib`) para contar **6 páginas**. Apps Script guardó el resultado verificado y lo asoció al recibo. No se modificó la carpeta privada ni hizo segunda carga. **Esta evidencia no confirma precio, carrito, cobro ni pedido del Centro de Pedidos.** Continúan desactivados.
+
+**Siguiente prioridad:** enlazar `privateVerifiedStatus` al presupuesto servidor del cotizador con precios aprobados, primero como simulación B/N A4, sin habilitar cobro.
+
 ## Hito confirmado — recepción real desde Chrome, 20/10/2026
 
 **VERIFICADO EN PILOTO por el titular:** tras instalar `DocumentosReceiver_PILOTO_UN_PDF.gs` en la implementación ya conectada de Apps Script y `worker-cloudflare-piloto-un-pdf.mjs` en el Worker independiente `saber-documentos-pruebas`, el navegador informó literalmente:
