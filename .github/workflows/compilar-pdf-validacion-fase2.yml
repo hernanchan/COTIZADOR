@@ -1,5 +1,5 @@
 # CI sólo de la rama de pruebas. Compila y prueba; NO despliega Workers, Apps Script ni web pública.
-name: Compilar validador PDF (solo artefacto de pruebas)
+name: Compilar PDF y presupuesto (rama de pruebas)
 on:
   push:
     branches:
@@ -29,21 +29,29 @@ jobs:
       - name: Compilar Worker standalone
         working-directory: integraciones/autocotizador/recepcion
         run: npm run build:pilot
+      - name: Compilar Worker de presupuesto sin pagos
+        working-directory: integraciones/autocotizador/recepcion
+        run: npm run build:quote
       - name: Verificar sintaxis del artefacto
-        run: node --check integraciones/autocotizador/recepcion/dist/saber-documentos-validacion-fase2.mjs
+        run: |
+          node --check integraciones/autocotizador/recepcion/dist/saber-documentos-validacion-fase2.mjs
+          node --check integraciones/autocotizador/recepcion/dist/saber-documentos-presupuesto-fase3.mjs
       - name: Guardar archivo compilado SOLO en rama de pruebas
         if: github.ref == 'refs/heads/cotizador/migracion-carga-archivos-20261018'
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add integraciones/autocotizador/recepcion/dist/saber-documentos-validacion-fase2.mjs
+          git add integraciones/autocotizador/recepcion/dist/saber-documentos-presupuesto-fase3.mjs
           if ! git diff --cached --quiet; then
-            git commit -m 'Compilar validador PDF standalone en rama de pruebas [skip ci]'
+            git commit -m 'Compilar validacion y presupuesto PDF en rama de pruebas [skip ci]'
             git push origin HEAD:refs/heads/cotizador/migracion-carga-archivos-20261018
           fi
       - uses: actions/upload-artifact@v4
         with:
           name: saber-documentos-validacion-fase2-NO-PUBLICADO
-          path: integraciones/autocotizador/recepcion/dist/saber-documentos-validacion-fase2.mjs
+          path: |
+            integraciones/autocotizador/recepcion/dist/saber-documentos-validacion-fase2.mjs
+            integraciones/autocotizador/recepcion/dist/saber-documentos-presupuesto-fase3.mjs
           if-no-files-found: error
           retention-days: 1
