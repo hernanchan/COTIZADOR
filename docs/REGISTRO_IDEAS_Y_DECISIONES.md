@@ -1,7 +1,7 @@
 # Librería Saber — Registro maestro de ideas, decisiones y pendientes
 
 **Proyecto:** migración integral del cotizador web, Polaroids, recepción privada y Centro de Pedidos.  
-**Última actualización:** 19/10/2026.  
+**Última actualización:** 20/10/2026.  
 **Propósito:** conservar las ideas que van surgiendo en conversaciones, incluidas las que se implementarán más adelante, sin confundirlas con funciones ya entregadas. Mantener este archivo en la rama de desarrollo y enlazar a especificaciones técnicas detalladas. No incluir secretos, datos personales de clientes, claves, movimientos bancarios o enlaces privados.
 
 ## Cómo vamos a tomar nota
@@ -19,7 +19,7 @@ Cada vez que surja una propuesta: agregar nueva entrada o actualizar la correspo
 
 ## Ideas y decisiones agrupadas
 
-| ID | Idea / decisión | Estado al 19/10 | Etapa y próximo paso |
+| ID | Idea / decisión | Estado al 20/10 | Etapa y próximo paso |
 | --- | --- | --- | --- |
 | WEB-01 | **Un solo cotizador migrado** con todas las categorías, precios reales, carrito unificado y sin reemplazos improvisados. Mantener web actual intacta hasta autorización. | DECIDIDO / EN DESARROLLO | Integración progresiva en rama privada; QA antes de publicar. |
 | WEB-02 | **PDF por tandas B/N y color**. Leer páginas reales, A4/A3, papel, caras, copias; jamás confiar exclusivamente en recuento del navegador. | DECIDIDO / EN DESARROLLO | Motor y pantalla de prueba creados; falta validador de servidor y pruebas con PDF real. |
@@ -27,8 +27,8 @@ Cada vez que surja una propuesta: agregar nueva entrada o actualizar la correspo
 | WEB-04 | **JPG/PNG**: componer 1, 2, 4 o 9 imágenes por cara A4/A3, encuadre y zoom, advertencia PPI según tamaño final, PDF privado listo para imprimir. | DECIDIDO / PARCIAL | Planificador puro ya preparado; falta interfaz, composición, validación y almacenamiento. |
 | WEB-05 | **Ploteos**: planos CAD y pósteres/imágenes grandes por caminos de cálculo separados, tamaño final seleccionado por cliente, rollo/orientación apropiados. | DECIDIDO / PARCIAL | Reutilizar calculadora existente; falta ruteo por archivo/tamaño final. |
 | WEB-06 | **Polaroids solo fotografías**: editor específico de seis por A4, calidad, encuadres y marcas de corte; no mezclar su recepción con documentos. | DECIDIDO / VERIFICADO EN PILOTO | Mantener receptor de fotos sin cambios; integrar al carrito y descargas del Centro de Pedidos. |
-| WEB-07 | **Drive privado, un Centro de Pedidos**, separados por servicio/pedido. Archivos originales y PDF de impresión accesibles al operador mediante descarga protegida. | DECIDIDO / EN DESARROLLO | Carpeta de pruebas en la cuenta operativa `dragonesdepoeta@gmail.com`, distinta del Drive conectado de ChatGPT; Apps Script de documentos creado manualmente, código copiado y conexión a carpeta validada a las 09:49 del 19/10. Implementación web solo para el titular y prueba manual de subida de PDF a Drive reportada exitosa por el usuario el 19/10; no verificada visualmente ni conectada a Cloudflare, y sin validación de páginas en backend. Históricos de Polaroids intactos. |
-| WEB-08 | **Subidas recuperables**, especialmente desde celular si se apaga pantalla; reanudar fragmentos, evitar archivos incompletos y cotejar integridad, sin gastos/R2. | DECIDIDO / EN DESARROLLO | Protocolo SHA y receptor preparado, simulaciones; falta instalación piloto y pruebas con red/dispositivos reales. |
+| WEB-07 | **Drive privado, un Centro de Pedidos**, separados por servicio/pedido. Archivos originales y PDF de impresión accesibles al operador mediante descarga protegida. | DECIDIDO / VERIFICADO EN PILOTO PARCIAL | **20/10: primer PDF real recibido desde Chrome, pasando por Cloudflare y Apps Script firmados, guardado en Drive y cotejado por tamaño y SHA-256 del archivo descargado; recibo `DOC-da162bf3-5b63-48d5-81fe-0f20bd7d02d9`.** Piloto de un único PDF hasta 1 MiB, sin páginas verificadas ni pagos. No se ha inspeccionado visualmente el archivo en el Drive privado desde ChatGPT; aún no existe Centro de Pedidos integrado. Polaroids y web pública intactos. |
+| WEB-08 | **Subidas recuperables**, especialmente desde celular si se apaga pantalla; reanudar fragmentos, evitar archivos incompletos y cotejar integridad, sin gastos/R2. | DECIDIDO / PILOTO PARCIAL | Envío real fragmentado de 1 PDF con cotejo SHA-256 al final confirmado el 20/10; falta demostrar reanudación ante interrupción, cargas grandes y distintos dispositivos. El cupo del piloto inicial ya se utilizó. |
 | WEB-09 | **Mercado Pago pago total**: verificar pago de servidor, webhook cuando funcione y conciliación periódica aceptable; comprobación manual alternativa. | DECIDIDO / VERIFICADO EN PILOTO | Piloto de pagos existente; no asociar automáticamente archivos incompletos a producción. Comprobar cron sin intervención. |
 | WEB-10 | **Transferencia a cuenta propia** como alternativa a MP, con verificación manual simple y botón «Confirmar pago» en Centro de Pedidos. | DECIDIDO / NO IMPLEMENTADO | Vincular movimiento real a pedido, titular/operación/comprobante opcional y evitar confundir transferencias del mostrador del mismo importe. Nunca confirmar por comprobante solamente. |
 | WEB-11 | **Control de cuota de Drive**: conservar archivos de trabajos entregados **30 días** y luego enviarlos a papelera **7 días** antes de borrado definitivo. Mantener histórico comercial. | DECIDIDO / CÓDIGO EN SIMULACIÓN | Motor de retención desarrollado apagado; falta estado «Entregado», inventario confiable por pedido, prueba de reversión y autorización para activar borrado. No tocar históricos Polaroids. |
@@ -42,8 +42,8 @@ Cada vez que surja una propuesta: agregar nueva entrada o actualizar la correspo
 
 ## Prioridad inmediata (secuencial)
 
-1. Completar la configuración segura del **receptor de PDF real** en el nuevo Apps Script de la cuenta operativa `dragonesdepoeta@gmail.com` y un relay de prueba aislado; verificación de carpeta realizada, falta desplegar con autorización y comprobar transmisión real sin tocar Polaroids.
-2. Verificar archivos PDF auténticos de punta a punta (cantidad de páginas validada del lado servidor, integridad y reanudación), bloqueando pago ante errores.
+1. **COMPLETADO EN PILOTO (20/10):** comunicación Cloudflare ↔ Google HMAC y primera transferencia de un PDF de Chrome a Drive privado comprobado por SHA-256, con un solo PDF de hasta 1 MiB y sin cobros. No repetir el mismo piloto: el cupo ya se consumió.
+2. **SIGUIENTE:** implementar conteo confiable de páginas PDF del lado servidor y reporte de tamaño/formato; mantener bloqueo de pago cuando no exista verificación. Diseñar después pruebas de reanudación con sesiones independientes, sin tocar la web pública.
 3. Integrar precio servidor, carrito, recepción de JPG/PNG y ploteos, y Centro de Pedidos con descargas.
 4. Conectar Mercado Pago y transferencias manuales al mismo estado seguro del pedido, incluir control de entregas.
 5. Incorporar retención de 30+7 días, limpieza de abandonos 48 h + 7 días, y enlace para recuperar el carrito; primero simulaciones.
@@ -53,7 +53,7 @@ Cada vez que surja una propuesta: agregar nueva entrada o actualizar la correspo
 
 - [Especificación principal](ESPECIFICACION_COTIZADOR_UNICO_AUTOMATICO.md)
 - [Bitácora de la prueba del cotizador](../pruebas/README_COTIZADOR_ARCHIVOS.md)
-- [Receptor PDF independiente — NO instalado](../integraciones/autocotizador/recepcion/README.md)
+- [Receptor PDF independiente — piloto aislado instalado](../integraciones/autocotizador/recepcion/README.md)
 - [Retención y carritos abandonados](../integraciones/autocotizador/retencion/README.md)
 - [Pruebas de pagos](../integraciones/mercadopago/pruebas/README.md)
 
