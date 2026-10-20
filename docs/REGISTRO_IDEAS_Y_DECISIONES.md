@@ -4,6 +4,17 @@
 **Última actualización:** 20/10/2026.  
 **Propósito:** conservar las ideas que van surgiendo en conversaciones, incluidas las que se implementarán más adelante, sin confundirlas con funciones ya entregadas. Mantener este archivo en la rama de desarrollo y enlazar a especificaciones técnicas detalladas. No incluir secretos, datos personales de clientes, claves, movimientos bancarios o enlaces privados.
 
+## Presupuesto piloto vinculado al PDF real de 6 páginas — 20/10/2026
+
+**Estado:** preparado en GitHub y validado en CI, **sin instalar todavía la fase 3 en Cloudflare**. La fase 2 de recepción y conteo de páginas sí fue probada en servicios reales.
+
+- `worker-fase3-presupuesto-pdf.mjs` añade `GET /prueba-presupuesto` y `POST /api/presupuesto-pdf` al Worker existente. El navegador sólo puede escoger formato A4/A3, simple/doble faz, 1–200 copias y con/sin anillado; **jamás recibe control sobre páginas, recibos, estado ni precio**. El Worker consulta `privatePilotInfo` y `privateVerifiedStatus` de Google Apps Script mediante las **mismas claves HMAC** del piloto. Rechaza si no hay seis páginas verificadas, recibo ajeno/no verificado o si Google autoriza pagos; entonces integra `cotizacion-desde-recibos-servidor.mjs`, `cotizar-documentos.mjs` y `manifiesto-documentos.mjs` usando una copia empaquetada de `precios-web.json`.
+- El archivo listo para instalar sin dependencias es `integraciones/autocotizador/recepcion/dist/saber-documentos-presupuesto-fase3.mjs` (generado en la rama de pruebas por CI). Conserva las rutas de validación, el piloto limitado y el **bloqueo incondicional de cargas generales**, incluso si accidentalmente `DOCS_UPLOAD_ENABLED=true`; no toca la página pública ni los sistemas Polaroids, Mercado Pago o Google.
+- **CI real ejecutado exitosamente en GitHub:** <https://github.com/hernanchan/COTIZADOR/actions/runs/39457576546>. Incluye pruebas Node del presupuesto basado en recibos verificados, lector PDF auténtico y compilación esbuild; se guardó el archivo compilado en la rama. Ensayo adicional del **bundle final** con Google/Turnstile simulados: seis páginas verificadas B/N, A4, simple faz, una copia **$600 orientativos**; dos copias, A4 doble faz, con anillado **$5.620 orientativos**; cliente intenta insertar `pages=999999` → HTTP 400; ruta general de subida → HTTP 503 aun con `DOCS_UPLOAD_ENABLED=true`. Se comprobó sintaxis JS del formulario HTML.
+- **IMPORTANTE sobre precios:** `precios-web.json` usado en build fue generado el **21/08/2026**. Este ensayo es de integración técnica, **NO un precio comercial aprobado ni apto para cobrarse a clientes**. Respuesta y pantalla indican `paymentAuthorized:false`.
+- **Siguiente ensayo permitido:** sin cambiar Apps Script ni claves, copiar **sólo el bundle fase 3** al Worker aislado `saber-documentos-pruebas` mediante Editar código → Implementar, abrir `/prueba-presupuesto`, completar Turnstile y calcular con el PDF ya recibido. Pedir al titular el resultado literal antes de iniciar carrito/pagos. No reutilizar la tabla de agosto para publicar precios reales.
+
+
 ## Hito real — conteo autoritativo de páginas, 20/10/2026
 
 El titular implementó el Apps Script `DocumentosReceiver_VALIDACION_FASE2.gs` sobre **PRUEBA 3** y el Worker compilado `dist/saber-documentos-validacion-fase2.mjs` en `saber-documentos-pruebas`, sin alterar sitio público ni Polaroids. Tras abrir `/prueba-validacion`, confirmó literalmente:
