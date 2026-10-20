@@ -1,0 +1,32 @@
+# Compilación EXCLUSIVAMENTE MANUAL. No despliega Workers, Apps Script ni la web pública.
+name: Compilar validador PDF (solo artefacto de pruebas)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar dependencias del validador (sin despliegue)
+        working-directory: integraciones/autocotizador/recepcion
+        run: npm install --no-audit --no-fund
+      - name: Probar PDF de 1, 3 y 11 páginas, fraude y corrupción
+        working-directory: integraciones/autocotizador/recepcion
+        run: npm test
+      - name: Compilar Worker standalone
+        working-directory: integraciones/autocotizador/recepcion
+        run: npm run build:pilot
+      - name: Verificar sintaxis del artefacto
+        run: node --check integraciones/autocotizador/recepcion/dist/saber-documentos-validacion-fase2.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: saber-documentos-validacion-fase2-NO-PUBLICADO
+          path: integraciones/autocotizador/recepcion/dist/saber-documentos-validacion-fase2.mjs
+          if-no-files-found: error
+          retention-days: 1
