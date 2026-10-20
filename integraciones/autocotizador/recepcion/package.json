@@ -1,0 +1,17 @@
+{
+  "name": "saber-documentos-validacion-fase2",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Compilación local de validador PDF privado; no despliega ni habilita pagos",
+  "scripts": {
+    "build:pilot": "esbuild ./worker-fase2-validar-pdf.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --outfile=./dist/saber-documentos-validacion-fase2.mjs",
+    "test": "node --test ./validacion-fase2.test.mjs"
+  },
+  "dependencies": {
+    "pdf-lib": "1.17.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.24.2"
+  }
+}
