@@ -15,6 +15,12 @@
 
 Este receptor **no** forma parte del Apps Script de Polaroids. El Apps Script de documentos y el Worker independiente `saber-documentos-pruebas` están en **piloto aislado**, habilitado únicamente para una sesión de un PDF de hasta 1 MiB. La ruta general sigue desactivada (HTTP 503) y Polaroids y la web pública no se modificaron. El código de desarrollo permanece en `cotizador/migracion-carga-archivos-20261018`.
 
+## Siguiente tramo técnico preparado (20/10)
+
+- `verificacion-pdf-drive-servidor.mjs`: validador de bytes y páginas con `pdf-lib` a ejecutar en Worker **empaquetado**. Necesita una operación privada nueva para releer bytes almacenados de Drive; no desplegado.
+- `../pruebas/cotizacion-desde-recibos-servidor.mjs`: enlace entre recibos autoritativos, motor actual de tarifas y manifiesto de producción; pagos siempre bloqueados hasta respuesta verificable del backend; probado con datos simulados y precios presentes en GitHub.
+- Ninguna de las dos piezas está conectada todavía con el Worker público de pruebas. La primera carga real de PDF sigue verificada sólo por integridad de bytes, **no por cantidad de páginas**.
+
 ## Archivos preparados
 - `DocumentosReceiver.gs`: servidor Apps Script independiente, firmado con HMAC-SHA256. Guarda PDF en carpeta privada por pedido mediante **Drive API v3 resumable upload** y confirma los bytes recibidos comparando SHA-256 contra el archivo **ya almacenado en Drive**.
 - `worker-documentos.mjs`: módulo para Cloudflare Workers/Pages Functions, **sin ruta desplegada**. Se mantiene apagado salvo que DOCS_UPLOAD_ENABLED sea exactamente "true". Comprueba origen, tamaño y Turnstile con acción `documentos`, firma cada operación y retransmite a Apps Script.
