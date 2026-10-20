@@ -22,7 +22,7 @@ Cada vez que surja una propuesta: agregar nueva entrada o actualizar la correspo
 | ID | Idea / decisión | Estado al 20/10 | Etapa y próximo paso |
 | --- | --- | --- | --- |
 | WEB-01 | **Un solo cotizador migrado** con todas las categorías, precios reales, carrito unificado y sin reemplazos improvisados. Mantener web actual intacta hasta autorización. | DECIDIDO / EN DESARROLLO | Integración progresiva en rama privada; QA antes de publicar. |
-| WEB-02 | **PDF por tandas B/N y color**. Leer páginas reales, A4/A3, papel, caras, copias; jamás confiar exclusivamente en recuento del navegador. | DECIDIDO / EN DESARROLLO | Motor y pantalla de prueba creados; falta validador de servidor y pruebas con PDF real. |
+| WEB-02 | **PDF por tandas B/N y color**. Leer páginas reales, A4/A3, papel, caras, copias; jamás confiar exclusivamente en recuento del navegador. | DECIDIDO / EN DESARROLLO | 20/10: preparado `verificacion-pdf-drive-servidor.mjs` con `pdf-lib` para contar páginas de bytes privados de Drive cotejados por SHA; falta empaquetar biblioteca e integrar consulta/confirmación con Apps Script. Cálculo desde recibos de servidor preparado y probado con tarifas actuales (todavía sin autorización de cobro). |
 | WEB-03 | **Anillados conjuntos, separados y mixtos**: el cliente elige orden de los PDF y grupo; incluir trabajo suelto. | DECIDIDO / EN DESARROLLO | Motor de grupos y ficha de armado en código; falta integración end-to-end. |
 | WEB-04 | **JPG/PNG**: componer 1, 2, 4 o 9 imágenes por cara A4/A3, encuadre y zoom, advertencia PPI según tamaño final, PDF privado listo para imprimir. | DECIDIDO / PARCIAL | Planificador puro ya preparado; falta interfaz, composición, validación y almacenamiento. |
 | WEB-05 | **Ploteos**: planos CAD y pósteres/imágenes grandes por caminos de cálculo separados, tamaño final seleccionado por cliente, rollo/orientación apropiados. | DECIDIDO / PARCIAL | Reutilizar calculadora existente; falta ruteo por archivo/tamaño final. |
@@ -48,6 +48,13 @@ Cada vez que surja una propuesta: agregar nueva entrada o actualizar la correspo
 4. Conectar Mercado Pago y transferencias manuales al mismo estado seguro del pedido, incluir control de entregas.
 5. Incorporar retención de 30+7 días, limpieza de abandonos 48 h + 7 días, y enlace para recuperar el carrito; primero simulaciones.
 6. Después de publicación y estabilidad: estudiar recordatorio automático de WhatsApp y otras mejoras comerciales, con presupuesto aprobado.
+
+## Avance de ingeniería del 20/10/2026 (posterior al primer PDF real)
+
+- **Nuevo módulo:** `integraciones/autocotizador/pruebas/cotizacion-desde-recibos-servidor.mjs`. Une cotizador B/N/color + anillados y ficha de armado **sólo** si cada recibo, consultado por el backend, confirma `storageVerified:true`, `pageVerification:'server'`, páginas, SHA-256, pedido y nombre. El navegador NO puede imponer una cantidad de páginas ni un importe. El resultado bloquea explícitamente el pago (`paymentAuthorized:false`). Pruebas aisladas realizadas: cotización de un PDF A4 de tres páginas a ARS 300 según `precios-web.json` vigente en el código, y rechazo de discrepancias de páginas, SHA, pedido, nombre, modalidad, recibo sin verificación o tarifas faltantes. **No constituye aprobación comercial de las tarifas** (planilla generada en agosto de 2026).
+- **Nuevo módulo:** `integraciones/autocotizador/recepcion/verificacion-pdf-drive-servidor.mjs`. Para Cloudflare Workers **empaquetado con** `pdf-lib`: vuelve a comparar hash/tamaño de los bytes originales **releídos del Drive privado** y lee el árbol de páginas con un motor PDF. Fail-closed: no verifica PDF corruptos/cifrados o pages fuera de rango. Pruebas unitarias con parser inyectado; **no** se ha empaquetado la librería ni probado con PDF real. No conectar a cobro ni llamar a esto integración terminada.
+- **Bloqueante inmediato**: mecanismo firmado y por fragmentos para que el Worker de validación obtenga el PDF **privadamente de Drive**, biblioteca PDF empaquetada, y actualización autoritativa del estado del recibo antes de cotización. Después, una única prueba integral de cotización real. Mantener aislada la web pública y sin volver a pedir cambio de claves.
+- **Prioridad de ejecución**: cerrar un flujo integral sencillo (PDF B/N/color A4/A3 → páginas del servidor → precio aprobado → carrito → pago confirmado → Centro de Pedidos), antes de ampliar ploteos y otras categorías. No reducir alcance funcional sin conformidad del titular.
 
 ## Referencias técnicas
 
