@@ -32,10 +32,17 @@ jobs:
       - name: Compilar Worker de presupuesto sin pagos
         working-directory: integraciones/autocotizador/recepcion
         run: npm run build:quote
+      - name: Compilar formulario unificado PDF fase 4
+        working-directory: integraciones/autocotizador/recepcion
+        run: npm run build:unificado
+      - name: Probar PDF real de seis páginas, subida HMAC y cotización unificada
+        working-directory: integraciones/autocotizador/recepcion
+        run: npm run test:unificado
       - name: Verificar sintaxis del artefacto
         run: |
           node --check integraciones/autocotizador/recepcion/dist/saber-documentos-validacion-fase2.mjs
           node --check integraciones/autocotizador/recepcion/dist/saber-documentos-presupuesto-fase3.mjs
+          node --check integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
       - name: Guardar archivo compilado SOLO en rama de pruebas
         if: github.ref == 'refs/heads/cotizador/migracion-carga-archivos-20261018'
         run: |
@@ -43,6 +50,7 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add integraciones/autocotizador/recepcion/dist/saber-documentos-validacion-fase2.mjs
           git add integraciones/autocotizador/recepcion/dist/saber-documentos-presupuesto-fase3.mjs
+          git add integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
           if ! git diff --cached --quiet; then
             git commit -m 'Compilar validacion y presupuesto PDF en rama de pruebas [skip ci]'
             git push origin HEAD:refs/heads/cotizador/migracion-carga-archivos-20261018
@@ -53,5 +61,6 @@ jobs:
           path: |
             integraciones/autocotizador/recepcion/dist/saber-documentos-validacion-fase2.mjs
             integraciones/autocotizador/recepcion/dist/saber-documentos-presupuesto-fase3.mjs
+            integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
           if-no-files-found: error
           retention-days: 1
