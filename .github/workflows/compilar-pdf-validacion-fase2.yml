@@ -7,9 +7,10 @@ on:
     paths:
       - '.github/workflows/compilar-pdf-validacion-fase2.yml'
       - 'integraciones/autocotizador/recepcion/**'
+      - '!integraciones/autocotizador/recepcion/dist/**'
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -30,6 +31,16 @@ jobs:
         run: npm run build:pilot
       - name: Verificar sintaxis del artefacto
         run: node --check integraciones/autocotizador/recepcion/dist/saber-documentos-validacion-fase2.mjs
+      - name: Guardar archivo compilado SOLO en rama de pruebas
+        if: github.ref == 'refs/heads/cotizador/migracion-carga-archivos-20261018'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add integraciones/autocotizador/recepcion/dist/saber-documentos-validacion-fase2.mjs
+          if ! git diff --cached --quiet; then
+            git commit -m 'Compilar validador PDF standalone en rama de pruebas [skip ci]'
+            git push origin HEAD:refs/heads/cotizador/migracion-carga-archivos-20261018
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: saber-documentos-validacion-fase2-NO-PUBLICADO
