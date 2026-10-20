@@ -4,6 +4,18 @@
 **Última actualización:** 20/10/2026.  
 **Propósito:** conservar las ideas que van surgiendo en conversaciones, incluidas las que se implementarán más adelante, sin confundirlas con funciones ya entregadas. Mantener este archivo en la rama de desarrollo y enlazar a especificaciones técnicas detalladas. No incluir secretos, datos personales de clientes, claves, movimientos bancarios o enlaces privados.
 
+## Hito real — conteo autoritativo de páginas, 20/10/2026
+
+El titular implementó el Apps Script `DocumentosReceiver_VALIDACION_FASE2.gs` sobre **PRUEBA 3** y el Worker compilado `dist/saber-documentos-validacion-fase2.mjs` en `saber-documentos-pruebas`, sin alterar sitio público ni Polaroids. Tras abrir `/prueba-validacion`, confirmó literalmente:
+
+> PDF VERIFICADO EN SERVIDOR: 6 página(s).  
+> Recibo: DOC-da162bf3-5b63-48d5-81fe-0f20bd7d02d9  
+> Pagos: desactivados.
+
+**Resultado confirmado en entorno real a partir del mensaje de la interfaz:** el Worker obtuvo por conexión firmada los bytes del mismo PDF previamente recibido de Drive, verificó SHA-256 y empleó el lector PDF empaquetado (`pdf-lib`) para contar **6 páginas**. Apps Script guardó el resultado verificado y lo asoció al recibo. No se modificó la carpeta privada ni hizo segunda carga. **Esta evidencia no confirma precio, carrito, cobro ni pedido del Centro de Pedidos.** Continúan desactivados.
+
+**Siguiente prioridad:** enlazar `privateVerifiedStatus` al presupuesto servidor del cotizador con precios aprobados, primero como simulación B/N A4, sin habilitar cobro.
+
 ## Cómo vamos a tomar nota
 
 Cada idea nueva tiene ID estable, fecha, estado, alcance y criterio para retomarla. Etiquetas:
@@ -22,7 +34,7 @@ Cada vez que surja una propuesta: agregar nueva entrada o actualizar la correspo
 | ID | Idea / decisión | Estado al 20/10 | Etapa y próximo paso |
 | --- | --- | --- | --- |
 | WEB-01 | **Un solo cotizador migrado** con todas las categorías, precios reales, carrito unificado y sin reemplazos improvisados. Mantener web actual intacta hasta autorización. | DECIDIDO / EN DESARROLLO | Integración progresiva en rama privada; QA antes de publicar. |
-| WEB-02 | **PDF por tandas B/N y color**. Leer páginas reales, A4/A3, papel, caras, copias; jamás confiar exclusivamente en recuento del navegador. | DECIDIDO / EN DESARROLLO | 20/10: preparado `verificacion-pdf-drive-servidor.mjs` con `pdf-lib` para contar páginas de bytes privados de Drive cotejados por SHA; falta empaquetar biblioteca e integrar consulta/confirmación con Apps Script. Cálculo desde recibos de servidor preparado y probado con tarifas actuales (todavía sin autorización de cobro). |
+| WEB-02 | **PDF por tandas B/N y color**. Leer páginas reales, A4/A3, papel, caras, copias; jamás confiar exclusivamente en recuento del navegador. | DECIDIDO / VERIFICADO EN PILOTO PARCIAL | 20/10: primer PDF almacenado en Drive verificado en backend por SHA y **6 páginas reales** con `pdf-lib` y confirmación Apps Script vinculada al recibo. Sigue pendiente vincular tarifas aprobadas, varias tandas, entrega a producción y pago. |
 | WEB-03 | **Anillados conjuntos, separados y mixtos**: el cliente elige orden de los PDF y grupo; incluir trabajo suelto. | DECIDIDO / EN DESARROLLO | Motor de grupos y ficha de armado en código; falta integración end-to-end. |
 | WEB-04 | **JPG/PNG**: componer 1, 2, 4 o 9 imágenes por cara A4/A3, encuadre y zoom, advertencia PPI según tamaño final, PDF privado listo para imprimir. | DECIDIDO / PARCIAL | Planificador puro ya preparado; falta interfaz, composición, validación y almacenamiento. |
 | WEB-05 | **Ploteos**: planos CAD y pósteres/imágenes grandes por caminos de cálculo separados, tamaño final seleccionado por cliente, rollo/orientación apropiados. | DECIDIDO / PARCIAL | Reutilizar calculadora existente; falta ruteo por archivo/tamaño final. |
