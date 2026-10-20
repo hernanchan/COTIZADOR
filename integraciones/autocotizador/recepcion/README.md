@@ -15,6 +15,17 @@
 
 Este receptor **no** forma parte del Apps Script de Polaroids. El Apps Script de documentos y el Worker independiente `saber-documentos-pruebas` están en **piloto aislado**, habilitado únicamente para una sesión de un PDF de hasta 1 MiB. La ruta general sigue desactivada (HTTP 503) y Polaroids y la web pública no se modificaron. El código de desarrollo permanece en `cotizador/migracion-carga-archivos-20261018`.
 
+## Fase 2 — verificar páginas del PDF existente sin volver a subirlo (20/10/2026)
+
+**Código en rama de pruebas, pendiente de instalación real. No editar el Worker desplegado hasta que termine el CI.**
+
+1. **Google Apps Script fase 2**: `DocumentosReceiver_VALIDACION_FASE2.gs` — mantiene el piloto del único PDF, añade `privatePilotInfo` para metadatos internos y `privateReadPart` para entregar al Worker trozos de 256 KiB mediante HMAC. `privateCommitPages` registra un número de páginas procedente del Worker comprobado con la versión `pdf-lib-1.17.1` y compara otra vez el SHA-256 del fichero guardado en Drive. `privateVerifiedStatus` sirve metadatos del recibo para presupuesto posterior. El navegador NO tiene rutas públicas para pedir estos trozos ni para declarar páginas.
+2. **Worker fase 2**: `worker-fase2-validar-pdf.mjs`, que conserva el formulario piloto de 1 MB, la ruta general siempre cerrada, y añade `GET /prueba-validacion` más `POST /api/validar-pdf` con Turnstile. Recupera el archivo existente con llamadas HMAC, comprueba SHA-256 de cada fragmento y del conjunto, cuenta páginas con `pdf-lib` importado por `verificacion-pdf-drive-servidor.mjs` y solicita a Apps Script guardar el resultado. Los PDF originales jamás se devuelven al navegador. Pagos explícitamente desactivados.
+3. **Build y pruebas**: `package.json` fijó `pdf-lib@1.17.1` y `esbuild@0.24.2`; `validacion-fase2.test.mjs` contiene cuatro grupos de pruebas **con PDF reales generados para test** (1, 3, 11 páginas; corrupción, falso SHA y estado inválido). La GitHub Action `compilar-pdf-validacion-fase2.yml` corre solamente en la rama de pruebas, empaqueta un único JS y publica un artefacto efímero, **sin despliegue**. Debido a que la Action puede estar pendiente o fallar, se requiere inspeccionar su resultado antes de dar instrucciones de instalación.
+4. **Flujo final del ensayo**: se reemplaza una sola vez `Código.gs` de documentos por la versión fase 2 y se actualiza la MISMA implementación existente; después se instala el **archivo compilado** (no el fuente con `import 'pdf-lib'`) en el Worker aislado; por último se abre `/prueba-validacion` para verificar el PDF ya almacenado, sin pedir otra subida ni cambiar secreto alguno.
+5. **Límites**: se trata del piloto de un archivo hasta 1 MiB. No demuestra rendimiento con PDF grandes, ni robustez de todos los PDF cifrados/deteriorados, ni autoriza pago o publicación. La recepción del PDF previo sí fue real y verificada por integridad el 20/10, pero aún falta conteo de páginas real.
+
+
 ## Siguiente tramo técnico preparado (20/10)
 
 - `verificacion-pdf-drive-servidor.mjs`: validador de bytes y páginas con `pdf-lib` a ejecutar en Worker **empaquetado**. Necesita una operación privada nueva para releer bytes almacenados de Drive; no desplegado.
