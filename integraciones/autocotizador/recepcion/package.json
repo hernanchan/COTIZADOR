@@ -7,7 +7,9 @@
   "scripts": {
     "build:pilot": "esbuild ./worker-fase2-validar-pdf.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --outfile=./dist/saber-documentos-validacion-fase2.mjs",
     "test": "node --test ./validacion-fase2.test.mjs ./presupuesto-fase3.test.mjs",
-    "build:quote": "esbuild ./worker-fase3-presupuesto-pdf.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --outfile=./dist/saber-documentos-presupuesto-fase3.mjs"
+    "build:quote": "esbuild ./worker-fase3-presupuesto-pdf.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --outfile=./dist/saber-documentos-presupuesto-fase3.mjs",
+    "build:unificado": "esbuild ./worker-fase4-cotizador-unificado.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --outfile=./dist/saber-documentos-cotizador-fase4.mjs",
+    "test:unificado": "node --test ./fase4-e2e.test.mjs"
   },
   "dependencies": {
     "pdf-lib": "1.17.1"
