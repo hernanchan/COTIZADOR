@@ -1,6 +1,19 @@
-# Receptor privado de PDF — Librería Saber (ensayo SIN ACTIVAR)
+# Receptor privado de PDF — Librería Saber (piloto de un PDF validado en pruebas) 
 
-Este receptor **no** forma parte del Apps Script de Polaroids. El titular instaló un Apps Script independiente para documentos, con acceso web **«Solo yo»**, y un Worker independiente `saber-documentos-pruebas` que devuelve **HTTP 503 con recepción desactivada**. El código de desarrollo permanece en `cotizador/migracion-carga-archivos-20261018`. **No se habilitaron cargas externas ni se modificó la web pública o Polaroids.**
+## Hito confirmado — recepción real desde Chrome, 20/10/2026
+
+**VERIFICADO EN PILOTO por el titular:** tras instalar `DocumentosReceiver_PILOTO_UN_PDF.gs` en la implementación ya conectada de Apps Script y `worker-cloudflare-piloto-un-pdf.mjs` en el Worker independiente `saber-documentos-pruebas`, el navegador informó literalmente:
+
+> PDF RECIBIDO Y COMPROBADO EN DRIVE. Recibo: DOC-da162bf3-5b63-48d5-81fe-0f20bd7d02d9  
+> Prueba exitosa de almacenamiento. Validación de páginas y cobros: DESACTIVADOS.
+
+**Alcance técnico:** carga real navegador → Worker aislado → Google Apps Script firmado HMAC → Google Drive privado. El mensaje `finish` sólo se genera después de descargar el PDF guardado desde Drive y cotejar tamaño + SHA-256 del contenido con el PDF de origen. La confirmación procede de la interfaz y fue comunicada por el titular; no equivale a una inspección visual independiente del archivo en su cuenta Drive. El **ID de recibo NO es un ID de archivo Drive**.
+
+**Restricciones conservadas:** una sola sesión de prueba por script properties, 1 MiB como máximo, rutas generales cerradas, servidor responde `verified:false` y `pdfPages:null`, sin pagos ni conexión con `libreriasaber.com.ar` pública ni Polaroids. Se conservaron las claves y permisos existentes. **El cupo de un PDF ya quedó usado**; no volver a pedir otra carga sin diseñar el ensayo siguiente. Queda pendiente validar en servidor el número real de páginas, soportar reanudación de conexión interrumpida en navegadores y autorización de pedidos reales. No desplegar en producción.
+
+---
+
+Este receptor **no** forma parte del Apps Script de Polaroids. El Apps Script de documentos y el Worker independiente `saber-documentos-pruebas` están en **piloto aislado**, habilitado únicamente para una sesión de un PDF de hasta 1 MiB. La ruta general sigue desactivada (HTTP 503) y Polaroids y la web pública no se modificaron. El código de desarrollo permanece en `cotizador/migracion-carga-archivos-20261018`.
 
 ## Archivos preparados
 - `DocumentosReceiver.gs`: servidor Apps Script independiente, firmado con HMAC-SHA256. Guarda PDF en carpeta privada por pedido mediante **Drive API v3 resumable upload** y confirma los bytes recibidos comparando SHA-256 contra el archivo **ya almacenado en Drive**.
@@ -183,4 +196,4 @@ Este receptor **no** forma parte del Apps Script de Polaroids. El titular instal
 - Las pruebas no verifican conectividad real de Google, cuotas, la pantalla móvil, el PDF real, el webhook, la firma HMAC con credenciales de producción, el estado de Cloudflare ni ninguna subida desde el sitio.
 - Referencia oficial: Google Drive API v3, [resumable upload](https://developers.google.com/workspace/drive/api/guides/manage-uploads).
 
-**No instalar ni publicar** sin autorización expresa; antes de tocar las cuentas corresponde crear el entorno de pruebas separado y confirmar propiedades, accesos y plan de reversión.
+**No fusionar a `main` ni publicar en la web del negocio sin autorización expresa.** El piloto ya está instalado únicamente en los servicios aislados de pruebas y el cupo individual ya fue utilizado.
