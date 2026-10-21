@@ -5,7 +5,7 @@
  */
 export function paginaLotePdf(sitekey) {
   if(!/^[a-zA-Z0-9._-]{10,200}$/.test(sitekey||''))throw Error('Turnstile ausente');
-  return \`<!doctype html><html lang="es"><head><meta charset="utf-8">
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
 <title>Librería Saber — Prueba de varios PDF</title>
 <style>
@@ -24,7 +24,7 @@ small{color:#586b79}
 <div class="row"><div><label>Archivo nuevo</label><input id="file" type="file" accept=".pdf,application/pdf"></div>
 <div><label>Impresión de este archivo</label><select id="mode"><option value="bn">Blanco y negro</option><option value="color">Color</option></select></div></div>
 <label>Seguridad para agregar cada archivo</label>
-<div class="cf-turnstile" data-sitekey="\${sitekey}" data-action="documentos"></div>
+<div class="cf-turnstile" data-sitekey="${sitekey}" data-action="documentos"></div>
 <button id="add" type="button">Agregar PDF al presupuesto</button>
 <h2>Archivos recibidos</h2><ol id="files"></ol>
 <p><small>Quitar un documento de la cotización no lo elimina del Drive privado ni devuelve el cupo de la sesión piloto.</small></p>
@@ -122,5 +122,5 @@ quote.addEventListener('click',async()=>{
  }catch(e){say('No se pudo verificar el lote: '+String(e.message||e))}
  finally{quote.disabled=recibidos.length===0}
 });
-</script></body></html>\`;
+</script></body></html>`;
 }
