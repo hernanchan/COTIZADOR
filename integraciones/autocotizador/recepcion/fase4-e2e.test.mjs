@@ -139,9 +139,11 @@ test('Fase4 real PDF -> HMAC Google mock -> páginas pdf-lib -> precio B/N, pago
  assert.ok(q.tiemposServidor.totalMs>=0);
  for(const k of ['consultaGoogleMs','lecturaPrivadaMs','analisisPdfMs','confirmacionGoogleMs'])
    assert.ok(Number.isFinite(q.tiemposServidor[k])&&q.tiemposServidor[k]>=0, k);
+ const googleCallsAntesDeRecotizar=googleCalls;
  const doubleQuote=await worker.fetch(req('/api/ensayo-cotizar',{uploadId:session.uploadId,token:session.token,
   formato:'a4',caras:'double',copias:2,anillado:'juntos'}),env);
  assert.equal((await doubleQuote.json()).total,5620);
+ assert.equal(googleCalls,googleCallsAntesDeRecotizar+1,'PDF ya verificado: sólo una llamada Google');
 });
 test('FASE 4 multifichero: pantalla privada, precio servidor y protección contra recibos repetidos',async()=>{
  const htmlResp=await worker.fetch(new Request(origin+'/prueba-cotizador-lote'),env);
