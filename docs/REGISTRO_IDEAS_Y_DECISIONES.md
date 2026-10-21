@@ -4,6 +4,14 @@
 **Última actualización:** 20/10/2026.  
 **Propósito:** conservar las ideas que van surgiendo en conversaciones, incluidas las que se implementarán más adelante, sin confundirlas con funciones ya entregadas. Mantener este archivo en la rama de desarrollo y enlazar a especificaciones técnicas detalladas. No incluir secretos, datos personales de clientes, claves, movimientos bancarios o enlaces privados.
 
+## Instrumentación y validación adicional — 21/10/2026
+
+- Pantalla de lote y endpoint de cotización incorporados a la rama de desarrollo, **todavía no desplegados**.
+- Nuevo test `tests/autocotizador-pantalla-lote.test.mjs`: comprueba controles del formulario, punto de entrada del presupuesto y sintaxis JavaScript del HTML.
+- GitHub Actions ampliado para ejecutar pruebas del lote, escalas y pantalla y revisar sintaxis de archivos fuente; **resultado de ejecución aún no confirmado** mediante acceso a Actions.
+- El formulario en desarrollo muestra duración de carga completa, transmisión/estado de fragmentos y confirmación en Drive. Además, el Worker en desarrollo mide el tiempo de verificación privada del PDF. Queda pendiente un ensayo con la implementación real para poder diagnosticar la lentitud; no se han medido tiempos reales.
+- Mantener `main`, Worker desplegado, Google Apps Script, Polaroids y cobros sin modificaciones hasta validar CI y aprobar explícitamente el siguiente ensayo.
+
 ## Piloto multifichero — integración en código, pendiente de pruebas (21/10/2026)
 
 **Todavía NO desplegado:** se prepararon la pantalla `GET /prueba-cotizador-lote` y el endpoint `POST /api/ensayo-cotizar-lote`, exclusivamente dentro del Worker de desarrollo. El cliente agrega documentos uno por uno, con Turnstile por inicio, consulta fragmentos confirmados antes de reenvío y conserva las sesiones en esa pestaña. Una lista de hasta cinco PDF forma una cotización conjunta, con modo B/N o color elegido por archivo y parámetros comunes de formato, caras y copias. Se permiten anillados juntos/separados en este piloto; tandas con formato o papel diferente siguen pendientes.
