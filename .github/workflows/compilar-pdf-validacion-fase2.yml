@@ -7,6 +7,9 @@ on:
     paths:
       - '.github/workflows/compilar-pdf-validacion-fase2.yml'
       - 'integraciones/autocotizador/recepcion/**'
+      - 'integraciones/autocotizador/pruebas/**'
+      - 'tests/autocotizador-*.test.mjs'
+      - 'precios-web.json'
       - '!integraciones/autocotizador/recepcion/dist/**'
   workflow_dispatch:
 permissions:
@@ -26,6 +29,8 @@ jobs:
       - name: Probar PDF de 1, 3 y 11 páginas, fraude y corrupción
         working-directory: integraciones/autocotizador/recepcion
         run: npm test
+      - name: Verificar umbrales de precio y recibos multifichero (sin despliegue)
+        run: node --test tests/autocotizador-escalas-multifichero.test.mjs tests/autocotizador-lote-verificado.test.mjs
       - name: Compilar Worker standalone
         working-directory: integraciones/autocotizador/recepcion
         run: npm run build:pilot
