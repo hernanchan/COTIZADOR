@@ -12,8 +12,8 @@ export function paginaCotizadorRapido(){
  #precio{font-size:20px;font-weight:700;background:#eff5fb;padding:16px;margin-top:16px;border-radius:9px;line-height:1.6}
  small{color:#54677a}#estado{margin:14px 0}</style></head><body><main>
  <h1>Presupuesto rápido de varios PDF</h1>
- <p class="note"><strong>Ensayo de precio preliminar.</strong> Los PDF se leen en este dispositivo y no se envían a Google Drive para cotizar. Tarifas orientativas pendientes de aprobación comercial. Para comprar, será necesaria una verificación posterior de archivos y precio. <strong>Pagos desactivados.</strong></p>
- <label for="archivo">Elegí hasta 30 PDF juntos</label><input id="archivo" type="file" accept=".pdf,application/pdf" multiple>
+ <p class="note"><strong>Ensayo de precio preliminar.</strong> Los PDF se leen en este dispositivo y no se envían a Google Drive para cotizar. Tarifas orientativas pendientes de aprobación comercial. Los archivos grandes se procesan uno por uno y pueden tardar o superar la memoria de algunos celulares. Para comprar, será necesaria una verificación posterior de archivos y precio. <strong>Pagos desactivados.</strong></p>
+ <label for="archivo">Elegí hasta 30 PDF juntos (hasta 250 MB por PDF para este ensayo)</label><input id="archivo" type="file" accept=".pdf,application/pdf" multiple>
  <div id="soltar" tabindex="0">O arrastrá aquí todos los PDF</div>
  <p id="estado" role="status">Cargando lector local…</p><strong id="paginas">0 páginas detectadas</strong>
  <ol id="documentos"></ol>
