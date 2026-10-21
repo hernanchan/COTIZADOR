@@ -281,3 +281,29 @@ test('grupos incompatibles no reciben precio engañoso',async()=>{
  assert.equal(r.status,400);
  assert.equal((await r.json()).paymentAuthorized,false);
 });
+
+
+test('resumen de cliente y ficha técnica en páginas separadas, conserva importes',async()=>{
+ const page=await worker.fetch(new Request(origin+'/prueba-cotizador-rapido'),env);
+ const html=await page.text();
+ assert.match(html,/id="resumen"/);
+ assert.match(html,/panel-resumen/);
+ const script=await worker.fetch(new Request(origin+'/prueba-cotizador-rapido.js'),env);
+ const js=await script.text();
+ assert.match(js,/Instrucciones para impresión/);
+ assert.match(js,/Tu presupuesto/);
+ assert.match(js,/Copiar instrucciones de impresión/);
+ assert.match(js,/PENDIENTE: verificar originales/);
+ const docs=[
+  {id:'pdf1',nombre:'parte1.pdf',paginas:10,modo:'bn',formato:'a4',caras:'simple',copias:2,anillado:'grupo',grupoAnillado:'1',materialColor:'obra70',orden:1},
+  {id:'pdf2',nombre:'parte2.pdf',paginas:10,modo:'bn',formato:'a4',caras:'double',copias:2,anillado:'grupo',grupoAnillado:'1',materialColor:'obra70',orden:2}
+ ];
+ const r=await worker.fetch(req('/api/ensayo-presupuesto-rapido',{
+  archivos:docs,formato:'a4',caras:'simple',copias:2,anillado:'ninguno'
+ }),env);
+ assert.equal(r.status,200);
+ const q=(await r.json()).resumen;
+ assert.equal(q.detalleArmados.length,1);
+ assert.equal(q.subtotalImpresiones+q.anillados,q.total);
+ assert.ok(q.detalleArmados[0].archivos.join(',')==='pdf1,pdf2');
+});
