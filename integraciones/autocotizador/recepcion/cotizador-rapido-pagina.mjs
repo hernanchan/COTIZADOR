@@ -16,7 +16,7 @@ export function paginaCotizadorRapido(){
  <label for="archivo">Elegí hasta 30 PDF juntos (hasta 250 MB por PDF para este ensayo)</label><input id="archivo" type="file" accept=".pdf,application/pdf" multiple>
  <div id="soltar" tabindex="0">O arrastrá aquí todos los PDF</div>
  <p id="estado" role="status">Cargando lector local…</p><strong id="paginas">0 páginas detectadas</strong>
- <ol id="documentos"></ol>
+ <p><strong>Anillado de varios archivos:</strong> elegí «Junto con grupo 1» en dos o más PDF para unirlos en ese orden. Podés usar hasta cinco grupos. Todos los archivos de cada grupo deben tener el mismo tamaño y la misma cantidad de copias; pueden mezclar B/N, color y simple/doble faz. El precio del anillado se calcula por cada juego completo.</p><ol id="documentos"></ol>
  <p><strong>Configuración para nuevos archivos o para aplicar a todos:</strong></p><div class="config">
   <div><label for="modoGeneral">Impresión</label><select id="modoGeneral"><option value="bn">B/N</option><option value="color">Color</option></select></div>
   <div><label for="formato">Tamaño</label><select id="formato"><option value="a4">A4</option><option value="a3">A3</option></select></div>
