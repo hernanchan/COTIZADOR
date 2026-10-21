@@ -4,6 +4,14 @@
 **Última actualización:** 20/10/2026.  
 **Propósito:** conservar las ideas que van surgiendo en conversaciones, incluidas las que se implementarán más adelante, sin confundirlas con funciones ya entregadas. Mantener este archivo en la rama de desarrollo y enlazar a especificaciones técnicas detalladas. No incluir secretos, datos personales de clientes, claves, movimientos bancarios o enlaces privados.
 
+## Validación directa y primera mejora de recotización — 21/10/2026
+
+- Se revisó el estado de la integración, pero la consulta de GitHub Actions devuelve listas vacías en el conector (el método de ejecuciones sólo enumera acciones de pull requests). **No declarar CI aprobado** por ese motivo.
+- Se verificó directamente la sintaxis JavaScript del formulario HTML multifichero y del código fuente del Worker (con imports externos apartados para el control sintáctico): **correcta**. Las rutas `/prueba-cotizador-lote` y `/api/ensayo-cotizar-lote` están presentes en el fuente.
+- Se ejecutaron directamente en un evaluador JavaScript cinco casos de los módulos puros: suma de tres PDF 20+30+50 (100 impresiones B/N, precio unitario de prueba 76, total 7600), B/N+color por separado, rechazo de páginas sin verificación, rechazo de duplicados y anillados por separado. **Los cinco casos pasaron**. Esto no sustituye las pruebas integrales Node/esbuild/Google reales.
+- Optimización segura de recotización: `fase4PrivateVerified` consulta primero `multiVerifiedStatus` con sesión+token. Si el PDF ya tiene recibo completo verificado, retorna inmediatamente con **una única llamada** a Apps Script (antes eran `multiInfo` + `multiVerifiedStatus`, dos llamadas). Si aún no está verificado, continúa el procedimiento original de descarga por fragmentos, SHA-256 y conteo de páginas del PDF guardado. Se agregó aserción e2e para la llamada eliminada, **pendiente de ejecución CI**. No afirmar una reducción de segundos sin medición real.
+- Todo está guardado sólo en rama de desarrollo; **NO desplegado**, sin cambios en Apps Script, Cloudflare público, Polaroids ni pagos.
+
 ## Instrumentación y validación adicional — 21/10/2026
 
 - Pantalla de lote y endpoint de cotización incorporados a la rama de desarrollo, **todavía no desplegados**.
