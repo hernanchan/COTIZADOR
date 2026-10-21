@@ -7,6 +7,14 @@ test('pantalla multifichero integra controles reales y JavaScript válido',()=>{
  const html=paginaLotePdf(key);
  assert.match(html,/Presupuesto conjunto de varios PDF/);
  assert.match(html,/id="file"/);
+ assert.match(html,/type="file"[^>]*multiple/);
+ assert.match(html,/id="drop"/);
+ assert.match(html,/id="pending"/);
+ assert.match(html,/Preparados para enviar/);
+ assert.match(html,/Enviar próximo PDF preparado/);
+ assert.match(html,/drop\.addEventListener\('drop'/);
+ assert.match(html,/preparados\.shift\(\)/);
+ assert.match(html,/mode\.addEventListener\('change'/);
  assert.match(html,/id="mode"/);
  assert.match(html,/id="quote"/);
  assert.match(html,/\/api\/ensayo-cotizar-lote/);
