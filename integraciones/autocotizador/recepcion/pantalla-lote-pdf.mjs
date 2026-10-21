@@ -109,6 +109,9 @@ add.addEventListener('click',async()=>{
   if(String.fromCharCode(...bytes.subarray(0,5))!=='%PDF-')throw Error('No es un PDF válido.');
   const sha=await hash(buf);if(recibidos.some(r=>r.sha===sha))throw Error('Ese mismo PDF ya fue incorporado.');
   const key=sha+':'+mode+':'+file.name;let state=pendientes.get(key);
+  // Una sesión recién creada aún no tiene fragmentos: evitar el status
+  // redundante. En reintentos SIEMPRE consultar Google antes de reenviar.
+  const sesionNueva=!state;
   const parts=Math.ceil(file.size/524288);
   if(!state){
    const rand=new Uint8Array(8);crypto.getRandomValues(rand);
@@ -121,7 +124,9 @@ add.addEventListener('click',async()=>{
    pendientes.set(key,state);
   }
   const tTransferencia=performance.now();
-  const progress=await rpc('/api/ensayo-pdf',{op:'status',uploadId:state.uploadId,token:state.token});
+  const progress=sesionNueva?{acceptedParts:[]}:await rpc('/api/ensayo-pdf',{
+   op:'status',uploadId:state.uploadId,token:state.token
+  });
   const accepted=new Set(progress.acceptedParts||[]);
   for(let i=0;i<parts;i++){
    if(accepted.has(i))continue;
