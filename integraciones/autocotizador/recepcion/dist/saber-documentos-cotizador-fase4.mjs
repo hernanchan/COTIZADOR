@@ -54,6 +54,7 @@ add.addEventListener('click',async()=>{
  if(recibidos.length>=5){say('Se alcanz\xF3 el l\xEDmite de cinco PDF en este ensayo.');return}
  add.disabled=true;quote.disabled=true;
  try {
+  const inicioCarga=performance.now();
   const buf=await file.arrayBuffer(),bytes=new Uint8Array(buf);
   if(String.fromCharCode(...bytes.subarray(0,5))!=='%PDF-')throw Error('No es un PDF v\xE1lido.');
   const sha=await hash(buf);if(recibidos.some(r=>r.sha===sha))throw Error('Ese mismo PDF ya fue incorporado.');
@@ -69,6 +70,7 @@ add.addEventListener('click',async()=>{
    state={uploadId:session.uploadId,token:session.token,sha,mode,name:file.name};
    pendientes.set(key,state);
   }
+  const tTransferencia=performance.now();
   const progress=await rpc('/api/ensayo-pdf',{op:'status',uploadId:state.uploadId,token:state.token});
   const accepted=new Set(progress.acceptedParts||[]);
   for(let i=0;i<parts;i++){
@@ -78,11 +80,17 @@ add.addEventListener('click',async()=>{
    await rpc('/api/ensayo-pdf',{op:'part',uploadId:state.uploadId,token:state.token,
       index:i,bytes:part.length,sha256:await hash(part),dataBase64:base64(part)});
   }
+  const tConfirmacion=performance.now();
   const result=await rpc('/api/ensayo-pdf',{op:'finish',uploadId:state.uploadId,
     token:state.token,sha256:sha,bytes:file.size,parts});
   if(!result.received)throw Error('La recepci\xF3n no fue confirmada.');
   recibidos.push(state);pendientes.delete(key);
-  $('file').value='';redraw();say('Recibido: '+file.name+'. Pod\xE9s agregar otro PDF o calcular el total.');
+  const finCarga=performance.now();
+  $('file').value='';redraw();
+  say('Recibido: '+file.name+'. Pod\xE9s agregar otro PDF o calcular el total.'+
+    '\\nTiempo total de carga: '+Math.round(finCarga-inicioCarga)+' ms'+
+    '\\nFragmentos y estado: '+Math.round(tConfirmacion-tTransferencia)+' ms'+
+    '\\nConfirmaci\xF3n Drive: '+Math.round(finCarga-tConfirmacion)+' ms');
  }catch(e){say('No se pudo terminar: '+String(e.message||e)+'. Si ya comenz\xF3 la subida, reintent\xE1 con el mismo archivo sin cerrar esta pesta\xF1a.')}
  finally{add.disabled=recibidos.length>=5;quote.disabled=recibidos.length===0;window.turnstile?.reset()}
 });
