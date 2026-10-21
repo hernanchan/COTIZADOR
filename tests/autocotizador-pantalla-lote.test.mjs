@@ -14,6 +14,9 @@ test('pantalla multifichero integra controles reales y JavaScript válido',()=>{
  assert.match(html,/Enviar próximo PDF preparado/);
  assert.match(html,/drop\.addEventListener\('drop'/);
  assert.match(html,/preparados\.shift\(\)/);
+ assert.match(html,/const sesionNueva=!state/);
+ assert.match(html,/sesionNueva\?\{acceptedParts:\[\]\}:await rpc\('\/api\/ensayo-pdf'/);
+ assert.match(html,/const accepted=new Set\(progress\.acceptedParts\|\|\[\]\)/);
  assert.match(html,/mode\.addEventListener\('change'/);
  assert.match(html,/mode\.addEventListener\('change'/);
  assert.match(html,/id="quote"/);
