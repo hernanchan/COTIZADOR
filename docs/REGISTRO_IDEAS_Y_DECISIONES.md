@@ -1,3 +1,10 @@
+## Validación real de FASE 5 — 21/10/2026
+
+- **Resultado comunicado por el titular:** prueba real de **dos PDF de dos páginas cada uno**, con flujo multifichero y cotización, **todo correcto funcionalmente**. La pantalla de FASE 5 fue desplegada en Worker aislado `saber-documentos-pruebas`, versión activa `89300d6a`, con Google Apps Script de documentos ya instalado (versión 5). No se reportaron errores de integridad, páginas o cotización en esta prueba, aunque no se recibieron tiempos medidos ni capturas de resultados finales.
+- **Problema crítico de rendimiento:** el usuario reporta **esperas excesivas** incluso con dos PDF de sólo dos páginas. Esto bloquea aprobación de UX comercial. Investigar latencia por operaciones `multiStart`, `multiStatus`, `multiPart`, `multiFinish`, `multiVerifiedStatus`, `multiInfo`, `multiReadPart`, `multiCommitPages`; medir por etapa antes de rediseñar. Revisar ida/vuelta Cloudflare ↔ Apps Script ↔ Drive, secuencialidad y lecturas repetidas. No relajar SHA-256, HMAC, conteo real, idempotencia o bloqueo de pagos. No presentar el mero cambio de límite 1 MiB como solución de rendimiento.
+- **Problema crítico UX de carga:** agregar un archivo por vez, elegir modalidad y repetir Turnstile no es intuitivo para clientes. **Nuevo criterio de diseño:** selección múltiple y arrastrar/soltar, lista de archivos antes de enviarlos, asignación B/N/color por archivo en un mismo lote, progreso individual y global, errores claros, posibilidad de modificar/quitar antes de comenzar, interfaz de un solo flujo sin perder progreso. Analizar autenticación única por sesión de lote con validación individual de permisos y cuotas en servidor antes de prometerla.
+- **Próxima prioridad:** instrumentación medible en vivo y prototipo de interfaz UX primero en rama de pruebas; no obligar al titular a repetir cargas de prueba innecesarias ni publicar cambios sin validación. Mantener producción, Polaroids, tarifas reales y pagos intactos.
+
 # Librería Saber — Registro maestro de ideas, decisiones y pendientes
 
 **Proyecto:** migración integral del cotizador web, Polaroids, recepción privada y Centro de Pedidos.  
