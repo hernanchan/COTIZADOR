@@ -4,6 +4,17 @@
 **Última actualización:** 20/10/2026.  
 **Propósito:** conservar las ideas que van surgiendo en conversaciones, incluidas las que se implementarán más adelante, sin confundirlas con funciones ya entregadas. Mantener este archivo en la rama de desarrollo y enlazar a especificaciones técnicas detalladas. No incluir secretos, datos personales de clientes, claves, movimientos bancarios o enlaces privados.
 
+## Hito real y requisitos ratificados — 21/10/2026
+
+**FASE 4: VERIFICADO EN PILOTO REAL, UN PDF NUEVO.** El titular instaló el receptor `DocumentosReceiver_FASE4_CINCO_PDF.gs` en el proyecto Apps Script exclusivo de documentos, actualizando la implementación activa «Sin título» a versión 5 (21/10/2026 07:38), cuya URL coincide con `DOCS_SCRIPT_URL` del Worker aislado `saber-documentos-pruebas`. Instaló el bundle compilado `dist/saber-documentos-cotizador-fase4.mjs` en dicho Worker (despliegue `d8d46fab`). La captura del navegador confirmó, para un PDF nuevo de autorización de viaje, **2 páginas verificadas en servidor, 1 copia B/N A4 simple, total orientativo ARS 200, recibo DOC-e1ee9414-9fc7-4d31-aaf4-37afcee68b45, pagos desactivados**. Evidencia aportada mediante captura del navegador; no se inspeccionó por separado el archivo en Drive. **No habilitar pagos, producción ni actualizar `main`**. La URL enlazada desde Cloudflare es la implementación activa «Sin título», no la implementación «PRUEBA 3» archivada que mencionan instrucciones históricas; corregir esas instrucciones antes de nuevos despliegues.
+
+**Requisitos reafirmados por el titular antes de avanzar:**
+
+- **Rendimiento:** la carga/verificación de un PDF resulta perceptiblemente lenta. Medir tiempos de transmisión por fragmentos, llamadas Apps Script/Drive, relectura/hash y conteo `pdf-lib`; optimizar el cuello de botella sin eliminar la verificación de integridad, páginas ni controles HMAC/Turnstile. No afirmar mejoras de velocidad sin mediciones.
+- **Multifichero:** ofrecer subida de varios PDF en una misma operación/cotización, con tandas y modos B/N/color, parámetros por grupo, desglose, orden y opciones de anillado. El piloto actual admite hasta cinco sesiones/PDF individuales de 1 MiB, **no** equivale aún a carga multifichero comercial.
+- **Escalas por volumen:** conservar **exactamente** los tramos de descuento por cantidad del cotizador vigente: al crecer la cantidad, aplicar la tarifa correspondiente, distinguiendo formato, modalidad, papel y caras. `cotizar-documentos.mjs` ya selecciona `scales` por `from/to`, pero falta contrastar los valores comerciales actuales con `precios-web.json` (generado 21/08/2026), validar unidad de cómputo y ensayar cruces de umbrales. **No asumir que ARS 200 representa una tarifa aprobada.** Precios definitivos siempre recalculados en servidor.
+- **Siguiente trabajo:** rendimiento medido + experiencia multifichero + paridad de escalas con web vigente, todo en rama aislada, sin alterar Polaroids, producción, secretos ni pagos.
+
 ## Fase 4 — carga y presupuesto de un PDF NUEVO en la misma pantalla (20/10/2026)
 
 **Estado:** código preparado y probado en la rama de desarrollo; **todavía NO instalado en Apps Script ni Cloudflare**. A diferencia de las fases 2–3, donde sólo se consultaba el PDF original de 6 páginas, esta fase permite que cada ensayo **seleccione un nuevo PDF**. El ensayo está limitado a cinco PDFs nuevos de 1 MiB máximo cada uno, con sesiones separadas y recibos nuevos. Las claves HMAC y Turnstile actuales se reutilizan sin cambios.
