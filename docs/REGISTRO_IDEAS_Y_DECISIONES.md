@@ -1,3 +1,10 @@
+## Optimización de carga nueva e instrumentación por PDF — 21/10/2026
+
+- **Cambio funcional en rama de desarrollo, todavía NO desplegado:** en la pantalla multifichero, al crear una sesión nueva mediante `multiStart`, se omite la petición `multiStatus` que siempre informaría 0 fragmentos. En sesiones interrumpidas/reintentadas que ya se guardaron localmente, **se conserva `multiStatus`** para comprobar fragmentos aceptados antes de reenviar; el receptor sigue verificando integridad SHA-256, cupos y firma HMAC en cada operación. Esto ahorra una ida/vuelta a Cloudflare→Apps Script→Drive por archivo **sólo en primer intento**. La reducción en segundos aún no fue medida.
+- **Instrumentación por archivo:** `POST /api/ensayo-cotizar-lote` expone únicamente tiempos no sensibles de la verificación privada por documento (estado previo, consulta Google cuando aplica, lectura por fragmentos, análisis y confirmación). La pantalla muestra el desglose temporal para medir el cuello de botella real. No expone llaves, rutas de Drive ni bytes.
+- **Pruebas añadidas/actualizadas:** comprobar que el estado no se consulta en una sesión recién creada, sí en reintentos; revisar latencias reportadas y sintaxis de interfaz. Ejecuciones de GitHub Actions automáticas; validar resultado final antes de habilitar nueva instalación.
+- **Reglas comerciales y producción:** sin cambios; mantener pagos apagados, sitio público intacto y Apps Script activo sin reemplazar.
+
 ## Mejoras de interfaz posteriores a la prueba multifichero — 21/10/2026
 
 - **Realizado en rama de pruebas, aún NO desplegado:** selector múltiple de PDF con `multiple`, zona de arrastre, cola de archivos **previa** a la subida, opción B/N o color por cada PDF, quitar archivos pendientes, lista de recibidos y un único presupuesto conjunto. Se mantienen autenticación Turnstile por inicio de archivo y confirmación individual: **todavía NO hay un único token para todo el lote**.
