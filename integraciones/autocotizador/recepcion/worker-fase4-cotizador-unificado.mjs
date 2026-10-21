@@ -744,6 +744,19 @@ async function fase4PrivateVerified(env,session,metrics=null){
  const mark=()=>Date.now();let last=mark();
  const lap=(name)=>{if(metrics){metrics[name]=mark()-last;}last=mark();};
  const ctx={uploadId:session.uploadId,token:session.token};
+ // En una recotización, consultar primero el recibo ya validado ahorra
+ // una llamada a Google. Si no está verificado, continuar con la lectura
+ // y análisis completos. La respuesta sigue vinculada a sesión+token.
+ const previo=await postToScript(env,{op:'multiVerifiedStatus',...ctx},fetch);
+ lap('estadoPrevioMs');
+ if(previo.ok&&previo.status==='verified'&&previo.verified===true&&
+    previo.storageVerified===true&&previo.pageVerification==='server'&&
+    previo.paymentAuthorized===false&&previo.receiptId===ctx.uploadId&&
+    Number.isSafeInteger(previo.pages)&&previo.pages>=1&&
+    Number.isSafeInteger(previo.bytes)&&previo.bytes>=5&&previo.bytes<=FASE4_QUOTA_BYTES&&
+    /^[a-f0-9]{64}$/.test(previo.sha256||'')){
+   return previo;
+ }
  const info=await postToScript(env,{op:'multiInfo',...ctx},fetch);
  lap('consultaGoogleMs');
  if(!info.ok||!phase4Session(info.receiptId)||info.receiptId!==ctx.uploadId||
