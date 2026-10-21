@@ -124,6 +124,7 @@ add.addEventListener('click',async()=>{
    pendientes.set(key,state);
   }
   const tTransferencia=performance.now();
+  const inicioFragmentos=tTransferencia;
   const progress=sesionNueva?{acceptedParts:[]}:await rpc('/api/ensayo-pdf',{
    op:'status',uploadId:state.uploadId,token:state.token
   });
@@ -144,8 +145,9 @@ add.addEventListener('click',async()=>{
   $('file').value='';redraw();
   say('Recibido: '+file.name+'. Podés agregar otro PDF o calcular el total.'+
     '\\nTiempo total de carga: '+Math.round(finCarga-inicioCarga)+' ms'+
-    '\\nFragmentos y estado: '+Math.round(tConfirmacion-tTransferencia)+' ms'+
-    '\\nConfirmación Drive: '+Math.round(finCarga-tConfirmacion)+' ms');
+    '\\nInicio protegido: '+Math.round(tTransferencia-inicioCarga)+' ms (incluye lectura y SHA-256 local)'+
+    '\\nTransferencia y estado: '+Math.round(tConfirmacion-inicioFragmentos)+' ms'+
+    '\\nConfirmación de recepción: '+Math.round(finCarga-tConfirmacion)+' ms');
  }catch(e){say('No se pudo terminar: '+String(e.message||e)+'. Si ya comenzó la subida, reintentá con el mismo archivo sin cerrar esta pestaña.')}
  finally{ocupado=false;redraw();window.turnstile?.reset()}
 });
