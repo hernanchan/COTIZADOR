@@ -1,3 +1,10 @@
+## Referencia de la competencia — MrByn y objetivo de rapidez (21/10/2026)
+
+- Referencia pública: https://mrbyn.com.ar/producto/impresiones/; formulario con campos de hasta 17 archivos y tamaño anunciado de 250 MB por archivo. Usuario informa 10 archivos y precio obtenido en ~10 segundos; **observación del usuario, no medida nuestra**.
+- Decisión arquitectónica: **mostrar precio preliminar ANTES de confirmar almacenamiento privado**. Contar páginas PDF del lado del cliente sin enviar bytes a un tercero; Worker cotiza provisoriamente usando precios de servidor. **Sólo** al avanzar con compra se suben los PDF privados y se verifican SHA-256/páginas/tarifas de nuevo; el servidor tiene autoridad final y debe exigir aceptación de diferencias.
+- Documento de análisis y requisitos técnicos: [REFERENCIA_COMPETITIVA_MRBYN_RENDIMIENTO.md](REFERENCIA_COMPETITIVA_MRBYN_RENDIMIENTO.md). No se copió código de terceros, no se publicó ningún cambio, no se tocan pagos ni la web pública.
+- Meta de diseño y benchmark: 10 PDF corrientes → cotización preliminar objetivo ~10 segundos en condiciones comparables; verificar tiempos p50/p95 y dispositivos antes de prometer velocidad comercial. No confundir rapidez del presupuesto con transferencia completa de los archivos.
+
 ## Medición real de latencia Google — 21/10/2026
 
 - **Ensayo real comunicado por el usuario**, worker privado `saber-documentos-pruebas`, versión `a087b1f4`, `/prueba-google`: **PING CONFIRMADO** mediante HMAC. Tiempo total navegador **1555 ms**; consulta firmada Google **1455 ms** (93,6 % de esa espera); diferencia **100 ms**. Recepción genérica de documentos permanece desactivada. No se subieron PDF ni se consumieron sesiones.
