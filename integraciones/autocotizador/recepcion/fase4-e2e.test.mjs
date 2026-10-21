@@ -136,6 +136,9 @@ test('Fase4 real PDF -> HMAC Google mock -> páginas pdf-lib -> precio B/N, pago
  assert.equal(q.pages,6);assert.equal(q.total,600);
  assert.equal(q.paymentAuthorized,false);
  assert.equal(q.receiptId,session.uploadId);
+ assert.ok(q.tiemposServidor.totalMs>=0);
+ for(const k of ['consultaGoogleMs','lecturaPrivadaMs','analisisPdfMs','confirmacionGoogleMs'])
+   assert.ok(Number.isFinite(q.tiemposServidor[k])&&q.tiemposServidor[k]>=0, k);
  const doubleQuote=await worker.fetch(req('/api/ensayo-cotizar',{uploadId:session.uploadId,token:session.token,
   formato:'a4',caras:'double',copias:2,anillado:'juntos'}),env);
  assert.equal((await doubleQuote.json()).total,5620);
