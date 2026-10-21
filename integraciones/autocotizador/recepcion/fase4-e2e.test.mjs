@@ -229,3 +229,26 @@ test('precio rápido de 10 PDF sin Google Drive, sin autorización de pago',asyn
  assert.equal(invalid.status,400);
  assert.equal(googleCalls,before);
 });
+
+
+test('descuento compartido sólo por formato/tipo/papel con copias distintas',async()=>{
+ const archivos=[
+  {id:'pdf1',nombre:'a.pdf',paginas:10,modo:'bn',formato:'a4',caras:'simple',copias:2,anillado:'ninguno',materialColor:'obra70',orden:1},
+  {id:'pdf2',nombre:'b.pdf',paginas:10,modo:'bn',formato:'a4',caras:'double',copias:1,anillado:'ninguno',materialColor:'obra70',orden:2},
+  {id:'pdf3',nombre:'c.pdf',paginas:10,modo:'color',formato:'a4',caras:'simple',copias:1,anillado:'ninguno',materialColor:'obra70',orden:3}
+ ];
+ const antes=googleCalls;
+ const result=await worker.fetch(req('/api/ensayo-presupuesto-rapido',{
+  archivos,formato:'a4',caras:'simple',copias:1,anillado:'ninguno'
+ }),env);
+ assert.equal(result.status,200,'Respuesta: '+JSON.stringify(await result.clone().json()));
+ const data=await result.json();
+ assert.equal(data.resumen.detalles.length,3);
+ assert.equal(data.resumen.grupos.length,2);
+ assert.equal(data.resumen.grupos[0].cantidad,30);
+ assert.equal(data.resumen.grupos[1].cantidad,10);
+ assert.equal(data.resumen.detalles[0].precioUnitario,84);
+ assert.equal(data.resumen.detalles[1].precioUnitario,80);
+ assert.equal(data.paymentAuthorized,false);
+ assert.equal(googleCalls,antes);
+});
