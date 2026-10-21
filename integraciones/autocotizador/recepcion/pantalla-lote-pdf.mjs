@@ -17,16 +17,19 @@ label{display:block;margin:12px 0 6px;font-weight:600}select,input{width:100%;fo
 button{padding:11px 16px;border:0;border-radius:7px;background:#16618d;color:white;font:inherit;cursor:pointer;margin:12px 7px 12px 0}
 button:disabled{opacity:.5}button.secondary{background:#566b7b}
 li{margin:9px 0;overflow-wrap:anywhere}#out{white-space:pre-wrap;line-height:1.6;overflow-wrap:anywhere}
-small{color:#586b79}
+small{color:#586b79}.drop{border:2px dashed #9aaebf;padding:18px;text-align:center;margin:12px 0;border-radius:8px;background:#f6fbff}.drop.over{border-color:#17618e;background:#e9f4ff}#pending li{display:flex;align-items:center;gap:10px;flex-wrap:wrap}#pending select{max-width:200px}#pending button{margin:0}
 </style></head><body><main>
 <h1>Presupuesto conjunto de varios PDF</h1>
 <p class="note">Prueba privada: agregá PDF de uno en uno (hasta cinco sesiones disponibles en total), de hasta 1 MB por archivo. Se acumulan las impresiones compatibles para conseguir mejores precios unitarios. Sin compras ni pagos.</p>
-<div class="row"><div><label>Archivo nuevo</label><input id="file" type="file" accept=".pdf,application/pdf"></div>
-<div><label>Impresión de este archivo</label><select id="mode"><option value="bn">Blanco y negro</option><option value="color">Color</option></select></div></div>
-<label>Seguridad para agregar cada archivo</label>
+<label for="file">Elegí varios archivos PDF de una sola vez</label>
+<input id="file" type="file" accept=".pdf,application/pdf" multiple>
+<div id="drop" class="drop" tabindex="0">También podés arrastrar tus PDF hasta acá</div>
+<h2>Preparados para enviar</h2><ol id="pending"></ol>
+<p><small>Antes de enviar, podés cambiar B/N o Color en cada archivo, quitarlo o agregar otros. Para este piloto, Turnstile debe renovarse antes de cada envío individual.</small></p>
+<label>Verificación para enviar el próximo PDF</label>
 <div class="cf-turnstile" data-sitekey="${sitekey}" data-action="documentos"></div>
-<button id="add" type="button">Agregar PDF al presupuesto</button>
-<h2>Archivos recibidos</h2><ol id="files"></ol>
+<button id="add" type="button" disabled>Enviar próximo PDF preparado</button>
+<h2>Archivos recibidos y listos para cotizar</h2><ol id="files"></ol>
 <p><small>Quitar un documento de la cotización no lo elimina del Drive privado ni devuelve el cupo de la sesión piloto.</small></p>
 <div class="row"><div><label>Formato común</label><select id="format"><option value="a4">A4</option><option value="a3">A3</option></select></div>
 <div><label>Caras</label><select id="faces"><option value="simple">Simple faz</option><option value="double">Doble faz</option></select></div>
@@ -38,28 +41,68 @@ small{color:#586b79}
 </main><script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 <script>
 const $=id=>document.getElementById(id);
-const recibidos=[];const pendientes=new Map();
-const add=$('add'),quote=$('quote'),out=$('out'),list=$('files');
+const recibidos=[];const pendientes=new Map();const preparados=[];let ocupado=false;
+const add=$('add'),quote=$('quote'),out=$('out'),list=$('files'),porEnviar=$('pending');
 const say=s=>{out.textContent=s};
 const fmt=new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0});
 async function hash(b){const a=new Uint8Array(await crypto.subtle.digest('SHA-256',b));return Array.from(a,x=>x.toString(16).padStart(2,'0')).join('')}
 function base64(b){let s='';for(let i=0;i<b.length;i+=12288)s+=btoa(String.fromCharCode(...b.subarray(i,i+12288)));return s}
 async function rpc(path,data){const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});const v=await r.json().catch(()=>null);
  if(!v||!r.ok||v.ok!==true)throw Error(v?.error||'El servidor no confirmó la operación');return v}
-function redraw(){list.replaceChildren();recibidos.forEach((r,i)=>{
+function redraw(){
+ porEnviar.replaceChildren();
+ preparados.forEach((r,i)=>{
+  const li=document.createElement('li'),name=document.createElement('span');
+  name.textContent=r.file.name+' ('+Math.ceil(r.file.size/1024)+' KB)';
+  const mode=document.createElement('select');
+  for(const [value,label] of [['bn','Blanco y negro'],['color','Color']]){
+   const option=document.createElement('option');option.value=value;option.textContent=label;
+   mode.appendChild(option);
+  }
+  mode.value=r.mode;mode.setAttribute('aria-label','Modo de impresión de '+r.file.name);
+  mode.addEventListener('change',()=>{r.mode=mode.value;say('Modo actualizado.');});
+  const remove=document.createElement('button');
+  remove.type='button';remove.className='secondary';remove.textContent='Quitar';
+  remove.addEventListener('click',()=>{preparados.splice(i,1);redraw()});
+  li.append(name,mode,remove);porEnviar.appendChild(li);
+ });
+ list.replaceChildren();recibidos.forEach((r,i)=>{
  const li=document.createElement('li');li.appendChild(document.createTextNode(r.name+' — '+(r.mode==='bn'?'B/N':'Color')+' '));
  const b=document.createElement('button');b.type='button';b.className='secondary';b.textContent='Quitar de la cotización';
  b.addEventListener('click',()=>{recibidos.splice(i,1);redraw();say('Lista modificada. Volvé a calcular el presupuesto.')});
  li.appendChild(b);list.appendChild(li)});
- quote.disabled=recibidos.length===0;add.disabled=recibidos.length>=5;
+ quote.disabled=ocupado||recibidos.length===0;
+ add.disabled=ocupado||preparados.length===0||recibidos.length>=5;
+}
+function enqueue(files){
+ const items=Array.from(files||[]);
+ for(const file of items){
+  if(preparados.length+recibidos.length>=5){say('El ensayo admite hasta cinco archivos en la lista.');break;}
+  if(!/\\.pdf$/i.test(file.name)||file.size<5||file.size>1048576){
+   say('Archivo no admitido: '+file.name+'. Usá PDF de hasta 1 MB.');continue;
+  }
+  if(preparados.some(r=>r.file===file||r.file.name===file.name&&r.file.size===file.size)){
+   continue;
+  }
+  preparados.push({file,mode:'bn'});
+ }
+ $('file').value='';redraw();
+}
+$('file').addEventListener('change',e=>enqueue(e.target.files));
+const drop=$('drop');
+drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('over')});
+drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
+drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('over');enqueue(e.dataTransfer.files)});
+drop.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('file').click()}});
 }
 add.addEventListener('click',async()=>{
- const file=$('file').files[0],mode=$('mode').value;
+ const selected=preparados[0];
+ const file=selected?.file,mode=selected?.mode;
  const token=window.turnstile?.getResponse();
- if(!file||!token){say('Seleccioná un PDF y completá la verificación.');return}
+ if(!file||!token){say('Prepará un PDF y completá la verificación antes de enviarlo.');return}
  if(!/\\.pdf$/i.test(file.name)||file.size<5||file.size>1048576){say('Cada PDF debe tener entre 5 bytes y 1 MB.');return}
  if(recibidos.length>=5){say('Se alcanzó el límite de cinco PDF en este ensayo.');return}
- add.disabled=true;quote.disabled=true;
+ ocupado=true;redraw();
  try {
   const inicioCarga=performance.now();
   const buf=await file.arrayBuffer(),bytes=new Uint8Array(buf);
@@ -91,7 +134,7 @@ add.addEventListener('click',async()=>{
   const result=await rpc('/api/ensayo-pdf',{op:'finish',uploadId:state.uploadId,
     token:state.token,sha256:sha,bytes:file.size,parts});
   if(!result.received)throw Error('La recepción no fue confirmada.');
-  recibidos.push(state);pendientes.delete(key);
+  recibidos.push(state);pendientes.delete(key);preparados.shift();
   const finCarga=performance.now();
   $('file').value='';redraw();
   say('Recibido: '+file.name+'. Podés agregar otro PDF o calcular el total.'+
@@ -99,7 +142,7 @@ add.addEventListener('click',async()=>{
     '\\nFragmentos y estado: '+Math.round(tConfirmacion-tTransferencia)+' ms'+
     '\\nConfirmación Drive: '+Math.round(finCarga-tConfirmacion)+' ms');
  }catch(e){say('No se pudo terminar: '+String(e.message||e)+'. Si ya comenzó la subida, reintentá con el mismo archivo sin cerrar esta pestaña.')}
- finally{add.disabled=recibidos.length>=5;quote.disabled=recibidos.length===0;window.turnstile?.reset()}
+ finally{ocupado=false;redraw();window.turnstile?.reset()}
 });
 quote.addEventListener('click',async()=>{
  if(!recibidos.length)return;
