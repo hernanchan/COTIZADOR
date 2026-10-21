@@ -94,7 +94,6 @@ drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('over
 drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
 drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('over');enqueue(e.dataTransfer.files)});
 drop.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('file').click()}});
-}
 add.addEventListener('click',async()=>{
  const selected=preparados[0];
  const file=selected?.file,mode=selected?.mode;
