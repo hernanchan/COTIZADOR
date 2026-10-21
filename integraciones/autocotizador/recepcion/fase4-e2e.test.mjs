@@ -165,6 +165,9 @@ test('FASE 4 multifichero: pantalla privada, precio servidor y protección contr
  assert.equal(q.total,1008);
  assert.equal(q.paymentAuthorized,false);
  assert.ok(q.tiempoServidorMs>=0);
+ assert.equal(q.tiemposPorArchivo.length,1);
+ assert.ok(q.tiemposPorArchivo[0].totalMs>=0);
+ assert.ok(q.tiemposPorArchivo[0].estadoPrevioMs>=0);
  const repeat=await worker.fetch(req('/api/ensayo-cotizar-lote',{
    sesiones:[single,single],formato:'a4',caras:'simple',copias:1,anillado:'ninguno'
  }),env);
