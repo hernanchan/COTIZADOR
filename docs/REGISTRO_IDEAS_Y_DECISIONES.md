@@ -4,6 +4,16 @@
 **Última actualización:** 20/10/2026.  
 **Propósito:** conservar las ideas que van surgiendo en conversaciones, incluidas las que se implementarán más adelante, sin confundirlas con funciones ya entregadas. Mantener este archivo en la rama de desarrollo y enlazar a especificaciones técnicas detalladas. No incluir secretos, datos personales de clientes, claves, movimientos bancarios o enlaces privados.
 
+## Piloto multifichero — integración en código, pendiente de pruebas (21/10/2026)
+
+**Todavía NO desplegado:** se prepararon la pantalla `GET /prueba-cotizador-lote` y el endpoint `POST /api/ensayo-cotizar-lote`, exclusivamente dentro del Worker de desarrollo. El cliente agrega documentos uno por uno, con Turnstile por inicio, consulta fragmentos confirmados antes de reenvío y conserva las sesiones en esa pestaña. Una lista de hasta cinco PDF forma una cotización conjunta, con modo B/N o color elegido por archivo y parámetros comunes de formato, caras y copias. Se permiten anillados juntos/separados en este piloto; tandas con formato o papel diferente siguen pendientes.
+
+**Seguridad:** el Worker recupera por HMAC el recibo de cada sesión desde Apps Script, verifica bytes/páginas si hace falta y recién después llama al agregador de precios. Nunca acepta páginas, precios ni recibos autodeclarados por el navegador; rechaza sesiones duplicadas y mantiene pagos desactivados. El límite de cinco sesiones es global al piloto (puede haber sesiones consumidas previamente): quitar un PDF de la pantalla NO libera cupo ni elimina su archivo privado.
+
+**Rendimiento:** el nuevo Worker de desarrollo registra fases de lectura privada, análisis PDF y confirmación de Google, pero todavía no hay mediciones reales. No prometer que la carga será más rápida. Tampoco se implementó reanudación tras cerrar la pestaña.
+
+**Pruebas:** añadidas pruebas e2e del nuevo endpoint y de la sintaxis de la pantalla al workflow de GitHub Actions. No marcar la integración como validada hasta confirmar la ejecución y resultados del CI. El paquete compilado desplegado previamente corresponde a la fase 4 de un solo PDF; no copiar manualmente el nuevo código fuente al Worker de Cloudflare.
+
 ## Desarrollo posterior al piloto — 21/10/2026 (sin publicar)
 
 - **Motor de descuentos:** `cotizar-documentos.mjs` agrega `siguienteDescuentoBN` y `siguienteDescuentoColor`, calculados desde las escalas existentes y sin sugerir descuentos inexistentes. Se añadieron pruebas de cruces de umbrales, copias y separación B/N/color.
