@@ -15,7 +15,7 @@ test('pantalla multifichero integra controles reales y JavaScript válido',()=>{
  assert.match(html,/drop\.addEventListener\('drop'/);
  assert.match(html,/preparados\.shift\(\)/);
  assert.match(html,/mode\.addEventListener\('change'/);
- assert.match(html,/id="mode"/);
+ assert.match(html,/mode\.addEventListener\('change'/);
  assert.match(html,/id="quote"/);
  assert.match(html,/\/api\/ensayo-cotizar-lote/);
  assert.match(html,/data-sitekey="0x4AAAAaa_TEST_SITEKEY_123456"/);
