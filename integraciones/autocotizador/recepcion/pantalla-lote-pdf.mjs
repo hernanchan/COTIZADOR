@@ -41,7 +41,7 @@ small{color:#586b79}.drop{border:2px dashed #9aaebf;padding:18px;text-align:cent
 </main><script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 <script>
 const $=id=>document.getElementById(id);
-const recibidos=[];const pendientes=new Map();const preparados=[];let ocupado=false;
+const recibidos=[];const pendientes=new Map();const preparados=[];let ocupado=false;let primeraCotizacion=true;
 const add=$('add'),quote=$('quote'),out=$('out'),list=$('files'),porEnviar=$('pending');
 const say=s=>{out.textContent=s};
 const fmt=new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0});
@@ -69,7 +69,7 @@ function redraw(){
  list.replaceChildren();recibidos.forEach((r,i)=>{
  const li=document.createElement('li');li.appendChild(document.createTextNode(r.name+' — '+(r.mode==='bn'?'B/N':'Color')+' '));
  const b=document.createElement('button');b.type='button';b.className='secondary';b.textContent='Quitar de la cotización';
- b.addEventListener('click',()=>{recibidos.splice(i,1);redraw();say('Lista modificada. Volvé a calcular el presupuesto.')});
+ b.addEventListener('click',()=>{recibidos.splice(i,1);primeraCotizacion=true;redraw();say('Lista modificada. Volvé a calcular el presupuesto.')});
  li.appendChild(b);list.appendChild(li)});
  quote.disabled=ocupado||recibidos.length===0;
  add.disabled=ocupado||preparados.length===0||recibidos.length>=5;
@@ -139,7 +139,7 @@ add.addEventListener('click',async()=>{
   const result=await rpc('/api/ensayo-pdf',{op:'finish',uploadId:state.uploadId,
     token:state.token,sha256:sha,bytes:file.size,parts});
   if(!result.received)throw Error('La recepción no fue confirmada.');
-  recibidos.push(state);pendientes.delete(key);preparados.shift();
+  recibidos.push(state);pendientes.delete(key);preparados.shift();primeraCotizacion=true;
   const finCarga=performance.now();
   $('file').value='';redraw();
   say('Recibido: '+file.name+'. Podés agregar otro PDF o calcular el total.'+
@@ -159,9 +159,11 @@ quote.addEventListener('click',async()=>{
   const t=performance.now();
   const result=await rpc('/api/ensayo-cotizar-lote',{
     sesiones:recibidos.map(r=>({uploadId:r.uploadId,token:r.token})),
+    primeraCotizacion,
     formato:$('format').value,caras:$('faces').value,copias:copies,
     anillado:$('binding').value
   });
+  primeraCotizacion=false;
   const lines=result.documentos.map(x=>'- '+x.nombre+': '+x.paginas+' página(s) '+(x.modo==='bn'?'B/N':'Color'));
   const msg=['LOTE VERIFICADO POR SERVIDOR',...lines,
     'Impresiones B/N: '+result.cantidadBN+' — '+fmt.format(result.precioUnitarioBN)+' unitario',
