@@ -926,7 +926,7 @@ async function cotizacionRapida(request,env){
   if(!Number.isFinite(d.total)||d.total<0)throw Error('Importe no calculable');
   return testResponse({
    ok:true,estado:'PRELIMINAR_SIN_VERIFICAR',paymentAuthorized:false,
-   resumen:individuales?{total:d.total,paginas:d.paginasTotales,detalles:d.detalles,grupos:d.grupos,detalleArmados:d.detalleArmados,anillados:d.subtotalAnillados}:{total:d.total,paginas:d.paginasPorEjemplar,
+   resumen:individuales?{total:d.total,paginas:d.paginasTotales,detalles:d.detalles,grupos:d.grupos,detalleArmados:d.detalleArmados,subtotalImpresiones:d.subtotalImpresiones,anillados:d.subtotalAnillados}:{total:d.total,paginas:d.paginasPorEjemplar,
      bnCantidad:d.bnCantidad,colorCantidad:d.colorCantidad,
      siguienteDescuentoBN:d.siguienteDescuentoBN,
      siguienteDescuentoColor:d.siguienteDescuentoColor,
