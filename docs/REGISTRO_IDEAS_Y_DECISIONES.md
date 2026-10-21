@@ -4,6 +4,14 @@
 **Última actualización:** 20/10/2026.  
 **Propósito:** conservar las ideas que van surgiendo en conversaciones, incluidas las que se implementarán más adelante, sin confundirlas con funciones ya entregadas. Mantener este archivo en la rama de desarrollo y enlazar a especificaciones técnicas detalladas. No incluir secretos, datos personales de clientes, claves, movimientos bancarios o enlaces privados.
 
+## CI finalmente localizado, FASE 5 lista para ensayo aislado (21/10/2026)
+
+**GitHub Actions verificado con evidencia real:** ejecución [39592168255](https://github.com/hernanchan/COTIZADOR/actions/runs/39592168255), commit `0e082570b214e563646c895f42a15454705735e8`, conclusión **success**. Todos los pasos verdes: tests FASE 2/3, pruebas de umbrales/lote/pantalla, compilaciones esbuild, E2E FASE 4+5, revisiones de sintaxis, commit del dist en rama y artefacto. El método de consulta anterior sólo devolvía ejecuciones asociadas a PR; el resultado fiable procede de la colección `/actions/runs` y detalles del job.
+
+**Paquete compilado confirmado:** `integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs`, SHA de contenido GitHub `77597add4b070265e540e8aae93bb5aab2933d8e`, 507210 caracteres UTF-8 aprox.; incluye literalmente las rutas de FASE 5 `/prueba-cotizador-lote` y `/api/ensayo-cotizar-lote`. Nombre `fase4` heredado; **es el bundle con FASE 5**. No pegar fuente sin empaquetar.
+
+**Instalación pendiente:** exclusivamente actualizar código de `saber-documentos-pruebas` con dicho bundle, sin cambiar Apps Script instalado (implementación `Sin título` v5), variables, producción, Polaroids o pagos. Solicitar/obtener evidencia de despliegue antes de pedir archivos. El cupo de cinco PDF es global y puede estar parcialmente consumido.
+
 ## Validación directa y primera mejora de recotización — 21/10/2026
 
 - Se revisó el estado de la integración, pero la consulta de GitHub Actions devuelve listas vacías en el conector (el método de ejecuciones sólo enumera acciones de pull requests). **No declarar CI aprobado** por ese motivo.
