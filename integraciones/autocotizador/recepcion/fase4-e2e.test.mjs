@@ -252,3 +252,32 @@ test('descuento compartido sólo por formato/tipo/papel con copias distintas',as
  assert.equal(data.paymentAuthorized,false);
  assert.equal(googleCalls,antes);
 });
+
+test('dos PDF juntos forman un anillado por juego, no uno por archivo',async()=>{
+ const antes=googleCalls;
+ const archivos=[
+ {id:'pdf1',nombre:'capitulo1.pdf',paginas:9,modo:'bn',formato:'a4',caras:'double',copias:3,anillado:'grupo',grupoAnillado:'1',materialColor:'obra70',orden:1},
+ {id:'pdf2',nombre:'capitulo2.pdf',paginas:6,modo:'color',formato:'a4',caras:'simple',copias:3,anillado:'grupo',grupoAnillado:'1',materialColor:'obra70',orden:2}
+ ];
+ const r=await worker.fetch(req('/api/ensayo-presupuesto-rapido',{
+  archivos,formato:'a4',caras:'simple',copias:3,anillado:'ninguno'
+ }),env);
+ assert.equal(r.status,200,'Respuesta: '+JSON.stringify(await r.clone().json()));
+ const p=await r.json();
+ assert.equal(p.resumen.detalleArmados.length,1);
+ assert.equal(p.resumen.detalleArmados[0].hojasPorJuego,11);
+ assert.equal(p.resumen.detalleArmados[0].juegos,3);
+ assert.equal(p.resumen.detalleArmados[0].subtotal,6990);
+ assert.equal(p.resumen.grupos.length,2,'descuentos de B/N y color separados');
+ assert.equal(p.paymentAuthorized,false);
+ assert.equal(googleCalls,antes);
+});
+test('grupos incompatibles no reciben precio engañoso',async()=>{
+ const base={nombre:'a.pdf',paginas:5,modo:'bn',formato:'a4',caras:'simple',copias:2,anillado:'grupo',grupoAnillado:'2',materialColor:'obra70'};
+ const docs=[{...base,id:'pdf1',orden:1},{...base,id:'pdf2',orden:2,formato:'a3'}];
+ const r=await worker.fetch(req('/api/ensayo-presupuesto-rapido',{
+  archivos:docs,formato:'a4',caras:'simple',copias:2,anillado:'ninguno'
+ }),env);
+ assert.equal(r.status,400);
+ assert.equal((await r.json()).paymentAuthorized,false);
+});
