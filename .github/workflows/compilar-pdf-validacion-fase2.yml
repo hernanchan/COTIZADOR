@@ -30,7 +30,7 @@ jobs:
         working-directory: integraciones/autocotizador/recepcion
         run: npm test
       - name: Verificar umbrales de precio y recibos multifichero (sin despliegue)
-        run: node --test tests/autocotizador-escalas-multifichero.test.mjs tests/autocotizador-lote-verificado.test.mjs
+        run: node --test tests/autocotizador-escalas-multifichero.test.mjs tests/autocotizador-lote-verificado.test.mjs tests/autocotizador-pantalla-lote.test.mjs
       - name: Compilar Worker standalone
         working-directory: integraciones/autocotizador/recepcion
         run: npm run build:pilot
@@ -43,6 +43,11 @@ jobs:
       - name: Probar PDF real de seis páginas, subida HMAC y cotización unificada
         working-directory: integraciones/autocotizador/recepcion
         run: npm run test:unificado
+      - name: Verificar sintaxis de módulos piloto multifichero
+        run: |
+          node --check integraciones/autocotizador/recepcion/pantalla-lote-pdf.mjs
+          node --check integraciones/autocotizador/pruebas/cotizacion-multifichero-piloto.mjs
+          node --check integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs
       - name: Verificar sintaxis del artefacto
         run: |
           node --check integraciones/autocotizador/recepcion/dist/saber-documentos-validacion-fase2.mjs
