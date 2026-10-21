@@ -913,12 +913,12 @@ async function cotizacionRapida(request,env){
    throw Error('Lote incorrecto');
   for(const [i,a] of p.archivos.entries()){
    if(!a||typeof a!=='object'||Array.isArray(a)||
-     !['id,modo,nombre,orden,paginas','anillado,caras,copias,formato,id,materialColor,modo,nombre,orden,paginas'].includes(Object.keys(a).sort().join(','))||
+     !['id,modo,nombre,orden,paginas','anillado,caras,copias,formato,grupoAnillado,id,materialColor,modo,nombre,orden,paginas','anillado,caras,copias,formato,id,materialColor,modo,nombre,orden,paginas'].includes(Object.keys(a).sort().join(','))||
      a.id!=='pdf'+(i+1)||a.orden!==i+1||
      typeof a.nombre!=='string'||a.nombre.length<1||a.nombre.length>160||
      !/\.pdf$/i.test(a.nombre)||!['bn','color'].includes(a.modo)||
      !Number.isSafeInteger(a.paginas)||a.paginas<1||a.paginas>20000||
-     (Object.hasOwn(a,'formato')&&(!['a4','a3'].includes(a.formato)||!['simple','double'].includes(a.caras)||!Number.isSafeInteger(a.copias)||a.copias<1||a.copias>500||!['ninguno','individual'].includes(a.anillado)||typeof a.materialColor!=='string'||a.materialColor.length>40)))
+     (Object.hasOwn(a,'formato')&&(!['a4','a3'].includes(a.formato)||!['simple','double'].includes(a.caras)||!Number.isSafeInteger(a.copias)||a.copias<1||a.copias>500||!['ninguno','individual','grupo'].includes(a.anillado)||(a.anillado==='grupo'&&!/^[1-9][0-9]?$/.test(String(a.grupoAnillado||'')))||typeof a.materialColor!=='string'||a.materialColor.length>40)))
     throw Error('Documentos incorrectos');
   }
   const individuales=p.archivos.every(a=>Object.hasOwn(a,'formato'));
@@ -926,7 +926,7 @@ async function cotizacionRapida(request,env){
   if(!Number.isFinite(d.total)||d.total<0)throw Error('Importe no calculable');
   return testResponse({
    ok:true,estado:'PRELIMINAR_SIN_VERIFICAR',paymentAuthorized:false,
-   resumen:individuales?{total:d.total,paginas:d.paginasTotales,detalles:d.detalles,grupos:d.grupos,anillados:d.subtotalAnillados}:{total:d.total,paginas:d.paginasPorEjemplar,
+   resumen:individuales?{total:d.total,paginas:d.paginasTotales,detalles:d.detalles,grupos:d.grupos,detalleArmados:d.detalleArmados,anillados:d.subtotalAnillados}:{total:d.total,paginas:d.paginasPorEjemplar,
      bnCantidad:d.bnCantidad,colorCantidad:d.colorCantidad,
      siguienteDescuentoBN:d.siguienteDescuentoBN,
      siguienteDescuentoColor:d.siguienteDescuentoColor,
