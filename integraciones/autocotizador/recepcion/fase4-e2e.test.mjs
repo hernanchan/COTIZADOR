@@ -199,3 +199,33 @@ test('Fase4 niega fraude de páginas, solicitudes cruzadas y apertura accidental
  const root=await worker.fetch(req('/',{op:'start'}),{...env,DOCS_UPLOAD_ENABLED:'true'});
  assert.equal(root.status,503);
 });
+
+
+test('precio rápido de 10 PDF sin Google Drive, sin autorización de pago',async()=>{
+ const before=googleCalls;
+ const page=await worker.fetch(new Request(origin+'/prueba-cotizador-rapido'),env);
+ assert.equal(page.status,200);
+ assert.match(await page.text(),/sin esperar la subida|Los PDF se leen en este dispositivo/);
+ const js=await worker.fetch(new Request(origin+'/prueba-cotizador-rapido.js'),env);
+ assert.equal(js.status,200);
+ assert.match(await js.text(),/No pudimos leer|preliminar|PDF/i);
+ const archivos=Array.from({length:10},(_,i)=>({
+  id:'pdf'+(i+1),nombre:'notas'+i+'.pdf',paginas:i+1,modo:'bn',orden:i+1
+ }));
+ const q=await worker.fetch(req('/api/ensayo-presupuesto-rapido',{
+  archivos,formato:'a4',caras:'simple',copias:1,anillado:'ninguno'
+ }),env);
+ assert.equal(q.status,200);
+ const data=await q.json();
+ assert.equal(data.ok,true);
+ assert.equal(data.resumen.paginas,55);
+ assert.equal(data.resumen.bnCantidad,55);
+ assert.equal(data.estado,'PRELIMINAR_SIN_VERIFICAR');
+ assert.equal(data.paymentAuthorized,false);
+ assert.equal(googleCalls,before,'no se contacta con Google ni se guardan PDF');
+ const invalid=await worker.fetch(req('/api/ensayo-presupuesto-rapido',{
+  archivos:[{...archivos[0],paginas:0}],formato:'a4',caras:'simple',copias:1,anillado:'ninguno'
+ }),env);
+ assert.equal(invalid.status,400);
+ assert.equal(googleCalls,before);
+});
