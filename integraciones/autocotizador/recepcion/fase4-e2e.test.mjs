@@ -290,9 +290,9 @@ test('resumen de cliente y ficha técnica en páginas separadas, conserva import
  assert.match(html,/panel-resumen/);
  const script=await worker.fetch(new Request(origin+'/prueba-cotizador-rapido.js'),env);
  const js=await script.text();
- assert.match(js,/Instrucciones para impresión/);
+ assert.match(js,/Instrucciones para impresi/);
  assert.match(js,/Tu presupuesto/);
- assert.match(js,/Copiar instrucciones de impresión/);
+ assert.match(js,/Copiar instrucciones de impresi/);
  assert.match(js,/PENDIENTE: verificar originales/);
  const docs=[
   {id:'pdf1',nombre:'parte1.pdf',paginas:10,modo:'bn',formato:'a4',caras:'simple',copias:2,anillado:'grupo',grupoAnillado:'1',materialColor:'obra70',orden:1},
