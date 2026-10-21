@@ -863,10 +863,13 @@ async function fase4QuoteLote(request,env){
  try{op=await readLimited(request);if(!validarLote(op))throw Error('Lote inválido');}
  catch(_){return testResponse({ok:false,error:'Opciones de lote inválidas',paymentAuthorized:false},400);}
  try {
-   const start=Date.now(),recibos=[];
+   const start=Date.now(),recibos=[],tiemposPorArchivo=[];
    // Secuencial: proteger cuotas de Apps Script. La aceleración requiere mediciones reales.
    for(const s of op.sesiones){
-     const r=await fase4PrivateVerified(env,s);
+     const metricas={};const inicioArchivo=Date.now();
+     const r=await fase4PrivateVerified(env,s,metricas);
+     tiemposPorArchivo.push({numero:tiemposPorArchivo.length+1,
+       totalMs:Date.now()-inicioArchivo,...metricas});
      if(!r.ok||r.verified!==true||r.storageVerified!==true||
         r.pageVerification!=='server'||r.paymentAuthorized!==false)
        throw Error('Un documento no está verificado');
@@ -875,7 +878,8 @@ async function fase4QuoteLote(request,env){
    const result=cotizarLoteVerificado({recibosVerificados:recibos,
      formato:op.formato,caras:op.caras,copias:op.copias,
      anillado:op.anillado,materialColor:'obra70',precios:preciosPiloto});
-   return testResponse({...result,tiempoServidorMs:Date.now()-start,paymentAuthorized:false},200);
+   return testResponse({...result,tiempoServidorMs:Date.now()-start,
+     tiemposPorArchivo,paymentAuthorized:false},200);
  }catch(_){
    return testResponse({ok:false,error:'No se pudo validar todos los archivos y cotizar el lote.',
      paymentAuthorized:false},422);
