@@ -5,7 +5,7 @@
  */
 import {PDFDocument} from 'pdf-lib';
 
-export async function leerPaginasLocales(archivos,{concurrencia=2,maxArchivos=30,maxBytesPorArchivo=100*1024*1024,onProgreso=()=>{}}={}){
+export async function leerPaginasLocales(archivos,{concurrencia=2,maxArchivos=30,maxBytesPorArchivo=250*1024*1024,onProgreso=()=>{}}={}){
  if(!Array.isArray(archivos)||archivos.length===0||archivos.length>maxArchivos)
   throw Error('Seleccioná entre uno y '+maxArchivos+' archivos PDF.');
  if(!Number.isSafeInteger(concurrencia)||concurrencia<1||concurrencia>4)
@@ -19,7 +19,8 @@ export async function leerPaginasLocales(archivos,{concurrencia=2,maxArchivos=30
    try {
     if(!/\.pdf$/i.test(resultado.nombre)||!Number.isSafeInteger(archivo.size)||archivo.size<5||
       archivo.size>maxBytesPorArchivo||typeof archivo.arrayBuffer!=='function')
-      throw Error('Archivo PDF no admitido o demasiado grande.');
+      throw Error('Este archivo no es un PDF válido o supera el límite de '+Math.round(maxBytesPorArchivo/1048576)+' MB.');
+    // Procesamos cada PDF grande de forma secuencial para limitar picos de memoria.
     const buffer=await archivo.arrayBuffer();
     if(buffer.byteLength!==archivo.size)throw Error('La lectura quedó incompleta.');
     const inicio=new Uint8Array(buffer,0,Math.min(5,buffer.byteLength));
@@ -30,16 +31,19 @@ export async function leerPaginasLocales(archivos,{concurrencia=2,maxArchivos=30
       throw Error('Cantidad de páginas no válida.');
     resultado.paginas=paginas;resultado.estado='preliminar';
    }catch(e){
-    resultado.error=/encrypted|password|encrypt/i.test(String(e?.message||e))
+    const detalle=String(e?.message||e);
+    resultado.error=/encrypted|password|encrypt/i.test(detalle)
       ?'PDF protegido: necesitaremos otro archivo sin contraseña.'
-      :'No pudimos leer las páginas de este PDF.';
+      :/supera el límite/.test(detalle)?detalle
+      :'No pudimos leer este PDF. Puede ser demasiado pesado para la memoria del dispositivo o estar dañado.';
    }
    resultados[indice]=resultado;
    terminados++;
    onProgreso({terminados,total:archivos.length,resultado:{...resultado}});
   }
  }
- await Promise.all(Array.from({length:Math.min(concurrencia,archivos.length)},()=>trabajador()));
+ const hayGrandes=archivos.some(f=>f&&f.size>40*1024*1024);
+ await Promise.all(Array.from({length:hayGrandes?1:Math.min(concurrencia,archivos.length)},()=>trabajador()));
  return {
   documentos:resultados,
   paginasTotales:resultados.reduce((n,x)=>n+(x.paginas||0),0),
