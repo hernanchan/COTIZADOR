@@ -23,7 +23,10 @@ function actualizar(){
   copias.value=String(e.copias);copias.setAttribute('aria-label','Copias de '+e.file.name);
   copias.disabled=procesando;copias.style.width='82px';
   copias.addEventListener('change',()=>{e.copias=Number(copias.value);calcular()});
-  const anillado=select('Anillado',[['ninguno','Sin anillado'],['individual','Anillado individual']],e.anillado,v=>e.anillado=v);
+  const opciones=[['ninguno','Sin anillado'],['individual','Anillado individual'],...Array.from({length:5},(_,i)=>['grupo'+(i+1),'Junto con grupo '+(i+1)])];
+  const anillado=select('Anillado',opciones,e.anillado==='grupo'?'grupo'+e.grupoAnillado:e.anillado,v=>{
+   e.anillado=v.startsWith('grupo')?'grupo':v;e.grupoAnillado=v.startsWith('grupo')?v.slice(5):null;
+  });
   const remove=document.createElement('button');remove.textContent='Quitar';remove.type='button';remove.disabled=procesando;
   remove.addEventListener('click',()=>{cola.splice(i,1);actualizar();calcular()});
   li.append(name,modo,formato,caras,papel,copias,anillado,remove);lista.append(li);
@@ -36,7 +39,7 @@ async function seleccionar(input){
  if(procesando)return;
  const files=Array.from(input);
  if(cola.length+files.length>30){txt('estado','Máximo 30 PDF en este ensayo.');return}
- for(const f of files)cola.push({file:f,modo:$('modoGeneral').value,formato:$('formato').value,caras:$('caras').value,copias:Number($('copias').value),anillado:$('anillado').value==='ninguno'?'ninguno':'individual',materialColor:'obra70',paginas:null,error:null});
+ for(const f of files)cola.push({file:f,modo:$('modoGeneral').value,formato:$('formato').value,caras:$('caras').value,copias:Number($('copias').value),anillado:$('anillado').value==='ninguno'?'ninguno':'individual',grupoAnillado:null,materialColor:'obra70',paginas:null,error:null});
  $('archivo').value='';procesando=true;actualizar();
  const offset=cola.length-files.length,start=performance.now();
  try {
@@ -51,7 +54,17 @@ async function calcular(){
  if(procesando||!cola.length||cola.some(x=>!x.paginas)){
   txt('precio','Completá la lectura de todos los PDF para cotizar.');return;
  }
- const archivos=cola.map((d,i)=>({id:'pdf'+(i+1),nombre:d.file.name,paginas:d.paginas,modo:d.modo,formato:d.formato,caras:d.caras,copias:d.copias,anillado:d.anillado,materialColor:d.materialColor,orden:i+1}));
+ const archivos=cola.map((d,i)=>({id:'pdf'+(i+1),nombre:d.file.name,paginas:d.paginas,modo:d.modo,formato:d.formato,caras:d.caras,copias:d.copias,anillado:d.anillado,grupoAnillado:d.grupoAnillado,materialColor:d.materialColor,orden:i+1}));
+ const grupos=new Map();
+ for(const d of cola){if(d.anillado==='grupo'){
+  const id=String(d.grupoAnillado);if(!grupos.has(id))grupos.set(id,[]);grupos.get(id).push(d);
+ }}
+ for(const [id,docs] of grupos){
+  if(docs.length<2){txt('precio','El grupo '+id+' necesita por lo menos dos PDF.');return}
+  if(docs.some(d=>d.formato!==docs[0].formato||d.copias!==docs[0].copias)){
+   txt('precio','Grupo '+id+': los PDF deben tener el mismo tamaño y cantidad de juegos.');return;
+  }
+ }
  const payload={archivos,copias:Number($('copias').value),formato:$('formato').value,
   caras:$('caras').value,anillado:$('anillado').value};
  txt('precio','Calculando precio preliminar…');
@@ -63,7 +76,8 @@ async function calcular(){
   if(!response.ok||r.ok!==true||r.paymentAuthorized!==false)throw Error(r.error||'Presupuesto no disponible.');
   const info=r.resumen;
   const detalles=(info.detalles||[]).map(d=>d.nombre+': '+money(d.subtotal)+' ('+d.cantidad+' impresiones)').join(' · ');
-  txt('precio','TOTAL ORIENTATIVO: '+money(info.total)+' — '+detalles+' — Respuesta: '+Math.round(performance.now()-start)+' ms.');
+  const armados=(info.detalleArmados||[]).map(g=>'Grupo '+g.grupo+': '+g.archivos.length+' PDF, '+g.hojasPorJuego+' hojas por juego, '+g.juegos+' anillado(s) — '+money(g.subtotal)).join(' · ');
+  txt('precio','TOTAL ORIENTATIVO: '+money(info.total)+' — '+detalles+(armados?' — Anillados conjuntos: '+armados:'')+' — Respuesta: '+Math.round(performance.now()-start)+' ms.');
  }catch(e){txt('precio','No se pudo cotizar: '+String(e.message||e))}
 }
 $('archivo').addEventListener('change',e=>seleccionar(e.target.files));
