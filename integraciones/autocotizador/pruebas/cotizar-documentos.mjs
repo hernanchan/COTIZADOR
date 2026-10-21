@@ -57,11 +57,30 @@ export function cotizarDocumentos({archivos,copias,formato,caras,materialColor,a
     cargoAnillado+=precio*copias;
     detalleAnillados.push({grupo:id,archivos:ordenado.map(a=>a.id),hojasPorEjemplar:hojas,ejemplares:copias,subtotal:precio*copias});
   }
+  // Información comercial orientativa de tramo siguiente. Nunca decide el cobro.
+  // Cada modo acumula únicamente sus impresiones compatibles.
+  const proximoTramo=(escalas,cantidad,tarifas)=>{
+    if(!cantidad)return null;
+    const actual=escala(escalas,cantidad);
+    for(let i=actual+1;i<escalas.length;i++){
+      const desde=Number(escalas[i].from);
+      const precio=Number(tarifas(i));
+      if(Number.isSafeInteger(desde)&&desde>cantidad&&
+         Number.isFinite(precio)&&precio>=0&&precio<Number(tarifas(actual)))
+        return {desde,faltan:desde-cantidad,precioUnitario:precio,
+          precioUnitarioActual:Number(tarifas(actual))};
+    }
+    return null;
+  };
+  const siguienteDescuentoBN=bnCantidad
+    ?proximoTramo(bn.scales,bnCantidad,i=>bn.scales[i][caras]):null;
+  const siguienteDescuentoColor=colorCantidad
+    ?proximoTramo(color.scales,colorCantidad,i=>papel.prices[i]?.[caras]):null;
   const hojasPorEjemplar=hojasPorArchivo.reduce((n,a)=>n+a.hojas,0);
   return Object.freeze({
     archivos:archivos.length,copias,formato,caras,paginasPorEjemplar:paginasBN+paginasColor,
     paginasBN,paginasColor,bnCantidad,colorCantidad,tarifaBN,tarifaColor,
-    subtotalBN,subtotalColor,papelColor:papel?.name||'',hojasPorEjemplar,
+    subtotalBN,subtotalColor,siguienteDescuentoBN,siguienteDescuentoColor,papelColor:papel?.name||'',hojasPorEjemplar,
     hojasTotales:hojasPorEjemplar*copias,anillado,detalleAnillados,
     cargoAnillado,total:subtotalBN+subtotalColor+cargoAnillado
   });
