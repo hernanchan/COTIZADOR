@@ -1,3 +1,11 @@
+## Cotizador rápido sin subir PDF — prototipo integrado (21/10/2026)
+
+- **FUNCIONA EN CÓDIGO Y PASA CI, NO INSTALADO AÚN:** ruta privada aislada del Worker `GET /prueba-cotizador-rapido`; JS del mismo origen `GET /prueba-cotizador-rapido.js`. Selección/arrastre de hasta 30 PDF, lectura de páginas local mediante `pdf-lib` empaquetado, procesamiento concurrente limitado, elección B/N-color por archivo, caras, tamaño, copias y anillado. No se envían bytes de PDF para calcular el precio.
+- Nueva `POST /api/ensayo-presupuesto-rapido`: el navegador envía **sólo metadatos y cantidades de páginas declaradas**, Worker calcula con `cotizarDocumentos` y tarifas `precios-web.json` embebidas en servidor, devuelve `PRELIMINAR_SIN_VERIFICAR`, `paymentAuthorized:false`, sin crear recibos ni contactar Apps Script/Drive. Endpoint aislado por origen y tamaño de solicitud. **Nunca usar su resultado para cobrar o enviar a imprimir**. En prueba CI de 10 PDF, 55 páginas suma y cotiza sin una sola llamada a Google.
+- Archivo compilado de Worker: `integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs` (~953 kB) actualizado mediante CI. **No implementar automáticamente**; falta aprobación/instalación manual y prueba real navegador. CI éxito: https://github.com/hernanchan/COTIZADOR/actions/runs/39624474566
+- **Pendiente antes de ofrecerlo comercialmente:** verificar los PDF originales en backend y reconfirmar precio antes de pedido; tarifas comerciales no aprobadas; recuperación de carga grande y reanudación; cuotas antifraude por cliente; métricas reales de latencia y compatibilidad móvil. No modificar web pública, Polaroids, Apps Script ni habilitar pagos.
+- Objetivo clave del usuario: **mostrar precio primero, sin perder clientes esperando la subida**. Benchmark relatado MrByn 10 PDF ~10 s; comparar mediciones reales una vez instalada la prueba.
+
 ## Referencia de la competencia — MrByn y objetivo de rapidez (21/10/2026)
 
 - Referencia pública: https://mrbyn.com.ar/producto/impresiones/; formulario con campos de hasta 17 archivos y tamaño anunciado de 250 MB por archivo. Usuario informa 10 archivos y precio obtenido en ~10 segundos; **observación del usuario, no medida nuestra**.
