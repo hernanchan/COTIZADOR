@@ -1,4 +1,6 @@
 import {prepararPresupuestoDocumentos} from '../pruebas/cotizacion-desde-recibos-servidor.mjs';
+import {cotizarLoteVerificado} from '../pruebas/cotizacion-multifichero-piloto.mjs';
+import {paginaLotePdf} from './pantalla-lote-pdf.mjs';
 import preciosPiloto from '../../../precios-web.json';
 import {verificarPdfAlmacenado} from './verificacion-pdf-drive-servidor.mjs';
 /**
@@ -815,10 +817,64 @@ async function fase4Quote(request,env){
  }
 }
 
+/* Ensayo multifichero: las sesiones se verifican en Google por HMAC.
+ * No aceptar páginas, importes, nombres, recibos ni configuraciones privadas
+ * provenientes del navegador. La ruta sólo existe en Worker aislado.
+ */
+function pantallaLote(env){
+ try {
+  return new Response(paginaLotePdf(env?.DOCS_TURNSTILE_SITE_KEY),{
+    status:200,headers:{'Content-Type':'text/html;charset=utf-8',
+    'Cache-Control':'no-store,private','X-Robots-Tag':'noindex,nofollow',
+    'X-Frame-Options':'DENY','X-Content-Type-Options':'nosniff'}
+  });
+ }catch(_){return testResponse({ok:false,error:'Turnstile ausente',paymentAuthorized:false},503);}
+}
+function validarLote(op){
+ return op&&typeof op==='object'&&!Array.isArray(op)&&
+   Object.keys(op).sort().join(',')==='anillado,caras,copias,formato,sesiones'&&
+   ['a4','a3'].includes(op.formato)&&['simple','double'].includes(op.caras)&&
+   ['ninguno','juntos','separados'].includes(op.anillado)&&
+   Number.isSafeInteger(op.copias)&&op.copias>=1&&op.copias<=200&&
+   Array.isArray(op.sesiones)&&op.sesiones.length>=1&&op.sesiones.length<=5&&
+   op.sesiones.every(s=>s&&typeof s==='object'&&!Array.isArray(s)&&
+     Object.keys(s).sort().join(',')==='token,uploadId'&&
+     phase4Session(s.uploadId)&&phase4Token(s.token))&&
+   new Set(op.sesiones.map(s=>s.uploadId)).size===op.sesiones.length;
+}
+async function fase4QuoteLote(request,env){
+ if(request.method!=='POST')return closed();
+ if(!allowed(request,env))
+   return testResponse({ok:false,error:'Origen no autorizado',paymentAuthorized:false},403);
+ let op;
+ try{op=await readLimited(request);if(!validarLote(op))throw Error('Lote inválido');}
+ catch(_){return testResponse({ok:false,error:'Opciones de lote inválidas',paymentAuthorized:false},400);}
+ try {
+   const start=Date.now(),recibos=[];
+   // Secuencial: proteger cuotas de Apps Script. La aceleración requiere mediciones reales.
+   for(const s of op.sesiones){
+     const r=await fase4PrivateVerified(env,s);
+     if(!r.ok||r.verified!==true||r.storageVerified!==true||
+        r.pageVerification!=='server'||r.paymentAuthorized!==false)
+       throw Error('Un documento no está verificado');
+     recibos.push(r);
+   }
+   const result=cotizarLoteVerificado({recibosVerificados:recibos,
+     formato:op.formato,caras:op.caras,copias:op.copias,
+     anillado:op.anillado,materialColor:'obra70',precios:preciosPiloto});
+   return testResponse({...result,tiempoServidorMs:Date.now()-start,paymentAuthorized:false},200);
+ }catch(_){
+   return testResponse({ok:false,error:'No se pudo validar todos los archivos y cotizar el lote.',
+     paymentAuthorized:false},422);
+ }
+}
+
 export default {
   async fetch(request, env, ctx) {
     const page=new URL(request.url).pathname;
     if(page==='/prueba-cotizador-pdf'&&request.method==='GET')return fase4Html(env);
+    if(page==='/prueba-cotizador-lote'&&request.method==='GET')return pantallaLote(env);
+    if(page==='/api/ensayo-cotizar-lote')return fase4QuoteLote(request,env);
     if(page==='/api/ensayo-pdf')return fase4Transfer(request,env);
     if(page==='/api/ensayo-cotizar')return fase4Quote(request,env);
     if(page==='/prueba-presupuesto'&&request.method==='GET')return presupuestoHtml(env);
