@@ -6,12 +6,14 @@
 export function cotizarDocumentosIndividuales({archivos,precios}){
  if(!Array.isArray(archivos)||archivos.length<1||archivos.length>30)throw Error('Cantidad de PDF inválida.');
  const ids=new Set(), grupos=new Map(), detalles=[];
+ const armados=new Map();
  for(const [i,a] of archivos.entries()){
   if(!a||typeof a.id!=='string'||ids.has(a.id)||a.id!=='pdf'+(i+1)||
    !Number.isSafeInteger(a.paginas)||a.paginas<1||a.paginas>20000||
    !Number.isSafeInteger(a.copias)||a.copias<1||a.copias>500||
    !['a4','a3'].includes(a.formato)||!['bn','color'].includes(a.modo)||
-   !['simple','double'].includes(a.caras)||!['ninguno','individual'].includes(a.anillado))
+   !['simple','double'].includes(a.caras)||!['ninguno','individual','grupo'].includes(a.anillado)||
+   (a.anillado==='grupo'&&!/^[1-9][0-9]?$/.test(String(a.grupoAnillado||''))))
    throw Error('Configuración de archivo inválida.');
   ids.add(a.id);
   const papel=a.modo==='bn'?'estandar':a.materialColor;
@@ -24,6 +26,11 @@ export function cotizarDocumentosIndividuales({archivos,precios}){
   if(!grupos.has(key))grupos.set(key,{key,formato:a.formato,modo:a.modo,papel,cantidad:0,archivos:[]});
   const grupo=grupos.get(key);grupo.cantidad+=cantidad;grupo.archivos.push(i);
   detalles.push({...a,cantidad,grupo:key});
+  if(a.anillado==='grupo'){
+   const id=String(a.grupoAnillado);
+   if(!armados.has(id))armados.set(id,[]);
+   armados.get(id).push(i);
+  }
  }
  let total=0,subtotalImpresiones=0,subtotalAnillados=0;
  for(const g of grupos.values()){
@@ -56,14 +63,29 @@ export function cotizarDocumentosIndividuales({archivos,precios}){
   }
   g.precioEscalaDesde=Number(scales[ix].from||1);
  }
+ const detalleArmados=[];
+ for(const [id,indices] of armados){
+  const docs=indices.map(i=>detalles[i]).sort((a,b)=>a.orden-b.orden);
+  if(docs.length<2)throw Error('El grupo '+id+' necesita al menos dos archivos; usá anillado individual.');
+  const formato=docs[0].formato,copias=docs[0].copias;
+  if(docs.some(d=>d.formato!==formato))throw Error('Los PDF del grupo '+id+' deben tener el mismo tamaño de hoja.');
+  if(docs.some(d=>d.copias!==copias))throw Error('Los PDF del grupo '+id+' deben tener la misma cantidad de juegos.');
+  const hojas=docs.reduce((n,d)=>n+Math.ceil(d.paginas/(d.caras==='double'?2:1)),0);
+  const fila=(precios.bindings?.[formato]||[]).find(r=>hojas<=Number(r.to));
+  if(!fila)throw Error('El grupo '+id+' supera la capacidad de anillado cotizable.');
+  const subtotal=Number(fila.price)*copias;
+  if(!Number.isFinite(subtotal)||subtotal<0)throw Error('Precio de anillado inválido.');
+  subtotalAnillados+=subtotal;
+  detalleArmados.push({grupo:id,archivos:docs.map(d=>d.id),hojasPorJuego:hojas,juegos:copias,subtotal});
+ }
  total=subtotalImpresiones+subtotalAnillados;
  if(!Number.isFinite(total)||total<0)throw Error('Total inválido.');
  return {estado:'PRELIMINAR_SIN_VERIFICAR',paymentAuthorized:false,total,
-   subtotalImpresiones,subtotalAnillados,
+   subtotalImpresiones,subtotalAnillados,detalleArmados,
    paginasTotales:detalles.reduce((n,a)=>n+a.paginas,0),
    detalles:detalles.map(a=>({id:a.id,nombre:a.nombre,paginas:a.paginas,
     formato:a.formato,modo:a.modo,materialColor:a.materialColor,caras:a.caras,
-    copias:a.copias,anillado:a.anillado,cantidad:a.cantidad,grupo:a.grupo,
+    copias:a.copias,anillado:a.anillado,grupoAnillado:a.grupoAnillado||null,cantidad:a.cantidad,grupo:a.grupo,
     precioUnitario:a.precioUnitario,subtotal:a.subtotal})),
    grupos:[...grupos.values()].map(g=>({clave:g.key,cantidad:g.cantidad,
       archivos:g.archivos.length,desde:g.precioEscalaDesde}))};
