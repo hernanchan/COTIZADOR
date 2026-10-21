@@ -915,7 +915,7 @@ async function cotizacionRapida(request,env){
      Object.keys(a).sort().join(',')!=='id,modo,nombre,orden,paginas'||
      a.id!=='pdf'+(i+1)||a.orden!==i+1||
      typeof a.nombre!=='string'||a.nombre.length<1||a.nombre.length>160||
-     !/\\.pdf$/i.test(a.nombre)||!['bn','color'].includes(a.modo)||
+     !/\.pdf$/i.test(a.nombre)||!['bn','color'].includes(a.modo)||
      !Number.isSafeInteger(a.paginas)||a.paginas<1||a.paginas>20000)
     throw Error('Documentos incorrectos');
   }
