@@ -1,3 +1,10 @@
+## Mejoras de interfaz posteriores a la prueba multifichero — 21/10/2026
+
+- **Realizado en rama de pruebas, aún NO desplegado:** selector múltiple de PDF con `multiple`, zona de arrastre, cola de archivos **previa** a la subida, opción B/N o color por cada PDF, quitar archivos pendientes, lista de recibidos y un único presupuesto conjunto. Se mantienen autenticación Turnstile por inicio de archivo y confirmación individual: **todavía NO hay un único token para todo el lote**.
+- **Seguridad UX:** durante un envío se bloquean cambios en la cola para evitar incongruencias; no se elimina ni se recupera el cupo de Drive al quitar un PDF de la cotización. No se han cambiado Apps Script, cupos ni pagos.
+- **Validación automática:** GitHub Actions ejecución [39601540089](https://github.com/hernanchan/COTIZADOR/actions/runs/39601540089) `success` incluye selector múltiple, sintaxis JS, pruebas de precios y compilación esbuild. Cambio adicional de textos y bloqueo de controles (commit `a090f6a7`) pendiente de la ejecución CI correspondiente al momento de registrar.
+- **RENDIMIENTO PENDIENTE:** esta mejora simplifica selección y preparación, **no reduce todavía la latencia de las llamadas a Google**. Falta evaluar tiempos reales de `multiStart`, `status`, `part`, `finish` y verificaciones antes de modificar el protocolo, especialmente para archivos más grandes. La interfaz de pruebas actual en Cloudflare no cambia hasta nuevo despliegue.
+
 ## Validación real de FASE 5 — 21/10/2026
 
 - **Resultado comunicado por el titular:** prueba real de **dos PDF de dos páginas cada uno**, con flujo multifichero y cotización, **todo correcto funcionalmente**. La pantalla de FASE 5 fue desplegada en Worker aislado `saber-documentos-pruebas`, versión activa `89300d6a`, con Google Apps Script de documentos ya instalado (versión 5). No se reportaron errores de integridad, páginas o cotización en esta prueba, aunque no se recibieron tiempos medidos ni capturas de resultados finales.
