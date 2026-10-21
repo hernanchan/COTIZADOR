@@ -143,6 +143,40 @@ test('Fase4 real PDF -> HMAC Google mock -> páginas pdf-lib -> precio B/N, pago
   formato:'a4',caras:'double',copias:2,anillado:'juntos'}),env);
  assert.equal((await doubleQuote.json()).total,5620);
 });
+test('FASE 4 multifichero: pantalla privada, precio servidor y protección contra recibos repetidos',async()=>{
+ const htmlResp=await worker.fetch(new Request(origin+'/prueba-cotizador-lote'),env);
+ assert.equal(htmlResp.status,200);
+ const html=await htmlResp.text();
+ assert.ok(html.includes('Presupuesto conjunto de varios PDF'));
+ const js=html.slice(html.lastIndexOf('<script>')+8,html.lastIndexOf('</script>'));
+ assert.doesNotThrow(()=>new Function(js));
+ const r=orders.get('WEB-ENSAYO-0123456789ABCDEF');
+ assert.ok(r,'el PDF de la prueba anterior debe estar disponible');
+ const single={uploadId:r.uploadId,token:r.token};
+ const one=await worker.fetch(req('/api/ensayo-cotizar-lote',{
+   sesiones:[single],formato:'a4',caras:'simple',copias:2,anillado:'ninguno'
+ }),env);
+ assert.equal(one.status,200);
+ const q=await one.json();
+ assert.equal(q.cantidadBN,12);
+ assert.equal(q.precioUnitarioBN,84);
+ assert.equal(q.total,1008);
+ assert.equal(q.paymentAuthorized,false);
+ assert.ok(q.tiempoServidorMs>=0);
+ const repeat=await worker.fetch(req('/api/ensayo-cotizar-lote',{
+   sesiones:[single,single],formato:'a4',caras:'simple',copias:1,anillado:'ninguno'
+ }),env);
+ assert.equal(repeat.status,400);
+ const tamper=await worker.fetch(req('/api/ensayo-cotizar-lote',{
+   sesiones:[single],formato:'a4',caras:'simple',copias:1,anillado:'ninguno',pages:9999
+ }),env);
+ assert.equal(tamper.status,400);
+ const others=await worker.fetch(req('/api/ensayo-cotizar-lote',{
+   sesiones:[single],formato:'a4',caras:'simple',copias:1,anillado:'ninguno'
+ },'https://otro.example'),env);
+ assert.equal(others.status,403);
+});
+
 test('Fase4 niega fraude de páginas, solicitudes cruzadas y apertura accidental de uploads',async()=>{
  const count=googleCalls;
  const invalid=await worker.fetch(req('/api/ensayo-cotizar',{uploadId:'DOC-'+randomUUID(),
