@@ -166,6 +166,12 @@ quote.addEventListener('click',async()=>{
     'Pagos: DESACTIVADOS'];
   if(result.siguienteDescuentoBN)msg.push('Pr\xF3ximo tramo B/N: faltan '+result.siguienteDescuentoBN.faltan+' impresiones para '+fmt.format(result.siguienteDescuentoBN.precioUnitario)+' unitario.');
   if(result.siguienteDescuentoColor)msg.push('Pr\xF3ximo tramo color: faltan '+result.siguienteDescuentoColor.faltan+' impresiones para '+fmt.format(result.siguienteDescuentoColor.precioUnitario)+' unitario.');
+  for(const m of result.tiemposPorArchivo||[]){
+   msg.push('Verificaci\xF3n PDF '+m.numero+': '+m.totalMs+' ms'+
+     ' \xB7 Google: '+(m.estadoPrevioMs||0)+' ms'+
+     ' \xB7 Lectura privada: '+(m.lecturaPrivadaMs||0)+' ms'+
+     ' \xB7 An\xE1lisis PDF: '+(m.analisisPdfMs||0)+' ms');
+  }
   msg.push('Tiempo total desde navegador: '+Math.round(performance.now()-t)+' ms');
   say(msg.join('\\n'));
  }catch(e){say('No se pudo verificar el lote: '+String(e.message||e))}
