@@ -1,6 +1,9 @@
 import {prepararPresupuestoDocumentos} from '../pruebas/cotizacion-desde-recibos-servidor.mjs';
 import {cotizarLoteVerificado} from '../pruebas/cotizacion-multifichero-piloto.mjs';
 import {paginaLotePdf} from './pantalla-lote-pdf.mjs';
+import {paginaCotizadorRapido} from './cotizador-rapido-pagina.mjs';
+import rapidoClienteJs from './cotizador-rapido-cliente.txt';
+import {cotizarDocumentos} from '../pruebas/cotizar-documentos.mjs';
 import preciosPiloto from '../../../precios-web.json';
 import {verificarPdfAlmacenado} from './verificacion-pdf-drive-servidor.mjs';
 /**
@@ -895,11 +898,60 @@ async function fase4QuoteLote(request,env){
  }
 }
 
+/** Cotización preliminar sin subida: nunca crea recibos ni autoriza pagos. */
+async function cotizacionRapida(request,env){
+ if(request.method!=='POST')return closed();
+ if(!allowed(request,env))
+  return testResponse({ok:false,error:'Origen no permitido',paymentAuthorized:false},403);
+ let p;
+ try{
+  p=await readLimited(request);
+  if(!p||typeof p!=='object'||Array.isArray(p)||
+    Object.keys(p).sort().join(',')!=='anillado,archivos,caras,copias,formato'||
+    !Array.isArray(p.archivos)||p.archivos.length<1||p.archivos.length>30)
+   throw Error('Lote incorrecto');
+  for(const [i,a] of p.archivos.entries()){
+   if(!a||typeof a!=='object'||Array.isArray(a)||
+     Object.keys(a).sort().join(',')!=='id,modo,nombre,orden,paginas'||
+     a.id!=='pdf'+(i+1)||a.orden!==i+1||
+     typeof a.nombre!=='string'||a.nombre.length<1||a.nombre.length>160||
+     !/\\.pdf$/i.test(a.nombre)||!['bn','color'].includes(a.modo)||
+     !Number.isSafeInteger(a.paginas)||a.paginas<1||a.paginas>20000)
+    throw Error('Documentos incorrectos');
+  }
+  const d=cotizarDocumentos({...p,materialColor:'obra70',precios:preciosPiloto});
+  if(!Number.isFinite(d.total)||d.total<0)throw Error('Importe no calculable');
+  return testResponse({
+   ok:true,estado:'PRELIMINAR_SIN_VERIFICAR',paymentAuthorized:false,
+   resumen:{total:d.total,paginas:d.paginasPorEjemplar,
+     bnCantidad:d.bnCantidad,colorCantidad:d.colorCantidad,
+     siguienteDescuentoBN:d.siguienteDescuentoBN,
+     siguienteDescuentoColor:d.siguienteDescuentoColor,
+     anillados:d.cargoAnillado},
+   advertencia:'El precio y las páginas deben verificarse con archivos originales antes de aceptar un pedido.'
+  },200);
+ }catch(_){return testResponse({ok:false,error:'No se pudo calcular el precio orientativo.',paymentAuthorized:false},400)}
+}
+function paginaRapida(){
+ return new Response(paginaCotizadorRapido(),{status:200,headers:{
+  'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store,private',
+  'X-Robots-Tag':'noindex,nofollow','X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY'
+ }});
+}
+function scriptRapido(){
+ return new Response(rapidoClienteJs,{status:200,headers:{
+  'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-store,private',
+  'X-Robots-Tag':'noindex,nofollow','X-Content-Type-Options':'nosniff'
+ }});
+}
 export default {
   async fetch(request, env, ctx) {
     const page=new URL(request.url).pathname;
     if(page==='/prueba-cotizador-pdf'&&request.method==='GET')return fase4Html(env);
     if(page==='/prueba-cotizador-lote'&&request.method==='GET')return pantallaLote(env);
+    if(page==='/prueba-cotizador-rapido'&&request.method==='GET')return paginaRapida();
+    if(page==='/prueba-cotizador-rapido.js'&&request.method==='GET')return scriptRapido();
+    if(page==='/api/ensayo-presupuesto-rapido')return cotizacionRapida(request,env);
     if(page==='/api/ensayo-cotizar-lote')return fase4QuoteLote(request,env);
     if(page==='/api/ensayo-pdf')return fase4Transfer(request,env);
     if(page==='/api/ensayo-cotizar')return fase4Quote(request,env);
