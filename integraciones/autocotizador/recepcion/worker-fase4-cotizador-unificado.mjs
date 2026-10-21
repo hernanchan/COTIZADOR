@@ -738,15 +738,19 @@ async function fase4Transfer(request,env){
  }catch(_){return testResponse({ok:false,error:'No se confirmó la recepción. Comprobá el estado antes de reintentar',
     paymentAuthorized:false},502)}
 }
-async function fase4PrivateVerified(env,session){
+async function fase4PrivateVerified(env,session,metrics=null){
+ const mark=()=>Date.now();let last=mark();
+ const lap=(name)=>{if(metrics){metrics[name]=mark()-last;}last=mark();};
  const ctx={uploadId:session.uploadId,token:session.token};
  const info=await postToScript(env,{op:'multiInfo',...ctx},fetch);
+ lap('consultaGoogleMs');
  if(!info.ok||!phase4Session(info.receiptId)||info.receiptId!==ctx.uploadId||
     !Number.isSafeInteger(info.bytes)||info.bytes<5||info.bytes>FASE4_QUOTA_BYTES||
     !/^[a-f0-9]{64}$/.test(info.sha256||'')||
     info.privateChunkBytes!==FASE4_CHUNK_BYTES)throw Error('Información privada inválida');
  if(info.pageVerification==='server'&&Number.isSafeInteger(info.pages)&&info.pages>=1){
    const ready=await postToScript(env,{op:'multiVerifiedStatus',...ctx},fetch);
+   lap('estadoVerificadoMs');
    if(ready.ok&&ready.verified&&ready.pages===info.pages&&
       ready.receiptId===info.receiptId&&ready.paymentAuthorized===false)
      return ready;
@@ -767,12 +771,15 @@ async function fase4PrivateVerified(env,session){
    if(await safeHash(chunk)!==part.chunkSha256)throw Error('Integridad de fragmento incorrecta');
    bytes.set(chunk,offset);
  }
+ lap('lecturaPrivadaMs');
  const checked=await verificarPdfAlmacenado({driveBytes:bytes,reciboServidor:{
    receiptState:'bytes_checked',receiptId:info.receiptId,orderId:info.orderId,
    fileId:info.fileId,name:info.name,mode:info.mode,bytes:info.bytes,sha256:info.sha256
  }});
+ lap('analisisPdfMs');
  const committed=await postToScript(env,{op:'multiCommitPages',...ctx,receiptId:info.receiptId,
    sha256:checked.sha256,bytes:checked.bytes,pages:checked.pages,parserVersion:'pdf-lib-1.17.1'},fetch);
+ lap('confirmacionGoogleMs');
  if(!committed.ok||committed.verified!==true||committed.receiptId!==checked.receiptId||
    committed.pages!==checked.pages||committed.paymentAuthorized!==false)
    throw Error('Google no guardó el conteo de páginas');
@@ -785,7 +792,8 @@ async function fase4Quote(request,env){
  try{o=await readLimited(request);if(!phase4Opts(o))throw Error('Opciones incorrectas')}
  catch(_){return testResponse({ok:false,error:'Opciones de cotización inválidas',paymentAuthorized:false},400)}
  try{
-   const r=await fase4PrivateVerified(env,o);
+   const metricas={};const inicio=Date.now();
+   const r=await fase4PrivateVerified(env,o,metricas);
    if(!r.ok||r.verified!==true||r.storageVerified!==true||
       r.pageVerification!=='server'||r.paymentAuthorized!==false)
      throw Error('Recibo pendiente de validación');
@@ -799,7 +807,8 @@ async function fase4Quote(request,env){
      hojasTotales:budget.quote.hojasTotales,
      subtotalImpresiones:budget.quote.subtotalBN+budget.quote.subtotalColor,
      anillados:budget.quote.cargoAnillado,total:budget.quote.total,
-     priceVersion:budget.priceVersion,paymentAuthorized:false},200);
+     priceVersion:budget.priceVersion,paymentAuthorized:false,
+     tiemposServidor:{...metricas,totalMs:Date.now()-inicio}},200);
  }catch(_){
    return testResponse({ok:false,error:'No se pudo validar y cotizar este PDF de prueba.',
      paymentAuthorized:false},422);
