@@ -17,13 +17,14 @@ export function paginaCotizadorRapido(){
  <div id="soltar" tabindex="0">O arrastrá aquí todos los PDF</div>
  <p id="estado" role="status">Cargando lector local…</p><strong id="paginas">0 páginas detectadas</strong>
  <ol id="documentos"></ol>
- <div class="config">
+ <p><strong>Configuración para nuevos archivos o para aplicar a todos:</strong></p><div class="config">
+  <div><label for="modoGeneral">Impresión</label><select id="modoGeneral"><option value="bn">B/N</option><option value="color">Color</option></select></div>
   <div><label for="formato">Tamaño</label><select id="formato"><option value="a4">A4</option><option value="a3">A3</option></select></div>
   <div><label for="caras">Caras</label><select id="caras"><option value="simple">Simple faz</option><option value="double">Doble faz</option></select></div>
   <div><label for="copias">Copias por PDF</label><input id="copias" type="number" min="1" max="500" value="1"></div>
   <div><label for="anillado">Anillado</label><select id="anillado"><option value="ninguno">Sin anillado</option><option value="juntos">Todos juntos</option><option value="separados">Por separado</option></select></div>
  </div>
- <p><button id="cotizar" type="button" disabled>Ver precio preliminar</button></p>
+ <p><button id="aplicarTodos" type="button">Aplicar configuración a todos</button> <button id="cotizar" type="button" disabled>Ver precio preliminar</button></p>
  <div id="precio" role="status" aria-live="polite">Elegí tus archivos para obtener el precio.</div>
  <p><small>Los valores de esta demostración no constituyen una oferta ni permiten pagar. No cierres la pestaña durante la lectura local.</small></p>
  </main><script src="/prueba-cotizador-rapido.js" defer></script></body></html>`;
