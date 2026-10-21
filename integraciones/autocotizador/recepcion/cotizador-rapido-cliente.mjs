@@ -50,7 +50,88 @@ async function seleccionar(input){
  }catch(e){txt('estado','No se pudieron analizar los PDF: '+String(e.message||e))}
  finally{procesando=false;actualizar();calcular()}
 }
+const modoTexto=v=>v==='bn'?'Blanco y negro':'Color';
+const fazTexto=v=>v==='double'?'Doble faz':'Simple faz';
+const armadoTexto=d=>d.anillado==='grupo'?'Grupo '+d.grupoAnillado:d.anillado==='individual'?'Anillado individual':'Sin anillado';
+function elemento(tipo,texto,clase){
+ const el=document.createElement(tipo);
+ if(texto!==undefined)el.textContent=String(texto);
+ if(clase)el.className=clase;
+ return el;
+}
+function linea(contenedor,izquierda,derecha,destacada=false){
+ const r=elemento('div',undefined,'resumen-linea'+(destacada?' destacada':''));
+ r.append(elemento('span',izquierda),elemento('strong',derecha));
+ contenedor.append(r);return r;
+}
+function mostrarResumen(info,tiempo){
+ const seccion=$('resumen');seccion.replaceChildren();
+ if(!Array.isArray(info.detalles)||!Array.isArray(info.detalleArmados)||
+    !Number.isFinite(info.total)||!Number.isFinite(info.subtotalImpresiones)||!Number.isFinite(info.anillados)){
+  txt('precio','No se pudo construir el resumen del presupuesto.');return;
+ }
+ const detalles=info.detalles;
+ const cliente=elemento('section',undefined,'panel-resumen');
+ cliente.append(elemento('h2','Tu presupuesto'));
+ cliente.append(elemento('p',detalles.length+' archivo(s) · '+info.paginas+' páginas originales · Precio preliminar','subtitulo'));
+ linea(cliente,'Impresiones',money(info.subtotalImpresiones));
+ linea(cliente,'Anillados',money(info.anillados));
+ linea(cliente,'TOTAL ORIENTATIVO',money(info.total),true);
+ const detalleCliente=elemento('details');
+ detalleCliente.append(elemento('summary','Ver detalle de precios por archivo'));
+ for(const d of detalles)linea(detalleCliente,d.nombre,money(d.subtotal));
+ if(info.detalleArmados.length){
+  detalleCliente.append(elemento('p','Anillados conjuntos (ya incluidos en el total)','subtitulo'));
+  for(const a of info.detalleArmados)linea(detalleCliente,'Grupo '+a.grupo+' · '+a.juegos+' juego(s)',money(a.subtotal));
+ }
+ cliente.append(detalleCliente);
+ cliente.append(elemento('p','Valor orientativo, pendiente de verificar los PDF originales. No se puede pagar ni confirmar el pedido desde esta prueba.','aviso'));
+ const trabajo=elemento('section',undefined,'panel-resumen');
+ trabajo.append(elemento('h2','Instrucciones para impresión'));
+ trabajo.append(elemento('p','Orden de los PDF según la lista. Cada ficha especifica cómo imprimir y terminar el trabajo.','subtitulo'));
+ for(const [i,d] of detalles.entries()){
+  const ficha=elemento('section',undefined,'ficha');
+  ficha.append(elemento('h3',(i+1)+'. '+d.nombre));
+  ficha.append(elemento('p',
+   d.paginas+' páginas · '+d.formato.toUpperCase()+' · '+modoTexto(d.modo)+
+   (d.modo==='color'?' · Papel '+d.materialColor:'')+' · '+fazTexto(d.caras)));
+  ficha.append(elemento('p',
+   d.copias+' juego(s) · '+d.cantidad+' impresiones · '+armadoTexto(d),'instruccion'));
+  trabajo.append(ficha);
+ }
+ if(info.detalleArmados.length){
+  trabajo.append(elemento('h3','Orden de armado y anillado'));
+  for(const a of info.detalleArmados){
+   const box=elemento('section',undefined,'armado');
+   box.append(elemento('strong','Grupo '+a.grupo+' · '+a.juegos+' anillado(s) · '+a.hojasPorJuego+' hojas por juego'));
+   const lista=elemento('ol');
+   for(const id of a.archivos){
+    const doc=detalles.find(d=>d.id===id);
+    lista.append(elemento('li',doc?doc.nombre+' ('+doc.paginas+' páginas)':'Documento por verificar'));
+   }
+   box.append(lista);trabajo.append(box);
+  }
+ }
+ const acciones=elemento('div',undefined,'acciones-resumen');
+ const copiar=elemento('button','Copiar instrucciones de impresión');copiar.type='button';
+ copiar.addEventListener('click',async()=>{
+  const texto=['ORDEN DE TRABAJO · PRELIMINAR · NO AUTORIZADA PARA PRODUCCIÓN',
+   ...detalles.map((d,i)=>(i+1)+'. '+d.nombre+' | '+d.paginas+' páginas | '+d.formato.toUpperCase()+
+    ' | '+modoTexto(d.modo)+(d.modo==='color'?' | '+d.materialColor:'')+' | '+fazTexto(d.caras)+
+    ' | '+d.copias+' juego(s) | '+armadoTexto(d)),
+   ...info.detalleArmados.map(a=>'GRUPO '+a.grupo+' ('+a.juegos+' juegos, '+a.hojasPorJuego+' hojas/juego): '+
+     a.archivos.map(id=>detalles.find(d=>d.id===id)?.nombre||id).join(' → ')),
+   'PRECIO PRELIMINAR: '+money(info.total),
+   'PENDIENTE: verificar originales, precio final y autorización del pedido.'].join('\n');
+  try{await navigator.clipboard.writeText(texto);copiar.textContent='Instrucciones copiadas';}
+  catch(_){copiar.textContent='No se pudo copiar: usá selección manual';}
+ });
+ acciones.append(copiar);trabajo.append(acciones);
+ seccion.append(cliente,trabajo);
+ txt('precio','Presupuesto listo en '+tiempo+' ms. Consultá las dos vistas debajo.');
+}
 async function calcular(){
+ $('resumen').replaceChildren();
  if(procesando||!cola.length||cola.some(x=>!x.paginas)){
   txt('precio','Completá la lectura de todos los PDF para cotizar.');return;
  }
@@ -74,10 +155,7 @@ async function calcular(){
    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
   const r=await response.json();
   if(!response.ok||r.ok!==true||r.paymentAuthorized!==false)throw Error(r.error||'Presupuesto no disponible.');
-  const info=r.resumen;
-  const detalles=(info.detalles||[]).map(d=>d.nombre+': '+money(d.subtotal)+' ('+d.cantidad+' impresiones)').join(' · ');
-  const armados=(info.detalleArmados||[]).map(g=>'Grupo '+g.grupo+': '+g.archivos.length+' PDF, '+g.hojasPorJuego+' hojas por juego, '+g.juegos+' anillado(s) — '+money(g.subtotal)).join(' · ');
-  txt('precio','TOTAL ORIENTATIVO: '+money(info.total)+' — '+detalles+(armados?' — Anillados conjuntos: '+armados:'')+' — Respuesta: '+Math.round(performance.now()-start)+' ms.');
+  mostrarResumen(r.resumen,Math.round(performance.now()-start));
  }catch(e){txt('precio','No se pudo cotizar: '+String(e.message||e))}
 }
 $('archivo').addEventListener('change',e=>seleccionar(e.target.files));
