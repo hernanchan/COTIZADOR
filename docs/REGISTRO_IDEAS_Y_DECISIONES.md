@@ -1,3 +1,10 @@
+## Medición real de latencia Google — 21/10/2026
+
+- **Ensayo real comunicado por el usuario**, worker privado `saber-documentos-pruebas`, versión `a087b1f4`, `/prueba-google`: **PING CONFIRMADO** mediante HMAC. Tiempo total navegador **1555 ms**; consulta firmada Google **1455 ms** (93,6 % de esa espera); diferencia **100 ms**. Recepción genérica de documentos permanece desactivada. No se subieron PDF ni se consumieron sesiones.
+- **Interpretación limitada:** es una medición puntual de ping de conexión Cloudflare↔Google Apps Script y redirección, no es benchmark completo de subida, verificación SHA-256, Drive ni cotización. Las operaciones de subida sucesivas pueden acumular latencia incluso para archivos pequeños; no extrapolar el 93,6 % a toda la subida.
+- **Acción implementada en código, todavía no desplegada:** desglosar los tiempos de `start` con lectura local/hash, `status/part` y `finish` en la pantalla multifichero. No se añade ninguna llamada ni se cambian límites, pagos, permisos, Apps Script ni web pública.
+- **Siguiente prioridad:** reducir idas y vueltas secuenciales de Google con medidas de integridad y recuperación preservadas, usando las métricas de operaciones reales antes de abrir la carga comercial.
+
 ## Optimización de primera cotización — 21/10/2026
 
 - **Implementado sólo en GitHub, rama de pruebas; no desplegado:** nuevo indicador `primeraCotizacion` booleano opcional del piloto multifichero. En primer presupuesto, el Worker consulta directamente `multiInfo` con sesión y token autenticados y omite la llamada previa redundante a `multiVerifiedStatus`; inmediatamente después sigue el circuito completo de descarga privada, verificación de integridad SHA-256, conteo con pdf-lib y `multiCommitPages`. Si los datos ya constan verificados, mantiene lectura del estado firmado antes de aceptar el recibo.
