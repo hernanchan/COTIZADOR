@@ -10,7 +10,25 @@ export function paginaCotizadorRapido(){
  button{cursor:pointer;background:#145c89;color:white;border:0}button:disabled{opacity:.55}.config{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:14px}
  label{display:block;font-weight:600;margin-bottom:6px}.config select,.config input{width:100%}
  #precio{font-size:20px;font-weight:700;background:#eff5fb;padding:16px;margin-top:16px;border-radius:9px;line-height:1.6}
- small{color:#54677a}#estado{margin:14px 0}</style></head><body><main>
+ small{color:#54677a}#estado{margin:14px 0}
+ #resumen{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:16px;margin:16px 0}
+ .panel-resumen{border:1px solid #cad7e2;border-radius:12px;padding:20px;min-width:0;background:#fff}
+ .panel-resumen h2{font-size:21px;margin:0 0 10px;color:#164a71}
+ .panel-resumen h3{font-size:16px;margin:0 0 5px}
+ .subtitulo{color:#53697c;font-size:14px;line-height:1.5}
+ .resumen-linea{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid #e2e8ee}
+ .resumen-linea strong{text-align:right;white-space:nowrap}
+ .resumen-linea.destacada{background:#e8f3fb;padding:16px 10px;border:0;border-radius:8px;font-size:18px;color:#124868}
+ .panel-resumen details{margin:18px 0}.panel-resumen summary{cursor:pointer;font-weight:600}
+ .aviso{font-size:13px;color:#845514;background:#fff6e6;padding:12px;border-radius:8px;line-height:1.5}
+ .ficha{border-left:3px solid #2773aa;padding:10px 12px;margin:12px 0;background:#f5f9fc;overflow-wrap:anywhere}
+ .ficha p{margin:5px 0;font-size:14px;line-height:1.45}
+ .ficha .instruccion{font-weight:650}
+ .armado{padding:12px;border:1px solid #d3e0ea;border-radius:8px;margin:10px 0;font-size:14px}
+ .armado li{display:list-item;padding:2px 0;overflow-wrap:anywhere}
+ .acciones-resumen{margin-top:16px} .acciones-resumen button{width:100%;padding:12px}
+ @media(max-width:520px){main{margin:0;padding:16px;border-radius:0}.panel-resumen{padding:14px}}
+</style></head><body><main>
  <h1>Presupuesto rápido de varios PDF</h1>
  <p class="note"><strong>Ensayo de precio preliminar.</strong> Los PDF se leen en este dispositivo y no se envían a Google Drive para cotizar. Tarifas orientativas pendientes de aprobación comercial. Los archivos grandes se procesan uno por uno y pueden tardar o superar la memoria de algunos celulares. Para comprar, será necesaria una verificación posterior de archivos y precio. <strong>Pagos desactivados.</strong></p>
  <label for="archivo">Elegí hasta 30 PDF juntos (hasta 250 MB por PDF para este ensayo)</label><input id="archivo" type="file" accept=".pdf,application/pdf" multiple>
@@ -26,6 +44,7 @@ export function paginaCotizadorRapido(){
  </div>
  <p><button id="aplicarTodos" type="button">Aplicar configuración a todos</button> <button id="cotizar" type="button" disabled>Ver precio preliminar</button></p>
  <div id="precio" role="status" aria-live="polite">Elegí tus archivos para obtener el precio.</div>
+ <div id="resumen" aria-label="Presupuesto para cliente y detalle de producción"></div>
  <p><small>Los valores de esta demostración no constituyen una oferta ni permiten pagar. No cierres la pestaña durante la lectura local.</small></p>
  </main><script src="/prueba-cotizador-rapido.js" defer></script></body></html>`;
 }
