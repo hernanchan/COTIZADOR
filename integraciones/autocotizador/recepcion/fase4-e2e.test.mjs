@@ -215,7 +215,7 @@ test('precio rápido de 10 PDF sin Google Drive, sin autorización de pago',asyn
  const q=await worker.fetch(req('/api/ensayo-presupuesto-rapido',{
   archivos,formato:'a4',caras:'simple',copias:1,anillado:'ninguno'
  }),env);
- assert.equal(q.status,200);
+ assert.equal(q.status,200,'Respuesta preliminar: '+JSON.stringify(await q.clone().json()));
  const data=await q.json();
  assert.equal(data.ok,true);
  assert.equal(data.resumen.paginas,55);
