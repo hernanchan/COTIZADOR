@@ -223,14 +223,17 @@ function testPage(env,mode='turnstile'){
     const token=window.turnstile?.getResponse();
     if(!token){out.textContent='Esperá o completá la verificación.';return;}
     out.textContent='Comprobando...';
+    const inicioNavegador=performance.now();
     try{
       const res=await fetch('${endpoint}',{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({token})
       });
       const value=await res.json();
+      const msNavegador=Math.round(performance.now()-inicioNavegador);
+      const timing=${googleMode?"value.ok ? ' Tiempo total desde el navegador: '+msNavegador+' ms. Conexión firmada con Google: '+value.googleMs+' ms.' : ''":"''"};
       out.textContent=value.ok
-        ? '${successMessage}'
+        ? '${successMessage}'+timing
         : 'NO VALIDADO — diagnóstico: '+String(value.reason || 'sin_diagnostico')+
           (Array.isArray(value.codes)&&value.codes.length ? ' ('+value.codes.join(', ')+')' : '')+
           (value.kind ? ' ['+value.kind+']' : '')+
@@ -321,6 +324,7 @@ async function testGooglePing(request,env){
   const guard=await testTurnstilePost(request,env);
   if(!guard.ok)return guard;
   let googleReply;
+  const inicioGoogle=Date.now();
   try{
     googleReply=await postToScript(env,{
       op:'ping',purpose:'saber-docs-hmac-v1'
@@ -342,6 +346,7 @@ async function testGooglePing(request,env){
     }
     return testResponse(diagnostic,502);
   }
+  const googleMs=Date.now()-inicioGoogle;
   if(googleReply?.ok===true&&
     googleReply?.service==='saber-docs-handshake'&&
     googleReply?.signed===true&&
@@ -349,7 +354,7 @@ async function testGooglePing(request,env){
     googleReply?.apiVersion==='ping-v1'){
     return testResponse({
       ok:true,service:'saber-docs-handshake',
-      signed:true,receptionEnabled:false
+      signed:true,receptionEnabled:false,googleMs
     },200);
   }
   return testResponse({ok:false,reason:'google_ping_not_confirmed',
