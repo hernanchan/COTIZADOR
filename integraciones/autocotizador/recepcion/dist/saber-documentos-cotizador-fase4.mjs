@@ -13,7 +13,7 @@ li{margin:9px 0;overflow-wrap:anywhere}#out{white-space:pre-wrap;line-height:1.6
 small{color:#586b79}.drop{border:2px dashed #9aaebf;padding:18px;text-align:center;margin:12px 0;border-radius:8px;background:#f6fbff}.drop.over{border-color:#17618e;background:#e9f4ff}#pending li{display:flex;align-items:center;gap:10px;flex-wrap:wrap}#pending select{max-width:200px}#pending button{margin:0}
 </style></head><body><main>
 <h1>Presupuesto conjunto de varios PDF</h1>
-<p class="note">Prueba privada: agreg\xE1 PDF de uno en uno (hasta cinco sesiones disponibles en total), de hasta 1 MB por archivo. Se acumulan las impresiones compatibles para conseguir mejores precios unitarios. Sin compras ni pagos.</p>
+<p class="note">Prueba privada: seleccion\xE1 hasta cinco PDF juntos y preparalos antes de enviarlos. Por seguridad, cada archivo se confirma por separado; el cupo global es de cinco sesiones de hasta 1 MB. Se acumulan las impresiones compatibles para conseguir mejores precios unitarios. Sin compras ni pagos.</p>
 <label for="file">Eleg\xED varios archivos PDF de una sola vez</label>
 <input id="file" type="file" accept=".pdf,application/pdf" multiple>
 <div id="drop" class="drop" tabindex="0">Tambi\xE9n pod\xE9s arrastrar tus PDF hasta ac\xE1</div>
@@ -52,10 +52,10 @@ function redraw(){
    const option=document.createElement('option');option.value=value;option.textContent=label;
    mode.appendChild(option);
   }
-  mode.value=r.mode;mode.setAttribute('aria-label','Modo de impresi\xF3n de '+r.file.name);
+  mode.value=r.mode;mode.disabled=ocupado;mode.setAttribute('aria-label','Modo de impresi\xF3n de '+r.file.name);
   mode.addEventListener('change',()=>{r.mode=mode.value;say('Modo actualizado.');});
   const remove=document.createElement('button');
-  remove.type='button';remove.className='secondary';remove.textContent='Quitar';
+  remove.type='button';remove.className='secondary';remove.textContent='Quitar';remove.disabled=ocupado;
   remove.addEventListener('click',()=>{preparados.splice(i,1);redraw()});
   li.append(name,mode,remove);porEnviar.appendChild(li);
  });
@@ -68,6 +68,7 @@ function redraw(){
  add.disabled=ocupado||preparados.length===0||recibidos.length>=5;
 }
 function enqueue(files){
+ if(ocupado){say('Esper\xE1 a que termine el env\xEDo actual.');return;}
  const items=Array.from(files||[]);
  for(const file of items){
   if(preparados.length+recibidos.length>=5){say('El ensayo admite hasta cinco archivos en la lista.');break;}
