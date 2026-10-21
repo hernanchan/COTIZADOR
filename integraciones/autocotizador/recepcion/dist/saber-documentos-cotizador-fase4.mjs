@@ -10,16 +10,19 @@ label{display:block;margin:12px 0 6px;font-weight:600}select,input{width:100%;fo
 button{padding:11px 16px;border:0;border-radius:7px;background:#16618d;color:white;font:inherit;cursor:pointer;margin:12px 7px 12px 0}
 button:disabled{opacity:.5}button.secondary{background:#566b7b}
 li{margin:9px 0;overflow-wrap:anywhere}#out{white-space:pre-wrap;line-height:1.6;overflow-wrap:anywhere}
-small{color:#586b79}
+small{color:#586b79}.drop{border:2px dashed #9aaebf;padding:18px;text-align:center;margin:12px 0;border-radius:8px;background:#f6fbff}.drop.over{border-color:#17618e;background:#e9f4ff}#pending li{display:flex;align-items:center;gap:10px;flex-wrap:wrap}#pending select{max-width:200px}#pending button{margin:0}
 </style></head><body><main>
 <h1>Presupuesto conjunto de varios PDF</h1>
 <p class="note">Prueba privada: agreg\xE1 PDF de uno en uno (hasta cinco sesiones disponibles en total), de hasta 1 MB por archivo. Se acumulan las impresiones compatibles para conseguir mejores precios unitarios. Sin compras ni pagos.</p>
-<div class="row"><div><label>Archivo nuevo</label><input id="file" type="file" accept=".pdf,application/pdf"></div>
-<div><label>Impresi\xF3n de este archivo</label><select id="mode"><option value="bn">Blanco y negro</option><option value="color">Color</option></select></div></div>
-<label>Seguridad para agregar cada archivo</label>
+<label for="file">Eleg\xED varios archivos PDF de una sola vez</label>
+<input id="file" type="file" accept=".pdf,application/pdf" multiple>
+<div id="drop" class="drop" tabindex="0">Tambi\xE9n pod\xE9s arrastrar tus PDF hasta ac\xE1</div>
+<h2>Preparados para enviar</h2><ol id="pending"></ol>
+<p><small>Antes de enviar, pod\xE9s cambiar B/N o Color en cada archivo, quitarlo o agregar otros. Para este piloto, Turnstile debe renovarse antes de cada env\xEDo individual.</small></p>
+<label>Verificaci\xF3n para enviar el pr\xF3ximo PDF</label>
 <div class="cf-turnstile" data-sitekey="${e}" data-action="documentos"></div>
-<button id="add" type="button">Agregar PDF al presupuesto</button>
-<h2>Archivos recibidos</h2><ol id="files"></ol>
+<button id="add" type="button" disabled>Enviar pr\xF3ximo PDF preparado</button>
+<h2>Archivos recibidos y listos para cotizar</h2><ol id="files"></ol>
 <p><small>Quitar un documento de la cotizaci\xF3n no lo elimina del Drive privado ni devuelve el cupo de la sesi\xF3n piloto.</small></p>
 <div class="row"><div><label>Formato com\xFAn</label><select id="format"><option value="a4">A4</option><option value="a3">A3</option></select></div>
 <div><label>Caras</label><select id="faces"><option value="simple">Simple faz</option><option value="double">Doble faz</option></select></div>
@@ -31,28 +34,67 @@ small{color:#586b79}
 </main><script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer><\/script>
 <script>
 const $=id=>document.getElementById(id);
-const recibidos=[];const pendientes=new Map();
-const add=$('add'),quote=$('quote'),out=$('out'),list=$('files');
+const recibidos=[];const pendientes=new Map();const preparados=[];let ocupado=false;
+const add=$('add'),quote=$('quote'),out=$('out'),list=$('files'),porEnviar=$('pending');
 const say=s=>{out.textContent=s};
 const fmt=new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0});
 async function hash(b){const a=new Uint8Array(await crypto.subtle.digest('SHA-256',b));return Array.from(a,x=>x.toString(16).padStart(2,'0')).join('')}
 function base64(b){let s='';for(let i=0;i<b.length;i+=12288)s+=btoa(String.fromCharCode(...b.subarray(i,i+12288)));return s}
 async function rpc(path,data){const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});const v=await r.json().catch(()=>null);
  if(!v||!r.ok||v.ok!==true)throw Error(v?.error||'El servidor no confirm\xF3 la operaci\xF3n');return v}
-function redraw(){list.replaceChildren();recibidos.forEach((r,i)=>{
+function redraw(){
+ porEnviar.replaceChildren();
+ preparados.forEach((r,i)=>{
+  const li=document.createElement('li'),name=document.createElement('span');
+  name.textContent=r.file.name+' ('+Math.ceil(r.file.size/1024)+' KB)';
+  const mode=document.createElement('select');
+  for(const [value,label] of [['bn','Blanco y negro'],['color','Color']]){
+   const option=document.createElement('option');option.value=value;option.textContent=label;
+   mode.appendChild(option);
+  }
+  mode.value=r.mode;mode.setAttribute('aria-label','Modo de impresi\xF3n de '+r.file.name);
+  mode.addEventListener('change',()=>{r.mode=mode.value;say('Modo actualizado.');});
+  const remove=document.createElement('button');
+  remove.type='button';remove.className='secondary';remove.textContent='Quitar';
+  remove.addEventListener('click',()=>{preparados.splice(i,1);redraw()});
+  li.append(name,mode,remove);porEnviar.appendChild(li);
+ });
+ list.replaceChildren();recibidos.forEach((r,i)=>{
  const li=document.createElement('li');li.appendChild(document.createTextNode(r.name+' \u2014 '+(r.mode==='bn'?'B/N':'Color')+' '));
  const b=document.createElement('button');b.type='button';b.className='secondary';b.textContent='Quitar de la cotizaci\xF3n';
  b.addEventListener('click',()=>{recibidos.splice(i,1);redraw();say('Lista modificada. Volv\xE9 a calcular el presupuesto.')});
  li.appendChild(b);list.appendChild(li)});
- quote.disabled=recibidos.length===0;add.disabled=recibidos.length>=5;
+ quote.disabled=ocupado||recibidos.length===0;
+ add.disabled=ocupado||preparados.length===0||recibidos.length>=5;
 }
+function enqueue(files){
+ const items=Array.from(files||[]);
+ for(const file of items){
+  if(preparados.length+recibidos.length>=5){say('El ensayo admite hasta cinco archivos en la lista.');break;}
+  if(!/\\.pdf$/i.test(file.name)||file.size<5||file.size>1048576){
+   say('Archivo no admitido: '+file.name+'. Us\xE1 PDF de hasta 1 MB.');continue;
+  }
+  if(preparados.some(r=>r.file===file||r.file.name===file.name&&r.file.size===file.size)){
+   continue;
+  }
+  preparados.push({file,mode:'bn'});
+ }
+ $('file').value='';redraw();
+}
+$('file').addEventListener('change',e=>enqueue(e.target.files));
+const drop=$('drop');
+drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('over')});
+drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
+drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('over');enqueue(e.dataTransfer.files)});
+drop.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('file').click()}});
 add.addEventListener('click',async()=>{
- const file=$('file').files[0],mode=$('mode').value;
+ const selected=preparados[0];
+ const file=selected?.file,mode=selected?.mode;
  const token=window.turnstile?.getResponse();
- if(!file||!token){say('Seleccion\xE1 un PDF y complet\xE1 la verificaci\xF3n.');return}
+ if(!file||!token){say('Prepar\xE1 un PDF y complet\xE1 la verificaci\xF3n antes de enviarlo.');return}
  if(!/\\.pdf$/i.test(file.name)||file.size<5||file.size>1048576){say('Cada PDF debe tener entre 5 bytes y 1 MB.');return}
  if(recibidos.length>=5){say('Se alcanz\xF3 el l\xEDmite de cinco PDF en este ensayo.');return}
- add.disabled=true;quote.disabled=true;
+ ocupado=true;redraw();
  try {
   const inicioCarga=performance.now();
   const buf=await file.arrayBuffer(),bytes=new Uint8Array(buf);
@@ -84,7 +126,7 @@ add.addEventListener('click',async()=>{
   const result=await rpc('/api/ensayo-pdf',{op:'finish',uploadId:state.uploadId,
     token:state.token,sha256:sha,bytes:file.size,parts});
   if(!result.received)throw Error('La recepci\xF3n no fue confirmada.');
-  recibidos.push(state);pendientes.delete(key);
+  recibidos.push(state);pendientes.delete(key);preparados.shift();
   const finCarga=performance.now();
   $('file').value='';redraw();
   say('Recibido: '+file.name+'. Pod\xE9s agregar otro PDF o calcular el total.'+
@@ -92,7 +134,7 @@ add.addEventListener('click',async()=>{
     '\\nFragmentos y estado: '+Math.round(tConfirmacion-tTransferencia)+' ms'+
     '\\nConfirmaci\xF3n Drive: '+Math.round(finCarga-tConfirmacion)+' ms');
  }catch(e){say('No se pudo terminar: '+String(e.message||e)+'. Si ya comenz\xF3 la subida, reintent\xE1 con el mismo archivo sin cerrar esta pesta\xF1a.')}
- finally{add.disabled=recibidos.length>=5;quote.disabled=recibidos.length===0;window.turnstile?.reset()}
+ finally{ocupado=false;redraw();window.turnstile?.reset()}
 });
 quote.addEventListener('click',async()=>{
  if(!recibidos.length)return;
@@ -464,7 +506,7 @@ button.addEventListener('click',async ()=>{
     (session?'\\nNo vuelvas a subirlo antes de verificar el estado del recibo.':''));
  }finally{button.disabled=false;window.turnstile?.reset()}
 });
-<\/script></body></html>`,Ds=1024*1024,Ps=256*1024;function wm(e){let t=e?.DOCS_TURNSTILE_SITE_KEY;return typeof t!="string"||!/^[a-zA-Z0-9._-]{10,200}$/.test(t)?X({ok:!1,error:"Clave p\xFAblica de Turnstile ausente",paymentAuthorized:!1},503):new Response(xm.replace("__SITEKEY__",t),{status:200,headers:{"Content-Type":"text/html;charset=utf-8","Cache-Control":"no-store,private","X-Frame-Options":"DENY","X-Robots-Tag":"noindex,nofollow","X-Content-Type-Options":"nosniff"}})}var Gi=e=>typeof e=="string"&&/^DOC-[a-f0-9-]{36}$/i.test(e),ks=e=>typeof e=="string"&&e.length>=16&&e.length<=256;function Fm(e){return e&&typeof e=="object"&&!Array.isArray(e)&&Object.keys(e).sort().join(",")==="anillado,caras,copias,formato,token,uploadId"&&Gi(e.uploadId)&&ks(e.token)&&["a4","a3"].includes(e.formato)&&["simple","double"].includes(e.caras)&&["ninguno","juntos"].includes(e.anillado)&&Number.isSafeInteger(e.copias)&&e.copias>=1&&e.copias<=200}async function Sm(e,t){if(e.method!=="POST")return jt();if(!Kr(e,t))return X({ok:!1,error:"Origen no autorizado",paymentAuthorized:!1},403);let r;try{if(r=await Hr(e),Cs(r),r.op==="start"){let n=r.meta;if(n.fileId!=="documento"||n.bytes>Ds||!["bn","color"].includes(n.mode)||n.name.length>120)throw Error("L\xEDmite alcanzado")}else if(!Gi(r.uploadId)||!ks(r.token))throw Error("Sesi\xF3n inv\xE1lida")}catch{return X({ok:!1,error:"Solicitud de PDF inv\xE1lida",paymentAuthorized:!1},400)}if(r.op==="start"&&!await qi(r.turnstileToken,t))return X({ok:!1,error:"No se pudo verificar el inicio seguro",paymentAuthorized:!1},403);let o={...r};if(delete o.turnstileToken,r.op==="start"){if(!/^WEB-ENSAYO-[A-F0-9]{16}$/.test(r.meta.orderId||""))return X({ok:!1,error:"ID de prueba inv\xE1lido",paymentAuthorized:!1},400);o.meta={...r.meta,fileId:"documento"}}o.op={start:"multiStart",part:"multiPart",finish:"multiFinish",status:"multiStatus"}[r.op];try{let n=await Ye(t,o,fetch);return n.ok?X({...n,ok:!0,paymentAuthorized:!1},200):X({ok:!1,error:"Google no pudo recibir el PDF o se agot\xF3 el cupo de cinco archivos",paymentAuthorized:!1},422)}catch{return X({ok:!1,error:"No se confirm\xF3 la recepci\xF3n. Comprob\xE1 el estado antes de reintentar",paymentAuthorized:!1},502)}}async function Qc(e,t,r=null){let o=()=>Date.now(),n=o(),i=d=>{r&&(r[d]=o()-n),n=o()},a={uploadId:t.uploadId,token:t.token},s=await Ye(e,{op:"multiVerifiedStatus",...a},fetch);if(i("estadoPrevioMs"),s.ok&&s.status==="verified"&&s.verified===!0&&s.storageVerified===!0&&s.pageVerification==="server"&&s.paymentAuthorized===!1&&s.receiptId===a.uploadId&&Number.isSafeInteger(s.pages)&&s.pages>=1&&Number.isSafeInteger(s.bytes)&&s.bytes>=5&&s.bytes<=Ds&&/^[a-f0-9]{64}$/.test(s.sha256||""))return s;let f=await Ye(e,{op:"multiInfo",...a},fetch);if(i("consultaGoogleMs"),!f.ok||!Gi(f.receiptId)||f.receiptId!==a.uploadId||!Number.isSafeInteger(f.bytes)||f.bytes<5||f.bytes>Ds||!/^[a-f0-9]{64}$/.test(f.sha256||"")||f.privateChunkBytes!==Ps)throw Error("Informaci\xF3n privada inv\xE1lida");if(f.pageVerification==="server"&&Number.isSafeInteger(f.pages)&&f.pages>=1){let d=await Ye(e,{op:"multiVerifiedStatus",...a},fetch);if(i("estadoVerificadoMs"),d.ok&&d.verified&&d.pages===f.pages&&d.receiptId===f.receiptId&&d.paymentAuthorized===!1)return d}let l=new Uint8Array(f.bytes);for(let d=0;d<l.length;d+=Ps){let h=await Ye(e,{op:"multiReadPart",...a,receiptId:f.receiptId,offset:d},fetch,42e4),p=Math.min(Ps,l.length-d);if(!h.ok||h.receiptId!==f.receiptId||h.offset!==d||h.length!==p||h.bytes!==f.bytes||h.sha256!==f.sha256||typeof h.dataBase64!="string"||h.dataBase64.length>38e4||!/^[a-f0-9]{64}$/.test(h.chunkSha256||""))throw Error("Google no entreg\xF3 el fragmento privado esperado");let m=atob(h.dataBase64);if(m.length!==p)throw Error("Tama\xF1o de fragmento inconsistente");let y=Uint8Array.from(m,b=>b.charCodeAt(0));if(await Jc(y)!==h.chunkSha256)throw Error("Integridad de fragmento incorrecta");l.set(y,d)}i("lecturaPrivadaMs");let u=await Ss({driveBytes:l,reciboServidor:{receiptState:"bytes_checked",receiptId:f.receiptId,orderId:f.orderId,fileId:f.fileId,name:f.name,mode:f.mode,bytes:f.bytes,sha256:f.sha256}});i("analisisPdfMs");let c=await Ye(e,{op:"multiCommitPages",...a,receiptId:f.receiptId,sha256:u.sha256,bytes:u.bytes,pages:u.pages,parserVersion:"pdf-lib-1.17.1"},fetch);if(i("confirmacionGoogleMs"),!c.ok||c.verified!==!0||c.receiptId!==u.receiptId||c.pages!==u.pages||c.paymentAuthorized!==!1)throw Error("Google no guard\xF3 el conteo de p\xE1ginas");return c}async function Pm(e,t){if(e.method!=="POST")return jt();if(!Kr(e,t))return X({ok:!1,error:"Origen no permitido",paymentAuthorized:!1},403);let r;try{if(r=await Hr(e),!Fm(r))throw Error("Opciones incorrectas")}catch{return X({ok:!1,error:"Opciones de cotizaci\xF3n inv\xE1lidas",paymentAuthorized:!1},400)}try{let o={},n=Date.now(),i=await Qc(t,r,o);if(!i.ok||i.verified!==!0||i.storageVerified!==!0||i.pageVerification!=="server"||i.paymentAuthorized!==!1)throw Error("Recibo pendiente de validaci\xF3n");let a={orderId:i.orderId,archivos:[{id:i.fileId,nombre:i.name,modo:i.mode,orden:1}],formato:r.formato,caras:r.caras,copias:r.copias,anillado:r.anillado,materialColor:"obra70"},s=Xi({solicitud:a,recibosConfiables:[i],tarifasServidor:Zn});if(s.paymentAuthorized!==!1||s.quote.total<=0||!Number.isSafeInteger(s.quote.total))throw Error("Importe no aprobado");return X({ok:!0,receiptId:i.receiptId,pages:i.pages,copias:r.copias,hojasTotales:s.quote.hojasTotales,subtotalImpresiones:s.quote.subtotalBN+s.quote.subtotalColor,anillados:s.quote.cargoAnillado,total:s.quote.total,priceVersion:s.priceVersion,paymentAuthorized:!1,tiemposServidor:{...o,totalMs:Date.now()-n}},200)}catch{return X({ok:!1,error:"No se pudo validar y cotizar este PDF de prueba.",paymentAuthorized:!1},422)}}function Dm(e){try{return new Response(Os(e?.DOCS_TURNSTILE_SITE_KEY),{status:200,headers:{"Content-Type":"text/html;charset=utf-8","Cache-Control":"no-store,private","X-Robots-Tag":"noindex,nofollow","X-Frame-Options":"DENY","X-Content-Type-Options":"nosniff"}})}catch{return X({ok:!1,error:"Turnstile ausente",paymentAuthorized:!1},503)}}function Cm(e){return e&&typeof e=="object"&&!Array.isArray(e)&&Object.keys(e).sort().join(",")==="anillado,caras,copias,formato,sesiones"&&["a4","a3"].includes(e.formato)&&["simple","double"].includes(e.caras)&&["ninguno","juntos","separados"].includes(e.anillado)&&Number.isSafeInteger(e.copias)&&e.copias>=1&&e.copias<=200&&Array.isArray(e.sesiones)&&e.sesiones.length>=1&&e.sesiones.length<=5&&e.sesiones.every(t=>t&&typeof t=="object"&&!Array.isArray(t)&&Object.keys(t).sort().join(",")==="token,uploadId"&&Gi(t.uploadId)&&ks(t.token))&&new Set(e.sesiones.map(t=>t.uploadId)).size===e.sesiones.length}async function km(e,t){if(e.method!=="POST")return jt();if(!Kr(e,t))return X({ok:!1,error:"Origen no autorizado",paymentAuthorized:!1},403);let r;try{if(r=await Hr(e),!Cm(r))throw Error("Lote inv\xE1lido")}catch{return X({ok:!1,error:"Opciones de lote inv\xE1lidas",paymentAuthorized:!1},400)}try{let o=Date.now(),n=[];for(let a of r.sesiones){let s=await Qc(t,a);if(!s.ok||s.verified!==!0||s.storageVerified!==!0||s.pageVerification!=="server"||s.paymentAuthorized!==!1)throw Error("Un documento no est\xE1 verificado");n.push(s)}let i=Ts({recibosVerificados:n,formato:r.formato,caras:r.caras,copias:r.copias,anillado:r.anillado,materialColor:"obra70",precios:Zn});return X({...i,tiempoServidorMs:Date.now()-o,paymentAuthorized:!1},200)}catch{return X({ok:!1,error:"No se pudo validar todos los archivos y cotizar el lote.",paymentAuthorized:!1},422)}}var kE={async fetch(e,t,r){let o=new URL(e.url).pathname;return o==="/prueba-cotizador-pdf"&&e.method==="GET"?wm(t):o==="/prueba-cotizador-lote"&&e.method==="GET"?Dm(t):o==="/api/ensayo-cotizar-lote"?km(e,t):o==="/api/ensayo-pdf"?Sm(e,t):o==="/api/ensayo-cotizar"?Pm(e,t):o==="/prueba-presupuesto"&&e.method==="GET"?ym(t):o==="/api/presupuesto-pdf"?bm(e,t):o==="/prueba-validacion"&&e.method==="GET"?pm(t):o==="/api/validar-pdf"?mm(e,t):o==="/prueba-pdf"&&e.method==="GET"?dm(t):o==="/api/piloto-pdf"?hm(e,t):o==="/prueba-turnstile"?e.method==="GET"?Zc(t):e.method==="POST"?Yc(e,t):jt():o==="/prueba-google"?e.method==="GET"?Zc(t,"google"):e.method==="POST"?lm(e,t):jt():!tm||t?.DOCS_UPLOAD_ENABLED!=="true"||e.method!=="POST"?jt():sm(e,t)}};export{kE as default};
+<\/script></body></html>`,Ds=1024*1024,Ps=256*1024;function wm(e){let t=e?.DOCS_TURNSTILE_SITE_KEY;return typeof t!="string"||!/^[a-zA-Z0-9._-]{10,200}$/.test(t)?X({ok:!1,error:"Clave p\xFAblica de Turnstile ausente",paymentAuthorized:!1},503):new Response(xm.replace("__SITEKEY__",t),{status:200,headers:{"Content-Type":"text/html;charset=utf-8","Cache-Control":"no-store,private","X-Frame-Options":"DENY","X-Robots-Tag":"noindex,nofollow","X-Content-Type-Options":"nosniff"}})}var Gi=e=>typeof e=="string"&&/^DOC-[a-f0-9-]{36}$/i.test(e),ks=e=>typeof e=="string"&&e.length>=16&&e.length<=256;function Fm(e){return e&&typeof e=="object"&&!Array.isArray(e)&&Object.keys(e).sort().join(",")==="anillado,caras,copias,formato,token,uploadId"&&Gi(e.uploadId)&&ks(e.token)&&["a4","a3"].includes(e.formato)&&["simple","double"].includes(e.caras)&&["ninguno","juntos"].includes(e.anillado)&&Number.isSafeInteger(e.copias)&&e.copias>=1&&e.copias<=200}async function Sm(e,t){if(e.method!=="POST")return jt();if(!Kr(e,t))return X({ok:!1,error:"Origen no autorizado",paymentAuthorized:!1},403);let r;try{if(r=await Hr(e),Cs(r),r.op==="start"){let n=r.meta;if(n.fileId!=="documento"||n.bytes>Ds||!["bn","color"].includes(n.mode)||n.name.length>120)throw Error("L\xEDmite alcanzado")}else if(!Gi(r.uploadId)||!ks(r.token))throw Error("Sesi\xF3n inv\xE1lida")}catch{return X({ok:!1,error:"Solicitud de PDF inv\xE1lida",paymentAuthorized:!1},400)}if(r.op==="start"&&!await qi(r.turnstileToken,t))return X({ok:!1,error:"No se pudo verificar el inicio seguro",paymentAuthorized:!1},403);let o={...r};if(delete o.turnstileToken,r.op==="start"){if(!/^WEB-ENSAYO-[A-F0-9]{16}$/.test(r.meta.orderId||""))return X({ok:!1,error:"ID de prueba inv\xE1lido",paymentAuthorized:!1},400);o.meta={...r.meta,fileId:"documento"}}o.op={start:"multiStart",part:"multiPart",finish:"multiFinish",status:"multiStatus"}[r.op];try{let n=await Ye(t,o,fetch);return n.ok?X({...n,ok:!0,paymentAuthorized:!1},200):X({ok:!1,error:"Google no pudo recibir el PDF o se agot\xF3 el cupo de cinco archivos",paymentAuthorized:!1},422)}catch{return X({ok:!1,error:"No se confirm\xF3 la recepci\xF3n. Comprob\xE1 el estado antes de reintentar",paymentAuthorized:!1},502)}}async function Qc(e,t,r=null){let o=()=>Date.now(),n=o(),i=d=>{r&&(r[d]=o()-n),n=o()},a={uploadId:t.uploadId,token:t.token},s=await Ye(e,{op:"multiVerifiedStatus",...a},fetch);if(i("estadoPrevioMs"),s.ok&&s.status==="verified"&&s.verified===!0&&s.storageVerified===!0&&s.pageVerification==="server"&&s.paymentAuthorized===!1&&s.receiptId===a.uploadId&&Number.isSafeInteger(s.pages)&&s.pages>=1&&Number.isSafeInteger(s.bytes)&&s.bytes>=5&&s.bytes<=Ds&&/^[a-f0-9]{64}$/.test(s.sha256||""))return s;let f=await Ye(e,{op:"multiInfo",...a},fetch);if(i("consultaGoogleMs"),!f.ok||!Gi(f.receiptId)||f.receiptId!==a.uploadId||!Number.isSafeInteger(f.bytes)||f.bytes<5||f.bytes>Ds||!/^[a-f0-9]{64}$/.test(f.sha256||"")||f.privateChunkBytes!==Ps)throw Error("Informaci\xF3n privada inv\xE1lida");if(f.pageVerification==="server"&&Number.isSafeInteger(f.pages)&&f.pages>=1){let d=await Ye(e,{op:"multiVerifiedStatus",...a},fetch);if(i("estadoVerificadoMs"),d.ok&&d.verified&&d.pages===f.pages&&d.receiptId===f.receiptId&&d.paymentAuthorized===!1)return d}let l=new Uint8Array(f.bytes);for(let d=0;d<l.length;d+=Ps){let h=await Ye(e,{op:"multiReadPart",...a,receiptId:f.receiptId,offset:d},fetch,42e4),p=Math.min(Ps,l.length-d);if(!h.ok||h.receiptId!==f.receiptId||h.offset!==d||h.length!==p||h.bytes!==f.bytes||h.sha256!==f.sha256||typeof h.dataBase64!="string"||h.dataBase64.length>38e4||!/^[a-f0-9]{64}$/.test(h.chunkSha256||""))throw Error("Google no entreg\xF3 el fragmento privado esperado");let m=atob(h.dataBase64);if(m.length!==p)throw Error("Tama\xF1o de fragmento inconsistente");let y=Uint8Array.from(m,b=>b.charCodeAt(0));if(await Jc(y)!==h.chunkSha256)throw Error("Integridad de fragmento incorrecta");l.set(y,d)}i("lecturaPrivadaMs");let u=await Ss({driveBytes:l,reciboServidor:{receiptState:"bytes_checked",receiptId:f.receiptId,orderId:f.orderId,fileId:f.fileId,name:f.name,mode:f.mode,bytes:f.bytes,sha256:f.sha256}});i("analisisPdfMs");let c=await Ye(e,{op:"multiCommitPages",...a,receiptId:f.receiptId,sha256:u.sha256,bytes:u.bytes,pages:u.pages,parserVersion:"pdf-lib-1.17.1"},fetch);if(i("confirmacionGoogleMs"),!c.ok||c.verified!==!0||c.receiptId!==u.receiptId||c.pages!==u.pages||c.paymentAuthorized!==!1)throw Error("Google no guard\xF3 el conteo de p\xE1ginas");return c}async function Pm(e,t){if(e.method!=="POST")return jt();if(!Kr(e,t))return X({ok:!1,error:"Origen no permitido",paymentAuthorized:!1},403);let r;try{if(r=await Hr(e),!Fm(r))throw Error("Opciones incorrectas")}catch{return X({ok:!1,error:"Opciones de cotizaci\xF3n inv\xE1lidas",paymentAuthorized:!1},400)}try{let o={},n=Date.now(),i=await Qc(t,r,o);if(!i.ok||i.verified!==!0||i.storageVerified!==!0||i.pageVerification!=="server"||i.paymentAuthorized!==!1)throw Error("Recibo pendiente de validaci\xF3n");let a={orderId:i.orderId,archivos:[{id:i.fileId,nombre:i.name,modo:i.mode,orden:1}],formato:r.formato,caras:r.caras,copias:r.copias,anillado:r.anillado,materialColor:"obra70"},s=Xi({solicitud:a,recibosConfiables:[i],tarifasServidor:Zn});if(s.paymentAuthorized!==!1||s.quote.total<=0||!Number.isSafeInteger(s.quote.total))throw Error("Importe no aprobado");return X({ok:!0,receiptId:i.receiptId,pages:i.pages,copias:r.copias,hojasTotales:s.quote.hojasTotales,subtotalImpresiones:s.quote.subtotalBN+s.quote.subtotalColor,anillados:s.quote.cargoAnillado,total:s.quote.total,priceVersion:s.priceVersion,paymentAuthorized:!1,tiemposServidor:{...o,totalMs:Date.now()-n}},200)}catch{return X({ok:!1,error:"No se pudo validar y cotizar este PDF de prueba.",paymentAuthorized:!1},422)}}function Dm(e){try{return new Response(Os(e?.DOCS_TURNSTILE_SITE_KEY),{status:200,headers:{"Content-Type":"text/html;charset=utf-8","Cache-Control":"no-store,private","X-Robots-Tag":"noindex,nofollow","X-Frame-Options":"DENY","X-Content-Type-Options":"nosniff"}})}catch{return X({ok:!1,error:"Turnstile ausente",paymentAuthorized:!1},503)}}function Cm(e){return e&&typeof e=="object"&&!Array.isArray(e)&&Object.keys(e).sort().join(",")==="anillado,caras,copias,formato,sesiones"&&["a4","a3"].includes(e.formato)&&["simple","double"].includes(e.caras)&&["ninguno","juntos","separados"].includes(e.anillado)&&Number.isSafeInteger(e.copias)&&e.copias>=1&&e.copias<=200&&Array.isArray(e.sesiones)&&e.sesiones.length>=1&&e.sesiones.length<=5&&e.sesiones.every(t=>t&&typeof t=="object"&&!Array.isArray(t)&&Object.keys(t).sort().join(",")==="token,uploadId"&&Gi(t.uploadId)&&ks(t.token))&&new Set(e.sesiones.map(t=>t.uploadId)).size===e.sesiones.length}async function km(e,t){if(e.method!=="POST")return jt();if(!Kr(e,t))return X({ok:!1,error:"Origen no autorizado",paymentAuthorized:!1},403);let r;try{if(r=await Hr(e),!Cm(r))throw Error("Lote inv\xE1lido")}catch{return X({ok:!1,error:"Opciones de lote inv\xE1lidas",paymentAuthorized:!1},400)}try{let o=Date.now(),n=[];for(let a of r.sesiones){let s=await Qc(t,a);if(!s.ok||s.verified!==!0||s.storageVerified!==!0||s.pageVerification!=="server"||s.paymentAuthorized!==!1)throw Error("Un documento no est\xE1 verificado");n.push(s)}let i=Ts({recibosVerificados:n,formato:r.formato,caras:r.caras,copias:r.copias,anillado:r.anillado,materialColor:"obra70",precios:Zn});return X({...i,tiempoServidorMs:Date.now()-o,paymentAuthorized:!1},200)}catch{return X({ok:!1,error:"No se pudo validar todos los archivos y cotizar el lote.",paymentAuthorized:!1},422)}}var k8={async fetch(e,t,r){let o=new URL(e.url).pathname;return o==="/prueba-cotizador-pdf"&&e.method==="GET"?wm(t):o==="/prueba-cotizador-lote"&&e.method==="GET"?Dm(t):o==="/api/ensayo-cotizar-lote"?km(e,t):o==="/api/ensayo-pdf"?Sm(e,t):o==="/api/ensayo-cotizar"?Pm(e,t):o==="/prueba-presupuesto"&&e.method==="GET"?ym(t):o==="/api/presupuesto-pdf"?bm(e,t):o==="/prueba-validacion"&&e.method==="GET"?pm(t):o==="/api/validar-pdf"?mm(e,t):o==="/prueba-pdf"&&e.method==="GET"?dm(t):o==="/api/piloto-pdf"?hm(e,t):o==="/prueba-turnstile"?e.method==="GET"?Zc(t):e.method==="POST"?Yc(e,t):jt():o==="/prueba-google"?e.method==="GET"?Zc(t,"google"):e.method==="POST"?lm(e,t):jt():!tm||t?.DOCS_UPLOAD_ENABLED!=="true"||e.method!=="POST"?jt():sm(e,t)}};export{k8 as default};
 /*! Bundled license information:
 
 tslib/tslib.es6.js:
