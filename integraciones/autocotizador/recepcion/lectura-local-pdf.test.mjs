@@ -35,3 +35,20 @@ test('no permite lote vacío ni concurrencia descontrolada',async()=>{
  await assert.rejects(leerPaginasLocales([]),/Seleccioná/);
  await assert.rejects(leerPaginasLocales([await archivo('a.pdf',1)],{concurrencia:100}),/Concurrencia/);
 });
+
+test('archivos mayores a 100 MB llegan al lector sin rechazo por tamaño antiguo',async()=>{
+ const grande={name:'apuntes-150mb.pdf',size:150*1024*1024,
+  arrayBuffer:async()=>new TextEncoder().encode('notpdf').buffer};
+ const r=await leerPaginasLocales([grande]);
+ assert.equal(r.documentos[0].estado,'error');
+ assert.doesNotMatch(r.documentos[0].error,/supera el límite/);
+ assert.equal(r.aptoParaCobro,false);
+});
+test('archivos mayores a 250 MB se rechazan antes de leer memoria',async()=>{
+ let llamado=false;
+ const grande={name:'demasiado-grande.pdf',size:251*1024*1024,
+  arrayBuffer:async()=>{llamado=true;throw Error('no debe ejecutarse')}};
+ const r=await leerPaginasLocales([grande]);
+ assert.equal(llamado,false);
+ assert.match(r.documentos[0].error,/supera el límite de 250 MB/);
+});
