@@ -365,3 +365,42 @@ test('catálogo A3 color conserva identificadores comerciales correctos y cotiza
  }),env);
  assert.equal(wrong.status,400,'A3 con ID A4 debe rechazarse');
 });
+
+
+test('ploteos independientes CAD y póster con tarifas oficiales de rollo',async()=>{
+ const inicial=googleCalls;
+ const home=await worker.fetch(new Request(origin+'/prueba-cotizador-rapido'),env);
+ assert.match(await home.text(),/prueba-ploteos-rapido/);
+ const page=await worker.fetch(new Request(origin+'/prueba-ploteos-rapido'),env);
+ assert.equal(page.status,200);
+ assert.match(await page.text(),/Ploteos/);
+ const js=await worker.fetch(new Request(origin+'/prueba-ploteos-rapido.js'),env);
+ assert.equal(js.status,200);
+ assert.match(await js.text(),/ensayo-ploteos-rapido/);
+ const catalogo=await worker.fetch(new Request(origin+'/api/ensayo-materiales-ploteo'),env);
+ assert.equal(catalogo.status,200);
+ const materiales=await catalogo.json();
+ assert.ok(materiales.supports.some(x=>x.id==='rollo42'&&x.widthCm===42));
+ const trabajos=[
+  {id:'pl1',nombre:'plano.pdf',modo:'cad',material:'rollo42',anchoCm:29.7,altoCm:42,copias:2},
+  {id:'pl2',nombre:'poster.pdf',modo:'poster',material:'rollo60',anchoCm:59.4,altoCm:84.1,copias:1}
+ ];
+ const quote=await worker.fetch(req('/api/ensayo-ploteos-rapido',{trabajos}),env);
+ assert.equal(quote.status,200,'Precio: '+JSON.stringify(await quote.clone().json()));
+ const q=await quote.json();
+ assert.equal(q.paymentAuthorized,false);
+ assert.equal(q.estado,'PRELIMINAR_SIN_VERIFICAR');
+ assert.equal(q.resumen.detalles.length,2);
+ assert.equal(q.resumen.detalles[0].subtotal,3100);
+ assert.equal(q.resumen.detalles[1].subtotal,7700);
+ assert.equal(q.resumen.total,10800);
+ assert.equal(googleCalls,inicial,'ploteos no deben contactar a Google');
+});
+test('ploteo demasiado ancho y datos adulterados no generan precio',async()=>{
+ const doc={id:'pl1',nombre:'plano.pdf',modo:'cad',material:'rollo42',anchoCm:60,altoCm:90,copias:1};
+ const r=await worker.fetch(req('/api/ensayo-ploteos-rapido',{trabajos:[doc]}),env);
+ assert.equal(r.status,400);
+ assert.equal((await r.json()).paymentAuthorized,false);
+ const r2=await worker.fetch(req('/api/ensayo-ploteos-rapido',{trabajos:[{...doc,anchoCm:20,altoCm:30,copias:0}]}),env);
+ assert.equal(r2.status,400);
+});
