@@ -4,13 +4,20 @@ Registrado el **22 de octubre de 2026** a pedido del titular, a partir de prueba
 
 > Estado del bloc: **pendientes**. No confundir estas notas con funcionalidades existentes o terminadas.
 
+## Avance técnico — 22/10/2026
+
+- **Precio arriba implementado en rama privada de pruebas, sin desplegar:** cabecera `#resumenRapido` con total preliminar, desglose resumido y estados `pendiente / calculando / listo / error`. Usa `position: sticky; top:0`, tamaño compacto para móviles, y descarta el precio viejo al modificar el pedido. **Pendiente:** validación visual y funcional real en PC/móvil con 20–30 PDF antes de marcar la tarea completamente aceptada.
+- **Leyenda de tiempos completada en código, aún sin desplegar:** se quitaron los milisegundos visibles del mensaje de presupuesto y de la lectura local. La medición técnica no se muestra al cliente; no se alteraron las fórmulas ni descuentos.
+- **Validación:** pruebas automáticas y compilación aprobadas: https://github.com/hernanchan/COTIZADOR/actions/runs/39764881324. Compilado `integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs`.
+- **Sin intervención:** precios y descuentos, papeles vigentes, ploteos, Drive/Apps Script, checkout, Polaroids y sitio público.
+
 ## Checklist de aceptación
 
 - [ ] **Igualar funciones del cotizador vigente.** Auditar las opciones de impresión ofrecidas hoy en el cotizador de producción, especialmente toda la **variedad de papeles y materiales**, y trasladar opciones, incompatibilidades y precios al flujo rápido, por archivo. Evitar reducirlo a Obra 70/140/180. Validar tarifas antes de habilitar pedidos.
 - [ ] **Rediseñar estética y claridad visual.** Vista más compacta, jerarquía visual clara, nombres de PDF, controles diferenciados, grupos de anillado reconocibles; presentación intuitiva tanto en PC como móvil.
 - [ ] **Precio visible arriba sin scroll excesivo.** Resumen corto de total preliminar, impresiones y anillados en cabecera y/o encabezado fijo cuando haya muchos documentos. Validar que en teléfono no bloquee la edición, navegación o botones. Actualizar sin usar precio obsoleto.
 - [ ] **Incluir módulo de ploteos.** Reutilizar reglas, papeles, tamaños y precios del cotizador actual para planos y gran formato, contemplando formatos superiores a A3. Probar cálculo y desglose para quien imprime; no inventar tarifas.
-- [ ] **Eliminar la leyenda de tiempo de respuesta del cliente.** Ocultar mensajes de milisegundos y velocidad de red del resumen comercial; si se requieren estadísticas técnicas, dejarlas fuera de la vista del cliente.
+- [x] **Eliminar la leyenda de tiempo de respuesta del cliente.** Ocultar mensajes de milisegundos y velocidad de red del resumen comercial; si se requieren estadísticas técnicas, dejarlas fuera de la vista del cliente.
 
 ## Condiciones para marcar terminado
 
