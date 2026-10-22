@@ -19,11 +19,13 @@ function invalidarCotizacion(){
 }
 const money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(n);
 const txt=(id,v)=>$(id).textContent=v;
+function avisarConjunto(estado,total=0){if(window.parent!==window)window.parent.postMessage({tipo:'saber-cotizacion-parcial-v1',modulo:'impresiones',estado,total},location.origin);}
 function estadoBarra(tipo,importe,mensaje){
  $('resumenRapido').dataset.estado=tipo;
  txt('importeArriba',importe);
  txt('estadoImporte',tipo==='listo'?'Total orientativo':'Precio preliminar');
  txt('detalleArriba',mensaje);
+ if(tipo!=='listo')avisarConjunto(tipo);
 }
 function actualizar(){
  const lista=$('documentos');lista.replaceChildren();
@@ -94,6 +96,7 @@ function mostrarResumen(info,tiempo){
   txt('precio','No se pudo construir el resumen del presupuesto.');return;
  }
  const detalles=info.detalles;
+ avisarConjunto('listo',info.total);
  estadoBarra('listo',money(info.total),
   detalles.length+' archivo(s) · Impresiones '+money(info.subtotalImpresiones)+' · Anillados '+money(info.anillados));
  const cliente=elemento('section',undefined,'panel-resumen');
