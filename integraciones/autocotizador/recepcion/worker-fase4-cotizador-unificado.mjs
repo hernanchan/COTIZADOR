@@ -2,6 +2,9 @@ import {prepararPresupuestoDocumentos} from '../pruebas/cotizacion-desde-recibos
 import {cotizarLoteVerificado} from '../pruebas/cotizacion-multifichero-piloto.mjs';
 import {paginaLotePdf} from './pantalla-lote-pdf.mjs';
 import {paginaCotizadorRapido} from './cotizador-rapido-pagina.mjs';
+import {paginaPloteosRapido} from './ploteos-rapido-pagina.mjs';
+import {cotizarPloteosRapido} from '../pruebas/cotizar-ploteos-rapido.mjs';
+import plotClienteJs from './ploteos-rapido-cliente.txt';
 import rapidoClienteJs from './cotizador-rapido-cliente.txt';
 import {cotizarDocumentos} from '../pruebas/cotizar-documentos.mjs';
 import {cotizarDocumentosIndividuales} from '../pruebas/cotizar-documentos-individuales.mjs';
@@ -943,6 +946,38 @@ function catalogoMaterialesRapido(request,env){
  const clean=(key)=>(preciosPiloto[key]?.materials||[]).map(m=>({id:m.id,name:m.name,family:m.family||''}));
  return testResponse({ok:true,materials:{a4:clean('colorA4'),a3:clean('colorA3')}});
 }
+/** Ploteos preliminares: nunca autoriza pagos ni recibe originales. */
+function catalogoPloteos(request,env){
+ if(request.method!=='GET')return closed();
+ if(new URL(request.url).origin!==new URL(env.DOCS_ALLOWED_ORIGIN||request.url).origin)
+  return testResponse({ok:false,error:'Origen no permitido'},403);
+ return testResponse({ok:true,supports:preciosPiloto.plotter.supports.map(x=>({
+  id:x.id,name:x.name,widthCm:x.widthCm
+ }))});
+}
+async function cotizacionPloteos(request,env){
+ if(request.method!=='POST')return closed();
+ if(!allowed(request,env))return testResponse({ok:false,error:'Origen no permitido',paymentAuthorized:false},403);
+ try{
+  const p=await readLimited(request);
+  if(!p||typeof p!=='object'||Array.isArray(p)||
+   Object.keys(p).join(',')!=='trabajos')throw Error('Solicitud inválida');
+  const detalle=cotizarPloteosRapido({trabajos:p.trabajos,precios:preciosPiloto});
+  return testResponse({ok:true,paymentAuthorized:false,estado:'PRELIMINAR_SIN_VERIFICAR',resumen:detalle});
+ }catch(_){return testResponse({ok:false,error:'Revisá las medidas y que el material admita el ancho del ploteo.',paymentAuthorized:false},400)}
+}
+function paginaPloteos(){
+ return new Response(paginaPloteosRapido(),{status:200,headers:{
+  'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store,private',
+  'X-Robots-Tag':'noindex,nofollow','X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY'
+ }});
+}
+function scriptPloteos(){
+ return new Response(plotClienteJs,{status:200,headers:{
+  'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-store,private',
+  'X-Robots-Tag':'noindex,nofollow','X-Content-Type-Options':'nosniff'
+ }});
+}
 function paginaRapida(){
  return new Response(paginaCotizadorRapido(),{status:200,headers:{
   'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store,private',
@@ -961,6 +996,10 @@ export default {
     if(page==='/prueba-cotizador-pdf'&&request.method==='GET')return fase4Html(env);
     if(page==='/prueba-cotizador-lote'&&request.method==='GET')return pantallaLote(env);
     if(page==='/prueba-cotizador-rapido'&&request.method==='GET')return paginaRapida();
+    if(page==='/prueba-ploteos-rapido'&&request.method==='GET')return paginaPloteos();
+    if(page==='/prueba-ploteos-rapido.js'&&request.method==='GET')return scriptPloteos();
+    if(page==='/api/ensayo-materiales-ploteo')return catalogoPloteos(request,env);
+    if(page==='/api/ensayo-ploteos-rapido')return cotizacionPloteos(request,env);
     if(page==='/prueba-cotizador-rapido.js'&&request.method==='GET')return scriptRapido();
     if(page==='/api/ensayo-materiales-rapido')return catalogoMaterialesRapido(request,env);
     if(page==='/api/ensayo-presupuesto-rapido')return cotizacionRapida(request,env);
