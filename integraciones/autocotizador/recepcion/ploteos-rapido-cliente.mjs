@@ -5,7 +5,7 @@ const lista=[];let catalogo=[],version=0,controlador=null,leyendo=false;
 const money=v=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(v);
 const dato=(tag,contenido)=>{const el=document.createElement(tag);if(contenido!==undefined)el.textContent=String(contenido);return el};
 const estado=txt=>$('resultado').textContent=txt;
-function avisarConjunto(estado,total=0){if(window.parent!==window)window.parent.postMessage({tipo:'saber-cotizacion-parcial-v1',modulo:'ploteos',estado,total},location.origin);}
+function avisarConjunto(estado,total=0){if(window.parent!==window)window.parent.postMessage({tipo:'saber-cotizacion-parcial-v1',modulo:'ploteos',estado,total},new URL(document.baseURI).origin);}
 function invalidar(){
  version++;if(controlador){controlador.abort();controlador=null}
  $('importe').textContent='Por calcular';$('estadoPrecio').textContent='Pendiente de cálculo';
