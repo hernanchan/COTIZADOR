@@ -65,3 +65,12 @@ No modificar `main`, la web pública, Apps Script, Polaroids ni pagos. No contra
 - **Limitaciones todavía abiertas:** selección de copias en cinco valores predefinidos; falta campo numérico completo. B/N sigue vinculado a su soporte estándar. A5 sin tarifa propia. Revisión de combinación de grupos de anillado frente a archivos que quedaron pendientes. No recibe originales ni permite pagos.
 - Pruebas automáticas aprobadas para color A4/A3, rechazo de materiales incorrectos y anillados separados/juntos: https://github.com/hernanchan/COTIZADOR/actions/runs/39866053141
 - El bundle actualizado permanece en GitHub (rama de pruebas); **NO está desplegado en Cloudflare**. Producción sin cambios.
+
+## Validaciones por archivo y cierre técnico previo al reensayo — 22/10/2026
+
+- En la carga única, el selector limitado 1/2/3/5/10 copias fue sustituido por **campo numérico libre entre 1 y 500** por PDF, con validación de entero y rango.
+- Se corrigió un fallo de grupos de anillado: cuando un grupo tiene sólo un PDF cotizable, uno de sus integrantes sigue sin confirmar tamaño o mezcla tamaños finales/cantidades de copias incompatibles, **todos los participantes del grupo quedan marcados como pendientes**, sin generar subtotal de grupo parcial ni mostrar total general definitivo.
+- Se conservan las tarifas vigentes, escalas, materiales y precios de anillados del catálogo; no se cambia producción ni el servicio Polaroids.
+- Nuevas pruebas automatizadas: copias 500/501, grupo de un archivo, grupo con un integrante pendiente y grupo con formatos/copias diferentes.
+- **CI aprobado:** https://github.com/hernanchan/COTIZADOR/actions/runs/39868014746.
+- **PENDIENTE:** despliegue manual del nuevo bundle al Worker privado `saber-documentos-pruebas` y ensayos de navegador con archivos reales. No marcar UX final aprobada; aún falta resolver A5, hojas seleccionadas, fotografías, stickers, corte, gráfica comercial, carrito y validación segura de originales.
