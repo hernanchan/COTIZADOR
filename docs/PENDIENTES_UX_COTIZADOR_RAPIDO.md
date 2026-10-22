@@ -35,6 +35,15 @@ Registrado el **22 de octubre de 2026** a pedido del titular, a partir de prueba
 - **Pendiente:** verificar el tamaño con el PDF original **recibido en servidor** antes de pagar o imprimir, y confirmar con el usuario que la presentación y los metros coinciden con la práctica de Librería Saber. Para PDF con escala de diseño distinta a tamaño físico deseado o imposición especial, se requerirá una opción de escala/corte, no presupuestar silenciosamente.
 - Todo aislado en `/prueba-ploteos-rapido`; no publicado ni cobros activados.
 
+## Clasificación automática CAD / Póster — 22/10/2026
+
+- **Pedido del usuario:** detectar automáticamente si cada página de ploteo corresponde a CAD (líneas, poca cobertura) o póster (fotos, fondos y plenos). **No dejar el tipo de tarifa a criterio del cliente.**
+- **Implementado en código de rama privada y pruebas sintéticas aprobadas:** la pantalla elimina el selector CAD/Póster y genera una miniatura local de cada página PDF (360 píxeles de lado mayor), estimando cobertura total y de color. La API admite `modo` por página para cobrar correctamente un PDF con mezcla de CAD y póster, sin modificar las tarifas. Si el resultado es ambiguo o casi vacío, muestra **Revisión Librería Saber**, sin precio automático y sin trasladar la decisión al cliente.
+- **Tecnología de esta primera prueba:** PDF.js 3.11.174 cargado desde CDN público de forma fija; el PDF se procesa únicamente en el navegador y no se transmite al CDN. Si falla la dependencia o renderizado, no se presupone CAD. **Pendiente técnico:** alojar el motor de renderizado en nuestra propia infraestructura para reducir dependencia externa.
+- **Limitaciones importantes:** heurística inicial por superficie rasterizada, no medición real de tinta ni clasificación infalible. Validar con planos escaneados, líneas densas, moldes, pósteres, fondos, páginas mixtas y archivos de baja resolución. Ajustar umbrales con casos reales. Evitar habilitar cobros basados en esta decisión hasta verificar originales en servidor.
+- **Entorno:** sólo Worker privado `saber-documentos-pruebas`; requiere nueva copia manual del bundle compilado a Cloudflare. Sin publicaciones en web pública ni cambios en Google Apps Script, Polaroids o pagos.
+- **Pruebas iniciales de clasificación y tarifa mixta:** https://github.com/hernanchan/COTIZADOR/actions/runs/39774874709. Falta validación real en navegador y PDFs del comercio.
+
 ## Checklist de aceptación
 
 - [ ] **Igualar funciones del cotizador vigente.** Auditar las opciones de impresión ofrecidas hoy en el cotizador de producción, especialmente toda la **variedad de papeles y materiales**, y trasladar opciones, incompatibilidades y precios al flujo rápido, por archivo. Evitar reducirlo a Obra 70/140/180. Validar tarifas antes de habilitar pedidos.
