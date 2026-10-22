@@ -1,3 +1,14 @@
+/** Rollo estándar automático: el más angosto que admite todas las páginas, nunca recubiertos. */
+export function rolloEstandarAutomatico(paginas,soportes){
+ if(!Array.isArray(paginas)||!paginas.length)throw Error('Sin páginas para seleccionar rollo.');
+ const estandar=soportes.filter(s=>/^rollo\d+$/.test(s.id))
+  .sort((a,b)=>Number(a.widthCm)-Number(b.widthCm));
+ const elegido=estandar.find(s=>paginas.every(p=>
+  Number.isFinite(p.anchoCm)&&Number.isFinite(p.altoCm)&&p.anchoCm>0&&p.altoCm>0&&
+  Math.min(p.anchoCm,p.altoCm)<=Number(s.widthCm)+0.03));
+ if(!elegido)throw Error('Ningún rollo estándar admite las medidas del PDF.');
+ return elegido;
+}
 /**
  * Cotización preliminar de ploteos: dimensiones detectadas localmente por página.
  * Tarifas existentes, sin carga de PDF ni autorización de compra.
@@ -16,9 +27,13 @@ export function cotizarPloteosRapido({trabajos,precios}){
     typeof t.nombre!=='string'||!t.nombre.trim()||t.nombre.length>160||
     !['cad','poster'].includes(t.modo)||!Number.isSafeInteger(t.copias)||t.copias<1||t.copias>500)
    throw Error('Trabajo de ploteo inválido.');
-  const soporte=config.supports.find(p=>p.id===t.material);
-  if(!soporte)throw Error('Material de ploteo no disponible.');
   const paginas=anterior?[{numero:1,anchoCm:t.anchoCm,altoCm:t.altoCm}]:t.paginas;
+  // En el flujo automático el rollo estándar no es una decisión del cliente.
+  // El contrato histórico de pruebas manuales se conserva aislado.
+  const seleccionado=nuevo?rolloEstandarAutomatico(paginas,config.supports):null;
+  if(nuevo&&t.material!==seleccionado.id)throw Error('Rollo incompatible con selección automática.');
+  const soporte=seleccionado||config.supports.find(p=>p.id===t.material);
+  if(!soporte)throw Error('Material de ploteo no disponible.');
   if(!Array.isArray(paginas)||paginas.length<1||paginas.length>2000)
    throw Error('Número de páginas inválido.');
   let metros=0,subtotalBruto=0;const detailPages=[];
