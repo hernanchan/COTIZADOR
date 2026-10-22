@@ -342,3 +342,26 @@ test('precio sticky visible y sin tiempos técnicos en la vista comercial',async
  assert.match(js,/Calculando/);
  assert.match(js,/No se pudo cotizar/);
 });
+
+
+test('catálogo A3 color conserva identificadores comerciales correctos y cotiza',async()=>{
+ const m=await worker.fetch(new Request(origin+'/api/ensayo-materiales-rapido'),env);
+ assert.equal(m.status,200);
+ const {materials}=await m.json();
+ assert.ok(materials.a3.some(x=>x.id==='a3_color_obra80'));
+ assert.ok(materials.a4.some(x=>x.id==='obra70'));
+ assert.ok(!materials.a3.some(x=>x.id==='obra70'));
+ assert.ok(materials.a4.length>3,'incluye variedad actual de papeles A4');
+ assert.ok(materials.a3.length>3,'incluye variedad actual de papeles A3');
+ const config={archivos:[{id:'pdf1',nombre:'color-a3.pdf',paginas:3,modo:'color',formato:'a3',caras:'simple',copias:1,anillado:'ninguno',grupoAnillado:null,materialColor:'a3_color_obra80',orden:1}],formato:'a4',caras:'simple',copias:1,anillado:'ninguno'};
+ const r=await worker.fetch(req('/api/ensayo-presupuesto-rapido',config),env);
+ assert.equal(r.status,200,'A3 color: '+JSON.stringify(await r.clone().json()));
+ const q=await r.json();
+ assert.equal(q.paymentAuthorized,false);
+ assert.ok(q.resumen.total>0);
+ assert.equal(q.resumen.detalles[0].materialColor,'a3_color_obra80');
+ const wrong=await worker.fetch(req('/api/ensayo-presupuesto-rapido',{
+  ...config,archivos:[{...config.archivos[0],materialColor:'obra70'}]
+ }),env);
+ assert.equal(wrong.status,400,'A3 con ID A4 debe rechazarse');
+});
