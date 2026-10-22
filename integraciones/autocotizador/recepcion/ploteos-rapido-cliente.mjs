@@ -44,7 +44,7 @@ function render(){
    const form=dato('div');form.className='controles';
    const cad=d.paginas.filter(p=>p.modo==='cad').length,poster=d.paginas.filter(p=>p.modo==='poster').length;
    card.append(dato('p','Clasificación automática: '+cad+' CAD · '+poster+' Póster'));
-   if(d.paginas.length<=15)card.append(dato('p',d.paginas.map(p=>'Pág. '+p.numero+': '+(p.modo==='cad'?'CAD':'Póster')).join(' · ')));
+   if(d.paginas.length<=15)card.append(dato('p',d.paginas.map(p=>'Pág. '+p.numero+': '+(p.modo==='cad'?'CAD':p.modo==='poster'?'Póster':'Revisión Librería Saber')).join(' · ')));
    
    const validos=soportesCompatibles(d);
    if(!validos.length){card.append(dato('p','Ningún rollo disponible admite el ancho de este PDF. No se puede cotizar.'))}
