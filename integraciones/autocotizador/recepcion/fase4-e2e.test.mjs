@@ -5,7 +5,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash,createHmac,randomUUID,webcrypto} from 'node:crypto';
-import {PDFDocument} from 'pdf-lib';
+import {PDFDocument,degrees} from 'pdf-lib';
+import {leerMedidasPloteo} from './medidas-local-pdf.mjs';
 import worker from './dist/saber-documentos-cotizador-fase4.mjs';
 
 globalThis.crypto ??= webcrypto;
@@ -403,4 +404,38 @@ test('ploteo demasiado ancho y datos adulterados no generan precio',async()=>{
  assert.equal((await r.json()).paymentAuthorized,false);
  const r2=await worker.fetch(req('/api/ensayo-ploteos-rapido',{trabajos:[{...doc,anchoCm:20,altoCm:30,copias:0}]}),env);
  assert.equal(r2.status,400);
+});
+
+
+test('lector local detecta tamaño real, rotación y varias páginas sin subir archivo',async()=>{
+ const pdf=await PDFDocument.create();
+ const a=pdf.addPage([1190.55,1683.78]); // A2 aproximado: 42 × 59.4 cm
+ a.setRotation(degrees(90));
+ pdf.addPage([2383.94,3370.39]); // A0: 84.1 × 118.9 cm
+ const bytes=await pdf.save();
+ const f={name:'plano.pdf',size:bytes.length,arrayBuffer:async()=>bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength)};
+ const info=await leerMedidasPloteo(f);
+ assert.equal(info.total,2);
+ assert.ok(Math.abs(info.paginas[0].anchoCm-59.4)<0.1);
+ assert.ok(Math.abs(info.paginas[0].altoCm-42)<0.1);
+ assert.ok(Math.abs(info.paginas[1].anchoCm-84.1)<0.2);
+ assert.equal(info.aptoParaCobro,false);
+ const js=await worker.fetch(new Request(origin+'/prueba-ploteos-rapido.js'),env);
+ const src=await js.text();
+ assert.match(src,/Detectando tama/);
+ assert.doesNotMatch(src,/Ancho final \(cm\)/);
+});
+test('ploteos multipágina suman metros reales y rechazan rollos estrechos',async()=>{
+ const base={id:'pl1',nombre:'dos-planos.pdf',modo:'cad',material:'rollo90',copias:2,
+ paginas:[{numero:1,anchoCm:42,altoCm:59.4},{numero:2,anchoCm:84.1,altoCm:118.9}]};
+ const ok=await worker.fetch(req('/api/ensayo-ploteos-rapido',{trabajos:[base]}),env);
+ assert.equal(ok.status,200,'ploteos: '+JSON.stringify(await ok.clone().json()));
+ const data=await ok.json();
+ assert.equal(data.resumen.detalles[0].paginasTotales,2);
+ assert.ok(Math.abs(data.resumen.detalles[0].metrosLineales-1.783)<0.001);
+ assert.ok(data.resumen.total>0);
+ assert.equal(data.paymentAuthorized,false);
+ const bad=await worker.fetch(req('/api/ensayo-ploteos-rapido',{trabajos:[{...base,material:'rollo60'}]}),env);
+ assert.equal(bad.status,400);
+ assert.equal((await bad.json()).paymentAuthorized,false);
 });
