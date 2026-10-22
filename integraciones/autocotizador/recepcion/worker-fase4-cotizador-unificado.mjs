@@ -970,7 +970,7 @@ async function cotizacionPloteos(request,env){
 function paginaPloteos(){
  return new Response(paginaPloteosRapido(),{status:200,headers:{
   'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store,private',
-  'X-Robots-Tag':'noindex,nofollow','X-Content-Type-Options':'nosniff','X-Frame-Options':'SAMEORIGIN'
+  'X-Robots-Tag':'noindex,nofollow','X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY'
  }});
 }
 function scriptPloteos(){
@@ -982,7 +982,7 @@ function scriptPloteos(){
 function paginaRapida(){
  return new Response(paginaCotizadorRapido(),{status:200,headers:{
   'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store,private',
-  'X-Robots-Tag':'noindex,nofollow','X-Content-Type-Options':'nosniff','X-Frame-Options':'SAMEORIGIN'
+  'X-Robots-Tag':'noindex,nofollow','X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY'
  }});
 }
 function scriptRapido(){
