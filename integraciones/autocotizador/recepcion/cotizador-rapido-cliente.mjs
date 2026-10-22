@@ -61,7 +61,7 @@ async function seleccionar(input){
   const r=await leerPaginasLocales(files,{concurrencia:2,maxArchivos:30,
    onProgreso:({terminados,total})=>txt('estado','Leyendo páginas: '+terminados+' de '+total+'…')});
   r.documentos.forEach((d,i)=>{cola[offset+i].paginas=d.paginas;cola[offset+i].error=d.error});
-  txt('estado','Lectura local terminada en '+Math.round(performance.now()-start)+' ms. Ningún PDF se envió a Google.');
+  txt('estado','Archivos analizados. Ya podés ver el presupuesto preliminar; no se enviaron PDF a Google.');
  }catch(e){txt('estado','No se pudieron analizar los PDF: '+String(e.message||e))}
  finally{procesando=false;actualizar();calcular()}
 }
