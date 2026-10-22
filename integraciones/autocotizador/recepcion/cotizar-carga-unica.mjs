@@ -71,8 +71,35 @@ export function cotizarCargaUnica({archivos,precios}){
   plan.push({indice:i,nombre:a.nombre,origen:a.paginas.map(p=>({numero:p.numero,anchoCm:p.anchoCm,altoCm:p.altoCm})),
    formatoFinal:'original',ajuste:'sin_escalado',destino:'ploteos',id});
  });
+ // Un grupo debe tener dos archivos válidos y coincidir en tamaño/cantidad.
+ // Los grupos no cotizables se bloquean completos, sin sumar un anillado parcial.
+ const grupos=new Map();
+ for(const doc of documentos){
+  if(doc.anillado!=='grupo')continue;
+  if(!grupos.has(doc.grupoAnillado))grupos.set(doc.grupoAnillado,[]);
+  grupos.get(doc.grupoAnillado).push(doc);
+ }
+ const gruposIncompletos=new Set();
+ for(const [id,miembros] of grupos){
+  const todos=archivos.filter(a=>a.anillado==='grupo'&&a.grupoAnillado===id);
+  const formato=miembros[0].formato,copias=miembros[0].copias;
+  if(miembros.length<2||todos.length!==miembros.length||
+    miembros.some(a=>a.formato!==formato||a.copias!==copias)){
+   gruposIncompletos.add(id);
+   for(const a of todos)pendientes.push({indice:archivos.indexOf(a),nombre:a.nombre,
+      motivo:'Grupo '+id+' incompleto o con tamaños/copias incompatibles. Revisar anillado conjunto.'});
+  }
+ }
+ const cotizables=documentos.filter(a=>a.anillado!=='grupo'||!gruposIncompletos.has(a.grupoAnillado));
+ for(const doc of documentos){
+  if(doc.anillado==='grupo'&&gruposIncompletos.has(doc.grupoAnillado)){
+   const ix=plan.findIndex(p=>p.id===doc.id&&p.destino==='documentos');
+   if(ix>=0)plan.splice(ix,1);
+  }
+ }
+ cotizables.forEach((a,i)=>{a.id='pdf'+(i+1)});
  // No ofrecer un importe aparentemente completo si algún archivo sigue sin precio.
- const c=documentos.length?cotizarDocumentosIndividuales({archivos:documentos,precios}):null;
+ const c=cotizables.length?cotizarDocumentosIndividuales({archivos:cotizables,precios}):null;
  const p=ploteos.length?cotizarPloteosRapido({trabajos:ploteos,precios}):null;
  const subtotalImpresiones=c?.total||0,subtotalPloteos=p?.total||0;
  return {ok:true,estado:pendientes.length?'INCOMPLETO':'PRELIMINAR',verificacion:VALORACION,
