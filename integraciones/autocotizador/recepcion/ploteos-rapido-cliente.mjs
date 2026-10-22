@@ -5,9 +5,11 @@ const lista=[];let catalogo=[],version=0,controlador=null,leyendo=false;
 const money=v=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(v);
 const dato=(tag,contenido)=>{const el=document.createElement(tag);if(contenido!==undefined)el.textContent=String(contenido);return el};
 const estado=txt=>$('resultado').textContent=txt;
+function avisarConjunto(estado,total=0){if(window.parent!==window)window.parent.postMessage({tipo:'saber-cotizacion-parcial-v1',modulo:'ploteos',estado,total},location.origin);}
 function invalidar(){
  version++;if(controlador){controlador.abort();controlador=null}
  $('importe').textContent='Por calcular';$('estadoPrecio').textContent='Pendiente de cálculo';
+ avisarConjunto('pendiente');
 }
 function selector(label,opciones,actual,change){
  const wrap=dato('label',label),el=document.createElement('select');
@@ -97,6 +99,7 @@ async function cotizar(){
   if(!r.ok||data.ok!==true||data.paymentAuthorized!==false)throw Error(data.error||'No se pudo cotizar');
   const resumen=data.resumen;
   $('importe').textContent=money(resumen.total);$('estadoPrecio').textContent='Calculado · orientativo';
+  avisarConjunto('listo',resumen.total);
   const panel=$('resultado');panel.replaceChildren();
   panel.append(dato('h2','Presupuesto de ploteos'));
   const ol=dato('ol');
@@ -112,6 +115,7 @@ async function cotizar(){
  }catch(e){
   if(n!==version||e.name==='AbortError')return;
   $('importe').textContent='Sin precio';$('estadoPrecio').textContent='Error de cálculo';estado(String(e.message||e));
+  avisarConjunto('error');
  }finally{if(n===version)controlador=null}
 }
 $('archivosPloteo').addEventListener('change',async event=>{
