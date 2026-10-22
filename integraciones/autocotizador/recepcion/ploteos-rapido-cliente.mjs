@@ -7,13 +7,13 @@ const dato=(tag,contenido)=>{const el=document.createElement(tag);if(contenido!=
 const estado=txt=>$('resultado').textContent=txt;
 function invalidar(){
  version++;if(controlador){controlador.abort();controlador=null}
- $('importe').textContent='Por calcular';
+ $('importe').textContent='Por calcular';$('estadoPrecio').textContent='Pendiente de cálculo';
 }
 function selector(label,opciones,actual,change){
  const wrap=dato('label',label),el=document.createElement('select');
  for(const [value,nombre] of opciones)el.add(new Option(nombre,value));
  el.value=actual;el.disabled=leyendo;
- el.addEventListener('change',()=>{change(el.value);cotizar()});
+ el.addEventListener('change',()=>{change(el.value);render();cotizar()});
  wrap.append(el);return wrap;
 }
 function copiasControl(d){
@@ -55,7 +55,15 @@ function render(){
    }
    const seleccionado=soportesCompatibles(d)[0];
    if(!seleccionado){card.append(dato('p','Ningún rollo estándar admite el ancho de este PDF. Requiere revisión de Librería Saber.'))}
-   else card.append(dato('p','Rollo obra asignado automáticamente: '+seleccionado.name+' ('+seleccionado.widthCm+' cm)'));
+   else {
+    const recubierto=poster>0&&d.papelPoster==='recubierto';
+    card.append(dato('p',(recubierto?'Rollo obra para páginas CAD: ':'Rollo obra asignado automáticamente: ')+seleccionado.name+' ('+seleccionado.widthCm+' cm)'));
+    if(recubierto){
+     const mayores=d.paginas.filter(p=>p.modo==='poster').map(p=>Math.min(p.anchoCm,p.altoCm));
+     const soporteRec=catalogo.filter(x=>/^rec\\d+$/.test(x.id)&&mayores.every(ancho=>ancho<=x.widthCm+0.03)).sort((a,b)=>a.widthCm-b.widthCm)[0];
+     if(soporteRec)card.append(dato('p','Rollo para páginas Póster: '+soporteRec.name+' ('+soporteRec.widthCm+' cm)'));
+    }
+   }
    if(poster>0&&d.papelPoster==='recubierto'){
     const recubiertos=catalogo.filter(x=>/^rec\d+$/.test(x.id));
     const falta=d.paginas.filter(p=>p.modo==='poster'&&!recubiertos.some(r=>
@@ -88,7 +96,7 @@ async function cotizar(){
   if(n!==version)return;
   if(!r.ok||data.ok!==true||data.paymentAuthorized!==false)throw Error(data.error||'No se pudo cotizar');
   const resumen=data.resumen;
-  $('importe').textContent=money(resumen.total);
+  $('importe').textContent=money(resumen.total);$('estadoPrecio').textContent='Calculado · orientativo';
   const panel=$('resultado');panel.replaceChildren();
   panel.append(dato('h2','Presupuesto de ploteos'));
   const ol=dato('ol');
@@ -103,7 +111,7 @@ async function cotizar(){
    dato('p','Los tamaños se detectaron del PDF en este dispositivo; deben verificarse con los originales antes del cobro.'));
  }catch(e){
   if(n!==version||e.name==='AbortError')return;
-  $('importe').textContent='Sin precio';estado(String(e.message||e));
+  $('importe').textContent='Sin precio';$('estadoPrecio').textContent='Error de cálculo';estado(String(e.message||e));
  }finally{if(n===version)controlador=null}
 }
 $('archivosPloteo').addEventListener('change',async event=>{
