@@ -517,3 +517,23 @@ test('rollo automático no es editable por el cliente ni manipulable vía API',a
   paginas:[{numero:1,anchoCm:84.1,altoCm:118.9,modo:'poster'}]}]}),env);
  assert.equal(ancho.status,200,'A0 en rollo 90');
 });
+
+
+test('líneas rojas densas se cotizan CAD, sin confundirlas con bloques de tinta',()=>{
+ const ancho=360,alto=180;
+ const bitmap=()=>{const data=new Uint8ClampedArray(ancho*alto*4);
+  for(let i=0;i<data.length;i+=4){data[i]=255;data[i+1]=255;data[i+2]=255;data[i+3]=255}
+  return data;
+ };
+ const rojo=(data,x,y)=>{const i=(y*ancho+x)*4;data[i]=240;data[i+1]=18;data[i+2]=26};
+ const lineas=bitmap();
+ // Fachadas y cotas densas: múltiples líneas cruzadas pero sin superficies plenas.
+ for(let y=12;y<alto-10;y+=7)for(let x=8;x<ancho-8;x++)rojo(lineas,x,y);
+ for(let x=15;x<ancho-8;x+=14)for(let y=10;y<alto-10;y++)rojo(lineas,x,y);
+ const res=clasificarCoberturaPloteo(lineas,{ancho,alto});
+ assert.equal(res.modo,'cad','CAD con líneas rojas de alta densidad: '+JSON.stringify(res));
+ const pleno=bitmap();
+ for(let y=25;y<150;y++)for(let x=30;x<260;x++)rojo(pleno,x,y);
+ const poster=clasificarCoberturaPloteo(pleno,{ancho,alto});
+ assert.equal(poster.modo,'poster','bloque de color sólido debe ser Póster: '+JSON.stringify(poster));
+});
