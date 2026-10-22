@@ -5,6 +5,7 @@ import {paginaCotizadorRapido} from './cotizador-rapido-pagina.mjs';
 import {paginaPloteosRapido} from './ploteos-rapido-pagina.mjs';
 import {paginaCotizadorConjunto} from './cotizador-conjunto-pagina.mjs';
 import {paginaCargaUnica} from './carga-unica-pagina.mjs';
+import {cotizarCargaUnica} from './cotizar-carga-unica.mjs';
 import cargaClienteJs from './carga-unica-cliente.txt';
 import {cotizarPloteosRapido} from '../pruebas/cotizar-ploteos-rapido.mjs';
 import plotClienteJs from './ploteos-rapido-cliente.txt';
@@ -1004,6 +1005,20 @@ export default {
     if(page==='/prueba-cotizador-rapido'&&request.method==='GET')return paginaRapida();
     if(page==='/prueba-ploteos-rapido'&&request.method==='GET')return paginaPloteos();
     if(page==='/prueba-ploteos-rapido.js'&&request.method==='GET')return scriptPloteos();
+    if(page==='/api/ensayo-carga-unica'){
+      if(request.method!=='POST')return closed();
+      try{
+        const origen=new URL(request.url).origin;
+        if(request.headers.get('Origin')!==origen||
+           (request.headers.get('Sec-Fetch-Site')&&request.headers.get('Sec-Fetch-Site')!=='same-origin')||
+           !/^application\/json(?:;|$)/i.test(request.headers.get('Content-Type')||''))
+          return testResponse({ok:false,error:'Solicitud no autorizada.',paymentAuthorized:false},403);
+        const body=await request.text();
+        if(body.length>500000)throw Error('Datos demasiado extensos.');
+        const data=cotizarCargaUnica({...JSON.parse(body),precios:preciosPiloto});
+        return testResponse(data);
+      }catch(_){return testResponse({ok:false,error:'Datos inválidos o trabajo pendiente de revisión.',paymentAuthorized:false},400)}
+    }
     if(page==='/api/ensayo-materiales-ploteo')return catalogoPloteos(request,env);
     if(page==='/api/ensayo-ploteos-rapido')return cotizacionPloteos(request,env);
     if(page==='/prueba-cotizador-rapido.js'&&request.method==='GET')return scriptRapido();
