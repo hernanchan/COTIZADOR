@@ -21,9 +21,11 @@ export function cotizarPloteosRapido({trabajos,precios}){
   const paginas=anterior?[{numero:1,anchoCm:t.anchoCm,altoCm:t.altoCm}]:t.paginas;
   if(!Array.isArray(paginas)||paginas.length<1||paginas.length>2000)
    throw Error('Número de páginas inválido.');
-  let metros=0;const detailPages=[];
+  let metros=0,subtotalBruto=0;const detailPages=[];
+  const minimo=Number(config.minMeters||0),redondeo=Number(config.roundTo||1);
+  if(!Number.isFinite(minimo)||minimo<0||!Number.isFinite(redondeo)||redondeo<=0)throw Error('Tarifa inválida.');
   for(const [index,p] of paginas.entries()){
-   if(!p||Object.keys(p).sort().join(',')!=='altoCm,anchoCm,numero'||
+   if(!p||!['altoCm,anchoCm,numero','altoCm,anchoCm,modo,numero'].includes(Object.keys(p).sort().join(','))||
     p.numero!==index+1||!Number.isFinite(p.anchoCm)||!Number.isFinite(p.altoCm)||
     p.anchoCm<=0||p.altoCm<=0||p.anchoCm>2000||p.altoCm>2000)
     throw Error('Medidas PDF inválidas.');
@@ -31,16 +33,18 @@ export function cotizarPloteosRapido({trabajos,precios}){
    // Los tamaños PDF pueden tener pequeñas imprecisiones en puntos.
    if(ancho>Number(soporte.widthCm)+0.03)
     throw Error('La página '+p.numero+' supera el ancho del rollo '+soporte.name+'.');
-   metros+=largo/100;
-   detailPages.push({numero:p.numero,anchoCm:p.anchoCm,altoCm:p.altoCm,
+   const modoPagina=p.modo||t.modo;
+   if(!['cad','poster'].includes(modoPagina))throw Error('Tipo de ploteo inválido.');
+   const tarifaPagina=Number(modoPagina==='cad'?soporte.cadPerMeter:soporte.posterPerMeter);
+   if(!Number.isFinite(tarifaPagina)||tarifaPagina<0)throw Error('Tarifa inválida.');
+   metros+=largo/100;subtotalBruto+=largo/100*tarifaPagina;
+   detailPages.push({numero:p.numero,anchoCm:p.anchoCm,altoCm:p.altoCm,modo:modoPagina,
      anchoEnRolloCm:ancho,largoEnRolloCm:largo});
   }
   const tarifa=Number(t.modo==='cad'?soporte.cadPerMeter:soporte.posterPerMeter);
-  const minimo=Number(config.minMeters||0),redondeo=Number(config.roundTo||1);
-  if(!Number.isFinite(tarifa)||tarifa<0||!Number.isFinite(minimo)||minimo<0||
-     !Number.isFinite(redondeo)||redondeo<=0)throw Error('Tarifa inválida.');
   const metrosFacturables=Math.max(minimo,metros);
-  const subtotal=Math.ceil((metrosFacturables*tarifa*t.copias-1e-8)/redondeo)*redondeo;
+  const precioMixto=metros>0?subtotalBruto*metrosFacturables/metros:0;
+  const subtotal=Math.ceil((precioMixto*t.copias-1e-8)/redondeo)*redondeo;
   if(!Number.isSafeInteger(subtotal)||subtotal<0)throw Error('Monto de ploteo fuera de rango.');
   total+=subtotal;
   if(!Number.isSafeInteger(total))throw Error('Total de ploteo fuera de rango.');
