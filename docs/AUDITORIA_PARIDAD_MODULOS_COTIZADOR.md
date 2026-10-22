@@ -44,3 +44,14 @@ No modificar `main`, la web pública, Apps Script, Polaroids ni pagos. No contra
 - Pruebas de decisión A2→A4, tamaño original, tamaños mixtos y ausencia de checkout incluidas en CI. Último resultado: https://github.com/hernanchan/COTIZADOR/actions/runs/39864235650
 - Pendiente siguiente: integrar selección final al motor de precios correspondiente (documentos/ploteos), después unir la carga de archivos con todas las familias comerciales, revalidación segura en servidor y confirmación de escala/recortes antes de producción.
 - Únicamente la rama privada fue modificada; falta despliegue manual del bundle en `saber-documentos-pruebas` y validación de navegador. Producción, Apps Script, Polaroids y pagos sin cambios.
+
+## Conexión preliminar de motores con la carga única — 22/10/2026
+
+- `/prueba-carga-unica` ahora posee controles básicos por PDF (tamaño final, copias, B/N o color y caras para documentos; papel póster en ploteos) y presenta presupuesto conjunto provisional.
+- Endpoint privado `/api/ensayo-carga-unica` llama sin duplicar tarifas a `cotizarDocumentosIndividuales` y `cotizarPloteosRapido`. Las páginas PDF se leen localmente; CAD/Póster se clasifica localmente con PDF.js. Los importes aún no tienen revalidación de originales.
+- A2→A4 se deriva a impresiones A4; A2 tamaño original se deriva a ploteo con rollo automático. El total solo aparece completo cuando todos los archivos son cotizables.
+- Fallan cerrados: A5 (sin tarifa diferenciada confirmada), originales que no son homogéneamente A4/A3 y no exceden A3, páginas CAD/Póster no clasificadas; figuran como pendientes, sin total definitivo.
+- **Limitación expresa:** primera integración usa obra estándar para documentos, sin selector completo de materiales ni anillados en esta nueva interfaz. Copias UI iniciales disponibles 1/2/3/5/10. Falta igualar íntegramente el módulo actual y optimizar el diseño final. La calculadora original de impresiones sigue intacta.
+- La API exige JSON desde mismo origen; `paymentAuthorized:false`. No recibe ni guarda archivos, no confirma producción, no activa pagos, pedidos ni carrito.
+- Pruebas de A2→A4, tamaño original de ploteos, casos pendientes y suma conjunta: https://github.com/hernanchan/COTIZADOR/actions/runs/39865061133 (CI aprobado).
+- **Despliegue pendiente:** nuevo bundle en GitHub, todavía no copiado al Worker privado. No tocar web pública, `main`, GAS ni Polaroids.
