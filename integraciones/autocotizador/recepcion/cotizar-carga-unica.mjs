@@ -1,0 +1,70 @@
+import {clasificarDestino} from './destino-impresion.mjs';
+import {cotizarDocumentosIndividuales} from '../pruebas/cotizar-documentos-individuales.mjs';
+import {cotizarPloteosRapido,rolloEstandarAutomatico} from '../pruebas/cotizar-ploteos-rapido.mjs';
+
+const PLANO=['cad','poster'];
+const VALORACION='PRELIMINAR_SIN_VERIFICAR';
+function validarArchivo(a,i){
+ if(!a||Object.keys(a).sort().join(',')!=='caras,copias,modo,nombre,paginas,papelPoster,seleccion'||
+ typeof a.nombre!=='string'||!a.nombre.trim()||a.nombre.length>160||
+ !Array.isArray(a.paginas)||a.paginas.length<1||a.paginas.length>2000||
+ !Number.isSafeInteger(a.copias)||a.copias<1||a.copias>500||
+ !['bn','color'].includes(a.modo)||!['simple','double'].includes(a.caras)||
+ !['obra80','recubierto'].includes(a.papelPoster))throw Error('Configuración inválida de archivo '+(i+1));
+ for(const [j,p] of a.paginas.entries()){
+  if(!p||Object.keys(p).sort().join(',')!=='altoCm,anchoCm,modo,numero'||
+   p.numero!==j+1||!Number.isFinite(p.anchoCm)||!Number.isFinite(p.altoCm)||
+   p.anchoCm<=0||p.altoCm<=0||p.anchoCm>2000||p.altoCm>2000||
+   ![...PLANO,'sin-clasificar'].includes(p.modo))throw Error('Página inválida en archivo '+(i+1));
+ }
+}
+function tipoOriginal(paginas){
+ const opciones=paginas.map(p=>{
+  const ancho=Math.min(p.anchoCm,p.altoCm),largo=Math.max(p.anchoCm,p.altoCm);
+  if(Math.abs(ancho-21)<=0.2&&Math.abs(largo-29.7)<=0.2)return 'a4';
+  if(Math.abs(ancho-29.7)<=0.2&&Math.abs(largo-42)<=0.2)return 'a3';
+  return null;
+ });
+ return opciones.every(v=>v===opciones[0])?opciones[0]:null;
+}
+/** Precio provisorio. Las medidas, clases y elecciones se declaran en el navegador;
+ * jamás se usa este resultado para cobrar o imprimir sin verificación del PDF real.
+ */
+export function cotizarCargaUnica({archivos,precios}){
+ if(!Array.isArray(archivos)||!archivos.length||archivos.length>30)throw Error('Cantidad de archivos inválida');
+ const documentos=[],ploteos=[],pendientes=[],plan=[];
+ archivos.forEach((a,i)=>{
+  validarArchivo(a,i);
+  const d=clasificarDestino(a.paginas,a.seleccion);
+  if(!d.confirmado){pendientes.push({indice:i,nombre:a.nombre,motivo:'Confirmar tamaño final'});return}
+  if(d.destino==='documentos'){
+   const formato=d.tamanoFinal==='original'?tipoOriginal(a.paginas):d.tamanoFinal;
+   if(!['a4','a3'].includes(formato)){
+    pendientes.push({indice:i,nombre:a.nombre,motivo:formato==='a5'?'A5 sin tarifa autónoma vigente':'Tamaño original no homogéneo A4/A3'});return;
+   }
+   const id='pdf'+(documentos.length+1);
+   documentos.push({id,nombre:a.nombre,paginas:a.paginas.length,copias:a.copias,
+    formato,modo:a.modo,caras:a.caras,anillado:'ninguno',materialColor:'obra70',orden:i+1});
+   plan.push({indice:i,nombre:a.nombre,origen:a.paginas.map(p=>({numero:p.numero,anchoCm:p.anchoCm,altoCm:p.altoCm})),
+    formatoFinal:formato,ajuste:d.cambioEscala?'proporcional_sin_recorte':'sin_escalado',destino:'documentos',id});
+   return;
+  }
+  if(a.paginas.some(p=>!PLANO.includes(p.modo))){
+   pendientes.push({indice:i,nombre:a.nombre,motivo:'Clasificación visual CAD/Póster pendiente'});return;
+  }
+  const id='pl'+(ploteos.length+1);
+  const material=rolloEstandarAutomatico(a.paginas,precios.plotter.supports).id;
+  const paginas=a.paginas.map(p=>({...p}));
+  ploteos.push({id,nombre:a.nombre,paginas,modo:paginas[0].modo,material,copias:a.copias,papelPoster:a.papelPoster});
+  plan.push({indice:i,nombre:a.nombre,origen:a.paginas.map(p=>({numero:p.numero,anchoCm:p.anchoCm,altoCm:p.altoCm})),
+   formatoFinal:'original',ajuste:'sin_escalado',destino:'ploteos',id});
+ });
+ // No ofrecer un importe aparentemente completo si algún archivo sigue sin precio.
+ const c=documentos.length?cotizarDocumentosIndividuales({archivos:documentos,precios}):null;
+ const p=ploteos.length?cotizarPloteosRapido({trabajos:ploteos,precios}):null;
+ const subtotalImpresiones=c?.total||0,subtotalPloteos=p?.total||0;
+ return {ok:true,estado:pendientes.length?'INCOMPLETO':'PRELIMINAR',verificacion:VALORACION,
+  paymentAuthorized:false,total:pendientes.length?null:subtotalImpresiones+subtotalPloteos,
+  subtotalImpresiones,subtotalPloteos,pendientes,plan,
+  detalleImpresiones:c?.detalles||[],detallePloteos:p?.detalles||[]};
+}
