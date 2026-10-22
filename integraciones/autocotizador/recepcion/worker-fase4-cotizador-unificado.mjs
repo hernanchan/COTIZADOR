@@ -4,6 +4,8 @@ import {paginaLotePdf} from './pantalla-lote-pdf.mjs';
 import {paginaCotizadorRapido} from './cotizador-rapido-pagina.mjs';
 import {paginaPloteosRapido} from './ploteos-rapido-pagina.mjs';
 import {paginaCotizadorConjunto} from './cotizador-conjunto-pagina.mjs';
+import {paginaCargaUnica} from './carga-unica-pagina.mjs';
+import cargaClienteJs from './carga-unica-cliente.txt';
 import {cotizarPloteosRapido} from '../pruebas/cotizar-ploteos-rapido.mjs';
 import plotClienteJs from './ploteos-rapido-cliente.txt';
 import rapidoClienteJs from './cotizador-rapido-cliente.txt';
@@ -996,6 +998,8 @@ export default {
     const page=new URL(request.url).pathname;
     if(page==='/prueba-cotizador-pdf'&&request.method==='GET')return fase4Html(env);
     if(page==='/prueba-cotizador-lote'&&request.method==='GET')return pantallaLote(env);
+    if(page==='/prueba-carga-unica'&&request.method==='GET')return new Response(paginaCargaUnica(),{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Robots-Tag':'noindex, nofollow','X-Frame-Options':'DENY'}});
+    if(page==='/prueba-carga-unica.js'&&request.method==='GET')return new Response(cargaClienteJs,{headers:{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
     if(page==='/prueba-cotizador-conjunto'&&request.method==='GET')return new Response(paginaCotizadorConjunto(),{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Robots-Tag':'noindex, nofollow'}});
     if(page==='/prueba-cotizador-rapido'&&request.method==='GET')return paginaRapida();
     if(page==='/prueba-ploteos-rapido'&&request.method==='GET')return paginaPloteos();
