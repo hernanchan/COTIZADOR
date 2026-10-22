@@ -80,3 +80,33 @@ test('la API no acepta papeles inventados para impresión color',()=>{
  const q=cotizarCargaUnica({archivos:[bad],precios});
  assert.equal(q.total,null);assert.equal(q.paymentAuthorized,false);
 });
+
+test('grupo de anillado con un solo PDF se informa pendiente, no produce total',()=>{
+ const a=archivo([p(21,29.7,'cad')],'a4',{anillado:'grupo',grupoAnillado:'1'});
+ const q=cotizarCargaUnica({archivos:[a],precios});
+ assert.equal(q.total,null);
+ assert.equal(q.detalleArmados.length,0);
+ assert.ok(q.pendientes.some(x=>/Grupo 1 incompleto/.test(x.motivo)));
+});
+test('grupo con un PDF pendiente no se cobra como grupo de uno',()=>{
+ const a=archivo([p(21,29.7,'cad')],'a4',{anillado:'grupo',grupoAnillado:'2'});
+ const b=archivo([p(21,29.7,'cad')],'sin-confirmar',{anillado:'grupo',grupoAnillado:'2',nombre:'por-confirmar.pdf'});
+ const q=cotizarCargaUnica({archivos:[a,b],precios});
+ assert.equal(q.total,null);
+ assert.equal(q.detalleArmados.length,0);
+ assert.ok(q.pendientes.length>=2);
+});
+test('grupo con distintas cantidades o formatos no se factura',()=>{
+ for(const segundo of [{copias:3},{seleccion:'a3'}]){
+  const a=archivo([p(21,29.7,'cad')],'a4',{anillado:'grupo',grupoAnillado:'1'});
+  const b=archivo([p(21,29.7,'cad')],'a4',{anillado:'grupo',grupoAnillado:'1',nombre:'otro.pdf',...segundo});
+  const q=cotizarCargaUnica({archivos:[a,b],precios});
+  assert.equal(q.total,null);
+  assert.equal(q.subtotalAnillados,0);
+ }
+});
+test('500 copias es permitido; 501 está fuera de rango',()=>{
+ const base=archivo([p(21,29.7,'cad')],'a4',{copias:500});
+ assert.ok(cotizarCargaUnica({archivos:[base],precios}).total>0);
+ assert.throws(()=>cotizarCargaUnica({archivos:[{...base,copias:501}],precios}));
+});
