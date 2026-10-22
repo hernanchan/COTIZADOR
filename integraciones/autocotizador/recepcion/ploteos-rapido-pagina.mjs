@@ -7,7 +7,7 @@ return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="v
 <p><a href="/prueba-cotizador-rapido">← Volver a impresiones A4/A3</a></p>
 <div id="barra" class="total" role="status"><span>Precio preliminar<br><small style="color:#fff">Aún no calculado</small></span><strong id="importe">A cotizar</strong></div>
 <p class="aviso"><strong>Prueba privada.</strong> Se usan las tarifas de ploteo ya configuradas en el cotizador. El sistema analiza localmente el tamaño y la cobertura visual de cada página. No se envían archivos para cotizar. La clasificación es preliminar y requiere validación antes del cobro. Se debe verificar el documento antes de confirmar el precio. Pagos desactivados.</p>
-<p>Elegí uno o varios PDF. Detectamos tamaños y cobertura de cada página para distinguir automáticamente planos CAD de pósteres. El sistema asigna automáticamente el rollo estándar más angosto que admite el trabajo; sólo indicá la cantidad de copias. Cuando el análisis sea dudoso, Librería Saber revisará el trabajo.</p>
+<p>Elegí uno o varios PDF. Detectamos tamaños y cobertura de cada página para distinguir automáticamente planos CAD de pósteres. El sistema asigna automáticamente los rollos según las medidas. Para páginas detectadas como Póster, podés elegir papel obra 80 g o recubierto 130 g; los planos CAD siempre se presupuestan en obra. También indicá la cantidad de copias. Cuando el análisis sea dudoso, Librería Saber revisará el trabajo.</p>
 <input type="file" id="archivosPloteo" multiple accept=".pdf,application/pdf"><button type="button" id="calcular" disabled>Calcular ploteos</button>
 <div id="trabajos"></div>
 <div id="resultado" class="resultado" role="status">Seleccioná los archivos y configurá cada ploteo.</div>
