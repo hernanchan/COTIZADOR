@@ -83,7 +83,7 @@ function render(){
 async function cotizar(){
  invalidar();
  if(leyendo){estado('Leyendo las dimensiones de los PDF…');return}
- if(!lista.length){estado('Elegí al menos un PDF para cotizar.');return}
+ if(!lista.length){avisarConjunto('vacio');estado('Elegí al menos un PDF para cotizar.');return}
  if(!catalogo.length){estado('Todavía no están disponibles los materiales.');return}
  if(lista.some(d=>d.error||!d.paginas||!d.material||d.paginas.some(p=>!['cad','poster'].includes(p.modo)))){estado('Este trabajo requiere revisión de Librería Saber: no se pudo clasificar con certeza o no entra en los rollos.');return}
  const n=version,ac=new AbortController();controlador=ac;
