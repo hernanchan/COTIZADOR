@@ -4,9 +4,11 @@ import {paginaCotizadorConjunto} from '../integraciones/autocotizador/recepcion/
 import {readFileSync} from 'node:fs';
 test('ensayo conjunto solo local: integra las dos pantallas, controla mensajes, no habilita cobros',()=>{
  const pagina=paginaCotizadorConjunto();
- assert.match(pagina,/src="\/prueba-cotizador-rapido"/);
- assert.match(pagina,/src="\/prueba-ploteos-rapido"/);
+ assert.match(pagina,/data-ruta="\/prueba-cotizador-rapido"/);
+ assert.match(pagina,/data-ruta="\/prueba-ploteos-rapido"/);
  assert.match(pagina,/event.origin!==location.origin/);
+ assert.match(pagina,/f.srcdoc=html/);
+ assert.doesNotMatch(pagina,/<iframe[^>]+ src=/);
  assert.match(pagina,/event.source!==iframe.contentWindow/);
  assert.match(pagina,/!Number.isFinite\(total\)/);
  assert.match(pagina,/No hay envío de PDF, pedido confirmado ni pagos/);
