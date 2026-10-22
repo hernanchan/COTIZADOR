@@ -1,37 +1,53 @@
 /**
- * Cálculo preliminar de ploteos por metro lineal. Basado exclusivamente en
- * precios-web.json: rollos, ancho físico, CAD/póster, redondeo y mínimo.
- * Sin PDF original verificado; no permite confirmar pedidos ni cobrar.
+ * Cotización preliminar de ploteos: dimensiones detectadas localmente por página.
+ * Tarifas existentes, sin carga de PDF ni autorización de compra.
+ * Conserva el contrato anterior de una página como compatibilidad de pruebas.
  */
 export function cotizarPloteosRapido({trabajos,precios}){
  const config=precios?.plotter;
  if(!config||!Array.isArray(config.supports))throw Error('Tarifas de ploteo no disponibles.');
  if(!Array.isArray(trabajos)||trabajos.length<1||trabajos.length>30)throw Error('Cantidad de ploteos inválida.');
- const detalles=[];
- let total=0;
+ const detalles=[];let total=0;
  for(const [i,t] of trabajos.entries()){
-  if(!t||Object.keys(t).sort().join(',')!=='altoCm,anchoCm,copias,id,material,modo,nombre'||
-   t.id!=='pl'+(i+1)||typeof t.nombre!=='string'||!t.nombre.trim()||t.nombre.length>160||
-   !['cad','poster'].includes(t.modo)||!Number.isSafeInteger(t.copias)||t.copias<1||t.copias>500||
-   !Number.isFinite(t.anchoCm)||!Number.isFinite(t.altoCm)||
-   t.anchoCm<=0||t.altoCm<=0||t.anchoCm>2000||t.altoCm>2000)
-   throw Error('Medidas u opciones de ploteo inválidas.');
+  const keys=Object.keys(t||{}).sort().join(',');
+  const anterior=keys==='altoCm,anchoCm,copias,id,material,modo,nombre';
+  const nuevo=keys==='copias,id,material,modo,nombre,paginas';
+  if(!t||(!anterior&&!nuevo)||t.id!=='pl'+(i+1)||
+    typeof t.nombre!=='string'||!t.nombre.trim()||t.nombre.length>160||
+    !['cad','poster'].includes(t.modo)||!Number.isSafeInteger(t.copias)||t.copias<1||t.copias>500)
+   throw Error('Trabajo de ploteo inválido.');
   const soporte=config.supports.find(p=>p.id===t.material);
   if(!soporte)throw Error('Material de ploteo no disponible.');
-  // Autoorientación: usar el lado menor como ancho para minimizar consumo.
-  const ancho=Math.min(t.anchoCm,t.altoCm),largo=Math.max(t.anchoCm,t.altoCm);
-  if(ancho>Number(soporte.widthCm))throw Error('El ploteo supera el ancho del material '+soporte.name+'.');
+  const paginas=anterior?[{numero:1,anchoCm:t.anchoCm,altoCm:t.altoCm}]:t.paginas;
+  if(!Array.isArray(paginas)||paginas.length<1||paginas.length>2000)
+   throw Error('Número de páginas inválido.');
+  let metros=0;const detailPages=[];
+  for(const [index,p] of paginas.entries()){
+   if(!p||Object.keys(p).sort().join(',')!=='altoCm,anchoCm,numero'||
+    p.numero!==index+1||!Number.isFinite(p.anchoCm)||!Number.isFinite(p.altoCm)||
+    p.anchoCm<=0||p.altoCm<=0||p.anchoCm>2000||p.altoCm>2000)
+    throw Error('Medidas PDF inválidas.');
+   const ancho=Math.min(p.anchoCm,p.altoCm),largo=Math.max(p.anchoCm,p.altoCm);
+   // Los tamaños PDF pueden tener pequeñas imprecisiones en puntos.
+   if(ancho>Number(soporte.widthCm)+0.03)
+    throw Error('La página '+p.numero+' supera el ancho del rollo '+soporte.name+'.');
+   metros+=largo/100;
+   detailPages.push({numero:p.numero,anchoCm:p.anchoCm,altoCm:p.altoCm,
+     anchoEnRolloCm:ancho,largoEnRolloCm:largo});
+  }
   const tarifa=Number(t.modo==='cad'?soporte.cadPerMeter:soporte.posterPerMeter);
-  const metros=largo/100;
-  const metrosFacturables=Math.max(Number(config.minMeters||0),metros);
-  const subtotalBruto=metrosFacturables*tarifa*t.copias;
-  const redondeo=Number(config.roundTo||1);
-  if(!Number.isFinite(tarifa)||tarifa<0||!Number.isFinite(redondeo)||redondeo<=0)throw Error('Tarifa inválida.');
-  const subtotal=Math.ceil((subtotalBruto-1e-8)/redondeo)*redondeo;
+  const minimo=Number(config.minMeters||0),redondeo=Number(config.roundTo||1);
+  if(!Number.isFinite(tarifa)||tarifa<0||!Number.isFinite(minimo)||minimo<0||
+     !Number.isFinite(redondeo)||redondeo<=0)throw Error('Tarifa inválida.');
+  const metrosFacturables=Math.max(minimo,metros);
+  const subtotal=Math.ceil((metrosFacturables*tarifa*t.copias-1e-8)/redondeo)*redondeo;
+  if(!Number.isSafeInteger(subtotal)||subtotal<0)throw Error('Monto de ploteo fuera de rango.');
   total+=subtotal;
+  if(!Number.isSafeInteger(total))throw Error('Total de ploteo fuera de rango.');
   detalles.push({id:t.id,nombre:t.nombre,modo:t.modo,material:t.material,
-   materialNombre:soporte.name,anchoCm:t.anchoCm,altoCm:t.altoCm,
-   copias:t.copias,metrosLineales:metros,tarifaPorMetro:tarifa,subtotal});
+   materialNombre:soporte.name,anchoCm:paginas[0].anchoCm,altoCm:paginas[0].altoCm,
+   paginas:detailPages,paginasTotales:paginas.length,copias:t.copias,
+   metrosLineales:Math.round(metros*10000)/10000,tarifaPorMetro:tarifa,subtotal});
  }
  return {estado:'PRELIMINAR_SIN_VERIFICAR',paymentAuthorized:false,
   total,trabajos:detalles.length,detalles};
