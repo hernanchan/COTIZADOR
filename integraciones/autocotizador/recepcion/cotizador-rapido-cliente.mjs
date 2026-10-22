@@ -19,7 +19,7 @@ function invalidarCotizacion(){
 }
 const money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(n);
 const txt=(id,v)=>$(id).textContent=v;
-function avisarConjunto(estado,total=0){if(window.parent!==window)window.parent.postMessage({tipo:'saber-cotizacion-parcial-v1',modulo:'impresiones',estado,total},location.origin);}
+function avisarConjunto(estado,total=0){if(window.parent!==window)window.parent.postMessage({tipo:'saber-cotizacion-parcial-v1',modulo:'impresiones',estado,total},new URL(document.baseURI).origin);}
 function estadoBarra(tipo,importe,mensaje){
  $('resumenRapido').dataset.estado=tipo;
  txt('importeArriba',importe);
