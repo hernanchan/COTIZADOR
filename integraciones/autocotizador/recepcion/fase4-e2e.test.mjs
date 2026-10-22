@@ -321,3 +321,24 @@ test('la pantalla rápida descarta respuestas antiguas y ofrece orden con hojas 
  assert.match(js,/grupoAnillado/,'la configuración masiva no debe perder grupo');
  assert.match(js,/signal:/,'la solicitud admite cancelación');
 });
+
+
+test('precio sticky visible y sin tiempos técnicos en la vista comercial',async()=>{
+ const page=await worker.fetch(new Request(origin+'/prueba-cotizador-rapido'),env);
+ assert.equal(page.status,200);
+ const html=await page.text();
+ assert.match(html,/id="resumenRapido"/);
+ assert.match(html,/id="importeArriba"/);
+ assert.match(html,/position:sticky/);
+ assert.match(html,/top:0/);
+ assert.match(html,/id="resumen"/);
+ const script=await worker.fetch(new Request(origin+'/prueba-cotizador-rapido.js'),env);
+ assert.equal(script.status,200);
+ const js=await script.text();
+ assert.match(js,/estadoBarra|importeArriba/);
+ assert.doesNotMatch(js,/Presupuesto listo en /);
+ assert.doesNotMatch(js,/Lectura local terminada en /);
+ assert.match(js,/Por calcular|A cotizar/);
+ assert.match(js,/Calculando/);
+ assert.match(js,/No se pudo cotizar/);
+});
