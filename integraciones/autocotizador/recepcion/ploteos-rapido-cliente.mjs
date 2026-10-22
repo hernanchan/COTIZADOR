@@ -24,7 +24,7 @@ function copiasControl(d){
  wrap.append(input);return wrap;
 }
 function soportesCompatibles(d){
- return catalogo.filter(s=>/^rollo\\d+$/.test(s.id)&&
+ return catalogo.filter(s=>/^rollo\d+$/.test(s.id)&&
   d.paginas.every(p=>Math.min(p.anchoCm,p.altoCm)<=s.widthCm+0.03))
   .sort((a,b)=>a.widthCm-b.widthCm);
 }
