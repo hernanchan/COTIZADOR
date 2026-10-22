@@ -22,7 +22,8 @@ export function cotizarPloteosRapido({trabajos,precios}){
  for(const [i,t] of trabajos.entries()){
   const keys=Object.keys(t||{}).sort().join(',');
   const anterior=keys==='altoCm,anchoCm,copias,id,material,modo,nombre';
-  const nuevo=keys==='copias,id,material,modo,nombre,paginas';
+  const nuevo=keys==='copias,id,material,modo,nombre,paginas'||
+   keys==='copias,id,material,modo,nombre,paginas,papelPoster';
   if(!t||(!anterior&&!nuevo)||t.id!=='pl'+(i+1)||
     typeof t.nombre!=='string'||!t.nombre.trim()||t.nombre.length>160||
     !['cad','poster'].includes(t.modo)||!Number.isSafeInteger(t.copias)||t.copias<1||t.copias>500)
@@ -36,6 +37,12 @@ export function cotizarPloteosRapido({trabajos,precios}){
   if(!soporte)throw Error('Material de ploteo no disponible.');
   if(!Array.isArray(paginas)||paginas.length<1||paginas.length>2000)
    throw Error('Número de páginas inválido.');
+  // El cliente elige solamente el acabado de las páginas clasificadas como Póster.
+  // CAD siempre usa obra estándar. El rollo y la tarifa los define el servidor.
+  const papelPoster=t.papelPoster===undefined?'obra80':t.papelPoster;
+  if(!['obra80','recubierto'].includes(papelPoster)||
+     (papelPoster==='recubierto'&&!paginas.some(p=>p.modo==='poster')))
+   throw Error('Papel de póster inválido.');
   let metros=0,subtotalBruto=0;const detailPages=[];
   const minimo=Number(config.minMeters||0),redondeo=Number(config.roundTo||1);
   if(!Number.isFinite(minimo)||minimo<0||!Number.isFinite(redondeo)||redondeo<=0)throw Error('Tarifa inválida.');
@@ -50,10 +57,19 @@ export function cotizarPloteosRapido({trabajos,precios}){
     throw Error('La página '+p.numero+' supera el ancho del rollo '+soporte.name+'.');
    const modoPagina=p.modo||t.modo;
    if(!['cad','poster'].includes(modoPagina))throw Error('Tipo de ploteo inválido.');
-   const tarifaPagina=Number(modoPagina==='cad'?soporte.cadPerMeter:soporte.posterPerMeter);
+   let rolloPagina=soporte;
+   if(nuevo&&modoPagina==='poster'&&papelPoster==='recubierto'){
+    rolloPagina=config.supports.filter(s=>/^rec\d+$/.test(s.id))
+      .sort((a,b)=>Number(a.widthCm)-Number(b.widthCm))
+      .find(s=>ancho<=Number(s.widthCm)+0.03);
+    if(!rolloPagina)throw Error('No hay papel recubierto suficientemente ancho para la página '+p.numero+'.');
+   }
+   const tarifaPagina=Number(modoPagina==='cad'?rolloPagina.cadPerMeter:rolloPagina.posterPerMeter);
    if(!Number.isFinite(tarifaPagina)||tarifaPagina<0)throw Error('Tarifa inválida.');
    metros+=largo/100;subtotalBruto+=largo/100*tarifaPagina;
    detailPages.push({numero:p.numero,anchoCm:p.anchoCm,altoCm:p.altoCm,modo:modoPagina,
+     material:rolloPagina.id,materialNombre:rolloPagina.name,
+     papel:modoPagina==='poster'&&papelPoster==='recubierto'?'recubierto':'obra80',
      anchoEnRolloCm:ancho,largoEnRolloCm:largo});
   }
   const tarifa=Number(t.modo==='cad'?soporte.cadPerMeter:soporte.posterPerMeter);
@@ -63,7 +79,7 @@ export function cotizarPloteosRapido({trabajos,precios}){
   if(!Number.isSafeInteger(subtotal)||subtotal<0)throw Error('Monto de ploteo fuera de rango.');
   total+=subtotal;
   if(!Number.isSafeInteger(total))throw Error('Total de ploteo fuera de rango.');
-  detalles.push({id:t.id,nombre:t.nombre,modo:t.modo,material:t.material,
+  detalles.push({id:t.id,nombre:t.nombre,modo:t.modo,material:t.material,papelPoster,
    materialNombre:soporte.name,anchoCm:paginas[0].anchoCm,altoCm:paginas[0].altoCm,
    paginas:detailPages,paginasTotales:paginas.length,copias:t.copias,
    metrosLineales:Math.round(metros*10000)/10000,tarifaPorMetro:tarifa,subtotal});
