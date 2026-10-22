@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import {createHash,createHmac,randomUUID,webcrypto} from 'node:crypto';
 import {PDFDocument,degrees} from 'pdf-lib';
 import {leerMedidasPloteo} from './medidas-local-pdf.mjs';
+import {clasificarCoberturaPloteo} from './clasificar-cobertura-ploteo.mjs';
 import worker from './dist/saber-documentos-cotizador-fase4.mjs';
 
 globalThis.crypto ??= webcrypto;
@@ -438,4 +439,54 @@ test('ploteos multipágina suman metros reales y rechazan rollos estrechos',asyn
  const bad=await worker.fetch(req('/api/ensayo-ploteos-rapido',{trabajos:[{...base,material:'rollo60'}]}),env);
  assert.equal(bad.status,400);
  assert.equal((await bad.json()).paymentAuthorized,false);
+});
+
+
+test('detección automática cobertura: plano lineal y póster denso sin intervención de cliente',()=>{
+ const imagen=(ancho,alto,paint)=>{
+  const data=new Uint8ClampedArray(ancho*alto*4);
+  for(let i=0;i<ancho*alto;i++){data[i*4]=255;data[i*4+1]=255;data[i*4+2]=255;data[i*4+3]=255;}
+  paint(data,ancho,alto);return data;
+ };
+ const cad=imagen(100,100,(data,w,h)=>{
+  for(let y=10;y<90;y+=10)for(let x=10;x<90;x++)for(let c=0;c<3;c++)data[(y*w+x)*4+c]=0;
+ });
+ const poster=imagen(100,100,(data,w,h)=>{
+  for(let y=0;y<100;y++)for(let x=0;x<100;x++){
+   const i=(y*w+x)*4;data[i]=20;data[i+1]=130;data[i+2]=210;
+  }
+ });
+ const gris=imagen(100,100,(data,w,h)=>{
+  for(let y=0;y<100;y++)for(let x=0;x<22;x++){
+   const i=(y*w+x)*4;data[i]=135;data[i+1]=135;data[i+2]=135;
+  }
+ });
+ assert.equal(clasificarCoberturaPloteo(cad).modo,'cad');
+ assert.equal(clasificarCoberturaPloteo(poster).modo,'poster');
+ assert.equal(clasificarCoberturaPloteo(gris).modo,'revision');
+});
+test('PDF mixto se cobra por clasificación de cada página, sin selector CAD/Póster',async()=>{
+ const material='rollo60';
+ const pdf={id:'pl1',nombre:'mixto.pdf',modo:'cad',material,copias:1,
+  paginas:[{numero:1,anchoCm:42,altoCm:60,modo:'cad'},
+          {numero:2,anchoCm:42,altoCm:60,modo:'poster'}]};
+ const res=await worker.fetch(req('/api/ensayo-ploteos-rapido',{trabajos:[pdf]}),env);
+ assert.equal(res.status,200,'mixto: '+JSON.stringify(await res.clone().json()));
+ const r=await res.json();
+ assert.equal(r.paymentAuthorized,false);
+ assert.equal(r.resumen.detalles[0].paginas[0].modo,'cad');
+ assert.equal(r.resumen.detalles[0].paginas[1].modo,'poster');
+ assert.equal(r.resumen.total,8600);
+ const page=await worker.fetch(new Request(origin+'/prueba-ploteos-rapido'),env);
+ const html=await page.text();
+ assert.match(html,/pdf\.min\.js/);
+ assert.match(html,/Solamente elegí el rollo y las copias/);
+ const js=await worker.fetch(new Request(origin+'/prueba-ploteos-rapido.js'),env);
+ const body=await js.text();
+ assert.match(body,/clasificaci|Clasificaci/i);
+ assert.doesNotMatch(body,/Tipo de ploteo/);
+ const uncertain=await worker.fetch(req('/api/ensayo-ploteos-rapido',{
+  trabajos:[{...pdf,paginas:[{numero:1,anchoCm:42,altoCm:60,modo:'revision'}]}]
+ }),env);
+ assert.equal(uncertain.status,400,'no debe cotizar un resultado dudoso');
 });
