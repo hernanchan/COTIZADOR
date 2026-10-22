@@ -11,6 +11,14 @@ Registrado el **22 de octubre de 2026** a pedido del titular, a partir de prueba
 - **Validación:** pruebas automáticas y compilación aprobadas: https://github.com/hernanchan/COTIZADOR/actions/runs/39764881324. Compilado `integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs`.
 - **Sin intervención:** precios y descuentos, papeles vigentes, ploteos, Drive/Apps Script, checkout, Polaroids y sitio público.
 
+## Incidencia A3 color detectada por el usuario — 22/10/2026
+
+- **Síntoma real en Cloudflare:** tras cambiar un único PDF a **A3 color**, la barra superior mostraba `Sin precio`. El cotizador actual ya resuelve ese trabajo; no es falta de tarifas.
+- **Causa confirmada en código:** el prototipo reutilizaba los valores `obra70`, `obra140` y `obra180` propios de Color A4 para Color A3, cuyos IDs reales son `a3_color_obra80`, `a3_color_obra140`, etc. La validación del servidor rechazaba el material incompatible.
+- **Corrección en rama privada:** nuevo endpoint `GET /api/ensayo-materiales-rapido` devuelve sólo IDs/nombres/familias A4/A3 del `precios-web.json` **ya existente**; el navegador llena los selectores por formato y cambia a un papel admitido al pasar de A4 a A3. No se editaron tarifas comerciales. Se conserva el formato del payload B/N esperado por el validador.
+- **Prueba automatizada:** caso A3 color con papel real correcto; prueba de rechazo de ID A4 colocado en A3; catálogo con opciones comerciales completas A4 y A3.
+- **Estado:** corrección en código, pendiente de desplegar de nuevo el Worker aislado y probar en navegador con PDF real. No marcar resuelta en operación hasta que el usuario lo compruebe.
+
 ## Checklist de aceptación
 
 - [ ] **Igualar funciones del cotizador vigente.** Auditar las opciones de impresión ofrecidas hoy en el cotizador de producción, especialmente toda la **variedad de papeles y materiales**, y trasladar opciones, incompatibilidades y precios al flujo rápido, por archivo. Evitar reducirlo a Obra 70/140/180. Validar tarifas antes de habilitar pedidos.
