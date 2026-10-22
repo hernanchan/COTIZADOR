@@ -179,5 +179,5 @@ drop.addEventListener('dragleave',()=>drop.classList.remove('active'));
 drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('active');seleccionar(e.dataTransfer.files)});
 drop.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('archivo').click()}});
 $('cotizar').addEventListener('click',calcular);
-$('aplicarTodos').addEventListener('click',()=>{for(const e of cola){e.modo=$('modoGeneral').value;e.formato=$('formato').value;e.caras=$('caras').value;e.copias=Number($('copias').value);e.anillado=$('anillado').value==='ninguno'?'ninguno':'individual';}actualizar();calcular()});
+$('aplicarTodos').addEventListener('click',()=>{for(const e of cola){e.modo=$('modoGeneral').value;e.formato=$('formato').value;e.caras=$('caras').value;e.copias=Number($('copias').value);e.anillado=$('anillado').value==='ninguno'?'ninguno':$('anillado').value==='juntos'&&cola.length>=2?'grupo':'individual';e.grupoAnillado=e.anillado==='grupo'?'1':null;}actualizar();calcular()});
 txt('estado','Seleccioná varios archivos para conocer el precio sin esperar la subida.');
