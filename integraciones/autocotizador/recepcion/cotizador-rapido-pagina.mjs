@@ -39,6 +39,7 @@ export function paginaCotizadorRapido(){
  @media(max-width:520px){main{margin:0;padding:16px;border-radius:0}.panel-resumen{padding:14px}}
 </style></head><body><main>
  <h1>Presupuesto rápido de varios PDF</h1>
+ <p><a href="/prueba-ploteos-rapido">Ir a Ploteos: planos CAD y pósteres de gran formato →</a></p>
  <section id="resumenRapido" data-estado="pendiente" role="status" aria-live="polite" aria-label="Precio orientativo de tu pedido">
   <div class="estado-precio"><span class="estado-importe" id="estadoImporte">Precio preliminar</span><strong class="importe" id="importeArriba">A cotizar</strong></div>
   <span class="metadatos" id="detalleArriba">Elegí los PDF y sus opciones</span>
