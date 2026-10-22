@@ -463,6 +463,7 @@ test('detección automática cobertura: plano lineal y póster denso sin interve
  });
  assert.equal(clasificarCoberturaPloteo(cad).modo,'cad');
  assert.equal(clasificarCoberturaPloteo(poster).modo,'poster');
+ assert.equal(clasificarCoberturaPloteo(new Uint8ClampedArray(Array.from({length:100*100},()=>[255,255,255,255]).flat())).modo,'revision');
  assert.equal(clasificarCoberturaPloteo(gris).modo,'revision');
 });
 test('PDF mixto se cobra por clasificación de cada página, sin selector CAD/Póster',async()=>{
