@@ -141,6 +141,14 @@ async function cotizar(){
  if(leyendo||!entries.length){out.textContent='Esperando archivos…';return}
  if(entries.some(e=>e.error||!e.paginas)){out.textContent='Hay documentos sin analizar correctamente. No se puede cotizar el conjunto.';return}
  out.textContent='Calculando importes preliminares…';
+ for(const e of entries){
+  if(!e.paginas||e.modo!=='color')continue;
+  const d=clasificarDestino(e.paginas,e.seleccion);
+  if(d.destino!=='documentos')continue;
+  const formato=d.tamanoFinal==='original'?formatoOriginal(e.paginas):d.tamanoFinal;
+  const disponibles=catalogo[formato]||[];
+  if(!e.materialColor&&disponibles.length)e.materialColor=disponibles[0].id;
+ }
  const archivos=entries.map(e=>({nombre:e.name,paginas:e.paginas,seleccion:e.seleccion,copias:e.copias,modo:e.modo,caras:e.caras,papelPoster:e.papelPoster,anillado:e.anillado,grupoAnillado:e.grupoAnillado,materialColor:e.materialColor}));
  try{const r=await fetch('/api/ensayo-carga-unica',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({archivos})});const d=await r.json();if(n!==version)return;if(!r.ok||d.ok!==true||d.paymentAuthorized!==false)throw Error(d.error||'Sin cotización');
  ultimoPresupuesto=d;
