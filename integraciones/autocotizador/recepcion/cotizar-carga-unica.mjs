@@ -44,7 +44,7 @@ export function cotizarCargaUnica({archivos,precios}){
    }
    const id='pdf'+(documentos.length+1);
    documentos.push({id,nombre:a.nombre,paginas:a.paginas.length,copias:a.copias,
-    formato,modo:a.modo,caras:a.caras,anillado:'ninguno',materialColor:'obra70',orden:i+1});
+    formato,modo:a.modo,caras:a.caras,anillado:'ninguno',materialColor:formato==='a3'?'a3_color_obra80':'obra70',orden:i+1});
    plan.push({indice:i,nombre:a.nombre,origen:a.paginas.map(p=>({numero:p.numero,anchoCm:p.anchoCm,altoCm:p.altoCm})),
     formatoFinal:formato,ajuste:d.cambioEscala?'proporcional_sin_recorte':'sin_escalado',destino:'documentos',id});
    return;
