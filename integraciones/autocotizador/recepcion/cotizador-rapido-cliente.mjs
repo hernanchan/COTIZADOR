@@ -162,6 +162,7 @@ async function calcular(){
  invalidarCotizacion();
  const version=versionCotizacion;
  if(procesando||!cola.length||!catalogoMateriales||cola.some(x=>!x.paginas)){
+  if(!cola.length)avisarConjunto('vacio');
   estadoBarra('pendiente','A cotizar',cola.length+' archivos seleccionados');
   txt('precio','Completá la lectura de todos los PDF para cotizar.');return;
  }
