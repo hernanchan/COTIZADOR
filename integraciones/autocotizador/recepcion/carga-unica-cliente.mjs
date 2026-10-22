@@ -35,39 +35,41 @@ function render(){
   if(!e.paginas){card.append(texto('p','Analizando medidas…'));lista.append(card);continue}
   const multiples=e.paginas.length>1;
   const medidas=e.paginas.map(p=>p.anchoCm.toFixed(2)+' × '+p.altoCm.toFixed(2)+' cm');
-  card.append(texto('p','Tamaño original: '+(new Set(medidas).size===1?medidas[0]:(multiples?'Varios tamaños · '+[...new Set(medidas)].join(' / '):medidas[0]))+' · '+e.paginas.length+' página(s)'));
+  const origin=texto('p','Tamaño original: +(new Set(medidas).size===1?medidas[0]:(multiples?'Varios tamaños · '+[...new Set(medidas)].join(' / '):medidas[0]))+' · '+e.paginas.length+' página(s)');origin.className='origen';card.append(origin);
   const aviso=clasificarDestino(e.paginas);
-  if(aviso.requiereConfirmacion)card.append(texto('p','Importante: confirmá el tamaño final. El tamaño del PDF no determina por sí solo el precio.'));
-  const label=texto('label','Quiero imprimir en: ');
+  if(aviso.requiereConfirmacion){const n=texto('p','Confirmá el tamaño de impresión: el PDF puede tener medidas distintas a las que querés.');n.className='advertencia';card.append(n)}
+  const controles=document.createElement('div');controles.className='controles';
+  const label=texto('label','Tamaño de impresión');
   const sel=document.createElement('select');sel.setAttribute('aria-label','Tamaño final de '+e.name);
   for(const [v,l] of [['sin-confirmar','Elegir tamaño final'],['original','Mantener tamaño original'],['a3','A3 (29,7 × 42 cm)'],['a4','A4 (21 × 29,7 cm)'],['a5','A5 (14,8 × 21 cm)']]){
    const o=new Option(l,v);sel.add(o);
   }
-  sel.value=e.seleccion;sel.onchange=()=>{e.seleccion=sel.value;cambio()};label.append(sel);card.append(label);
+  sel.value=e.seleccion;sel.onchange=()=>{e.seleccion=sel.value;cambio()};label.append(sel);controles.append(label);
   const decision=clasificarDestino(e.paginas,e.seleccion);
   if(decision.confirmado){
-   card.append(texto('p','Destino: '+(decision.destino==='ploteo'?'Ploteos CAD/Póster':'Impresiones de documentos')+' · Tamaño final: '+(decision.tamanoFinal==='original'?'original':decision.tamanoFinal.toUpperCase())));
-   if(decision.cambioEscala)card.append(texto('p','Se ajustará proporcionalmente sin recortar. Verificar legibilidad y escala, especialmente en planos CAD.'));
+   const destino=texto('p','Trabajo: '+(decision.destino==='ploteo'?'Ploteo grande':'Impresión de documentos')+' · Salida: '+(decision.tamanoFinal==='original'?'tamaño original':decision.tamanoFinal.toUpperCase()));destino.className='destino';card.append(destino);
+   if(decision.cambioEscala){const n=texto('p','El archivo se ajustará sin recortar. Revisá que textos y escalas sigan siendo legibles.');n.className='advertencia';card.append(n)}
    if(decision.mixtas&&decision.tamanoFinal==='original')card.append(texto('p','El PDF contiene tamaños distintos. Se conservarán individualmente al presupuestar.'));
-   card.append(cantidadCopias(e));
+   controles.append(cantidadCopias(e));
    if(decision.destino==='documentos'){
-    card.append(valor('Impresión', [['bn','Blanco y negro'],['color','Color']],e.modo,v=>{e.modo=v;cambio()}));
-    card.append(valor('Caras', [['simple','Simple faz'],['double','Doble faz']],e.caras,v=>{e.caras=v;cambio()}));
+    controles.append(valor('Impresión', [['bn','Blanco y negro'],['color','Color']],e.modo,v=>{e.modo=v;cambio()}));
+    controles.append(valor('Caras', [['simple','Simple faz'],['double','Doble faz']],e.caras,v=>{e.caras=v;cambio()}));
     const formato=decision.tamanoFinal==='original'?formatoOriginal(e.paginas):decision.tamanoFinal;
     if(e.modo==='color'&&['a4','a3'].includes(formato)){
      const disponibles=catalogo[formato]||[];
      if(!disponibles.some(m=>m.id===e.materialColor))e.materialColor=disponibles[0]?.id||'';
-     if(disponibles.length)card.append(valor('Material',disponibles.map(m=>[m.id,m.name]),e.materialColor,v=>{e.materialColor=v;cambio()}));
+     if(disponibles.length)controles.append(valor('Material',disponibles.map(m=>[m.id,m.name]),e.materialColor,v=>{e.materialColor=v;cambio()}));
      else card.append(texto('p','Materiales no disponibles: no cotizar hasta recuperar el catálogo.'));
     }
-    card.append(valor('Anillado',[['ninguno','Sin anillado'],['individual','Cada archivo por separado'],['grupo','Varios archivos juntos']],e.anillado,v=>{e.anillado=v;if(v!=='grupo')e.grupoAnillado='';else e.grupoAnillado='1';cambio()}));
-    if(e.anillado==='grupo')card.append(valor('Grupo de anillado',[['1','Grupo 1'],['2','Grupo 2'],['3','Grupo 3'],['4','Grupo 4'],['5','Grupo 5']],e.grupoAnillado,v=>{e.grupoAnillado=v;cambio()}));
+    controles.append(valor('Anillado',[['ninguno','Sin anillado'],['individual','Cada archivo por separado'],['grupo','Varios archivos juntos']],e.anillado,v=>{e.anillado=v;if(v!=='grupo')e.grupoAnillado='';else e.grupoAnillado='1';cambio()}));
+    if(e.anillado==='grupo')controles.append(valor('Grupo de anillado',[['1','Grupo 1'],['2','Grupo 2'],['3','Grupo 3'],['4','Grupo 4'],['5','Grupo 5']],e.grupoAnillado,v=>{e.grupoAnillado=v;cambio()}));
     if(e.anillado==='grupo')card.append(texto('p','Los PDF del grupo deben tener igual tamaño final y cantidad de copias.'));
    }else{
     if(e.paginas.some(p=>!['cad','poster'].includes(p.modo)))card.append(texto('p','Análisis CAD/Póster pendiente: requiere revisión, sin precio.'));
-    if(e.paginas.some(p=>p.modo==='poster'))card.append(valor('Papel para póster', [['obra80','Obra 80 g'],['recubierto','Recubierto 130 g']],e.papelPoster,v=>{e.papelPoster=v;cambio()}));
+    if(e.paginas.some(p=>p.modo==='poster'))controles.append(valor('Papel para póster', [['obra80','Obra 80 g'],['recubierto','Recubierto 130 g']],e.papelPoster,v=>{e.papelPoster=v;cambio()}));
    }
-  }else card.append(texto('p','Sin precio hasta confirmar el tamaño final.'));
+  }else {const n=texto('p','Elegí el tamaño de impresión para continuar.');n.className='advertencia';card.append(n)}
+  card.append(controles);
   lista.append(card);
  }
  $('estado').textContent=leyendo?'Analizando archivos…':entries.length?'Identificados '+entries.length+' PDF. Cotización orientativa, sin subir originales.':'Seleccioná tus PDF para comenzar.';
