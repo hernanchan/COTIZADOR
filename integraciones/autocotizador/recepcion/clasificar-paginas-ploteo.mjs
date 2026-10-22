@@ -28,7 +28,7 @@ export async function clasificarPaginasPloteo(file,{onProgreso=()=>{},maxPaginas
    context.fillStyle='#fff';context.fillRect(0,0,canvas.width,canvas.height);
    await page.render({canvasContext:context,viewport,background:'rgb(255,255,255)'}).promise;
    const pixels=context.getImageData(0,0,canvas.width,canvas.height).data;
-   const clasificacion=clasificarCoberturaPloteo(pixels);
+   const clasificacion=clasificarCoberturaPloteo(pixels,{ancho:canvas.width,alto:canvas.height});
    modos.push({numero:i,...clasificacion});
    canvas.width=0;canvas.height=0;
    page.cleanup();
