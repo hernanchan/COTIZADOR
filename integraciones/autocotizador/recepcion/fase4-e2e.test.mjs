@@ -481,7 +481,7 @@ test('PDF mixto se cobra por clasificación de cada página, sin selector CAD/P�
  const page=await worker.fetch(new Request(origin+'/prueba-ploteos-rapido'),env);
  const html=await page.text();
  assert.match(html,/pdf\.min\.js/);
- assert.match(html,/Solamente elegí el rollo y las copias/);
+ assert.match(html,/asigna automáticamente el rollo estándar/);
  const js=await worker.fetch(new Request(origin+'/prueba-ploteos-rapido.js'),env);
  const body=await js.text();
  assert.match(body,/clasificaci|Clasificaci/i);
