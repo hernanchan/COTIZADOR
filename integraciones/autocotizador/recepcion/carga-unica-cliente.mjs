@@ -9,6 +9,22 @@ let catalogo={a4:[],a3:[]};
 const formatoOriginal=paginas=>{const v=paginas.map(p=>{const a=Math.min(p.anchoCm,p.altoCm),b=Math.max(p.anchoCm,p.altoCm);return Math.abs(a-21)<0.2&&Math.abs(b-29.7)<0.2?'a4':Math.abs(a-29.7)<0.2&&Math.abs(b-42)<0.2?'a3':null});return v.every(x=>x===v[0])?v[0]:null};
 const valor=(label,options,selected,change)=>{const l=texto('label',label+' '),sel=document.createElement('select');for(const [k,v] of options)sel.add(new Option(v,k));sel.value=selected;sel.onchange=()=>change(sel.value);l.append(sel);return l};
 function cambio(){version++;render();cotizar()}
+function cantidadCopias(e){
+ const l=texto('label','Copias (1 a 500) ');
+ const input=document.createElement('input');
+ input.type='number';input.min='1';input.max='500';input.step='1';input.inputMode='numeric';
+ input.value=String(e.copias);input.setAttribute('aria-label','Cantidad de copias de '+e.name);
+ input.onchange=()=>{
+  const n=Number(input.value);
+  if(!Number.isSafeInteger(n)||n<1||n>500){
+   input.setCustomValidity('Elegí una cantidad entera entre 1 y 500.');
+   input.reportValidity();input.value=String(e.copias);return;
+  }
+  input.setCustomValidity('');e.copias=n;cambio();
+ };
+ l.append(input);return l;
+}
+
 const texto=(tag,value)=>{const n=document.createElement(tag);n.textContent=value;return n};
 function render(){
  const lista=$('lista');lista.replaceChildren();
@@ -33,7 +49,7 @@ function render(){
    card.append(texto('p','Destino: '+(decision.destino==='ploteo'?'Ploteos CAD/Póster':'Impresiones de documentos')+' · Tamaño final: '+(decision.tamanoFinal==='original'?'original':decision.tamanoFinal.toUpperCase())));
    if(decision.cambioEscala)card.append(texto('p','Se ajustará proporcionalmente sin recortar. Verificar legibilidad y escala, especialmente en planos CAD.'));
    if(decision.mixtas&&decision.tamanoFinal==='original')card.append(texto('p','El PDF contiene tamaños distintos. Se conservarán individualmente al presupuestar.'));
-   card.append(valor('Copias', [['1','1'],['2','2'],['3','3'],['5','5'],['10','10']],String(e.copias),v=>{e.copias=Number(v);cambio()}));
+   card.append(cantidadCopias(e));
    if(decision.destino==='documentos'){
     card.append(valor('Impresión', [['bn','Blanco y negro'],['color','Color']],e.modo,v=>{e.modo=v;cambio()}));
     card.append(valor('Caras', [['simple','Simple faz'],['double','Doble faz']],e.caras,v=>{e.caras=v;cambio()}));
