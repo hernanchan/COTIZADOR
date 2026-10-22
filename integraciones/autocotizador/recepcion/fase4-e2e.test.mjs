@@ -467,7 +467,7 @@ test('detección automática cobertura: plano lineal y póster denso sin interve
  assert.equal(clasificarCoberturaPloteo(gris).modo,'revision');
 });
 test('PDF mixto se cobra por clasificación de cada página, sin selector CAD/Póster',async()=>{
- const material='rollo60';
+ const material='rollo42';
  const pdf={id:'pl1',nombre:'mixto.pdf',modo:'cad',material,copias:1,
   paginas:[{numero:1,anchoCm:42,altoCm:60,modo:'cad'},
           {numero:2,anchoCm:42,altoCm:60,modo:'poster'}]};
@@ -477,7 +477,7 @@ test('PDF mixto se cobra por clasificación de cada página, sin selector CAD/P�
  assert.equal(r.paymentAuthorized,false);
  assert.equal(r.resumen.detalles[0].paginas[0].modo,'cad');
  assert.equal(r.resumen.detalles[0].paginas[1].modo,'poster');
- assert.equal(r.resumen.total,8600);
+ assert.equal(r.resumen.total,6100);
  const page=await worker.fetch(new Request(origin+'/prueba-ploteos-rapido'),env);
  const html=await page.text();
  assert.match(html,/pdf\.min\.js/);
@@ -490,4 +490,30 @@ test('PDF mixto se cobra por clasificación de cada página, sin selector CAD/P�
   trabajos:[{...pdf,paginas:[{numero:1,anchoCm:42,altoCm:60,modo:'revision'}]}]
  }),env);
  assert.equal(uncertain.status,400,'no debe cotizar un resultado dudoso');
+});
+
+
+test('rollo automático no es editable por el cliente ni manipulable vía API',async()=>{
+ const page=await worker.fetch(new Request(origin+'/prueba-ploteos-rapido'),env);
+ const html=await page.text();
+ assert.match(html,/detectamos tamaños|Detectamos tamaños/);
+ assert.doesNotMatch(html,/Solamente elegí el rollo/);
+ const js=await worker.fetch(new Request(origin+'/prueba-ploteos-rapido.js'),env);
+ const body=await js.text();
+ assert.match(body,/Rollo asignado autom/);
+ assert.doesNotMatch(body,/Rollo para imprimir/);
+ const base={id:'pl1',nombre:'plano.pdf',modo:'cad',copias:1,
+  paginas:[{numero:1,anchoCm:42,altoCm:59.4,modo:'cad'}]};
+ const valido=await worker.fetch(req('/api/ensayo-ploteos-rapido',{trabajos:[{...base,material:'rollo42'}]}),env);
+ assert.equal(valido.status,200);
+ const resultado=await valido.json();
+ assert.equal(resultado.resumen.detalles[0].material,'rollo42');
+ for(const incorrecto of ['rollo60','rollo90','rec60']){
+  const r=await worker.fetch(req('/api/ensayo-ploteos-rapido',{trabajos:[{...base,material:incorrecto}]}),env);
+  assert.equal(r.status,400,'Material distinto al asignado: '+incorrecto);
+  assert.equal((await r.json()).paymentAuthorized,false);
+ }
+ const ancho=await worker.fetch(req('/api/ensayo-ploteos-rapido',{trabajos:[{...base,material:'rollo90',
+  paginas:[{numero:1,anchoCm:84.1,altoCm:118.9,modo:'poster'}]}]}),env);
+ assert.equal(ancho.status,200,'A0 en rollo 90');
 });
