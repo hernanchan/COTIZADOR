@@ -935,6 +935,14 @@ async function cotizacionRapida(request,env){
   },200);
  }catch(_){return testResponse({ok:false,error:'No se pudo calcular el precio orientativo.',paymentAuthorized:false},400)}
 }
+/** Catálogo público limitado a identificadores y nombres de materiales color (sin tarifas). */
+function catalogoMaterialesRapido(request,env){
+ if(request.method!=='GET')return closed();
+ if(new URL(request.url).origin!==new URL(env.DOCS_ALLOWED_ORIGIN||request.url).origin)
+  return testResponse({ok:false,error:'Origen no permitido'},403);
+ const clean=(key)=>(preciosPiloto[key]?.materials||[]).map(m=>({id:m.id,name:m.name,family:m.family||''}));
+ return testResponse({ok:true,materials:{a4:clean('colorA4'),a3:clean('colorA3')}});
+}
 function paginaRapida(){
  return new Response(paginaCotizadorRapido(),{status:200,headers:{
   'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store,private',
@@ -954,6 +962,7 @@ export default {
     if(page==='/prueba-cotizador-lote'&&request.method==='GET')return pantallaLote(env);
     if(page==='/prueba-cotizador-rapido'&&request.method==='GET')return paginaRapida();
     if(page==='/prueba-cotizador-rapido.js'&&request.method==='GET')return scriptRapido();
+    if(page==='/api/ensayo-materiales-rapido')return catalogoMaterialesRapido(request,env);
     if(page==='/api/ensayo-presupuesto-rapido')return cotizacionRapida(request,env);
     if(page==='/api/ensayo-cotizar-lote')return fase4QuoteLote(request,env);
     if(page==='/api/ensayo-pdf')return fase4Transfer(request,env);
