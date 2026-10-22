@@ -1,4 +1,5 @@
 import {leerMedidasPloteo} from './medidas-local-pdf.mjs';
+import {clasificarPaginasPloteo} from './clasificar-paginas-ploteo.mjs';
 const $=id=>document.getElementById(id);
 const lista=[];let catalogo=[],version=0,controlador=null,leyendo=false;
 const money=v=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(v);
@@ -41,7 +42,10 @@ function render(){
    const iguales=measures.every(x=>x===measures[0]);
    card.append(dato('p',d.paginas.length+' página(s) · '+(iguales?measures[0]: 'Tamaños distintos: '+measures.join(' · '))));
    const form=dato('div');form.className='controles';
-   form.append(selector('Tipo de ploteo',[['cad','Plano CAD'],['poster','Póster / imagen']],d.modo,v=>d.modo=v));
+   const cad=d.paginas.filter(p=>p.modo==='cad').length,poster=d.paginas.filter(p=>p.modo==='poster').length;
+   card.append(dato('p','Clasificación automática: '+cad+' CAD · '+poster+' Póster'));
+   if(d.paginas.length<=15)card.append(dato('p',d.paginas.map(p=>'Pág. '+p.numero+': '+(p.modo==='cad'?'CAD':'Póster')).join(' · ')));
+   
    const validos=soportesCompatibles(d);
    if(!validos.length){card.append(dato('p','Ningún rollo disponible admite el ancho de este PDF. No se puede cotizar.'))}
    else form.append(selector('Rollo para imprimir',validos.map(x=>[x.id,x.name+' · '+x.widthCm+' cm']),d.material,v=>d.material=v));
@@ -51,14 +55,14 @@ function render(){
   quitar.addEventListener('click',()=>{lista.splice(i,1);render();cotizar()});
   card.append(quitar);panel.append(card);
  }
- $('calcular').disabled=leyendo||!catalogo.length||!lista.length||lista.some(d=>!d.paginas||!d.material);
+ $('calcular').disabled=leyendo||!catalogo.length||!lista.length||lista.some(d=>!d.paginas||!d.material||d.error||d.paginas.some(p=>!['cad','poster'].includes(p.modo)));
 }
 async function cotizar(){
  invalidar();
  if(leyendo){estado('Leyendo las dimensiones de los PDF…');return}
  if(!lista.length){estado('Elegí al menos un PDF para cotizar.');return}
  if(!catalogo.length){estado('Todavía no están disponibles los materiales.');return}
- if(lista.some(d=>d.error||!d.paginas||!d.material)){estado('Revisá el PDF que no se pudo leer o que no entra en ningún rollo.');return}
+ if(lista.some(d=>d.error||!d.paginas||!d.material||d.paginas.some(p=>!['cad','poster'].includes(p.modo)))){estado('Este trabajo requiere revisión de Librería Saber: no se pudo clasificar con certeza o no entra en los rollos.');return}
  const n=version,ac=new AbortController();controlador=ac;
  const trabajos=lista.map((d,i)=>({id:'pl'+(i+1),nombre:d.nombre,modo:d.modo,
   material:d.material,copias:d.copias,paginas:d.paginas}));
@@ -75,7 +79,7 @@ async function cotizar(){
   panel.append(dato('h2','Presupuesto de ploteos'));
   const ol=dato('ol');
   for(const x of resumen.detalles){
-   const li=dato('li',x.nombre+' · '+x.paginasTotales+' página(s) · '+x.metrosLineales+
+   const li=dato('li',x.nombre+' · '+x.paginasTotales+' página(s) (CAD '+x.paginas.filter(p=>p.modo==='cad').length+' / Póster '+x.paginas.filter(p=>p.modo==='poster').length+') · '+x.metrosLineales+
     ' m lineales por juego · '+x.materialNombre+' · '+x.copias+' copia(s) · '+money(x.subtotal));
    ol.append(li);
   }
@@ -101,7 +105,12 @@ $('archivosPloteo').addEventListener('change',async event=>{
    estado('Detectando tamaños: PDF '+(i+1)+' de '+files.length+'…');
    try{
     const data=await leerMedidasPloteo(files[i]);
-    d.paginas=data.paginas;elegirSoporte(d);
+    estado('Analizando cobertura de tinta: PDF '+(i+1)+' de '+files.length+'…');
+    const clasificaciones=await clasificarPaginasPloteo(files[i],{onProgreso:({terminadas,total})=>estado('Analizando página '+terminadas+' de '+total+'…')});
+    if(data.paginas.length!==clasificaciones.length)throw Error('La lectura de páginas no coincide con el análisis visual.');
+    d.paginas=data.paginas.map((p,j)=>({...p,modo:clasificaciones[j].modo}));
+    if(clasificaciones.some(p=>p.modo==='revision'))d.error='Clasificación dudosa: pendiente de revisión por Librería Saber. No se ofrece un precio automático.';
+    elegirSoporte(d);
     if(!d.material)d.error='El PDF no entra en los rollos disponibles.';
    }catch(e){d.error=String(e.message||e)}
    render();
@@ -116,7 +125,7 @@ async function iniciar(){
   if(!r.ok||!data.ok||!Array.isArray(data.supports)||!data.supports.length)throw Error('Catálogo no disponible');
   catalogo=data.supports;
   for(const d of lista)if(d.paginas)elegirSoporte(d);
-  render();estado('Subí los PDF: detectaremos automáticamente las medidas de todas sus páginas.');
+  render();estado('Subí los PDF: detectaremos tamaños y si cada página es CAD o Póster automáticamente.');
  }catch(e){estado('No se pudieron cargar los materiales. Recargá la página.')}
 }
 iniciar();
