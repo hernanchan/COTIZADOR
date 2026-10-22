@@ -5,12 +5,16 @@ import {cotizarPloteosRapido,rolloEstandarAutomatico} from '../pruebas/cotizar-p
 const PLANO=['cad','poster'];
 const VALORACION='PRELIMINAR_SIN_VERIFICAR';
 function validarArchivo(a,i){
- if(!a||Object.keys(a).sort().join(',')!=='caras,copias,modo,nombre,paginas,papelPoster,seleccion'||
+ if(!a||Object.keys(a).sort().join(',')!=='anillado,caras,copias,grupoAnillado,materialColor,modo,nombre,paginas,papelPoster,seleccion'||
  typeof a.nombre!=='string'||!a.nombre.trim()||a.nombre.length>160||
  !Array.isArray(a.paginas)||a.paginas.length<1||a.paginas.length>2000||
  !Number.isSafeInteger(a.copias)||a.copias<1||a.copias>500||
  !['bn','color'].includes(a.modo)||!['simple','double'].includes(a.caras)||
- !['obra80','recubierto'].includes(a.papelPoster))throw Error('Configuración inválida de archivo '+(i+1));
+ !['obra80','recubierto'].includes(a.papelPoster)||
+ !['ninguno','individual','grupo'].includes(a.anillado)||
+ typeof a.materialColor!=='string'||a.materialColor.length>120||
+ (a.anillado==='grupo'&&!/^[1-9][0-9]?$/.test(String(a.grupoAnillado||'')))||
+ (a.anillado!=='grupo'&&a.grupoAnillado!==''))throw Error('Configuración inválida de archivo '+(i+1));
  for(const [j,p] of a.paginas.entries()){
   if(!p||Object.keys(p).sort().join(',')!=='altoCm,anchoCm,modo,numero'||
    p.numero!==j+1||!Number.isFinite(p.anchoCm)||!Number.isFinite(p.altoCm)||
@@ -43,14 +47,22 @@ export function cotizarCargaUnica({archivos,precios}){
     pendientes.push({indice:i,nombre:a.nombre,motivo:formato==='a5'?'A5 sin tarifa autónoma vigente':'Tamaño original no homogéneo A4/A3'});return;
    }
    const id='pdf'+(documentos.length+1);
+   const catalogo=precios[formato==='a4'?'colorA4':'colorA3']?.materials||[];
+   if(a.modo==='color'&&!catalogo.some(m=>m.id===a.materialColor)){
+    pendientes.push({indice:i,nombre:a.nombre,motivo:'Material incompatible con formato final'});return;
+   }
    documentos.push({id,nombre:a.nombre,paginas:a.paginas.length,copias:a.copias,
-    formato,modo:a.modo,caras:a.caras,anillado:'ninguno',materialColor:formato==='a3'?'a3_color_obra80':'obra70',orden:i+1});
+    formato,modo:a.modo,caras:a.caras,anillado:a.anillado,grupoAnillado:a.grupoAnillado,
+    materialColor:a.modo==='color'?a.materialColor:'estandar',orden:i+1});
    plan.push({indice:i,nombre:a.nombre,origen:a.paginas.map(p=>({numero:p.numero,anchoCm:p.anchoCm,altoCm:p.altoCm})),
     formatoFinal:formato,ajuste:d.cambioEscala?'proporcional_sin_recorte':'sin_escalado',destino:'documentos',id});
    return;
   }
   if(a.paginas.some(p=>!PLANO.includes(p.modo))){
    pendientes.push({indice:i,nombre:a.nombre,motivo:'Clasificación visual CAD/Póster pendiente'});return;
+  }
+  if(a.anillado!=='ninguno'){
+   pendientes.push({indice:i,nombre:a.nombre,motivo:'Anillado incompatible con ploteo'});return;
   }
   const id='pl'+(ploteos.length+1);
   const material=rolloEstandarAutomatico(a.paginas,precios.plotter.supports).id;
@@ -65,6 +77,7 @@ export function cotizarCargaUnica({archivos,precios}){
  const subtotalImpresiones=c?.total||0,subtotalPloteos=p?.total||0;
  return {ok:true,estado:pendientes.length?'INCOMPLETO':'PRELIMINAR',verificacion:VALORACION,
   paymentAuthorized:false,total:pendientes.length?null:subtotalImpresiones+subtotalPloteos,
-  subtotalImpresiones,subtotalPloteos,pendientes,plan,
+  subtotalImpresiones,subtotalPloteos,subtotalAnillados:c?.subtotalAnillados||0,
+  detalleArmados:c?.detalleArmados||[],pendientes,plan,
   detalleImpresiones:c?.detalles||[],detallePloteos:p?.detalles||[]};
 }
