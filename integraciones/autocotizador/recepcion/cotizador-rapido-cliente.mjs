@@ -7,9 +7,16 @@ function invalidarCotizacion(){
  versionCotizacion++;
  if(solicitudCotizacion){solicitudCotizacion.abort();solicitudCotizacion=null;}
  $('resumen').replaceChildren();
+ estadoBarra('pendiente','Por calcular','Modificaste el pedido: recalculando');
 }
 const money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(n);
 const txt=(id,v)=>$(id).textContent=v;
+function estadoBarra(tipo,importe,mensaje){
+ $('resumenRapido').dataset.estado=tipo;
+ txt('importeArriba',importe);
+ txt('estadoImporte',tipo==='listo'?'Total orientativo':'Precio preliminar');
+ txt('detalleArriba',mensaje);
+}
 function actualizar(){
  const lista=$('documentos');lista.replaceChildren();
  cola.forEach((e,i)=>{
@@ -79,6 +86,8 @@ function mostrarResumen(info,tiempo){
   txt('precio','No se pudo construir el resumen del presupuesto.');return;
  }
  const detalles=info.detalles;
+ estadoBarra('listo',money(info.total),
+  detalles.length+' archivo(s) · Impresiones '+money(info.subtotalImpresiones)+' · Anillados '+money(info.anillados));
  const cliente=elemento('section',undefined,'panel-resumen');
  cliente.append(elemento('h2','Tu presupuesto'));
  cliente.append(elemento('p',detalles.length+' archivo(s) · '+info.paginas+' páginas originales · Precio preliminar','subtitulo'));
@@ -136,12 +145,13 @@ function mostrarResumen(info,tiempo){
  });
  acciones.append(copiar);trabajo.append(acciones);
  seccion.append(cliente,trabajo);
- txt('precio','Presupuesto listo en '+tiempo+' ms. Consultá las dos vistas debajo.');
+ txt('precio','Presupuesto orientativo listo. Debajo podés ver el detalle de precios y las instrucciones de impresión.');
 }
 async function calcular(){
  invalidarCotizacion();
  const version=versionCotizacion;
  if(procesando||!cola.length||cola.some(x=>!x.paginas)){
+  estadoBarra('pendiente','A cotizar',cola.length+' archivos seleccionados');
   txt('precio','Completá la lectura de todos los PDF para cotizar.');return;
  }
  const archivos=cola.map((d,i)=>({id:'pdf'+(i+1),nombre:d.file.name,paginas:d.paginas,modo:d.modo,formato:d.formato,caras:d.caras,copias:d.copias,anillado:d.anillado,grupoAnillado:d.grupoAnillado,materialColor:d.materialColor,orden:i+1}));
@@ -150,14 +160,15 @@ async function calcular(){
   const id=String(d.grupoAnillado);if(!grupos.has(id))grupos.set(id,[]);grupos.get(id).push(d);
  }}
  for(const [id,docs] of grupos){
-  if(docs.length<2){txt('precio','El grupo '+id+' necesita por lo menos dos PDF.');return}
+  if(docs.length<2){estadoBarra('error','Revisar grupo '+id,'Se requieren dos PDF');txt('precio','El grupo '+id+' necesita por lo menos dos PDF.');return}
   if(docs.some(d=>d.formato!==docs[0].formato||d.copias!==docs[0].copias)){
-   txt('precio','Grupo '+id+': los PDF deben tener el mismo tamaño y cantidad de juegos.');return;
+   estadoBarra('error','Revisar grupo '+id,'Tamaño o cantidad de juegos incompatible');txt('precio','Grupo '+id+': los PDF deben tener el mismo tamaño y cantidad de juegos.');return;
   }
  }
  const payload={archivos,copias:Number($('copias').value),formato:$('formato').value,
   caras:$('caras').value,anillado:$('anillado').value};
  txt('precio','Calculando precio preliminar…');
+ estadoBarra('calculando','Calculando…','Actualizando con las especificaciones elegidas');
  const start=performance.now();
  const controlador=new AbortController();
  solicitudCotizacion=controlador;
@@ -169,7 +180,10 @@ async function calcular(){
   if(!response.ok||r.ok!==true||r.paymentAuthorized!==false)throw Error(r.error||'Presupuesto no disponible.');
   mostrarResumen(r.resumen,Math.round(performance.now()-start));
  }catch(e){
-  if(version===versionCotizacion&&e.name!=='AbortError')txt('precio','No se pudo cotizar: '+String(e.message||e));
+  if(version===versionCotizacion&&e.name!=='AbortError'){
+   estadoBarra('error','Sin precio','Revisá las opciones del pedido');
+   txt('precio','No se pudo cotizar: '+String(e.message||e));
+  }
  }finally{if(version===versionCotizacion)solicitudCotizacion=null;}
 }
 $('archivo').addEventListener('change',e=>seleccionar(e.target.files));
