@@ -25,5 +25,22 @@ input:focus,select:focus{outline:3px solid #bedcf4;border-color:#2878ad}
 #presupuesto p{margin:7px 0;font-size:16px}
 .pie{font-size:14px;color:#5e6d78}
 @media(max-width:680px){main{width:100%;margin:0;padding:18px 14px 35px;border-radius:0}body{font-size:16px}.archivo{padding:17px}.archivo h3{font-size:18px}.controles{grid-template-columns:1fr;gap:13px}.nota{font-size:14px}#presupuesto{top:0;padding:14px 16px}#presupuesto strong{font-size:20px}}
+.archivo{padding:0;margin:8px 0;background:#fff;overflow:hidden}
+.fila{display:grid;grid-template-columns:minmax(0,1fr) minmax(105px,auto) 88px;align-items:center;gap:16px;padding:13px 17px;min-height:74px}
+.fila-principal{min-width:0}.nombre{display:block;overflow-wrap:anywhere;font-size:16px;color:#143f62}
+.resumen-archivo{font-size:14px;color:#53697b;margin-top:3px;line-height:1.35}
+.precio-archivo{text-align:right;font-weight:750;font-size:16px;white-space:nowrap;color:#154d73}
+.editar{border:1px solid #aac3d7;background:#fff;color:#0e5179;font-weight:700;border-radius:8px;font-size:14px;padding:9px 12px;cursor:pointer}
+.editar:hover,.editar:focus-visible{background:#e7f3fc}
+.panel-edicion{border-top:1px solid #d5e1eb;background:#f5f8fb;padding:15px 18px 20px}
+.panel-edicion p{font-size:14px;margin:8px 0}
+.panel-edicion .controles{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 16px;margin:12px 0 0}
+.panel-edicion label{font-size:14px;gap:4px}
+.panel-edicion input,.panel-edicion select{font-size:15px;min-height:42px;padding:8px}
+#presupuesto{position:static;padding:12px 18px;box-shadow:none}
+#presupuesto strong{font-size:22px}#presupuesto p{font-size:14px;margin:4px 0}
+h2{font-size:19px;margin:20px 0 7px}
+@media(max-width:720px){.fila{grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;padding:12px}.fila-principal{grid-column:1/-1}.precio-archivo{text-align:left}.editar{justify-self:end}.panel-edicion .controles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:440px){.panel-edicion .controles{grid-template-columns:1fr}}
 </style></head><body><main><h1>Una sola carga · Tamaño final</h1><p class="nota"><strong>Prueba privada de clasificación.</strong> Seleccioná varios PDF sin elegir de antemano entre impresiones y ploteos. Confirmá en qué tamaño querés imprimir cada archivo: el original puede ser A2, aunque quieras A4. Sin envío de originales, pedidos ni pagos. Presupuestos orientativos sin validez comercial hasta verificar los archivos. La clasificación CAD/Póster y las tarifas existentes no se modifican.</p><label for="archivos">Agregar PDF (hasta 30)</label><input id="archivos" type="file" accept=".pdf,application/pdf" multiple><p id="estado" role="status">Cargando…</p><h2>Resumen del presupuesto</h2><section class="archivo" id="presupuesto" aria-live="polite">Esperando archivos…</section><h2>Configuración de tus archivos</h2><div id="lista"></div><p><a href="/prueba-cotizador-conjunto">Volver a los presupuestos de prueba</a></p></main><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script><script src="/prueba-carga-unica.js" defer></script></body></html>`;
 }
