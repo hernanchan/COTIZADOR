@@ -307,3 +307,17 @@ test('resumen de cliente y ficha técnica en páginas separadas, conserva import
  assert.equal(q.subtotalImpresiones+q.anillados,q.total);
  assert.ok(q.detalleArmados[0].archivos.join(',')==='pdf1,pdf2');
 });
+
+
+test('la pantalla rápida descarta respuestas antiguas y ofrece orden con hojas por juego',async()=>{
+ const pagina=await worker.fetch(new Request(origin+'/prueba-cotizador-rapido'),env);
+ const html=await pagina.text();
+ assert.match(html,/Aplicar configuración a todos/);
+ const response=await worker.fetch(new Request(origin+'/prueba-cotizador-rapido.js'),env);
+ assert.equal(response.status,200);
+ const js=await response.text();
+ assert.match(js,/AbortController/,'descarta solicitudes anteriores');
+ assert.match(js,/hoja\(s\) por juego/,'la producción debe recibir las hojas por ejemplar');
+ assert.match(js,/grupoAnillado/,'la configuración masiva no debe perder grupo');
+ assert.match(js,/signal:/,'la solicitud admite cancelación');
+});
