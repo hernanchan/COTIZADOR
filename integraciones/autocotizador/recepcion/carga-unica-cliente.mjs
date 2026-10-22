@@ -1,8 +1,12 @@
 import {leerMedidasPloteo} from './medidas-local-pdf.mjs';
 import {clasificarDestino} from './destino-impresion.mjs';
+import {clasificarPaginasPloteo} from './clasificar-paginas-ploteo.mjs';
 const $=id=>document.getElementById(id);
 const entries=[];
 let leyendo=false;
+let version=0;
+const valor=(label,options,selected,change)=>{const l=texto('label',label+' '),sel=document.createElement('select');for(const [k,v] of options)sel.add(new Option(v,k));sel.value=selected;sel.onchange=()=>change(sel.value);l.append(sel);return l};
+function cambio(){version++;render();cotizar()}
 const texto=(tag,value)=>{const n=document.createElement(tag);n.textContent=value;return n};
 function render(){
  const lista=$('lista');lista.replaceChildren();
@@ -21,36 +25,59 @@ function render(){
   for(const [v,l] of [['sin-confirmar','Elegir tamaño final'],['original','Mantener tamaño original'],['a3','A3 (29,7 × 42 cm)'],['a4','A4 (21 × 29,7 cm)'],['a5','A5 (14,8 × 21 cm)']]){
    const o=new Option(l,v);sel.add(o);
   }
-  sel.value=e.seleccion;sel.onchange=()=>{e.seleccion=sel.value;render()};label.append(sel);card.append(label);
+  sel.value=e.seleccion;sel.onchange=()=>{e.seleccion=sel.value;cambio()};label.append(sel);card.append(label);
   const decision=clasificarDestino(e.paginas,e.seleccion);
   if(decision.confirmado){
    card.append(texto('p','Destino: '+(decision.destino==='ploteo'?'Ploteos CAD/Póster':'Impresiones de documentos')+' · Tamaño final: '+(decision.tamanoFinal==='original'?'original':decision.tamanoFinal.toUpperCase())));
    if(decision.cambioEscala)card.append(texto('p','Se ajustará proporcionalmente sin recortar. Verificar legibilidad y escala, especialmente en planos CAD.'));
    if(decision.mixtas&&decision.tamanoFinal==='original')card.append(texto('p','El PDF contiene tamaños distintos. Se conservarán individualmente al presupuestar.'));
+   card.append(valor('Copias', [['1','1'],['2','2'],['3','3'],['5','5'],['10','10']],String(e.copias),v=>{e.copias=Number(v);cambio()}));
+   if(decision.destino==='documentos'){
+    card.append(valor('Impresión', [['bn','Blanco y negro'],['color','Color']],e.modo,v=>{e.modo=v;cambio()}));
+    card.append(valor('Caras', [['simple','Simple faz'],['double','Doble faz']],e.caras,v=>{e.caras=v;cambio()}));
+    card.append(texto('p','Esta primera integración cotiza papel obra. Los demás papeles y anillados se incorporarán manteniendo el catálogo vigente.'));
+   }else{
+    if(e.paginas.some(p=>!['cad','poster'].includes(p.modo)))card.append(texto('p','Análisis CAD/Póster pendiente: requiere revisión, sin precio.'));
+    if(e.paginas.some(p=>p.modo==='poster'))card.append(valor('Papel para póster', [['obra80','Obra 80 g'],['recubierto','Recubierto 130 g']],e.papelPoster,v=>{e.papelPoster=v;cambio()}));
+   }
   }else card.append(texto('p','Sin precio hasta confirmar el tamaño final.'));
   lista.append(card);
  }
- $('estado').textContent=leyendo?'Analizando archivos…':entries.length?'Identificados '+entries.length+' PDF. Esta pantalla todavía no calcula precios: prepara decisiones para el cotizador definitivo.':'Seleccioná tus PDF para comenzar.';
+ $('estado').textContent=leyendo?'Analizando archivos…':entries.length?'Identificados '+entries.length+' PDF. Cotización orientativa, sin subir originales.':'Seleccioná tus PDF para comenzar.';
 }
 $('archivos').addEventListener('change',async ev=>{
  if(leyendo)return;
  const files=[...(ev.target.files||[])];ev.target.value='';
  if(entries.length+files.length>30){$('estado').textContent='Máximo 30 PDF.';return}
  leyendo=true;
- for(const f of files)entries.push({name:f.name,paginas:null,seleccion:'sin-confirmar',error:null});
+ for(const f of files)entries.push({name:f.name,paginas:null,seleccion:'sin-confirmar',error:null,copias:1,modo:'bn',caras:'simple',papelPoster:'obra80'});
  render();
  const start=entries.length-files.length;
  for(let i=0;i<files.length;i++){
   const e=entries[start+i];
   try{
    const x=await leerMedidasPloteo(files[i],{maxPaginas:2000});
-   e.paginas=x.paginas;
+   e.paginas=x.paginas.map(p=>({...p,modo:'sin-clasificar'}));
+   try{const clases=await clasificarPaginasPloteo(files[i]);for(const c of clases){if(['cad','poster'].includes(c.modo))e.paginas[c.numero-1].modo=c.modo;}}catch(_){}
    const suggested=clasificarDestino(e.paginas);
    // No adivinar tamaño final, incluso cuando el PDF parece A4.
    e.requiereConfirmacion=suggested.requiereConfirmacion;
   }catch(ex){e.error=String(ex.message||ex)}
   render();
  }
- leyendo=false;render();
+ leyendo=false;render();cotizar();
 });
+async function cotizar(){
+ const n=++version,out=$('presupuesto');
+ if(leyendo||!entries.length){out.textContent='Esperando archivos…';return}
+ if(entries.some(e=>e.error||!e.paginas)){out.textContent='Hay documentos sin analizar correctamente. No se puede cotizar el conjunto.';return}
+ out.textContent='Calculando importes preliminares…';
+ const archivos=entries.map(e=>({nombre:e.name,paginas:e.paginas,seleccion:e.seleccion,copias:e.copias,modo:e.modo,caras:e.caras,papelPoster:e.papelPoster}));
+ try{const r=await fetch('/api/ensayo-carga-unica',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({archivos})});const d=await r.json();if(n!==version)return;if(!r.ok||d.ok!==true||d.paymentAuthorized!==false)throw Error(d.error||'Sin cotización');
+ const ars=v=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(v);
+ out.replaceChildren(texto('strong',d.total===null?'TOTAL INCOMPLETO':'TOTAL PRELIMINAR: '+ars(d.total)),texto('p','Impresiones: '+ars(d.subtotalImpresiones)+' · Ploteos: '+ars(d.subtotalPloteos)));
+ for(const p of d.pendientes)out.append(texto('p',p.nombre+': '+p.motivo));
+ if(d.plan.length)out.append(texto('p','Tamaño original y tamaño final registrados por archivo. No habilita cobro ni producción.'));
+ }catch(e){if(n===version)out.textContent='No fue posible cotizar: '+String(e.message||e)}
+}
 render();
