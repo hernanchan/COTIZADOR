@@ -85,3 +85,12 @@ Registrado el **22 de octubre de 2026** a pedido del titular, a partir de prueba
 - **Corrección:** evaluar además áreas uniformemente cubiertas en ventanas de 13×13 píxeles; un bloque de color llena muchas ventanas, las líneas finas cruzadas no. Con la heurística corregida y una representación reducida del PDF real, el diagnóstico dio **CAD en las tres páginas**. Las pruebas sintéticas de trazos rojos densos y bloques sólidos están en el repositorio; el PDF privado no se agregó a la base de pruebas.
 - **Dimensiones detectadas en el ejemplar:** página 1, aprox. 120,02 × 60,01 cm; páginas 2 y 3, aprox. 124,99 × 60,96 cm. **Advertencia:** el ancho de 60,96 cm de las páginas 2–3 excede el rollo de 60 cm, por lo que, sin reescalar, el selector automático corresponde a **rollo 90** para el conjunto.
 - **Estado:** corrección de código compilada y test automatizado aprobado: https://github.com/hernanchan/COTIZADOR/actions/runs/39776885528. Pendiente implementación manual en Cloudflare y reensayo con este mismo PDF para confirmar el renderizado PDF.js del navegador.
+
+
+## Papeles para Póster — 22/10/2026
+
+- **Pedido del usuario:** dar al cliente la posibilidad de escoger `Obra 80 g` o `Recubierto` **sólo cuando las páginas se detectan como Póster**, sin devolverle la facultad de decidir CAD/Póster ni manipular rollos.
+- **Implementado en rama de ensayos, sin desplegar:** para archivos que contengan páginas Póster aparece un único selector de acabado, por defecto `Obra 80 g`; la alternativa es `Recubierto 130 g`, nombre/tarifas extraídos de los materiales `rec60` y `rec90` del catálogo comercial. Los PDF exclusivamente CAD no muestran esa opción.
+- **PDF mixto:** todas las páginas CAD siguen en obra con tarifa CAD; sólo las páginas clasificadas Póster pasan al recubierto si se selecciona. El servidor asigna automáticamente rollo recubierto 60 o 90 según la medida; no existe recubierto 42 en el catálogo. La respuesta detalla material y tipo **por página**, para facilitar la producción en dos materiales.
+- El servidor sólo acepta `papelPoster: 'obra80' | 'recubierto'`, rechaza opciones inventadas y rechaza recubierto sin páginas Póster. No se modificaron tarifas, clasificación ni modo de cobro (desactivado).
+- **Pruebas automáticas aprobadas:** https://github.com/hernanchan/COTIZADOR/actions/runs/39779061543. Pendiente copiar último bundle al Worker privado y confirmar en navegador un caso exclusivamente Póster y uno mixto CAD/Póster.
