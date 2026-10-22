@@ -55,3 +55,13 @@ No modificar `main`, la web pública, Apps Script, Polaroids ni pagos. No contra
 - La API exige JSON desde mismo origen; `paymentAuthorized:false`. No recibe ni guarda archivos, no confirma producción, no activa pagos, pedidos ni carrito.
 - Pruebas de A2→A4, tamaño original de ploteos, casos pendientes y suma conjunta: https://github.com/hernanchan/COTIZADOR/actions/runs/39865061133 (CI aprobado).
 - **Despliegue pendiente:** nuevo bundle en GitHub, todavía no copiado al Worker privado. No tocar web pública, `main`, GAS ni Polaroids.
+
+## Integración de materiales y anillados — 22/10/2026
+
+- En `/prueba-carga-unica` las impresiones color permiten seleccionar materiales desde el endpoint del catálogo comercial `/api/ensayo-materiales-rapido`, separados por A4/A3. No se codifican precios en el navegador ni se ofrece un material que no exista en el catálogo del formato.
+- Se agregaron **sin anillado**, **anillado individual por archivo** y **anillado en grupo** (grupos 1 a 5, requiere varios documentos compatibles); los subtotales utilizan el motor existente `cotizarDocumentosIndividuales` y las tablas `bindings`.
+- La API valida material, tamaño, modo y grupo antes de calcular. Material color incompatible queda **pendiente, sin total global**. Precio y reglas existentes sin modificaciones.
+- La vista previa distingue subtotal de impresiones/ploteos y subtotal de anillados incluido en el total de documentos, sin duplicarlo.
+- **Limitaciones todavía abiertas:** selección de copias en cinco valores predefinidos; falta campo numérico completo. B/N sigue vinculado a su soporte estándar. A5 sin tarifa propia. Revisión de combinación de grupos de anillado frente a archivos que quedaron pendientes. No recibe originales ni permite pagos.
+- Pruebas automáticas aprobadas para color A4/A3, rechazo de materiales incorrectos y anillados separados/juntos: https://github.com/hernanchan/COTIZADOR/actions/runs/39866053141
+- El bundle actualizado permanece en GitHub (rama de pruebas); **NO está desplegado en Cloudflare**. Producción sin cambios.
