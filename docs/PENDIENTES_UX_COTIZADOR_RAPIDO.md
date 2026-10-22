@@ -19,6 +19,14 @@ Registrado el **22 de octubre de 2026** a pedido del titular, a partir de prueba
 - **Prueba automatizada:** caso A3 color con papel real correcto; prueba de rechazo de ID A4 colocado en A3; catálogo con opciones comerciales completas A4 y A3.
 - **Estado:** corrección en código, pendiente de desplegar de nuevo el Worker aislado y probar en navegador con PDF real. No marcar resuelta en operación hasta que el usuario lo compruebe.
 
+## Avance de Ploteos — 22/10/2026
+
+- **Implementado en código y probado automáticamente; NO desplegado todavía en Cloudflare.** Página privada `/prueba-ploteos-rapido`, con acceso desde `/prueba-cotizador-rapido`, y API de pruebas `/api/ensayo-ploteos-rapido`.
+- Catálogo de rollos y tarifas CAD/póster tomados **sin editar precios** del módulo `plotter` de `precios-web.json`: rollos 42/60/90 cm y recubiertos 60/90 cm. Se solicitan medidas finales en centímetros, orientación automática para ajustar ancho, material y copias por archivo; valida anchos que excedan el material y calcula metros lineales con redondeo configurado.
+- **Límite importante:** el PDF se elige para identificar el trabajo, pero la aplicación **todavía no obtiene el tamaño de impresión del PDF**. Las medidas las declara el cliente y el precio es **orientativo sin verificación**. No se envían PDF ni se habilitan cobros.
+- **Pendiente para integración comercial real:** medición fiable de tamaños finales PDF/CAD y múltiplos de páginas, confirmación de recortes/orientación según el ploteo real, compatibilidad con el módulo vigente, unificación de ploteos + copias en un mismo carrito, recepción protegida y verificación previa al cobro. Por ello **no marcar el módulo completo como finalizado**.
+- Prueba CI: https://github.com/hernanchan/COTIZADOR/actions/runs/39770857048. Compilado para copia manual en Worker privado `saber-documentos-pruebas`. No web pública.
+
 ## Checklist de aceptación
 
 - [ ] **Igualar funciones del cotizador vigente.** Auditar las opciones de impresión ofrecidas hoy en el cotizador de producción, especialmente toda la **variedad de papeles y materiales**, y trasladar opciones, incompatibilidades y precios al flujo rápido, por archivo. Evitar reducirlo a Obra 70/140/180. Validar tarifas antes de habilitar pedidos.
