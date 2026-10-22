@@ -7,7 +7,7 @@ function ajustarMaterial(e){
  const lista=materialesPara(e.formato);
  if(e.modo==='color'){
   if(!lista.some(p=>p.id===e.materialColor))e.materialColor=lista[0]?.id||null;
- }else e.materialColor=null;
+ }else e.materialColor='obra70'; // sólo marcador para B/N; no interviene en su tarifa
 }
 // Una respuesta anterior nunca debe sobrescribir un presupuesto más reciente.
 let versionCotizacion=0,solicitudCotizacion=null;
