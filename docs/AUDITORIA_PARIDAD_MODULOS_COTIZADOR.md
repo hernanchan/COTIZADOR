@@ -81,3 +81,12 @@ No modificar `main`, la web pública, Apps Script, Polaroids ni pagos. No contra
 - Corregido en rama privada: área principal ampliada (hasta 1160 px), tipografía y controles más grandes, resumen general destacado, encabezados separando ingreso/presupuesto/configuración, opciones de cada archivo en grilla adaptable a móvil, identificación visible de tamaño original vs salida solicitada y advertencias más claras.
 - Importante: **esto es una mejora de legibilidad de ensayo y no aprobación del diseño final**. La UX comercial completa sigue pendiente; evitar volver a dos formularios independientes.
 - Pruebas y compilación aprobadas: https://github.com/hernanchan/COTIZADOR/actions/runs/39870272678. No desplegado automáticamente; hace falta actualizar manualmente sólo el Worker privado y ensayar Chrome con zoom 100%.
+
+## Interfaz compacta por archivo — 22/10/2026
+
+- Corrección de diagnóstico del usuario: la captura se tomó con el zoom **reducido intencionalmente** para mostrar todo. El problema real era la **longitud y densidad de formularios**, no el tamaño de fuente.
+- La carga única se rediseñó en rama privada como **lista de filas resumidas** (nombre PDF, páginas, tamaño final, B/N/color o papel póster, copias y precio orientativo si es atribuible). Cada fila contiene botón **Editar/Cerrar** y solo **una edición abierta a la vez**; se mantienen decisiones y montos existentes.
+- Primera apertura asistida de un archivo nuevo; los documentos A4/A3 homogéneos se preseleccionan en su tamaño original, pero los tamaños mayores o mezclados exigen confirmación expresa. Un anillado agrupado no muestra un precio individual engañoso: se informa como incluido en el grupo.
+- Se ajustaron CSS responsive, densidad por fila y resumen general compacto, sin volver al esquema de dos formularios independientes. El catálogo color se completa aunque la fila permanezca colapsada.
+- **CI aprobado:** https://github.com/hernanchan/COTIZADOR/actions/runs/39870572985
+- Aún **sin desplegar** en el Worker privado y **sin validar la interfaz final en navegador**. No modificar web pública, Apps Script, Polaroids ni pagos. Validación visual y comportamiento con 10 archivos pendiente.
