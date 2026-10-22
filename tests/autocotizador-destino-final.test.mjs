@@ -6,7 +6,7 @@ import {cotizarCargaUnica} from '../integraciones/autocotizador/recepcion/cotiza
 import {paginaCargaUnica} from '../integraciones/autocotizador/recepcion/carga-unica-pagina.mjs';
 const p=(anchoCm,altoCm,modo='poster',numero=1)=>({anchoCm,altoCm,modo,numero});
 const archivo=(paginas,seleccion='a4',extra={})=>({
- nombre:'test.pdf',paginas,seleccion,copias:1,modo:'bn',caras:'simple',papelPoster:'obra80',...extra
+ nombre:'test.pdf',paginas,seleccion,copias:1,modo:'bn',caras:'simple',papelPoster:'obra80',anillado:'ninguno',grupoAnillado:'',materialColor:'',...extra
 });
 test('A2 de IA elegido A4 usa tarifa de documento y no ploteo',()=>{
  const a=archivo([p(42,59.4)]);
@@ -47,4 +47,36 @@ test('página privada sin enviar PDF ni activar compras',()=>{
  assert.match(html,/prueba-carga-unica.js/);
  assert.match(html,/Sin envío de originales, pedidos ni pagos/);
  assert.doesNotMatch(html,/api\/ensayo-pdf|checkout|mercadopago/i);
+});
+
+test('papel color válido A4 y A3 usa precios existentes',()=>{
+ for(const [formato,materialColor] of [['a4','obra70'],['a3','a3_color_obra80']]){
+  const q=cotizarCargaUnica({archivos:[archivo([p(42,59.4)],formato,{modo:'color',materialColor})],precios});
+  assert.equal(q.estado,'PRELIMINAR');
+  assert.equal(q.detalleImpresiones[0].materialColor,materialColor);
+  assert.ok(q.total>0);
+ }
+});
+test('material incompatible no obtiene total',()=>{
+ const q=cotizarCargaUnica({archivos:[archivo([p(42,59.4)],'a3',{modo:'color',materialColor:'obra70'})],precios});
+ assert.equal(q.total,null);assert.equal(q.pendientes.length,1);
+});
+test('anillado individual suma al subtotal documento',()=>{
+ const base=cotizarCargaUnica({archivos:[archivo([p(21,29.7,'cad')],'a4')],precios});
+ const conAnillado=cotizarCargaUnica({archivos:[archivo([p(21,29.7,'cad')],'a4',{anillado:'individual'})],precios});
+ assert.ok(conAnillado.total>base.total);
+ assert.ok(conAnillado.subtotalAnillados>0);
+});
+test('anillado de grupo cobra una vez por juego',()=>{
+ const a=archivo([p(21,29.7,'cad')],'a4',{anillado:'grupo',grupoAnillado:'1'});
+ const b=archivo([p(21,29.7,'cad')],'a4',{anillado:'grupo',grupoAnillado:'1',nombre:'segundo.pdf'});
+ const q=cotizarCargaUnica({archivos:[a,b],precios});
+ assert.equal(q.detalleArmados.length,1);
+ assert.equal(q.detalleArmados[0].archivos.length,2);
+ assert.ok(q.subtotalAnillados>0);
+});
+test('la API no acepta papeles inventados para impresión color',()=>{
+ const bad=archivo([p(21,29.7,'cad')],'a4',{modo:'color',materialColor:'precio-inventado'});
+ const q=cotizarCargaUnica({archivos:[bad],precios});
+ assert.equal(q.total,null);assert.equal(q.paymentAuthorized,false);
 });
