@@ -57,7 +57,7 @@ function render(){
    if(!seleccionado){card.append(dato('p','Ningún rollo estándar admite el ancho de este PDF. Requiere revisión de Librería Saber.'))}
    else {
     const recubierto=poster>0&&d.papelPoster==='recubierto';
-    card.append(dato('p',(recubierto?'Rollo obra para páginas CAD: ':'Rollo obra asignado automáticamente: ')+seleccionado.name+' ('+seleccionado.widthCm+' cm)'));
+    if(!recubierto||cad>0)card.append(dato('p',(recubierto?'Rollo obra para páginas CAD: ':'Rollo obra asignado automáticamente: ')+seleccionado.name+' ('+seleccionado.widthCm+' cm)'));
     if(recubierto){
      const mayores=d.paginas.filter(p=>p.modo==='poster').map(p=>Math.min(p.anchoCm,p.altoCm));
      const soporteRec=catalogo.filter(x=>/^rec\\d+$/.test(x.id)&&mayores.every(ancho=>ancho<=x.widthCm+0.03)).sort((a,b)=>a.widthCm-b.widthCm)[0];
