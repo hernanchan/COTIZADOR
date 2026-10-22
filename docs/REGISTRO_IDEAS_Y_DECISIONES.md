@@ -1,3 +1,17 @@
+## Bloc de pendientes confirmado por usuario — 22/10/2026
+
+**Origen:** comentarios del titular tras probar satisfactoriamente la velocidad, el cálculo por archivo y el anillado conjunto del prototipo `/prueba-cotizador-rapido`. **Son requisitos pendientes, no funciones terminadas. No perder ni descartar estos puntos al continuar el proyecto.**
+
+1. **Paridad funcional con el cotizador actual (prioridad alta).** El prototipo nuevo muestra solamente una parte de las opciones ya existentes en el cotizador vigente. Debe relevarse y trasladarse la **variedad completa de papeles/materiales** y otras opciones de impresión aplicables, con sus precios, compatibilidades y configuraciones por archivo, en lugar de dejar el selector reducido de Obra 70/140/180. **No sustituir ni modificar tarifas de producción sin aprobación**. Comparar ambos sistemas antes de publicar.
+2. **Interfaz limpia y legible de un vistazo (prioridad alta).** Rediseñar la estética para distinguir claramente archivos, especificaciones, grupos de anillado y resumen; evitar fichas excesivas o bloques de texto densos. Una persona debe entender rápidamente qué cotiza o qué debe imprimir, tanto en PC como en celular.
+3. **Total y resumen de precio arriba / siempre accesible (prioridad alta).** Con muchos PDF el usuario hace demasiado scroll para ver el importe. Ubicar un resumen compacto de precio y estado **en la parte superior** y evaluar comportamiento fijo/sticky que no tape controles en pantallas pequeñas. El total debe actualizarse con cambios y distinguir `PRELIMINAR` de precio confirmado. Debe ser evidente sin recorrer 30 archivos.
+4. **Agregar módulo de ploteos (prioridad alta).** Incorporar el servicio de ploteo de planos y otros grandes formatos del negocio, con detección/elección de formato superior a A3, parámetros y precios correspondientes; integrarlo al flujo de presupuesto rápido. Revisar los módulos actuales del cotizador y sus reglas antes de trasladarlos. **No presuponer medidas, tarifas, papeles ni descuentos nuevos.**
+5. **Quitar la leyenda de tiempo de respuesta de la vista del cliente (ajuste rápido).** El texto `Presupuesto listo en XXX ms` / `Respuesta: XXX ms` no agrega valor comercial y ensucia la pantalla. La instrumentación puede mantenerse sólo en diagnósticos técnicos no visibles para el público; no romper la medición interna por simplificar la UI.
+
+**Criterios innegociables:** mantener la velocidad de cálculo local de páginas, los descuentos correctos por trabajos compatibles, las opciones particulares por PDF, los grupos de anillado y la separación entre vista cliente / instrucciones de producción. Primer precio antes de subir los originales. No publicar en la web pública ni tocar Polaroids, pagos, Apps Script o Cloudflare producción sin aprobación.
+
+**Seguimiento:** ver lista de aceptación en [PENDIENTES_UX_COTIZADOR_RAPIDO.md](PENDIENTES_UX_COTIZADOR_RAPIDO.md). Estado inicial: **pendiente de implementar y validar**.
+
 ## Cotizador rápido sin subir PDF — prototipo integrado (21/10/2026)
 
 - **FUNCIONA EN CÓDIGO Y PASA CI, NO INSTALADO AÚN:** ruta privada aislada del Worker `GET /prueba-cotizador-rapido`; JS del mismo origen `GET /prueba-cotizador-rapido.js`. Selección/arrastre de hasta 30 PDF, lectura de páginas local mediante `pdf-lib` empaquetado, procesamiento concurrente limitado, elección B/N-color por archivo, caras, tamaño, copias y anillado. No se envían bytes de PDF para calcular el precio.
