@@ -6,10 +6,10 @@ return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="v
 <h1>Ploteos · Presupuesto rápido</h1>
 <p><a href="/prueba-cotizador-rapido">← Volver a impresiones A4/A3</a></p>
 <div id="barra" class="total" role="status"><span>Precio preliminar<br><small style="color:#fff">Aún no calculado</small></span><strong id="importe">A cotizar</strong></div>
-<p class="aviso"><strong>Prueba privada.</strong> Se usan las tarifas de ploteo ya configuradas en el cotizador. El sistema detecta las medidas de cada página del PDF en tu dispositivo; no se envían archivos para cotizar. Se debe verificar el documento antes de confirmar el precio. Pagos desactivados.</p>
-<p>Elegí uno o varios PDF de planos o pósteres. Detectamos sus tamaños automáticamente; seleccioná el rollo, el tipo de trabajo y las copias.</p>
+<p class="aviso"><strong>Prueba privada.</strong> Se usan las tarifas de ploteo ya configuradas en el cotizador. El sistema analiza localmente el tamaño y la cobertura visual de cada página. No se envían archivos para cotizar. La clasificación es preliminar y requiere validación antes del cobro. Se debe verificar el documento antes de confirmar el precio. Pagos desactivados.</p>
+<p>Elegí uno o varios PDF. Detectamos tamaños y cobertura de cada página para distinguir automáticamente planos CAD de pósteres. Solamente elegí el rollo y las copias. Cuando el análisis sea dudoso, Librería Saber revisará el trabajo.</p>
 <input type="file" id="archivosPloteo" multiple accept=".pdf,application/pdf"><button type="button" id="calcular" disabled>Calcular ploteos</button>
 <div id="trabajos"></div>
 <div id="resultado" class="resultado" role="status">Seleccioná los archivos y configurá cada ploteo.</div>
-</main><script src="/prueba-ploteos-rapido.js" defer></script></body></html>`;
+</main><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer crossorigin="anonymous" referrerpolicy="no-referrer"></script><script src="/prueba-ploteos-rapido.js" defer></script></body></html>`;
 }
