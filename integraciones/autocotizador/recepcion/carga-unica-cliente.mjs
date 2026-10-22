@@ -35,7 +35,7 @@ function render(){
   if(!e.paginas){card.append(texto('p','Analizando medidas…'));lista.append(card);continue}
   const multiples=e.paginas.length>1;
   const medidas=e.paginas.map(p=>p.anchoCm.toFixed(2)+' × '+p.altoCm.toFixed(2)+' cm');
-  const origin=texto('p','Tamaño original: +(new Set(medidas).size===1?medidas[0]:(multiples?'Varios tamaños · '+[...new Set(medidas)].join(' / '):medidas[0]))+' · '+e.paginas.length+' página(s)');origin.className='origen';card.append(origin);
+  const origin=texto('p','Tamaño original: '+(new Set(medidas).size===1?medidas[0]:(multiples?'Varios tamaños · '+[...new Set(medidas)].join(' / '):medidas[0]))+' · '+e.paginas.length+' página(s)');origin.className='origen';card.append(origin);
   const aviso=clasificarDestino(e.paginas);
   if(aviso.requiereConfirmacion){const n=texto('p','Confirmá el tamaño de impresión: el PDF puede tener medidas distintas a las que querés.');n.className='advertencia';card.append(n)}
   const controles=document.createElement('div');controles.className='controles';
