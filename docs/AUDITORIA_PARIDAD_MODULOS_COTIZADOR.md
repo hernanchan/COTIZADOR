@@ -74,3 +74,10 @@ No modificar `main`, la web pública, Apps Script, Polaroids ni pagos. No contra
 - Nuevas pruebas automatizadas: copias 500/501, grupo de un archivo, grupo con un integrante pendiente y grupo con formatos/copias diferentes.
 - **CI aprobado:** https://github.com/hernanchan/COTIZADOR/actions/runs/39868014746.
 - **PENDIENTE:** despliegue manual del nuevo bundle al Worker privado `saber-documentos-pruebas` y ensayos de navegador con archivos reales. No marcar UX final aprobada; aún falta resolver A5, hojas seleccionadas, fotografías, stickers, corte, gráfica comercial, carrito y validación segura de originales.
+
+## Legibilidad en prueba de navegador — 22/10/2026
+
+- El usuario mostró la nueva carga única con 2 archivos y total preliminar $9.200 ($1.500 A3 de tres páginas + $7.700 ploteo), confirmó el cálculo pero calificó la interfaz de «inentendible» por la escala pequeña, campos amontonados y textos técnicos.
+- Corregido en rama privada: área principal ampliada (hasta 1160 px), tipografía y controles más grandes, resumen general destacado, encabezados separando ingreso/presupuesto/configuración, opciones de cada archivo en grilla adaptable a móvil, identificación visible de tamaño original vs salida solicitada y advertencias más claras.
+- Importante: **esto es una mejora de legibilidad de ensayo y no aprobación del diseño final**. La UX comercial completa sigue pendiente; evitar volver a dos formularios independientes.
+- Pruebas y compilación aprobadas: https://github.com/hernanchan/COTIZADOR/actions/runs/39870272678. No desplegado automáticamente; hace falta actualizar manualmente sólo el Worker privado y ensayar Chrome con zoom 100%.
