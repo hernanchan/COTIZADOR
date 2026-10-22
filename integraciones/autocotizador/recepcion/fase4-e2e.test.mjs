@@ -481,7 +481,7 @@ test('PDF mixto se cobra por clasificación de cada página, sin selector CAD/P�
  const page=await worker.fetch(new Request(origin+'/prueba-ploteos-rapido'),env);
  const html=await page.text();
  assert.match(html,/pdf\.min\.js/);
- assert.match(html,/asigna automáticamente el rollo estándar/);
+ assert.match(html,/asigna automáticamente los rollos/);
  const js=await worker.fetch(new Request(origin+'/prueba-ploteos-rapido.js'),env);
  const body=await js.text();
  assert.match(body,/clasificaci|Clasificaci/i);
@@ -500,7 +500,7 @@ test('rollo automático no es editable por el cliente ni manipulable vía API',a
  assert.doesNotMatch(html,/Solamente elegí el rollo/);
  const js=await worker.fetch(new Request(origin+'/prueba-ploteos-rapido.js'),env);
  const body=await js.text();
- assert.match(body,/Rollo asignado autom/);
+ assert.match(body,/Rollo obra asignado autom/);
  assert.doesNotMatch(body,/Rollo para imprimir/);
  const base={id:'pl1',nombre:'plano.pdf',modo:'cad',copias:1,
   paginas:[{numero:1,anchoCm:42,altoCm:59.4,modo:'cad'}]};
