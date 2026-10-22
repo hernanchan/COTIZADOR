@@ -104,7 +104,7 @@ function mostrarResumen(info,tiempo){
    d.paginas+' páginas · '+d.formato.toUpperCase()+' · '+modoTexto(d.modo)+
    (d.modo==='color'?' · Papel '+d.materialColor:'')+' · '+fazTexto(d.caras)));
   ficha.append(elemento('p',
-   d.copias+' juego(s) · '+d.cantidad+' impresiones · '+armadoTexto(d),'instruccion'));
+   d.copias+' juego(s) · '+Math.ceil(d.paginas/(d.caras==='double'?2:1))+' hoja(s) por juego · '+d.cantidad+' impresiones · '+armadoTexto(d),'instruccion'));
   trabajo.append(ficha);
  }
  if(info.detalleArmados.length){
@@ -126,7 +126,7 @@ function mostrarResumen(info,tiempo){
   const texto=['ORDEN DE TRABAJO · PRELIMINAR · NO AUTORIZADA PARA PRODUCCIÓN',
    ...detalles.map((d,i)=>(i+1)+'. '+d.nombre+' | '+d.paginas+' páginas | '+d.formato.toUpperCase()+
     ' | '+modoTexto(d.modo)+(d.modo==='color'?' | '+d.materialColor:'')+' | '+fazTexto(d.caras)+
-    ' | '+d.copias+' juego(s) | '+armadoTexto(d)),
+    ' | '+d.copias+' juego(s) | '+Math.ceil(d.paginas/(d.caras==='double'?2:1))+' hojas por juego | '+armadoTexto(d)),
    ...info.detalleArmados.map(a=>'GRUPO '+a.grupo+' ('+a.juegos+' juegos, '+a.hojasPorJuego+' hojas/juego): '+
      a.archivos.map(id=>detalles.find(d=>d.id===id)?.nombre||id).join(' → ')),
    'PRECIO PRELIMINAR: '+money(info.total),
