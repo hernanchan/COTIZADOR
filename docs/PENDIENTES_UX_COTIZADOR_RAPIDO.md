@@ -27,6 +27,14 @@ Registrado el **22 de octubre de 2026** a pedido del titular, a partir de prueba
 - **Pendiente para integración comercial real:** medición fiable de tamaños finales PDF/CAD y múltiplos de páginas, confirmación de recortes/orientación según el ploteo real, compatibilidad con el módulo vigente, unificación de ploteos + copias en un mismo carrito, recepción protegida y verificación previa al cobro. Por ello **no marcar el módulo completo como finalizado**.
 - Prueba CI: https://github.com/hernanchan/COTIZADOR/actions/runs/39770857048. Compilado para copia manual en Worker privado `saber-documentos-pruebas`. No web pública.
 
+## Detección automática de tamaños PDF para Ploteos — 22/10/2026
+
+- **Implementado en código, CI aprobado, NO desplegado en Cloudflare todavía.** El cliente carga sus PDF, el navegador lee las dimensiones reales de **cada página** con `pdf-lib`, incluyendo `CropBox`, rotación 90/180/270 y factor `/UserUnit`, sin subir los originales. Dejan de existir los campos manuales ancho/alto.
+- Las fichas muestran formatos detectados, material de rollo compatible, tipo CAD/póster y copias. Se excluyen rollos demasiado angostos y se suman los **metros lineales por página** dentro de un PDF multipágina. Tarifas `plotter` desde `precios-web.json`, sin alterar precios, únicamente cálculo orientativo.
+- Caso probado: PDF multipágina con página rotada, A2 + A0 sobre rollo 90; se rechaza rollo 60 cuando no alcanza el ancho. CI https://github.com/hernanchan/COTIZADOR/actions/runs/39773141663.
+- **Pendiente:** verificar el tamaño con el PDF original **recibido en servidor** antes de pagar o imprimir, y confirmar con el usuario que la presentación y los metros coinciden con la práctica de Librería Saber. Para PDF con escala de diseño distinta a tamaño físico deseado o imposición especial, se requerirá una opción de escala/corte, no presupuestar silenciosamente.
+- Todo aislado en `/prueba-ploteos-rapido`; no publicado ni cobros activados.
+
 ## Checklist de aceptación
 
 - [ ] **Igualar funciones del cotizador vigente.** Auditar las opciones de impresión ofrecidas hoy en el cotizador de producción, especialmente toda la **variedad de papeles y materiales**, y trasladar opciones, incompatibilidades y precios al flujo rápido, por archivo. Evitar reducirlo a Obra 70/140/180. Validar tarifas antes de habilitar pedidos.
