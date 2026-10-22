@@ -1,6 +1,14 @@
 import {leerPaginasLocales} from './lectura-local-pdf.mjs';
 const $=id=>document.getElementById(id);
 const cola=[];let procesando=false;
+let catalogoMateriales=null;
+const materialesPara=formato=>catalogoMateriales?.[formato]||[];
+function ajustarMaterial(e){
+ const lista=materialesPara(e.formato);
+ if(e.modo==='color'){
+  if(!lista.some(p=>p.id===e.materialColor))e.materialColor=lista[0]?.id||null;
+ }else e.materialColor=null;
+}
 // Una respuesta anterior nunca debe sobrescribir un presupuesto más reciente.
 let versionCotizacion=0,solicitudCotizacion=null;
 function invalidarCotizacion(){
@@ -28,11 +36,11 @@ function actualizar(){
    choices.forEach(([v,t])=>el.add(new Option(t,v)));el.value=value;el.disabled=procesando;
    el.addEventListener('change',()=>{handler(el.value);calcular()});return el;
   };
-  const modo=select('Impresión',[['bn','Blanco y negro'],['color','Color']],e.modo,v=>e.modo=v);
-  const formato=select('Tamaño',[['a4','A4'],['a3','A3']],e.formato,v=>e.formato=v);
+  const modo=select('Impresión',[['bn','Blanco y negro'],['color','Color']],e.modo,v=>{e.modo=v;ajustarMaterial(e);actualizar()});
+  const formato=select('Tamaño',[['a4','A4'],['a3','A3']],e.formato,v=>{e.formato=v;ajustarMaterial(e);actualizar()});
   const caras=select('Caras',[['simple','Simple faz'],['double','Doble faz']],e.caras,v=>e.caras=v);
-  const papel=select('Papel para color',[['obra70','Obra 70'],['obra140','Obra 140'],['obra180','Obra 180']],e.materialColor,v=>e.materialColor=v);
-  papel.hidden=e.modo!=='color';modo.addEventListener('change',()=>{papel.hidden=modo.value!=='color'});
+  const papel=select('Papel para color',materialesPara(e.formato).map(p=>[p.id,p.name]),e.materialColor,v=>e.materialColor=v);
+  papel.hidden=e.modo!=='color';
   const copias=document.createElement('input');copias.type='number';copias.min='1';copias.max='500';
   copias.value=String(e.copias);copias.setAttribute('aria-label','Copias de '+e.file.name);
   copias.disabled=procesando;copias.style.width='82px';
@@ -54,7 +62,7 @@ async function seleccionar(input){
  invalidarCotizacion();
  const files=Array.from(input);
  if(cola.length+files.length>30){txt('estado','Máximo 30 PDF en este ensayo.');return}
- for(const f of files)cola.push({file:f,modo:$('modoGeneral').value,formato:$('formato').value,caras:$('caras').value,copias:Number($('copias').value),anillado:$('anillado').value==='ninguno'?'ninguno':'individual',grupoAnillado:null,materialColor:'obra70',paginas:null,error:null});
+ for(const f of files){const e={file:f,modo:$('modoGeneral').value,formato:$('formato').value,caras:$('caras').value,copias:Number($('copias').value),anillado:$('anillado').value==='ninguno'?'ninguno':'individual',grupoAnillado:null,materialColor:null,paginas:null,error:null};ajustarMaterial(e);cola.push(e)}
  $('archivo').value='';procesando=true;actualizar();
  const offset=cola.length-files.length,start=performance.now();
  try {
@@ -150,7 +158,7 @@ function mostrarResumen(info,tiempo){
 async function calcular(){
  invalidarCotizacion();
  const version=versionCotizacion;
- if(procesando||!cola.length||cola.some(x=>!x.paginas)){
+ if(procesando||!cola.length||!catalogoMateriales||cola.some(x=>!x.paginas)){
   estadoBarra('pendiente','A cotizar',cola.length+' archivos seleccionados');
   txt('precio','Completá la lectura de todos los PDF para cotizar.');return;
  }
@@ -193,5 +201,23 @@ drop.addEventListener('dragleave',()=>drop.classList.remove('active'));
 drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('active');seleccionar(e.dataTransfer.files)});
 drop.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('archivo').click()}});
 $('cotizar').addEventListener('click',calcular);
-$('aplicarTodos').addEventListener('click',()=>{for(const e of cola){e.modo=$('modoGeneral').value;e.formato=$('formato').value;e.caras=$('caras').value;e.copias=Number($('copias').value);e.anillado=$('anillado').value==='ninguno'?'ninguno':$('anillado').value==='juntos'&&cola.length>=2?'grupo':'individual';e.grupoAnillado=e.anillado==='grupo'?'1':null;}actualizar();calcular()});
-txt('estado','Seleccioná varios archivos para conocer el precio sin esperar la subida.');
+$('aplicarTodos').addEventListener('click',()=>{for(const e of cola){e.modo=$('modoGeneral').value;e.formato=$('formato').value;e.caras=$('caras').value;e.copias=Number($('copias').value);e.anillado=$('anillado').value==='ninguno'?'ninguno':$('anillado').value==='juntos'&&cola.length>=2?'grupo':'individual';e.grupoAnillado=e.anillado==='grupo'?'1':null;ajustarMaterial(e);}actualizar();calcular()});
+async function cargarMateriales(){
+ try{
+  const respuesta=await fetch('/api/ensayo-materiales-rapido',{cache:'no-store'});
+  const datos=await respuesta.json();
+  if(!respuesta.ok||datos.ok!==true||!Array.isArray(datos.materials?.a4)||!Array.isArray(datos.materials?.a3)||
+      !datos.materials.a4.length||!datos.materials.a3.length)throw Error('Catálogo no disponible');
+  catalogoMateriales=datos.materials;
+  for(const e of cola)ajustarMaterial(e);
+  actualizar();
+  txt('estado','Materiales de impresión cargados. Elegí tus archivos para cotizar.');
+  if(cola.length)calcular();
+ }catch(_){
+  catalogoMateriales=null;
+  estadoBarra('error','Sin precio','No se pudo cargar el catálogo de papeles');
+  txt('estado','No se pudo cargar la lista de papeles. Recargá la página para intentar nuevamente.');
+ }
+}
+txt('estado','Cargando opciones de papeles A4 y A3…');
+cargarMateriales();
