@@ -247,8 +247,8 @@ quote.addEventListener('click',async()=>{
 <h1>Ploteos \xB7 Presupuesto r\xE1pido</h1>
 <p><a href="/prueba-cotizador-rapido">\u2190 Volver a impresiones A4/A3</a></p>
 <div id="barra" class="total" role="status"><span>Precio preliminar<br><small style="color:#fff">A\xFAn no calculado</small></span><strong id="importe">A cotizar</strong></div>
-<p class="aviso"><strong>Prueba privada.</strong> Se usan las tarifas de ploteo ya configuradas en el cotizador. El tama\xF1o se indica manualmente en cent\xEDmetros; todav\xEDa no se mide el tama\xF1o f\xEDsico de los PDF ni se env\xEDan archivos. Se debe verificar el documento antes de confirmar el precio. Pagos desactivados.</p>
-<p>Eleg\xED uno o varios PDF de planos o p\xF3steres. Indic\xE1 sus medidas finales, el rollo y las copias de cada uno.</p>
+<p class="aviso"><strong>Prueba privada.</strong> Se usan las tarifas de ploteo ya configuradas en el cotizador. El sistema detecta las medidas de cada p\xE1gina del PDF en tu dispositivo; no se env\xEDan archivos para cotizar. Se debe verificar el documento antes de confirmar el precio. Pagos desactivados.</p>
+<p>Eleg\xED uno o varios PDF de planos o p\xF3steres. Detectamos sus tama\xF1os autom\xE1ticamente; seleccion\xE1 el rollo, el tipo de trabajo y las copias.</p>
 <input type="file" id="archivosPloteo" multiple accept=".pdf,application/pdf"><button type="button" id="calcular" disabled>Calcular ploteos</button>
 <div id="trabajos"></div>
 <div id="resultado" class="resultado" role="status">Seleccion\xE1 los archivos y configur\xE1 cada ploteo.</div>
