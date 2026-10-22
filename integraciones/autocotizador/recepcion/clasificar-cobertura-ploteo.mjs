@@ -26,7 +26,7 @@ export function clasificarCoberturaPloteo(rgba,{paso=1}={}){
  let modo='revision';
  if(cobertura>=0.30||coberturaColor>=0.15||
   (cobertura>=0.19&&coberturaColor>=0.06))modo='poster';
- else if(cobertura<=0.10||(cobertura<=0.17&&coberturaColor<=0.025))modo='cad';
+ else if(cobertura>=0.002&&(cobertura<=0.10||(cobertura<=0.17&&coberturaColor<=0.025)))modo='cad';
  return {modo,cobertura:Math.round(cobertura*1000)/1000,
   coberturaColor:Math.round(coberturaColor*1000)/1000,
   coberturaOscura:Math.round(coberturaOscura*1000)/1000};
