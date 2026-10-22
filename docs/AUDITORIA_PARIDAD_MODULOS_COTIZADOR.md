@@ -35,3 +35,12 @@
 No modificar `main`, la web pública, Apps Script, Polaroids ni pagos. No contratar servicios ni habilitar cobros. Solo rama de pruebas y Worker `saber-documentos-pruebas`.
 
 **Criterio de aceptación:** no dar por concluida la nueva web hasta comparar los seis módulos y sus subopciones contra el cotizador público activo y validar importes y carrito con ejemplos representativos. La UI conjunta actual basada en dos superficies embebidas es únicamente un prototipo técnico; no constituye interfaz final.
+
+## Avance técnico posterior — ingreso único y tamaño final (rama privada)
+
+- Nueva ruta de ensayo `/prueba-carga-unica`: un solo selector para hasta 30 PDF, detecta tamaño físico por página localmente (CropBox, rotación, UserUnit), presenta medidas originales y exige elección explícita del tamaño de salida por archivo: original, A3, A4 o A5.
+- `destino-impresion.mjs` diferencia original de destino comercial: un A2 elegido A4 se deriva a documentos, no a ploteo; si conserva A2 se deriva a ploteos. Cuando hay reducción, informa ajuste proporcional sin recortes y advierte verificar legibilidad/escala de CAD. PDF con tamaños mixtos queda señalado.
+- **Alcance limitado:** esta pantalla **no calcula ni suma precios**, no transfiere archivos, no clasifica CAD/Póster, no arma carrito ni habilita pedidos/pagos. Es el primer componente aislado del flujo único, no reemplaza el cotizador conjunto existente ni equivale a la integración final.
+- Pruebas de decisión A2→A4, tamaño original, tamaños mixtos y ausencia de checkout incluidas en CI. Último resultado: https://github.com/hernanchan/COTIZADOR/actions/runs/39864235650
+- Pendiente siguiente: integrar selección final al motor de precios correspondiente (documentos/ploteos), después unir la carga de archivos con todas las familias comerciales, revalidación segura en servidor y confirmación de escala/recortes antes de producción.
+- Únicamente la rama privada fue modificada; falta despliegue manual del bundle en `saber-documentos-pruebas` y validación de navegador. Producción, Apps Script, Polaroids y pagos sin cambios.
