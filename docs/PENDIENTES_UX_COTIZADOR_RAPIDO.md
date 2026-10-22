@@ -39,3 +39,9 @@ Registrado el **22 de octubre de 2026** a pedido del titular, a partir de prueba
 **Repositorio/branch:** `hernanchan/COTIZADOR` — `cotizador/migracion-carga-archivos-20261018`.
 
 **Documento vinculado:** `docs/REGISTRO_IDEAS_Y_DECISIONES.md` (entrada del 22/10/2026).
+
+## Validación del usuario — 22/10/2026
+
+- **A3 color corregido y probado satisfactoriamente en el Worker de Cloudflare:** el usuario confirmó «espectacular» después de actualizar manualmente `saber-documentos-pruebas`. No seguir tratando la incidencia A3 color como fallo abierto.
+- **Decisión expresa sobre estética:** el usuario todavía **no está conforme con la apariencia** del cotizador rápido, pero solicita **posponer el rediseño visual integral hasta la etapa final**. Mantenerlo anotado como pendiente prioritario de terminación, sin distraerse ahora de los módulos y funciones restantes. No marcar estética como aprobada o completada.
+- **Orden de trabajo:** priorizar funcionalidades pendientes (incluidos ploteos, compatibilidad de opciones y flujo de compra seguro), dejando la revisión integral de estética, jerarquía visual y usabilidad para el cierre del proyecto.
