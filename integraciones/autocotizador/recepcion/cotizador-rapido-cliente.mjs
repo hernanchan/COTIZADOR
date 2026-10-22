@@ -162,8 +162,8 @@ async function calcular(){
  invalidarCotizacion();
  const version=versionCotizacion;
  if(procesando||!cola.length||!catalogoMateriales||cola.some(x=>!x.paginas)){
-  if(!cola.length)avisarConjunto('vacio');
   estadoBarra('pendiente','A cotizar',cola.length+' archivos seleccionados');
+  if(!cola.length)avisarConjunto('vacio');
   txt('precio','Completá la lectura de todos los PDF para cotizar.');return;
  }
  const archivos=cola.map((d,i)=>({id:'pdf'+(i+1),nombre:d.file.name,paginas:d.paginas,modo:d.modo,formato:d.formato,caras:d.caras,copias:d.copias,anillado:d.anillado,grupoAnillado:d.grupoAnillado,materialColor:d.materialColor,orden:i+1}));
