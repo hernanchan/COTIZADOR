@@ -1,6 +1,13 @@
 import {leerPaginasLocales} from './lectura-local-pdf.mjs';
 const $=id=>document.getElementById(id);
 const cola=[];let procesando=false;
+// Una respuesta anterior nunca debe sobrescribir un presupuesto más reciente.
+let versionCotizacion=0,solicitudCotizacion=null;
+function invalidarCotizacion(){
+ versionCotizacion++;
+ if(solicitudCotizacion){solicitudCotizacion.abort();solicitudCotizacion=null;}
+ $('resumen').replaceChildren();
+}
 const money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(n);
 const txt=(id,v)=>$(id).textContent=v;
 function actualizar(){
@@ -37,6 +44,7 @@ function actualizar(){
 }
 async function seleccionar(input){
  if(procesando)return;
+ invalidarCotizacion();
  const files=Array.from(input);
  if(cola.length+files.length>30){txt('estado','Máximo 30 PDF en este ensayo.');return}
  for(const f of files)cola.push({file:f,modo:$('modoGeneral').value,formato:$('formato').value,caras:$('caras').value,copias:Number($('copias').value),anillado:$('anillado').value==='ninguno'?'ninguno':'individual',grupoAnillado:null,materialColor:'obra70',paginas:null,error:null});
@@ -131,7 +139,8 @@ function mostrarResumen(info,tiempo){
  txt('precio','Presupuesto listo en '+tiempo+' ms. Consultá las dos vistas debajo.');
 }
 async function calcular(){
- $('resumen').replaceChildren();
+ invalidarCotizacion();
+ const version=versionCotizacion;
  if(procesando||!cola.length||cola.some(x=>!x.paginas)){
   txt('precio','Completá la lectura de todos los PDF para cotizar.');return;
  }
@@ -150,13 +159,18 @@ async function calcular(){
   caras:$('caras').value,anillado:$('anillado').value};
  txt('precio','Calculando precio preliminar…');
  const start=performance.now();
+ const controlador=new AbortController();
+ solicitudCotizacion=controlador;
  try{
   const response=await fetch('/api/ensayo-presupuesto-rapido',{
-   method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+   method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controlador.signal});
   const r=await response.json();
+  if(version!==versionCotizacion)return;
   if(!response.ok||r.ok!==true||r.paymentAuthorized!==false)throw Error(r.error||'Presupuesto no disponible.');
   mostrarResumen(r.resumen,Math.round(performance.now()-start));
- }catch(e){txt('precio','No se pudo cotizar: '+String(e.message||e))}
+ }catch(e){
+  if(version===versionCotizacion&&e.name!=='AbortError')txt('precio','No se pudo cotizar: '+String(e.message||e));
+ }finally{if(version===versionCotizacion)solicitudCotizacion=null;}
 }
 $('archivo').addEventListener('change',e=>seleccionar(e.target.files));
 const drop=$('soltar');
