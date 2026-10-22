@@ -537,3 +537,54 @@ test('líneas rojas densas se cotizan CAD, sin confundirlas con bloques de tinta
  const poster=clasificarCoberturaPloteo(pleno,{ancho,alto});
  assert.equal(poster.modo,'poster','bloque de color sólido debe ser Póster: '+JSON.stringify(poster));
 });
+
+
+test('cliente puede cambiar obra 80 a recubierto sólo en páginas Póster',async()=>{
+ const src=await worker.fetch(new Request(origin+'/prueba-ploteos-rapido.js'),env);
+ assert.equal(src.status,200);
+ const js=await src.text();
+ assert.match(js,/Papel para p/);
+ assert.match(js,/Recubierto 130 g/);
+ assert.match(js,/papelPoster/);
+ assert.doesNotMatch(js,/Rollo para imprimir/);
+ const plantilla=await worker.fetch(new Request(origin+'/prueba-ploteos-rapido'),env);
+ const html=await plantilla.text();
+ assert.match(html,/obra 80 g o recubierto 130 g/);
+ const base={id:'pl1',nombre:'mixto.pdf',modo:'cad',material:'rollo42',copias:1,
+  paginas:[{numero:1,anchoCm:42,altoCm:60,modo:'cad'},
+          {numero:2,anchoCm:42,altoCm:60,modo:'poster'}]};
+ const quote=async papelPoster=>{
+  const t=papelPoster===null?base:{...base,papelPoster};
+  const res=await worker.fetch(req('/api/ensayo-ploteos-rapido',{trabajos:[t]}),env);
+  return {status:res.status,data:await res.json()};
+ };
+ const obra=await quote('obra80');
+ const rec=await quote('recubierto');
+ assert.equal(obra.status,200);
+ assert.equal(rec.status,200);
+ assert.equal(obra.data.paymentAuthorized,false);
+ assert.equal(rec.data.paymentAuthorized,false);
+ assert.equal(obra.data.resumen.total,6100);
+ assert.equal(rec.data.resumen.total,13400);
+ assert.equal(obra.data.resumen.detalles[0].paginas[0].material,'rollo42');
+ assert.equal(rec.data.resumen.detalles[0].paginas[0].material,'rollo42','CAD no debe cambiar papel');
+ assert.equal(rec.data.resumen.detalles[0].paginas[1].material,'rec60');
+ assert.equal(rec.data.resumen.detalles[0].paginas[1].modo,'poster');
+ assert.deepEqual(rec.data.resumen.detalles[0].paginas.map(p=>p.papel),['obra80','recubierto']);
+ const anterior=await quote(null);
+ assert.equal(anterior.status,200,'conservar compatibilidad de ensayos anteriores');
+ assert.equal(anterior.data.resumen.total,6100);
+ const invalido=await quote('fotografico');
+ assert.equal(invalido.status,400);
+});
+test('recubierto A0 usa rollo rec90; trabajos exclusivamente CAD no admiten recubierto',async()=>{
+ const poster={id:'pl1',nombre:'poster-a0.pdf',modo:'poster',material:'rollo90',copias:1,
+  paginas:[{numero:1,anchoCm:84.1,altoCm:118.9,modo:'poster'}],papelPoster:'recubierto'};
+ const res=await worker.fetch(req('/api/ensayo-ploteos-rapido',{trabajos:[poster]}),env);
+ assert.equal(res.status,200,'rec90: '+JSON.stringify(await res.clone().json()));
+ assert.equal((await res.json()).resumen.detalles[0].paginas[0].material,'rec90');
+ const cad=await worker.fetch(req('/api/ensayo-ploteos-rapido',{trabajos:[{
+  ...poster,modo:'cad',paginas:[{...poster.paginas[0],modo:'cad'}]}]}),env);
+ assert.equal(cad.status,400,'no ofrecer recubierto para archivos sólo CAD');
+ assert.equal((await cad.json()).paymentAuthorized,false);
+});
