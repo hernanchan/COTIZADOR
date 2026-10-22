@@ -24,11 +24,13 @@ function copiasControl(d){
  wrap.append(input);return wrap;
 }
 function soportesCompatibles(d){
- return catalogo.filter(s=>d.paginas.every(p=>Math.min(p.anchoCm,p.altoCm)<=s.widthCm+0.03));
+ return catalogo.filter(s=>/^rollo\\d+$/.test(s.id)&&
+  d.paginas.every(p=>Math.min(p.anchoCm,p.altoCm)<=s.widthCm+0.03))
+  .sort((a,b)=>a.widthCm-b.widthCm);
 }
 function elegirSoporte(d){
- const validos=soportesCompatibles(d);
- if(!validos.some(x=>x.id===d.material))d.material=validos[0]?.id||'';
+ // Asignación determinista; el cliente no puede modificar el rollo.
+ d.material=soportesCompatibles(d)[0]?.id||'';
 }
 function render(){
  const panel=$('trabajos');panel.replaceChildren();
@@ -46,9 +48,9 @@ function render(){
    card.append(dato('p','Clasificación automática: '+cad+' CAD · '+poster+' Póster'));
    if(d.paginas.length<=15)card.append(dato('p',d.paginas.map(p=>'Pág. '+p.numero+': '+(p.modo==='cad'?'CAD':p.modo==='poster'?'Póster':'Revisión Librería Saber')).join(' · ')));
    
-   const validos=soportesCompatibles(d);
-   if(!validos.length){card.append(dato('p','Ningún rollo disponible admite el ancho de este PDF. No se puede cotizar.'))}
-   else form.append(selector('Rollo para imprimir',validos.map(x=>[x.id,x.name+' · '+x.widthCm+' cm']),d.material,v=>d.material=v));
+   const seleccionado=soportesCompatibles(d)[0];
+   if(!seleccionado){card.append(dato('p','Ningún rollo estándar admite el ancho de este PDF. Requiere revisión de Librería Saber.'))}
+   else card.append(dato('p','Rollo asignado automáticamente: '+seleccionado.name+' ('+seleccionado.widthCm+' cm)'));
    form.append(copiasControl(d));card.append(form);
   }
   const quitar=dato('button','Quitar PDF');quitar.type='button';quitar.disabled=leyendo;
