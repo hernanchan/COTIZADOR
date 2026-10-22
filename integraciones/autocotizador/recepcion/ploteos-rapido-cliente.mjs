@@ -1,89 +1,122 @@
+import {leerMedidasPloteo} from './medidas-local-pdf.mjs';
 const $=id=>document.getElementById(id);
-const lista=[];let catalogo=[];
-let version=0,controlador=null;
+const lista=[];let catalogo=[],version=0,controlador=null,leyendo=false;
 const money=v=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(v);
-const dato=(tag,contenido)=>{const el=document.createElement(tag);if(contenido!==undefined)el.textContent=contenido;return el};
-function resultado(mensaje){$('resultado').textContent=mensaje}
-function pendiente(mensaje='Recalculando…'){
+const dato=(tag,contenido)=>{const el=document.createElement(tag);if(contenido!==undefined)el.textContent=String(contenido);return el};
+const estado=txt=>$('resultado').textContent=txt;
+function invalidar(){
  version++;if(controlador){controlador.abort();controlador=null}
  $('importe').textContent='Por calcular';
- resultado(mensaje);
 }
-function input(label,tipo,valor,cambio){
- const wrap=dato('label',label),el=document.createElement('input');
- el.type=tipo;el.value=valor;el.min='1';el.max=tipo==='number'?'500':undefined;
- el.addEventListener('change',()=>{cambio(el.value);cotizar()});
- wrap.append(el);return wrap;
-}
-function selector(label,opciones,actual,cambio){
+function selector(label,opciones,actual,change){
  const wrap=dato('label',label),el=document.createElement('select');
- for(const [id,nombre] of opciones)el.add(new Option(nombre,id));
- el.value=actual;el.addEventListener('change',()=>{cambio(el.value);cotizar()});
+ for(const [value,nombre] of opciones)el.add(new Option(nombre,value));
+ el.value=actual;el.disabled=leyendo;
+ el.addEventListener('change',()=>{change(el.value);cotizar()});
  wrap.append(el);return wrap;
+}
+function copiasControl(d){
+ const wrap=dato('label','Copias'),input=document.createElement('input');
+ input.type='number';input.min='1';input.max='500';input.step='1';
+ input.value=String(d.copias);input.disabled=leyendo;
+ input.addEventListener('change',()=>{d.copias=Number(input.value);cotizar()});
+ wrap.append(input);return wrap;
+}
+function soportesCompatibles(d){
+ return catalogo.filter(s=>d.paginas.every(p=>Math.min(p.anchoCm,p.altoCm)<=s.widthCm+0.03));
+}
+function elegirSoporte(d){
+ const validos=soportesCompatibles(d);
+ if(!validos.some(x=>x.id===d.material))d.material=validos[0]?.id||'';
 }
 function render(){
- const box=$('trabajos');box.replaceChildren();
- lista.forEach((d,i)=>{
+ const panel=$('trabajos');panel.replaceChildren();
+ for(const [i,d] of lista.entries()){
   const card=dato('section');card.className='trabajo';
   card.append(dato('h2',(i+1)+'. '+d.nombre));
-  const form=dato('div');form.className='controles';
-  form.append(selector('Tipo de ploteo',[['cad','Plano CAD'],['poster','Póster / imagen']],d.modo,v=>d.modo=v));
-  form.append(selector('Material / ancho de rollo',catalogo.map(x=>[x.id,x.name+' ('+x.widthCm+' cm)']),d.material,v=>d.material=v));
-  const ancho=input('Ancho final (cm)','number',String(d.anchoCm),v=>d.anchoCm=Number(v));
-  const alto=input('Alto final (cm)','number',String(d.altoCm),v=>d.altoCm=Number(v));
-  const copias=input('Copias','number',String(d.copias),v=>d.copias=Number(v));
-  for(const e of [ancho,alto]){const x=e.querySelector('input');x.step='0.1';x.max='2000'}
-  form.append(ancho,alto,copias);
-  card.append(form);
-  const quitar=dato('button','Quitar archivo');quitar.type='button';quitar.addEventListener('click',()=>{lista.splice(i,1);render();cotizar()});card.append(quitar);
-  box.append(card);
- });
- $('calcular').disabled=!lista.length||!catalogo.length;
+  if(d.error){card.append(dato('p',d.error));}
+  else if(!d.paginas){card.append(dato('p','Leyendo dimensiones de PDF…'))}
+  else{
+   const measures=d.paginas.map(p=>p.anchoCm+' × '+p.altoCm+' cm');
+   const iguales=measures.every(x=>x===measures[0]);
+   card.append(dato('p',d.paginas.length+' página(s) · '+(iguales?measures[0]: 'Tamaños distintos: '+measures.join(' · '))));
+   const form=dato('div');form.className='controles';
+   form.append(selector('Tipo de ploteo',[['cad','Plano CAD'],['poster','Póster / imagen']],d.modo,v=>d.modo=v));
+   const validos=soportesCompatibles(d);
+   if(!validos.length){card.append(dato('p','Ningún rollo disponible admite el ancho de este PDF. No se puede cotizar.'))}
+   else form.append(selector('Rollo para imprimir',validos.map(x=>[x.id,x.name+' · '+x.widthCm+' cm']),d.material,v=>d.material=v));
+   form.append(copiasControl(d));card.append(form);
+  }
+  const quitar=dato('button','Quitar PDF');quitar.type='button';quitar.disabled=leyendo;
+  quitar.addEventListener('click',()=>{lista.splice(i,1);render();cotizar()});
+  card.append(quitar);panel.append(card);
+ }
+ $('calcular').disabled=leyendo||!catalogo.length||!lista.length||lista.some(d=>!d.paginas||!d.material);
 }
 async function cotizar(){
- pendiente();
- if(!lista.length){resultado('Elegí al menos un PDF para cotizar un ploteo.');return}
- if(!catalogo.length){resultado('Cargando materiales de ploteo.');return}
- const actual=version;const ac=new AbortController();controlador=ac;
- const trabajos=lista.map((d,i)=>({...d,id:'pl'+(i+1)}));
+ invalidar();
+ if(leyendo){estado('Leyendo las dimensiones de los PDF…');return}
+ if(!lista.length){estado('Elegí al menos un PDF para cotizar.');return}
+ if(!catalogo.length){estado('Todavía no están disponibles los materiales.');return}
+ if(lista.some(d=>d.error||!d.paginas||!d.material)){estado('Revisá el PDF que no se pudo leer o que no entra en ningún rollo.');return}
+ const n=version,ac=new AbortController();controlador=ac;
+ const trabajos=lista.map((d,i)=>({id:'pl'+(i+1),nombre:d.nombre,modo:d.modo,
+  material:d.material,copias:d.copias,paginas:d.paginas}));
+ estado('Calculando el presupuesto preliminar…');
  try{
   const r=await fetch('/api/ensayo-ploteos-rapido',{method:'POST',
    headers:{'Content-Type':'application/json'},body:JSON.stringify({trabajos}),signal:ac.signal});
-  const res=await r.json();
-  if(actual!==version)return;
-  if(!r.ok||res.ok!==true||res.paymentAuthorized!==false)throw Error(res.error||'No se pudo cotizar.');
-  $('importe').textContent=money(res.resumen.total);
-  const cont=$('resultado');cont.replaceChildren();
-  cont.append(dato('h2','Detalle del presupuesto preliminar'));
-  const list=dato('ol');
-  for(const p of res.resumen.detalles){
-   const li=dato('li',p.nombre+' · '+p.modo.toUpperCase()+' · '+p.materialNombre+
-    ' · '+p.anchoCm+' × '+p.altoCm+' cm · '+p.copias+' copia(s) → '+money(p.subtotal));
-   list.append(li);
+  const data=await r.json();
+  if(n!==version)return;
+  if(!r.ok||data.ok!==true||data.paymentAuthorized!==false)throw Error(data.error||'No se pudo cotizar');
+  const resumen=data.resumen;
+  $('importe').textContent=money(resumen.total);
+  const panel=$('resultado');panel.replaceChildren();
+  panel.append(dato('h2','Presupuesto de ploteos'));
+  const ol=dato('ol');
+  for(const x of resumen.detalles){
+   const li=dato('li',x.nombre+' · '+x.paginasTotales+' página(s) · '+x.metrosLineales+
+    ' m lineales por juego · '+x.materialNombre+' · '+x.copias+' copia(s) · '+money(x.subtotal));
+   ol.append(li);
   }
-  cont.append(list,dato('strong','TOTAL ORIENTATIVO: '+money(res.resumen.total)));
-  cont.append(dato('p','Medidas declaradas por el cliente: verificar tamaño real y orientación antes de aceptar el pedido.'));
+  panel.append(ol,dato('strong','TOTAL ORIENTATIVO: '+money(resumen.total)),
+   dato('p','Los tamaños se detectaron del PDF en este dispositivo; deben verificarse con los originales antes del cobro.'));
  }catch(e){
-  if(actual!==version||e.name==='AbortError')return;
-  $('importe').textContent='Sin precio';
-  resultado(String(e.message||e));
- }finally{if(actual===version)controlador=null}
+  if(n!==version||e.name==='AbortError')return;
+  $('importe').textContent='Sin precio';estado(String(e.message||e));
+ }finally{if(n===version)controlador=null}
 }
-$('archivosPloteo').addEventListener('change',event=>{
- const fs=Array.from(event.target.files||[]);
- if(lista.length+fs.length>30){resultado('Máximo 30 PDF por presupuesto de ploteos.');return}
- for(const file of fs)lista.push({nombre:file.name,modo:'cad',material:catalogo[0]?.id||'',anchoCm:29.7,altoCm:42,copias:1});
- event.target.value='';render();cotizar();
+$('archivosPloteo').addEventListener('change',async event=>{
+ const files=Array.from(event.target.files||[]);
+ event.target.value='';
+ if(leyendo){estado('Esperá a que termine la lectura actual.');return}
+ if(lista.length+files.length>30){estado('Máximo 30 PDF por pedido de ploteos.');return}
+ invalidar();leyendo=true;
+ for(const file of files)lista.push({file,nombre:file.name,modo:'cad',material:'',copias:1,paginas:null,error:null});
+ render();
+ const start=lista.length-files.length;
+ try{
+  for(let i=0;i<files.length;i++){
+   const d=lista[start+i];
+   estado('Detectando tamaños: PDF '+(i+1)+' de '+files.length+'…');
+   try{
+    const data=await leerMedidasPloteo(files[i]);
+    d.paginas=data.paginas;elegirSoporte(d);
+    if(!d.material)d.error='El PDF no entra en los rollos disponibles.';
+   }catch(e){d.error=String(e.message||e)}
+   render();
+  }
+ }finally{leyendo=false;render();cotizar()}
 });
 $('calcular').addEventListener('click',cotizar);
 async function iniciar(){
  try{
   const r=await fetch('/api/ensayo-materiales-ploteo',{cache:'no-store'});
   const data=await r.json();
-  if(!r.ok||!data.ok||!Array.isArray(data.supports)||!data.supports.length)throw Error('Catálogo de ploteos no disponible.');
+  if(!r.ok||!data.ok||!Array.isArray(data.supports)||!data.supports.length)throw Error('Catálogo no disponible');
   catalogo=data.supports;
-  for(const d of lista)if(!catalogo.some(p=>p.id===d.material))d.material=catalogo[0].id;
-  render();resultado('Configurá el tamaño final de cada PDF; no se calcula automáticamente desde el archivo.');
- }catch(e){resultado('No se pudieron cargar los materiales de ploteo. Recargá la página.')}
+  for(const d of lista)if(d.paginas)elegirSoporte(d);
+  render();estado('Subí los PDF: detectaremos automáticamente las medidas de todas sus páginas.');
+ }catch(e){estado('No se pudieron cargar los materiales. Recargá la página.')}
 }
 iniciar();
