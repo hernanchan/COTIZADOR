@@ -129,3 +129,82 @@ function doPost(e){
   return expressJson_({ok:false,verified:false,error:'Recepción Express no confirmada.'});
  }
 }
+
+
+/**
+ * Prueba de recepción REAL, sin navegador ni Cloudflare:
+ * 1) Requiere una carpeta PRIVADA y el secreto HMAC en Propiedades de script.
+ * 2) Construye un PDF válido A4 de seis posiciones (sólo dibujos de prueba).
+ * 3) Firma el mismo contrato HMAC que usaría el Worker y guarda UN solo PDF.
+ * 4) Lo vuelve a leer mediante el contrato privado y verifica SHA y bytes.
+ * 5) Puede ejecutarse otra vez: no debe crear otro archivo.
+ *
+ * Referencia fija de ENSAYO, imposible de confundir con una referencia aleatoria
+ * de clientes reales. No envía fotos ni modifica otros archivos en Drive.
+ */
+function pruebaExpressDriveReal(){
+ var props=PropertiesService.getScriptProperties();
+ var folderId=props.getProperty('EXPRESS_PDF_FOLDER_ID');
+ var key=props.getProperty('EXPRESS_PDF_HMAC_KEY');
+ if(!folderId||!key||key.length<32)
+  throw Error('Configurar EXPRESS_PDF_FOLDER_ID y EXPRESS_PDF_HMAC_KEY antes del ensayo.');
+ var reference='POL-FFFFFFFFFFFFFFFFFFFFFFFF';
+ var mm=function(n){return n*72/25.4};
+ var commands=['0.5 w','0.1 0.1 0.1 RG'];
+ for(var i=0;i<6;i++){
+  var col=i%2,row=Math.floor(i/2);
+  var x=mm(20+col*85),y=mm(297-13.5-(row+1)*90);
+  commands.push(x.toFixed(2)+' '+y.toFixed(2)+' '+mm(85).toFixed(2)+' '+mm(90).toFixed(2)+' re S');
+  commands.push('0.92 0.92 0.92 rg');
+  commands.push((x+mm(5)).toFixed(2)+' '+(y+mm(90-4-75)).toFixed(2)+' '+mm(75).toFixed(2)+' '+mm(75).toFixed(2)+' re f');
+  commands.push('0.1 0.1 0.1 RG');
+ }
+ commands.push('BT /F1 12 Tf 55 25 Td (POLAROIDS EXPRESS - ENSAYO PRIVADO) Tj ET');
+ var stream=commands.join('\n')+'\n';
+ var objs=[
+  '<< /Type /Catalog /Pages 2 0 R >>',
+  '<< /Type /Pages /Count 1 /Kids [3 0 R] >>',
+  '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
+  '<< /Length '+stream.length+' >>\nstream\n'+stream+'endstream',
+  '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'
+ ];
+ var pdf='%PDF-1.4\n';
+ var offsets=[0];
+ for(var j=0;j<objs.length;j++){
+  offsets.push(pdf.length);
+  pdf+=(j+1)+' 0 obj\n'+objs[j]+'\nendobj\n';
+ }
+ var start=pdf.length;
+ pdf+='xref\n0 '+(objs.length+1)+'\n0000000000 65535 f \n';
+ for(var k=1;k<offsets.length;k++){
+  pdf+=('0000000000'+offsets[k]).slice(-10)+' 00000 n \n';
+ }
+ pdf+='trailer\n<< /Size '+(objs.length+1)+' /Root 1 0 R >>\nstartxref\n'+start+'\n%%EOF\n';
+ var bytes=Utilities.newBlob(pdf,'application/pdf').getBytes();
+ var sha=expressPdfHash_(bytes);
+ var payload={op:'guardarPdfExpress',referencia:reference,
+  bytes:bytes.length,paginas:1,fotos:6,sha256:sha,
+  pdfBase64:Utilities.base64Encode(bytes)};
+ var build=function(body){
+  var timestamp=Math.floor(Date.now()/1000),nonce=Utilities.getUuid();
+  var payloadJson=JSON.stringify(body);
+  return {timestamp:timestamp,nonce:nonce,payloadJson:payloadJson,
+   signature:expressHex_(Utilities.computeHmacSha256Signature(
+    timestamp+'\n'+nonce+'\n'+payloadJson,key))};
+ };
+ var stored=expressStore_(expressVerify_(build(payload),key),folderId);
+ if(stored.ok!==true||stored.verified!==true||stored.sha256!==sha)
+  throw Error('La carpeta Drive no confirmó el PDF.');
+ var read=expressRead_(expressVerify_(build({
+  op:'leerPdfExpress',referencia:reference,bytes:bytes.length,sha256:sha
+ }),key),folderId);
+ if(read.ok!==true||read.verified!==true||
+    read.pdfBase64!==Utilities.base64Encode(bytes))
+  throw Error('El PDF devuelto por Drive no coincide con el original.');
+ var response={ok:true,archivo:reference+'_IMPRIMIR.pdf',
+  paginas:1,fotos:6,bytes:bytes.length,sha256:sha,
+  recibo:stored.verified,lecturaPrivada:read.verified,
+  originalFotosGuardadas:0,recortesSueltosGuardados:0};
+ Logger.log(JSON.stringify(response));
+ return response;
+}
