@@ -46,6 +46,9 @@ export function cotizarCargaUnica({archivos,precios}){
   const seleccionadas=seleccionarPaginas(a.paginas,a.paginasSeleccionadas);
   const d=clasificarDestino(seleccionadas,a.seleccion);
   if(a.servicio==='stickers'){
+   if(a.anillado!=='ninguno'){
+    pendientes.push({indice:i,nombre:a.nombre,motivo:'Stickers no admite anillado; quitá el anillado anterior'});return;
+   }
    if(!d.confirmado){pendientes.push({indice:i,nombre:a.nombre,motivo:'Confirmar tamaño A4/A3 para stickers'});return}
    const formato=d.tamanoFinal==='original'?tipoOriginal(seleccionadas):d.tamanoFinal;
    if(!['a4','a3'].includes(formato)){
