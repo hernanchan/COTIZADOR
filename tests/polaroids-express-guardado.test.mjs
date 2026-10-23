@@ -42,7 +42,8 @@ const Utilities={
  computeHmacSha256Signature:(message,secret)=>signedBytes(createHmac('sha256',secret).update(message).digest()),
  base64Decode:s=>signedBytes(Buffer.from(s,'base64')),
  base64Encode:bytes=>binary(bytes).toString('base64'),
- newBlob:(bytes,type,name)=>({bytes,name,getBytes:()=>bytes,type})
+ getUuid:()=>randomUUID(),
+ newBlob:(raw,type,name)=>{const bytes=typeof raw==='string' ? signedBytes(Buffer.from(raw,'utf8')):raw;return {bytes,name,getBytes:()=>bytes,type}}
 };
 const sandbox={Utilities,DriveApp:{Access:{PRIVATE:'PRIVATE'},getFolderById:()=>folder,
  getFileById:id=>byId.get(id)},PropertiesService:{getScriptProperties:()=>({
@@ -163,4 +164,26 @@ test('GAS entrega PDF completo sólo ante solicitud HMAC firmada',()=>{
  const missing=JSON.parse(sandbox.doPost(signedRead(hmacKey,'POL-'+'F'.repeat(24))).text);
  assert.equal(missing.ok,false);
  assert.equal('pdfBase64' in missing,false);
+});
+
+test('ensayo autónomo Drive real: un PDF A4 idempotente, firmado y recuperable',async()=>{
+ const first=sandbox.pruebaExpressDriveReal();
+ assert.equal(first.ok,true);
+ assert.equal(first.paginas,1);
+ assert.equal(first.fotos,6);
+ assert.equal(first.originalFotosGuardadas,0);
+ assert.equal(first.recortesSueltosGuardados,0);
+ assert.equal(first.lecturaPrivada,true);
+ assert.equal(files.size,2);
+ const file=[...files.values()].find(f=>f.name===first.archivo);
+ assert.ok(file);
+ const bytes=binary(file.getBlob().getBytes());
+ assert.equal(createHash('sha256').update(bytes).digest('hex'),first.sha256);
+ const doc=await pdfLib.PDFDocument.load(bytes);
+ assert.equal(doc.getPageCount(),1);
+ assert.ok(Math.abs(doc.getPages()[0].getWidth()-210*72/25.4)<.1);
+ assert.ok(Math.abs(doc.getPages()[0].getHeight()-297*72/25.4)<.1);
+ const again=sandbox.pruebaExpressDriveReal();
+ assert.deepEqual(JSON.parse(JSON.stringify(again)),JSON.parse(JSON.stringify(first)));
+ assert.equal(files.size,2,'El segundo ensayo no crea archivos adicionales');
 });
