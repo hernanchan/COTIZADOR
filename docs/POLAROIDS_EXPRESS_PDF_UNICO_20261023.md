@@ -71,3 +71,38 @@
 6. Aplicar cuotas de recepción, reglas de caducidad/purga de pedidos abandonados y verificación final de pago. Ninguna de ellas debe autorizar el checkout sólo con la declaración del navegador.
 
 **Nota de diseño:** no se suben tandas de seis por separado porque eso exigiría almacenar fotografías temporales entre peticiones, justamente lo que queremos evitar. Se comprimen en grupos de seis en el teléfono y se envían los recortes de todo el pedido en un único POST; el servidor produce y guarda directamente un solo PDF. Sin R2, KV ni servicios de pago adicionales.
+
+## Central de Pedidos y recuperación del celular — bloque completado en GitHub
+
+**La integración ya tiene código funcional y pruebas automatizadas, pero permanece SIN DESPLEGAR.**
+
+1. **Polaroids Express → Central.** Al verificar en GAS un solo PDF privado, el Worker Express firma una constancia `saber-polaroids-express-central-v1` que contiene únicamente referencia `POL-...`, número de fotos, hojas A4, precio servidor (`$3.000 × hojas`), bytes y SHA-256. Envía esta constancia al nuevo `POST /internal/central/polaroid-stage` con firma HMAC Cloudflare↔Cloudflare, sin transmitir fotos o PDF a la base de pedidos. Los intentos iguales son idempotentes; si se reutiliza la referencia con un PDF distinto, devuelve conflicto.
+2. **Persistencia privada D1.** La tabla `central_polaroids_express` guarda el manifiesto único y su eventual `commercial_order_id`. `GET /admin/api/central/polaroids` muestra las recepciones en la Central sólo a operadores autenticados, sin mostrar hash, claves, fotos ni PDF. Un PDF recibido **no** es un pedido cobrado.
+3. **Pedido mixto sin pago.** `POST /internal/central/polaroid-prepare-order` crea en la D1 de pruebas una orden comercial que vincula exactamente una referencia de PDF Express y, opcionalmente, artículos de tienda que se recalculan en servidor. Protegido por HMAC y `CENTRAL_EXPRESS_PREPARE_ENABLED=PRIVATE_TEST_ONLY`. `cart_requests` y referencia única impiden duplicar compras o asignar el PDF a otra orden. **Nunca habilita el checkout.** El endpoint `/demo/checkout` rechaza de forma explícita cualquier orden Express, aun cuando la orden ya exista.
+4. **Descarga del PDF único, privada y condicionada.** GAS implementa ahora la operación HMAC `leerPdfExpress`, que busca exactamente un archivo `POL-..._IMPRIMIR.pdf` en la carpeta privada y devuelve sus bytes codificados **solamente al backend que conoce la clave HMAC**. La Central expone `GET /admin/api/central/polaroid-pdf?reference=...`, autenticado por `DEMO_ADMIN_KEY`, bloqueado por defecto y permitido únicamente si D1 verifica: compra ligada, pago total aprobado, `payment_id`, `preference_id`, sin devolución, renglón Polaroids concordante y hash SHA-256 de los bytes que llegan desde GAS. El botón del panel solicita el PDF autenticado y descarga una copia local para el operador. No hay enlaces públicos a Drive ni entrega del PDF imprimible al comprador.
+5. **Recuperación en el teléfono.** El editor guarda una copia temporal de **sólo los recortes JPEG optimizados** en IndexedDB del navegador, no las fotos originales. Puede recuperar durante **dos horas** un envío Express cuyo POST se interrumpió o cuya pestaña se recargó **después de preparar los recortes**. Muestra un botón para reintentar sin volver a seleccionar fotos, y otro para descartar. Para reintentar exige de nuevo consentimiento y Turnstile. Conserva la misma referencia, que GAS y D1 procesan de modo idempotente. El navegador elimina la copia cuando el servidor confirma el pedido o cuando el cliente la descarta. Una copia vencida se purga en el siguiente acceso; no hay eliminación instantánea si el navegador permanece cerrado.
+6. **Seguridad del editor.** Se corrigió un error de presentación que podía borrar el casillero de consentimiento y el espacio de Turnstile al mostrar la descripción de Express. Además, como el carrito anterior aún no conoce los recibos Express de D1, ahora se **impide agregar estos pedidos al carrito heredado** hasta integrar el checkout definitivo. Ningún precio ni recibo declarado por el navegador autorizan pagos.
+
+### Variables adicionales apagadas por defecto
+
+- Worker de fotos Express: `EXPRESS_CENTRAL_SYNC_ENABLED=PRIVATE_TEST_ONLY`, `CENTRAL_BRIDGE_KEY`, `CENTRAL_EXPRESS_URL` apuntando exclusivamente a `/internal/central/polaroid-stage` en `saber-pagos-pruebas.*.workers.dev`.
+- Worker de Central: `CENTRAL_EXPRESS_ENABLED=PRIVATE_TEST_ONLY`, `CENTRAL_EXPRESS_PREPARE_ENABLED=PRIVATE_TEST_ONLY`, `CENTRAL_EXPRESS_DOWNLOAD_ENABLED=PRIVATE_TEST_ONLY`, `EXPRESS_DOWNLOAD_SCRIPT_URL`, `EXPRESS_DOWNLOAD_HMAC_KEY`. Su clave HMAC de descarga tiene que coincidir con `EXPRESS_PDF_HMAC_KEY` del receptor GAS, y ser distinta de las claves de Central/pagos.
+- Todos los valores son **interruptores de un entorno privado de ensayo**, no autorizaciones para publicar. La configuración actual de `recepcion-config.json` sigue con `enabled:false`, `showInShop:false`, `rollout:PENDIENTE_DE_APROBACION`, sin `delivery` activo. No se escribieron secretos en GitHub.
+
+### Pruebas automáticas
+
+- `tests/polaroids-express-worker.test.mjs`: generación de PDF por pedido, confirmación GAS simulada, HMAC hacia Central, duplicados y rechazo de host/Turnstile.
+- `tests/central-polaroids-express.test.mjs`: SQL local D1 real (SQLite), recepción única, privacidad, orden mixta, precios, idempotencia y bloqueo de checkout.
+- `tests/central-polaroids-descarga.test.mjs`: PDF real generado con pdf-lib, acceso operador, rechazo de compra impaga, devolución, desvío de Google y hash modificado.
+- `tests/polaroids-express-guardado.test.mjs`: Apps Script simulado, lectura privada firmada y comprobación integral del PDF.
+- `tests/polaroids-express-recuperacion.test.mjs`: IndexedDB simulado, recuperación tras recarga, caducidad a dos horas, bloqueo de otro pedido no confirmado, limpieza y privacidad.
+- `tests/polaroids-express-cliente.test.mjs`: navegador simulado, reintentos, captura de recortes solamente y bloqueo de carrito anterior.
+- El workflow `polaroids-express-ensayo.yml` compila el Worker, ejecuta esta suite y también regresiones del carrito y de documentos. No efectúa despliegues, llamadas reales a Google ni pagos.
+
+### Límites pendientes antes de presentar esto a clientes
+
+- **No se conectó a Google Drive real**, no se habilitaron claves de Cloudflare ni se imprimió un PDF Express de un pedido real.
+- La recepción sigue siendo **un POST único de recortes optimizados**, no reanudación parcial del envío en el servidor. El respaldo local permite repetir el POST tras una recarga, pero no retomar el byte exacto en el que se cortó. Si se cierra antes de terminar la optimización inicial, no hay recortes completos que recuperar.
+- La operación de descarga privada GAS entrega el PDF completo en una respuesta Base64 de hasta 12 MiB de PDF; su rendimiento y compatibilidad con límites reales de Apps Script/Cloudflare **aún no están comprobados**.
+- La creación de pedidos Express todavía no está conectada a un **carrito unificado de cliente ni al cobro sandbox**. El botón para continuar al carrito heredado permanece bloqueado para no generar un pedido que se cobraría con datos inconsistentes.
+- Los límites de CPU/memoria del plan Worker y la velocidad en teléfonos con 24 fotos reales deben medirse antes de autorizar un despliegue privado.
