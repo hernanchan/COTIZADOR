@@ -73,6 +73,201 @@ function estadoProduccionPrivado(order,items){
    !coherente?"Revisar renglones e importe antes de preparar":
    "Pago confirmado: comprobar archivos PDF finales y/o existencias antes de producir."};
 }
+
+/**
+ * Central D1: recibe SOLO resúmenes de archivos verificados, firmados por el
+ * servidor de documentos. No interpreta un pago como permiso de producción.
+ */
+const CENTRAL_WEB=/^WEB-[A-Za-z0-9_-]{5,80}$/;
+const CENTRAL_UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
+const CENTRAL_RECEIPT=/^DOC-[a-f0-9-]{36}$/i;
+const CENTRAL_HEX=/^[a-f0-9]{64}$/;
+const CENTRAL_FILE=/^[A-Za-z0-9_-]{1,80}$/;
+const CENTRAL_TYPES=new Set(["documentos","ploteos","stickers","fotos","corte","grafica"]);
+async function centralHash(input){
+ const bytes=new TextEncoder().encode(input);
+ return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",bytes)),
+  x=>x.toString(16).padStart(2,"0")).join("");
+}
+function centralSafeManifest(data){
+ if(!data||data.schema!=="saber-central-recepcion-verificada-v1"||
+    !CENTRAL_WEB.test(data.orderId||"")||data.paymentAuthorized!==false||
+    data.filesReceived!==true||data.listoParaProducir!==false||
+    !Number.isSafeInteger(data.importeVerificado)||data.importeVerificado<1||
+    data.importeVerificado>50000000||!Array.isArray(data.recibos)||
+    data.recibos.length<1||data.recibos.length>30||!data.ficha||
+    data.ficha.schema!=="saber-central-ficha-produccion-v1"||
+    data.ficha.orderId!==data.orderId||data.ficha.pagoConfirmado!==false||
+    data.ficha.listoParaProducir!==false||
+    data.ficha.totalVerificadoSinPago!==data.importeVerificado||
+    !Array.isArray(data.ficha.trabajos)||
+    data.ficha.trabajos.length!==data.recibos.length)
+  throw Error("Manifiesto de recepción incompleto o sin comprobación");
+ const seenReceipts=new Set(),seenFiles=new Set(),seenWork=new Set(),seenIndices=new Set();
+ const recibos=new Map();
+ for(const r of data.recibos){
+  if(!r||!CENTRAL_FILE.test(r.fileId||"")||seenFiles.has(r.fileId)||
+     !CENTRAL_RECEIPT.test(r.receiptId||"")||seenReceipts.has(r.receiptId)||
+     !CENTRAL_HEX.test(r.sha256||"")||
+     !Number.isSafeInteger(r.bytes)||r.bytes<5||r.bytes>20*1024*1024||
+     !Number.isSafeInteger(r.pages)||r.pages<1||r.pages>2000)
+   throw Error("Recibo privado inválido");
+  seenFiles.add(r.fileId);seenReceipts.add(r.receiptId);recibos.set(r.fileId,r);
+ }
+ const trabajos=data.ficha.trabajos.map(w=>{
+  if(!w||!Number.isSafeInteger(w.orden)||w.orden<1||
+     w.orden>data.recibos.length||seenIndices.has(w.orden)||
+     typeof w.idTrabajo!=="string"||w.idTrabajo.length>80||
+     seenWork.has(w.idTrabajo)||!CENTRAL_TYPES.has(w.servicio)||
+     !CENTRAL_FILE.test(w.fileId||"")||typeof w.nombreOriginal!=="string"||
+     w.nombreOriginal.length<1||w.nombreOriginal.length>180||
+     w.pdfImprimibleVerificado!==false||w.descargaPrivadaHabilitada!==false)
+   throw Error("Trabajo no identificado o marcado como imprimible");
+  seenIndices.add(w.orden);seenWork.add(w.idTrabajo);
+  const r=recibos.get(w.fileId);
+  if(!r||w.reciboPrivado!==r.receiptId||w.sha256!==r.sha256||
+     w.paginasOriginales!==r.pages||!Array.isArray(w.paginasElegidas)||
+     w.paginasElegidas.length<1||w.paginasElegidas.length>2000||
+     w.paginasElegidas.some(n=>!Number.isSafeInteger(n)||n<1||n>r.pages)||
+     new Set(w.paginasElegidas).size!==w.paginasElegidas.length)
+   throw Error("Archivo sin correspondencia con la ficha");
+  const texto=(s,max=100)=>typeof s==="string"&&s.length<=max?s:null;
+  const copies=w.copias;
+  if(copies!==null&&copies!==undefined&&(!Number.isSafeInteger(copies)||copies<1||copies>500))
+   throw Error("Cantidad de trabajo inválida");
+  return {
+   orden:w.orden,idTrabajo:w.idTrabajo,servicio:w.servicio,
+   nombreOriginal:w.nombreOriginal,fileId:w.fileId,
+   reciboPrivado:r.receiptId,sha256:r.sha256,paginasOriginales:r.pages,
+   bytes:r.bytes,paginasElegidas:[...w.paginasElegidas],
+   copias:copies??null,formatoFinal:texto(w.formatoFinal),
+   material:texto(w.material),modo:texto(w.modo),productoId:texto(w.productoId),
+   variante:texto(w.variante),metros:Number.isFinite(w.metros)&&w.metros>0?w.metros:null,
+   descripcion:texto(w.descripcion,180),archivoFinalVerificado:false
+  };
+ }).sort((a,b)=>a.orden-b.orden);
+ return {schema:"saber-central-documentos-d1-v1",webOrderId:data.orderId,
+  importe: data.importeVerificado,archivos:trabajos.length,
+  estado:"DOCUMENTOS_RECIBIDOS_NO_PAGADOS",trabajos,
+  pagoConfirmado:false,listoParaProducir:false};
+}
+async function centralTables(env){
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_document_manifests (web_order_id TEXT PRIMARY KEY,commercial_order_id TEXT UNIQUE REFERENCES orders(id) ON DELETE RESTRICT,amount_ars INTEGER NOT NULL CHECK(amount_ars>0 AND amount_ars<=50000000),file_count INTEGER NOT NULL CHECK(file_count BETWEEN 1 AND 30),manifest_hash TEXT NOT NULL,manifest_json TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'verified_waiting_order' CHECK(status IN ('verified_waiting_order','linked_waiting_payment','linked_paid_pending_preparation')),created_at TEXT NOT NULL DEFAULT (datetime('now')),linked_at TEXT)").run();
+ await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_central_manifests_commercial_order ON central_document_manifests(commercial_order_id)").run();
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_bridge_requests (request_id TEXT PRIMARY KEY,request_hash TEXT NOT NULL,action TEXT NOT NULL CHECK(action IN ('stage','link')),created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+}
+async function centralReadSigned(req,env){
+ if(env.CENTRAL_BRIDGE_ENABLED!=="PRIVATE_TEST_ONLY"||
+    typeof env.CENTRAL_BRIDGE_KEY!=="string"||env.CENTRAL_BRIDGE_KEY.length<32||
+    env.CENTRAL_BRIDGE_KEY===env.DEMO_ADMIN_KEY||
+    env.CENTRAL_BRIDGE_KEY===env.MP_WEBHOOK_SECRET)
+  return {error:"Sincronización privada no configurada",status:503};
+ if(req.method!=="POST"||req.headers.has("Origin")||
+    !/^application\/json(?:;|$)/i.test(req.headers.get("Content-Type")||""))
+  return {error:"Solicitud entre servidores requerida",status:403};
+ const ts=req.headers.get("x-saber-ts")||"",id=req.headers.get("x-saber-request-id")||"";
+ const sig=req.headers.get("x-saber-signature")||"";
+ if(!/^\d{10}$/.test(ts)||!CENTRAL_UUID.test(id)||!CENTRAL_HEX.test(sig)||
+    Math.abs(Math.floor(Date.now()/1000)-Number(ts))>300)
+  return {error:"Firma o tiempo de solicitud inválidos",status:401};
+ const raw=await req.text();
+ if(raw.length<10||raw.length>32000)
+  return {error:"Tamaño de manifiesto no permitido",status:413};
+ const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(env.CENTRAL_BRIDGE_KEY),
+  {name:"HMAC",hash:"SHA-256"},false,["sign"]);
+ const expected=Array.from(new Uint8Array(await crypto.subtle.sign("HMAC",key,
+  new TextEncoder().encode(ts+"\n"+id+"\n"+raw))),
+  b=>b.toString(16).padStart(2,"0")).join("");
+ let mismatch=0;
+ for(let i=0;i<64;i++)mismatch|=expected.charCodeAt(i)^sig.charCodeAt(i);
+ if(mismatch)return {error:"Firma de sincronización rechazada",status:401};
+ let payload;
+ try{payload=JSON.parse(raw)}
+ catch(_){return {error:"Manifiesto JSON inválido",status:400}}
+ return {requestId:id,raw,payload};
+}
+async function centralStage(req,env){
+ const signed=await centralReadSigned(req,env);
+ if(signed.error)return json({error:signed.error},signed.status);
+ let safe;
+ try{safe=centralSafeManifest(signed.payload)}
+ catch(_){return json({error:"Ficha de documentos incompleta"},422)}
+ await centralTables(env);
+ const digest=await centralHash(JSON.stringify(safe));
+ const existing=await env.DB.prepare("SELECT manifest_hash,commercial_order_id FROM central_document_manifests WHERE web_order_id=?").bind(safe.webOrderId).first();
+ if(existing){
+  if(existing.manifest_hash!==digest)return json({error:"El pedido ya tiene otro manifiesto verificado"},409);
+  return json({saved:true,idempotent:true,web_order_id:safe.webOrderId,paymentAuthorized:false});
+ }
+ const requestDigest=await centralHash(signed.raw);
+ const statements=[
+  env.DB.prepare("INSERT INTO central_bridge_requests(request_id,request_hash,action) VALUES(?,?,'stage')").bind(signed.requestId,requestDigest),
+  env.DB.prepare("INSERT INTO central_document_manifests(web_order_id,amount_ars,file_count,manifest_hash,manifest_json) VALUES(?,?,?,?,?)").bind(safe.webOrderId,safe.importe,safe.archivos,digest,JSON.stringify(safe))
+ ];
+ try{await env.DB.batch(statements)}
+ catch(_){return json({error:"Conflicto de recepción; verificar si ya existe"},409)}
+ return json({saved:true,idempotent:false,web_order_id:safe.webOrderId,
+  estado:"VERIFICADO_PENDIENTE_DE_PEDIDO",paymentAuthorized:false},201);
+}
+async function centralLink(req,env){
+ const signed=await centralReadSigned(req,env);
+ if(signed.error)return json({error:signed.error},signed.status);
+ const d=signed.payload;
+ if(!d||Object.keys(d).sort().join(",")!=="commercialOrderId,webOrderId"||
+    !CENTRAL_WEB.test(d.webOrderId||"")||!CENTRAL_UUID.test(d.commercialOrderId||""))
+  return json({error:"Identificación de pedidos inválida"},400);
+ await centralTables(env);
+ const manifest=await env.DB.prepare("SELECT * FROM central_document_manifests WHERE web_order_id=?").bind(d.webOrderId).first();
+ if(!manifest)return json({error:"No existe documentación verificada"},404);
+ if(manifest.commercial_order_id){
+  if(manifest.commercial_order_id!==d.commercialOrderId)
+   return json({error:"Esta recepción pertenece a otro pedido comercial"},409);
+  return json({linked:true,idempotent:true,paymentAuthorized:false});
+ }
+ const order=await env.DB.prepare("SELECT id,amount_ars,deposit_ars,status FROM orders WHERE id=?").bind(d.commercialOrderId).first();
+ if(!order)return json({error:"Pedido comercial no existe"},404);
+ const items=(await env.DB.prepare("SELECT item_type,sku,line_total_ars,file_references_json FROM order_items WHERE order_id=? ORDER BY line_number").bind(d.commercialOrderId).all()).results||[];
+ if(items.length<1||items.length>100||
+    items.reduce((n,x)=>n+x.line_total_ars,0)!==order.amount_ars)
+  return json({error:"El pedido no coincide con sus líneas comerciales"},409);
+ let safe;
+ try{safe=JSON.parse(manifest.manifest_json)}catch(_){return json({error:"Manifiesto no legible"},409)}
+ const expected=new Set(safe.trabajos.map(w=>w.reciboPrivado));
+ let docPrice=0,found=new Set();
+ for(const row of items.filter(x=>x.item_type==="print"&&x.sku==="DOCS_VERIFIED")){
+  let refs;
+  try{refs=JSON.parse(row.file_references_json||"null")}catch(_){}
+  if(!Array.isArray(refs)||refs.length<1||refs.length>30||
+     refs.some(ref=>typeof ref!=="string"||!expected.has(ref)||found.has(ref)))
+   return json({error:"Referencias de PDF incorrectas o repetidas"},409);
+  refs.forEach(ref=>found.add(ref));
+  docPrice+=row.line_total_ars;
+ }
+ if(docPrice!==manifest.amount_ars||found.size!==expected.size)
+  return json({error:"Faltan archivos documentales o el importe no coincide"},409);
+ const prior=await env.DB.prepare("SELECT web_order_id FROM central_document_manifests WHERE commercial_order_id=?").bind(order.id).first();
+ if(prior)return json({error:"Pedido ya vinculado con otros documentos"},409);
+ const digest=await centralHash(signed.raw);
+ try{await env.DB.batch([
+  env.DB.prepare("INSERT INTO central_bridge_requests(request_id,request_hash,action) VALUES(?,?,'link')").bind(signed.requestId,digest),
+  env.DB.prepare("UPDATE central_document_manifests SET commercial_order_id=?,status='linked_waiting_payment',linked_at=datetime('now') WHERE web_order_id=? AND commercial_order_id IS NULL").bind(order.id,d.webOrderId)
+ ])}
+ catch(_){return json({error:"Conflicto de vinculación"},409)}
+ return json({linked:true,idempotent:false,commercial_order_id:order.id,
+  estado:"VINCULADO_PENDIENTE_DE_CONTROL",paymentAuthorized:false});
+}
+async function centralAdminDetail(env,id){
+ await centralTables(env);
+ const row=await env.DB.prepare("SELECT web_order_id,manifest_json,created_at,amount_ars,file_count FROM central_document_manifests WHERE commercial_order_id=?").bind(id).first();
+ if(!row)return null;
+ let document;
+ try{document=JSON.parse(row.manifest_json)}catch(_){return null}
+ return {webOrderId:row.web_order_id,totalDocumentos:row.amount_ars,
+  fechaRecepcion:row.created_at,archivos:row.file_count,
+  estado:"DOCUMENTOS_VERIFICADOS_PDF_FINAL_PENDIENTE",
+  trabajos:document.trabajos,pdfFinalVerificado:false,listoParaProducir:false};
+}
+
 const adminHtml = `<!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title>Centro de Pedidos | Librería Saber · Pruebas</title>
