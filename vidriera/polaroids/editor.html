@@ -802,6 +802,10 @@ $('btnPdf').onclick=()=>{
  sendSecurePhotos().catch(err=>status('No se pudo enviar: '+(err&&err.message||err),'bad'));
 };
 $('goToCartAfterReceipt').onclick=()=>{
+ if(receiverConfig?.mode==='express'){
+  status('El PDF Express está confirmado en la Central. El carrito y los cobros para esta modalidad siguen desactivados hasta completar la prueba integral.','bad');
+  return;
+ }
  if(window.parent!==window||!receivedReference||!/^POL-[A-F0-9]{24}$/.test(receivedReference))return;
  if(!receivedOrder||receivedOrder.reference!==receivedReference)return;
  const n=receivedOrder.photos,count=receivedOrder.sheets;
