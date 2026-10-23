@@ -8,6 +8,7 @@ import {paginaCargaUnica} from './carga-unica-pagina.mjs';
 import {cotizarCargaUnica} from './cotizar-carga-unica.mjs';
 import {GRAFICA_COMERCIAL} from './cotizar-grafica.mjs';
 import {fase4FichaCentralPrivada} from './fase4-ficha-central-privada.mjs';
+import {enviarCentralFirmada} from './enviar-central-firmada.mjs';
 import cargaClienteJs from './carga-unica-cliente.txt';
 import {cotizarPloteosRapido} from '../pruebas/cotizar-ploteos-rapido.mjs';
 import plotClienteJs from './ploteos-rapido-cliente.txt';
@@ -999,7 +1000,7 @@ function scriptRapido(){
 /** Inspección de ficha central en piloto, solo operador con clave independiente.
  * No publica originales, no crea pedidos D1 ni permite pago.
  */
-async function apiFichaCentralPrivada(request,env){
+async function apiFichaCentralPrivada(request,env,sincronizar=false){
  if(request.method!=='POST')return closed();
  if(!allowed(request,env))
   return testResponse({ok:false,error:'Origen no permitido',paymentAuthorized:false},403);
@@ -1020,11 +1021,26 @@ async function apiFichaCentralPrivada(request,env){
     throw Error('Datos inválidos');
  }catch(_){return testResponse({ok:false,error:'Solicitud no válida',paymentAuthorized:false},400);}
  try{
+  if(sincronizar&&(env?.DOCS_CENTRAL_SYNC_ENABLED!=='PRIVATE_TEST_ONLY'||
+      typeof env?.CENTRAL_BRIDGE_KEY!=='string'||env.CENTRAL_BRIDGE_KEY.length<32||
+      env.CENTRAL_BRIDGE_KEY===env.DOCS_CENTRAL_ADMIN_KEY||
+      env.CENTRAL_BRIDGE_KEY===env.DOCS_RELAY_KEY))
+    return testResponse({ok:false,error:'Sincronización con D1 no habilitada',paymentAuthorized:false},503);
   const result=await fase4FichaCentralPrivada({
    sesion:input.sesion,opciones:input.opciones,
    consultarFirmado:p=>postToScript(env,p,fetch,420000),
    preciosServidor:preciosPiloto
   });
+  if(sincronizar){
+   const resultado=await enviarCentralFirmada({
+    verificacion:result,url:env.CENTRAL_TEST_URL,
+    clave:env.CENTRAL_BRIDGE_KEY,habilitado:env.DOCS_CENTRAL_SYNC_ENABLED
+   });
+   return testResponse({ok:true,sincronizado:true,
+    webOrderId:resultado.webOrderId,guardado:resultado.guardado,
+    yaExistia:resultado.existia,paymentAuthorized:false,
+    listoParaProducir:false},200);
+  }
   return testResponse({ok:true,...result,paymentAuthorized:false,
    listoParaProducir:false},200);
  }catch(_){
@@ -1044,6 +1060,7 @@ export default {
     if(page==='/prueba-ploteos-rapido'&&request.method==='GET')return paginaPloteos();
     if(page==='/prueba-ploteos-rapido.js'&&request.method==='GET')return scriptPloteos();
     if(page==='/api/ensayo-ficha-central')return apiFichaCentralPrivada(request,env);
+    if(page==='/api/ensayo-sincronizar-central')return apiFichaCentralPrivada(request,env,true);
     if(page==='/api/ensayo-carga-unica'){
       if(request.method!=='POST')return closed();
       try{
