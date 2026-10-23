@@ -1,5 +1,6 @@
 import {leerMedidasPloteo} from './medidas-local-pdf.mjs';
 import {clasificarDestino} from './destino-impresion.mjs';
+import {prepararBorradorPedido} from './preparar-borrador-pedido.mjs';
 import {seleccionarPaginas} from './seleccionar-paginas.mjs';
 import {clasificarPaginasPloteo} from './clasificar-paginas-ploteo.mjs';
 const $=id=>document.getElementById(id);
@@ -154,7 +155,7 @@ $('archivos').addEventListener('change',async ev=>{
  if(entries.length+files.length>30){$('estado').textContent='Máximo 30 PDF.';return}
  leyendo=true;
  if(!entries.length)abierto=0;
- for(const f of files)entries.push({name:f.name,paginas:null,seleccion:'sin-confirmar',error:null,copias:1,modo:'bn',caras:'simple',papelPoster:'obra80',anillado:'ninguno',grupoAnillado:'',materialColor:'',paginasSeleccionadas:'',servicio:'auto',productoFoto:'',productoGrafica:'',corteVariante:'gt3',corteMetros:1});
+ for(const f of files)entries.push({name:f.name,archivoOriginal:f,paginas:null,seleccion:'sin-confirmar',error:null,copias:1,modo:'bn',caras:'simple',papelPoster:'obra80',anillado:'ninguno',grupoAnillado:'',materialColor:'',paginasSeleccionadas:'',servicio:'auto',productoFoto:'',productoGrafica:'',corteVariante:'gt3',corteMetros:1});
  render();
  const start=entries.length-files.length;
  for(let i=0;i<files.length;i++){
@@ -175,6 +176,8 @@ $('archivos').addEventListener('change',async ev=>{
 });
 async function cotizar(){
  const n=++version,out=$('presupuesto');
+ $('prepararPedido').disabled=true;
+ $('resumenPedido').replaceChildren();
  ultimoPresupuesto=null;
  if(leyendo||!entries.length){out.textContent='Esperando archivos…';return}
  if(entries.some(e=>e.error||!e.paginas)){out.textContent='Hay documentos sin analizar correctamente. No se puede cotizar el conjunto.';return}
@@ -190,6 +193,7 @@ async function cotizar(){
  const archivos=entries.map(e=>({nombre:e.name,paginas:e.paginas,paginasSeleccionadas:e.paginasSeleccionadas,seleccion:e.seleccion,servicio:e.servicio||'auto',productoFoto:e.productoFoto||'',productoGrafica:e.productoGrafica||'',corteVariante:e.corteVariante,corteMetros:e.corteMetros,copias:e.copias,modo:e.modo,caras:e.caras,papelPoster:e.papelPoster,anillado:e.anillado,grupoAnillado:e.grupoAnillado,materialColor:e.materialColor}));
  try{const r=await fetch('/api/ensayo-carga-unica',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({archivos})});const d=await r.json();if(n!==version)return;if(!r.ok||d.ok!==true||d.paymentAuthorized!==false)throw Error(d.error||'Sin cotización');
  ultimoPresupuesto=d;
+ $('prepararPedido').disabled=!(d.estado==='PRELIMINAR'&&Number.isSafeInteger(d.total)&&d.total>0&&entries.every(e=>e.archivoOriginal));
  const ars=v=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(v);
  out.replaceChildren(texto('strong',d.total===null?'TOTAL INCOMPLETO':'TOTAL PRELIMINAR: '+ars(d.total)),texto('p','Impresiones (incluye anillados): '+ars(d.subtotalImpresiones)+' · Ploteos: '+ars(d.subtotalPloteos)+' · Stickers: '+ars(d.subtotalStickers||0)+' · Fotos: '+ars(d.subtotalFotos||0)+' · Corte: '+ars(d.subtotalCortes||0)+' · Gráfica: '+ars(d.subtotalGraficas||0)),texto('p','Anillados incluidos: '+ars(d.subtotalAnillados)));
  for(const p of d.pendientes)out.append(texto('p',p.nombre+': '+p.motivo));
@@ -203,3 +207,26 @@ async function iniciar(){
  render();if(entries.length)cotizar();
 }
 iniciar();
+
+$('prepararPedido').addEventListener('click',()=>{
+ const contenedor=$('resumenPedido');contenedor.replaceChildren();
+ try{
+  const draft=prepararBorradorPedido({
+   cotizacion:ultimoPresupuesto,
+   archivos:entries.map(e=>({file:e.archivoOriginal,name:e.name,paginas:e.paginas,copias:e.copias}))
+  });
+  contenedor.append(texto('h3','Pedido en preparación · '+pesos(draft.totalOrientativo)));
+  contenedor.append(texto('p','Los archivos siguen en este dispositivo. No fueron recibidos por Librería Saber.'));
+  const listado=document.createElement('ol');
+  for(const item of draft.items){
+   const li=document.createElement('li');
+   li.textContent=item.nombre+' · '+item.servicio+' · páginas '+item.paginasElegidas.join(', ')+' · '+item.estadoArchivo.replaceAll('_',' ');
+   listado.append(li);
+  }
+  contenedor.append(listado);
+  const aviso=texto('p','Falta la recepción protegida, la comprobación de originales y la validación de precios por servidor. Pago desactivado.');
+  aviso.className='advertencia';contenedor.append(aviso);
+ }catch(error){
+  const aviso=texto('p',String(error.message||error));aviso.className='advertencia';contenedor.append(aviso);
+ }
+});
