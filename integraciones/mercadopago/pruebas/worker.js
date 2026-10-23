@@ -448,6 +448,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px ui-monospace,monospace
 <input type="password" autocomplete="off" id="secret" placeholder="Clave privada del panel" aria-label="Clave privada">
 <button id="refresh">Consultar pedidos</button><button id="sync" class="outline">Verificar pagos pendientes</button>
 </div><p id="status" role="status" aria-live="polite"></p><p id="cronState" class="note">Conciliación automática: sin consultar.</p></fieldset>
+<fieldset><legend>Polaroids Express · PDF privado único</legend><button id="refreshExpress" class="outline">Consultar PDF recibidos</button><p class="note">Hasta cuatro hojas A4 por pedido. Archivo listo en Drive privado; el pago todavía no está confirmado.</p><ol id="expressReceipts"></ol></fieldset>
 <fieldset><legend>Recepciones de PDF verificadas sin pedido comercial</legend><div class="toolbar"><button id="refreshReceipts" class="outline">Consultar recepciones pendientes</button></div><p class="note">Documentos confirmados en Drive, todavía no vinculados a un pedido cobrado. No están listos para imprimir.</p><ol id="verifiedReceipts"></ol></fieldset>
 <fieldset><legend>Pedidos con PDF y pago pendiente</legend><button id="refreshUnpaid" class="outline">Consultar pedidos sin pago confirmado</button><ol id="unpaidDocs"></ol></fieldset>
 <div class="grid"><fieldset><legend>Pedidos pagados</legend><ol id="orders"></ol></fieldset><fieldset><legend>Detalle del pedido</legend>
@@ -481,6 +482,20 @@ async function refreshCronState(){
  }catch(e){el.textContent="Conciliación automática: no se pudo consultar el registro."}
 }
 async function refresh(){try{status.textContent="Consultando...";await refreshCronState();const x=await api("/admin/api/orders");orders.replaceChildren();if(!x.orders.length)orders.append(node("li","Aún no hay pedidos con pago total confirmado."));for(const o of x.orders){const li=node("li",o.description+" · "+money(o.amount_ars)+" · "+(o.paid_at||"sin fecha"));li.append(node("div",o.id));const b=node("button","Ver detalle");b.addEventListener("click",()=>showOrder(o.id));li.append(b);orders.append(li)}status.textContent=x.orders.length+" pedido(s) pagado(s) encontrado(s)"}catch(e){status.textContent=e.message}}
+document.querySelector("#refreshExpress").addEventListener("click",async()=>{
+ const list=document.querySelector("#expressReceipts");list.replaceChildren();
+ try{
+  const info=await api("/admin/api/central/polaroids");
+  if(!info.manifests.length)list.append(node("li","Sin Polaroids Express recibidas."));
+  for(const m of info.manifests){
+   const item=node("li",m.referencia+" · "+m.fotos+" fotos · "+m.hojas+
+    " hoja(s) A4 · "+money(m.importe));
+   item.append(node("p","PDF final privado confirmado · Pago aún por verificar"));
+   list.append(item);
+  }
+  status.textContent=info.manifests.length+" pedido(s) Polaroids Express recibido(s)";
+ }catch(e){status.textContent=e.message}
+});
 document.querySelector("#refreshReceipts").addEventListener("click",async()=>{
  const list=document.querySelector("#verifiedReceipts");
  try{
@@ -802,6 +817,7 @@ export default {
   }
   if(!env.DB || !env.MP_TEST_ACCESS_TOKEN || !env.DEMO_ADMIN_KEY || !env.MP_TEST_SELLER_ID || !env.TEST_WEBHOOK_URL || !env.MP_WEBHOOK_SECRET)return json({error:"Falta configuración privada de pruebas. Consultar diagnóstico autorizado."},503);
   try {
+   if(url.pathname==="/internal/central/polaroid-stage")return await centralPolaroidStage(req,env);
    if(url.pathname==="/internal/central/stage")return await centralStage(req,env);
    if(url.pathname==="/internal/central/link")return await centralLink(req,env);
    if(url.pathname==="/internal/central/prepare-order")return await centralPrepareDraft(req,env);
@@ -825,6 +841,17 @@ export default {
     const rows=await env.DB.prepare("SELECT m.web_order_id,m.commercial_order_id,m.amount_ars AS documents_ars,m.file_count,o.amount_ars AS order_ars,o.status,o.created_at FROM central_document_manifests m JOIN orders o ON o.id=m.commercial_order_id WHERE m.commercial_order_id IS NOT NULL AND (o.status!='paid' OR EXISTS(SELECT 1 FROM payment_reviews p WHERE p.order_id=o.id AND p.state='revoked')) ORDER BY o.created_at DESC LIMIT 50").all();
     return json({estado:"PEDIDOS_DOCUMENTALES_SIN_PAGO_CONFIRMADO",orders:rows.results||[],productionAuthorized:false});
    }
+   if(url.pathname==="/admin/api/central/polaroids"&&req.method==="GET"){
+    if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+    await centralPolaroidTable(env);
+    const rows=await env.DB.prepare("SELECT reference,photos,sheets,amount_ars,created_at,commercial_order_id FROM central_polaroids_express ORDER BY created_at DESC LIMIT 50").all();
+    return json({estado:"POLAROIDS_PDF_FINAL_VERIFICADO_PAGO_PENDIENTE",
+     manifests:(rows.results||[]).map(x=>({referencia:x.reference,
+      fotos:x.photos,hojas:x.sheets,importe:x.amount_ars,
+      recibido:x.created_at,vinculado:Boolean(x.commercial_order_id),
+      pedidoComercial:x.commercial_order_id||null})),
+     paymentAuthorized:false,listoParaProducir:false});
+   }
    if(url.pathname==="/admin/api/central/pending"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
     await centralTables(env);
@@ -844,6 +871,8 @@ export default {
     const central=await centralAdminDetail(env,id);
     const produccion=estadoProduccionPrivado(order,rows.results);
     if(central)produccion.documentosVerificados=central;
+    const express=await centralPolaroidDetail(env,id);
+    if(express)produccion.polaroidsExpress=express;
     return json({order,items:rows.results,produccion});
    }
    if(url.pathname==="/demo/catalog"&&req.method==="GET"){
