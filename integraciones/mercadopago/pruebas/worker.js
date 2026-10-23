@@ -702,7 +702,8 @@ document.querySelector("#refreshExpress").addEventListener("click",async()=>{
   for(const m of info.manifests){
    const item=node("li",m.referencia+" · "+m.fotos+" fotos · "+m.hojas+
     " hoja(s) A4 · "+money(m.importe));
-   item.append(node("p","PDF final privado confirmado · Pago aún por verificar"));
+   item.append(node("p","PDF final privado confirmado · "+(m.estadoPago==="PAGADO"?
+    "Pago confirmado · Ver en pedidos pagados":"Pago pendiente de confirmar")));
    list.append(item);
   }
   status.textContent=info.manifests.length+" pedido(s) Polaroids Express recibido(s)";
@@ -1059,13 +1060,14 @@ export default {
    }
    if(url.pathname==="/admin/api/central/polaroids"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
-    await centralPolaroidTable(env);
-    const rows=await env.DB.prepare("SELECT reference,photos,sheets,amount_ars,created_at,commercial_order_id FROM central_polaroids_express ORDER BY created_at DESC LIMIT 50").all();
-    return json({estado:"POLAROIDS_PDF_FINAL_VERIFICADO_PAGO_PENDIENTE",
+    await centralPolaroidTable(env);await ensurePaymentReviews(env);
+    const rows=await env.DB.prepare("SELECT p.reference,p.photos,p.sheets,p.amount_ars,p.created_at,p.commercial_order_id,CASE WHEN o.status='paid' AND o.deposit_ars=o.amount_ars AND o.paid_at IS NOT NULL AND o.payment_id IS NOT NULL AND o.preference_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM payment_reviews r WHERE r.order_id=o.id AND r.state='revoked') THEN 1 ELSE 0 END AS paid_confirmed FROM central_polaroids_express p LEFT JOIN orders o ON o.id=p.commercial_order_id ORDER BY p.created_at DESC LIMIT 50").all();
+    return json({estado:"POLAROIDS_PDF_RECIBIDO_CON_ESTADO_PAGO",
      manifests:(rows.results||[]).map(x=>({referencia:x.reference,
       fotos:x.photos,hojas:x.sheets,importe:x.amount_ars,
       recibido:x.created_at,vinculado:Boolean(x.commercial_order_id),
-      pedidoComercial:x.commercial_order_id||null})),
+      pedidoComercial:x.commercial_order_id||null,
+      estadoPago:x.paid_confirmed===1?"PAGADO":"PENDIENTE"})),
      paymentAuthorized:false,listoParaProducir:false});
    }
    if(url.pathname==="/admin/api/central/pending"&&req.method==="GET"){
