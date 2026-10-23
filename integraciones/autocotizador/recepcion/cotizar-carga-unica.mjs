@@ -1,5 +1,6 @@
 import {clasificarDestino} from './destino-impresion.mjs';
 import {cotizarStickersPdf} from './cotizar-stickers.mjs';
+import {cotizarFotosPdf} from './cotizar-fotos.mjs';
 import {seleccionarPaginas} from './seleccionar-paginas.mjs';
 import {cotizarDocumentosIndividuales} from '../pruebas/cotizar-documentos-individuales.mjs';
 import {cotizarPloteosRapido,rolloEstandarAutomatico} from '../pruebas/cotizar-ploteos-rapido.mjs';
@@ -40,7 +41,7 @@ function tipoOriginal(paginas){
  */
 export function cotizarCargaUnica({archivos,precios}){
  if(!Array.isArray(archivos)||!archivos.length||archivos.length>30)throw Error('Cantidad de archivos inválida');
- const documentos=[],ploteos=[],stickers=[],pendientes=[],plan=[];
+ const documentos=[],ploteos=[],stickers=[],fotos=[],pendientes=[],plan=[];
  archivos.forEach((a,i)=>{
   validarArchivo(a,i);
   const seleccionadas=seleccionarPaginas(a.paginas,a.paginasSeleccionadas);
@@ -125,9 +126,10 @@ export function cotizarCargaUnica({archivos,precios}){
  const p=ploteos.length?cotizarPloteosRapido({trabajos:ploteos,precios}):null;
  const subtotalImpresiones=c?.total||0,subtotalPloteos=p?.total||0;
  const subtotalStickers=stickers.reduce((sum,x)=>sum+x.subtotal,0);
+ const subtotalFotos=fotos.reduce((sum,x)=>sum+x.subtotal,0);
  return {ok:true,estado:pendientes.length?'INCOMPLETO':'PRELIMINAR',verificacion:VALORACION,
-  paymentAuthorized:false,total:pendientes.length?null:subtotalImpresiones+subtotalPloteos+subtotalStickers,
-  subtotalImpresiones,subtotalPloteos,subtotalStickers,subtotalAnillados:c?.subtotalAnillados||0,
+  paymentAuthorized:false,total:pendientes.length?null:subtotalImpresiones+subtotalPloteos+subtotalStickers+subtotalFotos,
+  subtotalImpresiones,subtotalPloteos,subtotalStickers,subtotalFotos,subtotalAnillados:c?.subtotalAnillados||0,
   detalleArmados:c?.detalleArmados||[],pendientes,plan,
-  detalleImpresiones:c?.detalles||[],detallePloteos:p?.detalles||[],detalleStickers:stickers};
+  detalleImpresiones:c?.detalles||[],detallePloteos:p?.detalles||[],detalleStickers:stickers,detalleFotos:fotos};
 }
