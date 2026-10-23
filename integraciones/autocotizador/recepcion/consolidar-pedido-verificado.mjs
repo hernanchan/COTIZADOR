@@ -16,16 +16,17 @@ export function consolidarPedidoVerificado({orderId,configuraciones,recibosServi
   throw Error('Pedido o recepción incompletos.');
  if(!preciosServidor||!preciosServidor.bnA4||!preciosServidor.plotter)
   throw Error('No se encontraron las tarifas del servidor.');
- const refs=new Map(),ids=new Set();
+ const refs=new Map(),ids=new Set(),identificadoresRecibos=new Set();
  for(const recibo of recibosServidor){
   if(!recibo||!ID.test(recibo.fileId||'')||refs.has(recibo.fileId)||
      recibo.orderId!==orderId||recibo.status!=='verified'||
      recibo.storageVerified!==true||recibo.pageVerification!=='server'||
-     !RECIBO.test(recibo.receiptId||'')||!SHA.test(recibo.sha256||'')||
+     (!RECIBO.test(recibo.receiptId||'')||identificadoresRecibos.has(recibo.receiptId))||!SHA.test(recibo.sha256||'')||
      !Number.isSafeInteger(recibo.bytes)||recibo.bytes<5||
      !Number.isSafeInteger(recibo.pageCount)||recibo.pageCount<1||recibo.pageCount>2000||
      !Array.isArray(recibo.pageMetrics)||recibo.pageMetrics.length!==recibo.pageCount)
    throw Error('Falta verificar un archivo PDF real desde el servidor.');
+  identificadoresRecibos.add(recibo.receiptId);
   refs.set(recibo.fileId,recibo);
  }
  const archivos=configuraciones.map(config=>{
