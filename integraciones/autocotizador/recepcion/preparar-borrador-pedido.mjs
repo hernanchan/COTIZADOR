@@ -34,7 +34,7 @@ export function prepararBorradorPedido({cotizacion,archivos}){
   indices.add(item.indice);
   const entrada=archivos[item.indice];
   if(!entrada||!(entrada.file instanceof Blob)||
-     typeof entrada.name!=='string'||entrada.file.name!==entrada.name||
+     typeof entrada.name!=='string'||item.nombre!==entrada.name||entrada.file.name!==entrada.name||
      !Number.isSafeInteger(entrada.file.size)||entrada.file.size<5||
      !Array.isArray(entrada.paginas)||!entrada.paginas.length)
    throw Error('Seleccioná nuevamente el archivo original antes de continuar.');
@@ -47,7 +47,7 @@ export function prepararBorradorPedido({cotizacion,archivos}){
    throw Error('La selección de páginas necesita revisión.');
   const detallesTrabajo=cotizacion[detalles[item.destino]];
   const calculo=detallesTrabajo?.find(x=>x.id===item.id);
-  if(!calculo)throw Error('Falta el detalle comercial de un trabajo.');
+  if(!calculo||calculo.nombre!==entrada.name)throw Error('Falta el detalle comercial vinculado al archivo original.');
   // Los anillados conjuntos se totalizan a nivel de presupuesto, no de archivo.
   lineas.push(Object.freeze({
    referenciaLocal:'archivo-'+(item.indice+1),nombre:entrada.name,
