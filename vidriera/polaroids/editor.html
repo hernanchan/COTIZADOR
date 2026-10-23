@@ -507,6 +507,78 @@ function resetChallenge(){
  if(turnstileWidget!==null&&window.turnstile&&typeof turnstile.reset==='function')
   turnstile.reset(turnstileWidget);
 }
+/** Nuevo flujo: JPG optimizados en tránsito; sólo PDF final en Google.
+ * Nunca envía File originales, ni genera PDF imprimible en el navegador.
+ */
+async function sendExpressPhotos(){
+ if(busy||loadingPhotos||editorIndex>=0||receivedReference||
+    receiverConfig?.mode!=='express'||!orderComplete())return;
+ if(!receiverApiUrl||sheets.length<1||sheets.length>MAX_SHEETS)
+  throw new Error('El receptor Express no está listo.');
+ if(!$('photoConsent').checked)
+  throw new Error('Aceptá el envío de tus fotos para producir el PDF privado.');
+ const fingerprint=photoFingerprint();
+ if(receivingSession&&receivingSession.fingerprint!==fingerprint)
+  throw new Error('Las fotos o encuadres cambiaron durante el envío.');
+ if(!turnstileToken)
+  throw new Error('Completá la verificación de seguridad para enviar o reintentar.');
+ const all=sheets.flat().filter(Boolean);
+ if(all.length<1||all.length>24)
+  throw new Error('Polaroids Express admite hasta 24 fotografías.');
+ for(const p of all){
+  const file=p?.file;
+  if(!file||!['image/jpeg','image/png'].includes(file.type)||
+     file.size<1||file.size>5*1024*1024)
+   throw new Error('Usá fotos JPG o PNG de hasta 5 MB.');
+ }
+ if(!receivingSession){
+  receivingSession={reference:secureOrderReference(),fingerprint,mode:'express'};
+ }
+ const reference=receivingSession.reference;
+ const challenge=turnstileToken;turnstileToken='';
+ busy=true;document.querySelector('.app').classList.add('uploading');updateSheetNav();
+ try{
+  const {prepararEnvioExpress}=await import('./express-cliente.mjs');
+  const prepared=await prepararEnvioExpress({
+   hojas:sheets.map(sheet=>sheet.filter(Boolean)),
+   recortar:(p,quality)=>imprimirRecorte(p,quality),
+   onAvance:p=>status('Optimizando fotos '+p.preparadas+' de '+p.total+
+    ' · hoja '+p.hoja+' de '+p.hojas+'…')
+  });
+  if(photoFingerprint()!==fingerprint)
+   throw new Error('Los encuadres cambiaron durante la preparación.');
+  status('Enviando '+prepared.fotos+' recortes optimizados para generar un solo PDF privado…');
+  const response=await fetch(receiverApiUrl,{
+   method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({reference,turnstileToken:challenge,hojas:prepared.hojas}),
+   cache:'no-store'
+  });
+  const reply=await response.json().catch(()=>null);
+  if(!response.ok||reply?.ok!==true||reply.verified!==true||
+     reply.pdfPrivateConfirmed!==true||reply.reference!==reference||
+     reply.sheets!==prepared.numeroHojas||reply.photos!==prepared.fotos||
+     reply.pdfForClient!==false||reply.checkoutAuthorized!==false)
+   throw new Error(reply?.error||'Google no confirmó el PDF. Podés reintentar.');
+  const payload={sheets:prepared.numeroHojas,photos:prepared.fotos,format:'85x90',
+   uploadsReceived:true,reference,referenceStatus:'received'};
+  receivedOrder=Object.freeze({
+   reference,sheets:prepared.numeroHojas,photos:prepared.fotos,
+   price:prepared.numeroHojas*unitPrice
+  });
+  receivedReference=reference;receivingSession=null;
+  status('¡PDF privado confirmado! '+prepared.numeroHojas+
+   ' hoja(s) A4 · Referencia '+reference+'.','ok');
+  if(window.parent!==window)
+   window.parent.postMessage({type:'SABER_POLAROID_RECEIVED',payload},window.location.origin);
+ }catch(e){
+  status('El PDF todavía no está confirmado. '+String(e?.message||'')+
+   ' Mantené esta pantalla abierta y reintentá con una nueva verificación.','bad');
+ }finally{
+  resetChallenge();
+  busy=false;document.querySelector('.app').classList.remove('uploading');updateSheetNav();
+ }
+}
+
 async function sendSecurePhotos(){
  if(receiverConfig?.mode==='express')return sendExpressPhotos();
  if(busy||loadingPhotos||editorIndex>=0||receivedReference||!receiverConfig||!receiverConfig.enabled||!orderComplete())return;
