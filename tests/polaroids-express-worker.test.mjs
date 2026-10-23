@@ -34,7 +34,7 @@ const fetcher=async(url,opts)=>{
   assert.equal(opts.method,'POST');
   assert.equal(opts.redirect,'manual');
   const signed=JSON.parse(opts.body);
-  const message=signed.timestamp+'\\n'+signed.nonce+'\\n'+signed.payloadJson;
+  const message=signed.timestamp+'\n'+signed.nonce+'\n'+signed.payloadJson;
   assert.equal(signed.signature,createHmac('sha256',env.EXPRESS_PDF_HMAC_KEY)
    .update(message).digest('hex'));
   const p=JSON.parse(signed.payloadJson);
