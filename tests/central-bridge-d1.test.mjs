@@ -220,3 +220,22 @@ test('crear orden mixta: recalcular catálogo, vincular D1 y bloquear checkout',
  assert.equal(db.prepare('SELECT preference_id FROM orders WHERE id=?').get(commercial).preference_id,null);
  assert.equal((await admin('/admin/api/orders')).result.orders.length,0);
 });
+
+test('Central conserva pedidos impagos aparte y no libera producción hasta cobro',async()=>{
+ const x=await admin('/admin/api/central/unpaid');
+ assert.equal(x.status,200);
+ const pending=x.result.orders;
+ assert.ok(pending.some(p=>p.web_order_id==='WEB-ENSAYO-SEGUNDO000000'&&p.status==='awaiting_payment'));
+ assert.ok(pending.some(p=>p.web_order_id===webId&&p.status==='paid'));
+ assert.equal((await admin('/admin/api/central/unpaid',false)).status,401);
+ const target=pending.find(p=>p.web_order_id==='WEB-ENSAYO-SEGUNDO000000');
+ assert.equal((await admin('/admin/api/order?id='+target.commercial_order_id)).status,404);
+ db.prepare("UPDATE orders SET status='paid',paid_at=datetime('now') WHERE id=?").run(target.commercial_order_id);
+ const paid=(await admin('/admin/api/orders')).result.orders;
+ assert.ok(paid.some(p=>p.id===target.commercial_order_id));
+ const detail=(await admin('/admin/api/order?id='+target.commercial_order_id)).result;
+ assert.equal(detail.produccion.documentosVerificados.trabajos.length,2);
+ assert.equal(detail.produccion.listoParaProducir,false);
+ const remaining=(await admin('/admin/api/central/unpaid')).result.orders;
+ assert.ok(!remaining.some(p=>p.commercial_order_id===target.commercial_order_id));
+});
