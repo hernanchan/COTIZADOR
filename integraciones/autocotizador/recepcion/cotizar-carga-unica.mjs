@@ -1,14 +1,16 @@
 import {clasificarDestino} from './destino-impresion.mjs';
+import {seleccionarPaginas} from './seleccionar-paginas.mjs';
 import {cotizarDocumentosIndividuales} from '../pruebas/cotizar-documentos-individuales.mjs';
 import {cotizarPloteosRapido,rolloEstandarAutomatico} from '../pruebas/cotizar-ploteos-rapido.mjs';
 
 const PLANO=['cad','poster'];
 const VALORACION='PRELIMINAR_SIN_VERIFICAR';
 function validarArchivo(a,i){
- if(!a||Object.keys(a).sort().join(',')!=='anillado,caras,copias,grupoAnillado,materialColor,modo,nombre,paginas,papelPoster,seleccion'||
+ if(!a||Object.keys(a).sort().join(',')!=='anillado,caras,copias,grupoAnillado,materialColor,modo,nombre,paginas,paginasSeleccionadas,papelPoster,seleccion'||
  typeof a.nombre!=='string'||!a.nombre.trim()||a.nombre.length>160||
  !Array.isArray(a.paginas)||a.paginas.length<1||a.paginas.length>2000||
  !Number.isSafeInteger(a.copias)||a.copias<1||a.copias>500||
+ typeof a.paginasSeleccionadas!=='string'||a.paginasSeleccionadas.length>500||
  !['bn','color'].includes(a.modo)||!['simple','double'].includes(a.caras)||
  !['obra80','recubierto'].includes(a.papelPoster)||
  !['ninguno','individual','grupo'].includes(a.anillado)||
@@ -39,10 +41,11 @@ export function cotizarCargaUnica({archivos,precios}){
  const documentos=[],ploteos=[],pendientes=[],plan=[];
  archivos.forEach((a,i)=>{
   validarArchivo(a,i);
-  const d=clasificarDestino(a.paginas,a.seleccion);
+  const seleccionadas=seleccionarPaginas(a.paginas,a.paginasSeleccionadas);
+  const d=clasificarDestino(seleccionadas,a.seleccion);
   if(!d.confirmado){pendientes.push({indice:i,nombre:a.nombre,motivo:'Confirmar tamaño final'});return}
   if(d.destino==='documentos'){
-   const formato=d.tamanoFinal==='original'?tipoOriginal(a.paginas):d.tamanoFinal;
+   const formato=d.tamanoFinal==='original'?tipoOriginal(seleccionadas):d.tamanoFinal;
    if(!['a4','a3'].includes(formato)){
     pendientes.push({indice:i,nombre:a.nombre,motivo:formato==='a5'?'A5 sin tarifa autónoma vigente':'Tamaño original no homogéneo A4/A3'});return;
    }
@@ -51,25 +54,25 @@ export function cotizarCargaUnica({archivos,precios}){
    if(a.modo==='color'&&!catalogo.some(m=>m.id===a.materialColor)){
     pendientes.push({indice:i,nombre:a.nombre,motivo:'Material incompatible con formato final'});return;
    }
-   documentos.push({id,nombre:a.nombre,paginas:a.paginas.length,copias:a.copias,
+   documentos.push({id,nombre:a.nombre,paginas:seleccionadas.length,copias:a.copias,
     formato,modo:a.modo,caras:a.caras,anillado:a.anillado,grupoAnillado:a.grupoAnillado,
     materialColor:a.modo==='color'?a.materialColor:'estandar',orden:i+1});
-   plan.push({indice:i,nombre:a.nombre,origen:a.paginas.map(p=>({numero:p.numero,anchoCm:p.anchoCm,altoCm:p.altoCm})),
-    formatoFinal:formato,ajuste:d.cambioEscala?'proporcional_sin_recorte':'sin_escalado',destino:'documentos',id});
+   plan.push({indice:i,nombre:a.nombre,origen:seleccionadas.map(p=>({numero:p.numero,anchoCm:p.anchoCm,altoCm:p.altoCm})),
+    paginasElegidas:seleccionadas.map(p=>p.numero),formatoFinal:formato,ajuste:d.cambioEscala?'proporcional_sin_recorte':'sin_escalado',destino:'documentos',id});
    return;
   }
-  if(a.paginas.some(p=>!PLANO.includes(p.modo))){
+  if(seleccionadas.some(p=>!PLANO.includes(p.modo))){
    pendientes.push({indice:i,nombre:a.nombre,motivo:'Clasificación visual CAD/Póster pendiente'});return;
   }
   if(a.anillado!=='ninguno'){
    pendientes.push({indice:i,nombre:a.nombre,motivo:'Anillado incompatible con ploteo'});return;
   }
   const id='pl'+(ploteos.length+1);
-  const material=rolloEstandarAutomatico(a.paginas,precios.plotter.supports).id;
-  const paginas=a.paginas.map(p=>({...p}));
+  const material=rolloEstandarAutomatico(seleccionadas,precios.plotter.supports).id;
+  const paginas=seleccionadas.map((p,j)=>({...p,numero:j+1}));
   ploteos.push({id,nombre:a.nombre,paginas,modo:paginas[0].modo,material,copias:a.copias,papelPoster:a.papelPoster});
   plan.push({indice:i,nombre:a.nombre,origen:a.paginas.map(p=>({numero:p.numero,anchoCm:p.anchoCm,altoCm:p.altoCm})),
-   formatoFinal:'original',ajuste:'sin_escalado',destino:'ploteos',id});
+   paginasElegidas:seleccionadas.map(p=>p.numero),formatoFinal:'original',ajuste:'sin_escalado',destino:'ploteos',id});
  });
  // Un grupo debe tener dos archivos válidos y coincidir en tamaño/cantidad.
  // Los grupos no cotizables se bloquean completos, sin sumar un anillado parcial.
