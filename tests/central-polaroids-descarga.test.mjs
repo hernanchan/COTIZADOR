@@ -98,6 +98,11 @@ test('la Central exige PDF privado registrado y una compra antes de descargar',a
 });
 test('sólo operador de pedido realmente pagado puede descargar UN PDF',async()=>{
  db.prepare("UPDATE orders SET status='paid',paid_at=datetime('now'),payment_id='MP-TEST-1',preference_id='MP-PREF-1' WHERE id=?").run(id);
+ const listResponse=await context.worker.fetch(new Request(host+'/admin/api/central/polaroids',{
+  headers:{Authorization:'Bearer '+env.DEMO_ADMIN_KEY}
+ }),env);
+ assert.equal(listResponse.status,200);
+ assert.equal((await listResponse.json()).manifests.find(x=>x.referencia===reference).estadoPago,'PAGADO');
  const res=await download();
  assert.equal(res.status,200,await res.clone().text().then(x=>x.slice(0,100)));
  assert.equal(res.headers.get('Content-Type'),'application/pdf');
