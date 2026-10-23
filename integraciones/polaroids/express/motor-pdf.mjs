@@ -116,6 +116,7 @@ export async function guardarPedidoPdfExpress({
  return Object.freeze({
   ok:true,referencia,fotos:result.fotos,hojas:result.hojas,
   precioOrientativo:result.precioOrientativo,
-  pdfPrivadoVerificado:true,permiteDescargaCliente:false
+  pdfPrivadoVerificado:true,permiteDescargaCliente:false,
+  pdfSha256:hash,pdfTamanoBytes:result.pdfBytes.length
  });
 }
