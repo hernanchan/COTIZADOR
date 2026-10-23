@@ -50,7 +50,7 @@ const sandbox={Utilities,DriveApp:{Access:{PRIVATE:'PRIVATE'},getFolderById:()=>
  getProperty:key=>key==='EXPRESS_PDF_HMAC_KEY'?hmacKey:key==='EXPRESS_PDF_FOLDER_ID'?'private-folder':null
  })},LockService:{getScriptLock:()=>({tryLock:()=>true,releaseLock:()=>{}})},
  ContentService:{MimeType:{JSON:'application/json'},
- createTextOutput:text=>({text,setMimeType(){return this}})},console};
+ createTextOutput:text=>({text,setMimeType(){return this}})},Logger:{log:()=>{}},console};
 vm.createContext(sandbox);
 const gs=readFileSync(new URL('../integraciones/polaroids/express/apps-script-solo-pdf.gs',import.meta.url),'utf8');
 assert.doesNotThrow(()=>new vm.Script(gs));
