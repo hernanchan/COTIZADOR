@@ -2,6 +2,7 @@ import {clasificarDestino} from './destino-impresion.mjs';
 import {cotizarStickersPdf} from './cotizar-stickers.mjs';
 import {procesarFotoCarga} from './procesar-foto-carga.mjs';
 import {procesarCorteCarga} from './procesar-corte-carga.mjs';
+import {procesarGraficaCarga} from './procesar-grafica-carga.mjs';
 import {seleccionarPaginas} from './seleccionar-paginas.mjs';
 import {cotizarDocumentosIndividuales} from '../pruebas/cotizar-documentos-individuales.mjs';
 import {cotizarPloteosRapido,rolloEstandarAutomatico} from '../pruebas/cotizar-ploteos-rapido.mjs';
