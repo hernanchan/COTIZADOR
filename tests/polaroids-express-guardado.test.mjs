@@ -142,8 +142,8 @@ test('GAS entrega PDF completo sólo ante solicitud HMAC firmada',()=>{
  const stored=files.values().next().value;
  const bytes=binary(stored.blob.getBytes());
  const sha256=createHash('sha256').update(bytes).digest('hex');
- const signedRead=(secret,reference=reference)=>{
-  const payloadJson=JSON.stringify({op:'leerPdfExpress',referencia:reference,
+ const signedRead=(secret,refName=reference)=>{
+  const payloadJson=JSON.stringify({op:'leerPdfExpress',referencia:refName,
    bytes:bytes.length,sha256});
   const timestamp=Math.floor(Date.now()/1000),nonce=randomUUID();
   const signature=createHmac('sha256',secret).update(timestamp+'\n'+nonce+'\n'+payloadJson).digest('hex');
