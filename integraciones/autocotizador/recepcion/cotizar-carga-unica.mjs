@@ -1,4 +1,5 @@
 import {clasificarDestino} from './destino-impresion.mjs';
+import {cotizarStickersPdf} from './cotizar-stickers.mjs';
 import {seleccionarPaginas} from './seleccionar-paginas.mjs';
 import {cotizarDocumentosIndividuales} from '../pruebas/cotizar-documentos-individuales.mjs';
 import {cotizarPloteosRapido,rolloEstandarAutomatico} from '../pruebas/cotizar-ploteos-rapido.mjs';
@@ -6,11 +7,12 @@ import {cotizarPloteosRapido,rolloEstandarAutomatico} from '../pruebas/cotizar-p
 const PLANO=['cad','poster'];
 const VALORACION='PRELIMINAR_SIN_VERIFICAR';
 function validarArchivo(a,i){
- if(!a||!['anillado,caras,copias,grupoAnillado,materialColor,modo,nombre,paginas,papelPoster,seleccion','anillado,caras,copias,grupoAnillado,materialColor,modo,nombre,paginas,paginasSeleccionadas,papelPoster,seleccion'].includes(Object.keys(a).sort().join(','))||
+ if(!a||!['anillado,caras,copias,grupoAnillado,materialColor,modo,nombre,paginas,papelPoster,seleccion','anillado,caras,copias,grupoAnillado,materialColor,modo,nombre,paginas,paginasSeleccionadas,papelPoster,seleccion','anillado,caras,copias,grupoAnillado,materialColor,modo,nombre,paginas,papelPoster,seleccion,servicio','anillado,caras,copias,grupoAnillado,materialColor,modo,nombre,paginas,paginasSeleccionadas,papelPoster,seleccion,servicio'].includes(Object.keys(a).sort().join(','))||
  typeof a.nombre!=='string'||!a.nombre.trim()||a.nombre.length>160||
  !Array.isArray(a.paginas)||a.paginas.length<1||a.paginas.length>2000||
  !Number.isSafeInteger(a.copias)||a.copias<1||a.copias>500||
  (a.paginasSeleccionadas!==undefined&&(typeof a.paginasSeleccionadas!=='string'||a.paginasSeleccionadas.length>500))||
+ !(a.servicio===undefined||['auto','stickers'].includes(a.servicio))||
  !['bn','color'].includes(a.modo)||!['simple','double'].includes(a.caras)||
  !['obra80','recubierto'].includes(a.papelPoster)||
  !['ninguno','individual','grupo'].includes(a.anillado)||
@@ -38,11 +40,25 @@ function tipoOriginal(paginas){
  */
 export function cotizarCargaUnica({archivos,precios}){
  if(!Array.isArray(archivos)||!archivos.length||archivos.length>30)throw Error('Cantidad de archivos inválida');
- const documentos=[],ploteos=[],pendientes=[],plan=[];
+ const documentos=[],ploteos=[],stickers=[],pendientes=[],plan=[];
  archivos.forEach((a,i)=>{
   validarArchivo(a,i);
   const seleccionadas=seleccionarPaginas(a.paginas,a.paginasSeleccionadas);
   const d=clasificarDestino(seleccionadas,a.seleccion);
+  if(a.servicio==='stickers'){
+   if(!d.confirmado){pendientes.push({indice:i,nombre:a.nombre,motivo:'Confirmar tamaño A4/A3 para stickers'});return}
+   const formato=d.tamanoFinal==='original'?tipoOriginal(seleccionadas):d.tamanoFinal;
+   if(!['a4','a3'].includes(formato)){
+    pendientes.push({indice:i,nombre:a.nombre,motivo:'Stickers con precorte: elegir tamaño A4 o A3'});return;
+   }
+   const calculo=cotizarStickersPdf({formato,paginas:seleccionadas.length,copias:a.copias,precios});
+   const id='stk'+(stickers.length+1);
+   stickers.push({id,nombre:a.nombre,...calculo});
+   plan.push({indice:i,nombre:a.nombre,origen:seleccionadas.map(p=>({numero:p.numero,anchoCm:p.anchoCm,altoCm:p.altoCm})),
+    paginasElegidas:seleccionadas.map(p=>p.numero),formatoFinal:formato,destino:'stickers',id,
+    ajuste:d.cambioEscala?'proporcional_sin_recorte':'sin_escalado'});
+   return;
+  }
   if(!d.confirmado){pendientes.push({indice:i,nombre:a.nombre,motivo:'Confirmar tamaño final'});return}
   if(d.destino==='documentos'){
    const formato=d.tamanoFinal==='original'?tipoOriginal(seleccionadas):d.tamanoFinal;
@@ -105,9 +121,10 @@ export function cotizarCargaUnica({archivos,precios}){
  const c=cotizables.length?cotizarDocumentosIndividuales({archivos:cotizables,precios}):null;
  const p=ploteos.length?cotizarPloteosRapido({trabajos:ploteos,precios}):null;
  const subtotalImpresiones=c?.total||0,subtotalPloteos=p?.total||0;
+ const subtotalStickers=stickers.reduce((sum,x)=>sum+x.subtotal,0);
  return {ok:true,estado:pendientes.length?'INCOMPLETO':'PRELIMINAR',verificacion:VALORACION,
-  paymentAuthorized:false,total:pendientes.length?null:subtotalImpresiones+subtotalPloteos,
-  subtotalImpresiones,subtotalPloteos,subtotalAnillados:c?.subtotalAnillados||0,
+  paymentAuthorized:false,total:pendientes.length?null:subtotalImpresiones+subtotalPloteos+subtotalStickers,
+  subtotalImpresiones,subtotalPloteos,subtotalStickers,subtotalAnillados:c?.subtotalAnillados||0,
   detalleArmados:c?.detalleArmados||[],pendientes,plan,
-  detalleImpresiones:c?.detalles||[],detallePloteos:p?.detalles||[]};
+  detalleImpresiones:c?.detalles||[],detallePloteos:p?.detalles||[],detalleStickers:stickers};
 }
