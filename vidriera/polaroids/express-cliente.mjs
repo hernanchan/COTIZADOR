@@ -1,7 +1,7 @@
 /** Cliente Express sin PDF imprimible ni envío de originales. */
 export const MAX_FOTOS_EXPRESS=24;
 export const MAX_HOJAS_EXPRESS=4;
-const MAX_RECorte=750000;
+const MAX_RECorte=450000;
 const CALIDADES=[.82,.75,.68,.60];
 function base64(bytes){
  const result=[],STEP=3*32768;
