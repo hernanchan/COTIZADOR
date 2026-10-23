@@ -38,6 +38,8 @@ jobs:
         run: node tests/mercadopago-carrito.test.mjs
       - name: Verificar vinculación D1 de Central con firmas HMAC (sin pagos reales)
         run: node --experimental-sqlite tests/central-bridge-d1.test.mjs
+      - name: Regresión integral de pagos y Centro de Pedidos (SQL local; sin red)
+        run: node --experimental-sqlite tests/pagos-integral.test.mjs
       - name: Compilar Worker standalone
         working-directory: integraciones/autocotizador/recepcion
         run: npm run build:pilot
