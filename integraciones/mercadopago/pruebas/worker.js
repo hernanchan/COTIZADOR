@@ -401,6 +401,98 @@ async function centralPolaroidStage(request,env){
  return json({saved:true,idempotent:false,referencia:verified.reference,
   pdfPrivadoVerificado:true,paymentAuthorized:false},201);
 }
+
+/**
+ * Alta de compra Express aún SIN CHECKOUT. Se limita a manifiestos auténticos
+ * del backend y recalcula productos del catálogo; jamás acepta importe cliente.
+ */
+async function centralPolaroidPrepareOrder(req,env){
+ if(env.CENTRAL_EXPRESS_PREPARE_ENABLED!=="PRIVATE_TEST_ONLY")
+  return json({error:"Pedidos Express todavía deshabilitados"},503);
+ const signed=await centralReadSigned(req,env);
+ if(signed.error)return json({error:signed.error},signed.status);
+ const data=signed.payload;
+ if(!data||typeof data!=="object"||Array.isArray(data)||
+    Object.keys(data).sort().join(",")!=="clientOrderId,items,referencia"||
+    !CENTRAL_UUID.test(data.clientOrderId||"")||
+    !CENTRAL_POLAROID.test(data.referencia||"")||
+    !Array.isArray(data.items)||data.items.length>40)
+  return json({error:"Pedido Express comercial inválido"},400);
+ const codes=new Set(),products=[];
+ for(const item of data.items){
+  if(!item||Object.keys(item).sort().join(",")!=="code,qty"||
+     typeof item.code!=="string"||!item.code.trim()||item.code.length>80||
+     !Number.isSafeInteger(item.qty)||item.qty<1||item.qty>500||
+     codes.has(item.code))
+   return json({error:"Artículo repetido o cantidad inválida"},422);
+  codes.add(item.code);
+  products.push({code:item.code,qty:item.qty});
+ }
+ await centralPolaroidTable(env);await ensureOrderItems(env);
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS cart_requests (client_order_id TEXT PRIMARY KEY,request_hash TEXT NOT NULL,order_id TEXT NOT NULL UNIQUE)").run();
+ const fingerprint=await centralHash(JSON.stringify({
+  referencia:data.referencia,items:products
+ }));
+ const old=await env.DB.prepare("SELECT request_hash,order_id FROM cart_requests WHERE client_order_id=?").bind(data.clientOrderId).first();
+ if(old){
+  if(old.request_hash!==fingerprint)
+   return json({error:"El intento de compra contiene otro carrito"},409);
+  const manifest=await env.DB.prepare("SELECT reference FROM central_polaroids_express WHERE commercial_order_id=?").bind(old.order_id).first();
+  const order=await env.DB.prepare("SELECT amount_ars,status FROM orders WHERE id=?").bind(old.order_id).first();
+  if(!manifest||!order||manifest.reference!==data.referencia)
+   return json({error:"No coincide el intento con la recepción verificada"},409);
+  return json({created:true,idempotent:true,commercial_order_id:old.order_id,
+   amount_ars:order.amount_ars,state:order.status,checkoutEnabled:false,
+   paymentAuthorized:false},200);
+ }
+ const manifest=await env.DB.prepare("SELECT reference,photos,sheets,sha256,bytes,amount_ars,commercial_order_id FROM central_polaroids_express WHERE reference=?").bind(data.referencia).first();
+ if(!manifest)return json({error:"La Central no recibió aún el PDF Express"},404);
+ if(manifest.commercial_order_id)
+  return json({error:"Este PDF ya pertenece a otro pedido"},409);
+ if(manifest.amount_ars!==manifest.sheets*3000||manifest.photos>manifest.sheets*6||
+    manifest.photos<manifest.sheets*6-5)
+  return json({error:"Importe o cantidad de fotos inconsistentes"},409);
+ let total=manifest.amount_ars;
+ const details=[];
+ if(products.length){
+  const catalog=await getCatalog();
+  for(const item of products){
+   const entry=catalog.get(item.code);
+   if(!entry)return json({error:"Artículo no disponible"},422);
+   const amount=entry.price*item.qty;
+   if(!Number.isSafeInteger(amount)||amount<1||amount>50000000)
+    return json({error:"Valor del artículo fuera de rango"},422);
+   total+=amount;
+   details.push({...item,unit:entry.price,title:entry.name,amount});
+  }
+ }
+ if(!Number.isSafeInteger(total)||total<1||total>50000000)
+  return json({error:"El pedido supera el máximo de ensayo"},422);
+ const orderId=crypto.randomUUID();
+ const statements=[
+  env.DB.prepare("INSERT INTO orders(id,description,amount_ars,deposit_ars) VALUES(?,?,?,?)").bind(orderId,"Librería Saber · Polaroids Express y tienda",total,total),
+  env.DB.prepare("INSERT INTO order_items(order_id,line_number,item_type,sku,title,quantity,unit_price_ars,line_total_ars,detail_json,file_references_json) VALUES(?,?,?,?,?,?,?,?,?,?)")
+   .bind(orderId,1,"print","POLAROID_EXPRESS_A4","Polaroids Express PDF privado",manifest.sheets,3000,manifest.amount_ars,
+    JSON.stringify({photos:manifest.photos,sheets:manifest.sheets,pdfFinalVerified:true}),
+    JSON.stringify([manifest.reference]))
+ ];
+ details.forEach((p,i)=>statements.push(
+  env.DB.prepare("INSERT INTO order_items(order_id,line_number,item_type,sku,title,quantity,unit_price_ars,line_total_ars,detail_json,file_references_json) VALUES(?,?,?,?,?,?,?,?,?,?)")
+   .bind(orderId,i+2,"product",p.code,p.title,p.qty,p.unit,p.amount,"{}","[]")
+ ));
+ statements.push(env.DB.prepare("INSERT INTO cart_requests(client_order_id,request_hash,order_id) VALUES(?,?,?)").bind(data.clientOrderId,fingerprint,orderId));
+ statements.push(env.DB.prepare("UPDATE central_polaroids_express SET commercial_order_id=?,linked_at=datetime('now') WHERE reference=? AND commercial_order_id IS NULL").bind(orderId,manifest.reference));
+ let results;
+ try{results=await env.DB.batch(statements)}
+ catch(_){return json({error:"Otro intento utilizó esta referencia; consultar primero"},409)}
+ if(results?.[results.length-1]?.meta?.changes!==1)
+  return json({error:"Vinculación de PDF con compra no confirmada"},409);
+ return json({created:true,idempotent:false,commercial_order_id:orderId,
+  amount_ars:total,polaroids_ars:manifest.amount_ars,
+  productos_ars:total-manifest.amount_ars,
+  state:"awaiting_payment",checkoutEnabled:false,paymentAuthorized:false},201);
+}
+
 async function centralPolaroidDetail(env,id){
  await centralPolaroidTable(env);
  const row=await env.DB.prepare("SELECT reference,sha256,bytes,photos,sheets,amount_ars,created_at FROM central_polaroids_express WHERE commercial_order_id=?").bind(id).first();
