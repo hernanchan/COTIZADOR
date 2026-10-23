@@ -9,7 +9,7 @@ export const EXPRESS=Object.freeze({
  anchoHojaMm:210,altoHojaMm:297,
  anchoPolaroidMm:85,altoPolaroidMm:90,
  imagenMm:75,imagenMargenIzquierdoMm:5,imagenMargenSuperiorMm:4,
- ladoRecortePx:886,maxRecorteBytes:750000,
+ ladoRecortePx:886,maxRecorteBytes:450000,
  precioPorHoja:3000,maxPdfBytes:12*1024*1024
 });
 const pt=mm=>mm*72/25.4;
