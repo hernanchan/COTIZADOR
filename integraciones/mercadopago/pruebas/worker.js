@@ -592,7 +592,8 @@ async function centralPolaroidDetail(env,id){
   totalPolaroids:row.amount_ars,bytes:row.bytes,
   sha256:row.sha256,fechaRecepcion:row.created_at,
   pdfPrivadoVerificado:true,
-  descargaSoloOperador:true,descargaHabilitada:false,
+  descargaSoloOperador:true,
+  descargaHabilitada:env.CENTRAL_EXPRESS_DOWNLOAD_ENABLED==="PRIVATE_TEST_ONLY",
   pagoConfirmado:false,listoParaProducir:false
  }:null;
 }
@@ -658,7 +659,29 @@ if(x.produccion?.polaroidsExpress){
  details.append(node("h4","Polaroids Express · PDF único verificado"));
  details.append(node("p",d.referencia+" · "+d.fotos+" fotos · "+d.paginasA4+
   " hoja(s) A4 · "+money(d.totalPolaroids)+" · Pago confirmado"));
- details.append(node("p","PDF en Drive privado. Descarga administrativa pendiente de habilitación."));
+ if(d.descargaHabilitada){
+  const button=node("button","Descargar PDF privado");
+  button.addEventListener("click",async()=>{
+   button.disabled=true;
+   try{
+    const response=await fetch("/admin/api/central/polaroid-pdf?reference="+
+      encodeURIComponent(d.referencia),{method:"GET",headers:{
+       "Authorization":"Bearer "+secret.value},"cache":"no-store"});
+    if(!response.ok||!String(response.headers.get("Content-Type")||"").startsWith("application/pdf"))
+     throw Error("No se confirmó el PDF privado de Drive.");
+    const blob=await response.blob();
+    if(blob.size<100||blob.size>12*1024*1024)
+     throw Error("El archivo recibido no es válido.");
+    const uri=URL.createObjectURL(blob);
+    const link=document.createElement("a");
+    link.href=uri;link.download=d.referencia+"_IMPRIMIR.pdf";
+    document.body.appendChild(link);link.click();link.remove();
+    setTimeout(()=>URL.revokeObjectURL(uri),10000);
+   }catch(e){status.textContent=String(e.message||e)}
+   finally{button.disabled=false}
+  });
+  details.append(button);
+ }else details.append(node("p","PDF en Drive privado. Descarga administrativa pendiente de habilitación."));
 }status.textContent=""}catch(e){status.textContent=e.message}}
 async function refreshCronState(){
  const el=document.querySelector("#cronState");
@@ -1030,6 +1053,9 @@ export default {
     await centralTables(env);await ensurePaymentReviews(env);
     const rows=await env.DB.prepare("SELECT m.web_order_id,m.commercial_order_id,m.amount_ars AS documents_ars,m.file_count,o.amount_ars AS order_ars,o.status,o.created_at FROM central_document_manifests m JOIN orders o ON o.id=m.commercial_order_id WHERE m.commercial_order_id IS NOT NULL AND (o.status!='paid' OR EXISTS(SELECT 1 FROM payment_reviews p WHERE p.order_id=o.id AND p.state='revoked')) ORDER BY o.created_at DESC LIMIT 50").all();
     return json({estado:"PEDIDOS_DOCUMENTALES_SIN_PAGO_CONFIRMADO",orders:rows.results||[],productionAuthorized:false});
+   }
+   if(url.pathname==="/admin/api/central/polaroid-pdf"&&req.method==="GET"){
+    return await centralPolaroidDownload(req,env,url.searchParams.get("reference")||"");
    }
    if(url.pathname==="/admin/api/central/polaroids"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
