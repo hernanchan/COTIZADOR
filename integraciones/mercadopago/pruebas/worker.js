@@ -742,6 +742,12 @@ export default {
     const rows=await env.DB.prepare("SELECT id,description,amount_ars,status,paid_at,created_at FROM orders WHERE status='paid' AND deposit_ars=amount_ars AND NOT EXISTS (SELECT 1 FROM payment_reviews WHERE order_id=orders.id AND state='revoked') ORDER BY paid_at DESC LIMIT 100").all();
     return json({orders:rows.results});
    }
+   if(url.pathname==="/admin/api/central/unpaid"&&req.method==="GET"){
+    if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+    await centralTables(env);await ensurePaymentReviews(env);
+    const rows=await env.DB.prepare("SELECT m.web_order_id,m.commercial_order_id,m.amount_ars AS documents_ars,m.file_count,o.amount_ars AS order_ars,o.status,o.created_at FROM central_document_manifests m JOIN orders o ON o.id=m.commercial_order_id WHERE m.commercial_order_id IS NOT NULL AND (o.status!='paid' OR EXISTS(SELECT 1 FROM payment_reviews p WHERE p.order_id=o.id AND p.state='revoked')) ORDER BY o.created_at DESC LIMIT 50").all();
+    return json({estado:"PEDIDOS_DOCUMENTALES_SIN_PAGO_CONFIRMADO",orders:rows.results||[],productionAuthorized:false});
+   }
    if(url.pathname==="/admin/api/central/pending"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
     await centralTables(env);
