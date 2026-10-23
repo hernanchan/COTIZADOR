@@ -57,7 +57,7 @@ function render(){
    const tipo=d.confirmado?(d.destino==='ploteo'?'Ploteo':'Impresión'):'Tamaño sin confirmar';
    const material=e.modo==='color'?'Color':'B/N';
    const extra=d.destino==='documentos'?(' · '+material+(e.anillado==='individual'?' · Anillado':e.anillado==='grupo'?' · Grupo '+e.grupoAnillado:'')):
-    (paginas.some(p=>p.modo==='poster')?' · '+(e.papelPoster==='recubierto'?'Recubierto':'Obra 80 g'):'');
+    (elegidas.some(p=>p.modo==='poster')?' · '+(e.papelPoster==='recubierto'?'Recubierto':'Obra 80 g'):'');
    resumen.textContent=(e.paginasSeleccionadas?(e.paginasSeleccionadas+' de '+e.paginas.length):(e.paginas.length+' pág.'))+' · '+tipo+(d.confirmado?' '+(d.tamanoFinal==='original'?'original':d.tamanoFinal.toUpperCase()):'')+' · '+e.copias+' copia(s)'+(d.confirmado?extra:'');
   }else resumen.textContent=e.error?'Error de lectura':'Analizando PDF…';
   principal.append(resumen);fila.append(principal);
