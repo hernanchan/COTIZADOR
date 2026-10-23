@@ -1,4 +1,6 @@
 import {clasificarCoberturaPloteo} from './clasificar-cobertura-ploteo.mjs';
+import {contieneRotuloTecnico} from './refinar-tipo-plano.mjs';
+import {ajustarPlanoTecnicoPorPagina} from './regla-comercial-ploteos.mjs';
 // PDF.js fijado en una versión conocida; procesa las páginas localmente.
 // No enviar bytes ni capturas del PDF a servicios externos.
 const PDFJS_WORKER='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -29,7 +31,9 @@ export async function clasificarPaginasPloteo(file,{onProgreso=()=>{},maxPaginas
    await page.render({canvasContext:context,viewport,background:'rgb(255,255,255)'}).promise;
    const pixels=context.getImageData(0,0,canvas.width,canvas.height).data;
    const clasificacion=clasificarCoberturaPloteo(pixels,{ancho:canvas.width,alto:canvas.height});
-   modos.push({numero:i,...clasificacion});
+   let rotuloTecnico=false;
+   try{const texto=await page.getTextContent();rotuloTecnico=contieneRotuloTecnico((texto.items||[]).map(item=>item.str||'').join(' '));}catch(_){/* Sin rótulo comprobado, sin ajuste automático. */}
+   modos.push({numero:i,...ajustarPlanoTecnicoPorPagina(clasificacion,{rotuloTecnico})});
    canvas.width=0;canvas.height=0;
    page.cleanup();
    onProgreso({terminadas:i,total:pdf.numPages,clasificacion});
