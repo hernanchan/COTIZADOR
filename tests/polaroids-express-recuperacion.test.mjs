@@ -49,7 +49,7 @@ test('borra borrador vencido o manipulado sin enviar fotos',async()=>{
  assert.equal(removed,2);
  await storage.put({key:'un-envio',version:1,guardadoEn:t,
   referencia:reference,hojas:[[Buffer.alloc(200).toString('base64')]]});
- assert.equal(await leerBorradorExpress({storage,now:()=>t+1000})?.fotos,1);
+ assert.equal((await leerBorradorExpress({storage,now:()=>t+1000}))?.fotos,1);
  await storage.put({key:'un-envio',version:1,guardadoEn:t,
   referencia:reference,hojas:[['not base64']]});
  assert.equal(await leerBorradorExpress({storage,now:()=>t+1000}),null);
