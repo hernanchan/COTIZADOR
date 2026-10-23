@@ -48,7 +48,7 @@ export function cotizarCargaUnica({archivos,precios}){
   validarArchivo(a,i);
   const seleccionadas=seleccionarPaginas(a.paginas,a.paginasSeleccionadas);
   const d=clasificarDestino(seleccionadas,a.seleccion);
-  if(a.servicio==='corte'){return;}
+  if(a.servicio==='corte'){pendientes.push({indice:i,nombre:a.nombre,motivo:'Corte pendiente de calcular'});return;}
   if(a.servicio==='fotos'){
    procesarFotoCarga({archivo:a,indice:i,paginas:seleccionadas,precios,fotos,plan,pendientes});
    return;
