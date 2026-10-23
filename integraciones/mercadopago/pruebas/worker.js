@@ -628,7 +628,7 @@ export default {
     const id=url.searchParams.get("id")||"";
     if(!/^[a-f0-9-]{36}$/i.test(id))return json({error:"ID de pedido inválido"},400);
     await ensurePaymentReviews(env);
-    const order=await env.DB.prepare("SELECT id,description,amount_ars,status,paid_at,created_at,payment_id FROM orders WHERE id=? AND status='paid' AND deposit_ars=amount_ars AND NOT EXISTS (SELECT 1 FROM payment_reviews WHERE order_id=orders.id AND state='revoked')").bind(id).first();
+    const order=await env.DB.prepare("SELECT id,description,amount_ars,deposit_ars,status,paid_at,created_at,payment_id FROM orders WHERE id=? AND status='paid' AND deposit_ars=amount_ars AND NOT EXISTS (SELECT 1 FROM payment_reviews WHERE order_id=orders.id AND state='revoked')").bind(id).first();
     if(!order)return json({error:"Pedido pagado no encontrado"},404);
     await ensureOrderItems(env);
     const rows=await env.DB.prepare("SELECT line_number,item_type,sku,title,quantity,unit_price_ars,line_total_ars,detail_json,file_references_json FROM order_items WHERE order_id=? ORDER BY line_number").bind(id).all();
