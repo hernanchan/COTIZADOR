@@ -87,7 +87,7 @@ function render(){
   const aviso=clasificarDestino(paginas);
   if(aviso.requiereConfirmacion){const n=texto('p','Confirmá el tamaño de impresión: el PDF puede tener medidas distintas a las que querés.');n.className='advertencia';panel.append(n)}
   const controles=document.createElement('div');controles.className='controles';
-  controles.append(valor('Servicio', [['auto','Impresiones / ploteos'],['stickers','Stickers con precorte A4/A3'],['fotos','Fotografías y carnet']],e.servicio||'auto',v=>{e.servicio=v;if(v==='stickers'||v==='fotos'){e.anillado='ninguno';e.grupoAnillado=''}cambio()}));
+  controles.append(valor('Servicio', [['auto','Impresiones / ploteos'],['stickers','Stickers con precorte A4/A3'],['fotos','Fotografías y carnet']],e.servicio||'auto',v=>{e.servicio=v;if(v==='fotos'){e.seleccion='a4';e.productoFoto=productosFoto[0]?.id||'';}if(v==='stickers'||v==='fotos'){e.anillado='ninguno';e.grupoAnillado=''}cambio()}));
   const label=texto('label','Tamaño de impresión');
   const sel=document.createElement('select');sel.setAttribute('aria-label','Tamaño final de '+e.name);
   for(const [v,l] of [['sin-confirmar','Elegir tamaño final'],['original','Mantener tamaño original'],['a3','A3 (29,7 × 42 cm)'],['a4','A4 (21 × 29,7 cm)'],['a5','A5 (14,8 × 21 cm)']]){
@@ -100,7 +100,11 @@ function render(){
    if(decision.cambioEscala){const n=texto('p','El archivo se ajustará sin recortar. Revisá que textos y escalas sigan siendo legibles.');n.className='advertencia';panel.append(n)}
    if(decision.mixtas&&decision.tamanoFinal==='original')panel.append(texto('p','El PDF contiene tamaños distintos. Se conservarán individualmente al presupuestar.'));
    controles.append(cantidadCopias(e));
-   if(e.servicio==='stickers'){
+   if(e.servicio==='fotos'){
+    if(productosFoto.length)controles.append(valor('Papel y tamaño',productosFoto.map(p=>[p.id,p.name]),e.productoFoto||productosFoto[0].id,v=>{e.productoFoto=v;cambio()}));
+    else panel.append(texto('p','Catálogo de fotografías no disponible.'));
+    panel.append(texto('p','Cada página seleccionada es una foto; carnet equivale a una plancha de seis. El encuadre se confirmará antes de producir.'));
+   }else if(e.servicio==='stickers'){
     if(!['a4','a3'].includes(decision.tamanoFinal==='original'?formatoOriginal(paginas):decision.tamanoFinal)){
      const aviso=texto('p','Para stickers, elegí tamaño de salida A4 o A3.');aviso.className='advertencia';panel.append(aviso);
     }else panel.append(texto('p','Incluye impresión en adhesivo fotográfico y precorte. Cada página del PDF representa una plancha por copia.'));
