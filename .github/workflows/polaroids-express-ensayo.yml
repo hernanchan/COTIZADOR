@@ -1,0 +1,35 @@
+# Rama aislada: sólo validación de Polaroids Express, sin despliegues.
+name: Polaroids Express · PDF privado (ensayo)
+on:
+  push:
+    branches:
+      - polaroids/express-pdf-unico-20261023
+    paths:
+      - '.github/workflows/polaroids-express-ensayo.yml'
+      - 'integraciones/polaroids/express/**'
+      - 'tests/polaroids-express-*.test.mjs'
+      - 'vidriera/polaroids/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  express:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Dependencia PDF en entorno aislado (no desplegar)
+        working-directory: integraciones/autocotizador/recepcion
+        run: npm install --no-audit --no-fund
+      - name: Probar PDF Express con 6, 12, 19 y 24 fotografías
+        run: node --test tests/polaroids-express-motor.test.mjs
+      - name: Validar editor/recepción anterior permanece apagada
+        run: |
+          node tests/polaroids-preparacion.test.mjs
+          node tests/polaroids-carrito.test.mjs
+      - name: Sintaxis de motor y editor
+        run: |
+          node --check integraciones/polaroids/express/motor-pdf.mjs
