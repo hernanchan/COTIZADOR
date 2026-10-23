@@ -30,7 +30,7 @@ jobs:
         working-directory: integraciones/autocotizador/recepcion
         run: npm test
       - name: Verificar umbrales de precio y recibos multifichero (sin despliegue)
-        run: node --test tests/autocotizador-escalas-multifichero.test.mjs tests/autocotizador-lote-verificado.test.mjs tests/autocotizador-pantalla-lote.test.mjs tests/autocotizador-pantalla-conjunta.test.mjs tests/autocotizador-destino-final.test.mjs tests/autocotizador-regla-comercial-ploteos.test.mjs tests/autocotizador-seleccionar-paginas.test.mjs tests/autocotizador-stickers.test.mjs
+        run: node --test tests/autocotizador-escalas-multifichero.test.mjs tests/autocotizador-lote-verificado.test.mjs tests/autocotizador-pantalla-lote.test.mjs tests/autocotizador-pantalla-conjunta.test.mjs tests/autocotizador-destino-final.test.mjs tests/autocotizador-regla-comercial-ploteos.test.mjs tests/autocotizador-seleccionar-paginas.test.mjs tests/autocotizador-stickers.test.mjs tests/autocotizador-fotos.test.mjs
       - name: Compilar Worker standalone
         working-directory: integraciones/autocotizador/recepcion
         run: npm run build:pilot
