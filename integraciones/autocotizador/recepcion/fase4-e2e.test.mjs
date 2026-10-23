@@ -61,7 +61,7 @@ function dispatch(p){
  if(p.op==='multiInfo'){
   if(!s.stored)throw Error('PDF not uploaded yet');
   return {ok:true,receiptId:s.uploadId,orderId:s.orderId,fileId:s.fileId,name:s.name,mode:s.mode,
-     bytes:s.bytes,sha256:s.sha256,privateChunkBytes:256*1024,pageVerification:s.pageVerification,pages:s.pages};
+     bytes:s.bytes,sha256:s.sha256,privateChunkBytes:256*1024,pageVerification:s.pageVerification,pages:s.pages,receiptState:s.pageVerification==='server'?'pages_verified':'bytes_checked'};
  }
  if(p.op==='multiReadPart'){
   if(p.receiptId!==s.uploadId)throw Error('Wrong read ID');
@@ -587,4 +587,39 @@ test('recubierto A0 usa rollo rec90; trabajos exclusivamente CAD no admiten recu
   ...poster,modo:'cad',paginas:[{...poster.paginas[0],modo:'cad'}]}]}),env);
  assert.equal(cad.status,400,'no ofrecer recubierto para archivos sólo CAD');
  assert.equal((await cad.json()).paymentAuthorized,false);
+});
+
+test('Central privada: sin clave rechaza; con HMAC GAS valida PDF real pero no cobra',async()=>{
+ const sesion=orders.get('WEB-ENSAYO-0123456789ABCDEF');
+ assert.ok(sesion?.pages===6,'el PDF original fue verificado en la prueba anterior');
+ const body={sesion:{uploadId:sesion.uploadId,token:sesion.token},opciones:{
+  nombre:'nombre declarado y falso.pdf',modo:'color',paginas:[{numero:1,anchoCm:99,altoCm:99,modo:'poster'}],
+  paginasSeleccionadas:'',seleccion:'a4',servicio:'stickers',copias:1,
+  caras:'simple',papelPoster:'obra80',anillado:'ninguno',grupoAnillado:'',
+  materialColor:'',productoFoto:'',productoGrafica:'',corteVariante:'gt3',corteMetros:1
+ }};
+ const workerEnv={...env,DOCS_CENTRAL_ADMIN_KEY:'admin-independent-secret-0123456789ABCDEFGHIJKLMNOP'};
+ const privateReq=(key)=>new Request(origin+'/api/ensayo-ficha-central',{method:'POST',
+  headers:{Origin:origin,'Sec-Fetch-Site':'same-origin','Content-Type':'application/json',
+   ...(key?{Authorization:'Bearer '+key}:{})},body:JSON.stringify(body)});
+ const noConfig=await worker.fetch(privateReq(),env);
+ assert.equal(noConfig.status,503);
+ const anonymous=await worker.fetch(privateReq(),workerEnv);
+ assert.equal(anonymous.status,401);
+ const earlier=googleCalls;
+ const preview=await worker.fetch(privateReq(workerEnv.DOCS_CENTRAL_ADMIN_KEY),workerEnv);
+ assert.equal(preview.status,200,'Ficha: '+JSON.stringify(await preview.clone().json()));
+ const x=await preview.json();
+ assert.equal(x.ok,true);
+ assert.equal(x.ficha.trabajos.length,1);
+ assert.equal(x.ficha.trabajos[0].nombreOriginal,sesion.name);
+ assert.equal(x.ficha.trabajos[0].paginasOriginales,6);
+ assert.equal(x.ficha.trabajos[0].servicio,'stickers');
+ assert.equal(x.ficha.trabajos[0].modo,null);
+ assert.equal(x.paymentAuthorized,false);
+ assert.equal(x.listoParaProducir,false);
+ assert.equal(x.ficha.pagoConfirmado,false);
+ assert.ok(googleCalls>earlier,'lecturas firmadas HMAC desde Google');
+ const invalid=await worker.fetch(privateReq('otro-secreto'),workerEnv);
+ assert.equal(invalid.status,401);
 });
