@@ -106,3 +106,13 @@ No modificar `main`, la web pública, Apps Script, Polaroids ni pagos. No contra
 - Se **desactivó del clasificador activo** el refinamiento automático por mayoría CAD+rótulo DWG: una referencia de plano o una mayoría CAD no justifican reclasificar imágenes/plenos. La función experimental permanece aislada sin importarse; su test se retiró del CI principal.
 - Mantener el bloqueo de precio para páginas de clasificación incierta hasta tener una heurística discriminativa validada con el usuario. No desplegar el bundle compilado previamente con la regla de consenso. El archivo privado no fue incorporado a GitHub.
 - Próxima validación: acordar qué páginas reales son Póster bajo la política de cobro de Librería Saber, y ajustar cobertura de imágenes o áreas plenas **por página**; preservar mezcla CAD/Póster y rollo 42 cuando el ancho físico lo permite.
+
+## Criterio comercial provisional por página — 23/10/2026
+
+- Acuerdo comercial: puede ser razonable cobrar el compilado entero como CAD, pero para una **cotización automática consistente**, el usuario admite **página 1 Póster y páginas 2–24 CAD** como referencia de trabajo. El criterio es subjetivo; no convertirlo en certeza técnica ni en regla de mayoría.
+- Ensayo local del PDF privado (24 páginas A2, 59,41 × 42,02 cm). En miniaturas del lado mayor 360px, la superficie ocupada y la proporción de ventanas 13×13 densamente cubiertas dieron: página 1 cobertura 30,4%, pleno continuo 10,7%; página 3 29,3%/5,6%; página 5 17,9%/2,4%; página 21 19,1%/2,5%. El PDF privado permanece fuera de GitHub.
+- Nueva `regla-comercial-ploteos.mjs`, incorporada al análisis de páginas, **sin mayoría del documento**. Para una página con rótulo técnico verificado por texto PDF.js: superficie continua desde 8,5% → Póster; las páginas visualmente dudosas con pleno continuo hasta 6,5% y cobertura total hasta 30% → CAD. Las páginas entre umbrales quedan con su clasificación previa o requieren revisión; un póster ya reconocido no se abarata a CAD solo por DWG.
+- Los umbrales son **hipótesis iniciales calibradas con este ejemplo**: no confundir con 30% de fotografía real. Falta compararlos con más PDF y verificar la extracción de rótulos de PDF.js en Chrome. No cobrar automáticamente todavía.
+- Se conserva el rollo de 42 cm con tolerancia física actualmente vigente; precios intactos.
+- CI de pruebas automáticas: https://github.com/hernanchan/COTIZADOR/actions/runs/39960021762 — aprobado.
+- **No desplegado** en Worker privado; no modificar sitio público ni autorizar pagos hasta reensayo.
