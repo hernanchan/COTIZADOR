@@ -138,7 +138,7 @@ $('archivos').addEventListener('change',async ev=>{
  if(entries.length+files.length>30){$('estado').textContent='Máximo 30 PDF.';return}
  leyendo=true;
  if(!entries.length)abierto=0;
- for(const f of files)entries.push({name:f.name,paginas:null,seleccion:'sin-confirmar',error:null,copias:1,modo:'bn',caras:'simple',papelPoster:'obra80',anillado:'ninguno',grupoAnillado:'',materialColor:'',paginasSeleccionadas:'',servicio:'auto'});
+ for(const f of files)entries.push({name:f.name,paginas:null,seleccion:'sin-confirmar',error:null,copias:1,modo:'bn',caras:'simple',papelPoster:'obra80',anillado:'ninguno',grupoAnillado:'',materialColor:'',paginasSeleccionadas:'',servicio:'auto',productoFoto:''});
  render();
  const start=entries.length-files.length;
  for(let i=0;i<files.length;i++){
@@ -171,7 +171,7 @@ async function cotizar(){
   const disponibles=catalogo[formato]||[];
   if(!e.materialColor&&disponibles.length)e.materialColor=disponibles[0].id;
  }
- const archivos=entries.map(e=>({nombre:e.name,paginas:e.paginas,paginasSeleccionadas:e.paginasSeleccionadas,seleccion:e.seleccion,servicio:e.servicio||'auto',copias:e.copias,modo:e.modo,caras:e.caras,papelPoster:e.papelPoster,anillado:e.anillado,grupoAnillado:e.grupoAnillado,materialColor:e.materialColor}));
+ const archivos=entries.map(e=>({nombre:e.name,paginas:e.paginas,paginasSeleccionadas:e.paginasSeleccionadas,seleccion:e.seleccion,servicio:e.servicio||'auto',productoFoto:e.productoFoto||'',copias:e.copias,modo:e.modo,caras:e.caras,papelPoster:e.papelPoster,anillado:e.anillado,grupoAnillado:e.grupoAnillado,materialColor:e.materialColor}));
  try{const r=await fetch('/api/ensayo-carga-unica',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({archivos})});const d=await r.json();if(n!==version)return;if(!r.ok||d.ok!==true||d.paymentAuthorized!==false)throw Error(d.error||'Sin cotización');
  ultimoPresupuesto=d;
  const ars=v=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(v);
@@ -182,8 +182,8 @@ async function cotizar(){
  }catch(e){if(n===version){out.textContent='No fue posible cotizar: '+String(e.message||e);render()}}
 }
 async function iniciar(){
- try{const r=await fetch('/api/ensayo-materiales-rapido',{cache:'no-store'});const x=await r.json();if(!r.ok||!x.ok||!x.materials)throw Error('Catálogo inaccesible');catalogo=x.materials;}
- catch(_){catalogo={a4:[],a3:[]};$('estado').textContent='No se pudo cargar el catálogo comercial.';}
+ try{const r=await fetch('/api/ensayo-materiales-rapido',{cache:'no-store'});const x=await r.json();if(!r.ok||!x.ok||!x.materials)throw Error('Catálogo inaccesible');catalogo=x.materials;productosFoto=x.photos||[];}
+ catch(_){catalogo={a4:[],a3:[]};productosFoto=[];$('estado').textContent='No se pudo cargar el catálogo comercial.';}
  render();if(entries.length)cotizar();
 }
 iniciar();
