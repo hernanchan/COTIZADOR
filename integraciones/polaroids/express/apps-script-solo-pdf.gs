@@ -81,6 +81,37 @@ function expressStore_(p,folderId){
    sha256:p.sha256,bytes:p.bytes,paginas:p.paginas,fotos:p.fotos};
  }finally{lock.releaseLock()}
 }
+
+/** Lectura posterior para operador autenticado en la Central.
+ * La petición HMAC sale exclusivamente del Worker privado. GAS nunca publica
+ * links, ni IDs de Drive. La Central verifica SHA completo antes de descargar.
+ */
+function expressRead_(p,folderId){
+ if(!p||p.op!=='leerPdfExpress'||!EXPRESS_REF_.test(p.referencia||'')||
+    !EXPRESS_SHA_.test(p.sha256||'')||!Number.isSafeInteger(p.bytes)||
+    p.bytes<100||p.bytes>EXPRESS_MAX_BYTES_)
+  throw Error('Lectura privada fuera del contrato.');
+ var folder=DriveApp.getFolderById(folderId);
+ if(folder.getSharingAccess()!==DriveApp.Access.PRIVATE)
+  throw Error('La carpeta no es privada.');
+ var name=p.referencia+'_IMPRIMIR.pdf';
+ var files=folder.getFilesByName(name),file=null;
+ while(files.hasNext()){
+  if(file)throw Error('Más de un PDF para la referencia.');
+  file=files.next();
+ }
+ if(!file||file.getMimeType&&file.getMimeType()!=='application/pdf')
+  throw Error('PDF privado ausente o incompatible.');
+ var buffer=file.getBlob().getBytes();
+ if(buffer.length!==p.bytes||expressPdfHash_(buffer)!==p.sha256)
+  throw Error('El PDF cambió desde su recepción.');
+ if(buffer[0]!==37||buffer[1]!==80||buffer[2]!==68||
+    buffer[3]!==70||buffer[4]!==45)
+  throw Error('La cabecera del PDF es inválida.');
+ return {ok:true,verified:true,referencia:p.referencia,
+  sha256:p.sha256,bytes:p.bytes,pdfBase64:Utilities.base64Encode(buffer)};
+}
+
 function doPost(e){
  try{
   var properties=PropertiesService.getScriptProperties();
@@ -91,6 +122,7 @@ function doPost(e){
   if(typeof source!=='string'||source.length>19*1024*1024)
    throw Error('Solicitud no válida.');
   var request=expressVerify_(JSON.parse(source),key);
+  if(request.op==='leerPdfExpress')return expressJson_(expressRead_(request,folder));
   return expressJson_(expressStore_(request,folder));
  }catch(_){
   // No filtrar nombres, tokens, IDs o Drive a visitantes no autorizados.
