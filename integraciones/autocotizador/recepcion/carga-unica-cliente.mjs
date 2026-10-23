@@ -89,7 +89,7 @@ function render(){
   const aviso=clasificarDestino(paginas);
   if(aviso.requiereConfirmacion){const n=texto('p','Confirmá el tamaño de impresión: el PDF puede tener medidas distintas a las que querés.');n.className='advertencia';panel.append(n)}
   const controles=document.createElement('div');controles.className='controles';
-  controles.append(valor('Servicio', [['auto','Impresiones / ploteos'],['stickers','Stickers con precorte A4/A3'],['fotos','Fotografías y carnet']],e.servicio||'auto',v=>{e.servicio=v;if(v==='fotos'){e.seleccion='a4';e.productoFoto=productosFoto[0]?.id||'';}if(v==='stickers'||v==='fotos'){e.anillado='ninguno';e.grupoAnillado=''}cambio()}));
+  controles.append(valor('Servicio', [['auto','Impresiones / ploteos'],['stickers','Stickers con precorte A4/A3'],['fotos','Fotografías y carnet'],['corte','Ploteo de corte']],e.servicio||'auto',v=>{e.servicio=v;if(v==='fotos'){e.seleccion='a4';e.productoFoto=productosFoto[0]?.id||'';}if(v==='stickers'||v==='fotos'||v==='corte'){e.anillado='ninguno';e.grupoAnillado=''}cambio()}));
   const label=texto('label','Tamaño de impresión');
   const sel=document.createElement('select');sel.setAttribute('aria-label','Tamaño final de '+e.name);
   for(const [v,l] of [['sin-confirmar','Elegir tamaño final'],['original','Mantener tamaño original'],['a3','A3 (29,7 × 42 cm)'],['a4','A4 (21 × 29,7 cm)'],['a5','A5 (14,8 × 21 cm)']]){
