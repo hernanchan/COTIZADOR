@@ -14,7 +14,7 @@ function validarArchivo(a,i){
  !Array.isArray(a.paginas)||a.paginas.length<1||a.paginas.length>2000||
  !Number.isSafeInteger(a.copias)||a.copias<1||a.copias>500||
  (a.paginasSeleccionadas!==undefined&&(typeof a.paginasSeleccionadas!=='string'||a.paginasSeleccionadas.length>500))||
- !(a.servicio===undefined||['auto','stickers','fotos'].includes(a.servicio))||
+ !(a.servicio===undefined||['auto','stickers','fotos','corte'].includes(a.servicio))||
  (a.productoFoto!==undefined&&typeof a.productoFoto!=='string')||
  !['bn','color'].includes(a.modo)||!['simple','double'].includes(a.caras)||
  !['obra80','recubierto'].includes(a.papelPoster)||
@@ -43,7 +43,7 @@ function tipoOriginal(paginas){
  */
 export function cotizarCargaUnica({archivos,precios}){
  if(!Array.isArray(archivos)||!archivos.length||archivos.length>30)throw Error('Cantidad de archivos inválida');
- const documentos=[],ploteos=[],stickers=[],fotos=[],pendientes=[],plan=[];
+ const documentos=[],ploteos=[],stickers=[],fotos=[],cortes=[],pendientes=[],plan=[];
  archivos.forEach((a,i)=>{
   validarArchivo(a,i);
   const seleccionadas=seleccionarPaginas(a.paginas,a.paginasSeleccionadas);
