@@ -44,21 +44,21 @@ test('rechaza reemplazar un pedido pendiente por otro y limpia tras el pago',asy
  assert.equal(removed,1);
 });
 test('borra borrador vencido o manipulado sin enviar fotos',async()=>{
- await guardarBorradorExpress({referencia,hojas:hojas(12)},{storage,now:()=>t});
+ await guardarBorradorExpress({referencia:reference,hojas:hojas(12)},{storage,now:()=>t});
  assert.equal(await leerBorradorExpress({storage,now:()=>t+2*60*60*1000+1}),null);
  assert.equal(removed,2);
  await storage.put({key:'un-envio',version:1,guardadoEn:t,
-  referencia,hojas:[[Buffer.alloc(200).toString('base64')]]});
+  referencia:reference,hojas:[[Buffer.alloc(200).toString('base64')]]});
  assert.equal(await leerBorradorExpress({storage,now:()=>t+1000})?.fotos,1);
  await storage.put({key:'un-envio',version:1,guardadoEn:t,
-  referencia,hojas:[['not base64']]});
+  referencia:reference,hojas:[['not base64']]});
  assert.equal(await leerBorradorExpress({storage,now:()=>t+1000}),null);
  assert.equal(removed,3);
 });
 test('rechaza más de cuatro hojas, foto mal formateada y archivo gigante',()=>{
- assert.throws(()=>validarExpressGuardado({referencia,hojas:hojas(25)},t,t));
- assert.throws(()=>validarExpressGuardado({referencia,hojas:[[image],Array(6).fill(image)]},t,t));
- assert.throws(()=>validarExpressGuardado({referencia,hojas:[['xxx']]},t,t));
+ assert.throws(()=>validarExpressGuardado({referencia:reference,hojas:hojas(25)},t,t));
+ assert.throws(()=>validarExpressGuardado({referencia:reference,hojas:[[image],Array(6).fill(image)]},t,t));
+ assert.throws(()=>validarExpressGuardado({referencia:reference,hojas:[['xxx']]},t,t));
  assert.throws(()=>validarExpressGuardado({referencia:'POL-X',hojas:hojas(6)},t,t));
 });
 test('API nativa IndexedDB guarda y recupera después de abrir un nuevo controlador',async()=>{
