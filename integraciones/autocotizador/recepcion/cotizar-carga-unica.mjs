@@ -133,6 +133,7 @@ export function cotizarCargaUnica({archivos,precios}){
  const subtotalImpresiones=c?.total||0,subtotalPloteos=p?.total||0;
  const subtotalStickers=stickers.reduce((sum,x)=>sum+x.subtotal,0);
  const subtotalFotos=fotos.reduce((sum,x)=>sum+x.subtotal,0);
+ const subtotalCortes=cortes.reduce((sum,x)=>sum+x.subtotal,0);
  return {ok:true,estado:pendientes.length?'INCOMPLETO':'PRELIMINAR',verificacion:VALORACION,
   paymentAuthorized:false,total:pendientes.length?null:subtotalImpresiones+subtotalPloteos+subtotalStickers+subtotalFotos,
   subtotalImpresiones,subtotalPloteos,subtotalStickers,subtotalFotos,subtotalAnillados:c?.subtotalAnillados||0,
