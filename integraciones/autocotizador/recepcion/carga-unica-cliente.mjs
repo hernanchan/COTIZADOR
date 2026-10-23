@@ -59,7 +59,7 @@ function render(){
   if(e.paginas){
    const elegidas=paginasElegidas(e)||e.paginas;
    const d=clasificarDestino(elegidas,e.seleccion);
-   const tipo=d.confirmado?(e.servicio==='stickers'?'Stickers con precorte':e.servicio==='fotos'?'Fotografías':d.destino==='ploteo'?'Ploteo':'Impresión'):'Tamaño sin confirmar';
+   const tipo=d.confirmado?(e.servicio==='stickers'?'Stickers con precorte':e.servicio==='fotos'?'Fotografías':e.servicio==='corte'?'Ploteo de corte':d.destino==='ploteo'?'Ploteo':'Impresión'):'Tamaño sin confirmar';
    const material=e.modo==='color'?'Color':'B/N';
    const extra=e.servicio==='fotos'?' · '+(productosFoto.find(p=>p.id===e.productoFoto)?.name||'Elegir producto'):e.servicio==='stickers'?' · Adhesivo fotográfico':d.destino==='documentos'?(' · '+material+(e.anillado==='individual'?' · Anillado':e.anillado==='grupo'?' · Grupo '+e.grupoAnillado:'')):
     (elegidas.some(p=>p.modo==='poster')?' · '+(e.papelPoster==='recubierto'?'Recubierto':'Obra 80 g'):'');
