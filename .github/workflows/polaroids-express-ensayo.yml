@@ -38,7 +38,9 @@ jobs:
       - name: Probar PDF Express con 6, 12, 19 y 24 fotografías
         run: node --experimental-vm-modules --test tests/polaroids-express-motor.test.mjs tests/polaroids-express-guardado.test.mjs tests/polaroids-express-tandas.test.mjs tests/polaroids-express-worker.test.mjs tests/polaroids-express-cliente.test.mjs tests/polaroids-express-recuperacion.test.mjs
       - name: Probar Central D1 con PDF Express y controles de acceso
-        run: node --experimental-sqlite --test tests/central-polaroids-express.test.mjs tests/central-polaroids-descarga.test.mjs
+        run: node --experimental-sqlite --test tests/central-polaroids-express.test.mjs tests/central-polaroids-descarga.test.mjs tests/central-bridge-d1.test.mjs
+      - name: Regresión de carrito y pasarela de pagos existente
+        run: node tests/mercadopago-carrito.test.mjs
       - name: Validar editor/recepción anterior permanece apagada
         run: |
           node tests/polaroids-preparacion.test.mjs
