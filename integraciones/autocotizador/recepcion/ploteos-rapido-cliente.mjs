@@ -39,7 +39,23 @@ function render(){
  for(const [i,d] of lista.entries()){
   const card=dato('section');card.className='trabajo';
   card.append(dato('h2',(i+1)+'. '+d.nombre));
-  if(d.error){card.append(dato('p',d.error));}
+  if(d.error){
+   card.append(dato('p',d.error));
+   if(d.paginas?.length){
+    const dudosas=d.paginas.filter(p=>p.modo==='revision');
+    if(dudosas.length){
+     card.append(dato('p','Páginas para revisar: '+dudosas.slice(0,20).map(p=>p.numero).join(', ')+(dudosas.length>20?' y '+(dudosas.length-20)+' más':'')+'.'));
+     for(const p of dudosas.slice(0,8)){
+      const cov=Number.isFinite(p.cobertura)?Math.round(p.cobertura*100):null;
+      card.append(dato('p','Página '+p.numero+': '+p.anchoCm.toFixed(2)+' × '+p.altoCm.toFixed(2)+' cm'+(cov===null?'':' · cobertura aproximada '+cov+' %')+'. La imagen no se pudo clasificar con seguridad.'));
+     }
+    }
+    const fuera=d.paginas.filter(p=>!catalogo.some(r=>/^rollo\\d+$/.test(r.id)&&Math.min(p.anchoCm,p.altoCm)<=r.widthCm+0.03));
+    if(fuera.length)card.append(dato('p','Fuera de los anchos de rollo configurados: páginas '+fuera.slice(0,20).map(p=>p.numero).join(', ')+'.'));
+    const buenas=d.paginas.filter(p=>p.modo==='cad'||p.modo==='poster');
+    if(buenas.length)card.append(dato('p','Páginas clasificadas: '+buenas.filter(p=>p.modo==='cad').length+' CAD y '+buenas.filter(p=>p.modo==='poster').length+' Póster.'));
+   }
+  }
   else if(!d.paginas){card.append(dato('p','Leyendo dimensiones de PDF…'))}
   else{
    const measures=d.paginas.map(p=>p.anchoCm+' × '+p.altoCm+' cm');
@@ -85,7 +101,7 @@ async function cotizar(){
  if(leyendo){estado('Leyendo las dimensiones de los PDF…');return}
  if(!lista.length){avisarConjunto('vacio');estado('Elegí al menos un PDF para cotizar.');return}
  if(!catalogo.length){estado('Todavía no están disponibles los materiales.');return}
- if(lista.some(d=>d.error||!d.paginas||!d.material||d.paginas.some(p=>!['cad','poster'].includes(p.modo)))){estado('Este trabajo requiere revisión de Librería Saber: no se pudo clasificar con certeza o no entra en los rollos.');return}
+ if(lista.some(d=>d.error||!d.paginas||!d.material||d.paginas.some(p=>!['cad','poster'].includes(p.modo)))){estado('No se generó un precio global: revisá el motivo y las páginas indicadas en la ficha de cada PDF.');return}
  const n=version,ac=new AbortController();controlador=ac;
  const trabajos=lista.map((d,i)=>({id:'pl'+(i+1),nombre:d.nombre,modo:d.modo,
   material:d.material,copias:d.copias,paginas:d.paginas,
@@ -136,10 +152,10 @@ $('archivosPloteo').addEventListener('change',async event=>{
     estado('Analizando cobertura de tinta: PDF '+(i+1)+' de '+files.length+'…');
     const clasificaciones=await clasificarPaginasPloteo(files[i],{onProgreso:({terminadas,total})=>estado('Analizando página '+terminadas+' de '+total+'…')});
     if(data.paginas.length!==clasificaciones.length)throw Error('La lectura de páginas no coincide con el análisis visual.');
-    d.paginas=data.paginas.map((p,j)=>({...p,modo:clasificaciones[j].modo}));
-    if(clasificaciones.some(p=>p.modo==='revision'))d.error='Clasificación dudosa: pendiente de revisión por Librería Saber. No se ofrece un precio automático.';
+    d.paginas=data.paginas.map((p,j)=>({...p,modo:clasificaciones[j].modo,cobertura:clasificaciones[j].cobertura}));
+    if(clasificaciones.some(p=>p.modo==='revision'))d.error='Hay páginas que el análisis no pudo identificar como CAD o Póster. El precio automático queda pendiente para evitar un cobro incorrecto.';
     elegirSoporte(d);
-    if(!d.material)d.error='El PDF no entra en los rollos disponibles.';
+    if(!d.material)d.error=(d.error?d.error+' ':'')+'Una o más páginas exceden el ancho de los rollos configurados.';
    }catch(e){d.error=String(e.message||e)}
    render();
   }
