@@ -106,6 +106,13 @@ function render(){
     if(productosFoto.length)controles.append(valor('Papel y tamaño',productosFoto.map(p=>[p.id,p.name]),e.productoFoto||productosFoto[0].id,v=>{e.productoFoto=v;cambio()}));
     else panel.append(texto('p','Catálogo de fotografías no disponible.'));
     panel.append(texto('p','Cada página seleccionada es una foto; carnet equivale a una plancha de seis. El encuadre se confirmará antes de producir.'));
+   }else if(e.servicio==='corte'){
+    if(variantesCorte.length)controles.append(valor('Tipo de corte',variantesCorte.map(v=>[v.id,v.name]),e.corteVariante,v=>{e.corteVariante=v;cambio()}));
+    const l=texto('label','Metros lineales');
+    const input=document.createElement('input');input.type='number';input.min='0.1';input.max='1000';input.step='0.1';
+    input.value=String(e.corteMetros);input.onchange=()=>{const n=Number(input.value);if(n>=0.1&&n<=1000){e.corteMetros=n;cambio()}else input.reportValidity()};
+    l.append(input);controles.append(l);
+    panel.append(texto('p','El metraje debe corresponder al trabajo real; no se deduce de las páginas del PDF. Contornos sujetos a verificación.'));
    }else if(e.servicio==='stickers'){
     if(!['a4','a3'].includes(decision.tamanoFinal==='original'?formatoOriginal(paginas):decision.tamanoFinal)){
      const aviso=texto('p','Para stickers, elegí tamaño de salida A4 o A3.');aviso.className='advertencia';panel.append(aviso);
