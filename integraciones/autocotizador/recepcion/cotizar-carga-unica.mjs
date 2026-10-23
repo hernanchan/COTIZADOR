@@ -6,11 +6,11 @@ import {cotizarPloteosRapido,rolloEstandarAutomatico} from '../pruebas/cotizar-p
 const PLANO=['cad','poster'];
 const VALORACION='PRELIMINAR_SIN_VERIFICAR';
 function validarArchivo(a,i){
- if(!a||Object.keys(a).sort().join(',')!=='anillado,caras,copias,grupoAnillado,materialColor,modo,nombre,paginas,paginasSeleccionadas,papelPoster,seleccion'||
+ if(!a||!['anillado,caras,copias,grupoAnillado,materialColor,modo,nombre,paginas,papelPoster,seleccion','anillado,caras,copias,grupoAnillado,materialColor,modo,nombre,paginas,paginasSeleccionadas,papelPoster,seleccion'].includes(Object.keys(a).sort().join(','))||
  typeof a.nombre!=='string'||!a.nombre.trim()||a.nombre.length>160||
  !Array.isArray(a.paginas)||a.paginas.length<1||a.paginas.length>2000||
  !Number.isSafeInteger(a.copias)||a.copias<1||a.copias>500||
- typeof a.paginasSeleccionadas!=='string'||a.paginasSeleccionadas.length>500||
+ (a.paginasSeleccionadas!==undefined&&(typeof a.paginasSeleccionadas!=='string'||a.paginasSeleccionadas.length>500))||
  !['bn','color'].includes(a.modo)||!['simple','double'].includes(a.caras)||
  !['obra80','recubierto'].includes(a.papelPoster)||
  !['ninguno','individual','grupo'].includes(a.anillado)||
