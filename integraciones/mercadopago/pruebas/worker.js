@@ -155,6 +155,7 @@ async function centralTables(env){
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_document_manifests (web_order_id TEXT PRIMARY KEY,commercial_order_id TEXT UNIQUE REFERENCES orders(id) ON DELETE RESTRICT,amount_ars INTEGER NOT NULL CHECK(amount_ars>0 AND amount_ars<=50000000),file_count INTEGER NOT NULL CHECK(file_count BETWEEN 1 AND 30),manifest_hash TEXT NOT NULL,manifest_json TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'verified_waiting_order' CHECK(status IN ('verified_waiting_order','linked_waiting_payment','linked_paid_pending_preparation')),created_at TEXT NOT NULL DEFAULT (datetime('now')),linked_at TEXT)").run();
  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_central_manifests_commercial_order ON central_document_manifests(commercial_order_id)").run();
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_bridge_requests (request_id TEXT PRIMARY KEY,request_hash TEXT NOT NULL,action TEXT NOT NULL CHECK(action IN ('stage','link')),created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_document_receipts (receipt_id TEXT PRIMARY KEY,web_order_id TEXT NOT NULL REFERENCES central_document_manifests(web_order_id) ON DELETE CASCADE,file_id TEXT NOT NULL,sha256 TEXT NOT NULL,UNIQUE(web_order_id,file_id))").run();
 }
 async function centralReadSigned(req,env){
  if(env.CENTRAL_BRIDGE_ENABLED!=="PRIVATE_TEST_ONLY"||
@@ -204,6 +205,9 @@ async function centralStage(req,env){
   env.DB.prepare("INSERT INTO central_bridge_requests(request_id,request_hash,action) VALUES(?,?,'stage')").bind(signed.requestId,requestDigest),
   env.DB.prepare("INSERT INTO central_document_manifests(web_order_id,amount_ars,file_count,manifest_hash,manifest_json) VALUES(?,?,?,?,?)").bind(safe.webOrderId,safe.importe,safe.archivos,digest,JSON.stringify(safe))
  ];
+ for(const item of safe.trabajos)statements.push(
+  env.DB.prepare("INSERT INTO central_document_receipts(receipt_id,web_order_id,file_id,sha256) VALUES(?,?,?,?)")
+   .bind(item.reciboPrivado,safe.webOrderId,item.fileId,item.sha256));
  try{await env.DB.batch(statements)}
  catch(_){return json({error:"Conflicto de recepción; verificar si ya existe"},409)}
  return json({saved:true,idempotent:false,web_order_id:safe.webOrderId,
