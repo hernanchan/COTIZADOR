@@ -600,6 +600,8 @@ export default {
   }
   if(!env.DB || !env.MP_TEST_ACCESS_TOKEN || !env.DEMO_ADMIN_KEY || !env.MP_TEST_SELLER_ID || !env.TEST_WEBHOOK_URL || !env.MP_WEBHOOK_SECRET)return json({error:"Falta configuración privada de pruebas. Consultar diagnóstico autorizado."},503);
   try {
+   if(url.pathname==="/internal/central/stage")return await centralStage(req,env);
+   if(url.pathname==="/internal/central/link")return await centralLink(req,env);
    if(url.pathname.startsWith("/checkout/"))return await customerCheckout(req,env,this);
    // Solo un operador que conoce DEMO_ADMIN_KEY puede preparar un pedido ficticio.
    if(url.pathname==="/admin/api/cron-status"&&req.method==="GET"){
@@ -614,6 +616,13 @@ export default {
     const rows=await env.DB.prepare("SELECT id,description,amount_ars,status,paid_at,created_at FROM orders WHERE status='paid' AND deposit_ars=amount_ars AND NOT EXISTS (SELECT 1 FROM payment_reviews WHERE order_id=orders.id AND state='revoked') ORDER BY paid_at DESC LIMIT 100").all();
     return json({orders:rows.results});
    }
+   if(url.pathname==="/admin/api/central/pending"&&req.method==="GET"){
+    if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+    await centralTables(env);
+    const rows=await env.DB.prepare("SELECT web_order_id,amount_ars,file_count,created_at FROM central_document_manifests WHERE commercial_order_id IS NULL ORDER BY created_at DESC LIMIT 50").all();
+    return json({estado:"DOCUMENTOS_VERIFICADOS_SIN_PEDIDO_COMERCIAL",
+      manifests:rows.results||[],productionAuthorized:false});
+   }
    if(url.pathname==="/admin/api/order"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
     const id=url.searchParams.get("id")||"";
@@ -623,7 +632,10 @@ export default {
     if(!order)return json({error:"Pedido pagado no encontrado"},404);
     await ensureOrderItems(env);
     const rows=await env.DB.prepare("SELECT line_number,item_type,sku,title,quantity,unit_price_ars,line_total_ars,detail_json,file_references_json FROM order_items WHERE order_id=? ORDER BY line_number").bind(id).all();
-    return json({order,items:rows.results,produccion:estadoProduccionPrivado(order,rows.results)});
+    const central=await centralAdminDetail(env,id);
+    const produccion=estadoProduccionPrivado(order,rows.results);
+    if(central)produccion.documentosVerificados=central;
+    return json({order,items:rows.results,produccion});
    }
    if(url.pathname==="/demo/catalog"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
