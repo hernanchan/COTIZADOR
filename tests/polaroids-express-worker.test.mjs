@@ -18,9 +18,12 @@ const env={EXPRESS_ALLOWED_HOST:host,EXPRESS_RECEPTION_ENABLED:'PRIVATE_TEST_ONL
  EXPRESS_PDF_HMAC_KEY:'standalone-express-hmac-secret-key-0123456789',
  EXPRESS_PDF_SCRIPT_URL:'https://script.google.com/macros/s/AKfycbEXPERIMENTAL01234567890123456789/exec',
  EXPRESS_TURNSTILE_SECRET:'turnstile-private-secret-for-express-tests',
+ EXPRESS_CENTRAL_SYNC_ENABLED:'PRIVATE_TEST_ONLY',
+ CENTRAL_BRIDGE_KEY:'independent-central-express-hmac-key-01234567890',
+ CENTRAL_EXPRESS_URL:'https://saber-pagos-pruebas.test.workers.dev/internal/central/polaroid-stage',
  ASSETS:{fetch:async()=>Response.json(config)}};
-const received=new Map();
-let challenges=0,googleCalls=0;
+const received=new Map(),centralReceived=new Map();
+let challenges=0,googleCalls=0,centralCalls=0;
 const fetcher=async(url,opts)=>{
  if(url.startsWith('https://challenges.cloudflare.com/')){
   challenges++;
@@ -55,6 +58,34 @@ const fetcher=async(url,opts)=>{
   received.set(p.referencia,p.sha256);
   return Response.json({ok:true,verified:true,
    referencia:p.referencia,sha256:p.sha256,bytes:p.bytes,paginas:p.paginas,fotos:p.fotos});
+ }
+ if(url.startsWith('https://saber-pagos-pruebas.test.workers.dev/')){
+  centralCalls++;
+  assert.equal(opts.redirect,'error');
+  assert.equal(opts.method,'POST');
+  const ts=opts.headers['x-saber-ts'],id=opts.headers['x-saber-request-id'];
+  const calc=createHmac('sha256',env.CENTRAL_BRIDGE_KEY)
+   .update(ts+'\n'+id+'\n'+opts.body).digest('hex');
+  assert.equal(opts.headers['x-saber-signature'],calc);
+  const d=JSON.parse(opts.body);
+  assert.deepEqual(Object.keys(d).sort(),[
+   'bytes','fotos','hojas','importeArs','listoParaProducir',
+   'pagoConfirmado','pdfPrivadoVerificado','referencia','schema','sha256'
+  ]);
+  assert.equal(d.schema,'saber-polaroids-express-central-v1');
+  assert.equal(d.importeArs,d.hojas*3000);
+  assert.equal(d.pagoConfirmado,false);
+  assert.equal(d.listoParaProducir,false);
+  assert.equal(d.pdfPrivadoVerificado,true);
+  assert.equal(d.sha256,received.get(d.referencia));
+  assert.equal('pdfBase64' in d,false);
+  const previous=centralReceived.get(d.referencia);
+  if(previous&&previous!==d.sha256)
+   return Response.json({error:'different PDF'},{status:409});
+  centralReceived.set(d.referencia,d.sha256);
+  return Response.json({saved:true,idempotent:Boolean(previous),
+   referencia:d.referencia,paymentAuthorized:false,pdfPrivadoVerificado:true},
+   {status:previous?200:201});
  }
  throw Error('Unexpected outbound host: '+url);
 };
@@ -93,7 +124,9 @@ test('6, 12, 19 y 24 recortes producen un solo PDF privado por pedido',async()=>
  }
  assert.equal(challenges,4);
  assert.equal(googleCalls,4);
+ assert.equal(centralCalls,4);
  assert.equal(received.size,4);
+ assert.equal(centralReceived.size,4);
 });
 test('si una respuesta se pierde, el mismo pedido es idempotente',async()=>{
  const first=await onRequestPost({request:request(12),env,fetcher});
@@ -101,9 +134,11 @@ test('si una respuesta se pierde, el mismo pedido es idempotente',async()=>{
  const second=await onRequestPost({request:request(12),env,fetcher});
  assert.equal(second.status,200,await second.text());
  assert.equal(received.size,5);
+ assert.equal(centralReceived.size,5);
 });
 test('el Worker rechaza host, origen, secreto, servicio apagado y fotos inválidas',async()=>{
  const before=googleCalls;
+ assert.equal((await onRequestPost({request:request(6),env:{...env,EXPRESS_CENTRAL_SYNC_ENABLED:''},fetcher})).status,503);
  assert.equal((await onRequestPost({request:request(6,{headers:{Origin:'https://bad.test'}}),env,fetcher})).status,403);
  assert.equal((await onRequestPost({request:request(6,{hostname:'bad.test'}),env,fetcher})).status,403);
  assert.equal((await onRequestPost({request:request(6),env:{...env,EXPRESS_RECEPTION_ENABLED:''},fetcher})).status,503);
