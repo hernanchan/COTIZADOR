@@ -120,7 +120,10 @@ async function validateChallenge(token,request,env,fetcher){
   throw Error('El control de seguridad fue rechazado.');
 }
 export async function onRequestGet({request,env}){
- const enabled=originMatches(request,env)&&await privateConfig(request,env);
+ const url=new URL(request.url);
+ const trustedHost=url.protocol==='https:'&&url.hostname===env?.EXPRESS_ALLOWED_HOST&&
+   url.port===''&&await privateConfig(request,env);
+ const enabled=Boolean(trustedHost);
  return json({ok:true,service:'polaroids-express',
   enabled,photosPerSheet:6,maxPhotos:24,pdfForClient:false});
 }
