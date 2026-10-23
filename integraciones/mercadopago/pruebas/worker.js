@@ -258,6 +258,97 @@ async function centralLink(req,env){
  return json({linked:true,idempotent:false,commercial_order_id:order.id,
   estado:"VINCULADO_PENDIENTE_DE_CONTROL",paymentAuthorized:false});
 }
+
+/** Create a D1 commercial order from signed, previously verified PDFs.
+ * Prices for shop SKUs are reloaded from the live catalog on this server.
+ * Deliberately DOES NOT create a Mercado Pago preference or allow checkout.
+ */
+async function centralPrepareDraft(req,env){
+ const signed=await centralReadSigned(req,env);
+ if(signed.error)return json({error:signed.error},signed.status);
+ if(env.CENTRAL_PREPARE_ENABLED!=="PRIVATE_TEST_ONLY")
+  return json({error:"Preparación documental deshabilitada"},503);
+ const data=signed.payload;
+ if(!data||Object.keys(data).sort().join(",")!=="clientOrderId,items,webOrderId"||
+    !CENTRAL_WEB.test(data.webOrderId||"")||!CENTRAL_UUID.test(data.clientOrderId||"")||
+    !Array.isArray(data.items)||data.items.length>50)
+  return json({error:"Solicitud de pedido inválida"},400);
+ const codes=new Set(),clean=[];
+ for(const it of data.items){
+  if(!it||Object.keys(it).sort().join(",")!=="code,qty"||
+     typeof it.code!=="string"||!it.code.trim()||it.code.length>80||
+     !Number.isSafeInteger(it.qty)||it.qty<1||it.qty>500||codes.has(it.code))
+   return json({error:"Productos repetidos o cantidades inválidas"},422);
+  codes.add(it.code);clean.push({code:it.code,qty:it.qty});
+ }
+ await centralTables(env);
+ await ensureOrderItems(env);
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS cart_requests (client_order_id TEXT PRIMARY KEY, request_hash TEXT NOT NULL,order_id TEXT NOT NULL UNIQUE)").run();
+ const hash=await centralHash(JSON.stringify({webOrderId:data.webOrderId,items:clean}));
+ const previous=await env.DB.prepare("SELECT request_hash,order_id FROM cart_requests WHERE client_order_id=?").bind(data.clientOrderId).first();
+ if(previous){
+  if(previous.request_hash!==hash)return json({error:"Identificador de compra usado con otro carrito"},409);
+  const old=await env.DB.prepare("SELECT amount_ars,status FROM orders WHERE id=?").bind(previous.order_id).first();
+  const manifest=await env.DB.prepare("SELECT web_order_id FROM central_document_manifests WHERE commercial_order_id=?").bind(previous.order_id).first();
+  if(!old||manifest?.web_order_id!==data.webOrderId)return json({error:"Recepción del intento anterior no coincide"},409);
+  return json({created:true,idempotent:true,commercial_order_id:previous.order_id,
+   amount_ars:old.amount_ars,state:old.status,checkoutEnabled:false,paymentAuthorized:false});
+ }
+ const row=await env.DB.prepare("SELECT amount_ars,manifest_json,commercial_order_id FROM central_document_manifests WHERE web_order_id=?").bind(data.webOrderId).first();
+ if(!row)return json({error:"No existe recepción comprobada para el pedido"},404);
+ if(row.commercial_order_id)return json({error:"Esta recepción ya pertenece a otro pedido"},409);
+ let manifest;
+ try{manifest=JSON.parse(row.manifest_json)}
+ catch(_){return json({error:"Recepción privada ilegible"},409)}
+ if(manifest.schema!=="saber-central-documentos-d1-v1"||
+    manifest.webOrderId!==data.webOrderId||
+    manifest.importe!==row.amount_ars||!Array.isArray(manifest.trabajos)||
+    manifest.trabajos.length<1||manifest.trabajos.length>30)
+  return json({error:"Recepción fuera del contrato de documentos"},409);
+ const reference=manifest.trabajos.map(x=>x.reciboPrivado);
+ if(reference.some(x=>!CENTRAL_RECEIPT.test(x))||new Set(reference).size!==reference.length)
+  return json({error:"Referencias documentales duplicadas"},409);
+ let total=row.amount_ars,products=[];
+ if(clean.length){
+  const catalog=await getCatalog();
+  for(const x of clean){
+   const found=catalog.get(x.code);
+   if(!found)return json({error:"Producto inexistente o inactivo"},422);
+   const value=found.price*x.qty;
+   if(!Number.isSafeInteger(value)||value<=0)return json({error:"Importe del producto inválido"},422);
+   total+=value;
+   products.push({...x,name:found.name,price:found.price,total:value});
+  }
+ }
+ if(!Number.isSafeInteger(total)||total<=0||total>50000000)
+  return json({error:"El pedido excede el límite de prueba"},422);
+ const orderId=crypto.randomUUID(),requests=[
+  env.DB.prepare("INSERT INTO orders(id,description,amount_ars,deposit_ars) VALUES(?,?,?,?)").bind(orderId,"Librería Saber · documentos verificados y tienda",total,total),
+  env.DB.prepare("INSERT INTO order_items(order_id,line_number,item_type,sku,title,quantity,unit_price_ars,line_total_ars,detail_json,file_references_json) VALUES(?,?,?,?,?,?,?,?,?,?)")
+   .bind(orderId,1,"print","DOCS_VERIFIED","Trabajos gráficos con PDF verificado",1,row.amount_ars,row.amount_ars,
+    JSON.stringify({source:"central_verified",files:reference.length}),JSON.stringify(reference))
+ ];
+ products.forEach((it,i)=>requests.push(env.DB.prepare("INSERT INTO order_items(order_id,line_number,item_type,sku,title,quantity,unit_price_ars,line_total_ars,detail_json,file_references_json) VALUES(?,?,?,?,?,?,?,?,?,?)")
+  .bind(orderId,i+2,"product",it.code,it.name,it.qty,it.price,it.total,"{}","[]")));
+ requests.push(env.DB.prepare("INSERT INTO cart_requests(client_order_id,request_hash,order_id) VALUES(?,?,?)").bind(data.clientOrderId,hash,orderId));
+ requests.push(env.DB.prepare("UPDATE central_document_manifests SET commercial_order_id=?,status='linked_waiting_payment',linked_at=datetime('now') WHERE web_order_id=? AND commercial_order_id IS NULL").bind(orderId,data.webOrderId));
+ let response;
+ try{response=await env.DB.batch(requests)}
+ catch(_){
+  const other=await env.DB.prepare("SELECT request_hash,order_id FROM cart_requests WHERE client_order_id=?").bind(data.clientOrderId).first();
+  if(other&&other.request_hash===hash){
+   return json({created:true,idempotent:true,commercial_order_id:other.order_id,
+    amount_ars:total,state:"awaiting_payment",checkoutEnabled:false,paymentAuthorized:false});
+  }
+  return json({error:"Pedido concurrente o recepción reutilizada"},409);
+ }
+ if(response?.[response.length-1]?.meta?.changes!==1)
+  return json({error:"Vinculación del nuevo pedido sin confirmar"},409);
+ return json({created:true,idempotent:false,commercial_order_id:orderId,
+  amount_ars:total,state:"awaiting_payment",documentos_ars:row.amount_ars,
+  productos_ars:total-row.amount_ars,checkoutEnabled:false,paymentAuthorized:false},201);
+}
+
 async function centralAdminDetail(env,id){
  await centralTables(env);
  const row=await env.DB.prepare("SELECT web_order_id,manifest_json,created_at,amount_ars,file_count FROM central_document_manifests WHERE commercial_order_id=?").bind(id).first();
