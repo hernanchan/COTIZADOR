@@ -14,6 +14,7 @@ function validarArchivo(a,i){
  !Number.isSafeInteger(a.copias)||a.copias<1||a.copias>500||
  (a.paginasSeleccionadas!==undefined&&(typeof a.paginasSeleccionadas!=='string'||a.paginasSeleccionadas.length>500))||
  !(a.servicio===undefined||['auto','stickers'].includes(a.servicio))||
+ (a.productoFoto!==undefined&&typeof a.productoFoto!=='string')||
  !['bn','color'].includes(a.modo)||!['simple','double'].includes(a.caras)||
  !['obra80','recubierto'].includes(a.papelPoster)||
  !['ninguno','individual','grupo'].includes(a.anillado)||
