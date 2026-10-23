@@ -44,7 +44,7 @@ function tipoOriginal(paginas){
  */
 export function cotizarCargaUnica({archivos,precios}){
  if(!Array.isArray(archivos)||!archivos.length||archivos.length>30)throw Error('Cantidad de archivos inválida');
- const documentos=[],ploteos=[],stickers=[],fotos=[],cortes=[],pendientes=[],plan=[];
+ const documentos=[],ploteos=[],stickers=[],fotos=[],cortes=[],graficas=[],pendientes=[],plan=[];
  archivos.forEach((a,i)=>{
   validarArchivo(a,i);
   const seleccionadas=seleccionarPaginas(a.paginas,a.paginasSeleccionadas);
