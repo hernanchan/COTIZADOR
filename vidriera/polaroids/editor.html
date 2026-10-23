@@ -644,7 +644,7 @@ $('goToCartAfterReceipt').onclick=()=>{
  if(window.parent!==window||!receivedReference||!/^POL-[A-F0-9]{24}$/.test(receivedReference))return;
  if(!receivedOrder||receivedOrder.reference!==receivedReference)return;
  const n=receivedOrder.photos,count=receivedOrder.sheets;
- if(n<1||n>60||count!==Math.ceil(n/6)||count>10)return;
+ if(n<1||n>MAX_SHEETS*6||count!==Math.ceil(n/6)||count>MAX_SHEETS)return;
  const price=receivedOrder.price,key='saberCartV1';
  let items=[];
  try{items=JSON.parse(localStorage.getItem(key)||'[]')}catch(_){items=[]}
