@@ -81,12 +81,22 @@ test('editor existente usa Express en vez de transportar originales',async()=>{
   assert.equal(JSON.stringify(payload).includes('foto0.jpg'),false);
   assert.equal(JSON.stringify(payload).includes('crop'),false);
   assert.equal(payload.hojas[0][0],Buffer.from(bytes).toString('base64'));
+  if(requests.length===1)throw new TypeError('El celular suspendió la conexión');
   return Response.json({ok:true,verified:true,pdfPrivateConfirmed:true,
    reference:payload.reference,photos:24,sheets:4,pdfForClient:false,
    checkoutAuthorized:false});
  };
  await run('sendSecurePhotos()');
- assert.equal(requests.length,1,'Editor status: '+String(nodes.get('status')?.textContent));
+ assert.equal(requests.length,1);
+ assert.equal(run('receivedReference'),'');
+ const initial=run('receivingSession.reference');
+ assert.equal(initial,requests[0].reference);
+ // La verificación Turnstile se repite pero el pedido NO cambia de referencia.
+ run("turnstileToken='second-independent-turnstile-token'");
+ await run('sendSecurePhotos()');
+ assert.equal(requests.length,2,'Editor status: '+String(nodes.get('status')?.textContent));
+ assert.equal(requests[0].reference,requests[1].reference);
+ assert.equal(run('receivedReference'),initial);
  assert.equal(run('receivedOrder.photos'),24);
  assert.equal(run('receivedOrder.sheets'),4);
  assert.equal(run('receivedOrder.price'),12000);
