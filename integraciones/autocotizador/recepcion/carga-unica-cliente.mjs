@@ -1,6 +1,7 @@
 import {leerMedidasPloteo} from './medidas-local-pdf.mjs';
 import {clasificarDestino} from './destino-impresion.mjs';
 import {prepararBorradorPedido} from './preparar-borrador-pedido.mjs';
+import {componerCarritoPreliminar} from './componer-carrito-preliminar.mjs';
 import {seleccionarPaginas} from './seleccionar-paginas.mjs';
 import {clasificarPaginasPloteo} from './clasificar-paginas-ploteo.mjs';
 const $=id=>document.getElementById(id);
@@ -215,7 +216,12 @@ $('prepararPedido').addEventListener('click',()=>{
    cotizacion:ultimoPresupuesto,
    archivos:entries.map(e=>({file:e.archivoOriginal,name:e.name,paginas:e.paginas,copias:e.copias}))
   });
-  contenedor.append(texto('h3','Pedido en preparación · '+pesos(draft.totalOrientativo)));
+  let articulos=[];
+  try{articulos=JSON.parse(localStorage.getItem('saberCartV1')||'[]')}catch(_){articulos=[]}
+  const carrito=componerCarritoPreliminar({borrador:draft,articulos});
+  contenedor.append(texto('h3','Pedido en preparación · '+pesos(carrito.totalOrientativo)));
+  if(carrito.productos.length)contenedor.append(texto('p','Artículos de tienda (precios pendientes de verificación): '+carrito.productos.length+' · '+pesos(carrito.subtotalProductosOrientativo)));
+  contenedor.append(texto('p','Trabajos de impresión: '+pesos(carrito.subtotalTrabajosOrientativo)));
   contenedor.append(texto('p','Los archivos siguen en este dispositivo. No fueron recibidos por Librería Saber.'));
   const listado=document.createElement('ol');
   for(const item of draft.items){
