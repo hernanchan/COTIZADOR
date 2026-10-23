@@ -124,3 +124,11 @@ No modificar `main`, la web pública, Apps Script, Polaroids ni pagos. No contra
 - **Importante:** si no pudo leerse/renderizarse el PDF o faltan métricas numéricas fiables, NO se inventa la clasificación ni un precio. Errores técnicos siguen bloqueados.
 - La política se aplica **por página**, no por votación del PDF; conserva trabajos mixtos CAD/Póster. Precios y selección automática de rollos sin modificaciones.
 - Pendiente reensayo del compilado de 24 páginas en Chrome después de actualizar manualmente el Worker privado. No activar pagos ni publicar producción.
+
+## Selección de páginas por PDF en carga única — 23/10/2026
+
+- Se añadió en la ficha colapsable de cada PDF el campo **Páginas a imprimir (vacío=todas)** con rangos como `1-3,5`. Atiende al caso real de un PDF de siete páginas del que el cliente pide solo tres.
+- `seleccionar-paginas.mjs` valida números, rangos, duplicados, límites y entrada malformada; conserva el orden original y no transforma el PDF del usuario.
+- `/api/ensayo-carga-unica` recibe `paginasSeleccionadas` opcional (compatibilidad con clientes anteriores). Calcula documentos, ploteos, destino final y materiales usando **solo páginas seleccionadas**, preserva en el `plan` las numeraciones originales que deben imprimirse. Para precio de ploteos la numeración se normaliza internamente, manteniéndose `paginasElegidas` como fuente de instrucciones de producción.
+- Pruebas unitarias de 1-3 de siete, mezcla de rangos, selección de todas y validaciones. **CI compilado correcto:** https://github.com/hernanchan/COTIZADOR/actions/runs/39961873096
+- Este cambio no corta, elimina ni manda el PDF original. **Todavía no existe recepción verificable del PDF de origen ni emisión de archivo listo para imprimir.** Es presupuesto preliminar, paymentAuthorized=false. No desplegado automáticamente a Cloudflare.
