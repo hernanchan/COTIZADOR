@@ -8,6 +8,7 @@
 import * as pdfLib from 'pdf-lib';
 import {EXPRESS,guardarPedidoPdfExpress} from './motor-pdf.mjs';
 import {guardarPdfPrivadoEnGAS} from './guardar-pdf-privado.mjs';
+import {enviarPolaroidsACentral} from './enviar-central-express.mjs';
 const REF=/^POL-[A-F0-9]{24}$/;
 const B64=/^[A-Za-z0-9+/]+={0,2}$/;
 const BODY_LIMIT=18*1024*1024;
@@ -29,7 +30,11 @@ function originMatches(request,env){
 }
 async function privateConfig(request,env){
  if(env?.EXPRESS_RECEPTION_ENABLED!=='PRIVATE_TEST_ONLY'||
-    env?.EXPRESS_PDF_ENABLED!=='PRIVATE_TEST_ONLY'||!env?.ASSETS?.fetch)
+    env?.EXPRESS_PDF_ENABLED!=='PRIVATE_TEST_ONLY'||
+    env?.EXPRESS_CENTRAL_SYNC_ENABLED!=='PRIVATE_TEST_ONLY'||
+    typeof env?.CENTRAL_BRIDGE_KEY!=='string'||env.CENTRAL_BRIDGE_KEY.length<32||
+    env.CENTRAL_BRIDGE_KEY===env.EXPRESS_PDF_HMAC_KEY||
+    !env?.ASSETS?.fetch)
   return false;
  try{
   const url=new URL('/polaroids/recepcion-config.json',request.url);
@@ -144,6 +149,11 @@ export async function onRequestPost({request,env,fetcher=fetch}){
    referencia:order.reference,hojas:order.hojas,pdfLib,
    guardarPdfPrivado:x=>guardarPdfPrivadoEnGAS({...x,env,fetcher})
   });
+  // Fail closed: un PDF en Drive no constituye pedido hasta registrarlo en
+  // la Central. Reintentar la misma referencia es idempotente en ambos lados.
+  const central=await enviarPolaroidsACentral({recibo:receipt,env,fetcher});
+  if(central.registrado!==true||central.referencia!==receipt.referencia)
+   throw Error('La Central no confirmó la recepción.');
   return json({ok:true,verified:true,reference:receipt.referencia,
    sheets:receipt.hojas,photos:receipt.fotos,
    pdfPrivateConfirmed:true,priceReference:receipt.precioOrientativo,
