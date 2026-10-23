@@ -691,7 +691,11 @@ async function setupSecureReception(){
     throw new Error('El nuevo receptor Express todavía está deshabilitado.');
    receiverApiUrl=url.href;
    const info=$('secureReceptionNotice');
-   info.textContent='Express: se envían únicamente los recortes optimizados y Drive recibe un solo PDF privado. El PDF imprimible no se descarga.';
+   // No reemplazar el contenedor: incluye consentimiento y Turnstile.
+   const heading=info.querySelector('strong');
+   const details=info.querySelector('span');
+   if(heading)heading.textContent='Polaroids Express · PDF privado único';
+   if(details)details.textContent='Se envían únicamente recortes optimizados. Drive recibe un solo PDF imprimible, privado para Librería Saber.';
   }else{
    const url=new URL(cfg.bridgeUrl);
    if(url.protocol!=='https:'||url.hostname!=='script.google.com'||
