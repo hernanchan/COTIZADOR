@@ -86,7 +86,7 @@ test('editor existente usa Express en vez de transportar originales',async()=>{
    checkoutAuthorized:false});
  };
  await run('sendSecurePhotos()');
- assert.equal(requests.length,1);
+ assert.equal(requests.length,1,'Editor status: '+String(nodes.get('status')?.textContent));
  assert.equal(run('receivedOrder.photos'),24);
  assert.equal(run('receivedOrder.sheets'),4);
  assert.equal(run('receivedOrder.price'),12000);
