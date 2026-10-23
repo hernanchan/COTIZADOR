@@ -49,6 +49,7 @@ export function cotizarCargaUnica({archivos,precios}){
   validarArchivo(a,i);
   const seleccionadas=seleccionarPaginas(a.paginas,a.paginasSeleccionadas);
   const d=clasificarDestino(seleccionadas,a.seleccion);
+  if(a.servicio==='grafica'){return;}
   if(a.servicio==='corte'){procesarCorteCarga(a,i,seleccionadas,precios,cortes,plan,pendientes);return;}
   if(a.servicio==='fotos'){
    procesarFotoCarga({archivo:a,indice:i,paginas:seleccionadas,precios,fotos,plan,pendientes});
