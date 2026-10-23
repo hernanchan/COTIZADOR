@@ -4,6 +4,6 @@ export function procesarGraficaCarga(a,i,paginas,graficas,plan,pendientes){
  const calc=cotizarGrafica({productoId:a.productoGrafica,lotes:a.copias});
  const id='graf'+(graficas.length+1);
  graficas.push({id,nombre:a.nombre,...calc});
- plan.push({indice:i,nombre:a.nombre,destino:'grafica',id});
+ plan.push({indice:i,nombre:a.nombre,destino:'grafica',id,paginasElegidas:paginas.map(p=>p.numero),productoId:calc.id,lotes:calc.lotes,nota:'Sin diseño; producción sujeta a revisión técnica'});
 }
 
