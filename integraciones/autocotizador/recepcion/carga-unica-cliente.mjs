@@ -93,7 +93,7 @@ function render(){
   for(const [v,l] of [['sin-confirmar','Elegir tamaño final'],['original','Mantener tamaño original'],['a3','A3 (29,7 × 42 cm)'],['a4','A4 (21 × 29,7 cm)'],['a5','A5 (14,8 × 21 cm)']]){
    const o=new Option(l,v);sel.add(o);
   }
-  sel.value=e.seleccion;sel.onchange=()=>{e.seleccion=sel.value;cambio()};label.append(sel);controles.append(label);
+  sel.value=e.seleccion;sel.onchange=()=>{e.seleccion=sel.value;cambio()};label.append(sel);if(e.servicio!=='fotos')controles.append(label);
   const decision=clasificarDestino(paginas,e.seleccion);
   if(decision.confirmado){
    const destino=texto('p','Trabajo: '+(decision.destino==='ploteo'?'Ploteo grande':'Impresión de documentos')+' · Salida: '+(decision.tamanoFinal==='original'?'tamaño original':decision.tamanoFinal.toUpperCase()));destino.className='destino';panel.append(destino);
