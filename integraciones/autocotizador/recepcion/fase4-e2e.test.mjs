@@ -86,6 +86,25 @@ globalThis.fetch=async (url,init={})=>{
  if(uri.hostname==='challenges.cloudflare.com'){
   return Response.json({success:turnstileSuccess,action:'documentos',hostname:new URL(origin).hostname});
  }
+ if(uri.hostname==='saber-pagos-pruebas.test.workers.dev'){
+  assert.equal(uri.pathname,'/internal/central/stage');
+  assert.equal(init.method,'POST');
+  assert.equal(init.headers['Content-Type'],'application/json');
+  const key='private-bridge-key-0123456789-abcdefghij';
+  const ts=init.headers['x-saber-ts'],id=init.headers['x-saber-request-id'];
+  const expected=createHmac('sha256',key).update(ts+'\\n'+id+'\\n'+init.body).digest('hex');
+  assert.equal(init.headers['x-saber-signature'],expected);
+  const packet=JSON.parse(init.body);
+  assert.equal(packet.schema,'saber-central-recepcion-verificada-v1');
+  assert.equal(packet.importeVerificado,packet.ficha.totalVerificadoSinPago);
+  assert.equal(packet.filesReceived,true);
+  assert.equal(packet.paymentAuthorized,false);
+  assert.equal(packet.listoParaProducir,false);
+  assert.ok(packet.recibos.length===1&&packet.ficha.trabajos.length===1);
+  assert.equal(init.body.includes('uploadKey'),false);
+  return Response.json({saved:true,paymentAuthorized:false,
+   web_order_id:packet.orderId,idempotent:false},{status:201});
+ }
  if(uri.hostname==='script.google.com'){
   const envBody=JSON.parse(init.body);
   const check=createHmac('sha256',relayKey).update(envBody.timestamp+'\n'+envBody.payloadJson).digest('hex');
@@ -622,4 +641,34 @@ test('Central privada: sin clave rechaza; con HMAC GAS valida PDF real pero no c
  assert.ok(googleCalls>earlier,'lecturas firmadas HMAC desde Google');
  const invalid=await worker.fetch(privateReq('otro-secreto'),workerEnv);
  assert.equal(invalid.status,401);
+});
+
+test('Documentos envia a Central D1 sólo con secretos independientes y HMAC válido',async()=>{
+ const stored=orders.get('WEB-ENSAYO-0123456789ABCDEF');
+ const opts={sesion:{uploadId:stored.uploadId,token:stored.token},opciones:{
+  seleccion:'a4',servicio:'stickers',copias:1,caras:'simple',papelPoster:'obra80',
+  paginasSeleccionadas:'',anillado:'ninguno',grupoAnillado:'',materialColor:'',
+  productoFoto:'',productoGrafica:'',corteVariante:'gt3',corteMetros:1
+ }};
+ const privateKey='other-admin-credential-for-Central-0123456789';
+ const headers={Origin:origin,'Sec-Fetch-Site':'same-origin',
+  'Content-Type':'application/json',Authorization:'Bearer '+privateKey};
+ const reqSync=()=>new Request(origin+'/api/ensayo-sincronizar-central',
+  {method:'POST',headers,body:JSON.stringify(opts)});
+ const baseEnv={...env,DOCS_CENTRAL_ADMIN_KEY:privateKey};
+ assert.equal((await worker.fetch(reqSync(),baseEnv)).status,503);
+ const syncedEnv={...baseEnv,DOCS_CENTRAL_SYNC_ENABLED:'PRIVATE_TEST_ONLY',
+  CENTRAL_TEST_URL:'https://saber-pagos-pruebas.test.workers.dev/internal/central/stage',
+  CENTRAL_BRIDGE_KEY:'private-bridge-key-0123456789-abcdefghij'};
+ const res=await worker.fetch(reqSync(),syncedEnv);
+ assert.equal(res.status,200,JSON.stringify(await res.clone().json()));
+ const data=await res.json();
+ assert.equal(data.ok,true);assert.equal(data.sincronizado,true);
+ assert.equal(data.paymentAuthorized,false);
+ assert.equal(data.listoParaProducir,false);
+ assert.equal(data.webOrderId,stored.orderId);
+ const evil=await worker.fetch(new Request(origin+'/api/ensayo-sincronizar-central',
+  {method:'POST',headers:{...headers,Authorization:'Bearer wrong'},
+  body:JSON.stringify(opts)}),syncedEnv);
+ assert.equal(evil.status,401);
 });
