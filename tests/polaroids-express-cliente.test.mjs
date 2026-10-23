@@ -5,7 +5,7 @@ import {inflateSync} from 'node:zlib';
 import {readFile} from 'node:fs/promises';
 import {webcrypto as crypto} from 'node:crypto';
 import {prepararEnvioExpress} from '../vidriera/polaroids/express-cliente.mjs';
-const bytes=Uint8Array.from(inflateSync(Buffer.from('eNr7f+P/AwYBLzdPNwZGRiBk+H+bwZmBl5OLm4uDl5uLm4+Pl19YQVRYSEhYXUZOXEFP09BAT1NXx9jKy87YzM1cR9ch3NHNxy8oOMjILioxKiDBKzDIH2QIIx8fn7CgsJqoqJq/qa6pP8ng/wEGQQ7mMiBkVGJgEmRkFmT8f4RBFOxUFMAOFBYRQBdlAIqKMTKiq2ZmAakWxFR9i4GHmRFoD7Mggz3DAoYzOxhGwSgYBaNgFIyCUTAKRsEoGAWjYBSMglEwCkbBKCAb2P+/CQBcpjcR','base64')));
+const bytes=Uint8Array.from(inflateSync(Buffer.from('eNr7f+P/AwYBLzdPNwZGRgYGRiBk+H+bwZmBl5OLm4uDl5uLm4+Pl19YQVRYSEhYXUZOXEFP09BAT1NXx9jKy87YzM1cR9ch3NHNxy8oOMjILioxKiDBKzDIH2QIIx8fn7CgsJqoqJq/qa6pP8ng/wEGQQ7mMiBkVGJgEmRkFmT8f4RBFOxUFMAOFBYRQBdlAIqKMTKiq2ZmAakWxFR9i4GHmRFoD7Mggz3DAoYzOxhGwSgYBaNgFIyCUTAKRsEoGAWjYBSMglEwCkbBKCAb2P+/CQBcpjcR','base64')));
 const imgBlob=new Blob([bytes],{type:'image/jpeg'});
 test('cliente prepara 24 fotos en 4 tandas y nunca incorpora originales al payload',async()=>{
  const progress=[];
