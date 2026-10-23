@@ -11,7 +11,7 @@ const line=(nombre,servicio,fileId,productoGrafica='')=>({
 const configs=[line('stickers.pdf','stickers','f1'),line('tarjeta.pdf','grafica','f2','tarjetas-0')];
 const recibo=(fileId,name)=>({
  fileId,name,orderId,status:'verified',storageVerified:true,pageVerification:'server',
- receiptId:'DOC-12345678-1234-4234-8234-1234567890ab',
+ receiptId:fileId==='f1'?'DOC-12345678-1234-4234-8234-1234567890ab':'DOC-87654321-1234-4234-8234-1234567890ab',
  sha256:'a'.repeat(64),bytes:1526,pageCount:1,
  pageMetrics:[{anchoCm:21,altoCm:29.7,modo:'sin-clasificar'}]
 });
@@ -37,6 +37,7 @@ test('rechaza falta de medidas del PDF, archivo cambiado y recibos duplicados',(
  assert.throws(()=>run(configs,[{...receipts[0],pageMetrics:[]},receipts[1]]));
  assert.throws(()=>run([{...configs[0],nombre:'otro.pdf'},configs[1]]));
  assert.throws(()=>run(configs,[receipts[0],receipts[0]]));
+ assert.throws(()=>run(configs,[receipts[0],{...receipts[1],receiptId:receipts[0].receiptId}]));
 });
 test('recalcula dimensiones solo de recibos, no de los valores del navegador',()=>{
  const d=run();
