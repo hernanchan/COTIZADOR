@@ -103,4 +103,10 @@ test('editor existente usa Express en vez de transportar originales',async()=>{
  assert.equal(run('receivingSession'),null);
  assert.match(run('receivedReference'),/^POL-[A-F0-9]{24}$/);
  assert.equal(nodes.get('btnPdf').disabled,true);
+ // Aunque el PDF esté confirmado, no ofrecer un carrito legado que no
+ // sabe reconocer la recepción Express en D1.
+ sandbox.parent={postMessage:()=>{}};
+ nodes.get('goToCartAfterReceipt').onclick();
+ assert.equal(store.has('saberCartV1'),false);
+ assert.match(String(nodes.get('status').textContent),/cobros.*desactivados/i);
 });
