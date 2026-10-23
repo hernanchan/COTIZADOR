@@ -139,8 +139,8 @@ export function cotizarCargaUnica({archivos,precios}){
  const subtotalCortes=cortes.reduce((sum,x)=>sum+x.subtotal,0);
  const subtotalGraficas=graficas.reduce((sum,x)=>sum+x.subtotal,0);
  return {ok:true,estado:pendientes.length?'INCOMPLETO':'PRELIMINAR',verificacion:VALORACION,
-  paymentAuthorized:false,total:pendientes.length?null:subtotalImpresiones+subtotalPloteos+subtotalStickers+subtotalFotos+subtotalCortes,
-  subtotalImpresiones,subtotalPloteos,subtotalStickers,subtotalFotos,subtotalCortes,subtotalAnillados:c?.subtotalAnillados||0,
+  paymentAuthorized:false,total:pendientes.length?null:subtotalImpresiones+subtotalPloteos+subtotalStickers+subtotalFotos+subtotalCortes+subtotalGraficas,
+  subtotalImpresiones,subtotalPloteos,subtotalStickers,subtotalFotos,subtotalCortes,subtotalGraficas,subtotalAnillados:c?.subtotalAnillados||0,
   detalleArmados:c?.detalleArmados||[],pendientes,plan,
-  detalleImpresiones:c?.detalles||[],detallePloteos:p?.detalles||[],detalleStickers:stickers,detalleFotos:fotos,detalleCortes:cortes};
+  detalleImpresiones:c?.detalles||[],detallePloteos:p?.detalles||[],detalleStickers:stickers,detalleFotos:fotos,detalleCortes:cortes,detalleGraficas:graficas};
 }
