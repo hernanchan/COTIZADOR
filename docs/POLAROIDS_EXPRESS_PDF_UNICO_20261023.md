@@ -47,3 +47,27 @@
 - El cliente no recibe el PDF de impresión ni enlaces de Drive.
 - La Central de Pedidos presenta una descarga privada accesible únicamente al operador y nunca incluye pedidos impagos como listos para producir.
 - Sin R2 ni costos nuevos y sin cambios a la web pública antes de autorización expresa.
+
+## Integración de navegador y Worker Express — avance 23/10/2026
+
+**Implementado adicionalmente en esta rama:**
+
+- El editor aprobado se conserva: se añadió un selector de transporte por configuración `delivery:"express-pdf-only"`, con URL interna fija `/api/polaroids-express`. El viejo flujo queda separado, sin alteración de producción. Con la configuración actual (`enabled:false`) **no se puede enviar ningún pedido**.
+- `vidriera/polaroids/express-cliente.mjs` optimiza fotos localmente por tandas de seis, generando recortes JPEG de 886×886 con calidad adaptativa y **máximo 450 KB por foto**. El cliente no lee el original en Base64 para enviar; entrega únicamente los JPEG recortados, en **una solicitud de hasta 18 MiB**, junto con la referencia y el token Turnstile. La preparación por tandas es local: el POST es uno solo, **no es todavía carga reanudable en servidor**.
+- `worker-express.mjs` es la implementación de `POST /api/polaroids-express`, expuesta desde `functions/api/polaroids-express.js` y compilable con esbuild: host y Origin exactos, modo aprobado en ASSETS, dos interruptores privados de entorno, validación Turnstile con acción `polaroids-express`, cantidad 1–24 y hasta cuatro hojas, tamaño total acotado, JPEG real y documento PDF único generado mediante `pdf-lib`. No hay enlaces ni bytes de PDF en las respuestas al cliente.
+- El Worker solamente declara recepción exitosa **después** de que el Apps Script independiente confirma integridad y un único PDF privado. El editor añade al carrito un artículo Polaroids con su referencia **después** de esa confirmación.
+- Reintentos del mismo pedido conservan el `POL-...` durante la sesión del navegador. Se exige un nuevo Turnstile para reintentar y Google verifica que el PDF ya guardado sea el mismo, sin duplicarlo. Los metadatos PDF se fijaron para que un PDF reconstruido de las mismas imágenes sea reproducible.
+- Se añadió `package.json` al root sólo en la rama para permitir resolución de `pdf-lib` en la Cloudflare Pages Function de vista previa. La compilación del Worker se ha probado **sin despliegue**, junto con pruebas HTTP simuladas del Worker y simulación de editor móvil.
+
+**Suite actual:** [GitHub Actions](https://github.com/hernanchan/COTIZADOR/actions/runs/40028783523) — completada con resultado **success**. Incluye pruebas con 6/12/19/24 fotos, PDF A4, control de acceso, Turnstile, HMAC, Drive simulado, cartera/reintento tras una caída de red, y comprobación de que ningún original de imagen ni PDF imprimible aparece en el JSON para clientes.
+
+### Pendientes actualizados: no activarlo aún
+
+1. Configurar y desplegar exclusivamente el receptor Apps Script en una carpeta **privada de prueba**, sin tocar el receptor antiguo ni la web pública. Necesita una prueba de almacenamiento *real* con una fotografía.
+2. Configurar secretos del Worker Express en el entorno privado y habilitar una configuración de ensayo sólo tras aprobación. La opción `delivery` sigue AUSENTE y `enabled:false`; ningún trabajo se puede enviar a través del nuevo flujo en la web pública.
+3. Medir el tiempo y la fidelidad de **24 fotos reales** de diferentes celulares, en Wi-Fi y datos móviles. Verificar encuadres, marcas de guillotina y salida impresa en chorro de tinta; un test automatizado no prueba colores ni papel.
+4. Probar interrupción por bloqueo o **recarga** del teléfono. Reintentar con la misma referencia funciona en la misma pestaña, pero **no** hay recuperación garantizada después de recargar, cerrar la pestaña o reiniciar el navegador.
+5. Conectar la descarga de ese único PDF privado a la **Central de Pedidos**, con control administrativo y estado de pago; hoy sólo está listo el contrato de almacenamiento, no la descarga desde la Central.
+6. Aplicar cuotas de recepción, reglas de caducidad/purga de pedidos abandonados y verificación final de pago. Ninguna de ellas debe autorizar el checkout sólo con la declaración del navegador.
+
+**Nota de diseño:** no se suben tandas de seis por separado porque eso exigiría almacenar fotografías temporales entre peticiones, justamente lo que queremos evitar. Se comprimen en grupos de seis en el teléfono y se envían los recortes de todo el pedido en un único POST; el servidor produce y guarda directamente un solo PDF. Sin R2, KV ni servicios de pago adicionales.
