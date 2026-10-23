@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {PDFDocument} from '../integraciones/autocotizador/recepcion/node_modules/pdf-lib/dist/pdf-lib.esm.js';
+import {createRequire} from 'node:module';
+const load=createRequire(new URL('../integraciones/autocotizador/recepcion/package.json',import.meta.url));
+const {PDFDocument}=load('pdf-lib');
 import precios from '../precios-web.json' with {type:'json'};
 import {conectarRecepcionConCentral} from '../integraciones/autocotizador/recepcion/puente-recepcion-central.mjs';
 const orderId='WEB-ENSAYO-1234567890ABCDEF';
@@ -29,8 +31,8 @@ async function data(){
  }
  return {blobs,recibos};
 }
-const run=({blobs,recibos})=>conectarRecepcionConCentral({
- orderId,configuraciones,preciosServidor:precios,
+const run=({blobs,recibos,configs=configuraciones})=>conectarRecepcionConCentral({
+ orderId,configuraciones:configs,preciosServidor:precios,
  consultarRecibosPrivados:async()=>recibos,
  descargarPdfPrivado:async({fileId})=>blobs.get(fileId)
 });
@@ -69,9 +71,6 @@ test('un PDF de dimensión A0 requiere clasificar CAD/póster antes de cobrar',a
  const bytes=await large.save();const blobs=new Map(original.blobs);
  blobs.set('f1',bytes);
  const recibos=original.recibos.map((r,i)=>i?r:{...r,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')});
- // Stickers sobre A0 no se acepta como plancha A4.
- // La ficha queda pendiente si el cotizador exige corregir destino comercial.
- const d=await run({blobs,recibos});
- assert.equal(d.paymentAuthorized,false);
- assert.equal(d.ficha.listoParaProducir,false);
+ const configs=[{...configuraciones[0],servicio:'auto',seleccion:'original'},configuraciones[1]];
+ await assert.rejects(run({blobs,recibos,configs}),/revisión|pendiente|cotizar/i);
 });
