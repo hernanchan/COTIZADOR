@@ -97,6 +97,15 @@ html.embedded .demo-cart{display:none}
    <label class="consent-check"><input id="photoConsent" type="checkbox"> Acepto enviar mis fotografías únicamente para preparar este pedido en Librería Saber.</label>
    <div id="turnstileBox"></div>
   </div>
+  <div id="expressRecovery" class="secure-reception-note" hidden>
+   <strong>Envío Express recuperable</strong>
+   <span id="expressRecoveryText">Hay un PDF Express pendiente de confirmar desde este navegador.</span>
+   <div class="buttons">
+    <button class="secondary" id="retryExpress" type="button">Reintentar envío preparado</button>
+    <button class="secondary" id="discardExpress" type="button">Descartar recortes locales</button>
+   </div>
+   <small>Se conservan sólo los recortes optimizados en este dispositivo, hasta 2 horas. Se borran al confirmar o descartar. Para reintentar debés completar nuevamente la verificación de seguridad.</small>
+  </div>
   <div id="receiverHolder" hidden></div><div id="receiverHealth" class="receiver-health" hidden role="status" aria-live="polite"><strong>Google todavía no confirmó la conexión.</strong><span id="receiverHealthText"></span> <a id="receiverHealthLink" target="_blank" rel="noopener noreferrer">Comprobar receptor de Google</a></div>
   <div class="buttons"><button class="primary" id="btnPdf" disabled>Recepción no disponible</button><button class="secondary" id="btnDemo" title="Para probar antes de usar fotos reales">Cargar prueba</button><button class="secondary" id="btnClear">Vaciar</button></div>
   <div class="status" id="status" role="status" aria-live="polite">Seleccioná tus fotografías. Podés cargarlas todas de una vez.</div>
@@ -506,6 +515,72 @@ function resetChallenge(){
  turnstileToken='';
  if(turnstileWidget!==null&&window.turnstile&&typeof turnstile.reset==='function')
   turnstile.reset(turnstileWidget);
+}
+async function detectarExpressPendiente(){
+ if(receiverConfig?.mode!=='express')return;
+ try{
+  const {leerBorradorExpress}=await import('./express-recuperacion.mjs');
+  const pending=await leerBorradorExpress();
+  $('expressRecovery').hidden=!pending;
+  if(pending)$('expressRecoveryText').textContent=
+   'Hay '+pending.fotos+' fotos de '+pending.hojasA4+
+   ' hoja(s) preparadas. Podés reintentar sin volver a elegir las imágenes.';
+ }catch(_){$('expressRecovery').hidden=true}
+}
+async function eliminarExpressLocal(){
+ try{
+  const {borrarBorradorExpress}=await import('./express-recuperacion.mjs');
+  await borrarBorradorExpress();
+ }catch(_){}
+ $('expressRecovery').hidden=true;
+}
+async function confirmarExpressPrivado({reference,challenge,hojas,fotos,numeroHojas}){
+ const response=await fetch(receiverApiUrl,{
+  method:'POST',headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({reference,turnstileToken:challenge,hojas}),
+  cache:'no-store'
+ });
+ const reply=await response.json().catch(()=>null);
+ if(!response.ok||reply?.ok!==true||reply.verified!==true||
+    reply.pdfPrivateConfirmed!==true||reply.reference!==reference||
+    reply.sheets!==numeroHojas||reply.photos!==fotos||
+    reply.pdfForClient!==false||reply.checkoutAuthorized!==false)
+  throw new Error(reply?.error||'Google no confirmó el PDF. Podés reintentar.');
+ receivedOrder=Object.freeze({
+  reference,sheets:numeroHojas,photos:fotos,price:numeroHojas*unitPrice
+ });
+ receivedReference=reference;receivingSession=null;
+ await eliminarExpressLocal();
+ status('¡PDF privado confirmado! '+numeroHojas+
+  ' hoja(s) A4 · Referencia '+reference+'.','ok');
+ if(window.parent!==window)
+  window.parent.postMessage({type:'SABER_POLAROID_RECEIVED',
+   payload:{sheets:numeroHojas,photos:fotos,format:'85x90',
+    uploadsReceived:true,reference,referenceStatus:'received'}},window.location.origin);
+}
+async function reintentarExpressGuardado(){
+ if(busy||receivedReference||receiverConfig?.mode!=='express'||!receiverApiUrl)return;
+ if(!$('photoConsent').checked)
+  throw new Error('Aceptá el uso de tus fotografías para el pedido.');
+ if(!turnstileToken)throw new Error('Completá nuevamente el control de seguridad.');
+ const {leerBorradorExpress}=await import('./express-recuperacion.mjs');
+ const cached=await leerBorradorExpress();
+ if(!cached){$('expressRecovery').hidden=true;throw new Error('No hay fotos recuperables en este navegador.');}
+ const challenge=turnstileToken;turnstileToken='';
+ busy=true;document.querySelector('.app').classList.add('uploading');updateSheetNav();
+ try{
+  status('Reintentando el envío preparado · '+cached.fotos+' fotos…');
+  await confirmarExpressPrivado({
+   reference:cached.referencia,challenge,hojas:cached.hojas,
+   fotos:cached.fotos,numeroHojas:cached.hojasA4
+  });
+ }catch(e){
+  status('La recepción aún no se confirmó: '+String(e.message||e)+
+   '. Podés volver a reintentar durante dos horas.','bad');
+ }finally{
+  resetChallenge();busy=false;
+  document.querySelector('.app').classList.remove('uploading');updateSheetNav();
+ }
 }
 /** Nuevo flujo: JPG optimizados en tránsito; sólo PDF final en Google.
  * Nunca envía File originales, ni genera PDF imprimible en el navegador.
