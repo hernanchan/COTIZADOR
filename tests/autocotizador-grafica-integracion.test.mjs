@@ -13,6 +13,8 @@ test('gráfica comercial de 100 tarjetas cuesta 18000 por lote',()=>{
  const d=cotizarCargaUnica({archivos:[archivo('grafica',{productoGrafica:'tarjetas-0'})],precios});
  assert.equal(d.estado,'PRELIMINAR');
  assert.equal(d.subtotalGraficas,18000);
+ assert.equal(d.plan[0].id,d.detalleGraficas[0].id);
+ assert.equal(d.detalleGraficas[0].productoId,'tarjetas-0');
  assert.equal(d.total,18000);
  assert.deepEqual(d.plan[0].paginasElegidas,[1]);
  assert.equal(d.paymentAuthorized,false);
