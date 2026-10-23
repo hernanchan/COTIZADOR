@@ -9,6 +9,7 @@ let version=0;
 let catalogo={a4:[],a3:[]};
 let productosFoto=[];
 let variantesCorte=[];
+let productosGrafica=[];
 let abierto=-1;
 let ultimoPresupuesto=null;
 const pesos=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(n);
@@ -21,6 +22,7 @@ function importeArchivo(indice){
    plan.destino==='stickers'?ultimoPresupuesto.detalleStickers?.find(x=>x.id===plan.id):
    plan.destino==='fotos'?ultimoPresupuesto.detalleFotos?.find(x=>x.id===plan.id):
    plan.destino==='corte'?ultimoPresupuesto.detalleCortes?.find(x=>x.id===plan.id):
+   plan.destino==='grafica'?ultimoPresupuesto.detalleGraficas?.find(x=>x.id===plan.id):
    ultimoPresupuesto.detallePloteos?.find(x=>x.id===plan.id);
  // Anillados agrupados se suman sólo al total general; evitar un subtotal individual ambiguo.
  if(plan.destino==='documentos'&&entries[indice].anillado==='grupo')return 'Incluido en el grupo';
@@ -31,7 +33,7 @@ const valor=(label,options,selected,change)=>{const l=texto('label',label+' '),s
 function paginasElegidas(e){try{return seleccionarPaginas(e.paginas,e.paginasSeleccionadas)}catch(_){return null}}
 function cambio(){version++;render();cotizar()}
 function cantidadCopias(e){
- const l=texto('label','Copias (1 a 500) ');
+ const l=texto('label',e.servicio==='grafica'?'Lotes (1 a 500) ':'Copias (1 a 500) ');
  const input=document.createElement('input');
  input.type='number';input.min='1';input.max='500';input.step='1';input.inputMode='numeric';
  input.value=String(e.copias);input.setAttribute('aria-label','Cantidad de copias de '+e.name);
@@ -59,14 +61,15 @@ function render(){
   if(e.paginas){
    const elegidas=paginasElegidas(e)||e.paginas;
    const d=clasificarDestino(elegidas,e.seleccion);
-   const tipo=d.confirmado?(e.servicio==='stickers'?'Stickers con precorte':e.servicio==='fotos'?'Fotografías':e.servicio==='corte'?'Ploteo de corte':d.destino==='ploteo'?'Ploteo':'Impresión'):'Tamaño sin confirmar';
+   const independiente=['fotos','corte','grafica'].includes(e.servicio);
+   const tipo=(d.confirmado||independiente)?(e.servicio==='grafica'?'Gráfica comercial':e.servicio==='stickers'?'Stickers con precorte':e.servicio==='fotos'?'Fotografías':e.servicio==='corte'?'Ploteo de corte':d.destino==='ploteo'?'Ploteo':'Impresión'):'Tamaño sin confirmar';
    const material=e.modo==='color'?'Color':'B/N';
-   const extra=e.servicio==='corte'?' · '+e.corteMetros+' m':e.servicio==='fotos'?' · '+(productosFoto.find(p=>p.id===e.productoFoto)?.name||'Elegir producto'):e.servicio==='stickers'?' · Adhesivo fotográfico':d.destino==='documentos'?(' · '+material+(e.anillado==='individual'?' · Anillado':e.anillado==='grupo'?' · Grupo '+e.grupoAnillado:'')):
+   const extra=e.servicio==='grafica'?' · '+(productosGrafica.find(p=>p.id===e.productoGrafica)?.name||'Elegir variante'):e.servicio==='corte'?' · '+e.corteMetros+' m':e.servicio==='fotos'?' · '+(productosFoto.find(p=>p.id===e.productoFoto)?.name||'Elegir producto'):e.servicio==='stickers'?' · Adhesivo fotográfico':d.destino==='documentos'?(' · '+material+(e.anillado==='individual'?' · Anillado':e.anillado==='grupo'?' · Grupo '+e.grupoAnillado:'')):
     (elegidas.some(p=>p.modo==='poster')?' · '+(e.papelPoster==='recubierto'?'Recubierto':'Obra 80 g'):'');
-   resumen.textContent=(e.paginasSeleccionadas?(e.paginasSeleccionadas+' de '+e.paginas.length):(e.paginas.length+' pág.'))+' · '+tipo+(d.confirmado?' '+(d.tamanoFinal==='original'?'original':d.tamanoFinal.toUpperCase()):'')+' · '+e.copias+' copia(s)'+(d.confirmado?extra:'');
+   resumen.textContent=(e.paginasSeleccionadas?(e.paginasSeleccionadas+' de '+e.paginas.length):(e.paginas.length+' pág.'))+' · '+tipo+(d.confirmado?' '+(d.tamanoFinal==='original'?'original':d.tamanoFinal.toUpperCase()):'')+' · '+e.copias+(e.servicio==='grafica'?' lote(s)':' copia(s)')+((d.confirmado||independiente)?extra:'');
   }else resumen.textContent=e.error?'Error de lectura':'Analizando PDF…';
   principal.append(resumen);fila.append(principal);
-  const importe=texto('span',importeArchivo(i)||(e.error?'Revisar':e.seleccion==='sin-confirmar'?'Pendiente':'Por calcular'));
+  const importe=texto('span',importeArchivo(i)||(e.error?'Revisar':(e.seleccion==='sin-confirmar'&&!['fotos','corte','grafica'].includes(e.servicio))?'Pendiente':'Por calcular'));
   importe.className='precio-archivo';fila.append(importe);
   const boton=texto('button',abierto===i?'Cerrar':'Editar');
   boton.className='editar';boton.type='button';boton.setAttribute('aria-expanded',String(abierto===i));
@@ -89,20 +92,24 @@ function render(){
   const aviso=clasificarDestino(paginas);
   if(aviso.requiereConfirmacion){const n=texto('p','Confirmá el tamaño de impresión: el PDF puede tener medidas distintas a las que querés.');n.className='advertencia';panel.append(n)}
   const controles=document.createElement('div');controles.className='controles';
-  controles.append(valor('Servicio', [['auto','Impresiones / ploteos'],['stickers','Stickers con precorte A4/A3'],['fotos','Fotografías y carnet'],['corte','Ploteo de corte']],e.servicio||'auto',v=>{e.servicio=v;if(v==='fotos'){e.seleccion='a4';e.productoFoto=productosFoto[0]?.id||'';}if(v==='stickers'||v==='fotos'||v==='corte'){e.anillado='ninguno';e.grupoAnillado=''}cambio()}));
+  controles.append(valor('Servicio', [['auto','Impresiones / ploteos'],['stickers','Stickers con precorte A4/A3'],['fotos','Fotografías y carnet'],['corte','Ploteo de corte'],['grafica','Gráfica comercial']],e.servicio||'auto',v=>{e.servicio=v;if(v==='fotos'){e.seleccion='a4';e.productoFoto=productosFoto[0]?.id||'';}if(v==='grafica'){e.productoGrafica=productosGrafica[0]?.id||'';}if(v==='stickers'||v==='fotos'||v==='corte'||v==='grafica'){e.anillado='ninguno';e.grupoAnillado=''}cambio()}));
   const label=texto('label','Tamaño de impresión');
   const sel=document.createElement('select');sel.setAttribute('aria-label','Tamaño final de '+e.name);
   for(const [v,l] of [['sin-confirmar','Elegir tamaño final'],['original','Mantener tamaño original'],['a3','A3 (29,7 × 42 cm)'],['a4','A4 (21 × 29,7 cm)'],['a5','A5 (14,8 × 21 cm)']]){
    const o=new Option(l,v);sel.add(o);
   }
-  sel.value=e.seleccion;sel.onchange=()=>{e.seleccion=sel.value;cambio()};label.append(sel);if(e.servicio!=='fotos'&&e.servicio!=='corte')controles.append(label);
+  sel.value=e.seleccion;sel.onchange=()=>{e.seleccion=sel.value;cambio()};label.append(sel);if(!['fotos','corte','grafica'].includes(e.servicio))controles.append(label);
   const decision=clasificarDestino(paginas,e.seleccion);
-  if(decision.confirmado||e.servicio==='corte'){
-   const destino=texto('p',(e.servicio==='corte'?'Trabajo: ploteo de corte · Metros declarados':e.servicio==='fotos'?'Trabajo fotográfico · Tamaño elegido por producto':'Trabajo: '+(decision.destino==='ploteo'?'Ploteo grande':'Impresión de documentos')+' · Salida: '+(decision.tamanoFinal==='original'?'tamaño original':decision.tamanoFinal.toUpperCase())));destino.className='destino';panel.append(destino);
+  if(decision.confirmado||['corte','fotos','grafica'].includes(e.servicio)){
+   const destino=texto('p',(e.servicio==='grafica'?'Gráfica comercial · Precio por lote, sin diseño':e.servicio==='corte'?'Trabajo: ploteo de corte · Metros declarados':e.servicio==='fotos'?'Trabajo fotográfico · Tamaño elegido por producto':'Trabajo: '+(decision.destino==='ploteo'?'Ploteo grande':'Impresión de documentos')+' · Salida: '+(decision.tamanoFinal==='original'?'tamaño original':decision.tamanoFinal.toUpperCase())));destino.className='destino';panel.append(destino);
    if(decision.cambioEscala){const n=texto('p','El archivo se ajustará sin recortar. Revisá que textos y escalas sigan siendo legibles.');n.className='advertencia';panel.append(n)}
    if(decision.mixtas&&decision.tamanoFinal==='original')panel.append(texto('p','El PDF contiene tamaños distintos. Se conservarán individualmente al presupuestar.'));
    if(e.servicio!=='corte')controles.append(cantidadCopias(e));
-   if(e.servicio==='fotos'){
+   if(e.servicio==='grafica'){
+    if(productosGrafica.length)controles.append(valor('Producto y variante',productosGrafica.map(p=>[p.id,p.name]),e.productoGrafica||productosGrafica[0].id,v=>{e.productoGrafica=v;cambio()}));
+    else panel.append(texto('p','Catálogo de gráfica no disponible.'));
+    panel.append(texto('p','Una sola página PDF con el diseño. Cantidad expresada en lotes comerciales, no unidades sueltas. No incluye diseño.'));
+   }else if(e.servicio==='fotos'){
     if(productosFoto.length)controles.append(valor('Papel y tamaño',productosFoto.map(p=>[p.id,p.name]),e.productoFoto||productosFoto[0].id,v=>{e.productoFoto=v;cambio()}));
     else panel.append(texto('p','Catálogo de fotografías no disponible.'));
     panel.append(texto('p','Cada página seleccionada es una foto; carnet equivale a una plancha de seis. El encuadre se confirmará antes de producir.'));
@@ -147,7 +154,7 @@ $('archivos').addEventListener('change',async ev=>{
  if(entries.length+files.length>30){$('estado').textContent='Máximo 30 PDF.';return}
  leyendo=true;
  if(!entries.length)abierto=0;
- for(const f of files)entries.push({name:f.name,paginas:null,seleccion:'sin-confirmar',error:null,copias:1,modo:'bn',caras:'simple',papelPoster:'obra80',anillado:'ninguno',grupoAnillado:'',materialColor:'',paginasSeleccionadas:'',servicio:'auto',productoFoto:'',corteVariante:'gt3',corteMetros:1});
+ for(const f of files)entries.push({name:f.name,paginas:null,seleccion:'sin-confirmar',error:null,copias:1,modo:'bn',caras:'simple',papelPoster:'obra80',anillado:'ninguno',grupoAnillado:'',materialColor:'',paginasSeleccionadas:'',servicio:'auto',productoFoto:'',productoGrafica:'',corteVariante:'gt3',corteMetros:1});
  render();
  const start=entries.length-files.length;
  for(let i=0;i<files.length;i++){
@@ -180,19 +187,19 @@ async function cotizar(){
   const disponibles=catalogo[formato]||[];
   if(!e.materialColor&&disponibles.length)e.materialColor=disponibles[0].id;
  }
- const archivos=entries.map(e=>({nombre:e.name,paginas:e.paginas,paginasSeleccionadas:e.paginasSeleccionadas,seleccion:e.seleccion,servicio:e.servicio||'auto',productoFoto:e.productoFoto||'',corteVariante:e.corteVariante,corteMetros:e.corteMetros,copias:e.copias,modo:e.modo,caras:e.caras,papelPoster:e.papelPoster,anillado:e.anillado,grupoAnillado:e.grupoAnillado,materialColor:e.materialColor}));
+ const archivos=entries.map(e=>({nombre:e.name,paginas:e.paginas,paginasSeleccionadas:e.paginasSeleccionadas,seleccion:e.seleccion,servicio:e.servicio||'auto',productoFoto:e.productoFoto||'',productoGrafica:e.productoGrafica||'',corteVariante:e.corteVariante,corteMetros:e.corteMetros,copias:e.copias,modo:e.modo,caras:e.caras,papelPoster:e.papelPoster,anillado:e.anillado,grupoAnillado:e.grupoAnillado,materialColor:e.materialColor}));
  try{const r=await fetch('/api/ensayo-carga-unica',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({archivos})});const d=await r.json();if(n!==version)return;if(!r.ok||d.ok!==true||d.paymentAuthorized!==false)throw Error(d.error||'Sin cotización');
  ultimoPresupuesto=d;
  const ars=v=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(v);
- out.replaceChildren(texto('strong',d.total===null?'TOTAL INCOMPLETO':'TOTAL PRELIMINAR: '+ars(d.total)),texto('p','Impresiones (incluye anillados): '+ars(d.subtotalImpresiones)+' · Ploteos: '+ars(d.subtotalPloteos)+' · Stickers: '+ars(d.subtotalStickers||0)+' · Fotos: '+ars(d.subtotalFotos||0)+' · Corte: '+ars(d.subtotalCortes||0)),texto('p','Anillados incluidos: '+ars(d.subtotalAnillados)));
+ out.replaceChildren(texto('strong',d.total===null?'TOTAL INCOMPLETO':'TOTAL PRELIMINAR: '+ars(d.total)),texto('p','Impresiones (incluye anillados): '+ars(d.subtotalImpresiones)+' · Ploteos: '+ars(d.subtotalPloteos)+' · Stickers: '+ars(d.subtotalStickers||0)+' · Fotos: '+ars(d.subtotalFotos||0)+' · Corte: '+ars(d.subtotalCortes||0)+' · Gráfica: '+ars(d.subtotalGraficas||0)),texto('p','Anillados incluidos: '+ars(d.subtotalAnillados)));
  for(const p of d.pendientes)out.append(texto('p',p.nombre+': '+p.motivo));
  if(d.plan.length)out.append(texto('p','Precio orientativo. Los archivos no se enviaron ni se autoriza el cobro.'));
  render();
  }catch(e){if(n===version){out.textContent='No fue posible cotizar: '+String(e.message||e);render()}}
 }
 async function iniciar(){
- try{const r=await fetch('/api/ensayo-materiales-rapido',{cache:'no-store'});const x=await r.json();if(!r.ok||!x.ok||!x.materials)throw Error('Catálogo inaccesible');catalogo=x.materials;productosFoto=x.photos||[];variantesCorte=x.cutVariants||[];}
- catch(_){catalogo={a4:[],a3:[]};productosFoto=[];variantesCorte=[];$('estado').textContent='No se pudo cargar el catálogo comercial.';}
+ try{const r=await fetch('/api/ensayo-materiales-rapido',{cache:'no-store'});const x=await r.json();if(!r.ok||!x.ok||!x.materials)throw Error('Catálogo inaccesible');catalogo=x.materials;productosFoto=x.photos||[];variantesCorte=x.cutVariants||[];productosGrafica=x.graphicProducts||[];}
+ catch(_){catalogo={a4:[],a3:[]};productosFoto=[];variantesCorte=[];productosGrafica=[];$('estado').textContent='No se pudo cargar el catálogo comercial.';}
  render();if(entries.length)cotizar();
 }
 iniciar();

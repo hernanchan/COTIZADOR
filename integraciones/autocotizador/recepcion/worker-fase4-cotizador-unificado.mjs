@@ -6,6 +6,7 @@ import {paginaPloteosRapido} from './ploteos-rapido-pagina.mjs';
 import {paginaCotizadorConjunto} from './cotizador-conjunto-pagina.mjs';
 import {paginaCargaUnica} from './carga-unica-pagina.mjs';
 import {cotizarCargaUnica} from './cotizar-carga-unica.mjs';
+import {GRAFICA_COMERCIAL} from './cotizar-grafica.mjs';
 import cargaClienteJs from './carga-unica-cliente.txt';
 import {cotizarPloteosRapido} from '../pruebas/cotizar-ploteos-rapido.mjs';
 import plotClienteJs from './ploteos-rapido-cliente.txt';
@@ -948,7 +949,7 @@ function catalogoMaterialesRapido(request,env){
  if(new URL(request.url).origin!==new URL(env.DOCS_ALLOWED_ORIGIN||request.url).origin)
   return testResponse({ok:false,error:'Origen no permitido'},403);
  const clean=(key)=>(preciosPiloto[key]?.materials||[]).map(m=>({id:m.id,name:m.name,family:m.family||''}));
- return testResponse({ok:true,materials:{a4:clean('colorA4'),a3:clean('colorA3')},photos:preciosPiloto.photos.products.filter(p=>p.size!=='Polaroid').map(p=>({id:p.id,name:p.paper+' · '+p.size})),cutVariants:preciosPiloto.cutPlotter.variants.map(v=>({id:v.id,name:v.name}))});
+ return testResponse({ok:true,materials:{a4:clean('colorA4'),a3:clean('colorA3')},photos:preciosPiloto.photos.products.filter(p=>p.size!=='Polaroid').map(p=>({id:p.id,name:p.paper+' · '+p.size})),cutVariants:preciosPiloto.cutPlotter.variants.map(v=>({id:v.id,name:v.name})),graphicProducts:GRAFICA_COMERCIAL.map(p=>({id:p.id,name:p.familia+' · '+p.descripcion}))});
 }
 /** Ploteos preliminares: nunca autoriza pagos ni recibe originales. */
 function catalogoPloteos(request,env){
