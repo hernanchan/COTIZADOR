@@ -388,6 +388,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px ui-monospace,monospace
 <button id="refresh">Consultar pedidos</button><button id="sync" class="outline">Verificar pagos pendientes</button>
 </div><p id="status" role="status" aria-live="polite"></p><p id="cronState" class="note">Conciliación automática: sin consultar.</p></fieldset>
 <fieldset><legend>Recepciones de PDF verificadas sin pedido comercial</legend><div class="toolbar"><button id="refreshReceipts" class="outline">Consultar recepciones pendientes</button></div><p class="note">Documentos confirmados en Drive, todavía no vinculados a un pedido cobrado. No están listos para imprimir.</p><ol id="verifiedReceipts"></ol></fieldset>
+<fieldset><legend>Pedidos con PDF y pago pendiente</legend><button id="refreshUnpaid" class="outline">Consultar pedidos sin pago confirmado</button><ol id="unpaidDocs"></ol></fieldset>
 <div class="grid"><fieldset><legend>Pedidos pagados</legend><ol id="orders"></ol></fieldset><fieldset><legend>Detalle del pedido</legend>
 <div id="details">Seleccioná un pedido para ver sus datos y archivos referenciados.</div></fieldset></div>
 <script>
@@ -432,6 +433,21 @@ document.querySelector("#refreshReceipts").addEventListener("click",async()=>{
    list.append(li);
   }
   status.textContent=x.manifests.length+" recepción(es) sin pedido comercial";
+ }catch(e){list.replaceChildren();status.textContent=e.message}
+});
+document.querySelector("#refreshUnpaid").addEventListener("click",async()=>{
+ const list=document.querySelector("#unpaidDocs");
+ try{
+  status.textContent="Consultando pagos pendientes...";
+  const x=await api("/admin/api/central/unpaid");
+  list.replaceChildren();
+  if(!x.orders.length)list.append(node("li","No hay pedidos documentales esperando pago."));
+  for(const o of x.orders){
+   const li=node("li",o.web_order_id+" · "+o.file_count+" PDF · Total pedido "+money(o.order_ars));
+   li.append(node("p","Referencia de compra: "+o.commercial_order_id+" · Estado: pago sin confirmar"));
+   list.append(li);
+  }
+  status.textContent=x.orders.length+" pedido(s) en espera de pago";
  }catch(e){list.replaceChildren();status.textContent=e.message}
 });
 document.querySelector("#refresh").addEventListener("click",refresh);
