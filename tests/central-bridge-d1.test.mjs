@@ -149,3 +149,15 @@ test('la Central sólo muestra la ficha ligada después del pago aprobado',async
  db.prepare("INSERT INTO payment_reviews(order_id,state,checked_at) VALUES(?,'revoked',datetime('now'))").run(commercialOrderId);
  assert.equal((await admin('/admin/api/order?id='+commercialOrderId)).status,404);
 });
+
+test('el panel privado muestra recepciones separadas de pagados sin exponer secretos',async()=>{
+ const res=await context.worker.fetch(new Request(base+'/admin'),env);
+ assert.equal(res.status,200);
+ const html=await res.text();
+ assert.match(html,/Recepciones de PDF verificadas sin pedido comercial/);
+ assert.match(html,/Consultar recepciones pendientes/);
+ assert.match(html,/PDF originales verificados/);
+ const js=html.slice(html.lastIndexOf('<script>')+8,html.lastIndexOf('</script>'));
+ assert.doesNotThrow(()=>new Function(js));
+ assert.ok(!html.includes(env.CENTRAL_BRIDGE_KEY));
+});
