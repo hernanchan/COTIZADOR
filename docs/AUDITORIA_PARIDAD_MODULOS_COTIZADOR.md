@@ -90,3 +90,12 @@ No modificar `main`, la web pública, Apps Script, Polaroids ni pagos. No contra
 - Se ajustaron CSS responsive, densidad por fila y resumen general compacto, sin volver al esquema de dos formularios independientes. El catálogo color se completa aunque la fila permanezca colapsada.
 - **CI aprobado:** https://github.com/hernanchan/COTIZADOR/actions/runs/39870572985
 - Aún **sin desplegar** en el Worker privado y **sin validar la interfaz final en navegador**. No modificar web pública, Apps Script, Polaroids ni pagos. Validación visual y comportamiento con 10 archivos pendiente.
+
+## Caso real 23/10/2026: compilado de 24 planos técnicos A2
+
+- Archivo original del cliente **analizado de forma local, NO subido a GitHub**. Contiene 24 páginas, tamaño aproximado 59,41 × 42,02 cm cada una. Planos de electricidad, montantes, fuerza motriz, iluminación, cortinas y señal débil con trazos magenta/naranja/azul y algunas fotografías/zonas sombreadas.
+- Diagnóstico local reproduciendo los umbrales de cobertura en miniatura de 360 px (motor de renderizado equivalente, no resultado PDF.js en navegador): **20 CAD, 3 revisión (3, 5 y 21), 1 falso póster (1)**. Se explica por fotografías y rellenos; no son 24 pósteres. Todas las páginas contienen rótulo técnico con referencia DWG y escala/proyecto.
+- Implementado en `refinar-tipo-plano.mjs`: refinar a CAD solo con al menos 4 páginas, mayoría visual CAD >=70%, referencia de rótulos técnicos >=70%, rótulo por página y cobertura menor a 45% para las ambiguas/falsos pósteres. Conserva modo visual previo para diagnóstico y NO cambia casos aislados ni mezclas CAD/Póster de 2 páginas.
+- `clasificar-paginas-ploteo.mjs` extrae texto mediante PDF.js **localmente en el navegador**, sin transmitir PDF, y aplica refinamiento después del análisis visual. No cambia precios.
+- Tests de rótulo DWG, 24 páginas, mezcla CAD/Póster y póster muy pleno aprobados: https://github.com/hernanchan/COTIZADOR/actions/runs/39955953809
+- **No confirmado aún en Chrome con el archivo original**, falta copiar el bundle manualmente al Worker privado y reensayar. Diagnóstico local no es garantía de resultado de PDF.js. El PDF privado no forma parte del repositorio.
