@@ -92,7 +92,7 @@ globalThis.fetch=async (url,init={})=>{
   assert.equal(init.headers['Content-Type'],'application/json');
   const key='private-bridge-key-0123456789-abcdefghij';
   const ts=init.headers['x-saber-ts'],id=init.headers['x-saber-request-id'];
-  const expected=createHmac('sha256',key).update(ts+'\\n'+id+'\\n'+init.body).digest('hex');
+  const expected=createHmac('sha256',key).update(ts+'\n'+id+'\n'+init.body).digest('hex');
   assert.equal(init.headers['x-saber-signature'],expected);
   const packet=JSON.parse(init.body);
   assert.equal(packet.schema,'saber-central-recepcion-verificada-v1');
