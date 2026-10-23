@@ -221,6 +221,7 @@ $('prepararPedido').addEventListener('click',()=>{
   const carrito=componerCarritoPreliminar({borrador:draft,articulos});
   contenedor.append(texto('h3','Pedido en preparación · '+pesos(carrito.totalOrientativo)));
   if(carrito.productos.length)contenedor.append(texto('p','Artículos de tienda (precios pendientes de verificación): '+carrito.productos.length+' · '+pesos(carrito.subtotalProductosOrientativo)));
+  else contenedor.append(texto('p','Artículos de tienda: ninguno accesible desde este ensayo. Si el carrito está en otro dominio, todavía no se sincroniza.'));
   contenedor.append(texto('p','Trabajos de impresión: '+pesos(carrito.subtotalTrabajosOrientativo)));
   contenedor.append(texto('p','Los archivos siguen en este dispositivo. No fueron recibidos por Librería Saber.'));
   const listado=document.createElement('ol');
