@@ -22,7 +22,10 @@ const DB={
  }
 };
 const c=vm.createContext({Request,Response,URL,URLSearchParams,TextEncoder,AbortSignal,
- crypto:webcrypto,console,fetch:async()=>{throw Error('Network disabled')}});
+ crypto:webcrypto,console,fetch:async(url)=>{
+  if(!String(url).startsWith('https://docs.google.com/'))throw Error('Network disabled');
+  return new Response('Activo,Código,Producto,Precio,Oferta\nSI,ABC-1,Cuaderno,3500,0\n',{status:200});
+ }});
 const src=readFileSync(new URL('../integraciones/mercadopago/pruebas/worker.js',import.meta.url),'utf8');
 vm.runInContext(src.replace('export default {','globalThis.worker = {'),c);
 const env={DB,MP_TEST_ACCESS_TOKEN:'TEST-100',DEMO_ADMIN_KEY:'private-admin-value',
@@ -111,4 +114,67 @@ test('panel muestra recepciones Express separadas de pagos aprobados',async()=>{
  assert.equal(html.includes(env.CENTRAL_BRIDGE_KEY),false);
  const paid=await admin('/admin/api/orders');
  assert.deepEqual([...paid.body.orders],[]);
+});
+
+async function prepare(input){
+ const body=JSON.stringify(input),ts=Math.floor(Date.now()/1000),id=randomUUID();
+ const signature=createHmac('sha256',env.CENTRAL_BRIDGE_KEY)
+  .update(ts+'\n'+id+'\n'+body).digest('hex');
+ const request=new Request(url+'/internal/central/polaroid-prepare-order',{
+  method:'POST',headers:{'Content-Type':'application/json',
+   'x-saber-ts':String(ts),'x-saber-request-id':id,
+   'x-saber-signature':signature},body});
+ const response=await c.worker.fetch(request,env);
+ return {status:response.status,body:await response.json()};
+}
+test('alta privada crea compra mixta sin permitir pagos ni inventar precios',async()=>{
+ const request={clientOrderId:randomUUID(),referencia:ref,items:[{code:'ABC-1',qty:2}]};
+ const disabled=await prepare(request);
+ assert.equal(disabled.status,503);
+ env.CENTRAL_EXPRESS_PREPARE_ENABLED='PRIVATE_TEST_ONLY';
+ const result=await prepare(request);
+ assert.equal(result.status,201,JSON.stringify(result.body));
+ assert.equal(result.body.amount_ars,19000);
+ assert.equal(result.body.polaroids_ars,12000);
+ assert.equal(result.body.productos_ars,7000);
+ assert.equal(result.body.paymentAuthorized,false);
+ assert.equal(result.body.checkoutEnabled,false);
+ const id=result.body.commercial_order_id;
+ const rows=db.prepare('SELECT * FROM order_items WHERE order_id=? ORDER BY line_number').all(id);
+ assert.equal(rows.length,2);
+ assert.equal(rows[0].sku,'POLAROID_EXPRESS_A4');
+ assert.equal(rows[0].quantity,4);
+ assert.equal(rows[0].unit_price_ars,3000);
+ assert.deepEqual(JSON.parse(rows[0].file_references_json),[ref]);
+ assert.equal(rows[1].sku,'ABC-1');
+ assert.equal(rows[1].quantity,2);
+ assert.equal(rows[1].unit_price_ars,3500);
+ assert.equal(db.prepare('SELECT commercial_order_id FROM central_polaroids_express WHERE reference=?').get(ref).commercial_order_id,id);
+ const duplicate=await prepare(request);
+ assert.equal(duplicate.status,200);
+ assert.equal(duplicate.body.idempotent,true);
+ assert.equal(duplicate.body.commercial_order_id,id);
+ assert.equal((await prepare({...request,items:[{code:'ABC-1',qty:3}]})).status,409);
+ assert.equal((await prepare({...request,clientOrderId:randomUUID()})).status,409);
+ const checkout=await c.worker.fetch(new Request(url+'/demo/checkout',{
+  method:'POST',headers:{Authorization:'Bearer '+env.DEMO_ADMIN_KEY,'Content-Type':'application/json'},
+  body:JSON.stringify({order_id:id})}),env);
+ assert.equal(checkout.status,503);
+ assert.equal(db.prepare('SELECT preference_id FROM orders WHERE id=?').get(id).preference_id,null);
+ assert.equal((await admin('/admin/api/order?id='+id)).status,404);
+ db.prepare("UPDATE orders SET status='paid',paid_at=datetime('now') WHERE id=?").run(id);
+ const detail=(await admin('/admin/api/order?id='+id)).body;
+ assert.equal(detail.produccion.polaroidsExpress.referencia,ref);
+ assert.equal(detail.produccion.polaroidsExpress.paginasA4,4);
+ assert.equal(detail.produccion.polaroidsExpress.pagoConfirmado,true);
+ assert.equal(detail.produccion.polaroidsExpress.descargaHabilitada,false);
+ assert.equal(detail.produccion.listoParaProducir,false);
+ db.prepare("INSERT INTO payment_reviews(order_id,state) VALUES(?,'revoked')").run(id);
+ assert.equal((await admin('/admin/api/order?id='+id)).status,404);
+});
+test('Express sin referencia verificada no crea compra ni cobro',async()=>{
+ assert.equal((await prepare({clientOrderId:randomUUID(),referencia:'POL-'+'D'.repeat(24),items:[]})).status,404);
+ assert.equal((await prepare({clientOrderId:randomUUID(),referencia:different,items:[{code:'ABC-1',qty:-2}]})).status,422);
+ assert.equal((await prepare({clientOrderId:randomUUID(),referencia:different,items:[{code:'no-existe',qty:1}]})).status,422);
+ assert.equal(db.prepare('SELECT COUNT(*) total FROM orders').get().total,1);
 });
