@@ -57,9 +57,9 @@ function render(){
   if(e.paginas){
    const elegidas=paginasElegidas(e)||e.paginas;
    const d=clasificarDestino(elegidas,e.seleccion);
-   const tipo=d.confirmado?(e.servicio==='stickers'?'Stickers con precorte':d.destino==='ploteo'?'Ploteo':'Impresión'):'Tamaño sin confirmar';
+   const tipo=d.confirmado?(e.servicio==='stickers'?'Stickers con precorte':e.servicio==='fotos'?'Fotografías':d.destino==='ploteo'?'Ploteo':'Impresión'):'Tamaño sin confirmar';
    const material=e.modo==='color'?'Color':'B/N';
-   const extra=e.servicio==='stickers'?' · Adhesivo fotográfico':d.destino==='documentos'?(' · '+material+(e.anillado==='individual'?' · Anillado':e.anillado==='grupo'?' · Grupo '+e.grupoAnillado:'')):
+   const extra=e.servicio==='fotos'?' · '+(productosFoto.find(p=>p.id===e.productoFoto)?.name||'Elegir producto'):e.servicio==='stickers'?' · Adhesivo fotográfico':d.destino==='documentos'?(' · '+material+(e.anillado==='individual'?' · Anillado':e.anillado==='grupo'?' · Grupo '+e.grupoAnillado:'')):
     (elegidas.some(p=>p.modo==='poster')?' · '+(e.papelPoster==='recubierto'?'Recubierto':'Obra 80 g'):'');
    resumen.textContent=(e.paginasSeleccionadas?(e.paginasSeleccionadas+' de '+e.paginas.length):(e.paginas.length+' pág.'))+' · '+tipo+(d.confirmado?' '+(d.tamanoFinal==='original'?'original':d.tamanoFinal.toUpperCase()):'')+' · '+e.copias+' copia(s)'+(d.confirmado?extra:'');
   }else resumen.textContent=e.error?'Error de lectura':'Analizando PDF…';
@@ -175,7 +175,7 @@ async function cotizar(){
  try{const r=await fetch('/api/ensayo-carga-unica',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({archivos})});const d=await r.json();if(n!==version)return;if(!r.ok||d.ok!==true||d.paymentAuthorized!==false)throw Error(d.error||'Sin cotización');
  ultimoPresupuesto=d;
  const ars=v=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(v);
- out.replaceChildren(texto('strong',d.total===null?'TOTAL INCOMPLETO':'TOTAL PRELIMINAR: '+ars(d.total)),texto('p','Impresiones (incluye anillados): '+ars(d.subtotalImpresiones)+' · Ploteos: '+ars(d.subtotalPloteos)+' · Stickers: '+ars(d.subtotalStickers||0)),texto('p','Anillados incluidos: '+ars(d.subtotalAnillados)));
+ out.replaceChildren(texto('strong',d.total===null?'TOTAL INCOMPLETO':'TOTAL PRELIMINAR: '+ars(d.total)),texto('p','Impresiones (incluye anillados): '+ars(d.subtotalImpresiones)+' · Ploteos: '+ars(d.subtotalPloteos)+' · Stickers: '+ars(d.subtotalStickers||0)+' · Fotos: '+ars(d.subtotalFotos||0)),texto('p','Anillados incluidos: '+ars(d.subtotalAnillados)));
  for(const p of d.pendientes)out.append(texto('p',p.nombre+': '+p.motivo));
  if(d.plan.length)out.append(texto('p','Precio orientativo. Los archivos no se enviaron ni se autoriza el cobro.'));
  render();
