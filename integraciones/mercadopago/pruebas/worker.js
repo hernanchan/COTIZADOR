@@ -290,6 +290,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px ui-monospace,monospace
 <input type="password" autocomplete="off" id="secret" placeholder="Clave privada del panel" aria-label="Clave privada">
 <button id="refresh">Consultar pedidos</button><button id="sync" class="outline">Verificar pagos pendientes</button>
 </div><p id="status" role="status" aria-live="polite"></p><p id="cronState" class="note">Conciliación automática: sin consultar.</p></fieldset>
+<fieldset><legend>Recepciones de PDF verificadas sin pedido comercial</legend><div class="toolbar"><button id="refreshReceipts" class="outline">Consultar recepciones pendientes</button></div><p class="note">Documentos confirmados en Drive, todavía no vinculados a un pedido cobrado. No están listos para imprimir.</p><ol id="verifiedReceipts"></ol></fieldset>
 <div class="grid"><fieldset><legend>Pedidos pagados</legend><ol id="orders"></ol></fieldset><fieldset><legend>Detalle del pedido</legend>
 <div id="details">Seleccioná un pedido para ver sus datos y archivos referenciados.</div></fieldset></div>
 <script>
@@ -297,7 +298,19 @@ const secret=document.querySelector("#secret"),status=document.querySelector("#s
 function money(n){return new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0}).format(Number(n)||0)}
 async function api(path,method="GET"){const r=await fetch(path,{method,headers:{"Authorization":"Bearer "+secret.value},cache:"no-store"});const x=await r.json().catch(()=>({}));if(!r.ok)throw Error(r.status===401?"Clave incorrecta":x.error||"Error "+r.status);return x}
 function node(tag,txt){const x=document.createElement(tag);x.textContent=String(txt);return x}
-async function showOrder(id){try{status.textContent="Consultando detalle...";const x=await api("/admin/api/order?id="+encodeURIComponent(id));details.replaceChildren();details.append(node("h3","Pedido "+x.order.id));details.append(node("p","Total: "+money(x.order.amount_ars)+" · Aprobado: "+(x.order.paid_at||"sin fecha")));if(x.produccion){const pr=x.produccion;details.append(node("h4","Estado operativo: "+pr.estado.replaceAll("_"," ")));details.append(node("p",pr.mensaje));for(const t of pr.trabajos){const area=node("section","");area.append(node("h4",t.linea+". "+t.cantidad+" × "+t.descripcion+" — "+money(t.subtotal)));area.append(node("p","Estado: "+t.etapa.replaceAll("_"," ")+" · "+t.instruccion));const valores=Object.entries(t.especificaciones||{}).map(a=>a[0]+": "+a[1]).join(" · ");if(valores)area.append(node("p","Ficha técnica: "+valores));if(t.referencias?.length)area.append(node("p","Referencias privadas: "+t.referencias.join(", ")));details.append(area)}}else details.append(node("p","La ficha de producción no está disponible."));status.textContent=""}catch(e){status.textContent=e.message}}
+async function showOrder(id){try{status.textContent="Consultando detalle...";const x=await api("/admin/api/order?id="+encodeURIComponent(id));details.replaceChildren();details.append(node("h3","Pedido "+x.order.id));details.append(node("p","Total: "+money(x.order.amount_ars)+" · Aprobado: "+(x.order.paid_at||"sin fecha")));if(x.produccion){const pr=x.produccion;details.append(node("h4","Estado operativo: "+pr.estado.replaceAll("_"," ")));details.append(node("p",pr.mensaje));for(const t of pr.trabajos){const area=node("section","");area.append(node("h4",t.linea+". "+t.cantidad+" × "+t.descripcion+" — "+money(t.subtotal)));area.append(node("p","Estado: "+t.etapa.replaceAll("_"," ")+" · "+t.instruccion));const valores=Object.entries(t.especificaciones||{}).map(a=>a[0]+": "+a[1]).join(" · ");if(valores)area.append(node("p","Ficha técnica: "+valores));if(t.referencias?.length)area.append(node("p","Referencias privadas: "+t.referencias.join(", ")));details.append(area)}}else details.append(node("p","La ficha de producción no está disponible."));if(x.produccion?.documentosVerificados){
+ const d=x.produccion.documentosVerificados;
+ details.append(node("h4","PDF originales verificados · "+d.archivos+" archivo(s)"));
+ details.append(node("p","Recepción "+d.webOrderId+" · "+money(d.totalDocumentos)+" · PDF final listo para imprimir: pendiente"));
+ for(const t of d.trabajos){
+  const line=node("section","");
+  line.append(node("h4",t.orden+". "+t.nombreOriginal+" · "+t.servicio));
+  line.append(node("p","Páginas "+t.paginasElegidas.join(", ")+" de "+t.paginasOriginales+" · "+t.copias+" copia(s)/lote(s)"));
+  line.append(node("p","Recibo privado: "+t.reciboPrivado+" · Preparación: pendiente de PDF final"));
+  details.append(line);
+ }
+}
+status.textContent=""}catch(e){status.textContent=e.message}}
 async function refreshCronState(){
  const el=document.querySelector("#cronState");
  try{
@@ -309,6 +322,21 @@ async function refreshCronState(){
  }catch(e){el.textContent="Conciliación automática: no se pudo consultar el registro."}
 }
 async function refresh(){try{status.textContent="Consultando...";await refreshCronState();const x=await api("/admin/api/orders");orders.replaceChildren();if(!x.orders.length)orders.append(node("li","Aún no hay pedidos con pago total confirmado."));for(const o of x.orders){const li=node("li",o.description+" · "+money(o.amount_ars)+" · "+(o.paid_at||"sin fecha"));li.append(node("div",o.id));const b=node("button","Ver detalle");b.addEventListener("click",()=>showOrder(o.id));li.append(b);orders.append(li)}status.textContent=x.orders.length+" pedido(s) pagado(s) encontrado(s)"}catch(e){status.textContent=e.message}}
+document.querySelector("#refreshReceipts").addEventListener("click",async()=>{
+ const list=document.querySelector("#verifiedReceipts");
+ try{
+  status.textContent="Consultando recepciones privadas...";
+  const x=await api("/admin/api/central/pending");
+  list.replaceChildren();
+  if(!x.manifests.length)list.append(node("li","No hay documentos esperando vinculación."));
+  for(const m of x.manifests){
+   const li=node("li",m.web_order_id+" · "+m.file_count+" archivo(s) · "+money(m.amount_ars));
+   li.append(node("p","Recibidos: "+m.created_at+" · Pago no confirmado"));
+   list.append(li);
+  }
+  status.textContent=x.manifests.length+" recepción(es) sin pedido comercial";
+ }catch(e){list.replaceChildren();status.textContent=e.message}
+});
 document.querySelector("#refresh").addEventListener("click",refresh);
 document.querySelector("#sync").addEventListener("click",async()=>{try{status.textContent="Verificando pagos en Mercado Pago...";const x=await api("/demo/sync-pending","POST");await refresh();status.textContent+=" · Sincronizados: "+x.registered+" · Errores: "+x.errors}catch(e){status.textContent=e.message}});
 </script></body></html>`;
