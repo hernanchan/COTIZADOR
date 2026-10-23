@@ -106,3 +106,22 @@
 - La operación de descarga privada GAS entrega el PDF completo en una respuesta Base64 de hasta 12 MiB de PDF; su rendimiento y compatibilidad con límites reales de Apps Script/Cloudflare **aún no están comprobados**.
 - La creación de pedidos Express todavía no está conectada a un **carrito unificado de cliente ni al cobro sandbox**. El botón para continuar al carrito heredado permanece bloqueado para no generar un pedido que se cobraría con datos inconsistentes.
 - Los límites de CPU/memoria del plan Worker y la velocidad en teléfonos con 24 fotos reales deben medirse antes de autorizar un despliegue privado.
+
+## 23/10/2026 · Autorización para ensayo real en Google Drive
+
+El propietario autorizó **ensayo privado exclusivamente**, sin publicar la web y sin afectar GAS productivos, sus despliegues o Mercado Pago.
+
+**Confirmado contra Google Drive real con conexión autenticada:**
+- Se creó una carpeta nueva de nombre `POLAROIDS EXPRESS - ENSAYO PDF UNICO - 2026-10-23` dentro de `Librería Saber - Documentos WEB - PRUEBAS`, cuyo propietario es la cuenta de Librería Saber.
+- La nueva carpeta y su PDF de ensayo muestran `shared:false`; los metadatos de permisos contienen únicamente el usuario propietario.
+- Se subió **un único PDF de diagnóstico de 31.542 bytes** mediante el conector de Google Drive. Se comprobó que aparece dentro de la carpeta y que es un PDF no compartido.
+- Se eliminó el Google Doc temporal utilizado para exportar ese PDF, de modo que no queden originales ni documentos auxiliares por ese camino.
+- **Muy importante:** esta prueba **no fue por Apps Script ni por Cloudflare**, y el PDF de diagnóstico **no es** el PDF renderizado por el motor Express. Sólo acredita escritura, acceso y privacidad de archivos en el Drive real.
+
+**Preparado en GitHub:** `apps-script-solo-pdf.gs` incluye `pruebaExpressDriveReal()`, que genera un PDF A4 de seis posiciones (sin fotos de clientes), lo firma con HMAC, lo guarda en la carpeta privada, lo lee de vuelta, verifica SHA-256 y repite sin crear duplicados. Esta función está cubierta por pruebas simuladas de Drive/Google Apps Script. **La función todavía no fue ejecutada en Google.**
+
+**Bloqueador concreto:** la conexión disponible a Google Drive permite gestionar carpetas y PDFs, pero no ofrece acciones para crear, modificar o desplegar **proyectos de Google Apps Script**; tampoco hay conexión de Cloudflare para configurar el Worker de ensayo. No afirmar que se realizó el ensayo integral hasta que exista despliegue privado verificado.
+
+**Próximo paso de acceso, minimizando intervención:** abrir un proyecto Apps Script NUEVO y exclusivamente de pruebas en la cuenta dueña de la carpeta; cargar la fuente de `integraciones/polaroids/express/apps-script-solo-pdf.gs`; guardar como propiedades de script privadas `EXPRESS_PDF_FOLDER_ID` y `EXPRESS_PDF_HMAC_KEY` (al menos 32 caracteres aleatorios; no publicarlos); ejecutar `pruebaExpressDriveReal()` y comprobar en Drive un solo `POL-FFFFFFFFFFFFFFFFFFFFFFFF_IMPRIMIR.pdf`. En la segunda ejecución, verificar que sigue habiendo un solo archivo con esa referencia.
+
+**Sólo después:** crear un despliegue distinto del GAS anterior, configurar sus URL y secretos en el Worker de ensayo aislado, verificar autenticación HMAC/Turnstile sin exponer datos y ejecutar la transmisión desde un teléfono. No activar `enabled`, `showInShop`, `rollout`, checkout ni producción sin aprobación específica adicional. No introducir claves ni referencias del Drive personal en archivos públicos del repositorio.
