@@ -622,29 +622,19 @@ async function sendExpressPhotos(){
   });
   if(photoFingerprint()!==fingerprint)
    throw new Error('Los encuadres cambiaron durante la preparación.');
+  try{
+   const {guardarBorradorExpress}=await import('./express-recuperacion.mjs');
+   await guardarBorradorExpress({referencia:reference,hojas:prepared.hojas});
+   $('expressRecovery').hidden=false;
+   $('expressRecoveryText').textContent='Se guardaron temporalmente '+prepared.fotos+
+    ' recortes optimizados para recuperar este envío durante dos horas.';
+  }catch(e){
+   if(String(e.message||e).includes('otro envío'))throw e;
+   status('Este navegador no permitió guardar una copia local recuperable. No cierres la pantalla durante el envío.','bad');
+  }
   status('Enviando '+prepared.fotos+' recortes optimizados para generar un solo PDF privado…');
-  const response=await fetch(receiverApiUrl,{
-   method:'POST',headers:{'Content-Type':'application/json'},
-   body:JSON.stringify({reference,turnstileToken:challenge,hojas:prepared.hojas}),
-   cache:'no-store'
-  });
-  const reply=await response.json().catch(()=>null);
-  if(!response.ok||reply?.ok!==true||reply.verified!==true||
-     reply.pdfPrivateConfirmed!==true||reply.reference!==reference||
-     reply.sheets!==prepared.numeroHojas||reply.photos!==prepared.fotos||
-     reply.pdfForClient!==false||reply.checkoutAuthorized!==false)
-   throw new Error(reply?.error||'Google no confirmó el PDF. Podés reintentar.');
-  const payload={sheets:prepared.numeroHojas,photos:prepared.fotos,format:'85x90',
-   uploadsReceived:true,reference,referenceStatus:'received'};
-  receivedOrder=Object.freeze({
-   reference,sheets:prepared.numeroHojas,photos:prepared.fotos,
-   price:prepared.numeroHojas*unitPrice
-  });
-  receivedReference=reference;receivingSession=null;
-  status('¡PDF privado confirmado! '+prepared.numeroHojas+
-   ' hoja(s) A4 · Referencia '+reference+'.','ok');
-  if(window.parent!==window)
-   window.parent.postMessage({type:'SABER_POLAROID_RECEIVED',payload},window.location.origin);
+  await confirmarExpressPrivado({reference,challenge,
+   hojas:prepared.hojas,fotos:prepared.fotos,numeroHojas:prepared.numeroHojas});
  }catch(e){
   status('El PDF todavía no está confirmado. '+String(e?.message||'')+
    ' Mantené esta pantalla abierta y reintentá con una nueva verificación.','bad');
@@ -783,6 +773,7 @@ async function setupSecureReception(){
   $('inputPhotos').accept='image/jpeg,image/png';
   $('inputReplace').accept='image/jpeg,image/png';
   await loadTurnstile(cfg.turnstileSiteKey);
+  if(receiverConfig.mode==='express')await detectarExpressPendiente();
   updateSheetNav();
   status('Recepción protegida lista. Verificá la seguridad antes de enviar las fotos.');
   if(window.parent!==window)
@@ -798,6 +789,10 @@ async function setupSecureReception(){
 }
 setupSecureReception();
 
+$('retryExpress').onclick=()=>reintentarExpressGuardado()
+ .catch(e=>status(String(e.message||e),'bad'));
+$('discardExpress').onclick=()=>eliminarExpressLocal()
+ .then(()=>status('Se descartaron los recortes temporales de este dispositivo.','ok'));
 $('btnPdf').onclick=()=>{
  if(busy||receivedReference)return;
  if(!receiverConfig?.enabled||!receiverApiUrl){
