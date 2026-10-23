@@ -562,7 +562,13 @@ async function showOrder(id){try{status.textContent="Consultando detalle...";con
   details.append(line);
  }
 }
-status.textContent=""}catch(e){status.textContent=e.message}}
+if(x.produccion?.polaroidsExpress){
+ const d=x.produccion.polaroidsExpress;
+ details.append(node("h4","Polaroids Express · PDF único verificado"));
+ details.append(node("p",d.referencia+" · "+d.fotos+" fotos · "+d.paginasA4+
+  " hoja(s) A4 · "+money(d.totalPolaroids)+" · Pago confirmado"));
+ details.append(node("p","PDF en Drive privado. Descarga administrativa pendiente de habilitación."));
+}status.textContent=""}catch(e){status.textContent=e.message}}
 async function refreshCronState(){
  const el=document.querySelector("#cronState");
  try{
@@ -910,6 +916,7 @@ export default {
   if(!env.DB || !env.MP_TEST_ACCESS_TOKEN || !env.DEMO_ADMIN_KEY || !env.MP_TEST_SELLER_ID || !env.TEST_WEBHOOK_URL || !env.MP_WEBHOOK_SECRET)return json({error:"Falta configuración privada de pruebas. Consultar diagnóstico autorizado."},503);
   try {
    if(url.pathname==="/internal/central/polaroid-stage")return await centralPolaroidStage(req,env);
+   if(url.pathname==="/internal/central/polaroid-prepare-order")return await centralPolaroidPrepareOrder(req,env);
    if(url.pathname==="/internal/central/stage")return await centralStage(req,env);
    if(url.pathname==="/internal/central/link")return await centralLink(req,env);
    if(url.pathname==="/internal/central/prepare-order")return await centralPrepareDraft(req,env);
@@ -964,7 +971,7 @@ export default {
     const produccion=estadoProduccionPrivado(order,rows.results);
     if(central)produccion.documentosVerificados=central;
     const express=await centralPolaroidDetail(env,id);
-    if(express)produccion.polaroidsExpress=express;
+    if(express){express.pagoConfirmado=true;produccion.polaroidsExpress=express;}
     return json({order,items:rows.results,produccion});
    }
    if(url.pathname==="/demo/catalog"&&req.method==="GET"){
@@ -1000,6 +1007,7 @@ export default {
     const order=await env.DB.prepare("SELECT * FROM orders WHERE id=?").bind(orderId).first();
     if(!order)return json({error:"Pedido no encontrado"},404);
     if(order.description==="Librería Saber · documentos verificados y tienda")return json({error:"Cobro de documentos aún no habilitado. Falta el ensayo integral."},503);
+    if(order.description==="Librería Saber · Polaroids Express y tienda")return json({error:"Cobro de Polaroids Express aún no habilitado. Falta el ensayo integral."},503);
     if(order.status!=="awaiting_payment")return json({error:"El pedido ya está pago"},409);
     const expiresAt=new Date(String(order.created_at).replace(" ","T")+"Z").getTime()+24*60*60*1000;
     if(!Number.isFinite(expiresAt)||Date.now()>=expiresAt)return json({error:"La cotización venció; prepará un nuevo pedido"},409);
