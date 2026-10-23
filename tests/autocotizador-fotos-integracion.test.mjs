@@ -9,3 +9,9 @@ test('suma foto y sticker',()=>{
  assert.equal(x.subtotalStickers,3000);
  assert.equal(x.total,3500);
 });
+
+test('polaroid separado del servicio de fotos',()=>{
+ const x=cotizarCargaUnica({archivos:[a('fotos','foto_polaroid')],precios});
+ assert.equal(x.total,null);
+ assert.equal(x.estado,'INCOMPLETO');
+});
