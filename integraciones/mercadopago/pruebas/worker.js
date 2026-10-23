@@ -493,6 +493,97 @@ async function centralPolaroidPrepareOrder(req,env){
   state:"awaiting_payment",checkoutEnabled:false,paymentAuthorized:false},201);
 }
 
+
+/**
+ * Descarga administrativa: únicamente PDF Express asociado a un pedido pagado
+ * íntegramente en Mercado Pago de pruebas, sin revocación y con referencia
+ * consistente en D1. GAS recibe una solicitud firmada; no publica URLs.
+ */
+async function centralPolaroidDownload(req,env,reference){
+ if(!tokenOK(req,env))return json({error:"Operador no autorizado"},401);
+ if(env.CENTRAL_EXPRESS_DOWNLOAD_ENABLED!=="PRIVATE_TEST_ONLY"||
+    typeof env.EXPRESS_DOWNLOAD_HMAC_KEY!=="string"||
+    env.EXPRESS_DOWNLOAD_HMAC_KEY.length<32||
+    env.EXPRESS_DOWNLOAD_HMAC_KEY===env.CENTRAL_BRIDGE_KEY||
+    env.EXPRESS_DOWNLOAD_HMAC_KEY===env.DEMO_ADMIN_KEY)
+  return json({error:"Descargas Express no habilitadas"},503);
+ if(!CENTRAL_POLAROID.test(reference||""))
+  return json({error:"Referencia Express no válida"},400);
+ await centralPolaroidTable(env);
+ await ensurePaymentReviews(env);
+ await ensureOrderItems(env);
+ const row=await env.DB.prepare("SELECT p.reference,p.sha256,p.bytes,p.photos,p.sheets,p.amount_ars,p.commercial_order_id,o.status,o.payment_id,o.preference_id,o.paid_at,o.deposit_ars,o.amount_ars AS order_amount FROM central_polaroids_express p JOIN orders o ON o.id=p.commercial_order_id WHERE p.reference=? AND o.status='paid' AND o.deposit_ars=o.amount_ars AND o.paid_at IS NOT NULL AND o.payment_id IS NOT NULL AND o.preference_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM payment_reviews q WHERE q.order_id=o.id AND q.state='revoked')").bind(reference).first();
+ if(!row)return json({error:"No existe PDF de pedido pagado verificable"},404);
+ const lines=(await env.DB.prepare("SELECT sku,quantity,unit_price_ars,line_total_ars,file_references_json FROM order_items WHERE order_id=? ORDER BY line_number").bind(row.commercial_order_id).all()).results||[];
+ if(!lines.length||lines.length>100||
+    lines.reduce((n,l)=>n+Number(l.line_total_ars||0),0)!==row.order_amount)
+  return json({error:"El importe del pedido requiere revisión"},409);
+ const only=lines.filter(x=>x.sku==="POLAROID_EXPRESS_A4");
+ let references;
+ try{references=JSON.parse(only[0]?.file_references_json||"null")}catch(_){}
+ if(only.length!==1||only[0].quantity!==row.sheets||
+    only[0].unit_price_ars!==3000||only[0].line_total_ars!==row.amount_ars||
+    !Array.isArray(references)||references.length!==1||references[0]!==reference)
+  return json({error:"El PDF no coincide con la compra"},409);
+ let gas;
+ try{gas=new URL(env.EXPRESS_DOWNLOAD_SCRIPT_URL)}catch(_){return json({error:"Google privado no configurado"},503)}
+ if(gas.protocol!=="https:"||gas.hostname!=="script.google.com"||
+    !/^\/macros\/s\/[A-Za-z0-9_-]{20,}\/exec\/?$/.test(gas.pathname)||
+    gas.username||gas.password||gas.port||gas.search||gas.hash)
+  return json({error:"Receptor privado incorrecto"},503);
+ const payload=JSON.stringify({op:"leerPdfExpress",referencia:reference,
+  bytes:row.bytes,sha256:row.sha256});
+ const timestamp=Math.floor(Date.now()/1000),nonce=crypto.randomUUID();
+ const hmac=await crypto.subtle.importKey("raw",
+  new TextEncoder().encode(env.EXPRESS_DOWNLOAD_HMAC_KEY),
+  {name:"HMAC",hash:"SHA-256"},false,["sign"]);
+ const bytes=Array.from(new Uint8Array(await crypto.subtle.sign("HMAC",hmac,
+  new TextEncoder().encode(timestamp+"\n"+nonce+"\n"+payload))),
+  n=>n.toString(16).padStart(2,"0")).join("");
+ let response;
+ try{
+  const original=await fetch(gas.href,{method:"POST",
+   headers:{"Content-Type":"text/plain;charset=UTF-8"},
+   body:JSON.stringify({timestamp,nonce,payloadJson:payload,signature:bytes}),
+   redirect:"manual",signal:AbortSignal.timeout(35000)});
+  response=original;
+  if([301,302,303,307,308].includes(original.status)){
+   const redirect=new URL(original.headers.get("Location")||"",gas);
+   if(redirect.protocol!=="https:"||
+      redirect.hostname!=="script.googleusercontent.com"||
+      !redirect.pathname.startsWith("/macros/echo")||
+      redirect.username||redirect.password||redirect.port)
+    throw Error("La URL de descarga de Google cambió.");
+   response=await fetch(redirect.href,{method:"GET",redirect:"error",
+    headers:{"Accept":"application/json"},signal:AbortSignal.timeout(35000)});
+  }
+  if(!response.ok)throw Error("Google no confirmó.");
+  const text=await response.text();
+  if(text.length<100||text.length>17*1024*1024+1500)
+   throw Error("Respuesta demasiado grande.");
+  const data=JSON.parse(text);
+  if(data.ok!==true||data.verified!==true||
+     data.referencia!==reference||data.sha256!==row.sha256||
+     data.bytes!==row.bytes||typeof data.pdfBase64!=="string"||
+     data.pdfBase64.length>17*1024*1024)
+   throw Error("Recibo de Google distinto del registrado.");
+  const raw=atob(data.pdfBase64);
+  if(raw.length!==row.bytes)throw Error("El PDF está incompleto.");
+  const pdf=Uint8Array.from(raw,ch=>ch.charCodeAt(0));
+  const actual=Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",pdf)),
+   b=>b.toString(16).padStart(2,"0")).join("");
+  if(actual!==row.sha256||raw.slice(0,5)!=="%PDF-"||
+     !raw.slice(-72).includes("%%EOF"))
+   throw Error("El PDF privado está alterado.");
+  return new Response(pdf,{status:200,headers:{
+   "Content-Type":"application/pdf","Content-Disposition":'attachment; filename="'+reference+'_IMPRIMIR.pdf"',
+   "Content-Length":String(pdf.length),"Cache-Control":"private, no-store",
+   "X-Content-Type-Options":"nosniff","Referrer-Policy":"no-referrer",
+   "X-Robots-Tag":"noindex, nofollow"
+  }});
+ }catch(_){return json({error:"No se pudo verificar la descarga de Drive."},502)}
+}
+
 async function centralPolaroidDetail(env,id){
  await centralPolaroidTable(env);
  const row=await env.DB.prepare("SELECT reference,sha256,bytes,photos,sheets,amount_ars,created_at FROM central_polaroids_express WHERE commercial_order_id=?").bind(id).first();
