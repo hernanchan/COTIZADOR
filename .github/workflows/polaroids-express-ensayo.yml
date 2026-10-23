@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/polaroids-express-ensayo.yml'
       - 'integraciones/polaroids/express/**'
+      - 'functions/api/polaroids-express.js'
       - 'tests/polaroids-express-*.test.mjs'
       - 'vidriera/polaroids/**'
   workflow_dispatch:
@@ -24,8 +25,14 @@ jobs:
       - name: Dependencia PDF en entorno aislado (no desplegar)
         working-directory: integraciones/autocotizador/recepcion
         run: npm install --no-audit --no-fund
+      - name: Instalar motor Express de Cloudflare Pages (sin despliegue)
+        working-directory: integraciones/polaroids/express
+        run: npm install --no-audit --no-fund
+      - name: Compilar el Worker Express sin publicarlo
+        working-directory: integraciones/polaroids/express
+        run: npm run build:worker
       - name: Probar PDF Express con 6, 12, 19 y 24 fotografías
-        run: node --test tests/polaroids-express-motor.test.mjs tests/polaroids-express-guardado.test.mjs tests/polaroids-express-tandas.test.mjs
+        run: node --test tests/polaroids-express-motor.test.mjs tests/polaroids-express-guardado.test.mjs tests/polaroids-express-tandas.test.mjs tests/polaroids-express-worker.test.mjs
       - name: Validar editor/recepción anterior permanece apagada
         run: |
           node tests/polaroids-preparacion.test.mjs
@@ -35,3 +42,5 @@ jobs:
           node --check integraciones/polaroids/express/motor-pdf.mjs
           node --check integraciones/polaroids/express/guardar-pdf-privado.mjs
           node --check integraciones/polaroids/express/preparar-tandas.mjs
+          node --check vidriera/polaroids/express-cliente.mjs
+          node --check functions/api/polaroids-express.js
