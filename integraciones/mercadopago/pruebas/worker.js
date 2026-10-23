@@ -353,6 +353,67 @@ async function centralPrepareDraft(req,env){
   productos_ars:total-row.amount_ars,checkoutEnabled:false,paymentAuthorized:false},201);
 }
 
+/**
+ * Central privada, rama Express. PDF almacenado exclusivamente en Drive.
+ * No se aceptan fotos, bytes, enlaces ni URLs suministrados por un comprador.
+ */
+const CENTRAL_POLAROID=/^POL-[A-F0-9]{24}$/;
+async function centralPolaroidTable(env){
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_polaroids_express (reference TEXT PRIMARY KEY,sha256 TEXT NOT NULL CHECK(length(sha256)=64),bytes INTEGER NOT NULL CHECK(bytes BETWEEN 100 AND 12582912),photos INTEGER NOT NULL CHECK(photos BETWEEN 1 AND 24),sheets INTEGER NOT NULL CHECK(sheets BETWEEN 1 AND 4),amount_ars INTEGER NOT NULL CHECK(amount_ars IN (3000,6000,9000,12000)),commercial_order_id TEXT UNIQUE REFERENCES orders(id) ON DELETE RESTRICT,created_at TEXT NOT NULL DEFAULT (datetime('now')),linked_at TEXT)").run();
+ await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_central_express_order ON central_polaroids_express(commercial_order_id)").run();
+}
+function centralPolaroidSafe(data){
+ if(!data||typeof data!=="object"||Array.isArray(data)||
+    Object.keys(data).sort().join(",")!=="bytes,fotos,hojas,importeArs,listoParaProducir,pagoConfirmado,pdfPrivadoVerificado,referencia,schema,sha256"||
+    data.schema!=="saber-polaroids-express-central-v1"||
+    !CENTRAL_POLAROID.test(data.referencia||"")||!CENTRAL_HEX.test(data.sha256||"")||
+    !Number.isSafeInteger(data.bytes)||data.bytes<100||data.bytes>12*1024*1024||
+    !Number.isSafeInteger(data.fotos)||data.fotos<1||data.fotos>24||
+    !Number.isSafeInteger(data.hojas)||data.hojas!==Math.ceil(data.fotos/6)||
+    !Number.isSafeInteger(data.importeArs)||data.importeArs!==data.hojas*3000||
+    data.pdfPrivadoVerificado!==true||data.pagoConfirmado!==false||
+    data.listoParaProducir!==false)
+  throw Error("PDF Polaroids Express sin verificación privada completa.");
+ return {reference:data.referencia,sha256:data.sha256,bytes:data.bytes,
+  photos:data.fotos,sheets:data.hojas,amount_ars:data.importeArs};
+}
+async function centralPolaroidStage(request,env){
+ if(env.CENTRAL_EXPRESS_ENABLED!=="PRIVATE_TEST_ONLY")
+  return json({error:"Polaroids Express no está habilitado en la Central"},503);
+ const signed=await centralReadSigned(request,env);
+ if(signed.error)return json({error:signed.error},signed.status);
+ let verified;try{verified=centralPolaroidSafe(signed.payload)}
+ catch(_){return json({error:"Recibo Express no válido"},422)}
+ await centralPolaroidTable(env);
+ const old=await env.DB.prepare("SELECT reference,sha256,bytes,photos,sheets,amount_ars FROM central_polaroids_express WHERE reference=?").bind(verified.reference).first();
+ if(old){
+  if(old.sha256!==verified.sha256||old.bytes!==verified.bytes||
+     old.photos!==verified.photos||old.sheets!==verified.sheets||
+     old.amount_ars!==verified.amount_ars)
+   return json({error:"La referencia ya corresponde a un PDF diferente"},409);
+  return json({saved:true,idempotent:true,referencia:verified.reference,
+   pdfPrivadoVerificado:true,paymentAuthorized:false},200);
+ }
+ try{
+  await env.DB.prepare("INSERT INTO central_polaroids_express(reference,sha256,bytes,photos,sheets,amount_ars) VALUES(?,?,?,?,?,?)")
+   .bind(verified.reference,verified.sha256,verified.bytes,verified.photos,verified.sheets,verified.amount_ars).run();
+ }catch(_){return json({error:"Conflicto de referencia; consultá la recepción privada"},409)}
+ return json({saved:true,idempotent:false,referencia:verified.reference,
+  pdfPrivadoVerificado:true,paymentAuthorized:false},201);
+}
+async function centralPolaroidDetail(env,id){
+ await centralPolaroidTable(env);
+ const row=await env.DB.prepare("SELECT reference,sha256,bytes,photos,sheets,amount_ars,created_at FROM central_polaroids_express WHERE commercial_order_id=?").bind(id).first();
+ return row?{
+  referencia:row.reference,paginasA4:row.sheets,fotos:row.photos,
+  totalPolaroids:row.amount_ars,bytes:row.bytes,
+  sha256:row.sha256,fechaRecepcion:row.created_at,
+  pdfPrivadoVerificado:true,
+  descargaSoloOperador:true,descargaHabilitada:false,
+  pagoConfirmado:false,listoParaProducir:false
+ }:null;
+}
+
 async function centralAdminDetail(env,id){
  await centralTables(env);
  const row=await env.DB.prepare("SELECT web_order_id,manifest_json,created_at,amount_ars,file_count FROM central_document_manifests WHERE commercial_order_id=?").bind(id).first();
