@@ -99,3 +99,10 @@ No modificar `main`, la web pública, Apps Script, Polaroids ni pagos. No contra
 - `clasificar-paginas-ploteo.mjs` extrae texto mediante PDF.js **localmente en el navegador**, sin transmitir PDF, y aplica refinamiento después del análisis visual. No cambia precios.
 - Tests de rótulo DWG, 24 páginas, mezcla CAD/Póster y póster muy pleno aprobados: https://github.com/hernanchan/COTIZADOR/actions/runs/39955953809
 - **No confirmado aún en Chrome con el archivo original**, falta copiar el bundle manualmente al Worker privado y reensayar. Diagnóstico local no es garantía de resultado de PDF.js. El PDF privado no forma parte del repositorio.
+
+## Rectificación de clasificación CAD/Póster — 23/10/2026
+
+- El usuario señaló que el PDF real de 24 páginas incluye páginas que **no deben cobrarse como CAD**. El objetivo correcto es cotización **mixta por página**, no convertir el conjunto entero a CAD mediante votación.
+- Se **desactivó del clasificador activo** el refinamiento automático por mayoría CAD+rótulo DWG: una referencia de plano o una mayoría CAD no justifican reclasificar imágenes/plenos. La función experimental permanece aislada sin importarse; su test se retiró del CI principal.
+- Mantener el bloqueo de precio para páginas de clasificación incierta hasta tener una heurística discriminativa validada con el usuario. No desplegar el bundle compilado previamente con la regla de consenso. El archivo privado no fue incorporado a GitHub.
+- Próxima validación: acordar qué páginas reales son Póster bajo la política de cobro de Librería Saber, y ajustar cobertura de imágenes o áreas plenas **por página**; preservar mezcla CAD/Póster y rollo 42 cuando el ancho físico lo permite.
