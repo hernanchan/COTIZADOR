@@ -52,7 +52,8 @@ async function fakeFetch(url,opts){
  assert.equal(payload.sha256,sha256);
  assert.equal(payload.bytes,pdf.length);
  if(redirect)return new Response(null,{status:302,headers:{Location:'https://evil.invalid/receive'}});
- const altered=tamper?Uint8Array.from(pdf,x=>x===1?2:x):pdf;
+ const altered=tamper?Uint8Array.from(pdf):pdf;
+ if(tamper)altered[10]^=1;
  return Response.json({ok:true,verified:true,referencia:reference,
   sha256,bytes:pdf.length,pdfBase64:Buffer.from(altered).toString('base64')});
 }
