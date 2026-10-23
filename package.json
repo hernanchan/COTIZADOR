@@ -1,0 +1,9 @@
+{
+  "name": "libreria-saber-pages-express-preview",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Pages preview dependencies for protected Polaroids Express; branch-only, no deployment",
+  "dependencies": {
+    "pdf-lib": "1.17.1"
+  }
+}
