@@ -48,7 +48,7 @@ export function cotizarCargaUnica({archivos,precios}){
   const seleccionadas=seleccionarPaginas(a.paginas,a.paginasSeleccionadas);
   const d=clasificarDestino(seleccionadas,a.seleccion);
   if(a.servicio==='fotos'){
-   pendientes.push({indice:i,nombre:a.nombre,motivo:'Fotografías pendientes de selección del producto'});
+   procesarFotoCarga({archivo:a,indice:i,paginas:seleccionadas,precios,fotos,plan,pendientes});
    return;
   }
   if(a.servicio==='stickers'){
