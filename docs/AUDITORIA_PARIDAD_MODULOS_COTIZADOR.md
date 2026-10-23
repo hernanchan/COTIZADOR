@@ -141,3 +141,12 @@ No modificar `main`, la web pública, Apps Script, Polaroids ni pagos. No contra
 - Servicio stickers no permite anillado; el cliente borra una selección previa al cambiar de servicio, y el servidor rechaza combinaciones incompatibles. API mantiene compatibilidad con clientes anteriores sin el campo `servicio`.
 - Tests de paridad A4/A3, límite de 21 planchas y validación de cantidad incorporados a CI. Pendiente **reensayo visual real y validación de diseños de una plancha por página**. No permite subir fotografías como servicio fotos ni trae el flujo de precorte SignMaster/contorno individual al trabajo de producción.
 - Sigue sin desplegarse Cloudflare y sin modificar la web pública. Próximos servicios: fotografías normales/Luster/carnet, ploteo de corte y gráfica comercial.
+
+## Ploteo de corte integrado en presupuesto conjunto — 23/10/2026
+
+- `cotizar-corte.mjs` replica exactamente el criterio comercial de `main:cotizador-web-v2.html`: tarifa por metro de la variante elegida, mínimo `cutPlotter.minimumPrice`, redondeo con `Math.round` al paso del catálogo. Metros ingresados manualmente, **no derivados de tamaños de hoja PDF**.
+- Se agregó `procesar-corte-carga.mjs` y se conectó como `servicio=corte` a `/api/ensayo-carga-unica`. Suma al presupuesto junto con documentos, ploteos, fotos y stickers. Rechaza anillado; guarda variante, metros e identificación del PDF para revisión técnica posterior. Sigue siendo cotización preliminar no verificable para cobro.
+- La ficha de PDF ofrece variante de corte desde el catálogo del servidor y campo de metros (0,1–1000). No se obliga a seleccionar tamaño A4/A3 para corte.
+- Tests de precio mínimo, redondeo, tipo no disponible, integración en cotización única con tamaño sin confirmar. CI aprobado para integración: https://github.com/hernanchan/COTIZADOR/actions/runs/39977496969
+- Pendientes importantes: detección/validación de contornos y archivos productivos, carga alternativa de formatos vectoriales, volumen/agrupación por pedido y recepción verificada; no asignar precio desde supuestos de metros.
+- Sin despliegue a Cloudflare; sin producción, cobros ni modificación de Polaroids. Próximo módulo: gráfica comercial.
