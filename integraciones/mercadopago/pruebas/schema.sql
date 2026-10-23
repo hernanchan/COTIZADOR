@@ -87,3 +87,27 @@ CREATE TABLE IF NOT EXISTS cron_health (
  registered INTEGER NOT NULL DEFAULT 0,
  errors INTEGER NOT NULL DEFAULT 0
 );
+
+-- Central de Pedidos: manifiestos de PDFs verificados por el backend privado.
+-- Se conserva aparte del pago hasta que un pedido comercial coincidente
+-- pueda vincularse sin ambigüedad. Nada de blobs, enlaces públicos o claves.
+CREATE TABLE IF NOT EXISTS central_document_manifests (
+ web_order_id TEXT PRIMARY KEY,
+ commercial_order_id TEXT UNIQUE REFERENCES orders(id) ON DELETE RESTRICT,
+ amount_ars INTEGER NOT NULL CHECK(amount_ars>0 AND amount_ars<=50000000),
+ file_count INTEGER NOT NULL CHECK(file_count BETWEEN 1 AND 30),
+ manifest_hash TEXT NOT NULL,
+ manifest_json TEXT NOT NULL,
+ status TEXT NOT NULL DEFAULT 'verified_waiting_order'
+  CHECK(status IN ('verified_waiting_order','linked_waiting_payment','linked_paid_pending_preparation')),
+ created_at TEXT NOT NULL DEFAULT (datetime('now')),
+ linked_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_central_manifests_commercial_order
+ ON central_document_manifests(commercial_order_id);
+CREATE TABLE IF NOT EXISTS central_bridge_requests (
+ request_id TEXT PRIMARY KEY,
+ request_hash TEXT NOT NULL,
+ action TEXT NOT NULL CHECK(action IN ('stage','link')),
+ created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
