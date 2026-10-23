@@ -47,6 +47,10 @@ export function cotizarCargaUnica({archivos,precios}){
   validarArchivo(a,i);
   const seleccionadas=seleccionarPaginas(a.paginas,a.paginasSeleccionadas);
   const d=clasificarDestino(seleccionadas,a.seleccion);
+  if(a.servicio==='fotos'){
+   pendientes.push({indice:i,nombre:a.nombre,motivo:'Fotografías pendientes de selección del producto'});
+   return;
+  }
   if(a.servicio==='stickers'){
    if(a.anillado!=='ninguno'){
     pendientes.push({indice:i,nombre:a.nombre,motivo:'Stickers no admite anillado; quitá el anillado anterior'});return;
