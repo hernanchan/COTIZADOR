@@ -7,6 +7,7 @@ import {paginaCotizadorConjunto} from './cotizador-conjunto-pagina.mjs';
 import {paginaCargaUnica} from './carga-unica-pagina.mjs';
 import {cotizarCargaUnica} from './cotizar-carga-unica.mjs';
 import {GRAFICA_COMERCIAL} from './cotizar-grafica.mjs';
+import {fase4FichaCentralPrivada} from './fase4-ficha-central-privada.mjs';
 import cargaClienteJs from './carga-unica-cliente.txt';
 import {cotizarPloteosRapido} from '../pruebas/cotizar-ploteos-rapido.mjs';
 import plotClienteJs from './ploteos-rapido-cliente.txt';
@@ -995,6 +996,42 @@ function scriptRapido(){
   'X-Robots-Tag':'noindex,nofollow','X-Content-Type-Options':'nosniff'
  }});
 }
+/** Inspección de ficha central en piloto, solo operador con clave independiente.
+ * No publica originales, no crea pedidos D1 ni permite pago.
+ */
+async function apiFichaCentralPrivada(request,env){
+ if(request.method!=='POST')return closed();
+ if(!allowed(request,env))
+  return testResponse({ok:false,error:'Origen no permitido',paymentAuthorized:false},403);
+ const key=env?.DOCS_CENTRAL_ADMIN_KEY;
+ if(typeof key!=='string'||key.length<32||key===env.DOCS_RELAY_KEY)
+  return testResponse({ok:false,error:'Central privada sin configurar',paymentAuthorized:false},503);
+ const given=request.headers.get('Authorization')||'';
+ const expected='Bearer '+key;
+ let diff=given.length===expected.length?0:1;
+ for(let i=0;i<expected.length;i++)
+  diff|=expected.charCodeAt(i)^(given.charCodeAt(i)||0);
+ if(diff)return testResponse({ok:false,error:'Acceso administrativo requerido',paymentAuthorized:false},401);
+ let input;
+ try{
+  input=await readLimited(request);
+  if(!input||typeof input!=='object'||Array.isArray(input)||
+     Object.keys(input).sort().join(',')!=='opciones,sesion')
+    throw Error('Datos inválidos');
+ }catch(_){return testResponse({ok:false,error:'Solicitud no válida',paymentAuthorized:false},400);}
+ try{
+  const result=await fase4FichaCentralPrivada({
+   sesion:input.sesion,opciones:input.opciones,
+   consultarFirmado:p=>postToScript(env,p,fetch,420000),
+   preciosServidor:preciosPiloto
+  });
+  return testResponse({ok:true,...result,paymentAuthorized:false,
+   listoParaProducir:false},200);
+ }catch(_){
+  return testResponse({ok:false,error:'No se pudo verificar la ficha en Drive. Requiere revisión.',
+   paymentAuthorized:false,listoParaProducir:false},422);
+ }
+}
 export default {
   async fetch(request, env, ctx) {
     const page=new URL(request.url).pathname;
@@ -1006,6 +1043,7 @@ export default {
     if(page==='/prueba-cotizador-rapido'&&request.method==='GET')return paginaRapida();
     if(page==='/prueba-ploteos-rapido'&&request.method==='GET')return paginaPloteos();
     if(page==='/prueba-ploteos-rapido.js'&&request.method==='GET')return scriptPloteos();
+    if(page==='/api/ensayo-ficha-central')return apiFichaCentralPrivada(request,env);
     if(page==='/api/ensayo-carga-unica'){
       if(request.method!=='POST')return closed();
       try{
