@@ -7,6 +7,7 @@ const entries=[];
 let leyendo=false;
 let version=0;
 let catalogo={a4:[],a3:[]};
+let productosFoto=[];
 let abierto=-1;
 let ultimoPresupuesto=null;
 const pesos=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(n);
@@ -17,6 +18,7 @@ function importeArchivo(indice){
  const d=plan.destino==='documentos'?
    ultimoPresupuesto.detalleImpresiones?.find(x=>x.id===plan.id):
    plan.destino==='stickers'?ultimoPresupuesto.detalleStickers?.find(x=>x.id===plan.id):
+   plan.destino==='fotos'?ultimoPresupuesto.detalleFotos?.find(x=>x.id===plan.id):
    ultimoPresupuesto.detallePloteos?.find(x=>x.id===plan.id);
  // Anillados agrupados se suman sólo al total general; evitar un subtotal individual ambiguo.
  if(plan.destino==='documentos'&&entries[indice].anillado==='grupo')return 'Incluido en el grupo';
