@@ -42,6 +42,12 @@ test('rechazar precio alterado, líneas omitidas y páginas inválidas',()=>{
  assert.throws(()=>prepararBorradorPedido({cotizacion:{...cotizacion,plan:cotizacion.plan.slice(0,1)},archivos:files}),/presupuestar/i);
  assert.throws(()=>prepararBorradorPedido({cotizacion:{...cotizacion,plan:cotizacion.plan.map(x=>({...x,paginasElegidas:[99]}))},archivos:files}),/páginas/i);
 });
+test('se rechaza intercambio de originales de dos trabajos',()=>{
+ const archivos=[archivo('stickers'),archivo('grafica','tarjetas-0')];
+ const cotizacion=cotizarCargaUnica({archivos,precios});
+ const files=archivos.map(conFile);
+ assert.throws(()=>prepararBorradorPedido({cotizacion,archivos:files.reverse()}),/original/i);
+});
 test('no se prepara pedido si un trabajo sigue pendiente',()=>{
  const archivos=[archivo('grafica','')];
  const cotizacion=cotizarCargaUnica({archivos,precios});
