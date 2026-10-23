@@ -16,6 +16,7 @@ function importeArchivo(indice){
  if(!plan)return null;
  const d=plan.destino==='documentos'?
    ultimoPresupuesto.detalleImpresiones?.find(x=>x.id===plan.id):
+   plan.destino==='stickers'?ultimoPresupuesto.detalleStickers?.find(x=>x.id===plan.id):
    ultimoPresupuesto.detallePloteos?.find(x=>x.id===plan.id);
  // Anillados agrupados se suman sólo al total general; evitar un subtotal individual ambiguo.
  if(plan.destino==='documentos'&&entries[indice].anillado==='grupo')return 'Incluido en el grupo';
@@ -54,9 +55,9 @@ function render(){
   if(e.paginas){
    const elegidas=paginasElegidas(e)||e.paginas;
    const d=clasificarDestino(elegidas,e.seleccion);
-   const tipo=d.confirmado?(d.destino==='ploteo'?'Ploteo':'Impresión'):'Tamaño sin confirmar';
+   const tipo=d.confirmado?(e.servicio==='stickers'?'Stickers con precorte':d.destino==='ploteo'?'Ploteo':'Impresión'):'Tamaño sin confirmar';
    const material=e.modo==='color'?'Color':'B/N';
-   const extra=d.destino==='documentos'?(' · '+material+(e.anillado==='individual'?' · Anillado':e.anillado==='grupo'?' · Grupo '+e.grupoAnillado:'')):
+   const extra=e.servicio==='stickers'?' · Adhesivo fotográfico':d.destino==='documentos'?(' · '+material+(e.anillado==='individual'?' · Anillado':e.anillado==='grupo'?' · Grupo '+e.grupoAnillado:'')):
     (elegidas.some(p=>p.modo==='poster')?' · '+(e.papelPoster==='recubierto'?'Recubierto':'Obra 80 g'):'');
    resumen.textContent=(e.paginasSeleccionadas?(e.paginasSeleccionadas+' de '+e.paginas.length):(e.paginas.length+' pág.'))+' · '+tipo+(d.confirmado?' '+(d.tamanoFinal==='original'?'original':d.tamanoFinal.toUpperCase()):'')+' · '+e.copias+' copia(s)'+(d.confirmado?extra:'');
   }else resumen.textContent=e.error?'Error de lectura':'Analizando PDF…';
@@ -84,6 +85,7 @@ function render(){
   const aviso=clasificarDestino(paginas);
   if(aviso.requiereConfirmacion){const n=texto('p','Confirmá el tamaño de impresión: el PDF puede tener medidas distintas a las que querés.');n.className='advertencia';panel.append(n)}
   const controles=document.createElement('div');controles.className='controles';
+  controles.append(valor('Servicio', [['auto','Impresiones / ploteos'],['stickers','Stickers con precorte A4/A3']],e.servicio||'auto',v=>{e.servicio=v;cambio()}));
   const label=texto('label','Tamaño de impresión');
   const sel=document.createElement('select');sel.setAttribute('aria-label','Tamaño final de '+e.name);
   for(const [v,l] of [['sin-confirmar','Elegir tamaño final'],['original','Mantener tamaño original'],['a3','A3 (29,7 × 42 cm)'],['a4','A4 (21 × 29,7 cm)'],['a5','A5 (14,8 × 21 cm)']]){
@@ -96,7 +98,11 @@ function render(){
    if(decision.cambioEscala){const n=texto('p','El archivo se ajustará sin recortar. Revisá que textos y escalas sigan siendo legibles.');n.className='advertencia';panel.append(n)}
    if(decision.mixtas&&decision.tamanoFinal==='original')panel.append(texto('p','El PDF contiene tamaños distintos. Se conservarán individualmente al presupuestar.'));
    controles.append(cantidadCopias(e));
-   if(decision.destino==='documentos'){
+   if(e.servicio==='stickers'){
+    if(!['a4','a3'].includes(decision.tamanoFinal==='original'?formatoOriginal(paginas):decision.tamanoFinal)){
+     const aviso=texto('p','Para stickers, elegí tamaño de salida A4 o A3.');aviso.className='advertencia';panel.append(aviso);
+    }else panel.append(texto('p','Incluye impresión en adhesivo fotográfico y precorte. Cada página del PDF representa una plancha por copia.'));
+   }else if(decision.destino==='documentos'){
     controles.append(valor('Impresión', [['bn','Blanco y negro'],['color','Color']],e.modo,v=>{e.modo=v;cambio()}));
     controles.append(valor('Caras', [['simple','Simple faz'],['double','Doble faz']],e.caras,v=>{e.caras=v;cambio()}));
     const formato=decision.tamanoFinal==='original'?formatoOriginal(paginas):decision.tamanoFinal;
@@ -126,7 +132,7 @@ $('archivos').addEventListener('change',async ev=>{
  if(entries.length+files.length>30){$('estado').textContent='Máximo 30 PDF.';return}
  leyendo=true;
  if(!entries.length)abierto=0;
- for(const f of files)entries.push({name:f.name,paginas:null,seleccion:'sin-confirmar',error:null,copias:1,modo:'bn',caras:'simple',papelPoster:'obra80',anillado:'ninguno',grupoAnillado:'',materialColor:'',paginasSeleccionadas:''});
+ for(const f of files)entries.push({name:f.name,paginas:null,seleccion:'sin-confirmar',error:null,copias:1,modo:'bn',caras:'simple',papelPoster:'obra80',anillado:'ninguno',grupoAnillado:'',materialColor:'',paginasSeleccionadas:'',servicio:'auto'});
  render();
  const start=entries.length-files.length;
  for(let i=0;i<files.length;i++){
@@ -159,11 +165,11 @@ async function cotizar(){
   const disponibles=catalogo[formato]||[];
   if(!e.materialColor&&disponibles.length)e.materialColor=disponibles[0].id;
  }
- const archivos=entries.map(e=>({nombre:e.name,paginas:e.paginas,paginasSeleccionadas:e.paginasSeleccionadas,seleccion:e.seleccion,copias:e.copias,modo:e.modo,caras:e.caras,papelPoster:e.papelPoster,anillado:e.anillado,grupoAnillado:e.grupoAnillado,materialColor:e.materialColor}));
+ const archivos=entries.map(e=>({nombre:e.name,paginas:e.paginas,paginasSeleccionadas:e.paginasSeleccionadas,seleccion:e.seleccion,servicio:e.servicio||'auto',copias:e.copias,modo:e.modo,caras:e.caras,papelPoster:e.papelPoster,anillado:e.anillado,grupoAnillado:e.grupoAnillado,materialColor:e.materialColor}));
  try{const r=await fetch('/api/ensayo-carga-unica',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({archivos})});const d=await r.json();if(n!==version)return;if(!r.ok||d.ok!==true||d.paymentAuthorized!==false)throw Error(d.error||'Sin cotización');
  ultimoPresupuesto=d;
  const ars=v=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(v);
- out.replaceChildren(texto('strong',d.total===null?'TOTAL INCOMPLETO':'TOTAL PRELIMINAR: '+ars(d.total)),texto('p','Impresiones (incluye anillados): '+ars(d.subtotalImpresiones)+' · Ploteos: '+ars(d.subtotalPloteos)),texto('p','Anillados incluidos: '+ars(d.subtotalAnillados)));
+ out.replaceChildren(texto('strong',d.total===null?'TOTAL INCOMPLETO':'TOTAL PRELIMINAR: '+ars(d.total)),texto('p','Impresiones (incluye anillados): '+ars(d.subtotalImpresiones)+' · Ploteos: '+ars(d.subtotalPloteos)+' · Stickers: '+ars(d.subtotalStickers||0)),texto('p','Anillados incluidos: '+ars(d.subtotalAnillados)));
  for(const p of d.pendientes)out.append(texto('p',p.nombre+': '+p.motivo));
  if(d.plan.length)out.append(texto('p','Precio orientativo. Los archivos no se enviaron ni se autoriza el cobro.'));
  render();
