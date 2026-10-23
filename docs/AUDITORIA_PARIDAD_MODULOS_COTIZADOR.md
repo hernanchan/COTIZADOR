@@ -132,3 +132,12 @@ No modificar `main`, la web pública, Apps Script, Polaroids ni pagos. No contra
 - `/api/ensayo-carga-unica` recibe `paginasSeleccionadas` opcional (compatibilidad con clientes anteriores). Calcula documentos, ploteos, destino final y materiales usando **solo páginas seleccionadas**, preserva en el `plan` las numeraciones originales que deben imprimirse. Para precio de ploteos la numeración se normaliza internamente, manteniéndose `paginasElegidas` como fuente de instrucciones de producción.
 - Pruebas unitarias de 1-3 de siete, mezcla de rangos, selección de todas y validaciones. **CI compilado correcto:** https://github.com/hernanchan/COTIZADOR/actions/runs/39961873096
 - Este cambio no corta, elimina ni manda el PDF original. **Todavía no existe recepción verificable del PDF de origen ni emisión de archivo listo para imprimir.** Es presupuesto preliminar, paymentAuthorized=false. No desplegado automáticamente a Cloudflare.
+
+## Integración de stickers A4/A3 con precorte — 23/10/2026
+
+- El cotizador público vigente `cotizador-web-v2.html` utiliza `precios-web.json > stickers.products`; el cálculo es **cantidad de planchas × tarifa unitaria del tramo**, tomando la primera coincidencia entre `from` y `to`. Adhesivo fotográfico y precorte incluidos.
+- Integrado en `/prueba-carga-unica` como servicio elegible dentro de **Editar PDF**, con selección de tamaño A4/A3, páginas del PDF a imprimir y copias. Cada página seleccionada se interpreta como **una plancha por copia**. No altera el original.
+- Tarifas observadas en `main` a fecha de trabajo: A4 3000 hasta 20 planchas y 2700 a partir de 21; A3 5000 hasta 20 y 4500 desde 21. No se duplicaron precios en código: los consulta del catálogo vigente de la rama. Los totales de stickers se suman a impresiones y ploteos en el mismo presupuesto, sin cobros habilitados.
+- Servicio stickers no permite anillado; el cliente borra una selección previa al cambiar de servicio, y el servidor rechaza combinaciones incompatibles. API mantiene compatibilidad con clientes anteriores sin el campo `servicio`.
+- Tests de paridad A4/A3, límite de 21 planchas y validación de cantidad incorporados a CI. Pendiente **reensayo visual real y validación de diseños de una plancha por página**. No permite subir fotografías como servicio fotos ni trae el flujo de precorte SignMaster/contorno individual al trabajo de producción.
+- Sigue sin desplegarse Cloudflare y sin modificar la web pública. Próximos servicios: fotografías normales/Luster/carnet, ploteo de corte y gráfica comercial.
