@@ -98,10 +98,10 @@ function render(){
   sel.value=e.seleccion;sel.onchange=()=>{e.seleccion=sel.value;cambio()};label.append(sel);if(e.servicio!=='fotos'&&e.servicio!=='corte')controles.append(label);
   const decision=clasificarDestino(paginas,e.seleccion);
   if(decision.confirmado||e.servicio==='corte'){
-   const destino=texto('p',(e.servicio==='fotos'?'Trabajo fotográfico · Tamaño elegido por producto':'Trabajo: '+(decision.destino==='ploteo'?'Ploteo grande':'Impresión de documentos')+' · Salida: '+(decision.tamanoFinal==='original'?'tamaño original':decision.tamanoFinal.toUpperCase())));destino.className='destino';panel.append(destino);
+   const destino=texto('p',(e.servicio==='corte'?'Trabajo: ploteo de corte · Metros declarados':e.servicio==='fotos'?'Trabajo fotográfico · Tamaño elegido por producto':'Trabajo: '+(decision.destino==='ploteo'?'Ploteo grande':'Impresión de documentos')+' · Salida: '+(decision.tamanoFinal==='original'?'tamaño original':decision.tamanoFinal.toUpperCase())));destino.className='destino';panel.append(destino);
    if(decision.cambioEscala){const n=texto('p','El archivo se ajustará sin recortar. Revisá que textos y escalas sigan siendo legibles.');n.className='advertencia';panel.append(n)}
    if(decision.mixtas&&decision.tamanoFinal==='original')panel.append(texto('p','El PDF contiene tamaños distintos. Se conservarán individualmente al presupuestar.'));
-   controles.append(cantidadCopias(e));
+   if(e.servicio!=='corte')controles.append(cantidadCopias(e));
    if(e.servicio==='fotos'){
     if(productosFoto.length)controles.append(valor('Papel y tamaño',productosFoto.map(p=>[p.id,p.name]),e.productoFoto||productosFoto[0].id,v=>{e.productoFoto=v;cambio()}));
     else panel.append(texto('p','Catálogo de fotografías no disponible.'));
