@@ -27,7 +27,10 @@ const DB={
 };
 const context=vm.createContext({
  Request,Response,URL,URLSearchParams,TextEncoder,AbortSignal,
- crypto:webcrypto,console,fetch:async()=>{throw Error('No network allowed')}
+ crypto:webcrypto,console,fetch:async(url)=>{
+  if(!String(url).startsWith('https://docs.google.com/'))throw Error('Outbound network forbidden');
+  return new Response('Activo,Código,Producto,Precio,Oferta\nSI,ABC-1,Cuaderno,3500,0\n',{status:200});
+ }
 });
 const src=readFileSync(new URL('../integraciones/mercadopago/pruebas/worker.js',import.meta.url),'utf8');
 vm.runInContext(src.replace('export default {','globalThis.worker = {'),context,{filename:'worker.js'});
@@ -160,4 +163,60 @@ test('el panel privado muestra recepciones separadas de pagados sin exponer secr
  const js=html.slice(html.lastIndexOf('<script>')+8,html.lastIndexOf('</script>'));
  assert.doesNotThrow(()=>new Function(js));
  assert.ok(!html.includes(env.CENTRAL_BRIDGE_KEY));
+});
+
+test('el mismo recibo de Drive no puede reservarse para otra orden',async()=>{
+ const other=JSON.parse(JSON.stringify(packet));
+ other.orderId='WEB-ENSAYO-SEGUNDO000000';
+ other.ficha.orderId=other.orderId;
+ const r=await call('/internal/central/stage',other);
+ assert.equal(r.status,409);
+ assert.equal(db.prepare('SELECT COUNT(*) n FROM central_document_manifests').get().n,1);
+ assert.equal(db.prepare('SELECT COUNT(*) n FROM central_document_receipts').get().n,2);
+});
+test('crear orden mixta: recalcular catálogo, vincular D1 y bloquear checkout',async()=>{
+ const other=JSON.parse(JSON.stringify(packet));
+ other.orderId='WEB-ENSAYO-SEGUNDO000000';
+ other.ficha.orderId=other.orderId;
+ other.recibos[0].receiptId='DOC-aaaabbbb-1234-4234-8234-1234567890ab';
+ other.recibos[1].receiptId='DOC-ccccdddd-1234-4234-8234-1234567890ab';
+ other.ficha.trabajos[0].reciboPrivado=other.recibos[0].receiptId;
+ other.ficha.trabajos[1].reciboPrivado=other.recibos[1].receiptId;
+ assert.equal((await call('/internal/central/stage',other)).status,201);
+ const payload={clientOrderId:randomUUID(),webOrderId:other.orderId,
+  items:[{code:'ABC-1',qty:2}]};
+ // No permitir crear pedidos desde la interfaz cliente hasta aprobar el ensayo privado.
+ assert.equal((await call('/internal/central/prepare-order',payload)).status,503);
+ env.CENTRAL_PREPARE_ENABLED='PRIVATE_TEST_ONLY';
+ const created=await call('/internal/central/prepare-order',payload);
+ assert.equal(created.status,201,JSON.stringify(created.result));
+ assert.equal(created.result.amount_ars,28000);
+ assert.equal(created.result.documentos_ars,21000);
+ assert.equal(created.result.productos_ars,7000);
+ assert.equal(created.result.checkoutEnabled,false);
+ assert.equal(created.result.paymentAuthorized,false);
+ const commercial=created.result.commercial_order_id;
+ const rows=db.prepare('SELECT * FROM order_items WHERE order_id=? ORDER BY line_number').all(commercial);
+ assert.equal(rows.length,2);
+ assert.equal(rows[0].sku,'DOCS_VERIFIED');
+ assert.deepEqual(JSON.parse(rows[0].file_references_json),
+  [other.recibos[0].receiptId,other.recibos[1].receiptId]);
+ assert.equal(rows[1].unit_price_ars,3500);
+ assert.equal(rows[1].quantity,2);
+ assert.equal(db.prepare('SELECT amount_ars FROM orders WHERE id=?').get(commercial).amount_ars,28000);
+ assert.equal(db.prepare('SELECT commercial_order_id FROM central_document_manifests WHERE web_order_id=?')
+  .get(other.orderId).commercial_order_id,commercial);
+ const retried=await call('/internal/central/prepare-order',payload);
+ assert.equal(retried.status,200);
+ assert.equal(retried.result.idempotent,true);
+ assert.equal(retried.result.commercial_order_id,commercial);
+ assert.equal((await call('/internal/central/prepare-order',{...payload,items:[{code:'ABC-1',qty:3}]})).status,409);
+ assert.equal((await call('/internal/central/prepare-order',{...payload,clientOrderId:randomUUID()})).status,409);
+ const pay=await context.worker.fetch(new Request(base+'/demo/checkout',{
+  method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+env.DEMO_ADMIN_KEY},
+  body:JSON.stringify({order_id:commercial})
+ }),env);
+ assert.equal(pay.status,503);
+ assert.equal(db.prepare('SELECT preference_id FROM orders WHERE id=?').get(commercial).preference_id,null);
+ assert.equal((await admin('/admin/api/orders')).result.orders.length,0);
 });
