@@ -30,6 +30,49 @@ async function verifySignature(req,url,secret){
  return mismatch===0;
 }
 const demoHtml="<!doctype html><html lang=\"es\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Saber pagos prueba</title><style>body{font:16px system-ui;max-width:650px;margin:35px auto;padding:18px}input{padding:10px;width:95%}button{padding:12px;margin:8px 3px}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style><h2>Librería Saber | Prueba de pagos</h2><p>Solo pruebas: pedido $10.000, pago total $10.000. No introduzcas tokens de Mercado Pago.</p><input type=\"password\" id=\"key\" placeholder=\"Clave del demo (no se guarda)\"><p><button id=\"start\">Crear pedido y preparar pago</button><button id=\"catalog\">Ver artículos del catálogo</button><p><input id=\"catalogCode\" placeholder=\"Código del artículo de prueba\"><button id=\"cartOrder\">Preparar carrito del artículo (sin cobrar)</button></p><button id=\"sync\">Actualizar pedidos pagados</button><button id=\"list\">Consultar pagos aprobados</button><button id=\"diag\">Diagnosticar configuración</button><button id=\"audit\">Ver eventos automáticos</button><button id=\"cryptotest\">Probar verificador HMAC</button><p><input id=\"paymentId\" inputmode=\"numeric\" placeholder=\"Número de operación de prueba\"><button id=\"paymentCheck\">Analizar pago de prueba</button><button id=\"reconcile\">Verificar y registrar pago aprobado</button></p></p><pre id=\"output\"></pre><script>\nconst o=document.querySelector('#output');\nasync function api(p,m='GET',b){const r=await fetch(p,{method:m,headers:{'Authorization':'Bearer '+document.querySelector('#key').value,'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});const d=await r.json();if(!r.ok)throw Error(d.error||r.status);return d}\ndocument.querySelector('#start').onclick=async()=>{try{o.textContent='Preparando...';const x=await api('/demo/order','POST');const y=await api('/demo/checkout','POST',{order_id:x.id});o.textContent='Pedido '+x.id+' creado. ';const a=document.createElement('a');a.href=y.checkout_url;a.target='_blank';a.rel='noopener noreferrer';a.textContent='Abrir pago de prueba';o.append(a)}catch(e){o.textContent=e.message}};\ndocument.querySelector('#catalog').onclick=async()=>{try{const r=await api('/demo/catalog');o.textContent=JSON.stringify(r,null,2)}catch(e){o.textContent=e.message}};\ndocument.querySelector('#cartOrder').onclick=async()=>{try{const code=document.querySelector('#catalogCode').value.trim();if(!code)throw Error('Ingresá un código del catálogo');const b={client_order_id:crypto.randomUUID(),schema:'saber-cart-v1',currency:'ARS',paymentMode:'FULL',items:[{type:'product',code,qty:1}]};const x=await api('/demo/cart-order','POST',b);o.textContent='Importe validado $'+x.total_ars+'. Pedido: '+x.order_id+'. Sin cobro aún. ';const y=await api('/demo/checkout','POST',{order_id:x.order_id});const a=document.createElement('a');a.href=y.checkout_url;a.target='_blank';a.rel='noopener noreferrer';a.textContent='Abrir Mercado Pago de prueba';o.append(a)}catch(e){o.textContent='Error: '+e.message}};\ndocument.querySelector('#sync').onclick=async()=>{try{o.textContent='Consultando pagos pendientes...';const x=await api('/demo/sync-pending','POST');const y=await api('/demo/paid-orders');o.textContent=JSON.stringify({sincronizacion:x,pedidos_pagados:y.orders},null,2)}catch(e){o.textContent='Error: '+e.message}};\ndocument.querySelector('#list').onclick=async()=>{try{o.textContent=JSON.stringify(await api('/demo/paid-orders'),null,2)}catch(e){o.textContent=e.message}};\ndocument.querySelector('#diag').onclick=async()=>{try{o.textContent=JSON.stringify(await api('/demo/diagnostic'),null,2)}catch(e){o.textContent=e.message}};\ndocument.querySelector('#audit').onclick=async()=>{try{o.textContent=JSON.stringify(await api('/demo/webhook-audit'),null,2)}catch(e){o.textContent=e.message}};\ndocument.querySelector('#cryptotest').onclick=async()=>{try{o.textContent=JSON.stringify(await api('/demo/crypto-test'),null,2)}catch(e){o.textContent=e.message}};\ndocument.querySelector('#paymentCheck').onclick=async()=>{try{o.textContent=JSON.stringify(await api('/demo/payment-check','POST',{payment_id:document.querySelector('#paymentId').value.trim()}),null,2)}catch(e){o.textContent='Error: '+e.message}};\ndocument.querySelector('#reconcile').onclick=async()=>{try{o.textContent=JSON.stringify(await api('/demo/reconcile','POST',{payment_id:document.querySelector('#paymentId').value.trim()}),null,2)}catch(e){o.textContent='Error: '+e.message}};\n</script></html>";
+/** The private central distinguishes approved payment from print production clearance.
+ * Payment+rows originate from protected D1 reads, NEVER from a browser cart.
+ */
+function estadoProduccionPrivado(order,items){
+ const pagado=order?.status==="paid"&&Number.isSafeInteger(order.amount_ars)&&order.amount_ars>0&&order.deposit_ars===order.amount_ars&&Boolean(order.paid_at);
+ const lineas=Array.isArray(items)?items:[];
+ const sum=lineas.reduce((n,x)=>n+Number(x.line_total_ars||0),0);
+ const coherente=lineas.length>0&&lineas.length<=100&&lineas.every((x,i)=>
+  Number.isSafeInteger(x.line_number)&&x.line_number===i+1&&
+  ["print","product"].includes(x.item_type)&&Number.isSafeInteger(x.quantity)&&x.quantity>0&&
+  Number.isSafeInteger(x.unit_price_ars)&&x.unit_price_ars>0&&
+  Number.isSafeInteger(x.line_total_ars)&&x.line_total_ars===x.quantity*x.unit_price_ars
+ )&&Number.isSafeInteger(sum)&&sum===order?.amount_ars;
+ const trabajos=lineas.map(x=>{
+  const producto=x.item_type==="product",polaroid=x.sku==="POLAROID_A4";
+  const etapa=producto?"VERIFICAR_STOCK":polaroid?"VERIFICAR_PDF_POLAROIDS":"VERIFICAR_ARCHIVOS_IMPRESION";
+  const instruccion=producto?"Comprobar existencia y preparar el artículo":
+   polaroid?"Confirmar el PDF final y las fotos recibidas en Drive privado":
+   "Revisar recibos, archivo original, medidas y PDF imprimible en Drive privado";
+  let refs=[],especificaciones={};
+  try{const val=JSON.parse(x.file_references_json||"[]");
+   if(Array.isArray(val)&&val.length<=30&&val.every(r=>typeof r==="string"&&/^[A-Za-z0-9_-]{3,100}$/.test(r)))refs=val;
+  }catch(_){}
+  try{const obj=JSON.parse(x.detail_json||"{}");
+   if(obj&&typeof obj==="object"&&!Array.isArray(obj)){
+    for(const k of ["photos","sheets","format","size","mode","copies","pages","paper","binding"]){
+     if((typeof obj[k]==="string"&&obj[k].length<=100)||Number.isSafeInteger(obj[k]))especificaciones[k]=obj[k];
+    }
+   }
+  }catch(_){}
+  return {linea:x.line_number,tipo:producto?"articulo":"impresion",
+   sku:String(x.sku||"").slice(0,80),descripcion:String(x.title||"").slice(0,180),
+   cantidad:x.quantity,subtotal:x.line_total_ars,referencias:refs,especificaciones,
+   etapa,instruccion,archivoVerificadoParaProduccion:false};
+ });
+ return {estado:!pagado?"PAGO_NO_CONFIRMADO":!coherente?"REVISAR_DESGLOSE":"PAGADO_PENDIENTE_PREPARACION",
+  pagoConfirmado:pagado,desgloseCoherente:coherente,
+  listoParaProducir:false,archivosCompletosParaProduccion:false,
+  pendienteDeComprobar:trabajos.length,trabajos,
+  mensaje:!pagado?"No liberar pedido sin pago aprobado":
+   !coherente?"Revisar renglones e importe antes de preparar":
+   "Pago confirmado: comprobar archivos PDF finales y/o existencias antes de producir."};
+}
 const adminHtml = `<!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title>Centro de Pedidos | Librería Saber · Pruebas</title>
@@ -41,7 +84,7 @@ fieldset{border:1px solid #d9e0ec;border-radius:12px;background:white;padding:16
 input{font:inherit;padding:10px;max-width:100%;border:1px solid #aab6c5;border-radius:7px}
 button{font:inherit;padding:10px 14px;background:#174b8f;color:white;border:0;border-radius:7px;cursor:pointer}
 button:disabled{opacity:.5;cursor:default}.outline{color:#174b8f;background:white;border:1px solid #174b8f}
-.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}#details section{margin:14px 0;padding:13px;border:1px solid #d9e0ec;border-radius:10px;background:#f8fbff}#details section h4{margin:0 0 7px}#details section p{margin:6px 0}
 #status{min-height:1.5em;font-weight:600}.grid{display:grid;grid-template-columns:minmax(260px,1fr) minmax(280px,1.4fr);gap:16px}
 ol{padding-left:22px}li{padding:12px 6px;border-bottom:1px solid #e5ebf3}li button{margin-top:7px}
 pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px ui-monospace,monospace;background:#f0f3f9;padding:12px;border-radius:6px;max-height:450px;overflow:auto}
@@ -59,8 +102,7 @@ const secret=document.querySelector("#secret"),status=document.querySelector("#s
 function money(n){return new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0}).format(Number(n)||0)}
 async function api(path,method="GET"){const r=await fetch(path,{method,headers:{"Authorization":"Bearer "+secret.value},cache:"no-store"});const x=await r.json().catch(()=>({}));if(!r.ok)throw Error(r.status===401?"Clave incorrecta":x.error||"Error "+r.status);return x}
 function node(tag,txt){const x=document.createElement(tag);x.textContent=String(txt);return x}
-async function showOrder(id){try{status.textContent="Consultando detalle...";const x=await api("/admin/api/order?id="+encodeURIComponent(id));details.replaceChildren();details.append(node("h3","Pedido "+x.order.id));details.append(node("p","Total: "+money(x.order.amount_ars)+" · Aprobado: "+(x.order.paid_at||"sin fecha")));if(!x.items.length){details.append(node("p","Este pedido de prueba anterior no tiene detalle de artículos guardado."))}
-for(const i of x.items){details.append(node("h4",i.quantity+" × "+i.title+" — "+money(i.line_total_ars)));if(i.detail_json)details.append(node("pre",i.detail_json));if(i.file_references_json)details.append(node("pre","Archivos / referencias: "+i.file_references_json))}status.textContent=""}catch(e){status.textContent=e.message}}
+async function showOrder(id){try{status.textContent="Consultando detalle...";const x=await api("/admin/api/order?id="+encodeURIComponent(id));details.replaceChildren();details.append(node("h3","Pedido "+x.order.id));details.append(node("p","Total: "+money(x.order.amount_ars)+" · Aprobado: "+(x.order.paid_at||"sin fecha")));if(x.produccion){const pr=x.produccion;details.append(node("h4","Estado operativo: "+pr.estado.replaceAll("_"," ")));details.append(node("p",pr.mensaje));for(const t of pr.trabajos){const area=node("section","");area.append(node("h4",t.linea+". "+t.cantidad+" × "+t.descripcion+" — "+money(t.subtotal)));area.append(node("p","Estado: "+t.etapa.replaceAll("_"," ")+" · "+t.instruccion));const valores=Object.entries(t.especificaciones||{}).map(a=>a[0]+": "+a[1]).join(" · ");if(valores)area.append(node("p","Ficha técnica: "+valores));if(t.referencias?.length)area.append(node("p","Referencias privadas: "+t.referencias.join(", ")));details.append(area)}}else details.append(node("p","La ficha de producción no está disponible."));status.textContent=""}catch(e){status.textContent=e.message}}
 async function refreshCronState(){
  const el=document.querySelector("#cronState");
  try{
@@ -386,7 +428,7 @@ export default {
     if(!order)return json({error:"Pedido pagado no encontrado"},404);
     await ensureOrderItems(env);
     const rows=await env.DB.prepare("SELECT line_number,item_type,sku,title,quantity,unit_price_ars,line_total_ars,detail_json,file_references_json FROM order_items WHERE order_id=? ORDER BY line_number").bind(id).all();
-    return json({order,items:rows.results});
+    return json({order,items:rows.results,produccion:estadoProduccionPrivado(order,rows.results)});
    }
    if(url.pathname==="/demo/catalog"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
