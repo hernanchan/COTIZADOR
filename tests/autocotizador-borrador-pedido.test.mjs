@@ -8,7 +8,7 @@ const pagina={numero:1,anchoCm:21,altoCm:29.7,modo:'cad'};
 const archivo=(servicio,productoGrafica='')=>({
  nombre:servicio+'.pdf',paginas:[pagina],paginasSeleccionadas:'',
  seleccion:'a4',servicio,productoGrafica,copias:1,modo:'bn',caras:'simple',
- papelPoster:'obra80',materialColor:'',anillado:'ninguno',grupoAnillado:''
+ papelPoster:'obra80',materialColor:'',corteVariante:'gt3',corteMetros:1,productoFoto:'',anillado:'ninguno',grupoAnillado:''
 });
 function conFile(a){
  const blob=new Blob(['%PDF-1.4\nfoo. endobj'],{type:'application/pdf'});
