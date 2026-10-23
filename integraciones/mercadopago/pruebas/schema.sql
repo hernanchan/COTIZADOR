@@ -111,3 +111,12 @@ CREATE TABLE IF NOT EXISTS central_bridge_requests (
  action TEXT NOT NULL CHECK(action IN ('stage','link')),
  created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- El mismo archivo/recibo privado jamás se asigna a dos pedidos.
+CREATE TABLE IF NOT EXISTS central_document_receipts (
+ receipt_id TEXT PRIMARY KEY,
+ web_order_id TEXT NOT NULL REFERENCES central_document_manifests(web_order_id) ON DELETE CASCADE,
+ file_id TEXT NOT NULL,
+ sha256 TEXT NOT NULL,
+ UNIQUE(web_order_id,file_id)
+);
