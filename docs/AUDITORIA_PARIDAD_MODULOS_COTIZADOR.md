@@ -150,3 +150,12 @@ No modificar `main`, la web pública, Apps Script, Polaroids ni pagos. No contra
 - Tests de precio mínimo, redondeo, tipo no disponible, integración en cotización única con tamaño sin confirmar. CI aprobado para integración: https://github.com/hernanchan/COTIZADOR/actions/runs/39977496969
 - Pendientes importantes: detección/validación de contornos y archivos productivos, carga alternativa de formatos vectoriales, volumen/agrupación por pedido y recepción verificada; no asignar precio desde supuestos de metros.
 - Sin despliegue a Cloudflare; sin producción, cobros ni modificación de Polaroids. Próximo módulo: gráfica comercial.
+
+## Gráfica comercial incorporada a presupuesto de pruebas — 23/10/2026
+
+- Se completó la ruta de `servicio=grafica`: antes retornaba sin agregar ningún renglón y podía omitir el precio. Ahora ejecuta `procesarGraficaCarga`, registra `detalleGraficas`, calcula `subtotalGraficas` y lo incluye en `total`.
+- Se integraron las 14 variantes de **tarjetas personales, recetarios y folletos** copiadas de las opciones actuales de `main:cotizador-web-v2.html`, con `lotes` como unidad de cobro. Este catálogo comercial es una instantánea independiente porque dichas tarifas no están en `precios-web.json`; antes de reemplazar producción se requiere comprobar posibles modificaciones posteriores.
+- La API privada ofrece `graphicProducts` junto a los materiales, fotografías y corte. La ficha del PDF permite elegir servicio, producto/variante y cantidad de lotes, y muestra el renglón y su contribución al resumen.
+- Se exige un único diseño por PDF seleccionado, sin anillado. Si falta elegir variante o existen varias páginas seleccionadas, se marca pendiente y el total se devuelve `null`. Un identificador de producto inexistente es rechazado. La planificación conserva la página original elegida, variante y lotes.
+- Validación automática aprobada en https://github.com/hernanchan/COTIZADOR/actions/runs/39996006914. Entre las pruebas: una plancha de tarjetas, pedido mixto con recetario+stickers+fotografías+corte, página seleccionada de un PDF multipágina, ausencias y variantes inválidas. Se mantiene `paymentAuthorized:false`.
+- **No significa tienda/cotizador listo para producción.** La interfaz actual aún presupone PDF (no JPG/PNG generales), no verifica originales contra importes, no conserva carrito unificado con artículos de tienda ni autoriza pedido/pagos. No desplegado en Cloudflare; `main` y web pública sin cambios.
