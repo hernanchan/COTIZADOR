@@ -11,6 +11,7 @@ on:
       - 'tests/autocotizador-*.test.mjs'
       - 'integraciones/mercadopago/pruebas/worker.js'
       - 'tests/mercadopago-carrito.test.mjs'
+      - 'tests/central-bridge-d1.test.mjs'
       - 'precios-web.json'
       - '!integraciones/autocotizador/recepcion/dist/**'
   workflow_dispatch:
@@ -35,6 +36,8 @@ jobs:
         run: node --test tests/autocotizador-escalas-multifichero.test.mjs tests/autocotizador-lote-verificado.test.mjs tests/autocotizador-pantalla-lote.test.mjs tests/autocotizador-pantalla-conjunta.test.mjs tests/autocotizador-destino-final.test.mjs tests/autocotizador-regla-comercial-ploteos.test.mjs tests/autocotizador-seleccionar-paginas.test.mjs tests/autocotizador-stickers.test.mjs tests/autocotizador-fotos.test.mjs tests/autocotizador-fotos-integracion.test.mjs tests/autocotizador-corte.test.mjs tests/autocotizador-corte-integracion.test.mjs tests/autocotizador-grafica.test.mjs tests/autocotizador-grafica-integracion.test.mjs tests/autocotizador-borrador-pedido.test.mjs tests/autocotizador-carrito-preliminar.test.mjs tests/autocotizador-pedido-verificado.test.mjs tests/autocotizador-ficha-central.test.mjs tests/autocotizador-puente-central.test.mjs tests/autocotizador-lectura-fase4.test.mjs
       - name: Probar Centro de Pedidos privado y checkout sin red real
         run: node tests/mercadopago-carrito.test.mjs
+      - name: Verificar vinculación D1 de Central con firmas HMAC (sin pagos reales)
+        run: node --experimental-sqlite tests/central-bridge-d1.test.mjs
       - name: Compilar Worker standalone
         working-directory: integraciones/autocotizador/recepcion
         run: npm run build:pilot
