@@ -116,3 +116,11 @@ No modificar `main`, la web pública, Apps Script, Polaroids ni pagos. No contra
 - Se conserva el rollo de 42 cm con tolerancia física actualmente vigente; precios intactos.
 - CI de pruebas automáticas: https://github.com/hernanchan/COTIZADOR/actions/runs/39960021762 — aprobado.
 - **No desplegado** en Worker privado; no modificar sitio público ni autorizar pagos hasta reensayo.
+
+## Política comercial definitiva para dudas visuales — 23/10/2026
+
+- Decisión explícita: **si la página no satisface claramente los criterios de Póster, se cobra como CAD**, aunque el clasificador visual hubiera marcado `revision`.
+- Implementado en `regla-comercial-ploteos.mjs`: un resultado `revision` con métricas válidas pasa a `cad`, tanto con rótulo técnico como sin él. Una página positivamente clasificada como `poster` conserva ese modo; una señal de superficie continua suficiente en plano técnico también puede justificar Póster.
+- **Importante:** si no pudo leerse/renderizarse el PDF o faltan métricas numéricas fiables, NO se inventa la clasificación ni un precio. Errores técnicos siguen bloqueados.
+- La política se aplica **por página**, no por votación del PDF; conserva trabajos mixtos CAD/Póster. Precios y selección automática de rollos sin modificaciones.
+- Pendiente reensayo del compilado de 24 páginas en Chrome después de actualizar manualmente el Worker privado. No activar pagos ni publicar producción.
