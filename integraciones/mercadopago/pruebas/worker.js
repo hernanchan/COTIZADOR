@@ -248,11 +248,13 @@ async function centralLink(req,env){
  const prior=await env.DB.prepare("SELECT web_order_id FROM central_document_manifests WHERE commercial_order_id=?").bind(order.id).first();
  if(prior)return json({error:"Pedido ya vinculado con otros documentos"},409);
  const digest=await centralHash(signed.raw);
- try{await env.DB.batch([
+ let linkage;
+ try{linkage=await env.DB.batch([
   env.DB.prepare("INSERT INTO central_bridge_requests(request_id,request_hash,action) VALUES(?,?,'link')").bind(signed.requestId,digest),
   env.DB.prepare("UPDATE central_document_manifests SET commercial_order_id=?,status='linked_waiting_payment',linked_at=datetime('now') WHERE web_order_id=? AND commercial_order_id IS NULL").bind(order.id,d.webOrderId)
  ])}
  catch(_){return json({error:"Conflicto de vinculación"},409)}
+ if(linkage?.[1]?.meta?.changes!==1)return json({error:"Otra solicitud modificó el pedido; volver a consultar"},409);
  return json({linked:true,idempotent:false,commercial_order_id:order.id,
   estado:"VINCULADO_PENDIENTE_DE_CONTROL",paymentAuthorized:false});
 }
