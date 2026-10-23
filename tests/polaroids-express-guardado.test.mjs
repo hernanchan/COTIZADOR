@@ -41,6 +41,7 @@ const Utilities={
  computeDigest:(algorithm,bytes)=>signedBytes(createHash('sha256').update(binary(bytes)).digest()),
  computeHmacSha256Signature:(message,secret)=>signedBytes(createHmac('sha256',secret).update(message).digest()),
  base64Decode:s=>signedBytes(Buffer.from(s,'base64')),
+ base64Encode:bytes=>binary(bytes).toString('base64'),
  newBlob:(bytes,type,name)=>({bytes,name,getBytes:()=>bytes,type})
 };
 const sandbox={Utilities,DriveApp:{Access:{PRIVATE:'PRIVATE'},getFolderById:()=>folder,
@@ -135,4 +136,31 @@ test('claves ausentes y redirección externa rechazan almacenamiento',async()=>{
   fetcher:async()=>new Response(null,{status:302,headers:{Location:'https://evil.example/steal'}})
  }),/redirección/i);
  assert.equal(files.size,1);
+});
+
+test('GAS entrega PDF completo sólo ante solicitud HMAC firmada',()=>{
+ const stored=files.values().next().value;
+ const bytes=binary(stored.blob.getBytes());
+ const sha256=createHash('sha256').update(bytes).digest('hex');
+ const signedRead=(secret,reference=reference)=>{
+  const payloadJson=JSON.stringify({op:'leerPdfExpress',referencia:reference,
+   bytes:bytes.length,sha256});
+  const timestamp=Math.floor(Date.now()/1000),nonce=randomUUID();
+  const signature=createHmac('sha256',secret).update(timestamp+'\n'+nonce+'\n'+payloadJson).digest('hex');
+  return {postData:{contents:JSON.stringify({timestamp,nonce,payloadJson,signature})}};
+ };
+ const response=JSON.parse(sandbox.doPost(signedRead(hmacKey)).text);
+ assert.equal(response.ok,true);
+ assert.equal(response.verified,true);
+ assert.equal(response.referencia,reference);
+ assert.equal(response.sha256,sha256);
+ assert.equal(response.bytes,bytes.length);
+ assert.deepEqual(Buffer.from(response.pdfBase64,'base64'),bytes);
+ assert.equal(files.size,1);
+ const invalid=JSON.parse(sandbox.doPost(signedRead('clave-incorrecta')).text);
+ assert.equal(invalid.ok,false);
+ assert.equal('pdfBase64' in invalid,false);
+ const missing=JSON.parse(sandbox.doPost(signedRead(hmacKey,'POL-'+'F'.repeat(24))).text);
+ assert.equal(missing.ok,false);
+ assert.equal('pdfBase64' in missing,false);
 });
