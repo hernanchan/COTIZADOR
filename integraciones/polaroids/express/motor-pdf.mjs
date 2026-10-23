@@ -58,6 +58,11 @@ export async function generarPdfExpress({hojas,pdfLib}){
  const pdf=await pdfLib.PDFDocument.create();
  pdf.setTitle('Polaroids Librería Saber');
  pdf.setSubject('Impresión privada A4 · 6 polaroids por hoja');
+ // Fechas fijas: mismo material produce los mismos bytes en un reintento.
+ pdf.setCreationDate(new Date('2020-01-01T00:00:00.000Z'));
+ pdf.setModificationDate(new Date('2020-01-01T00:00:00.000Z'));
+ pdf.setCreator('Libreria Saber Express');
+ pdf.setProducer('Libreria Saber Express');
  for(let h=0;h<hojas.length;h++){
   const page=pdf.addPage([pt(210),pt(297)]);
   const x0=20,y0=13.5;
