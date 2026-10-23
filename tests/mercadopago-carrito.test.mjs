@@ -111,7 +111,33 @@ assert.equal((await api('/demo/cart-order','POST',{...intent,items:[{type:'produ
 assert.equal((await api('/demo/cart-order','POST',{...intent,client_order_id:'10000000-1000-4000-8000-100000000002',
  items:[{type:'print',code:null,qty:1}]})).status,422); // No cobrar gráfica sin validación.
 assert.equal((await api('/admin/api/orders')).data.orders.length,0); // Sin pago, nada en panel.
-orders.get(first.data.order_id).status='paid';
+const cobrado=orders.get(first.data.order_id);
+cobrado.status='paid';
+cobrado.paid_at='2026-10-23 17:00:00';
 assert.equal((await api('/admin/api/orders')).data.orders.length,1);
-assert.equal((await api('/admin/api/order?id='+first.data.order_id)).data.items.length,1);
-console.log('PASS: importe de servidor, idempotencia, un único checkout, gráfica bloqueada y panel de pagos completos.');
+const ficha=(await api('/admin/api/order?id='+first.data.order_id)).data;
+assert.equal(ficha.items.length,1);
+assert.equal(ficha.produccion.pagoConfirmado,true);
+assert.equal(ficha.produccion.desgloseCoherente,true);
+assert.equal(ficha.produccion.estado,'PAGADO_PENDIENTE_PREPARACION');
+assert.equal(ficha.produccion.trabajos[0].etapa,'VERIFICAR_STOCK');
+assert.equal(ficha.produccion.listoParaProducir,false); // Ningún catálogo sin stock verificado.
+const fila=items.get(first.data.order_id)[0];
+const copia={...fila};
+fila.item_type='print';fila.sku='POLAROID_A4';
+fila.file_references_json=JSON.stringify(['POL-AAAAAAAAAAAAAAAAAAAAAAAA']);
+fila.detail_json=JSON.stringify({sheets:2,photos:12,uploadKey:'SECRETO-NUNCA-MOSTRAR'});
+const fichaFoto=(await api('/admin/api/order?id='+first.data.order_id)).data;
+assert.equal(fichaFoto.produccion.trabajos[0].etapa,'VERIFICAR_PDF_POLAROIDS');
+assert.equal(fichaFoto.produccion.listoParaProducir,false); // La referencia no prueba el PDF imprimible.
+assert.equal(fichaFoto.produccion.trabajos[0].especificaciones.uploadKey,undefined);
+assert.equal(fichaFoto.produccion.trabajos[0].referencias.length,1);
+Object.assign(fila,copia);
+fila.line_total_ars=999999; // Detectar un renglón alterado incluso con pago aprobado.
+const inconsistente=(await api('/admin/api/order?id='+first.data.order_id)).data;
+assert.equal(inconsistente.produccion.estado,'REVISAR_DESGLOSE');
+assert.equal(inconsistente.produccion.listoParaProducir,false);
+Object.assign(fila,copia);
+const sinClave=await sandbox.worker.fetch(new Request('https://worker.example/admin/api/order?id='+first.data.order_id),env);
+assert.equal(sinClave.status,401);
+console.log('PASS: checkout seguro y Central pagada con revisión de stock, PDF y desglose.');
