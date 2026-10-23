@@ -184,8 +184,8 @@ async function cotizar(){
  }catch(e){if(n===version){out.textContent='No fue posible cotizar: '+String(e.message||e);render()}}
 }
 async function iniciar(){
- try{const r=await fetch('/api/ensayo-materiales-rapido',{cache:'no-store'});const x=await r.json();if(!r.ok||!x.ok||!x.materials)throw Error('Catálogo inaccesible');catalogo=x.materials;productosFoto=x.photos||[];}
- catch(_){catalogo={a4:[],a3:[]};productosFoto=[];$('estado').textContent='No se pudo cargar el catálogo comercial.';}
+ try{const r=await fetch('/api/ensayo-materiales-rapido',{cache:'no-store'});const x=await r.json();if(!r.ok||!x.ok||!x.materials)throw Error('Catálogo inaccesible');catalogo=x.materials;productosFoto=x.photos||[];variantesCorte=x.cutVariants||[];}
+ catch(_){catalogo={a4:[],a3:[]};productosFoto=[];variantesCorte=[];$('estado').textContent='No se pudo cargar el catálogo comercial.';}
  render();if(entries.length)cotizar();
 }
 iniciar();
