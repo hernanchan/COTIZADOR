@@ -723,6 +723,7 @@ export default {
   try {
    if(url.pathname==="/internal/central/stage")return await centralStage(req,env);
    if(url.pathname==="/internal/central/link")return await centralLink(req,env);
+   if(url.pathname==="/internal/central/prepare-order")return await centralPrepareDraft(req,env);
    if(url.pathname.startsWith("/checkout/"))return await customerCheckout(req,env,this);
    // Solo un operador que conoce DEMO_ADMIN_KEY puede preparar un pedido ficticio.
    if(url.pathname==="/admin/api/cron-status"&&req.method==="GET"){
@@ -790,6 +791,7 @@ export default {
     if(!isUUID(orderId))return json({error:"order_id inválido"},400);
     const order=await env.DB.prepare("SELECT * FROM orders WHERE id=?").bind(orderId).first();
     if(!order)return json({error:"Pedido no encontrado"},404);
+    if(order.description==="Librería Saber · documentos verificados y tienda")return json({error:"Cobro de documentos aún no habilitado. Falta el ensayo integral."},503);
     if(order.status!=="awaiting_payment")return json({error:"El pedido ya está pago"},409);
     const expiresAt=new Date(String(order.created_at).replace(" ","T")+"Z").getTime()+24*60*60*1000;
     if(!Number.isFinite(expiresAt)||Date.now()>=expiresAt)return json({error:"La cotización venció; prepará un nuevo pedido"},409);
