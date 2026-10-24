@@ -375,7 +375,8 @@ test('Central: unifica Documentos, Polaroids Express y catálogo en un único pe
    {...payload,items:[{code:'ABC-1',qty:3}]})).status,409);
   assert.equal((await call('/internal/central/prepare-mixed-order',
    {...payload,clientOrderId:randomUUID()})).status,409);
-  // Checkout real sigue sin autorizar estos trabajos.
+  // Cambiar el texto del pedido tampoco debe permitir el cobro.
+  db.prepare("UPDATE orders SET description='Carrito integrado de pruebas' WHERE id=?").run(id);
   const payment=await context.worker.fetch(new Request(base+'/demo/checkout',{
    method:'POST',headers:{Authorization:'Bearer '+env.DEMO_ADMIN_KEY,
     'Content-Type':'application/json'},body:JSON.stringify({order_id:id})}),env);
