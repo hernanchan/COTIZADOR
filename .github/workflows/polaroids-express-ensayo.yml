@@ -54,6 +54,8 @@ jobs:
         run: |
           node tests/polaroids-preparacion.test.mjs
           node tests/polaroids-carrito.test.mjs
+      - name: Verificar contrato del receptor GAS sin acceder a Drive
+        run: node --test tests/polaroids-express-gas-contrato.test.mjs
       - name: Validar superficie privada Express y conexión interna
         run: node --test tests/polaroids-express-aislamiento.test.mjs tests/polaroids-express-bridge-check.test.mjs
       - name: Sintaxis de motor y editor
