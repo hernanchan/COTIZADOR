@@ -19,7 +19,7 @@ function json(data,status=200){
   'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'
  }});
 }
-function originMatches(request,env){
+export function originMatches(request,env){
  const host=String(env?.EXPRESS_ALLOWED_HOST||'');
  if(!/^[a-z0-9.-]{4,120}$/.test(host))return false;
  const url=new URL(request.url);
@@ -28,7 +28,7 @@ function originMatches(request,env){
    (!request.headers.get('Sec-Fetch-Site')||
     request.headers.get('Sec-Fetch-Site')==='same-origin');
 }
-async function privateConfig(request,env){
+export async function privateConfig(request,env){
  if(env?.EXPRESS_RECEPTION_ENABLED!=='PRIVATE_TEST_ONLY'||
     env?.EXPRESS_PDF_ENABLED!=='PRIVATE_TEST_ONLY'||
     env?.EXPRESS_CENTRAL_SYNC_ENABLED!=='PRIVATE_TEST_ONLY'||
@@ -105,7 +105,7 @@ function parsePayload(payload){
  return {reference:payload.reference,turnstileToken:payload.turnstileToken,
   hojas:photos,fotos:count};
 }
-async function validateChallenge(token,request,env,fetcher){
+export async function validateChallenge(token,request,env,fetcher){
  if(typeof env?.EXPRESS_TURNSTILE_SECRET!=='string'||
     env.EXPRESS_TURNSTILE_SECRET.length<16)throw Error('Turnstile no disponible.');
  const url=new URL(request.url);
