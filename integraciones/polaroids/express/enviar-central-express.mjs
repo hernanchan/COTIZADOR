@@ -48,11 +48,12 @@ export async function enviarPolaroidsACentral({
   throw Error('Falta vinculación privada con la Central de pruebas.');
  const options={method:'POST',
   headers:{'Content-Type':'application/json','x-saber-ts':String(ts),
-   'x-saber-request-id':id,'x-saber-signature':digest},
-  body,redirect:'error',signal:AbortSignal.timeout(15000)};
+   'x-saber-request-id':id,'x-saber-signature':digest},body};
+ // No trasladar signal de timeout entre Worker y Service Binding.
  const response=typeof service?.fetch==='function'
   ?await service.fetch(new Request(url.href,options))
-  :await fetcher(url.href,options);
+  :await fetcher(url.href,{...options,redirect:'error',
+      signal:AbortSignal.timeout(15000)});
  if(!response.ok)throw Error('La Central no confirmó el PDF.');
  const message=await response.text();
  if(message.length>1600)throw Error('Respuesta inválida de la Central.');
