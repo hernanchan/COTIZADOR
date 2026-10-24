@@ -140,3 +140,17 @@ Con el orden de validación del `worker.js`, esto demuestra que `CENTRAL_EXPRESS
 ## Reimplementación aislada de Pages Express — 24/10/2026, 21:32 UTC
 
 El propietario compartió el log real de Cloudflare Pages al seleccionar **Reintentar implementación** sobre `d1167d8` en `saber-polaroids-express-pruebas`. Git clonó el SHA exacto `d1167d8441e859d1a36f49f1950bf69e93adb82f`, se instalaron dependencias, se encontró `/functions`, Wrangler `3.114.17` compiló correctamente y finalizó con `Success: Your site was deployed!`. Por tanto, **la reimplementación aislada terminó sin errores reportados**, después de la actualización de variables/secreto. El log no prueba por sí solo que los bindings estén presentes en runtime, ni comunicación HMAC real ni D1. El asistente no pudo consultar los dominios de Workers/Pages desde su herramienta externa, por lo cual deberá confirmarse desde el navegador del propietario que `GET /api/polaroids-express` conserva `enabled:false` y `pdfForClient:false`. Mantener recepción, pagos y descarga cerrados; no desplegar nada en `main` ni `libreriasaber.com.ar`.
+
+## Confirmación GET tras reintentar Pages y preparación de prueba HMAC real — 24/10/2026
+
+Después de reintentar manualmente en Cloudflare Pages el despliegue original `d1167d8`, se obtuvo `Success: Your site was deployed!`. El propietario confirmó desde Chrome la respuesta real de `GET https://saber-polaroids-express-pruebas.pages.dev/api/polaroids-express`:
+
+```json
+{"ok":true,"service":"polaroids-express","enabled":false,"photosPerSheet":6,"maxPhotos":24,"pdfForClient":false}
+```
+
+La recepción sigue **desactivada** y el cliente no recibe PDF. El GET no verifica HMAC ni D1.
+
+Para cubrir esa laguna sin tocar recepción ni pagos, se preparó en esta **rama GitHub, NO DESPLEGADO** un diagnóstico temporal: `integraciones/polaroids/express/probar-puente-hmac.mjs`, expuesto por `functions/api/express-bridge-check.js` solo después de un futuro despliegue específico. Exige POST desde el mismo origen HTTPS de Pages y que el operador pegue `CENTRAL_BRIDGE_KEY` solo en la página de prueba, como autenticación; no se guarda ni devuelve el secreto. Envía desde el Worker Express a la Central un JSON firmado con el esquema **deliberadamente inválido** `saber-polaroids-express-bridge-check-v1`. Una respuesta exacta HTTP **422** con `Recibo Express no válido` indica que la firma HMAC pasó y la Central rechazó el manifiesto **antes de cualquier acceso a D1**; 401/403/503 u otros 422 no confirman conexión. El formulario de ensayo, sin librerías externas, está en `integraciones/polaroids/express/public/pruebas/puente-hmac.html`; ruta Pages `/pruebas/puente-hmac.html`. Hay pruebas dedicadas en `tests/polaroids-express-bridge-check.test.mjs`, **aún no ejecutadas**. El actual despliegue `d1167d8` no contiene este diagnóstico; reintentarlo otra vez no lo agregará.
+
+**No afirmar prueba HMAC real completada.** La ruta temporal debe verificarse primero con pruebas específicas y autorizarse separadamente para su despliegue **solo en Pages Express aislado**, sin tocar main, checkout, recibos ni claves. Después del ensayo firmado, retirar la ruta de prueba y el diagnóstico extra de Central mediante versiones controladas para no mantener una superficie de diagnóstico abierta. En ningún caso insertar la clave HMAC en URL, chat, repositorio, capturas ni salida de consola.
