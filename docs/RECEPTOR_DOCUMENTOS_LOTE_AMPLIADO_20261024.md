@@ -26,3 +26,12 @@ El código prepara `GET /prueba-cotizador-lote-ampliado`, `POST /api/ensayo-pdf-
 4. Mantener `DOCS_CENTRAL_SYNC_ENABLED`, `DOCS_MIXED_PREPARE_ENABLED` y pagos apagados hasta que Google y D1 reales queden comprobados. No convertir esta versión de laboratorio en pública por el mero CI aprobado.
 
 **Pendientes prioritarios de lanzamiento integral:** JPG/PNG y conversión controlada, carga/recuperación desde móvil sin pasos repetidos, rendimiento real (los 40 fragmentos de un archivo de 20 MiB no prometen cargas rápidas), retención y limpieza, composiciones imprimibles, verificación de todos los materiales y opciones del cotizador, carrito público y pagos únicamente tras conformidad final.
+
+
+## Verificación CI efectiva
+
+**24/10/2026.** Tras corregir una aserción de prueba sobre el texto de cuota excedida, la corrida **40143286602** completó con `success` en GitHub Actions, commit `3b13f46266f9846ac8d78832a56e2544249dee07`. Se inspeccionaron los pasos: compilación Worker documental unificado, validación de interfaz ampliada/JavaScript, cotización de 30 PDF y regresión del viejo límite de cinco, simulación del GAS ampliado con Range y cuotas, D1 y comunicaciones internas. Todos finalizaron sin fallos. 
+
+https://github.com/hernanchan/COTIZADOR/actions/runs/40143286602
+
+**No equivale a prueba remota.** Ningún Apps Script nuevo ni Worker fue desplegado; la versión original mantiene su límite de cinco PDF de 1 MiB. La página `/prueba-cotizador-lote-ampliado` y sus API siguen únicamente en la rama, detrás de `DOCS_EXTENDED_RECEIVER_ENABLED=PRIVATE_TEST_ONLY` (sin activar). La prueba no midió tiempos reales, reposo móvil o subida simultánea de diez archivos.
