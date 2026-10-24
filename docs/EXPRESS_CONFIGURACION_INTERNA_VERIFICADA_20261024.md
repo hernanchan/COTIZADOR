@@ -246,3 +246,18 @@ Este archivo coincide en referencia y propósito con la prueba interna `pruebaEx
 Para evitar mezclar el viejo ensayo con la siguiente fase, se **creó y verificó** una subcarpeta nueva, vacía, denominada `RECEPCION_PDF_UNICO_PRIVADA_PRUEBAS`. El metadato de permisos obtenido solamente presenta propietario y un usuario con rol escritor: **no hay permiso de tipo `anyone`**. No se subieron, movieron ni eliminaron documentos. El ID de la carpeta no se incorpora al repositorio; debe usarse únicamente como propiedad privada `EXPRESS_PDF_FOLDER_ID` en el Apps Script de pruebas correspondiente al pasar a la fase de recepción nueva.
 
 **Bloqueador objetivo y no repetido:** falta validar **la ruta de datos real** `motor-pdf.mjs` → Worker Express con PDF auténtico → Apps Script de pruebas → PDF único en carpeta limpia → manifiesto en D1 → Centro de Pedidos, manteniendo checkout y fotos públicas deshabilitados. La HMAC Pages→Central ya quedó validada; no repetirla.
+
+
+## Avance del bloque de pruebas integradas y estado de pagos — 24/10/2026
+
+**Trabajo incorporado directamente en la rama de pruebas, sin intervención del propietario:**
+
+1. Se agregó `tests/polaroids-express-circuito-integrado.test.mjs` y se lo conectó al workflow `.github/workflows/polaroids-express-ensayo.yml`. Ejecuta con un JPEG ficticio y un PDF generado por el motor real (`pdf-lib`), emula `Apps Script` ejecutando el código original en un entorno VM con Drive simulado, usa la interfaz de `Service Binding SABER_CENTRAL` hacia el Worker original de la Central y una base `node:sqlite` local real. Comprueba PDF único A4, SHA-256 idéntico en Drive y D1, importe ARS $3.000 por hoja, ausencia de checkout, idempotencia y ningún PDF en la respuesta pública. **Es una prueba de integración de servicios simulados: no equivale a validar GAS/Drive o D1 remotos.**
+2. Se corrigió la ficha de `Polaroids Express` en `integraciones/mercadopago/pruebas/worker.js`: antes, el Centro de Pedidos forzaba `pagoConfirmado:true` en cuanto `orders.status='paid'`, aunque `payment_id` y `preference_id` fueran nulos. Ahora exige ambas referencias de pago, fecha de pago y pago total para indicar `pagoConfirmado:true`. También condiciona `descargaHabilitada` a esa verificación y muestra el estado real en pantalla. La ruta de descarga ya exigía esos controles: esto alinea la interfaz con el control estricto existente. **El código de la Central está en GitHub; el Worker de Cloudflare no se ha actualizado automáticamente mediante este commit y aún requiere despliegue aislado antes de atribuirle el arreglo remoto.**
+3. Se actualizó `tests/central-polaroids-express.test.mjs` con rechazo del estado artificial `paid` sin referencias de pago, y aceptación de los indicadores solo después de que se añaden identificadores de prueba. El interruptor de descarga permanece apagado.
+
+La sintaxis JavaScript de las fuentes modificadas y del nuevo test fue comprobada. Las comprobaciones GitHub Actions no exponen un estado de ejecución verificable a los conectores actuales; **no declarar estas pruebas aprobadas sin confirmar su ejecución**.
+
+El flujo actual conserva `recepcion-config.json` con `enabled:false`, `showInShop:false`, `rollout:PENDIENTE_DE_APROBACION`, checkout inactivo. No se alteraron `main`, `libreriasaber.com.ar`, secretos o pagos.
+
+**Riesgos aún pendientes antes de clientes reales:** ejecución del motor PDF bajo tamaño/carga real, recepción GAS hacia carpeta dedicada, alta del manifiesto en D1 de Cloudflare, asociación a Centro de Pedidos, retención/purga segura de PDFs de pedidos abandonados y ensayo móvil. No habilitar cobro o carga pública para resolverlos.
