@@ -40,6 +40,29 @@ test('prueba HMAC acepta únicamente rechazo 422 del manifiesto deliberadamente 
  assert.equal(result.paymentsEnabled,false);
  assert.equal(calls,1);
 });
+test('usa Service Binding de la Central y no fetch público',async()=>{
+ let internalCalls=0, publicCalls=0;
+ const localEnv={...env,SABER_CENTRAL:{async fetch(req){
+   internalCalls++;
+   assert.equal(req.url,central);
+   assert.equal(req.method,'POST');
+   assert.equal(req.headers.get('Origin'),null);
+   const ts=req.headers.get('x-saber-ts');
+   const id=req.headers.get('x-saber-request-id');
+   const body=await req.text();
+   assert.equal(req.headers.get('x-saber-signature'),
+     createHmac('sha256',secret).update(ts+'\\n'+id+'\\n'+body).digest('hex'));
+   assert.equal(JSON.parse(body).invalid,true);
+   return Response.json({error:'Recibo Express no válido'},{status:422});
+ }}};
+ const fetcher=async()=>{publicCalls++;throw Error('No usar Internet para conectar Central')};
+ const res=await onRequestPost({request:makeRequest(),env:localEnv,fetcher,...testParams});
+ assert.equal(res.status,200);
+ assert.equal((await res.json()).signedConnection,true);
+ assert.equal(internalCalls,1);
+ assert.equal(publicCalls,0);
+});
+
 test('no realiza llamadas sin clave correcta, host u Origin',async()=>{
  let calls=0;
  const fetcher=async()=>{calls++;throw Error('Should never call')};
