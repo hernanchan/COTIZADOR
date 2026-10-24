@@ -261,3 +261,14 @@ La sintaxis JavaScript de las fuentes modificadas y del nuevo test fue comprobad
 El flujo actual conserva `recepcion-config.json` con `enabled:false`, `showInShop:false`, `rollout:PENDIENTE_DE_APROBACION`, checkout inactivo. No se alteraron `main`, `libreriasaber.com.ar`, secretos o pagos.
 
 **Riesgos aún pendientes antes de clientes reales:** ejecución del motor PDF bajo tamaño/carga real, recepción GAS hacia carpeta dedicada, alta del manifiesto en D1 de Cloudflare, asociación a Centro de Pedidos, retención/purga segura de PDFs de pedidos abandonados y ensayo móvil. No habilitar cobro o carga pública para resolverlos.
+
+
+## Preparación de pedido comercial sin pagos ni público — 24/10/2026
+
+Se implementó `integraciones/polaroids/express/preparar-pedido-comercial.mjs`, **módulo interno sin endpoint público**, para conectar una referencia Express ya verificada en D1 con el pedido comercial del carrito, sin iniciar Mercado Pago. Usa exclusivamente el Service Binding `SABER_CENTRAL` con HMAC y reutiliza la URL de la Central configurada previamente cambiando únicamente la ruta validada a `/internal/central/polaroid-prepare-order`. La Central comprueba que el manifiesto PDF exista previamente, valida catálogo/precios en servidor, vincula una referencia a un único pedido y mantiene checkout desactivado.
+
+**Seguridad:** `EXPRESS_ORDER_PREPARE_ENABLED=PRIVATE_TEST_ONLY` será indispensable y está **apagado por defecto**; se requiere además `EXPRESS_CENTRAL_SYNC_ENABLED=PRIVATE_TEST_ONLY`. La Central tiene su segundo control `CENTRAL_EXPRESS_PREPARE_ENABLED`, también desactivado por defecto según el entorno. No se incorporó el módulo a una ruta pública de Pages, al cliente, ni al Worker de recepción. Las respuestas inesperadas que pretendan habilitar cobro se rechazan.
+
+Pruebas de contrato añadidas a `tests/polaroids-express-preparar-pedido.test.mjs` y al workflow `.github/workflows/polaroids-express-ensayo.yml`: HMAC interno de alta comercial, guardas apagadas, entradas maliciosas, rechazo de checkout activado y respuesta de pago inconsistente. **Pendiente su ejecución efectiva**; se verificó el archivo y la referencia del workflow en GitHub, no una corrida de Actions.
+
+**No tocar** `main`, `libreriasaber.com.ar`, recepción de fotografías, claves ni pagos. Para culminar el recorrido privado faltan aún pruebas reales de GAS/Drive y alta D1 de ensayo, seguidas de integración consciente con carrito y pago exclusivamente cuando el propietario lo autorice.
