@@ -36,6 +36,7 @@ small{color:#586b79}.drop{border:2px dashed #9aaebf;padding:18px;text-align:cent
 <div><label>Copias de cada PDF</label><input id="copies" type="number" value="1" min="1" max="200"></div>
 <div><label>Anillado</label><select id="binding"><option value="ninguno">Sin anillado</option><option value="juntos">Todos juntos</option><option value="separados">Por separado</option></select></div></div>
 <button id="quote" type="button" disabled>Calcular presupuesto conjunto</button>
+<button id="new-order" class="secondary" type="button">Comenzar otro pedido de prueba</button>
 <div id="out" role="status" aria-live="polite">Agregá un PDF para comenzar.</div>
 <p><small>Precios orientativos de agosto de 2026, no aprobados para cobro. Si recargás la página, volvé a seleccionar los PDF del pedido: el servidor consulta los fragmentos ya recibidos. El piloto no admite compras.</small></p>
 </main><script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
@@ -176,6 +177,12 @@ add.addEventListener('click',async()=>{
     '\\nConfirmación de recepción: '+Math.round(finCarga-tConfirmacion)+' ms');
  }catch(e){say('No se pudo terminar: '+String(e.message||e)+'. Volvé a seleccionar el mismo archivo para consultar lo recibido y continuar.')}
  finally{ocupado=false;redraw();window.turnstile?.reset()}
+});
+$('new-order').addEventListener('click',()=>{
+ if(ocupado){say('Primero terminá o cancelá la transferencia actual.');return}
+ if(!window.confirm('¿Empezar otro pedido? Las subidas anteriores quedan en Google privado.'))return;
+ try{sessionStorage.removeItem(ORDER_RECOVERY_KEY)}catch{}
+ location.reload();
 });
 quote.addEventListener('click',async()=>{
  if(!recibidos.length)return;
