@@ -8,6 +8,7 @@ import {paginaCargaUnica} from './carga-unica-pagina.mjs';
 import {cotizarCargaUnica} from './cotizar-carga-unica.mjs';
 import {GRAFICA_COMERCIAL} from './cotizar-grafica.mjs';
 import {fase4FichaCentralPrivada} from './fase4-ficha-central-privada.mjs';
+import {fase4FichaCentralLotePrivada} from './fase4-ficha-central-lote-privada.mjs';
 import {enviarCentralFirmada} from './enviar-central-firmada.mjs';
 import {prepararMixtoCentralFirmado} from './preparar-mixto-central.mjs';
 import cargaClienteJs from './carga-unica-cliente.txt';
@@ -1001,7 +1002,7 @@ function scriptRapido(){
 /** Inspección de ficha central en piloto, solo operador con clave independiente.
  * No publica originales, no crea pedidos D1 ni permite pago.
  */
-async function apiFichaCentralPrivada(request,env,sincronizar=false,mixto=false){
+async function apiFichaCentralPrivada(request,env,sincronizar=false,mixto=false,lote=false){
  if(request.method!=='POST')return closed();
  if(!allowed(request,env))
   return testResponse({ok:false,error:'Origen no permitido',paymentAuthorized:false},403);
@@ -1018,7 +1019,9 @@ async function apiFichaCentralPrivada(request,env,sincronizar=false,mixto=false)
  try{
   input=await readLimited(request);
   if(!input||typeof input!=='object'||Array.isArray(input)||
-     Object.keys(input).sort().join(',')!==(mixto?'clientOrderId,items,opciones,polaroidReference,sesion':'opciones,sesion'))
+     Object.keys(input).sort().join(',')!==(mixto?
+      (lote?'clientOrderId,items,polaroidReference,sesiones':'clientOrderId,items,opciones,polaroidReference,sesion'):
+      (lote?'sesiones':'opciones,sesion')))
     throw Error('Datos inválidos');
  }catch(_){return testResponse({ok:false,error:'Solicitud no válida',paymentAuthorized:false},400);}
  try{
@@ -1029,11 +1032,11 @@ async function apiFichaCentralPrivada(request,env,sincronizar=false,mixto=false)
       env.CENTRAL_BRIDGE_KEY===env.DOCS_CENTRAL_ADMIN_KEY||
       env.CENTRAL_BRIDGE_KEY===env.DOCS_RELAY_KEY))
     return testResponse({ok:false,error:'Sincronización con D1 no habilitada',paymentAuthorized:false},503);
-  const result=await fase4FichaCentralPrivada({
-   sesion:input.sesion,opciones:input.opciones,
-   consultarFirmado:p=>postToScript(env,p,fetch,420000),
-   preciosServidor:preciosPiloto
-  });
+  const parametros={consultarFirmado:p=>postToScript(env,p,fetch,420000),
+   preciosServidor:preciosPiloto};
+  const result=lote?
+   await fase4FichaCentralLotePrivada({...parametros,sesiones:input.sesiones}):
+   await fase4FichaCentralPrivada({...parametros,sesion:input.sesion,opciones:input.opciones});
   if(sincronizar||mixto){
    const resultado=await enviarCentralFirmada({
     verificacion:result,url:env.CENTRAL_TEST_URL,
@@ -1077,6 +1080,9 @@ export default {
     if(page==='/api/ensayo-ficha-central')return apiFichaCentralPrivada(request,env);
     if(page==='/api/ensayo-sincronizar-central')return apiFichaCentralPrivada(request,env,true);
     if(page==='/api/ensayo-preparar-mixto')return apiFichaCentralPrivada(request,env,false,true);
+    if(page==='/api/ensayo-ficha-central-lote')return apiFichaCentralPrivada(request,env,false,false,true);
+    if(page==='/api/ensayo-sincronizar-central-lote')return apiFichaCentralPrivada(request,env,true,false,true);
+    if(page==='/api/ensayo-preparar-mixto-lote')return apiFichaCentralPrivada(request,env,false,true,true);
     if(page==='/api/ensayo-carga-unica'){
       if(request.method!=='POST')return closed();
       try{
