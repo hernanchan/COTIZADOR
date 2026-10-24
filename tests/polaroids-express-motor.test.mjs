@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {writeFile,mkdir} from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import {inflateSync} from 'node:zlib';
 import {createRequire} from 'node:module';
@@ -27,6 +28,10 @@ test('crea PDF real A4 con 6 polaroids por página y marcas de corte',async()=>{
  assert.ok(pdfBytes.byteLength<EXPRESS.maxPdfBytes);
  const pdf=await pdfLib.PDFDocument.load(pdfBytes);
  assert.equal(pdf.getPageCount(),4);
+ if(process.env.EXPRESS_EXPORT_PDF==='1'){
+  await mkdir('artifacts/polaroids-express',{recursive:true});
+  await writeFile('artifacts/polaroids-express/POLAROID-EXPRESS-24-FOTOS-MARCAS-GUILLOTINA.pdf',pdfBytes);
+ }
  for(const p of pdf.getPages()){
   assert.ok(Math.abs(p.getWidth()-210*72/25.4)<.1);
   assert.ok(Math.abs(p.getHeight()-297*72/25.4)<.1);
