@@ -126,3 +126,13 @@ El operador desplegó el cambio de diagnóstico **solo en `saber-pagos-pruebas`*
 ## Diagnóstico de dependencia Documentos en rotación HMAC — 24/10/2026
 
 Captura de Cloudflare del proyecto `saber-documentos-pruebas`, pestaña Configuración → Variables y secretos de runtime (Producción): figuran `DOCS_ALLOWED_ORIGIN`, `DOCS_PING_ENABLED`, `DOCS_RELAY_KEY`, `DOCS_SCRIPT_URL`, `DOCS_TURNSTILE_SECRET`, `DOCS_TURNSTILE_SITE_KEY` y `DOCS_UPLOAD_ENABLED=false`. **No aparecen** `CENTRAL_BRIDGE_KEY`, `DOCS_CENTRAL_SYNC_ENABLED` ni `CENTRAL_TEST_URL`. Por la configuración visible, no participa ahora del puente privado HMAC hacia la Central y **no requiere rotación de `CENTRAL_BRIDGE_KEY` en esta etapa**. No se alteró ese Worker ni se habilitó carga de documentos. La rotación coordinada autorizada queda limitada a `saber-pagos-pruebas` y `saber-polaroids-express-pruebas`, reutilizando únicamente la nueva clave generada localmente y guardada por el propietario en su gestor de contraseñas; nunca transcribir secretos a GitHub/chat. La presencia del secreto nuevo en Cloudflare y la conexión HMAC real siguen pendientes de confirmación.
+
+## Puente Central: guarda superada con clave rotada — 24/10/2026
+
+Tras actualizar `CENTRAL_BRIDGE_KEY` en la Central y promocionar al **100%** la versión Cloudflare `29dab411` (secreta, sin publicar valor), el propietario confirmó desde Chrome que `GET https://saber-pagos-pruebas.libreriasaber.workers.dev/internal/central/polaroid-stage` devolvió **exactamente**:
+
+```json
+{"error":"Solicitud entre servidores requerida"}
+```
+
+Con el orden de validación del `worker.js`, esto demuestra que `CENTRAL_EXPRESS_ENABLED` y la guarda de configuración del puente HMAC en **ese Worker** están superadas, y que una solicitud GET no firmada se rechaza antes de escrituras. No demuestra que Express tenga la misma clave activa, ni comunicación servidor↔servidor, ni persistencia de datos en D1. El propietario indicó haber actualizado también el secreto en Pages Express, pero aún no se ha comprobado despliegue posterior al cambio. Los secretos en Cloudflare Pages deben estar configurados antes del despliegue que vaya a usarlos (Cloudflare Pages Functions bindings); la implementación Express conocida `d1167d8` precede al cambio. Mantener `enabled:false`, `EXPRESS_RECEPTION_ENABLED` y `EXPRESS_PDF_ENABLED` apagados y checkout deshabilitado. Pendiente: confirmar despliegue del proyecto Pages aislado con nuevas variables y luego preparar, bajo autorización, una comprobación HMAC de servidor a servidor sin datos reales y sin habilitar recepción.
