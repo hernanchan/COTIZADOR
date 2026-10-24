@@ -55,3 +55,20 @@ También se añadió una prueba de integración sobre el Worker Central real car
 **Pendiente de infraestructura real:** en el Worker aislado `saber-documentos-pruebas` añadir un Service Binding de nombre `SABER_CENTRAL` que apunte al Worker `saber-pagos-pruebas`, al desplegar la rama autorizada. No reutilizar el secreto HMAC de acceso del operador ni publicar rutas públicas. La vinculación **ya existe en Pages Express** pero no consta configurada en el Worker de documentos. Agrupar esta operación con el ensayo final de recepción, no hacer intervenir al propietario ahora.
 
 La prueba integral remota sigue condicionada a Apps Script y carga privada reales y **no está demostrada**. Sin R2, sin nuevos gastos, sin cobros activos y sin modificaciones a `main` ni al dominio público.
+
+
+## 24/10/2026 · Compra verdaderamente mixta en una sola orden D1
+
+**Problema resuelto en la rama integral de pruebas:** los endpoints previos podían preparar separadamente un pedido de documentos y otro de Polaroids, pero no una única compra de ambas familias junto con artículos del catálogo. Se incorporó el nuevo endpoint HMAC `POST /internal/central/prepare-mixed-order` al Worker privado de la Central (`integraciones/mercadopago/pruebas/worker.js`), sin acceso público ni activación de cobros.
+
+- Exige **tres permisos apagados por defecto**: `CENTRAL_MIXED_PREPARE_ENABLED=PRIVATE_TEST_ONLY`, `CENTRAL_PREPARE_ENABLED=PRIVATE_TEST_ONLY` y `CENTRAL_EXPRESS_PREPARE_ENABLED=PRIVATE_TEST_ONLY`, más la guarda HMAC `CENTRAL_BRIDGE_ENABLED`.
+- Recibe solamente `clientOrderId`, `webOrderId` documental verificado, `polaroidReference` verificada y artículos `{code,qty}`. Comprueba que ambos manifiestos existen, están libres y mantienen importes y referencias íntegros.
+- Recalcula los SKU de tienda contra catálogo servidor; prepara una orden D1 con tres clases de renglones: `DOCS_VERIFIED`, `POLAROID_EXPRESS_A4` y `product`. Con pago total pendiente: `checkoutEnabled:false`, `paymentAuthorized:false`, sin crear preferencias de Mercado Pago ni habilitar descarga.
+- Vincula ambas referencias dentro de `DB.batch`; una condición SQL de integridad al insertar `cart_requests` hace fallar el lote entero si una vinculación fue tomada por otro proceso. Reintentos con mismo identificador son idempotentes y carritos alterados se rechazan.
+- Se detectó por **CI real una omisión crítica**: el checkout de pruebas bloqueaba trabajos nuevos en función de `order.description`, lo que no cubría la descripción del pedido mixto. Se corrigió el guard para buscar los SKU `DOCS_VERIFIED` o `POLAROID_EXPRESS_A4` en `order_items` y rechazar el cobro antes de consultar Mercado Pago, independientemente del título. Se añadió una regresión que cambia el texto del pedido y exige rechazo del checkout.
+
+**Evidencia de ejecución GitHub Actions:** el commit `c6dd262305e0231f865ce9e5f9a855f99eb78107` terminó con estado `polaroids-express/ci: success`, corrida `40142180078`; se verificó que **todas las etapas del job terminaron correctamente**, incluyendo pruebas Central+D1 y regresión de checkout, construcción del Worker documental y vínculo Documentos→Central. URL: https://github.com/hernanchan/COTIZADOR/actions/runs/40142180078
+
+**Importante: no publicar todavía.** El endpoint mixto se ensayó contra el Worker original corriendo en SQLite local, **no en Cloudflare D1 remoto**. Todavía no existe interfaz de cliente conectada a este endpoint, recepción integral en Google Drive para todas las familias, cobro y descarga de PDF final verificados ni validación real PC/móvil. `CENTRAL_MIXED_PREPARE_ENABLED` **no fue creado ni activado** en Cloudflare. `main`, el dominio público y cobros activos permanecen intactos.
+
+El siguiente desarrollo prioritario es conectar el flujo de recepción documental comprobada y el manifiesto Express con el endpoint mixto desde el backend de ensayos (sin exponer credenciales); luego ejecutar el primer pedido completo privado Cloudflare↔GAS↔D1.
