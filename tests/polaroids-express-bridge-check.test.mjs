@@ -51,7 +51,7 @@ test('usa Service Binding de la Central y no fetch público',async()=>{
    const id=req.headers.get('x-saber-request-id');
    const body=await req.text();
    assert.equal(req.headers.get('x-saber-signature'),
-     createHmac('sha256',secret).update(ts+'\\n'+id+'\\n'+body).digest('hex'));
+     createHmac('sha256',secret).update(ts+'\n'+id+'\n'+body).digest('hex'));
    assert.equal(JSON.parse(body).invalid,true);
    return Response.json({error:'Recibo Express no válido'},{status:422});
  }}};
