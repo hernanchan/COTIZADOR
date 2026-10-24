@@ -495,6 +495,129 @@ async function centralPolaroidPrepareOrder(req,env){
 
 
 /**
+ * Ensayo de carrito integral: documentos + Polaroids Express + catálogo.
+ * Sólo servidor HMAC. Requiere guardas independientes de AMBAS familias
+ * y no tiene ningún vínculo con checkout ni con habilitación de pagos.
+ */
+async function centralPrepareMixedOrder(req,env){
+ if(env.CENTRAL_MIXED_PREPARE_ENABLED!=="PRIVATE_TEST_ONLY"||
+    env.CENTRAL_PREPARE_ENABLED!=="PRIVATE_TEST_ONLY"||
+    env.CENTRAL_EXPRESS_PREPARE_ENABLED!=="PRIVATE_TEST_ONLY")
+  return json({error:"Carrito mixto privado deshabilitado"},503);
+ const signed=await centralReadSigned(req,env);
+ if(signed.error)return json({error:signed.error},signed.status);
+ const d=signed.payload;
+ if(!d||typeof d!=="object"||Array.isArray(d)||
+    Object.keys(d).sort().join(",")!=="clientOrderId,items,polaroidReference,webOrderId"||
+    !CENTRAL_UUID.test(d.clientOrderId||"")||
+    !CENTRAL_WEB.test(d.webOrderId||"")||
+    !CENTRAL_POLAROID.test(d.polaroidReference||"")||
+    !Array.isArray(d.items)||d.items.length>40)
+  return json({error:"Pedido mixto sin referencias verificables"},400);
+ const seen=new Set(),products=[];
+ for(const x of d.items){
+  if(!x||typeof x!=="object"||Array.isArray(x)||
+     Object.keys(x).sort().join(",")!=="code,qty"||
+     typeof x.code!=="string"||!x.code.trim()||x.code.length>80||
+     !Number.isSafeInteger(x.qty)||x.qty<1||x.qty>500||seen.has(x.code))
+   return json({error:"Artículo repetido o cantidad inválida"},422);
+  seen.add(x.code);products.push({code:x.code,qty:x.qty});
+ }
+ await centralTables(env);
+ await centralPolaroidTable(env);
+ await ensureOrderItems(env);
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS cart_requests (client_order_id TEXT PRIMARY KEY,request_hash TEXT NOT NULL,order_id TEXT NOT NULL UNIQUE)").run();
+ const fingerprint=await centralHash(JSON.stringify({
+  webOrderId:d.webOrderId,polaroidReference:d.polaroidReference,items:products
+ }));
+ const previous=await env.DB.prepare("SELECT request_hash,order_id FROM cart_requests WHERE client_order_id=?").bind(d.clientOrderId).first();
+ if(previous){
+  if(previous.request_hash!==fingerprint)
+   return json({error:"El identificador de compra pertenece a otro carrito"},409);
+  const [o,a,b]=await Promise.all([
+   env.DB.prepare("SELECT amount_ars,status FROM orders WHERE id=?").bind(previous.order_id).first(),
+   env.DB.prepare("SELECT web_order_id FROM central_document_manifests WHERE commercial_order_id=?").bind(previous.order_id).first(),
+   env.DB.prepare("SELECT reference FROM central_polaroids_express WHERE commercial_order_id=?").bind(previous.order_id).first()
+  ]);
+  if(!o||o.status!=="awaiting_payment"||a?.web_order_id!==d.webOrderId||
+     b?.reference!==d.polaroidReference)
+   return json({error:"El intento anterior no coincide con ambos trabajos"},409);
+  return json({created:true,idempotent:true,commercial_order_id:previous.order_id,
+   amount_ars:o.amount_ars,state:"awaiting_payment",
+   checkoutEnabled:false,paymentAuthorized:false},200);
+ }
+ const [docs,pol]=await Promise.all([
+  env.DB.prepare("SELECT amount_ars,file_count,manifest_json,commercial_order_id FROM central_document_manifests WHERE web_order_id=?").bind(d.webOrderId).first(),
+  env.DB.prepare("SELECT reference,sha256,bytes,photos,sheets,amount_ars,commercial_order_id FROM central_polaroids_express WHERE reference=?").bind(d.polaroidReference).first()
+ ]);
+ if(!docs||!pol)return json({error:"Faltan recibos privados de uno o ambos trabajos"},404);
+ if(docs.commercial_order_id||pol.commercial_order_id)
+  return json({error:"Uno de los trabajos ya pertenece a otra compra"},409);
+ let manifest;
+ try{manifest=JSON.parse(docs.manifest_json)}
+ catch(_){return json({error:"Manifiesto documental ilegible"},409)}
+ if(manifest.schema!=="saber-central-documentos-d1-v1"||
+    manifest.webOrderId!==d.webOrderId||manifest.importe!==docs.amount_ars||
+    manifest.archivos!==docs.file_count||
+    !Array.isArray(manifest.trabajos)||manifest.trabajos.length!==docs.file_count||
+    docs.file_count<1||docs.file_count>30)
+  return json({error:"Recibo de documentos inconsistente"},409);
+ const receipts=manifest.trabajos.map(x=>x.reciboPrivado);
+ if(receipts.some(x=>!CENTRAL_RECEIPT.test(x))||
+    new Set(receipts).size!==receipts.length)
+  return json({error:"Recibos documentales duplicados"},409);
+ if(!CENTRAL_HEX.test(pol.sha256)||pol.bytes<100||pol.bytes>12*1024*1024||
+    pol.photos<1||pol.photos>24||pol.sheets!==Math.ceil(pol.photos/6)||
+    pol.amount_ars!==pol.sheets*3000)
+  return json({error:"PDF Polaroids sin integridad o precio confirmado"},409);
+ let total=docs.amount_ars+pol.amount_ars,shop=[];
+ if(products.length){
+  const catalog=await getCatalog();
+  for(const item of products){
+   const p=catalog.get(item.code);
+   if(!p)return json({error:"Producto inexistente o inactivo"},422);
+   const price=p.price*item.qty;
+   if(!Number.isSafeInteger(price)||price<1||price>50000000)
+    return json({error:"Cantidad o precio de artículo inválido"},422);
+   total+=price;
+   shop.push({...item,name:p.name,unit:p.price,total:price});
+  }
+ }
+ if(!Number.isSafeInteger(total)||total<=0||total>50000000)
+  return json({error:"Total mixto supera el máximo autorizado"},422);
+ const id=crypto.randomUUID();
+ const sql="INSERT INTO order_items(order_id,line_number,item_type,sku,title,quantity,unit_price_ars,line_total_ars,detail_json,file_references_json) VALUES(?,?,?,?,?,?,?,?,?,?)";
+ const changes=[
+  env.DB.prepare("INSERT INTO orders(id,description,amount_ars,deposit_ars) VALUES(?,?,?,?)")
+   .bind(id,"Librería Saber · Documentos, Polaroids y tienda",total,total),
+  env.DB.prepare(sql).bind(id,1,"print","DOCS_VERIFIED","Documentos y trabajos gráficos verificados",1,
+    docs.amount_ars,docs.amount_ars,
+    JSON.stringify({source:"central_verified",files:receipts.length}),JSON.stringify(receipts)),
+  env.DB.prepare(sql).bind(id,2,"print","POLAROID_EXPRESS_A4","Polaroids Express PDF privado",
+    pol.sheets,3000,pol.amount_ars,
+    JSON.stringify({photos:pol.photos,sheets:pol.sheets,pdfFinalVerified:true}),JSON.stringify([pol.reference]))
+ ];
+ shop.forEach((p,i)=>changes.push(env.DB.prepare(sql)
+  .bind(id,i+3,"product",p.code,p.name,p.qty,p.unit,p.total,"{}","[]")));
+ changes.push(env.DB.prepare("UPDATE central_document_manifests SET commercial_order_id=?,status='linked_waiting_payment',linked_at=datetime('now') WHERE web_order_id=? AND commercial_order_id IS NULL").bind(id,d.webOrderId));
+ changes.push(env.DB.prepare("UPDATE central_polaroids_express SET commercial_order_id=?,linked_at=datetime('now') WHERE reference=? AND commercial_order_id IS NULL").bind(id,d.polaroidReference));
+ // Si otro proceso tomó cualquiera de las referencias durante el lote,
+ // ORDER_ID NULL viola NOT NULL y revierte la transacción completa en D1.
+ changes.push(env.DB.prepare(
+  "INSERT INTO cart_requests(client_order_id,request_hash,order_id) VALUES(?,?,CASE WHEN (SELECT commercial_order_id FROM central_document_manifests WHERE web_order_id=?)=? AND (SELECT commercial_order_id FROM central_polaroids_express WHERE reference=?)=? THEN ? ELSE NULL END)"
+ ).bind(d.clientOrderId,fingerprint,d.webOrderId,id,d.polaroidReference,id,id));
+ let written;
+ try{written=await env.DB.batch(changes)}
+ catch(_){return json({error:"El carrito mixto ya fue utilizado o hay un pedido concurrente"},409)}
+ if(written?.[written.length-1]?.meta?.changes!==1)
+  return json({error:"El pedido mixto no fue confirmado"},409);
+ return json({created:true,idempotent:false,commercial_order_id:id,
+  amount_ars:total,documentos_ars:docs.amount_ars,
+  polaroids_ars:pol.amount_ars,productos_ars:total-docs.amount_ars-pol.amount_ars,
+  state:"awaiting_payment",checkoutEnabled:false,paymentAuthorized:false},201);
+}
+
+/**
  * Descarga administrativa: únicamente PDF Express asociado a un pedido pagado
  * íntegramente en Mercado Pago de pruebas, sin revocación y con referencia
  * consistente en D1. GAS recibe una solicitud firmada; no publica URLs.
@@ -1043,6 +1166,7 @@ export default {
   try {
    if(url.pathname==="/internal/central/polaroid-stage")return await centralPolaroidStage(req,env);
    if(url.pathname==="/internal/central/polaroid-prepare-order")return await centralPolaroidPrepareOrder(req,env);
+   if(url.pathname==="/internal/central/prepare-mixed-order")return await centralPrepareMixedOrder(req,env);
    if(url.pathname==="/internal/central/stage")return await centralStage(req,env);
    if(url.pathname==="/internal/central/link")return await centralLink(req,env);
    if(url.pathname==="/internal/central/prepare-order")return await centralPrepareDraft(req,env);
