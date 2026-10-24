@@ -79,6 +79,42 @@ async function admin(path,authorized=true){
  const res=await context.worker.fetch(new Request(base+path,{headers:authorized?{Authorization:'Bearer '+env.DEMO_ADMIN_KEY}:{}}),env);
  return {status:res.status,result:await res.json()};
 }
+test('diagnóstico de HMAC requiere permiso y no revela secretos',async()=>{
+ const unauthorized=await admin('/demo/diagnostic',false);
+ assert.equal(unauthorized.status,401);
+ const authorized=await admin('/demo/diagnostic');
+ assert.equal(authorized.status,200);
+ assert.equal(authorized.result.centralBridge.bridgeEnabled,true);
+ assert.equal(authorized.result.centralBridge.expressEnabled,false);
+ assert.equal(authorized.result.centralBridge.keyPresent,true);
+ assert.equal(authorized.result.centralBridge.keyMinimumLength,true);
+ assert.equal(authorized.result.centralBridge.keyDifferentFromAdmin,true);
+ assert.equal(authorized.result.centralBridge.keyDifferentFromWebhook,true);
+ const responseBody=JSON.stringify(authorized.result);
+ assert.ok(!responseBody.includes(env.CENTRAL_BRIDGE_KEY));
+ assert.ok(!responseBody.includes(env.DEMO_ADMIN_KEY));
+ assert.ok(!responseBody.includes(env.MP_WEBHOOK_SECRET));
+});
+
+test('diagnóstico distingue clave corta y reutilizada sin exponerla',async()=>{
+ const originalKey=env.CENTRAL_BRIDGE_KEY;
+ const originalFlag=env.CENTRAL_BRIDGE_ENABLED;
+ try{
+  env.CENTRAL_BRIDGE_ENABLED='';
+  env.CENTRAL_BRIDGE_KEY=env.DEMO_ADMIN_KEY;
+  const result=await admin('/demo/diagnostic');
+  assert.equal(result.status,200);
+  assert.equal(result.result.centralBridge.bridgeEnabled,false);
+  assert.equal(result.result.centralBridge.keyPresent,true);
+  assert.equal(result.result.centralBridge.keyMinimumLength,false);
+  assert.equal(result.result.centralBridge.keyDifferentFromAdmin,false);
+  assert.equal(result.result.centralBridge.keyDifferentFromWebhook,true);
+ }finally{
+  env.CENTRAL_BRIDGE_ENABLED=originalFlag;
+  env.CENTRAL_BRIDGE_KEY=originalKey;
+ }
+});
+
 test('no se aceptan sincronizaciones sin habilitación explícita, con otro HMAC o desde navegador',async()=>{
  const old=env.CENTRAL_BRIDGE_ENABLED;env.CENTRAL_BRIDGE_ENABLED='';
  assert.equal((await call('/internal/central/stage',packet)).status,503);
