@@ -146,3 +146,17 @@ test('guillotina: 14 marcas en cada hoja para 1, 6, 12, 19 y 24 fotos',async()=>
   assert.ok(pages.every(p=>p.rectangles===0));
  }
 });
+
+
+// Una caída de conexión puede provocar un reintento del mismo pedido.
+// GAS rechaza un hash distinto bajo la misma referencia: el PDF debe ser
+// binariamente estable, no solamente visualmente equivalente.
+test('reintento idéntico conserva exactamente el mismo PDF y hash',async()=>{
+ for(const count of [6,19,24]){
+  const first=await generarPdfExpress({hojas:hojas(count),pdfLib});
+  const second=await generarPdfExpress({hojas:hojas(count),pdfLib});
+  assert.equal(first.pdfBytes.length,second.pdfBytes.length);
+  assert.deepEqual(first.pdfBytes,second.pdfBytes,
+   'Un mismo conjunto de '+count+' fotos no debe cambiar el PDF al reintentar');
+ }
+});
