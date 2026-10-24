@@ -14,6 +14,8 @@ on:
       - 'integraciones/autocotizador/recepcion/fase4-ficha-central-lote-privada.mjs'
       - 'tests/autocotizador-mixto-central.test.mjs'
       - 'tests/autocotizador-ficha-lote-gas.test.mjs'
+      - 'integraciones/autocotizador/recepcion/DocumentosReceiver_LOTE_AMPLIADO_PRUEBAS_20261024.gs'
+      - 'tests/autocotizador-gas-lote-ampliado.test.mjs'
       - 'functions/api/polaroids-express.js'
       - 'tests/polaroids-express-*.test.mjs'
       - 'tests/central-polaroids-express.test.mjs'
@@ -77,6 +79,8 @@ jobs:
       - name: Compilar Worker documental unificado con vínculo privado (sin desplegar)
         working-directory: integraciones/autocotizador/recepcion
         run: npm run build:unificado
+      - name: Ensayar Apps Script ampliado con 30 PDF, cuotas y Range sin Google real
+        run: node --test tests/autocotizador-gas-lote-ampliado.test.mjs
       - name: Verificar lote de PDFs privados GAS antes de calcular y registrar D1
         run: node --test tests/autocotizador-ficha-lote-gas.test.mjs
       - name: Probar adaptador del carrito mixto Documentos más Polaroids
