@@ -11,7 +11,7 @@ const sha=value=>createHash('sha256').update(Buffer.from(value)).digest('hex');
 
 function setup(){
  const properties=new Map([['DOCS_RELAY_KEY',secret],['DOCS_ROOT_FOLDER_ID','ROOT']]);
- let uploads=0,rangeRequests=0,wrongRange=false;
+ let uploads=0,rangeRequests=0,wrongRange=false,propReads=0,bulkReads=0;
  const payloads=new Map();
  const response=(code,headers={},bytes=Buffer.alloc(0),body='')=>({
   getResponseCode:()=>code,getAllHeaders:()=>headers,
@@ -28,7 +28,8 @@ function setup(){
  const env={
   Utilities:utilities,Date,Math,JSON,console,
   PropertiesService:{getScriptProperties:()=>({
-   getProperty:k=>properties.get(k)||null,
+   getProperty:k=>(propReads++,properties.get(k)||null),
+   getProperties:()=> (bulkReads++,Object.fromEntries(properties)),
    setProperty:(k,v)=>properties.set(k,String(v))
   })},
   LockService:{getScriptLock:()=>({tryLock:()=>true,releaseLock(){}})},
@@ -69,7 +70,9 @@ function setup(){
   orderId,fileId,name:fileId+'.pdf',mode,bytes,
   sha256:'a'.repeat(64),partBytes:512*1024,parts:Math.ceil(bytes/(512*1024))
  });
- return {call,createMeta,properties,payloads,stats:()=>({uploads,rangeRequests}),
+ return {call,createMeta,properties,payloads,
+  stats:()=>({uploads,rangeRequests,propReads,bulkReads}),
+  resetReads:()=>{propReads=0;bulkReads=0},
   brokenRange:value=>{wrongRange=value}};
 }
 test('30 archivos únicos en el mismo pedido, idempotencia y 31.º bloqueado',()=>{
@@ -126,4 +129,39 @@ test('lectura parcial usa Range 206, checksum y rechaza Content-Range incorrecto
  t.brokenRange(true);
  assert.equal(t.call({op:'multiReadPart',...req,offset:0}).ok,false);
  assert.equal(t.call({op:'multiReadPart',...req,offset:17}).ok,false);
+});
+
+
+test('cada lectura privada usa un índice compacto aunque existan 110 sesiones',()=>{
+ const t=setup();
+ const bytes=Buffer.alloc(1024*1024+29);
+ bytes.write('%PDF-1.7\n');
+ const meta={...t.createMeta('principal',{bytes:bytes.length}),sha256:sha(bytes)};
+ const created=t.call({op:'multiStart',meta});
+ assert.equal(created.ok,true);
+ const state=JSON.parse(t.properties.get('FILE_'+created.uploadId));
+ state.receiptState='bytes_checked';
+ state.driveFileId='RANGE_FILE';
+ t.properties.set('FILE_'+created.uploadId,JSON.stringify(state));
+ t.payloads.set('RANGE_FILE',bytes);
+ const ids=[created.uploadId];
+ for(let i=0;i<109;i++){
+  const uploadId='DOC-'+randomUUID();
+  ids.push(uploadId);
+  t.properties.set('FILE_'+uploadId,JSON.stringify({
+   uploadId,orderId:'WEB-OTRO-LOTE-20261024',fileId:'f'+i,
+   bytes:1200,createdAt:Date.now(),receiptState:'receiving'
+  }));
+ }
+ t.properties.set('DOCS_MULTI_INDEX_LOTE_20261024',JSON.stringify(ids));
+ t.resetReads();
+ const result=t.call({op:'multiReadPart',uploadId:created.uploadId,
+  token:created.token,receiptId:created.uploadId,offset:0});
+ assert.equal(result.ok,true,JSON.stringify(result));
+ assert.equal(t.stats().bulkReads,1);
+ assert.ok(t.stats().propReads<=3,
+  'No se debe leer una propiedad por cada sesión activa');
+ assert.equal(t.stats().rangeRequests,1);
+ assert.equal(Buffer.from(result.dataBase64,'base64').length,256*1024);
+ assert.ok(!JSON.stringify(result).includes(secret),'Nunca exponer clave HMAC');
 });
