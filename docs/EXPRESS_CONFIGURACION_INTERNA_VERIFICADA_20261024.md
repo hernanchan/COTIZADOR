@@ -164,3 +164,21 @@ Se comprobó que el blob GitHub del módulo de prueba coincide exactamente con e
 El propietario **autoriza explícitamente** desplegar el diagnóstico temporal HMAC **únicamente en** `saber-polaroids-express-pruebas`. No autoriza `main`, `libreriasaber.com.ar`, pagos, recepción pública, alteración de claves, R2 ni servicios de pago. El código del diagnóstico ya está preparado en la rama `polaroids/express-pdf-unico-20261023`, pero la configuración de Cloudflare Pages mantiene **implementaciones automáticas en pausa** y no existe acceso directo desde los conectores de ChatGPT a ese panel. No se ha desplegado todavía el diagnóstico.
 
 Procedimiento controlado elegido: el operador habilita temporalmente **solo** las implementaciones automáticas de la rama de producción del **proyecto aislado** en Cloudflare Pages, sin alterar rama ni previews. Entonces se realiza **una sola confirmación de código en GitHub bajo `integraciones/polaroids/express/**`**, disparando la compilación, se confirma el commit desplegado y el operador vuelve a pausar las implementaciones. El flujo de recepción permanece con `enabled:false` y checkout apagado. Tras prueba remota, retirar diagnósticos temporales con nuevo despliegue controlado.
+
+## Corrección de comunicación interna Cloudflare Pages → Worker — 24/10/2026
+
+**Evidencia remota aportada por el operador:** en `https://saber-polaroids-express-pruebas.pages.dev/pruebas/puente-hmac.html`, el intento autorizado mostró `HTTP 502`, `signedConnection:false`, `error:"Sin comunicación HTTPS con la Central"`, `writes:false`. Este mensaje proviene de una captura genérica de excepciones en `probar-puente-hmac.mjs`, **no permite distinguir** error de transporte, respuesta no válida o fallo de red; no demuestra diferencia entre secretos HMAC.
+
+La documentación oficial de Cloudflare sobre Worker-to-Worker y Pages Service Bindings (actualizada octubre de 2026) recomienda vincular el Worker llamador con el Worker destino mediante un **Service Binding interno**. Para solicitudes entre Workers de la misma zona, `fetch()` público a `workers.dev` puede producir error de ruteo (p. ej. 1042). Se considera causa probable y se prepara corrección, pendiente prueba real con binding. Fuentes:
+- https://developers.cloudflare.com/pages/functions/bindings/
+- https://developers.cloudflare.com/workers/runtime-apis/bindings/service-bindings/
+- https://developers.cloudflare.com/workers/configuration/routing/custom-domains/
+
+**Código actualizado en la rama exclusivamente de pruebas:**
+- `integraciones/polaroids/express/probar-puente-hmac.mjs`: llamada a `env.SABER_CENTRAL.fetch(new Request(dest.href, options))`, con URL destino validada y firma HMAC. Sin binding en runtime no intenta red pública; responde fallo de configuración.
+- `integraciones/polaroids/express/enviar-central-express.mjs`: igual tratamiento para la comunicación real futura, que permanece totalmente bloqueada por `enabled:false`, sin modificar archivos ni precios.
+- `tests/polaroids-express-bridge-check.test.mjs`: caso adicional que comprueba el uso del Service Binding interno y ausencia de llamadas al `fetcher` público. Los tests añadidos no se consideran ejecutados hasta recibir evidencia de ejecución.
+
+**ÚNICA configuración Cloudflare pendiente** en `saber-polaroids-express-pruebas` (entorno Producción de este proyecto de ensayo, no la web pública): `Configuración → Vinculaciones → Agregar → Service binding`, nombre de variable exacto **`SABER_CENTRAL`**, servicio destino **`saber-pagos-pruebas`**. Guardar y reimplementar la rama de pruebas para que surta efecto (sin tocar las claves). Cloudflare documenta que Service Bindings no generan un cargo adicional por el vínculo, aunque las solicitudes siguen sujetas a límites ordinarios de uso.
+
+**Verificación posterior:** repetir una sola vez el diagnóstico protegido; éxito SOLO si `signedConnection:true` tras respuesta HTTP 422 `Recibo Express no válido` generada por Central a una ficha sintética intencionalmente inválida, sin escrituras en D1 ni fotos. Si falla, revisar error sanitizado/observabilidad sin pedir secretos. Tras finalizar retirar la ruta de diagnóstico y la pantalla temporal; no activar checkout ni recepción.
