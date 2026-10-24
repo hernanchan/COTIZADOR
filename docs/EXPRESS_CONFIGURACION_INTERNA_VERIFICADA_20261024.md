@@ -315,3 +315,19 @@ Se recuperó el **artefacto auténtico** generado por `pdf-lib` en la corrida Gi
 La inspección con `pdfinfo` y PyMuPDF confirmó **4 páginas A4 exactas (210 × 297 mm)**; en **cada página: 6 dibujos de imagen, 14 segmentos de marcas de guillotina y ningún rectángulo de contorno**. Se renderizaron todas las páginas y se inspeccionó visualmente la primera: las fotografías ficticias ocupan el espacio superior de cada polaroid dejando margen blanco inferior; las marcas no cruzan las áreas de imagen. Las cuatro páginas son idénticas porque el JPEG de prueba es el mismo, **no** porque se haya repetido erróneamente una página de un pedido real.
 
 **Alcance:** PDF binario real generado en GitHub Actions, NO PDF geométrico ficticio de Drive. Esta inspección verifica geometría de 24 posiciones y corte, **no** reemplaza impresión física, pruebas con fotografías distintas/reales o recepción remota GAS/D1.
+
+
+## Ensayo de carga máxima con 24 JPEG sintéticos — 24/10/2026
+
+Para verificar los límites reales antes de involucrar al propietario en ensayos de subida, se implementó `tests/polaroids-express-carga-limite.test.mjs`: parte de un JPEG válido de 886×886 y añade metadatos COM válidos con datos diferentes por fotografía hasta llegar a **445.000 bytes/JPEG**; no utiliza fotografías de clientes. Ejecuta el **motor real pdf-lib** con 24 imágenes de tamaño grande, repite la generación y compara SHA-256. Valida 4 páginas A4 y los topes de 12 MiB para PDF, 18 MiB para el cuerpo POST del cliente y 19 MiB para la envoltura de Google Apps Script.
+
+**Resultado real de GitHub Actions:** commit `044c946b2396e35a25fb1b9156f1fccee7758195`, corrida `40141164686`, estado publicado `polaroids-express/ci = success`; se inspeccionó la bitácora del job y todas las pruebas quedaron sin fallos. Valores emitidos por la prueba:
+
+- **24 JPEG**: `10.680.000 bytes` en total (445.000 cada uno).
+- **PDF privado final**: `10.687.251 bytes`.
+- **POST JSON desde el navegador**: `14.240.233 bytes`.
+- **Envoltorio JSON de GAS con PDF Base64**: `14.249.869 bytes`.
+
+Los resultados se encuentran dentro de los límites de código vigentes y el mismo material genera idéntico PDF en dos ejecuciones. URL: https://github.com/hernanchan/COTIZADOR/actions/runs/40141164686.
+
+**Precaución:** no se midió memoria de Cloudflare Pages en producción, tráfico por 4G ni tiempos de Google Apps Script. Los bytes JPEG añadidos son sintéticos y no predicen compresión típica de fotografías reales. No prueba que la recepción real remota haya quedado activa. Sin cambios a `main`, web pública, pago, fotos reales o receptores productivos.
