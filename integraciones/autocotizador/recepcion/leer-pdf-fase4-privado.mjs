@@ -7,12 +7,13 @@ const RECIBO=/^DOC-[a-f0-9-]{36}$/i;
 const bytesHex=data=>Array.from(data,n=>n.toString(16).padStart(2,'0')).join('');
 export async function leerPdfFase4Privado({
  session,receiptId,bytes,sha256,consultarFirmado,
- chunkBytes=256*1024,subtle=crypto.subtle
+ chunkBytes=256*1024,maxFileBytes=1024*1024,subtle=crypto.subtle
 }){
  if(!session||!RECIBO.test(session.uploadId||'')||
     typeof session.token!=='string'||session.token.length<16||session.token.length>256||
     session.uploadId!==receiptId||!RECIBO.test(receiptId||'')||
-    !Number.isSafeInteger(bytes)||bytes<5||bytes>1024*1024||
+    ![1024*1024,20*1024*1024].includes(maxFileBytes)||
+    !Number.isSafeInteger(bytes)||bytes<5||bytes>maxFileBytes||
     !HEX.test(sha256||'')||chunkBytes!==256*1024||
     typeof consultarFirmado!=='function')
   throw Error('Lectura privada no autorizada.');
