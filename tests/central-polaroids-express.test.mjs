@@ -166,9 +166,15 @@ test('alta privada crea compra mixta sin permitir pagos ni inventar precios',asy
  const detail=(await admin('/admin/api/order?id='+id)).body;
  assert.equal(detail.produccion.polaroidsExpress.referencia,ref);
  assert.equal(detail.produccion.polaroidsExpress.paginasA4,4);
- assert.equal(detail.produccion.polaroidsExpress.pagoConfirmado,true);
+ assert.equal(detail.produccion.polaroidsExpress.pagoConfirmado,false,
+  'status=paid sin IDs de Mercado Pago no prueba un pago verificable');
  assert.equal(detail.produccion.polaroidsExpress.descargaHabilitada,false);
  assert.equal(detail.produccion.listoParaProducir,false);
+ db.prepare("UPDATE orders SET payment_id='MP-TEST-PAID',preference_id='PREF-TEST-PAID' WHERE id=?").run(id);
+ const verified=(await admin('/admin/api/order?id='+id)).body;
+ assert.equal(verified.produccion.polaroidsExpress.pagoConfirmado,true);
+ assert.equal(verified.produccion.polaroidsExpress.descargaHabilitada,false,
+  'el interruptor de descarga permanece apagado');
  db.prepare("INSERT INTO payment_reviews(order_id,state) VALUES(?,'revoked')").run(id);
  assert.equal((await admin('/admin/api/order?id='+id)).status,404);
 });
