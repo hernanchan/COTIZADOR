@@ -9,6 +9,7 @@ import {cotizarCargaUnica} from './cotizar-carga-unica.mjs';
 import {GRAFICA_COMERCIAL} from './cotizar-grafica.mjs';
 import {fase4FichaCentralPrivada} from './fase4-ficha-central-privada.mjs';
 import {enviarCentralFirmada} from './enviar-central-firmada.mjs';
+import {prepararMixtoCentralFirmado} from './preparar-mixto-central.mjs';
 import cargaClienteJs from './carga-unica-cliente.txt';
 import {cotizarPloteosRapido} from '../pruebas/cotizar-ploteos-rapido.mjs';
 import plotClienteJs from './ploteos-rapido-cliente.txt';
@@ -1000,7 +1001,7 @@ function scriptRapido(){
 /** Inspección de ficha central en piloto, solo operador con clave independiente.
  * No publica originales, no crea pedidos D1 ni permite pago.
  */
-async function apiFichaCentralPrivada(request,env,sincronizar=false){
+async function apiFichaCentralPrivada(request,env,sincronizar=false,mixto=false){
  if(request.method!=='POST')return closed();
  if(!allowed(request,env))
   return testResponse({ok:false,error:'Origen no permitido',paymentAuthorized:false},403);
@@ -1017,11 +1018,13 @@ async function apiFichaCentralPrivada(request,env,sincronizar=false){
  try{
   input=await readLimited(request);
   if(!input||typeof input!=='object'||Array.isArray(input)||
-     Object.keys(input).sort().join(',')!=='opciones,sesion')
+     Object.keys(input).sort().join(',')!==(mixto?'clientOrderId,items,opciones,polaroidReference,sesion':'opciones,sesion'))
     throw Error('Datos inválidos');
  }catch(_){return testResponse({ok:false,error:'Solicitud no válida',paymentAuthorized:false},400);}
  try{
-  if(sincronizar&&(env?.DOCS_CENTRAL_SYNC_ENABLED!=='PRIVATE_TEST_ONLY'||
+  if(mixto&&env?.DOCS_MIXED_PREPARE_ENABLED!=='PRIVATE_TEST_ONLY')
+    return testResponse({ok:false,error:'Pedido mixto privado apagado',paymentAuthorized:false},503);
+  if((sincronizar||mixto)&&(env?.DOCS_CENTRAL_SYNC_ENABLED!=='PRIVATE_TEST_ONLY'||
       typeof env?.CENTRAL_BRIDGE_KEY!=='string'||env.CENTRAL_BRIDGE_KEY.length<32||
       env.CENTRAL_BRIDGE_KEY===env.DOCS_CENTRAL_ADMIN_KEY||
       env.CENTRAL_BRIDGE_KEY===env.DOCS_RELAY_KEY))
@@ -1031,12 +1034,23 @@ async function apiFichaCentralPrivada(request,env,sincronizar=false){
    consultarFirmado:p=>postToScript(env,p,fetch,420000),
    preciosServidor:preciosPiloto
   });
-  if(sincronizar){
+  if(sincronizar||mixto){
    const resultado=await enviarCentralFirmada({
     verificacion:result,url:env.CENTRAL_TEST_URL,
     clave:env.CENTRAL_BRIDGE_KEY,habilitado:env.DOCS_CENTRAL_SYNC_ENABLED,
     service:env.SABER_CENTRAL
    });
+   if(mixto){
+    const commercial=await prepararMixtoCentralFirmado({env,
+     webOrderId:resultado.webOrderId,
+     polaroidReference:input.polaroidReference,
+     clientOrderId:input.clientOrderId,items:input.items});
+    return testResponse({ok:true,carritoMixto:true,
+     orderId:commercial.commercialOrderId,totalArs:commercial.amountArs,
+     idempotent:commercial.idempotent,
+     checkoutEnabled:false,paymentAuthorized:false,
+     listoParaProducir:false},200);
+   }
    return testResponse({ok:true,sincronizado:true,
     webOrderId:resultado.webOrderId,guardado:resultado.guardado,
     yaExistia:resultado.existia,paymentAuthorized:false,
@@ -1062,6 +1076,7 @@ export default {
     if(page==='/prueba-ploteos-rapido.js'&&request.method==='GET')return scriptPloteos();
     if(page==='/api/ensayo-ficha-central')return apiFichaCentralPrivada(request,env);
     if(page==='/api/ensayo-sincronizar-central')return apiFichaCentralPrivada(request,env,true);
+    if(page==='/api/ensayo-preparar-mixto')return apiFichaCentralPrivada(request,env,false,true);
     if(page==='/api/ensayo-carga-unica'){
       if(request.method!=='POST')return closed();
       try{
