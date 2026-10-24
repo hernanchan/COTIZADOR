@@ -4,7 +4,7 @@
  */
 const HOST=/^saber-pagos-pruebas\.[a-z0-9-]+\.workers\.dev$/;
 export async function enviarCentralFirmada({
- verificacion,url,clave,habilitado,fetcher=fetch,subtle=crypto.subtle,
+ verificacion,url,clave,habilitado,service,fetcher=fetch,subtle=crypto.subtle,
  nuevoId=()=>crypto.randomUUID(),ahora=()=>Math.floor(Date.now()/1000)
 }){
  if(habilitado!=='PRIVATE_TEST_ONLY'||typeof clave!=='string'||clave.length<32)
@@ -35,10 +35,18 @@ export async function enviarCentralFirmada({
  const data=new TextEncoder().encode(timestamp+'\n'+requestId+'\n'+body);
  const signature=Array.from(new Uint8Array(await subtle.sign('HMAC',key,data)),
   x=>x.toString(16).padStart(2,'0')).join('');
- const response=await fetcher(target.href,{method:'POST',headers:{
+ // El envío entre Workers de la misma cuenta usa un Service Binding.
+ // No recurrir a workers.dev en producción si falta el binding: la Central
+ // podría rechazar Worker-to-Worker fetch y no debe haber ruta alternativa.
+ if(typeof service?.fetch!=='function'&&fetcher===fetch)
+  throw Error('Falta vinculación privada SABER_CENTRAL en documentos.');
+ const options={method:'POST',headers:{
   'Content-Type':'application/json','x-saber-ts':String(timestamp),
   'x-saber-request-id':requestId,'x-saber-signature':signature
- },body,signal:AbortSignal.timeout(15000),redirect:'error'});
+ },body};
+ const response=typeof service?.fetch==='function'
+  ?await service.fetch(new Request(target.href,options))
+  :await fetcher(target.href,{...options,signal:AbortSignal.timeout(15000),redirect:'error'});
  const text=await response.text();
  if(!response.ok||text.length>4000)throw Error('La Central aún no confirmó la recepción.');
  let confirmacion;
