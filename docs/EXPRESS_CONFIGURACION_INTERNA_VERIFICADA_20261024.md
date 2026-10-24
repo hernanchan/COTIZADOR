@@ -293,3 +293,16 @@ Tras integrar `prepararPedidoComercialExpress()` como módulo, se detectó que *
 **Estado verificable:** commits realizados en la rama `polaroids/express-pdf-unico-20261023`; **no hay confirmación independiente de ejecución de las pruebas nuevas ni del despliegue de la última versión en Cloudflare** (el conector GitHub consultado expone solamente runs asociados a PR y los dominios Pages no se pudieron abrir con el navegador de consulta disponible). No confundir código preparado con comunicación remota probada; lo único verificado remotamente en HMAC es el diagnóstico anterior. Los interruptores de recepción, pedidos y pagos continúan previstos apagados; el archivo `recepcion-config.json` permanece con `enabled:false`, `showInShop:false`.
 
 **Siguiente bloqueo real**: Apps Script de recepción dedicado y prueba del PDF final desde el Worker a una carpeta privada limpia, seguido de manifiesto D1 y asociación al Centro de Pedidos. Este paso no se puede ejecutar con el conector Google Drive porque no administra despliegues de Apps Script o secretos de Cloudflare. Reservar cualquier intervención necesaria del propietario para una sola sesión final de habilitación **solo de ensayos**, sin habilitar cobros ni recepción pública.
+
+
+## GitHub Actions ejecutado y aprobado — 24/10/2026
+
+**Evidencia remota verificable:** al commit `aa49b4fb7b1d5fc9769fb877890863b45eda9be3` GitHub Actions le asignó inicialmente estado `failure`, corrida `40140206310`. Al consultar logs se detectó un error **exclusivamente en un test local**, `tests/polaroids-express-bridge-check.test.mjs:60`: el mock de Service Binding armaba `ts + '\\\\n' + id` (barra escapada literal) en lugar de usar el separador salto de línea exigido por el contrato HMAC. El módulo operativo no fue modificado por esta corrección.
+
+Se corrigió solamente el test en el commit **`0f5d3768efecfd3d9be5905a2f5001193cbd513b`**. El sistema de CI publicó el estado `polaroids-express/ci: success`; se confirmó vía GitHub API que **la corrida `40140275025` concluyó en `success` y todos sus pasos operativos finalizaron correctamente**. URL verificada: https://github.com/hernanchan/COTIZADOR/actions/runs/40140275025
+
+Incluye: compilación Worker Express, PDFs auténticos de 6/12/19/24 fotos, conservación del artefacto para inspección, tests de esquema D1 local, carrito/sandbox histórico, aislamiento de editor viejo, circuito local PDF→GAS simulado→Service Binding simulado→D1 SQLite, preparación comercial firmada, seis pruebas del contrato GAS simulado, controles de aislamiento y chequeos de sintaxis. **No demuestra envío remoto de PDF a Google Apps Script ni persistencia D1 de Cloudflare;** siguen pendientes esas dos verificaciones reales.
+
+Adicionalmente, se ejecutó en Node.js local (versión 22) el módulo `integraciones/polaroids/express/preparar-pedido-comercial.mjs` cuya SHA1 git coincide exactamente con el blob de GitHub `e981083ff5e9e5fd2fa76eb7120845fd9b94f271`; cinco pruebas de HMAC/binding/autorización/pagos arrojaron `pass 5, fail 0`, independientemente del CI.
+
+El workflow ahora informa su conclusión mediante el estado nativo de commit `polaroids-express/ci`, con permisos limitados a `contents:read` y `statuses:write`; permite consultar CI sin pedir capturas ni intervención. No se tocó `main`, no se activó recepción pública ni pagos.
