@@ -53,12 +53,21 @@ export async function onRequestPost({
     {name:'HMAC',hash:'SHA-256'},false,['sign']);
   const signature=hex(new Uint8Array(await subtle.sign('HMAC',key,
     new TextEncoder().encode(ts+'\n'+requestId+'\n'+body))));
+  // Cloudflare restringe fetch() hacia otro Worker del mismo ámbito.
+  // El binding interno SABER_CENTRAL es obligatorio en el runtime real.
+  const service=env?.SABER_CENTRAL;
+  if(typeof service?.fetch!=='function'&&fetcher===fetch)
+    return respond({ok:false,signedConnection:false,
+      error:'Falta vinculación privada SABER_CENTRAL',writes:false},503);
   try{
-    const result=await fetcher(dest.href,{method:'POST',headers:{
+    const options={method:'POST',headers:{
       'Content-Type':'application/json',
       'x-saber-ts':String(ts),'x-saber-request-id':requestId,
       'x-saber-signature':signature
-    },body,redirect:'error',signal:AbortSignal.timeout(12000)});
+    },body,redirect:'error',signal:AbortSignal.timeout(12000)};
+    const result=typeof service?.fetch==='function'
+      ?await service.fetch(new Request(dest.href,options))
+      :await fetcher(dest.href,options);
     // Sólo esta combinación prueba que HMAC pasó y el esquema fue rechazado.
     if(result.status!==422)
       return respond({ok:false,signedConnection:false,centralStatus:result.status,
