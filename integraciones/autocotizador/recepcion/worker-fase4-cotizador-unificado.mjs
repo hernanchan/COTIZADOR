@@ -1034,8 +1034,10 @@ async function apiFichaCentralPrivada(request,env,sincronizar=false,mixto=false,
     return testResponse({ok:false,error:'Sincronización con D1 no habilitada',paymentAuthorized:false},503);
   const parametros={consultarFirmado:p=>postToScript(env,p,fetch,420000),
    preciosServidor:preciosPiloto};
+  const extended=env?.DOCS_EXTENDED_RECEIVER_ENABLED==='PRIVATE_TEST_ONLY';
   const result=lote?
-   await fase4FichaCentralLotePrivada({...parametros,sesiones:input.sesiones}):
+   await fase4FichaCentralLotePrivada({...parametros,sesiones:input.sesiones,
+    maxFiles:extended?30:5,maxFileBytes:extended?20*1024*1024:1024*1024}):
    await fase4FichaCentralPrivada({...parametros,sesion:input.sesion,opciones:input.opciones});
   if(sincronizar||mixto){
    const resultado=await enviarCentralFirmada({
