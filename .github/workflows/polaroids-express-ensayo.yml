@@ -10,6 +10,8 @@ on:
       - 'integraciones/autocotizador/recepcion/enviar-central-firmada.mjs'
       - 'integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs'
       - 'tests/autocotizador-central-binding.test.mjs'
+      - 'integraciones/autocotizador/recepcion/preparar-mixto-central.mjs'
+      - 'tests/autocotizador-mixto-central.test.mjs'
       - 'functions/api/polaroids-express.js'
       - 'tests/polaroids-express-*.test.mjs'
       - 'tests/central-polaroids-express.test.mjs'
@@ -73,6 +75,8 @@ jobs:
       - name: Compilar Worker documental unificado con vínculo privado (sin desplegar)
         working-directory: integraciones/autocotizador/recepcion
         run: npm run build:unificado
+      - name: Probar adaptador del carrito mixto Documentos más Polaroids
+        run: node --test tests/autocotizador-mixto-central.test.mjs
       - name: Probar comunicación privada Documentos a Central D1
         run: node --test tests/autocotizador-central-binding.test.mjs
       - name: Validar superficie privada Express y conexión interna
@@ -87,6 +91,7 @@ jobs:
           node --check functions/api/polaroids-express.js
           node --check integraciones/polaroids/express/worker-order.mjs
           node --check integraciones/polaroids/express/functions/api/polaroids-order.js
+          node --check integraciones/autocotizador/recepcion/preparar-mixto-central.mjs
       - name: Registrar el resultado de pruebas para consulta automática
         if: ${{ always() }}
         env:
