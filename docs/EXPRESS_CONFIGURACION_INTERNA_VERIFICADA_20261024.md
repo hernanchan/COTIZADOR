@@ -64,3 +64,13 @@ Captura de `saber-polaroids-express-pruebas` > Implementaciones: sitio de prueba
 Comparación exacta GitHub `d1167d8...` → rama `polaroids/express-pdf-unico-20261023`: **4 commits posteriores**, y solo dos rutas modificadas/agregadas: `docs/EXPRESS_CONFIGURACION_INTERNA_VERIFICADA_20261024.md` (documentación) y `integraciones/mercadopago/pruebas/migraciones/20261024-central-polaroids-express.sql` (migración aditiva D1). **No hay cambios de Worker o cliente Express en GitHub después del commit desplegado**. Esto no sustituye comparar el artefacto remoto compilado ni comprobar si las variables Pages guardadas son efectivas en la implementación vigente.
 
 Configuración Pages vista en otra captura: `CENTRAL_BRIDGE_KEY` y `EXPRESS_PDF_HMAC_KEY` enmascaradas; `EXPRESS_ALLOWED_HOST=saber-polaroids-express-pruebas.pages.dev`; `EXPRESS_PDF_SCRIPT_URL` ya establecida; `EXPRESS_CENTRAL_SYNC_ENABLED=PRIVATE_TEST_ONLY`; `CENTRAL_EXPRESS_URL` con host `saber-pagos-pruebas.libreriasaber.workers.dev` (el campo no deja ver el sufijo en captura). Ninguna evidencia de que estén activadas `EXPRESS_RECEPTION_ENABLED`, `EXPRESS_PDF_ENABLED` o checkout. Archivo de `recepcion-config.json` en commit activo conserva `enabled:false`, `showInShop:false`, `rollout:PENDIENTE_DE_APROBACION`. Ninguna foto ni pedido real recibido o sincronizado en esta revisión. Comprobaciones GET de ambos hosts no resultaron accesibles desde herramientas externas del asistente; quedan pendientes verificaciones remotas.
+
+## Prueba HTTP real de lectura de Pages Express — 24/10/2026
+
+El propietario abrió en su Chrome el endpoint real `GET https://saber-polaroids-express-pruebas.pages.dev/api/polaroids-express` y reportó exactamente:
+
+```json
+{"ok":true,"service":"polaroids-express","enabled":false,"photosPerSheet":6,"maxPhotos":24,"pdfForClient":false}
+```
+
+**Acredita:** respuesta HTTPS del endpoint desde su navegador y recepción Express deshabilitada en la versión consultada. **No acredita:** sincronización Cloudflare↔Cloudflare firmada con HMAC, claves coincidentes, registro en D1 ni creación de pedido. No se transmitieron fotos, PDF, datos de pago ni información secreta. El asistente intentó consultar los hosts desde una herramienta web externa, pero esta no pudo acceder a ninguno de los dos: esto no implica caída del servicio. Próxima prueba pasiva sugerida: `GET /internal/central/polaroid-stage` del Worker Central, que con las claves/flags correctos debe rechazar peticiones GET sin firma con HTTP 403 y `Solicitud entre servidores requerida`. Esa comprobación sigue sin demostrar comunicación firmada.
