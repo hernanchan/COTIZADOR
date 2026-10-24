@@ -1034,7 +1034,8 @@ async function apiFichaCentralPrivada(request,env,sincronizar=false){
   if(sincronizar){
    const resultado=await enviarCentralFirmada({
     verificacion:result,url:env.CENTRAL_TEST_URL,
-    clave:env.CENTRAL_BRIDGE_KEY,habilitado:env.DOCS_CENTRAL_SYNC_ENABLED
+    clave:env.CENTRAL_BRIDGE_KEY,habilitado:env.DOCS_CENTRAL_SYNC_ENABLED,
+    service:env.SABER_CENTRAL
    });
    return testResponse({ok:true,sincronizado:true,
     webOrderId:resultado.webOrderId,guardado:resultado.guardado,
