@@ -37,13 +37,33 @@ small{color:#586b79}.drop{border:2px dashed #9aaebf;padding:18px;text-align:cent
 <div><label>Anillado</label><select id="binding"><option value="ninguno">Sin anillado</option><option value="juntos">Todos juntos</option><option value="separados">Por separado</option></select></div></div>
 <button id="quote" type="button" disabled>Calcular presupuesto conjunto</button>
 <div id="out" role="status" aria-live="polite">Agregá un PDF para comenzar.</div>
-<p><small>Precios orientativos de agosto de 2026, no aprobados para cobro. La pestaña debe permanecer abierta durante el ensayo. El piloto no admite compras.</small></p>
+<p><small>Precios orientativos de agosto de 2026, no aprobados para cobro. Si recargás la página, volvé a seleccionar los PDF del pedido: el servidor consulta los fragmentos ya recibidos. El piloto no admite compras.</small></p>
 </main><script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 <script>
 const $=id=>document.getElementById(id);
 const recibidos=[];const pendientes=new Map();const preparados=[];let ocupado=false;let primeraCotizacion=true;
-const batchBytes=new Uint8Array(8);crypto.getRandomValues(batchBytes);
-const batchOrderId='WEB-ENSAYO-'+Array.from(batchBytes,x=>x.toString(16).padStart(2,'0')).join('').toUpperCase();
+// Únicamente se conserva una referencia aleatoria NO secreta de la compra.
+ // Nunca se guardan tokens de GAS, archivos, PDFs ni fragmentos en el navegador.
+const ORDER_RECOVERY_KEY='saber-lote-ampliado-order-v1';
+function recoverOrderId(){
+ const now=Date.now();
+ try{
+  const raw=sessionStorage.getItem(ORDER_RECOVERY_KEY);
+  if(raw&&raw.length<256){
+   const item=JSON.parse(raw);
+   if(item?.version===1&&/^WEB-ENSAYO-[A-F0-9]{32}$/.test(item.orderId||'')&&
+      Number.isSafeInteger(item.createdAt)&&now>=item.createdAt&&
+      now-item.createdAt<24*60*60*1000)return item.orderId;
+  }
+ }catch{}
+ const random=new Uint8Array(16);crypto.getRandomValues(random);
+ const orderId='WEB-ENSAYO-'+Array.from(random,x=>x.toString(16).padStart(2,'0')).join('').toUpperCase();
+ try{sessionStorage.setItem(ORDER_RECOVERY_KEY,JSON.stringify({
+  version:1,orderId,createdAt:now
+ }))}catch{}
+ return orderId;
+}
+const batchOrderId=recoverOrderId();
 const MAX_BATCH_BYTES=60*1024*1024;
 const add=$('add'),quote=$('quote'),out=$('out'),list=$('files'),porEnviar=$('pending');
 const say=s=>{out.textContent=s};
@@ -117,9 +137,8 @@ add.addEventListener('click',async()=>{
   if(String.fromCharCode(...bytes.subarray(0,5))!=='%PDF-')throw Error('No es un PDF válido.');
   const sha=await hash(buf);if(recibidos.some(r=>r.sha===sha))throw Error('Ese mismo PDF ya fue incorporado.');
   const key=sha+':'+mode+':'+file.name;let state=pendientes.get(key);
-  // Una sesión recién creada aún no tiene fragmentos: evitar el status
-  // redundante. En reintentos SIEMPRE consultar Google antes de reenviar.
-  const sesionNueva=!state;
+  // Incluso si la pestaña se recargó, start puede devolver una sesión
+  // existente. Consultar SIEMPRE Google antes de reenviar cualquier bloque.
   const parts=Math.ceil(file.size/524288);
   if(!state){
    const orderId=batchOrderId;
@@ -132,7 +151,7 @@ add.addEventListener('click',async()=>{
   }
   const tTransferencia=performance.now();
   const inicioFragmentos=tTransferencia;
-  const progress=sesionNueva?{acceptedParts:[]}:await rpc('/api/ensayo-pdf-ampliado',{
+  const progress=await rpc('/api/ensayo-pdf-ampliado',{
    op:'status',uploadId:state.uploadId,token:state.token
   });
   const accepted=new Set(progress.acceptedParts||[]);
@@ -155,7 +174,7 @@ add.addEventListener('click',async()=>{
     '\\nInicio protegido: '+Math.round(tTransferencia-inicioCarga)+' ms (incluye lectura y SHA-256 local)'+
     '\\nTransferencia y estado: '+Math.round(tConfirmacion-inicioFragmentos)+' ms'+
     '\\nConfirmación de recepción: '+Math.round(finCarga-tConfirmacion)+' ms');
- }catch(e){say('No se pudo terminar: '+String(e.message||e)+'. Si ya comenzó la subida, reintentá con el mismo archivo sin cerrar esta pestaña.')}
+ }catch(e){say('No se pudo terminar: '+String(e.message||e)+'. Volvé a seleccionar el mismo archivo para consultar lo recibido y continuar.')}
  finally{ocupado=false;redraw();window.turnstile?.reset()}
 });
 quote.addEventListener('click',async()=>{
