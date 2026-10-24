@@ -45,6 +45,24 @@ test('24 fotos JPG grandes: un PDF real privado bajo 12MB y 4 A4',async()=>{
   'El ensayo debe usar un PDF de carga importante');
  assert.ok(result.pdfBytes.length<=EXPRESS.maxPdfBytes);
  assert.ok(Math.ceil(result.pdfBytes.length/3)*4<17*1024*1024);
+ const envelope=JSON.stringify({reference:'POL-'+'C'.repeat(24),
+  turnstileToken:'token-de-ensayo',hojas:hojas.map(page=>
+   page.map(jpg=>Buffer.from(jpg).toString('base64')))});
+ assert.ok(Buffer.byteLength(envelope,'utf8')<=18*1024*1024,
+  'El pedido completo superó el límite del Worker');
+ const gasPayloadBytes=Buffer.byteLength(JSON.stringify({
+  op:'guardarPdfExpress',referencia:'POL-'+'C'.repeat(24),
+  sha256:'0'.repeat(64),bytes:result.pdfBytes.length,
+  paginas:4,fotos:24,
+  pdfBase64:Buffer.from(result.pdfBytes).toString('base64')
+ }),'utf8');
+ assert.ok(gasPayloadBytes<=19*1024*1024,
+  'El PDF codificado superó el límite del receptor GAS');
+ console.log('Prueba de 24 JPEG grandes: '+JSON.stringify({
+  jpegBytes:hojas.flat().reduce((n,photo)=>n+photo.length,0),
+  pdfBytes:result.pdfBytes.length,clientRequestBytes:Buffer.byteLength(envelope,'utf8'),
+  gasPayloadBytes
+ }));
  const doc=await PDFDocument.load(result.pdfBytes);
  assert.equal(doc.getPageCount(),4);
  assert.ok(doc.getPages().every(p=>Math.abs(p.getWidth()-595.2756)<.1));
