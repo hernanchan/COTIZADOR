@@ -202,3 +202,21 @@ Esto corresponde al diagnóstico protegido del commit `15cb523c5d7960e0f591eb0db
 - Mantener el despliegue automatizado en el proyecto *aislado* únicamente durante desarrollo; no incorporar nada a `main` ni publicar herramientas a clientes antes de aprobación comercial.
 
 No repetir la prueba de HMAC ya superada salvo que cambie la arquitectura, la vinculación o las claves.
+
+
+## Saneamiento post-HMAC y autonomía de desarrollo — 24/10/2026
+
+Tras confirmar el éxito de la comunicación real HMAC, se retiraron en la rama de ensayos **tres archivos de exposición temporal**:
+- `integraciones/polaroids/express/public/pruebas/puente-hmac.html`
+- `integraciones/polaroids/express/functions/api/express-bridge-check.js`
+- `functions/api/express-bridge-check.js`
+
+Se conserva el módulo de diagnóstico **no expuesto públicamente** `integraciones/polaroids/express/probar-puente-hmac.mjs` solo para regresiones automatizadas, sin ruta Pages. La comunicación productiva futura continúa usando el Service Binding `SABER_CENTRAL` y la firma HMAC. La configuración actual de fuentes `recepcion-config.json` sigue con `enabled:false`, `showInShop:false`, `rollout:PENDIENTE_DE_APROBACION`.
+
+Se añadió una batería específica de **comprobaciones de aislamiento** `tests/polaroids-express-aislamiento.test.mjs` que verifica ausencia de esas rutas, configuración de recepción bloqueada, guardas del Worker, binding interno y PDF no disponible para el cliente; el workflow `.github/workflows/polaroids-express-ensayo.yml` ahora incorpora esta prueba y la del Service Binding. **No atribuir estado CI exitoso sin un resultado de ejecución confirmado.** Los commits en esta rama disparan despliegue automático en el proyecto **aislado** según la configuración declarada del propietario; falta verificación externa de la versión activa posterior a la retirada. No se alteró la web pública.
+
+En Drive se localizó la carpeta de ensayo `POLAROIDS EXPRESS - ENSAYO PDF UNICO - 2026-10-23` y un PDF `ENSAYO_PRIVADO_UNICO_PDF_DRIVE_2026-10-23.pdf`. Este archivo ya existente no demuestra recepción Express actual ni creación por GAS en esta etapa. La carpeta no tiene permiso público de tipo `anyone` en los metadatos obtenidos, pero sí permisos de usuario adicionales al propietario; revisar alcance antes de la recepción real. **No se crearon ni modificaron archivos de Drive.**
+
+### Próximo bloque útil sin intervención del propietario
+
+Revisar el flujo GAS → PDF único → ficha de D1 → Centro de Pedidos en código y pruebas aisladas, cerrando puntos pendientes que se puedan resolver en la rama. El acceso directo a configuración o publicación de Cloudflare/GAS desde los conectores actuales no está disponible: agrupar cualquier instrucción manual necesaria en una sola sesión de validación con alcance previamente delimitado. No pedir nuevas capturas ni repetir pruebas HMAC aprobadas. No habilitar pagos ni recepción pública.
