@@ -272,3 +272,10 @@ Se implementó `integraciones/polaroids/express/preparar-pedido-comercial.mjs`, 
 Pruebas de contrato añadidas a `tests/polaroids-express-preparar-pedido.test.mjs` y al workflow `.github/workflows/polaroids-express-ensayo.yml`: HMAC interno de alta comercial, guardas apagadas, entradas maliciosas, rechazo de checkout activado y respuesta de pago inconsistente. **Pendiente su ejecución efectiva**; se verificó el archivo y la referencia del workflow en GitHub, no una corrida de Actions.
 
 **No tocar** `main`, `libreriasaber.com.ar`, recepción de fotografías, claves ni pagos. Para culminar el recorrido privado faltan aún pruebas reales de GAS/Drive y alta D1 de ensayo, seguidas de integración consciente con carrito y pago exclusivamente cuando el propietario lo autorice.
+
+
+## Verificación de distribución y marcas de corte en 1–24 fotografías — 24/10/2026
+
+Se ejecutó **el motor de distribución real** de `integraciones/polaroids/express/motor-pdf.mjs` en un aislado JS con una implementación simulada exclusivamente del objeto `pdfLib`. Los casos de 1, 6, 12, 19 y 24 fotografías comprobaron: páginas `1,1,2,4,4`, dibujos de foto exactamente iguales a `1,6,12,19,24`, **14 marcas de corte por cada hoja A4** y dimensiones de página `595.28 × 841.89 pt` (A4). El objeto simulado emitía bytes ficticios con cabecera PDF; **esta verificación no constituye un PDF codificado auténtico ni prueba de impresión física**. La generación real mediante `pdf-lib` ya está cubierta por `tests/polaroids-express-motor.test.mjs`, incorporando ahora un nuevo caso de regresión para verificar en todos esos tamaños las 14 marcas y ausencia de rectángulos cerrados. El resultado de ejecución del nuevo caso de GitHub Actions sigue pendiente de confirmación.
+
+El proyecto continúa **sin recepción pública y sin pagos**. La prueba no envió información a Cloudflare, GAS, Drive o D1.
