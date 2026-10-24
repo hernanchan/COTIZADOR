@@ -386,3 +386,147 @@ test('Central: unifica Documentos, Polaroids Express y catálogo en un único pe
   if(flags[key]===undefined)delete env[key];else env[key]=flags[key];
  }}
 });
+
+
+test('Pedido integral E2E: PDF auténticos de Drive simulado → HMAC → Central D1 → Express + tienda',async()=>{
+ const {createHash}=await import('node:crypto');
+ const {createRequire}=await import('node:module');
+ const {fase4FichaCentralLotePrivada}=await import('../integraciones/autocotizador/recepcion/fase4-ficha-central-lote-privada.mjs');
+ const {enviarCentralFirmada}=await import('../integraciones/autocotizador/recepcion/enviar-central-firmada.mjs');
+ const {prepararMixtoCentralFirmado}=await import('../integraciones/autocotizador/recepcion/preparar-mixto-central.mjs');
+ const precios=JSON.parse(readFileSync(new URL('../precios-web.json',import.meta.url),'utf8'));
+ const require=createRequire(new URL('../integraciones/autocotizador/recepcion/package.json',import.meta.url));
+ const {PDFDocument}=require('pdf-lib');
+ const docId='WEB-INTEGRAL-E2E-20261024';
+ const polReference='POL-'+'D'.repeat(24);
+ const sessions=[
+  {sesion:{uploadId:'DOC-11111111-1234-4234-8234-1234567890ab',token:'valid-e2e-document-token-000001'},
+   opciones:{servicio:'stickers',seleccion:'a4',paginasSeleccionadas:'',
+    copias:1,modo:'bn',caras:'simple',papelPoster:'obra80',anillado:'ninguno',
+    grupoAnillado:'',materialColor:'',productoFoto:'',productoGrafica:'',
+    corteVariante:'gt3',corteMetros:1}},
+  {sesion:{uploadId:'DOC-22222222-1234-4234-8234-1234567890ab',token:'valid-e2e-document-token-000002'},
+   opciones:{servicio:'grafica',productoGrafica:'tarjetas-0',seleccion:'a4',
+    paginasSeleccionadas:'',copias:1,modo:'bn',caras:'simple',papelPoster:'obra80',
+    anillado:'ninguno',grupoAnillado:'',materialColor:'',productoFoto:'',
+    corteVariante:'gt3',corteMetros:1}}
+ ];
+ const docs=new Map(),steps=[];
+ for(let i=0;i<2;i++){
+  const pdf=await PDFDocument.create();
+  pdf.addPage([595.28,841.89]);
+  const bytes=Buffer.from(await pdf.save());
+  const s=sessions[i].sesion;
+  const receipt={ok:true,receiptId:s.uploadId,orderId:docId,fileId:'f'+(i+1),
+   name:i===0?'stickers.pdf':'tarjetas.pdf',mode:'bn',
+   bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),pages:1};
+  docs.set(s.uploadId,{receipt,bytes,token:s.token});
+ }
+ const consultarFirmado=async({op,uploadId,token,offset})=>{
+  steps.push(op);
+  const d=docs.get(uploadId);
+  if(!d||d.token!==token)return {ok:false};
+  if(op==='multiInfo')return {...d.receipt,
+   receiptState:'pages_verified',privateChunkBytes:256*1024};
+  if(op==='multiVerifiedStatus')return {...d.receipt,status:'verified',
+   verified:true,storageVerified:true,pageVerification:'server',
+   paymentAuthorized:false};
+  if(op==='multiReadPart'){
+   const bytes=d.bytes.subarray(offset,offset+256*1024);
+   return {ok:true,receiptId:uploadId,offset,length:bytes.length,
+    bytes:d.bytes.length,sha256:d.receipt.sha256,
+    chunkSha256:createHash('sha256').update(bytes).digest('hex'),
+    dataBase64:bytes.toString('base64')};
+  }
+  throw Error('Operación GAS no permitida');
+ };
+ const docsManifest=await fase4FichaCentralLotePrivada({
+  sesiones,consultarFirmado,preciosServidor:precios
+ });
+ assert.equal(docsManifest.orderId,docId);
+ assert.equal(docsManifest.importeVerificado,21000);
+ assert.equal(docsManifest.recibos.length,2);
+ assert.deepEqual(docsManifest.ficha.trabajos.map(x=>x.servicio),['stickers','grafica']);
+ assert.equal(steps.filter(x=>x==='multiReadPart').length,2);
+ assert.equal(docsManifest.paymentAuthorized,false);
+ assert.equal(docsManifest.listoParaProducir,false);
+ let internalCalls=0,publicCalls=0;
+ const internal={async fetch(req){
+  internalCalls++;
+  assert.equal(req.headers.get('Origin'),null,'No sale desde navegador');
+  assert.equal(new URL(req.url).hostname,'saber-pagos-pruebas.libreriasaber.workers.dev');
+  return context.worker.fetch(req,env);
+ }};
+ const before=db.prepare('SELECT COUNT(*) n FROM central_document_manifests').get().n;
+ const signedOptions={
+  verificacion:docsManifest,
+  url:'https://saber-pagos-pruebas.libreriasaber.workers.dev/internal/central/stage',
+  clave:env.CENTRAL_BRIDGE_KEY,habilitado:'PRIVATE_TEST_ONLY',
+  service:internal,subtle:webcrypto.subtle,nuevoId:randomUUID,
+  fetcher:async()=>{publicCalls++;throw Error('Prohibido fetch público')}
+ };
+ const first=await enviarCentralFirmada(signedOptions);
+ assert.equal(first.guardado,true);
+ assert.equal(first.existia,false);
+ assert.equal(db.prepare('SELECT COUNT(*) n FROM central_document_manifests').get().n,before+1);
+ const again=await enviarCentralFirmada(signedOptions);
+ assert.equal(again.existia,true);
+ assert.equal(publicCalls,0);
+ const pol={schema:'saber-polaroids-express-central-v1',referencia:polReference,
+  fotos:6,hojas:1,sha256:'e'.repeat(64),bytes:123456,importeArs:3000,
+  pdfPrivadoVerificado:true,pagoConfirmado:false,listoParaProducir:false};
+ const oldFlags={
+  CENTRAL_EXPRESS_ENABLED:env.CENTRAL_EXPRESS_ENABLED,
+  CENTRAL_PREPARE_ENABLED:env.CENTRAL_PREPARE_ENABLED,
+  CENTRAL_EXPRESS_PREPARE_ENABLED:env.CENTRAL_EXPRESS_PREPARE_ENABLED,
+  CENTRAL_MIXED_PREPARE_ENABLED:env.CENTRAL_MIXED_PREPARE_ENABLED
+ };
+ try{
+  Object.assign(env,{CENTRAL_EXPRESS_ENABLED:'PRIVATE_TEST_ONLY',
+   CENTRAL_PREPARE_ENABLED:'PRIVATE_TEST_ONLY',
+   CENTRAL_EXPRESS_PREPARE_ENABLED:'PRIVATE_TEST_ONLY',
+   CENTRAL_MIXED_PREPARE_ENABLED:'PRIVATE_TEST_ONLY'});
+  assert.equal((await call('/internal/central/polaroid-stage',pol)).status,201);
+  const clientOrderId=randomUUID();
+  const mixedEnv={...env,
+   DOCS_MIXED_PREPARE_ENABLED:'PRIVATE_TEST_ONLY',
+   DOCS_CENTRAL_SYNC_ENABLED:'PRIVATE_TEST_ONLY',
+   DOCS_CENTRAL_ADMIN_KEY:'admin-not-hmac',
+   DOCS_RELAY_KEY:'gas-hmac-not-central',
+   CENTRAL_TEST_URL:signedOptions.url,
+   SABER_CENTRAL:internal
+  };
+  const prepare=()=>prepararMixtoCentralFirmado({env:mixedEnv,
+   webOrderId:docId,polaroidReference:polReference,clientOrderId,
+   items:[{code:'ABC-1',qty:2}],subtle:webcrypto.subtle,requestId:randomUUID});
+  const made=await prepare();
+  assert.equal(made.created,true);
+  assert.equal(made.amountArs,31000);
+  assert.equal(made.paymentAuthorized,false);
+  assert.equal(made.checkoutEnabled,false);
+  const order=made.commercialOrderId;
+  const lineItems=db.prepare('SELECT item_type,sku,line_total_ars FROM order_items WHERE order_id=? ORDER BY line_number').all(order);
+  assert.deepEqual(lineItems.map(x=>x.sku),
+   ['DOCS_VERIFIED','POLAROID_EXPRESS_A4','ABC-1']);
+  assert.equal(lineItems.reduce((n,x)=>n+x.line_total_ars,0),31000);
+  const stored=db.prepare('SELECT status,amount_ars,preference_id,paid_at FROM orders WHERE id=?').get(order);
+  assert.equal(stored.status,'awaiting_payment');
+  assert.equal(stored.amount_ars,31000);
+  assert.equal(stored.preference_id,null);
+  assert.equal(stored.paid_at,null);
+  assert.equal((await prepare()).commercialOrderId,order,'Reintento sin nueva compra');
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM cart_requests WHERE order_id=?').get(order).n,1);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM orders WHERE id=?').get(order).n,1);
+  const paid=await context.worker.fetch(new Request(base+'/demo/checkout',{
+   method:'POST',headers:{Authorization:'Bearer '+env.DEMO_ADMIN_KEY,
+   'Content-Type':'application/json'},body:JSON.stringify({order_id:order})}),env);
+  assert.equal(paid.status,503,'Los PDF NO pueden pasar a cobro');
+  assert.equal(publicCalls,0);
+  assert.ok(internalCalls>=4);
+ }finally{
+  for(const [key,value] of Object.entries(oldFlags)){
+   if(value===undefined)delete env[key];
+   else env[key]=value;
+  }
+ }
+});
