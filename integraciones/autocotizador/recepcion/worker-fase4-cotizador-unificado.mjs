@@ -729,7 +729,9 @@ function phase4Opts(o){
   ['ninguno','juntos'].includes(o.anillado)&&
   Number.isSafeInteger(o.copias)&&o.copias>=1&&o.copias<=200;
 }
-async function fase4Transfer(request,env){
+async function fase4Transfer(request,env,extended=false){
+ if(extended&&env?.DOCS_EXTENDED_RECEIVER_ENABLED!=='PRIVATE_TEST_ONLY')
+  return testResponse({ok:false,error:'Recepción ampliada privada deshabilitada',paymentAuthorized:false},503);
  if(request.method!=='POST')return closed();
  if(!allowed(request,env))
    return testResponse({ok:false,error:'Origen no autorizado',paymentAuthorized:false},403);
@@ -738,8 +740,11 @@ async function fase4Transfer(request,env){
   o=await readLimited(request);validateBasic(o);
   if(o.op==='start'){
    const m=o.meta;
-   if(m.fileId!=='documento'||m.bytes>FASE4_QUOTA_BYTES||
-      !['bn','color'].includes(m.mode)||m.name.length>120)throw Error('Límite alcanzado');
+   if((!extended&&(m.fileId!=='documento'||m.bytes>FASE4_QUOTA_BYTES||
+      !['bn','color'].includes(m.mode)))||
+      (extended&&(!/^[A-Za-z0-9_-]{1,80}$/.test(m.fileId)||
+       m.bytes>DOCS_MAX||!['bn','color','cad','poster'].includes(m.mode)))||
+      m.name.length>120)throw Error('Límite alcanzado');
   }else if(!phase4Session(o.uploadId)||!phase4Token(o.token)){
    throw Error('Sesión inválida');
   }
@@ -748,20 +753,22 @@ async function fase4Transfer(request,env){
    return testResponse({ok:false,error:'No se pudo verificar el inicio seguro',paymentAuthorized:false},403);
  const p={...o};delete p.turnstileToken;
  if(o.op==='start'){
-   if(!/^WEB-ENSAYO-[A-F0-9]{16}$/.test(o.meta.orderId||''))
+   if(!(extended?/^WEB-[A-Za-z0-9_-]{5,80}$/.test(o.meta.orderId||''):
+     /^WEB-ENSAYO-[A-F0-9]{16}$/.test(o.meta.orderId||'')))
      return testResponse({ok:false,error:'ID de prueba inválido',paymentAuthorized:false},400);
-   p.meta={...o.meta,fileId:'documento'};
+   p.meta={...o.meta,fileId:extended?o.meta.fileId:'documento'};
  }
  p.op=({start:'multiStart',part:'multiPart',finish:'multiFinish',status:'multiStatus'})[o.op];
  try {
    const response=await postToScript(env,p,fetch);
-   if(!response.ok)return testResponse({ok:false,error:'Google no pudo recibir el PDF o se agotó el cupo de cinco archivos',
+   if(!response.ok)return testResponse({ok:false,error:'Google no pudo recibir el PDF o se agotó el cupo de recepción privada',
      paymentAuthorized:false},422);
    return testResponse({...response,ok:true,paymentAuthorized:false},200);
  }catch(_){return testResponse({ok:false,error:'No se confirmó la recepción. Comprobá el estado antes de reintentar',
     paymentAuthorized:false},502)}
 }
-async function fase4PrivateVerified(env,session,metrics=null,preferirInfo=false){
+async function fase4PrivateVerified(env,session,metrics=null,preferirInfo=false,maxFileBytes=FASE4_QUOTA_BYTES){
+ if(![FASE4_QUOTA_BYTES,DOCS_MAX].includes(maxFileBytes))throw Error('Límite documental inválido');
  const mark=()=>Date.now();let last=mark();
  const lap=(name)=>{if(metrics){metrics[name]=mark()-last;}last=mark();};
  const ctx={uploadId:session.uploadId,token:session.token};
@@ -775,7 +782,7 @@ async function fase4PrivateVerified(env,session,metrics=null,preferirInfo=false)
      previo.storageVerified===true&&previo.pageVerification==='server'&&
      previo.paymentAuthorized===false&&previo.receiptId===ctx.uploadId&&
      Number.isSafeInteger(previo.pages)&&previo.pages>=1&&
-     Number.isSafeInteger(previo.bytes)&&previo.bytes>=5&&previo.bytes<=FASE4_QUOTA_BYTES&&
+     Number.isSafeInteger(previo.bytes)&&previo.bytes>=5&&previo.bytes<=maxFileBytes&&
      /^[a-f0-9]{64}$/.test(previo.sha256||'')){
     return previo;
   }
@@ -783,7 +790,7 @@ async function fase4PrivateVerified(env,session,metrics=null,preferirInfo=false)
  const info=await postToScript(env,{op:'multiInfo',...ctx},fetch);
  lap('consultaGoogleMs');
  if(!info.ok||!phase4Session(info.receiptId)||info.receiptId!==ctx.uploadId||
-    !Number.isSafeInteger(info.bytes)||info.bytes<5||info.bytes>FASE4_QUOTA_BYTES||
+    !Number.isSafeInteger(info.bytes)||info.bytes<5||info.bytes>maxFileBytes||
     !/^[a-f0-9]{64}$/.test(info.sha256||'')||
     info.privateChunkBytes!==FASE4_CHUNK_BYTES)throw Error('Información privada inválida');
  if(info.pageVerification==='server'&&Number.isSafeInteger(info.pages)&&info.pages>=1){
@@ -866,7 +873,8 @@ function pantallaLote(env){
   });
  }catch(_){return testResponse({ok:false,error:'Turnstile ausente',paymentAuthorized:false},503);}
 }
-function validarLote(op){
+function validarLote(op,maxFiles=5){
+ if(![5,30].includes(maxFiles))return false;
  return op&&typeof op==='object'&&!Array.isArray(op)&&
    (Object.keys(op).sort().join(',')==='anillado,caras,copias,formato,sesiones'||
     Object.keys(op).sort().join(',')==='anillado,caras,copias,formato,primeraCotizacion,sesiones'&&
@@ -874,25 +882,28 @@ function validarLote(op){
    ['a4','a3'].includes(op.formato)&&['simple','double'].includes(op.caras)&&
    ['ninguno','juntos','separados'].includes(op.anillado)&&
    Number.isSafeInteger(op.copias)&&op.copias>=1&&op.copias<=200&&
-   Array.isArray(op.sesiones)&&op.sesiones.length>=1&&op.sesiones.length<=5&&
+   Array.isArray(op.sesiones)&&op.sesiones.length>=1&&op.sesiones.length<=maxFiles&&
    op.sesiones.every(s=>s&&typeof s==='object'&&!Array.isArray(s)&&
      Object.keys(s).sort().join(',')==='token,uploadId'&&
      phase4Session(s.uploadId)&&phase4Token(s.token))&&
    new Set(op.sesiones.map(s=>s.uploadId)).size===op.sesiones.length;
 }
-async function fase4QuoteLote(request,env){
+async function fase4QuoteLote(request,env,extended=false){
+ if(extended&&env?.DOCS_EXTENDED_RECEIVER_ENABLED!=='PRIVATE_TEST_ONLY')
+  return testResponse({ok:false,error:'Cotización ampliada privada deshabilitada',paymentAuthorized:false},503);
+ const maxFiles=extended?30:5,maxFileBytes=extended?DOCS_MAX:FASE4_QUOTA_BYTES;
  if(request.method!=='POST')return closed();
  if(!allowed(request,env))
    return testResponse({ok:false,error:'Origen no autorizado',paymentAuthorized:false},403);
  let op;
- try{op=await readLimited(request);if(!validarLote(op))throw Error('Lote inválido');}
+ try{op=await readLimited(request);if(!validarLote(op,maxFiles))throw Error('Lote inválido');}
  catch(_){return testResponse({ok:false,error:'Opciones de lote inválidas',paymentAuthorized:false},400);}
  try {
    const start=Date.now(),recibos=[],tiemposPorArchivo=[];
    // Secuencial: proteger cuotas de Apps Script. La aceleración requiere mediciones reales.
    for(const s of op.sesiones){
      const metricas={};const inicioArchivo=Date.now();
-     const r=await fase4PrivateVerified(env,s,metricas,op.primeraCotizacion===true);
+     const r=await fase4PrivateVerified(env,s,metricas,op.primeraCotizacion===true,maxFileBytes);
      tiemposPorArchivo.push({numero:tiemposPorArchivo.length+1,
        totalMs:Date.now()-inicioArchivo,...metricas});
      if(!r.ok||r.verified!==true||r.storageVerified!==true||
@@ -902,7 +913,8 @@ async function fase4QuoteLote(request,env){
    }
    const result=cotizarLoteVerificado({recibosVerificados:recibos,
      formato:op.formato,caras:op.caras,copias:op.copias,
-     anillado:op.anillado,materialColor:'obra70',precios:preciosPiloto});
+     anillado:op.anillado,materialColor:'obra70',precios:preciosPiloto,
+     maxFiles,maxFileBytes,requireSharedOrder:extended});
    return testResponse({...result,tiempoServidorMs:Date.now()-start,
      tiemposPorArchivo,paymentAuthorized:false},200);
  }catch(_){
@@ -1105,7 +1117,9 @@ export default {
     if(page==='/api/ensayo-materiales-rapido')return catalogoMaterialesRapido(request,env);
     if(page==='/api/ensayo-presupuesto-rapido')return cotizacionRapida(request,env);
     if(page==='/api/ensayo-cotizar-lote')return fase4QuoteLote(request,env);
+    if(page==='/api/ensayo-cotizar-lote-ampliado')return fase4QuoteLote(request,env,true);
     if(page==='/api/ensayo-pdf')return fase4Transfer(request,env);
+    if(page==='/api/ensayo-pdf-ampliado')return fase4Transfer(request,env,true);
     if(page==='/api/ensayo-cotizar')return fase4Quote(request,env);
     if(page==='/prueba-presupuesto'&&request.method==='GET')return presupuestoHtml(env);
     if(page==='/api/presupuesto-pdf')return presupuestoPost(request,env);
