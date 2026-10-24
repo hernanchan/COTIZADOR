@@ -41,10 +41,18 @@ export async function enviarPolaroidsACentral({
   {name:'HMAC',hash:'SHA-256'},false,['sign']);
  const digest=hex(new Uint8Array(await subtle.sign('HMAC',key,
   new TextEncoder().encode(ts+'\n'+id+'\n'+body))));
- const response=await fetcher(url.href,{method:'POST',
+ // Servicio interno entre Workers de la misma cuenta. El valor de la
+ // URL se valida arriba, pero no se usa para salir a Internet.
+ const service=env?.SABER_CENTRAL;
+ if(typeof service?.fetch!=='function'&&fetcher===fetch)
+  throw Error('Falta vinculación privada con la Central de pruebas.');
+ const options={method:'POST',
   headers:{'Content-Type':'application/json','x-saber-ts':String(ts),
    'x-saber-request-id':id,'x-saber-signature':digest},
-  body,redirect:'error',signal:AbortSignal.timeout(15000)});
+  body,redirect:'error',signal:AbortSignal.timeout(15000)};
+ const response=typeof service?.fetch==='function'
+  ?await service.fetch(new Request(url.href,options))
+  :await fetcher(url.href,options);
  if(!response.ok)throw Error('La Central no confirmó el PDF.');
  const message=await response.text();
  if(message.length>1600)throw Error('Respuesta inválida de la Central.');
