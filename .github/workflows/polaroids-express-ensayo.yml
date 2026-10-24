@@ -40,6 +40,8 @@ jobs:
         env:
           EXPRESS_EXPORT_PDF: '1'
         run: node --experimental-vm-modules --test tests/polaroids-express-motor.test.mjs tests/polaroids-express-guardado.test.mjs tests/polaroids-express-tandas.test.mjs tests/polaroids-express-worker.test.mjs tests/polaroids-express-cliente.test.mjs tests/polaroids-express-recuperacion.test.mjs
+      - name: Probar tamaño y reintento con 24 fotografías JPEG grandes
+        run: node --test tests/polaroids-express-carga-limite.test.mjs
       - name: Conservar PDF de prueba para inspección visual (sin fotos reales)
         uses: actions/upload-artifact@v4
         with:
