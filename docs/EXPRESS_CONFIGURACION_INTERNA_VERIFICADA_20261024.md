@@ -306,3 +306,12 @@ Incluye: compilación Worker Express, PDFs auténticos de 6/12/19/24 fotos, cons
 Adicionalmente, se ejecutó en Node.js local (versión 22) el módulo `integraciones/polaroids/express/preparar-pedido-comercial.mjs` cuya SHA1 git coincide exactamente con el blob de GitHub `e981083ff5e9e5fd2fa76eb7120845fd9b94f271`; cinco pruebas de HMAC/binding/autorización/pagos arrojaron `pass 5, fail 0`, independientemente del CI.
 
 El workflow ahora informa su conclusión mediante el estado nativo de commit `polaroids-express/ci`, con permisos limitados a `contents:read` y `statuses:write`; permite consultar CI sin pedir capturas ni intervención. No se tocó `main`, no se activó recepción pública ni pagos.
+
+
+## PDF de 24 fotografías extraído del CI y verificado visualmente — 24/10/2026
+
+Se recuperó el **artefacto auténtico** generado por `pdf-lib` en la corrida GitHub Actions aprobada **40140275025**, nombre `express-pdf-guillotina-motor-real`, ZIP id `12578406657` (caduca 31/10/2026). Archivo: `POLAROID-EXPRESS-24-FOTOS-MARCAS-GUILLOTINA.pdf` de **126.966 bytes**, SHA-256 `d997a3f2e96d174db591192ddb0b496cb4ca99c1af0474360073f9058fe1b5d6`.
+
+La inspección con `pdfinfo` y PyMuPDF confirmó **4 páginas A4 exactas (210 × 297 mm)**; en **cada página: 6 dibujos de imagen, 14 segmentos de marcas de guillotina y ningún rectángulo de contorno**. Se renderizaron todas las páginas y se inspeccionó visualmente la primera: las fotografías ficticias ocupan el espacio superior de cada polaroid dejando margen blanco inferior; las marcas no cruzan las áreas de imagen. Las cuatro páginas son idénticas porque el JPEG de prueba es el mismo, **no** porque se haya repetido erróneamente una página de un pedido real.
+
+**Alcance:** PDF binario real generado en GitHub Actions, NO PDF geométrico ficticio de Drive. Esta inspección verifica geometría de 24 posiciones y corte, **no** reemplaza impresión física, pruebas con fotografías distintas/reales o recepción remota GAS/D1.
