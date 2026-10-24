@@ -74,3 +74,15 @@ El propietario abrió en su Chrome el endpoint real `GET https://saber-polaroids
 ```
 
 **Acredita:** respuesta HTTPS del endpoint desde su navegador y recepción Express deshabilitada en la versión consultada. **No acredita:** sincronización Cloudflare↔Cloudflare firmada con HMAC, claves coincidentes, registro en D1 ni creación de pedido. No se transmitieron fotos, PDF, datos de pago ni información secreta. El asistente intentó consultar los hosts desde una herramienta web externa, pero esta no pudo acceder a ninguno de los dos: esto no implica caída del servicio. Próxima prueba pasiva sugerida: `GET /internal/central/polaroid-stage` del Worker Central, que con las claves/flags correctos debe rechazar peticiones GET sin firma con HTTP 403 y `Solicitud entre servidores requerida`. Esa comprobación sigue sin demostrar comunicación firmada.
+
+## Prueba remota GET de Central — 24/10/2026
+
+El propietario abrió en Chrome `GET https://saber-pagos-pruebas.libreriasaber.workers.dev/internal/central/polaroid-stage` y obtuvo exactamente:
+
+```json
+{"error":"Sincronización privada no configurada"}
+```
+
+El código versionado de `integraciones/mercadopago/pruebas/worker.js` comprueba primero `CENTRAL_EXPRESS_ENABLED=PRIVATE_TEST_ONLY` (otro error si falla) y después en `centralReadSigned` comprueba `CENTRAL_BRIDGE_ENABLED=PRIVATE_TEST_ONLY`, que `CENTRAL_BRIDGE_KEY` sea string con 32+ caracteres y que no coincida con `DEMO_ADMIN_KEY` ni `MP_WEBHOOK_SECRET`. La respuesta recibida es **coherente con un rechazo de la guarda de configuración HMAC**, antes de comprobar método HTTP o firma. Capturas anteriores muestran ambos flags en `PRIVATE_TEST_ONLY`, secretos presentes pero cifrados y despliegues `Listo`; por ello **no se puede deducir la causa exacta ni validar longitud/igualdad de secretos**. Tampoco se ha confirmado que el código manualmente desplegado coincida al byte con la rama de GitHub. **No tratar el resultado como prueba HMAC o de D1.**
+
+La siguiente inspección debe ser de solo lectura, sin reiniciar ni cambiar secrets: contrastar `centralReadSigned` del editor de Worker desplegado con la rama GitHub y, si coincide, evaluar un diagnóstico autenticado que solo exponga condiciones booleanas (sin contenido de secretos) en una versión de pruebas *si se autoriza expresamente su despliegue*. Evitar repeticiones de GET sin cambios, ya que producirían el mismo resultado.
