@@ -1,6 +1,7 @@
 import {prepararPresupuestoDocumentos} from '../pruebas/cotizacion-desde-recibos-servidor.mjs';
 import {cotizarLoteVerificado} from '../pruebas/cotizacion-multifichero-piloto.mjs';
 import {paginaLotePdf} from './pantalla-lote-pdf.mjs';
+import {paginaLotePdfAmpliado} from './pantalla-lote-pdf-ampliado.mjs';
 import {paginaCotizadorRapido} from './cotizador-rapido-pagina.mjs';
 import {paginaPloteosRapido} from './ploteos-rapido-pagina.mjs';
 import {paginaCotizadorConjunto} from './cotizador-conjunto-pagina.mjs';
@@ -1085,6 +1086,14 @@ export default {
     const page=new URL(request.url).pathname;
     if(page==='/prueba-cotizador-pdf'&&request.method==='GET')return fase4Html(env);
     if(page==='/prueba-cotizador-lote'&&request.method==='GET')return pantallaLote(env);
+    if(page==='/prueba-cotizador-lote-ampliado'&&request.method==='GET'){
+      if(env?.DOCS_EXTENDED_RECEIVER_ENABLED!=='PRIVATE_TEST_ONLY')
+        return testResponse({ok:false,error:'Ensayo ampliado deshabilitado',paymentAuthorized:false},503);
+      try{return new Response(paginaLotePdfAmpliado(env.DOCS_TURNSTILE_SITE_KEY),{
+        headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store,private',
+          'X-Robots-Tag':'noindex,nofollow','X-Frame-Options':'DENY'}})}
+      catch{return testResponse({ok:false,error:'Turnstile sin configurar',paymentAuthorized:false},503)}
+    }
     if(page==='/prueba-carga-unica'&&request.method==='GET')return new Response(paginaCargaUnica(),{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Robots-Tag':'noindex, nofollow','X-Frame-Options':'DENY'}});
     if(page==='/prueba-carga-unica.js'&&request.method==='GET')return new Response(cargaClienteJs,{headers:{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
     if(page==='/prueba-cotizador-conjunto'&&request.method==='GET')return new Response(paginaCotizadorConjunto(),{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Robots-Tag':'noindex, nofollow'}});
