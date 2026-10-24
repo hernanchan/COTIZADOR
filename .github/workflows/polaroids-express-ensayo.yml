@@ -56,6 +56,8 @@ jobs:
           node tests/polaroids-carrito.test.mjs
       - name: Circuito integrado PDF → GAS simulado → binding → D1 real local
         run: node --experimental-sqlite --test tests/polaroids-express-circuito-integrado.test.mjs
+      - name: Validar ruta aislada para preparación comercial sin cobro
+        run: node --test tests/polaroids-express-pedido-ruta.test.mjs
       - name: Probar pedido comercial Express con firma y cobros bloqueados
         run: node --test tests/polaroids-express-preparar-pedido.test.mjs
       - name: Verificar contrato del receptor GAS sin acceder a Drive
@@ -70,3 +72,5 @@ jobs:
           node --check vidriera/polaroids/express-cliente.mjs
           node --check vidriera/polaroids/express-recuperacion.mjs
           node --check functions/api/polaroids-express.js
+          node --check integraciones/polaroids/express/worker-order.mjs
+          node --check integraciones/polaroids/express/functions/api/polaroids-order.js
