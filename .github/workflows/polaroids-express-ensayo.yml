@@ -68,6 +68,9 @@ jobs:
         run: node --test tests/polaroids-express-preparar-pedido.test.mjs
       - name: Verificar contrato del receptor GAS sin acceder a Drive
         run: node --test tests/polaroids-express-gas-contrato.test.mjs
+      - name: Compilar Worker documental unificado con vínculo privado (sin desplegar)
+        working-directory: integraciones/autocotizador/recepcion
+        run: npm run build:unificado
       - name: Probar comunicación privada Documentos a Central D1
         run: node --test tests/autocotizador-central-binding.test.mjs
       - name: Validar superficie privada Express y conexión interna
