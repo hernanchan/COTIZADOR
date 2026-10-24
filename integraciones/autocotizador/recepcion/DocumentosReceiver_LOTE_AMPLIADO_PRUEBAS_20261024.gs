@@ -194,7 +194,10 @@ var DOCS_MULTI_CAP=30,DOCS_MULTI_GLOBAL_CAP=120,
  DOCS_MULTI_ORDER_MAX_BYTES=60*1024*1024,
  DOCS_MULTI_INDEX='DOCS_MULTI_INDEX_LOTE_20261024';
 function docsMultiIds(){
- var store=docsStore(),raw=store.getProperty(DOCS_MULTI_INDEX)||'[]',list=JSON.parse(raw);
+ // Una lectura de propiedades para todo el índice. Sin esta instantánea,
+ // cada bloque de 256 KiB producía hasta 120 lecturas individuales de GAS.
+ var store=docsStore(),snapshot=store.getProperties();
+ var raw=snapshot[DOCS_MULTI_INDEX]||'[]',list=JSON.parse(raw);
  if(!Array.isArray(list)||list.length>DOCS_MULTI_GLOBAL_CAP)
    throw Error('Índice de cupo inconsistente');
  var seen={},valid=[],now=Date.now();
@@ -203,7 +206,7 @@ function docsMultiIds(){
    if(typeof id!=='string'||!/^DOC-[a-f0-9-]{36}$/i.test(id)||seen[id])
      throw Error('Índice de recibo inválido');
    seen[id]=true;
-   var saved=store.getProperty('FILE_'+id);
+   var saved=snapshot['FILE_'+id];
    if(!saved)throw Error('Índice sin estado de sesión');
    var state=JSON.parse(saved);
    if(state.uploadId!==id||!Number.isFinite(state.createdAt)||
