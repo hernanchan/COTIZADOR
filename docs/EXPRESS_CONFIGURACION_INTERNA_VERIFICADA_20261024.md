@@ -220,3 +220,18 @@ En Drive se localizó la carpeta de ensayo `POLAROIDS EXPRESS - ENSAYO PDF UNICO
 ### Próximo bloque útil sin intervención del propietario
 
 Revisar el flujo GAS → PDF único → ficha de D1 → Centro de Pedidos en código y pruebas aisladas, cerrando puntos pendientes que se puedan resolver en la rama. El acceso directo a configuración o publicación de Cloudflare/GAS desde los conectores actuales no está disponible: agrupar cualquier instrucción manual necesaria en una sola sesión de validación con alcance previamente delimitado. No pedir nuevas capturas ni repetir pruebas HMAC aprobadas. No habilitar pagos ni recepción pública.
+
+
+## Contrato del receptor GAS verificado en código y cubierto por CI — 24/10/2026
+
+Revisión del código de `integraciones/polaroids/express/apps-script-solo-pdf.gs` y de `guardar-pdf-privado.mjs`:
+- Solo se envía el PDF final en Base64 con referencia `POL-...`, SHA-256, bytes y cantidad de hojas/fotos. No se envían originales, JPEG sueltos ni `encuadres.json`.
+- Apps Script exige secreto HMAC de al menos 32 caracteres y carpeta de recepción de tipo privada; valida cabecera `%PDF-`, marca `%%EOF`, tamaño y SHA-256.
+- La misma referencia con el mismo PDF reutiliza el archivo existente; si el PDF difiere, rechaza el intento; con LockService se evita una carrera de dos recepciones simultáneas.
+- `leerPdfExpress` devuelve bytes firmados al backend. En la Central, `centralPolaroidDownload` exige operador autenticado, orden vinculada y **pago total verificado**, así como SHA coincidente. La descarga de cliente permanece bloqueada.
+- La Central crea el manifiesto bajo HMAC, y una eventual orden comercial se crea con `checkoutEnabled:false`; ese endpoint todavía **no está conectado** al carrito de cliente ni a pagos sandbox.
+- No se ha confirmado despliegue ni ejecución real de ese Apps Script; la presencia de un PDF de ensayo en Drive no constituye esa prueba.
+
+Se creó `tests/polaroids-express-gas-contrato.test.mjs`, con seis casos simulados y aislados de servicios externos: idempotencia un PDF, lectura íntegra, rechazo de colisión, carpeta con acceso público rechazada, HMAC inválida rechazada y prueba interna GAS repetida sin duplicar. Se agregó al workflow exclusivo `.github/workflows/polaroids-express-ensayo.yml`. **El test está añadido, no se afirma ejecución CI exitosa sin su resultado.**
+
+El bloqueo externo realmente pendiente para la siguiente fase es un Apps Script nuevo, separado de los existentes, con propiedades privadas `EXPRESS_PDF_FOLDER_ID` y `EXPRESS_PDF_HMAC_KEY` y despliegue de pruebas. Los conectores disponibles administran archivos de Drive, no proyectos de Apps Script; por tanto ese paso todavía requiere intervención autorizada en una sesión agrupada. No generar claves en chat ni habilitar recepción pública.
