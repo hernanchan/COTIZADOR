@@ -441,7 +441,7 @@ test('Pedido integral E2E: PDF auténticos de Drive simulado → HMAC → Centra
   throw Error('Operación GAS no permitida');
  };
  const docsManifest=await fase4FichaCentralLotePrivada({
-  sesiones,consultarFirmado,preciosServidor:precios
+  sesiones:sessions,consultarFirmado,preciosServidor:precios
  });
  assert.equal(docsManifest.orderId,docId);
  assert.equal(docsManifest.importeVerificado,21000);
