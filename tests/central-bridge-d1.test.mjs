@@ -315,3 +315,73 @@ test('Documentos: sender real usa Service Binding hasta Central D1 local',async(
  assert.equal((await admin('/admin/api/central/pending')).status,200);
  assert.ok((await admin('/admin/api/central/pending')).result.manifests.some(x=>x.web_order_id===p.orderId));
 });
+
+
+test('Central: unifica Documentos, Polaroids Express y catálogo en un único pedido sin cobro',async()=>{
+ const flags={CENTRAL_PREPARE_ENABLED:env.CENTRAL_PREPARE_ENABLED,
+  CENTRAL_EXPRESS_PREPARE_ENABLED:env.CENTRAL_EXPRESS_PREPARE_ENABLED,
+  CENTRAL_EXPRESS_ENABLED:env.CENTRAL_EXPRESS_ENABLED,
+  CENTRAL_MIXED_PREPARE_ENABLED:env.CENTRAL_MIXED_PREPARE_ENABLED};
+ const doc=JSON.parse(JSON.stringify(packet));
+ doc.orderId='WEB-MIXTO-ENSAYO-20261024';
+ doc.ficha.orderId=doc.orderId;
+ doc.recibos[0].receiptId='DOC-cccccccc-1234-4234-8234-1234567890ab';
+ doc.recibos[1].receiptId='DOC-dddddddd-1234-4234-8234-1234567890ab';
+ doc.ficha.trabajos[0].reciboPrivado=doc.recibos[0].receiptId;
+ doc.ficha.trabajos[1].reciboPrivado=doc.recibos[1].receiptId;
+ const pol={schema:'saber-polaroids-express-central-v1',
+  referencia:'POL-'+'E'.repeat(24),fotos:6,hojas:1,
+  sha256:'f'.repeat(64),bytes:127000,importeArs:3000,
+  pdfPrivadoVerificado:true,pagoConfirmado:false,listoParaProducir:false};
+ const clientOrderId=randomUUID();
+ const payload={clientOrderId,webOrderId:doc.orderId,polaroidReference:pol.referencia,
+  items:[{code:'ABC-1',qty:2}]};
+ try{
+  // Las tres guardas impiden el alta de un carrito mixto aunque exista HMAC.
+  assert.equal((await call('/internal/central/prepare-mixed-order',payload)).status,503);
+  Object.assign(env,{CENTRAL_EXPRESS_ENABLED:'PRIVATE_TEST_ONLY',
+   CENTRAL_PREPARE_ENABLED:'PRIVATE_TEST_ONLY',
+   CENTRAL_EXPRESS_PREPARE_ENABLED:'PRIVATE_TEST_ONLY',
+   CENTRAL_MIXED_PREPARE_ENABLED:'PRIVATE_TEST_ONLY'});
+  assert.equal((await call('/internal/central/prepare-mixed-order',payload)).status,404);
+  assert.equal((await call('/internal/central/stage',doc)).status,201);
+  assert.equal((await call('/internal/central/polaroid-stage',pol)).status,201);
+  assert.equal((await call('/internal/central/prepare-mixed-order',
+   {...payload,items:[{code:'ABC-1',qty:1},{code:'ABC-1',qty:2}]})).status,422);
+  const created=await call('/internal/central/prepare-mixed-order',payload);
+  assert.equal(created.status,201,JSON.stringify(created.result));
+  assert.equal(created.result.created,true);
+  assert.equal(created.result.amount_ars,31000);
+  assert.equal(created.result.documentos_ars,21000);
+  assert.equal(created.result.polaroids_ars,3000);
+  assert.equal(created.result.productos_ars,7000);
+  assert.equal(created.result.checkoutEnabled,false);
+  assert.equal(created.result.paymentAuthorized,false);
+  const id=created.result.commercial_order_id;
+  const lines=db.prepare('SELECT sku,item_type,quantity,line_total_ars,file_references_json FROM order_items WHERE order_id=? ORDER BY line_number').all(id);
+  assert.deepEqual(lines.map(x=>x.sku),['DOCS_VERIFIED','POLAROID_EXPRESS_A4','ABC-1']);
+  assert.equal(lines.reduce((sum,line)=>sum+line.line_total_ars,0),31000);
+  assert.deepEqual(JSON.parse(lines[0].file_references_json),doc.recibos.map(x=>x.receiptId));
+  assert.deepEqual(JSON.parse(lines[1].file_references_json),[pol.referencia]);
+  assert.equal(db.prepare('SELECT commercial_order_id FROM central_document_manifests WHERE web_order_id=?').get(doc.orderId).commercial_order_id,id);
+  assert.equal(db.prepare('SELECT commercial_order_id FROM central_polaroids_express WHERE reference=?').get(pol.referencia).commercial_order_id,id);
+  assert.equal(db.prepare('SELECT status,preference_id FROM orders WHERE id=?').get(id).status,'awaiting_payment');
+  assert.equal(db.prepare('SELECT preference_id FROM orders WHERE id=?').get(id).preference_id,null);
+  const again=await call('/internal/central/prepare-mixed-order',payload);
+  assert.equal(again.status,200,JSON.stringify(again.result));
+  assert.equal(again.result.idempotent,true);
+  assert.equal(again.result.commercial_order_id,id);
+  assert.equal((await call('/internal/central/prepare-mixed-order',
+   {...payload,items:[{code:'ABC-1',qty:3}]})).status,409);
+  assert.equal((await call('/internal/central/prepare-mixed-order',
+   {...payload,clientOrderId:randomUUID()})).status,409);
+  // Checkout real sigue sin autorizar estos trabajos.
+  const payment=await context.worker.fetch(new Request(base+'/demo/checkout',{
+   method:'POST',headers:{Authorization:'Bearer '+env.DEMO_ADMIN_KEY,
+    'Content-Type':'application/json'},body:JSON.stringify({order_id:id})}),env);
+  assert.equal(payment.status,503);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM cart_requests WHERE order_id=?').get(id).n,1);
+ }finally{for(const key of Object.keys(flags)){
+  if(flags[key]===undefined)delete env[key];else env[key]=flags[key];
+ }}
+});
