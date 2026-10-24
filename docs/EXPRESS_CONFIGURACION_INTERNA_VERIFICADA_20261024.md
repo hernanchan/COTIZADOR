@@ -98,3 +98,27 @@ El propietario **autorizó expresamente** una implementación de diagnóstico li
 Cambio preparado en la rama de pruebas, archivo `integraciones/mercadopago/pruebas/worker.js`: el endpoint de solo lectura `GET /demo/diagnostic`, **ya protegido por `DEMO_ADMIN_KEY` (cabecera Bearer)**, añade el objeto booleano `centralBridge` con `bridgeEnabled`, `expressEnabled`, `keyPresent`, `keyMinimumLength`, `keyDifferentFromAdmin` y `keyDifferentFromWebhook`. No devuelve claves ni longitudes. El botón existente `Diagnosticar configuración` de `/demo` consume ese endpoint. Se incorporaron pruebas de autorización y ausencia de secretos en `tests/central-bridge-d1.test.mjs`.
 
 **Estado:** solo preparado en GitHub. El conector GitHub no tiene acceso para implementar Workers de Cloudflare. La implementación en Cloudflare requiere acción manual del propietario en su Chrome; comprobar que el código desplegado coincide con el cambio preparado. **No afirmar que se desplegó** sin evidencia de versión de Cloudflare y resultado auténtico. Después del diagnóstico, valorar retirar el bloque de diagnóstico adicional de la versión activa, con autorización, para reducir superficie de exposición. No solicitar secretos por chat.
+
+## Diagnóstico remoto autenticado: causa identificada — 24/10/2026
+
+El operador desplegó el cambio de diagnóstico **solo en `saber-pagos-pruebas`** y compartió una captura del botón *Diagnosticar configuración* de `/demo` con la respuesta real:
+
+```json
+{
+  "ok": true,
+  "missing": [],
+  "ordersTableReady": true,
+  "centralBridge": {
+    "bridgeEnabled": true,
+    "expressEnabled": true,
+    "keyPresent": true,
+    "keyMinimumLength": false,
+    "keyDifferentFromAdmin": true,
+    "keyDifferentFromWebhook": true
+  }
+}
+```
+
+**Diagnóstico concluyente:** el secreto `CENTRAL_BRIDGE_KEY` **existe pero tiene menos de 32 caracteres en `saber-pagos-pruebas`**. Los dos flags y los controles de independencia con administrador/webhook son correctos; la tabla de pedidos en D1 es accesible. Por diseño, `centralReadSigned` rechaza la sincronización antes de validar HMAC. No se han revelado claves, ni comprobado todavía si la clave en `saber-polaroids-express-pruebas` cumple longitud o coincide con la de Central. **No reducir la longitud mínima en el código.**
+
+**Bloqueo de autorización:** la instrucción vigente prohíbe cambiar claves existentes. La autorización para desplegar el diagnóstico no constituye autorización para rotar `CENTRAL_BRIDGE_KEY`. Para resolverlo, obtener permiso explícito de rotación coordinada: generar fuera del chat una clave aleatoria de >=32 caracteres y usar exactamente la misma en Central y Express; además inventariar el vínculo opcional del Worker `saber-documentos-pruebas` (`DOCS_CENTRAL_SYNC_ENABLED` y `CENTRAL_BRIDGE_KEY`) para no romper la interoperabilidad documental si se encontraba activada. Mantener inalteradas todas las claves de administración, pagos y PDF, y los bloqueos de cobros y recepción de fotos. Después de corregir, repetir el GET sin firma del endpoint interno y esperar rechazo `Solicitud entre servidores requerida` (no acredita por sí solo HMAC). El diagnóstico privado debe retirarse tras validación bajo autorización específica. No se crearon registros de pedidos ni fotografías con esta prueba.
