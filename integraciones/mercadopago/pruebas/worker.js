@@ -1266,6 +1266,11 @@ export default {
     if(!isUUID(orderId))return json({error:"order_id inválido"},400);
     const order=await env.DB.prepare("SELECT * FROM orders WHERE id=?").bind(orderId).first();
     if(!order)return json({error:"Pedido no encontrado"},404);
+    // La prohibición de cobro depende de los trabajos, NO de una descripción:
+    // un carrito mixto o un cambio de título nunca puede eludirla.
+    await ensureOrderItems(env);
+    const restricted=await env.DB.prepare("SELECT sku FROM order_items WHERE order_id=? AND sku IN ('DOCS_VERIFIED','POLAROID_EXPRESS_A4') LIMIT 1").bind(orderId).first();
+    if(restricted)return json({error:"Cobro de trabajos con archivos todavía deshabilitado hasta la validación integral."},503);
     if(order.description==="Librería Saber · documentos verificados y tienda")return json({error:"Cobro de documentos aún no habilitado. Falta el ensayo integral."},503);
     if(order.description==="Librería Saber · Polaroids Express y tienda")return json({error:"Cobro de Polaroids Express aún no habilitado. Falta el ensayo integral."},503);
     if(order.status!=="awaiting_payment")return json({error:"El pedido ya está pago"},409);
