@@ -20,7 +20,7 @@ li{margin:9px 0;overflow-wrap:anywhere}#out{white-space:pre-wrap;line-height:1.6
 small{color:#586b79}.drop{border:2px dashed #9aaebf;padding:18px;text-align:center;margin:12px 0;border-radius:8px;background:#f6fbff}.drop.over{border-color:#17618e;background:#e9f4ff}#pending li{display:flex;align-items:center;gap:10px;flex-wrap:wrap}#pending select{max-width:200px}#pending button{margin:0}
 </style></head><body><main>
 <h1>Presupuesto conjunto de varios PDF</h1>
-<p class="note">Prueba privada: seleccioná hasta treinta PDF juntos y preparalos antes de enviarlos. Por seguridad, cada archivo se confirma por separado; el cupo global es de cinco sesiones de hasta 20 MB. Se acumulan las impresiones compatibles para conseguir mejores precios unitarios. Sin compras ni pagos.</p>
+<p class="note">Prueba privada: seleccioná hasta treinta PDF juntos y preparalos antes de enviarlos. Por seguridad, cada archivo se confirma por separado; el límite es de 30 PDF por pedido, hasta 20 MB cada uno y 60 MB en total. Se acumulan las impresiones compatibles para conseguir mejores precios unitarios. Sin compras ni pagos.</p>
 <label for="file">Elegí varios archivos PDF de una sola vez</label>
 <input id="file" type="file" accept=".pdf,application/pdf" multiple>
 <div id="drop" class="drop" tabindex="0">También podés arrastrar tus PDF hasta acá</div>
