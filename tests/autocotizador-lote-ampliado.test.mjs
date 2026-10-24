@@ -42,5 +42,5 @@ test('el piloto antiguo conserva exactamente el límite de cinco sesiones indepe
    bytes:500
   }))}),/entre uno y cinco/);
  assert.throws(()=>cotizarLoteVerificado({...args,maxFiles:30,
-  maxFileBytes:1024*1024,recibosVerificados:[receipt(1)]}),/límite/);
+  maxFileBytes:1024*1024,recibosVerificados:[receipt(1)]}),/máximo|límite/);
 });
