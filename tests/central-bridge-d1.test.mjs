@@ -275,3 +275,43 @@ test('Central conserva pedidos impagos aparte y no libera producción hasta cobr
  const remaining=(await admin('/admin/api/central/unpaid')).result.orders;
  assert.ok(!remaining.some(p=>p.commercial_order_id===target.commercial_order_id));
 });
+
+
+test('Documentos: sender real usa Service Binding hasta Central D1 local',async()=>{
+ const {enviarCentralFirmada}=await import('../integraciones/autocotizador/recepcion/enviar-central-firmada.mjs');
+ const p=JSON.parse(JSON.stringify(packet));
+ p.orderId='WEB-BINDING-ENSAYO-20261024';
+ p.ficha.orderId=p.orderId;
+ p.recibos[0].receiptId='DOC-aaaaaaaa-1234-4234-8234-1234567890ab';
+ p.recibos[1].receiptId='DOC-bbbbbbbb-1234-4234-8234-1234567890ab';
+ p.ficha.trabajos[0].reciboPrivado=p.recibos[0].receiptId;
+ p.ficha.trabajos[1].reciboPrivado=p.recibos[1].receiptId;
+ let internalCalls=0;
+ const service={async fetch(request){
+  internalCalls++;
+  assert.equal(request.url,'https://saber-pagos-pruebas.libreriasaber.workers.dev/internal/central/stage');
+  assert.equal(request.headers.get('Origin'),null);
+  return context.worker.fetch(request,env);
+ }};
+ const options={verificacion:p,url:'https://saber-pagos-pruebas.libreriasaber.workers.dev/internal/central/stage',
+  clave:env.CENTRAL_BRIDGE_KEY,habilitado:'PRIVATE_TEST_ONLY',
+  service,subtle:webcrypto.subtle,nuevoId:randomUUID};
+ const first=await enviarCentralFirmada(options);
+ assert.equal(first.guardado,true);
+ assert.equal(first.paymentAuthorized,false);
+ assert.equal(first.webOrderId,p.orderId);
+ assert.equal(first.existia,false);
+ const again=await enviarCentralFirmada(options);
+ assert.equal(again.guardado,true);
+ assert.equal(again.existia,true);
+ assert.equal(internalCalls,2);
+ const row=db.prepare('SELECT amount_ars,commercial_order_id FROM central_document_manifests WHERE web_order_id=?')
+   .get(p.orderId);
+ assert.equal(row.amount_ars,21000);
+ assert.equal(row.commercial_order_id,null);
+ const count=db.prepare('SELECT COUNT(*) n FROM central_document_receipts WHERE web_order_id=?')
+   .get(p.orderId).n;
+ assert.equal(count,2);
+ assert.equal((await admin('/admin/api/central/pending')).status,200);
+ assert.ok((await admin('/admin/api/central/pending')).result.manifests.some(x=>x.web_order_id===p.orderId));
+});
