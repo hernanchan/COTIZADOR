@@ -9,9 +9,11 @@ const SESSION=/^DOC-[a-f0-9-]{36}$/i;
 const FILE=/^[A-Za-z0-9_-]{1,80}$/;
 const SHA=/^[a-f0-9]{64}$/;
 export async function fase4FichaCentralLotePrivada({
- sesiones,consultarFirmado,preciosServidor
+ sesiones,consultarFirmado,preciosServidor,
+ maxFiles=5,maxFileBytes=1024*1024
 }){
- if(!Array.isArray(sesiones)||sesiones.length<1||sesiones.length>5||
+ if(![[5,1024*1024],[30,20*1024*1024]].some(x=>x[0]===maxFiles&&x[1]===maxFileBytes)||
+    !Array.isArray(sesiones)||sesiones.length<1||sesiones.length>maxFiles||
     typeof consultarFirmado!=='function')
   throw Error('Lote privado no autorizado o supera el cupo del receptor.');
  const ids=new Set(),files=new Set(),receipts=[],configs=[],byFile=new Map();
@@ -44,7 +46,7 @@ export async function fase4FichaCentralLotePrivada({
      typeof info.name!=='string'||!/\.pdf$/i.test(info.name)||
      !['bn','color'].includes(info.mode)||
      !Number.isSafeInteger(info.pages)||info.pages<1||info.pages>2000||
-     !Number.isSafeInteger(info.bytes)||info.bytes<5||info.bytes>1024*1024||
+     !Number.isSafeInteger(info.bytes)||info.bytes<5||info.bytes>maxFileBytes||
      !SHA.test(info.sha256||''))
    throw Error('Faltan recibos íntegros y confirmados en Google.');
   if(orderId!==null&&orderId!==info.orderId)
@@ -67,7 +69,7 @@ export async function fase4FichaCentralLotePrivada({
     throw Error('El PDF privado no corresponde al recibo verificado.');
    return leerPdfFase4Privado({
     session:file.safe,receiptId:file.receiptId,bytes:file.bytes,
-    sha256:file.sha256,consultarFirmado
+    sha256:file.sha256,consultarFirmado,maxFileBytes
    });
   }
  });
