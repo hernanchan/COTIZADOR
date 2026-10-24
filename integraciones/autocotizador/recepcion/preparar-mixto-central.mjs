@@ -4,7 +4,7 @@
  */
 const DOC=/^WEB-[A-Za-z0-9_-]{5,80}$/;
 const POL=/^POL-[A-F0-9]{24}$/;
-const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{12}$/i;
+const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 const WORKER=/^saber-pagos-pruebas\.[a-z0-9-]+\.workers\.dev$/;
 const hex=values=>Array.from(values,x=>x.toString(16).padStart(2,'0')).join('');
 export async function prepararMixtoCentralFirmado({
