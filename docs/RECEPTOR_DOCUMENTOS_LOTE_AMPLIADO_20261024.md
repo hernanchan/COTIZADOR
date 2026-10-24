@@ -46,3 +46,14 @@ Se añadió **Comenzar otro pedido de prueba**, que descarta la referencia tempo
 `tests/autocotizador-lote-ampliado-pantalla.test.mjs` prueba con VM dos cargas de página independientes compartiendo almacenamiento, verifica persistencia únicamente de los campos `orderId`, `createdAt`, `version`, expiración del estado y obligación de consultar `status`. **GitHub Actions aprobado**: commit `707f6d2c0fb55c87a2398163c2acb7562b1c371f`, ejecución https://github.com/hernanchan/COTIZADOR/actions/runs/40143646586, conclusión `success`, sin fallas: compilación documental, UI, cotizador de 30 archivos, receptor GAS simulado, Central D1 y pruebas Express.
 
 **Limitación importante**: este mecanismo es una recuperación **de referencia y reanudación al re-seleccionar el mismo PDF**. La experiencia real de un cliente con reposo de celular, pestaña cerrada, caché eliminado o cambio de dispositivo sigue pendiente de pruebas y diseño. No se cambió ninguna variable remota ni se desplegó Apps Script.
+
+
+## 24/10/2026 · Optimización de lecturas de propiedades con alta concurrencia
+
+La versión aislada `DocumentosReceiver_LOTE_AMPLIADO_PRUEBAS_20261024.gs` contenía un cuello de botella: `docsMultiIds()` recorría cada recibo activo realizando una llamada `getProperty('FILE_'+id)` por archivo en **cada operación**. Al leer un PDF de 20 MiB en fragmentos de 256 KiB (80 solicitudes), y con el cupo global de 120 sesiones, esto podía provocar miles de lecturas al almacenamiento de propiedades de Apps Script, además de consultas repetidas de Drive.
+
+Se sustituyó por `getProperties()` una sola vez por operación, leyendo las 120 sesiones desde la instantánea en memoria. **Se conservan** las comprobaciones de índices duplicados, estructura, fechas, tope de sesiones, identidad del archivo y los tokens privados. Las credenciales presentes en propiedades nunca forman parte de la respuesta HTTP. Este cambio no instala ni modifica el Apps Script existente.
+
+**Prueba CI:** `tests/autocotizador-gas-lote-ampliado.test.mjs` simula **110 sesiones** y un PDF de más de 1 MiB. Comprueba que una lectura privada con autenticación y rango devuelve exactamente 256 KiB, sólo hace **una consulta colectiva** al almacén de propiedades y como máximo tres consultas individuales; rechaza la exposición del secreto HMAC. El resto del circuito de cotización, compilación y D1 se ejecutó sin regresiones. GitHub Actions **success**, commit `a1baee484ff8d8ce31f041963ddbeb6ccdca9ae1`, corrida: https://github.com/hernanchan/COTIZADOR/actions/runs/40143800301.
+
+**Límite de esta comprobación:** la reducción en número de consultas fue probada en simulación. No se midió latencia o consumo de cuotas en Apps Script desplegado. Una descarga por rangos seguirá necesitando una petición a Google por fragmento y una carga nueva a Drive por fragmento; el rendimiento móvil y el límite de ejecuciones simultáneas deben validarse con una prueba remota privada antes de publicar.
