@@ -13,6 +13,8 @@ test('pantalla piloto de 30 PDF: un pedido, archivos individuales y endpoints ai
  assert.match(html,/fileId:'pdf-'\+sha\.slice\(0,24\)/);
  assert.match(html,/file\.size>20\*1048576/);
  assert.match(html,/recibidos\.length>=30/);
+ assert.match(html,/id="new-order"/);
+ assert.match(html,/sessionStorage\.removeItem\(ORDER_RECOVERY_KEY\)/);
  assert.match(html,/\/api\/ensayo-pdf-ampliado/);
  assert.match(html,/\/api\/ensayo-cotizar-lote-ampliado/);
  assert.doesNotMatch(html,/rpc\('\/api\/ensayo-pdf'/);
