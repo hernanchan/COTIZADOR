@@ -35,3 +35,14 @@ El código prepara `GET /prueba-cotizador-lote-ampliado`, `POST /api/ensayo-pdf-
 https://github.com/hernanchan/COTIZADOR/actions/runs/40143286602
 
 **No equivale a prueba remota.** Ningún Apps Script nuevo ni Worker fue desplegado; la versión original mantiene su límite de cinco PDF de 1 MiB. La página `/prueba-cotizador-lote-ampliado` y sus API siguen únicamente en la rama, detrás de `DOCS_EXTENDED_RECEIVER_ENABLED=PRIVATE_TEST_ONLY` (sin activar). La prueba no midió tiempos reales, reposo móvil o subida simultánea de diez archivos.
+
+
+## 24/10/2026 · Recuperación ante recarga del navegador
+
+Se corrigió `pantalla-lote-pdf-ampliado.mjs`: la pantalla aislada conserva en `sessionStorage` **exclusivamente la referencia aleatoria `WEB-ENSAYO-...` de 128 bits**, una versión y la fecha de creación (vigencia de 24 horas). **No se guardan archivos, fotografías, PDF, bloques, tokens de GAS ni claves HMAC en el navegador**. Si el usuario recarga, vuelve a elegir el mismo PDF; el servidor `multiStart` obtiene/reutiliza la sesión basada en referencia de pedido + huella del archivo, y el navegador ahora ejecuta **siempre** `multiStatus` antes de reenviar bloques, incluso cuando no recuerda ninguna sesión previa. El receptor anterior es idempotente para metadatos idénticos. Si hay un PDF diferente bajo el mismo identificador se rechaza.
+
+Se añadió **Comenzar otro pedido de prueba**, que descarta la referencia temporal almacenada después de confirmación del usuario, sin ejecutar ninguna operación en Drive; los pedidos anteriores no se borran automáticamente de la carpeta privada. La UI corrigió la descripción del cupo: hasta 30 PDFs, 20 MB cada uno, 60 MB por pedido. No promete recuperar listas de archivos tras recarga sin nueva selección, ni reactivar cargas suspendidas cuando el teléfono cierra el navegador sin volver a abrirlo.
+
+`tests/autocotizador-lote-ampliado-pantalla.test.mjs` prueba con VM dos cargas de página independientes compartiendo almacenamiento, verifica persistencia únicamente de los campos `orderId`, `createdAt`, `version`, expiración del estado y obligación de consultar `status`. **GitHub Actions aprobado**: commit `707f6d2c0fb55c87a2398163c2acb7562b1c371f`, ejecución https://github.com/hernanchan/COTIZADOR/actions/runs/40143646586, conclusión `success`, sin fallas: compilación documental, UI, cotizador de 30 archivos, receptor GAS simulado, Central D1 y pruebas Express.
+
+**Limitación importante**: este mecanismo es una recuperación **de referencia y reanudación al re-seleccionar el mismo PDF**. La experiencia real de un cliente con reposo de celular, pestaña cerrada, caché eliminado o cambio de dispositivo sigue pendiente de pruebas y diseño. No se cambió ninguna variable remota ni se desplegó Apps Script.
