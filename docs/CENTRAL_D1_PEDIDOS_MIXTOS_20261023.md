@@ -40,3 +40,18 @@
 3. Conciliar de forma integral carrito de la tienda, Polaroids y documentos en una única orden, sin pérdida de datos cuando el cliente cambia de pantalla o se duerme el teléfono.
 4. Verificar y descargar de manera privada el **PDF definitivo de impresión** (no solamente el original), controlar instrucciones de producción, opciones de anillado y stock. Sólo un operador autorizado puede modificar el estado de preparado/entregado.
 5. Repetir pruebas completas PC/móvil, interrupciones, pagos sandbox y devolución antes de considerar activación.
+
+
+## 24/10/2026 · Documentos → Central mediante Service Binding
+
+Se descubrió que el backend del cotizador documental seguía enviando la ficha HMAC a `saber-pagos-pruebas.*.workers.dev` mediante `fetch()` público, una ruta que ya había provocado fallo de Worker-to-Worker en el ensayo Express. La rama de integración `polaroids/express-pdf-unico-20261023` es **descendiente directo de** `cotizador/migracion-carga-archivos-20261018` y de `pagos/mercadopago-checkout-pro-pruebas-20261017`; los cambios de esos componentes en la rama más avanzada siguen sin copiarse a `main`.
+
+**Corrección incorporada en la rama avanzada, no desplegada:** `enviar-central-firmada.mjs` utiliza un Service Binding `SABER_CENTRAL.fetch(new Request(destino,opciones))` manteniendo el host validado y HMAC. Si no hay binding real se rechaza el envío antes de hacer una llamada por Internet; el `fetcher` inyectado queda solo para pruebas unitarias. `worker-fase4-cotizador-unificado.mjs` suministra `env.SABER_CENTRAL`. El receptor D1 conserva bloqueo independiente `CENTRAL_BRIDGE_ENABLED`; documentos exige `DOCS_CENTRAL_SYNC_ENABLED` y autenticación administrativa antes de generar el manifiesto. **No se modificaron variables ni vinculaciones existentes de Cloudflare.**
+
+Se añadió `tests/autocotizador-central-binding.test.mjs` que comprueba firma HMAC en el binding, ausencia de tráfico público, rechazo por falta de vinculación, documentos inválidos, host no autorizado y rechazo de respuestas de Central que intentan permitir cobros. En el workflow `polaroids-express-ensayo.yml` de la rama avanzada se incorporó la **compilación del Worker documental** además de su test. GitHub Actions completó con `success` en el commit `94cd1594f115fdc35a022997b547b3ea31c09bd9`, corrida https://github.com/hernanchan/COTIZADOR/actions/runs/40141674435; pasos de compilación documental y pruebas de enlace interno ambos exitosos.
+
+También se añadió una prueba de integración sobre el Worker Central real cargado en SQLite D1 local, usando la función de envío real con un Service Binding simulado. Confirma alta de manifiesto sin pedido pagado ni producción y reenvío idempotente; **su CI aún no estaba confirmado al momento de escribir esta nota** y se debe revisar el estado de la ejecución asociada al commit `5adab8889b8501374057d763e65b28646dc2cbf9`.
+
+**Pendiente de infraestructura real:** en el Worker aislado `saber-documentos-pruebas` añadir un Service Binding de nombre `SABER_CENTRAL` que apunte al Worker `saber-pagos-pruebas`, al desplegar la rama autorizada. No reutilizar el secreto HMAC de acceso del operador ni publicar rutas públicas. La vinculación **ya existe en Pages Express** pero no consta configurada en el Worker de documentos. Agrupar esta operación con el ensayo final de recepción, no hacer intervenir al propietario ahora.
+
+La prueba integral remota sigue condicionada a Apps Script y carga privada reales y **no está demostrada**. Sin R2, sin nuevos gastos, sin cobros activos y sin modificaciones a `main` ni al dominio público.
