@@ -182,3 +182,23 @@ La documentación oficial de Cloudflare sobre Worker-to-Worker y Pages Service B
 **ÚNICA configuración Cloudflare pendiente** en `saber-polaroids-express-pruebas` (entorno Producción de este proyecto de ensayo, no la web pública): `Configuración → Vinculaciones → Agregar → Service binding`, nombre de variable exacto **`SABER_CENTRAL`**, servicio destino **`saber-pagos-pruebas`**. Guardar y reimplementar la rama de pruebas para que surta efecto (sin tocar las claves). Cloudflare documenta que Service Bindings no generan un cargo adicional por el vínculo, aunque las solicitudes siguen sujetas a límites ordinarios de uso.
 
 **Verificación posterior:** repetir una sola vez el diagnóstico protegido; éxito SOLO si `signedConnection:true` tras respuesta HTTP 422 `Recibo Express no válido` generada por Central a una ficha sintética intencionalmente inválida, sin escrituras en D1 ni fotos. Si falla, revisar error sanitizado/observabilidad sin pedir secretos. Tras finalizar retirar la ruta de diagnóstico y la pantalla temporal; no activar checkout ni recepción.
+
+
+## Comunicación HMAC real confirmada — 24/10/2026
+
+**Resultado comprobado mediante captura del navegador del propietario** en `https://saber-polaroids-express-pruebas.pages.dev/pruebas/puente-hmac.html`:
+
+```text
+CONEXIÓN HMAC CONFIRMADA. Sin fotografías, pedidos ni escrituras en D1.
+```
+
+Esto corresponde al diagnóstico protegido del commit `15cb523c5d7960e0f591eb0db8911c98a7694524`, desplegado automáticamente en el proyecto Pages aislado `saber-polaroids-express-pruebas` tras configurar un **Service Binding** `SABER_CENTRAL` con destino `saber-pagos-pruebas`. La versión previa devolvía HTTP 502 genérico; el código corregido utiliza `env.SABER_CENTRAL.fetch(...)` con una solicitud interna firmada HMAC. La Central respondió el rechazo esperado para un esquema deliberadamente inválido después de verificar la firma (HTTP 422 y `Recibo Express no válido`). **Confirma conectividad real de los dos servicios y correspondencia de la clave HMAC en el ensayo**, no procesamiento de PDFs reales.
+
+**Alcance estrictamente probado:** una petición sintética, sin fotografía ni PDF ni pedido comercial. El código de la Central rechaza el esquema del ensayo antes de llamar a D1; no se realizó escritura de manifiesto ni cobro. Los bloqueos de recepción permanecen independientes: `enabled:false`, `showInShop:false`, `rollout:PENDIENTE_DE_APROBACION`, sin activar `EXPRESS_RECEPTION_ENABLED` ni `EXPRESS_PDF_ENABLED`. `main` y `libreriasaber.com.ar` no se modificaron.
+
+**Pendientes prioritarios:**
+- Retirar el formulario público temporal `/pruebas/puente-hmac.html` y la ruta `/api/express-bridge-check` después de documentar el resultado; actualmente la página de ensayo recibe la clave de puente del operador en su propio origen HTTPS y no debe quedar como interfaz permanente. Retirar también la ampliación de diagnóstico temporal de `saber-pagos-pruebas` mediante una versión controlada, evitando cualquier cambio de claves.
+- Comprobar de forma no destructiva el esquema D1 real para `central_polaroids_express` y, más adelante, probar la persistencia real del PDF único mediante GAS privado, solo con autorización de esa fase.
+- Mantener el despliegue automatizado en el proyecto *aislado* únicamente durante desarrollo; no incorporar nada a `main` ni publicar herramientas a clientes antes de aprobación comercial.
+
+No repetir la prueba de HMAC ya superada salvo que cambie la arquitectura, la vinculación o las claves.
