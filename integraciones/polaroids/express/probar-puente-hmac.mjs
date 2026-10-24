@@ -59,19 +59,24 @@ export async function onRequestPost({
   if(typeof service?.fetch!=='function'&&fetcher===fetch)
     return respond({ok:false,signedConnection:false,
       error:'Falta vinculación privada SABER_CENTRAL',writes:false},503);
+  let phase='build-request';
   try{
-    const options={method:'POST',headers:{
-      'Content-Type':'application/json',
+    const headers={'Content-Type':'application/json',
       'x-saber-ts':String(ts),'x-saber-request-id':requestId,
-      'x-saber-signature':signature
-    },body,redirect:'error',signal:AbortSignal.timeout(12000)};
-    const result=typeof service?.fetch==='function'
-      ?await service.fetch(new Request(dest.href,options))
-      :await fetcher(dest.href,options);
-    // Sólo esta combinación prueba que HMAC pasó y el esquema fue rechazado.
+      'x-saber-signature':signature};
+    // Service Binding: no propagar AbortSignal del llamador a otro Worker.
+    // El camino de pruebas simulado conserva las opciones que verifican los tests.
+    const internal=typeof service?.fetch==='function';
+    const req=internal?new Request(dest.href,{method:'POST',headers,body}):null;
+    phase='invoke-central';
+    const result=internal
+      ?await service.fetch(req)
+      :await fetcher(dest.href,{method:'POST',headers,body,redirect:'error',
+          signal:AbortSignal.timeout(12000)});
     if(result.status!==422)
       return respond({ok:false,signedConnection:false,centralStatus:result.status,
         writes:false},502);
+    phase='read-response';
     const text=await result.text();
     let answer;try{answer=JSON.parse(text)}catch{return respond({
       ok:false,signedConnection:false,error:'Respuesta central inválida',writes:false},502)}
@@ -79,7 +84,12 @@ export async function onRequestPost({
       return respond({ok:false,signedConnection:false,error:'Rechazo no identificado',writes:false},502);
     return respond({ok:true,signedConnection:true,centralStatus:422,
       writes:false,photosSent:false,paymentsEnabled:false});
-  }catch{return respond({ok:false,signedConnection:false,
-    error:'Sin comunicación HTTPS con la Central',writes:false},502)}
+  }catch(e){
+    // Diagnóstico acotado: ni claves, ni URLs, ni texto libre de excepciones.
+    const kind=['TypeError','Error','AbortError','TimeoutError'].includes(e?.name)
+      ?e.name:'Unknown';
+    return respond({ok:false,signedConnection:false,
+      error:'Falló el enlace interno',phase,errorType:kind,writes:false},502)
+  }
 }
 export async function onRequestGet(){return respond({ok:false,error:'Método no permitido'},405);}
