@@ -56,6 +56,8 @@ jobs:
           node tests/polaroids-carrito.test.mjs
       - name: Circuito integrado PDF → GAS simulado → binding → D1 real local
         run: node --experimental-sqlite --test tests/polaroids-express-circuito-integrado.test.mjs
+      - name: Probar pedido comercial Express con firma y cobros bloqueados
+        run: node --test tests/polaroids-express-preparar-pedido.test.mjs
       - name: Verificar contrato del receptor GAS sin acceder a Drive
         run: node --test tests/polaroids-express-gas-contrato.test.mjs
       - name: Validar superficie privada Express y conexión interna
