@@ -33,6 +33,7 @@ export async function privateConfig(request,env){
     env?.EXPRESS_PDF_ENABLED!=='PRIVATE_TEST_ONLY'||
     env?.EXPRESS_CENTRAL_SYNC_ENABLED!=='PRIVATE_TEST_ONLY'||
     typeof env?.CENTRAL_BRIDGE_KEY!=='string'||env.CENTRAL_BRIDGE_KEY.length<32||
+    typeof env?.EXPRESS_PDF_HMAC_KEY!=='string'||env.EXPRESS_PDF_HMAC_KEY.length<32||
     env.CENTRAL_BRIDGE_KEY===env.EXPRESS_PDF_HMAC_KEY||
     !env?.ASSETS?.fetch)
   return false;
