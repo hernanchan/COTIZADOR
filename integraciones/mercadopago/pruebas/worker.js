@@ -1026,7 +1026,17 @@ export default {
    const missing=required.filter(k=>!env[k]);
    let table=false;
    if(env.DB){try{table=Boolean(await env.DB.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='orders'").first())}catch{}}
-   return json({ok:missing.length===0&&table,missing,ordersTableReady:table});
+   // Diagnóstico privado y de sólo lectura: nunca exponer claves ni su longitud.
+   const bridgeKey=env.CENTRAL_BRIDGE_KEY;
+   const centralBridge={
+    bridgeEnabled:env.CENTRAL_BRIDGE_ENABLED==="PRIVATE_TEST_ONLY",
+    expressEnabled:env.CENTRAL_EXPRESS_ENABLED==="PRIVATE_TEST_ONLY",
+    keyPresent:typeof bridgeKey==="string"&&bridgeKey.length>0,
+    keyMinimumLength:typeof bridgeKey==="string"&&bridgeKey.length>=32,
+    keyDifferentFromAdmin:typeof bridgeKey==="string"&&bridgeKey!==env.DEMO_ADMIN_KEY,
+    keyDifferentFromWebhook:typeof bridgeKey==="string"&&bridgeKey!==env.MP_WEBHOOK_SECRET
+   };
+   return json({ok:missing.length===0&&table,missing,ordersTableReady:table,centralBridge});
   }
   if(!env.DB || !env.MP_TEST_ACCESS_TOKEN || !env.DEMO_ADMIN_KEY || !env.MP_TEST_SELLER_ID || !env.TEST_WEBHOOK_URL || !env.MP_WEBHOOK_SECRET)return json({error:"Falta configuración privada de pruebas. Consultar diagnóstico autorizado."},503);
   try {
