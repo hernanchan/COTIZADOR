@@ -76,3 +76,41 @@ test('rechaza recibo sin confirmar y recortes JPEG inválidos',async()=>{
  }
  await assert.rejects(generarPdfExpress({hojas:[[resized]],pdfLib}),/886/);
 });
+
+test('guillotina: 14 marcas exteriores, sin marcos alrededor de las fotos',async()=>{
+ const drawings=[];
+ const hooked={
+  ...pdfLib,
+  PDFDocument:{
+   create:async()=>{
+    const document=await pdfLib.PDFDocument.create();
+    const addPage=document.addPage.bind(document);
+    document.addPage=(...args)=>{
+     const page=addPage(...args);
+     for(const method of ['drawLine','drawRectangle','drawImage']){
+      const original=page[method].bind(page);
+      page[method]=(...params)=>{
+       drawings.push({method,args:params[0]});
+       return original(...params);
+      };
+     }
+     return page;
+    }
+    return document;
+   }
+  }
+ };
+ await generarPdfExpress({hojas:hojas(6),pdfLib:hooked});
+ assert.equal(drawings.filter(x=>x.method==='drawImage').length,6);
+ assert.equal(drawings.filter(x=>x.method==='drawLine').length,14);
+ assert.equal(drawings.filter(x=>x.method==='drawRectangle').length,0,
+  'No deben existir bordes cerrados que obliguen a recortar cada Polaroid');
+ const pt=n=>n*72/25.4;
+ const marks=drawings.filter(x=>x.method==='drawLine');
+ assert.ok(marks.every(({args})=>{
+  const x1=args.start.x/pt(1),x2=args.end.x/pt(1);
+  const y1=297-args.start.y/pt(1),y2=297-args.end.y/pt(1);
+  return (Math.abs(x1-x2)<0.001&&(y1<13.5&&y2<13.5||y1>283.5&&y2>283.5))||
+   (Math.abs(y1-y2)<0.001&&(x1<20&&x2<20||x1>190&&x2>190));
+ }), 'Todas las marcas deben quedar fuera de la zona de corte');
+});
