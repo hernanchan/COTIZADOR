@@ -20,8 +20,8 @@ export function cotizarLoteVerificado({
      x[0]===maxFiles&&x[1]===maxFileBytes&&x[2]===requireSharedOrder)||
      !Array.isArray(recibosVerificados)||recibosVerificados.length<1||
      recibosVerificados.length>maxFiles)
-    throw Error('El lote excede el límite de recepción permitido.');
-  const ids=new Set(),ordenes=new Set(),huellas=new Set();
+    throw Error(requireSharedOrder?'El lote excede el máximo de 30 archivos.':'Seleccioná entre uno y cinco archivos verificados.');
+  const ids=new Set(),ordenes=new Set(),huellas=new Set(),archivosUnicos=new Set();
   const documentos=recibosVerificados.map((r,i)=>{
     if(!r||r.ok!==true||r.verified!==true||r.storageVerified!==true||
        r.status!=='verified'||r.pageVerification!=='server'||
@@ -33,11 +33,12 @@ export function cotizarLoteVerificado({
        !Number.isSafeInteger(r.pages)||r.pages<1||r.pages>20000||
        !Number.isSafeInteger(r.bytes)||r.bytes<5||r.bytes>maxFileBytes)
       throw Error('Uno de los PDF carece de verificación privada completa.');
-    if(ids.has(r.receiptId)||(!requireSharedOrder&&ordenes.has(r.orderId))||
+    if(ids.has(r.receiptId)||(requireSharedOrder&&archivosUnicos.has(r.fileId))||
+       (!requireSharedOrder&&ordenes.has(r.orderId))||
        (requireSharedOrder&&ordenes.size>0&&!ordenes.has(r.orderId))||
        huellas.has(r.sha256))
       throw Error('Recibos o documentos duplicados en el lote.');
-    ids.add(r.receiptId);ordenes.add(r.orderId);huellas.add(r.sha256);
+    ids.add(r.receiptId);ordenes.add(r.orderId);huellas.add(r.sha256);archivosUnicos.add(r.fileId);
     return {id:'pdf'+(i+1),nombre:r.name,paginas:r.pages,modo:r.mode,orden:i+1};
   });
   // En el piloto, el anillado de varios documentos sólo admite ninguno,
