@@ -103,3 +103,20 @@ test('rechazo HMAC 401 o cualquier 422 diferente no es éxito',async()=>{
   assert.equal((await res.json()).signedConnection,false);
  }
 });
+
+
+test('distingue fallo del Service Binding sin filtrar secretos',async()=>{
+  const internalEnv={...env,SABER_CENTRAL:{async fetch(){
+    throw new TypeError('Error interno con material reservado '+secret)
+  }}};
+  const result=await onRequestPost({request:makeRequest(),env:internalEnv,
+    fetcher:async()=>{throw Error('No se debe usar fetch público')},
+    ...testParams});
+  assert.equal(result.status,502);
+  const body=await result.json();
+  assert.equal(body.phase,'invoke-central');
+  assert.equal(body.errorType,'TypeError');
+  assert.equal(body.signedConnection,false);
+  assert.equal(body.writes,false);
+  assert.ok(!JSON.stringify(body).includes(secret));
+});
