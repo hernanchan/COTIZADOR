@@ -119,3 +119,30 @@ test('guillotina: 14 marcas exteriores, sin marcos alrededor de las fotos',async
    (Math.abs(y1-y2)<0.001&&(x1<20&&x2<20||x1>190&&x2>190));
  }), 'Todas las marcas deben quedar fuera de la zona de corte');
 });
+
+
+test('guillotina: 14 marcas en cada hoja para 1, 6, 12, 19 y 24 fotos',async()=>{
+ for(const n of [1,6,12,19,24]){
+  const pages=[];
+  const wrapped={...pdfLib,PDFDocument:{create:async()=>{
+   const document=await pdfLib.PDFDocument.create();
+   const oldAddPage=document.addPage.bind(document);
+   document.addPage=(...args)=>{
+    const page=oldAddPage(...args),c={images:0,marks:0,rectangles:0};
+    pages.push(c);
+    for(const [method,key] of [['drawImage','images'],['drawLine','marks'],['drawRectangle','rectangles']]){
+     const original=page[method].bind(page);
+     page[method]=(...params)=>{c[key]++;return original(...params)};
+    }
+    return page;
+   };
+   return document;
+  }}};
+  const result=await generarPdfExpress({hojas:hojas(n),pdfLib:wrapped});
+  assert.equal(result.hojas,Math.ceil(n/6));
+  assert.equal(pages.length,Math.ceil(n/6));
+  assert.equal(pages.reduce((sum,p)=>sum+p.images,0),n);
+  assert.ok(pages.every(p=>p.marks===14));
+  assert.ok(pages.every(p=>p.rectangles===0));
+ }
+});
