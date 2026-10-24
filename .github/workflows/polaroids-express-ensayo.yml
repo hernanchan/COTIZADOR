@@ -13,6 +13,7 @@ on:
       - 'functions/api/polaroids-express.js'
       - 'tests/polaroids-express-*.test.mjs'
       - 'tests/central-polaroids-express.test.mjs'
+      - 'tests/central-bridge-d1.test.mjs'
       - 'tests/central-polaroids-descarga.test.mjs'
       - 'integraciones/mercadopago/pruebas/worker.js'
       - 'integraciones/mercadopago/pruebas/schema.sql'
@@ -52,6 +53,7 @@ jobs:
           path: artifacts/polaroids-express/*.pdf
           if-no-files-found: error
           retention-days: 7
+      # Incluye compra mixta documentos, Express y catálogo sin checkout.
       - name: Probar Central D1 con PDF Express y controles de acceso
         run: node --experimental-sqlite --test tests/central-polaroids-express.test.mjs tests/central-polaroids-descarga.test.mjs tests/central-bridge-d1.test.mjs
       - name: Regresión de carrito y pasarela de pagos existente
