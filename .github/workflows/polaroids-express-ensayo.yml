@@ -7,6 +7,9 @@ on:
     paths:
       - '.github/workflows/polaroids-express-ensayo.yml'
       - 'integraciones/polaroids/express/**'
+      - 'integraciones/autocotizador/recepcion/enviar-central-firmada.mjs'
+      - 'integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs'
+      - 'tests/autocotizador-central-binding.test.mjs'
       - 'functions/api/polaroids-express.js'
       - 'tests/polaroids-express-*.test.mjs'
       - 'tests/central-polaroids-express.test.mjs'
@@ -65,6 +68,8 @@ jobs:
         run: node --test tests/polaroids-express-preparar-pedido.test.mjs
       - name: Verificar contrato del receptor GAS sin acceder a Drive
         run: node --test tests/polaroids-express-gas-contrato.test.mjs
+      - name: Probar comunicación privada Documentos a Central D1
+        run: node --test tests/autocotizador-central-binding.test.mjs
       - name: Validar superficie privada Express y conexión interna
         run: node --test tests/polaroids-express-aislamiento.test.mjs tests/polaroids-express-bridge-check.test.mjs
       - name: Sintaxis de motor y editor
