@@ -224,7 +224,7 @@ function docsMultiStart(p){
  var m=p.meta;
  if(!m||!/^WEB-[A-Za-z0-9_-]{5,80}$/.test(m.orderId||'')||
     !/^[A-Za-z0-9_-]{1,80}$/.test(m.fileId||'')||typeof m.name!=='string'||m.name.length>120||
-    !/\.pdf$/i.test(m.name)||!['bn','color'].includes(m.mode)||
+    !/\.pdf$/i.test(m.name)||!['bn','color','cad','poster'].includes(m.mode)||
     !Number.isSafeInteger(m.bytes)||m.bytes<5||m.bytes>DOCS_MAX||
     !/^[a-f0-9]{64}$/.test(m.sha256||'')||
     m.partBytes!==DOCS_PART||m.parts!==Math.ceil(m.bytes/DOCS_PART))
