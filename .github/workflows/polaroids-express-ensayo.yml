@@ -20,6 +20,8 @@ on:
       - 'integraciones/autocotizador/recepcion/leer-pdf-fase4-privado.mjs'
       - 'integraciones/autocotizador/recepcion/fase4-ficha-central-lote-privada.mjs'
       - 'tests/autocotizador-lote-ampliado.test.mjs'
+      - 'integraciones/autocotizador/recepcion/pantalla-lote-pdf-ampliado.mjs'
+      - 'tests/autocotizador-lote-ampliado-pantalla.test.mjs'
       - 'functions/api/polaroids-express.js'
       - 'tests/polaroids-express-*.test.mjs'
       - 'tests/central-polaroids-express.test.mjs'
@@ -83,6 +85,8 @@ jobs:
       - name: Compilar Worker documental unificado con vínculo privado (sin desplegar)
         working-directory: integraciones/autocotizador/recepcion
         run: npm run build:unificado
+      - name: Revisar UI ampliada, rutas privadas y JS del navegador
+        run: node --test tests/autocotizador-lote-ampliado-pantalla.test.mjs
       - name: Verificar cotizador ampliado 30 archivos y no romper piloto viejo
         run: node --test tests/autocotizador-lote-ampliado.test.mjs tests/autocotizador-lote-verificado.test.mjs
       - name: Ensayar Apps Script ampliado con 30 PDF, cuotas y Range sin Google real
