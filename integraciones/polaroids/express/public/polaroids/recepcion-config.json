@@ -1,0 +1,9 @@
+{
+  "enabled": false,
+  "showInShop": false,
+  "allowedHost": "saber-polaroids-express-pruebas.pages.dev",
+  "delivery": "express-pdf-only",
+  "maxSheetsForRealUploads": 4,
+  "rollout": "PENDIENTE_DE_APROBACION",
+  "turnstileSiteKey": ""
+}
