@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {prepararPresupuestoDocumentos} from '../integraciones/autocotizador/pruebas/cotizacion-desde-recibos-servidor.mjs';
 import {verificarVinculoCotizadorV2} from '../integraciones/autocotizador/recepcion/verificar-vinculo-cotizador-v2.mjs';
 
 const sha='a'.repeat(64);
@@ -104,4 +105,21 @@ test('el vínculo V2 permite presupuesto de servidor opcional sin habilitar chec
  assert.match(handler,/paymentAuthorized:false/);
  assert.match(handler,/input\.opciones!==undefined/);
  assert.doesNotMatch(handler,/prepararDocumentosCentralFirmado|prepararMixtoCentralFirmado/);
+});
+
+test('cotización comprobada A3 color usa el material real; papel A4 no puede presupuestarse como A3',()=>{
+ const precios=JSON.parse(readFileSync(new URL('../precios-web.json',import.meta.url),'utf8'));
+ const recibo={...good,mode:'color'};
+ const req={orderId,archivos:[{id:recibo.fileId,nombre:recibo.name,modo:'color',orden:1}],
+  formato:'a3',caras:'simple',copias:1,anillado:'ninguno',
+  materialColor:'a3_color_obra80'};
+ const result=prepararPresupuestoDocumentos({solicitud:req,
+  recibosConfiables:[recibo],tarifasServidor:precios});
+ assert.equal(result.quote.total,7000);
+ assert.equal(result.quote.papelColor,'Color A3 · Obra 80 g');
+ assert.equal(result.paymentAuthorized,false);
+ assert.throws(()=>prepararPresupuestoDocumentos({
+  solicitud:{...req,materialColor:'obra70'},
+  recibosConfiables:[recibo],tarifasServidor:precios
+ }),/papel/i);
 });
