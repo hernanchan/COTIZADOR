@@ -130,6 +130,6 @@ test('la preparación D1 de V2 permanece cerrada sin administración y permisos 
  const invalid=await call({...env,DOCS_CENTRAL_ADMIN_KEY:admin},{
   Authorization:'Bearer '+admin
  });
- assert.equal(invalid.status,400,'No deben aceptarse referencias de archivo vacías');
+ assert.equal(invalid.status,503,'No se habilita D1 cuando faltan los interruptores privados');
  assert.equal((await get(path,{},env,'GET')).status,503);
 });
