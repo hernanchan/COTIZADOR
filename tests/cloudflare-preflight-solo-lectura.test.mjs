@@ -90,3 +90,22 @@ test('Si bindings está ausente informa desconocido, no afirma incorrectamente a
 // Revisión de Service Binding SABER_CENTRAL, posterior a la configuración manual (solo GET).
 
 // Comprobación de presencia de clave compartida documental tras configuración del usuario (GET sin secretos).
+
+test('auditoría detecta sólo presencia de banderas del probe sin leer valores',async()=>{
+ const found=await verificarWorkersEnsayoSoloLectura({accountId,token,
+  fetcher:async()=>({ok:true,status:200,json:async()=>({
+   success:true,result:{bindings:[
+    {type:'plain_text',name:'CENTRAL_BRIDGE_ENABLED',text:'PRIVATE_TEST_ONLY'},
+    {type:'plain_text',name:'CENTRAL_BRIDGE_PROBE_ENABLED',text:'PRIVATE_TEST_ONLY'},
+    {type:'service',name:'SABER_CENTRAL',service:'saber-pagos-pruebas'},
+    {type:'secret_text',name:'DOCS_CENTRAL_ADMIN_KEY'},
+    {type:'plain_text',name:'DOCS_CENTRAL_PROBE_ENABLED',text:'PRIVATE_TEST_ONLY'}
+   ]}
+  })})
+ });
+ assert.equal(found.workers[0].centralBindingsPresent.CENTRAL_BRIDGE_ENABLED,true);
+ assert.equal(found.workers[0].centralBindingsPresent.CENTRAL_BRIDGE_PROBE_ENABLED,true);
+ assert.equal(found.workers[1].documentsBindingsPresent.DOCS_CENTRAL_PROBE_ENABLED,true);
+ assert.equal(found.workers[1].documentsBindingsPresent.DOCS_CENTRAL_ADMIN_KEY,true);
+ assert.doesNotMatch(JSON.stringify(found),/PRIVATE_TEST_ONLY|saber-pagos-pruebas.*workers.dev|secret/);
+});
