@@ -42,6 +42,9 @@ on:
       - 'tests/cotizador-v2-vinculo-servidor.test.mjs'
       - 'tests/cotizador-v2-subida-vinculo.test.mjs'
       - 'integraciones/autocotizador/recepcion/subir-vincular-pdf-v2-privado.mjs'
+      - 'integraciones/autocotizador/recepcion/pantalla-cotizador-v2-prueba-privada.mjs'
+      - 'integraciones/autocotizador/recepcion/package.json'
+      - 'integraciones/autocotizador/recepcion/v2-origen-privado.test.mjs'
       - 'integraciones/autocotizador/recepcion/verificar-vinculo-cotizador-v2.mjs'
       - 'vidriera/cotizar.html'
       - 'tests/central-polaroids-descarga.test.mjs'
@@ -105,6 +108,8 @@ jobs:
       - name: Compilar Worker documental unificado con vínculo privado (sin desplegar)
         working-directory: integraciones/autocotizador/recepcion
         run: npm run build:unificado
+      - name: Verificar portal V2 same-origin y autenticación privada real del Worker
+        run: node --test integraciones/autocotizador/recepcion/v2-origen-privado.test.mjs
       - name: Revisar UI ampliada, rutas privadas y JS del navegador
         run: node --test tests/autocotizador-lote-ampliado-pantalla.test.mjs
       - name: Verificar cotizador ampliado 30 archivos y no romper piloto viejo
