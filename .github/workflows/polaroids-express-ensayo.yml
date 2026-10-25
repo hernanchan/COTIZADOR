@@ -11,6 +11,8 @@ on:
       - 'integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs'
       - 'tests/autocotizador-central-binding.test.mjs'
       - 'integraciones/autocotizador/recepcion/preparar-mixto-central.mjs'
+      - 'integraciones/autocotizador/recepcion/preparar-documentos-central.mjs'
+      - 'tests/autocotizador-documentos-central.test.mjs'
       - 'integraciones/autocotizador/recepcion/fase4-ficha-central-lote-privada.mjs'
       - 'tests/autocotizador-mixto-central.test.mjs'
       - 'tests/autocotizador-ficha-lote-gas.test.mjs'
@@ -93,6 +95,8 @@ jobs:
         run: node --test tests/autocotizador-gas-lote-ampliado.test.mjs
       - name: Verificar lote de PDFs privados GAS antes de calcular y registrar D1
         run: node --test tests/autocotizador-ficha-lote-gas.test.mjs
+      - name: Verificar pedido de documentos y tienda sin Polaroids y sin cobro
+        run: node --test tests/autocotizador-documentos-central.test.mjs
       - name: Probar adaptador del carrito mixto Documentos más Polaroids
         run: node --test tests/autocotizador-mixto-central.test.mjs
       - name: Probar comunicación privada Documentos a Central D1
