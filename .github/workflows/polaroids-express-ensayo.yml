@@ -35,6 +35,9 @@ on:
       - 'tests/polaroids-express-*.test.mjs'
       - 'tests/central-polaroids-express.test.mjs'
       - 'tests/central-bridge-d1.test.mjs'
+      - 'cotizador-web-v2.html'
+      - 'cotizador-v2-ensayo-archivos.mjs'
+      - 'tests/cotizador-v2-archivo-optin.test.mjs'
       - 'tests/central-polaroids-descarga.test.mjs'
       - 'integraciones/mercadopago/pruebas/worker.js'
       - 'integraciones/mercadopago/pruebas/schema.sql'
@@ -75,6 +78,8 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       # Incluye compra mixta documentos, Express y catálogo sin checkout.
+      - name: Verificar paridad cotizador V2 y lector PDF opt-in
+        run: node --test tests/cotizador-v2-archivo-optin.test.mjs
       - name: Probar Central D1 con PDF Express y controles de acceso
         run: node --experimental-sqlite --test tests/central-polaroids-express.test.mjs tests/central-polaroids-descarga.test.mjs tests/central-bridge-d1.test.mjs
       - name: Regresión de carrito y pasarela de pagos existente
