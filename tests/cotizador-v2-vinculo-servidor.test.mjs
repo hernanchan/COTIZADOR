@@ -89,3 +89,19 @@ test('ruta privada del Worker cerrada por defecto y sin posibilidad de cobro',()
  assert.doesNotMatch(fn,/paymentAuthorized:true|checkoutEnabled:true/);
  assert.doesNotMatch(fn,/dataBase64|pdfBytes|DriveApp/);
 });
+
+test('el vínculo V2 permite presupuesto de servidor opcional sin habilitar checkout',()=>{
+ const src=readFileSync(new URL('../integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs',import.meta.url),'utf8');
+ const i=src.indexOf('async function v2VincularPdf(');
+ const j=src.indexOf('async function fase4Quote(',i);
+ assert.ok(i>=0&&j>i);
+ const handler=src.slice(i,j);
+ assert.match(handler,/prepararPresupuestoDocumentos\(/);
+ assert.match(handler,/recibosConfiables:\[recibo\]/);
+ assert.match(handler,/tarifasServidor:preciosPiloto/);
+ assert.match(handler,/PRELIMINAR_VERIFICADA_SIN_PEDIDO/);
+ assert.match(handler,/checkoutEnabled:false/);
+ assert.match(handler,/paymentAuthorized:false/);
+ assert.match(handler,/input\.opciones!==undefined/);
+ assert.doesNotMatch(handler,/prepararDocumentosCentralFirmado|prepararMixtoCentralFirmado/);
+});
