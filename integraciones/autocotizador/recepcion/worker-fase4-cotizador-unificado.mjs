@@ -1089,7 +1089,7 @@ function scriptRapido(){
 /** Inspección de ficha central en piloto, solo operador con clave independiente.
  * No publica originales, no crea pedidos D1 ni permite pago.
  */
-async function apiFichaCentralPrivada(request,env,sincronizar=false,mixto=false,lote=false,documental=false,compuesto=false){
+async function apiFichaCentralPrivada(request,env,sincronizar=false,mixto=false,lote=false,documental=false,compuesto=false,v2=false){
  if(request.method!=='POST')return closed();
  if(!allowed(request,env))
   return testResponse({ok:false,error:'Origen no permitido',paymentAuthorized:false},403);
@@ -1108,11 +1108,27 @@ async function apiFichaCentralPrivada(request,env,sincronizar=false,mixto=false,
   if(!input||typeof input!=='object'||Array.isArray(input)||
      Object.keys(input).sort().join(',')!==(mixto?
       (lote?'clientOrderId,items,polaroidReference,sesiones':'clientOrderId,items,opciones,polaroidReference,sesion'):
-      documental?(lote?'clientOrderId,items,sesiones':'clientOrderId,items,opciones,sesion'):
+      documental?(lote?'clientOrderId,items,sesiones':v2?'clientOrderId,items,opciones,referencia,sesion':'clientOrderId,items,opciones,sesion'):
       (lote?'sesiones':'opciones,sesion')))
     throw Error('Datos inválidos');
  }catch(_){return testResponse({ok:false,error:'Solicitud no válida',paymentAuthorized:false},400);}
  try{
+  // V2: verificar referencia exacta del archivo original con una consulta
+  // nueva al receptor GAS. Nunca confiar en estados recibidos del navegador.
+  if(v2){
+   if(!documental||lote||mixto||compuesto||
+      env?.DOCS_V2_RECEIPT_LINK_ENABLED!=='PRIVATE_TEST_ONLY'||
+      env?.DOCS_EXTENDED_RECEIVER_ENABLED!=='PRIVATE_TEST_ONLY')
+    return testResponse({ok:false,error:'Vínculo comercial V2 privado apagado',paymentAuthorized:false},503);
+   const original=await fase4PrivateVerified(env,input.sesion,null,false,DOCS_MAX);
+   const cotejo=verificarVinculoCotizadorV2({
+    referencia:input.referencia,recibo:original,
+    sessionId:input.sesion.uploadId,
+    expectedOrderId:original.orderId,expectedMode:original.mode
+   });
+   if(cotejo.reciboGoogleVerificado!==true||cotejo.paymentAuthorized!==false)
+    throw Error('La referencia V2 no está confirmada.');
+  }
   if(compuesto&&(env?.DOCS_PRINT_DRAFT_ENABLED!=='PRIVATE_TEST_ONLY'||
       env?.DOCS_PRINT_DRAFT_CENTRAL_ENABLED!=='PRIVATE_TEST_ONLY'))
     return testResponse({ok:false,error:'Composición de PDF privado deshabilitada',paymentAuthorized:false},503);
@@ -1183,6 +1199,16 @@ async function apiFichaCentralPrivada(request,env,sincronizar=false,mixto=false,
      listoParaProducir:false},200);
    }
    if(documental){
+    if(v2){
+     const recibido=result.recibos;
+     if(!Array.isArray(recibido)||recibido.length!==1||
+        recibido[0].receiptId!==input.sesion.uploadId||
+        recibido[0].sha256!==input.referencia.sha256||
+        recibido[0].bytes!==input.referencia.bytes||
+        recibido[0].pages!==input.referencia.paginas||
+        resultado.webOrderId!==result.orderId)
+      throw Error('La ficha D1 no corresponde al archivo V2 verificado.');
+    }
     const commercial=await prepararDocumentosCentralFirmado({env,
      webOrderId:resultado.webOrderId,clientOrderId:input.clientOrderId,items:input.items});
     return testResponse({ok:true,carritoDocumental:true,
@@ -1299,6 +1325,7 @@ export default {
     if(page==='/api/ensayo-sincronizar-central-lote')return apiFichaCentralPrivada(request,env,true,false,true);
     if(page==='/api/ensayo-preparar-mixto-lote')return apiFichaCentralPrivada(request,env,false,true,true);
     if(page==='/api/ensayo-preparar-documentos')return apiFichaCentralPrivada(request,env,false,false,false,true);
+    if(page==='/api/ensayo-preparar-documentos-v2')return apiFichaCentralPrivada(request,env,false,false,false,true,false,true);
     if(page==='/api/ensayo-preparar-documentos-lote')return apiFichaCentralPrivada(request,env,false,false,true,true);
     if(page==='/api/ensayo-guardar-pdf-compuesto')return apiFichaCentralPrivada(request,env,false,false,false,false,true);
     if(page==='/api/ensayo-carga-unica'){
