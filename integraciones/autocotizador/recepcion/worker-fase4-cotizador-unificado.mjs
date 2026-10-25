@@ -1210,6 +1210,10 @@ async function apiFichaCentralPrivada(request,env,sincronizar=false,mixto=false,
      listoParaProducir:false},200);
    }
    if(documental){
+    // V2: la Central debe registrar exactamente la orden cuyo original
+    // acaba de verificarse en GAS, antes de preparar su compra comercial.
+    if(v2&&resultado.webOrderId!==result.orderId)
+     throw Error('La Central vinculó un identificador de pedido diferente.');
     const commercial=await prepararDocumentosCentralFirmado({env,
      webOrderId:resultado.webOrderId,clientOrderId:input.clientOrderId,items:input.items});
     return testResponse({ok:true,carritoDocumental:true,
