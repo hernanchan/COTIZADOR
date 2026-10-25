@@ -168,7 +168,7 @@ test('Si el cliente cambia PDF durante la lectura, el resultado viejo no puede r
   let calls=0;
   assert.equal(montarAsistentePdf(ui.app,{leer:async file=>{
    calls++;if(calls===1)return first;
-   return {nombre:file.name,paginas:17};
+   return {nombre:file.name,paginas:17,bytes:1234,verificacion:'LOCAL_PRELIMINAR',subido:false,pagoAutorizado:false};
   }}),true);
   const input=ui.input();
   input.files=[{name:'antiguo.pdf'}];
