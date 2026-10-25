@@ -44,6 +44,8 @@ const list=document.getElementById('all'),status=document.getElementById('state'
 const random=new Uint8Array(16);crypto.getRandomValues(random);
 const orderId='WEB-ENSAYO-'+Array.from(random,b=>b.toString(16).padStart(2,'0')).join('').toUpperCase();
 const all=[],used=new Set();
+const catalogPromise=fetch('/prueba-v2/precios-web.json',{credentials:'same-origin'})
+ .then(r=>{if(!r.ok)throw Error('Catálogo no disponible');return r.json()});
 function render(){
  list.replaceChildren();
  for(const [itemIndex,item] of all.entries()){
@@ -68,20 +70,35 @@ function render(){
     wrapper.append(select);area.append(wrapper);return select;
    };
    const formato=field('Formato', [['a4','A4'],['a3','A3']]);
+   const papel=field('Papel color', []);
+   const updatePaper=async()=>{
+    papel.replaceChildren();papel.disabled=true;
+    try{
+     const catalog=await catalogPromise;
+     const materiales=catalog[formato.value==='a4'?'colorA4':'colorA3']?.materials||[];
+     if(!materiales.length)throw Error('Materiales no disponibles');
+     for(const m of materiales){
+      const option=document.createElement('option');option.value=m.id;option.textContent=m.name;papel.append(option);
+     }
+     papel.disabled=false;
+    }catch(_){msg.textContent='No fue posible obtener los papeles del catálogo. No se puede presupuestar.'}
+   };
+   formato.addEventListener('change',updatePaper);
+   void updatePaper();
    const caras=field('Caras', [['simple','Simple faz'],['double','Doble faz']]);
-   const copias=field('Copias', Array.from({length:20},(_,i)=>[String(i+1),String(i+1)]));
+   const copias=field('Copias', Array.from({length:200},(_,i)=>[String(i+1),String(i+1)]));
    const anillado=field('Anillado', [['ninguno','Sin anillado'],['juntos','Anillado conjunto']]);
    const btn=document.createElement('button');btn.type='button';btn.textContent='Enviar, verificar y cotizar PDF';
    const msg=document.createElement('p');msg.className='state';
    btn.addEventListener('click',async()=>{
     const chosen=file.files?.[0],turnstileToken=window.turnstile?.getResponse();
-    if(!chosen||!turnstileToken){msg.textContent='Seleccioná el PDF y completá la verificación de seguridad.';return}
+    if(!chosen||!turnstileToken||!papel.value){msg.textContent='Seleccioná el PDF y completá la verificación de seguridad.';return}
     btn.disabled=true;file.disabled=true;mode.disabled=true;
-    for(const control of [formato,caras,copias,anillado])control.disabled=true;
+    for(const control of [formato,caras,copias,anillado,papel])control.disabled=true;
     try{
      const result=await subirYVincularPdfCotizadorV2({
       archivo:chosen,referencia:r,orderId,modo:mode.value,turnstileToken,
-      opciones:{formato:formato.value,caras:caras.value,copias:Number(copias.value),anillado:anillado.value},
+      opciones:{formato:formato.value,caras:caras.value,copias:Number(copias.value),anillado:anillado.value,materialColor:papel.value},
       origin:location.origin,
       onProgress:p=>{msg.textContent=p.phase==='transferencia'?'Transferencia: '+p.completed+' de '+p.total+' bloques':p.phase}
      });
