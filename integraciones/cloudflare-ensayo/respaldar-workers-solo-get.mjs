@@ -52,5 +52,8 @@ for(const name of names){
  console.log(name+': respaldo obtenido ('+saved.join(', ')+'). Sin publicación ni cambios.');
 }
 await writeFile(join(out,'route-inventory.json'),JSON.stringify(footprints,null,2)+'\n',{mode:0o600});
-for(const f of footprints)console.log(f.worker+': inventario de rutas generado; '+f.sourceBytes+' bytes respaldados.');
+for(const f of footprints){
+ console.log(f.worker+': inventario de rutas; '+f.sourceBytes+' bytes respaldados.');
+ for(const [route,present] of Object.entries(f.routeHints))console.log('  ruta '+route+': '+(present?'presente':'no encontrada'));
+}
 console.log('BACKUP_2_WORKERS_OK. No se consultó D1; sin despliegue; sin cobros.');
