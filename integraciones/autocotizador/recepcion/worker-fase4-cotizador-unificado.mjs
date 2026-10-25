@@ -858,12 +858,15 @@ async function v2VincularPdf(request,env){
      !['bn','color'].includes(input.expectedMode)||
      (input.opciones!==undefined&&(
        !input.opciones||typeof input.opciones!=='object'||Array.isArray(input.opciones)||
-       Object.keys(input.opciones).sort().join(',')!=='anillado,caras,copias,formato'||
+       Object.keys(input.opciones).sort().join(',')!=='anillado,caras,copias,formato,materialColor'||
        !['a4','a3'].includes(input.opciones.formato)||
        !['simple','double'].includes(input.opciones.caras)||
        !['ninguno','juntos'].includes(input.opciones.anillado)||
        !Number.isSafeInteger(input.opciones.copias)||
-       input.opciones.copias<1||input.opciones.copias>200)))
+       input.opciones.copias<1||input.opciones.copias>200||
+       typeof input.opciones.materialColor!=='string'||
+       !(preciosPiloto[input.opciones.formato==='a4'?'colorA4':'colorA3']?.materials||[])
+        .some(m=>m.id===input.opciones.materialColor))))
    throw Error('Solicitud V2 inválida');
  }catch(_){
   return testResponse({ok:false,error:'Referencia o sesión de PDF inválida',paymentAuthorized:false},400);
@@ -883,7 +886,7 @@ async function v2VincularPdf(request,env){
     solicitud:{orderId:recibo.orderId,archivos:[{
      id:recibo.fileId,nombre:recibo.name,modo:recibo.mode,orden:1
     }],formato:o.formato,caras:o.caras,copias:o.copias,
-    anillado:o.anillado,materialColor:'obra70'},
+    anillado:o.anillado,materialColor:o.materialColor},
     recibosConfiables:[recibo],tarifasServidor:preciosPiloto
    });
    if(budget.paymentAuthorized!==false||
@@ -893,7 +896,7 @@ async function v2VincularPdf(request,env){
     cotizacionServidor:{estado:'PRELIMINAR_VERIFICADA_SIN_PEDIDO',
      totalArs:budget.quote.total,priceVersion:budget.priceVersion,
      paginasOriginales:recibo.pages,formato:o.formato,caras:o.caras,
-     copias:o.copias,anillado:o.anillado,paymentAuthorized:false},
+     copias:o.copias,anillado:o.anillado,materialColor:o.materialColor,paymentAuthorized:false},
     paymentAuthorized:false,checkoutEnabled:false},200);
   }
   return testResponse({...link,ok:true},200);
