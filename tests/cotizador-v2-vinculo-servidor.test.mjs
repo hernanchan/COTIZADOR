@@ -143,3 +143,16 @@ test('preparar pedido V2 exige acceso administrativo, recibo coincidente y valid
  assert.match(handler,/prepararDocumentosCentralFirmado/);
  assert.doesNotMatch(handler,/checkoutEnabled:true|paymentAuthorized:true/);
 });
+
+test('V2 jamás prepara compra si Central confirma otra orden WEB',()=>{
+ const src=readFileSync(new URL('../integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs',import.meta.url),'utf8');
+ const start=src.indexOf('async function apiFichaCentralPrivada(');
+ const end=src.indexOf('function v2PrivateBrowserAuthorized(',start);
+ const route=src.slice(start,end);
+ const stage=route.indexOf('await enviarCentralFirmada(',route.indexOf('if(sincronizar||mixto||documental){'));
+ const orderCheck=route.indexOf('if(v2&&resultado.webOrderId!==result.orderId)',stage);
+ const prepare=route.indexOf('await prepararDocumentosCentralFirmado(',stage);
+ assert.ok(stage>=0&&orderCheck>stage&&prepare>orderCheck,
+  'Antes del pedido comercial debe cotejarse el ID del manifiesto firmado con GAS');
+ assert.match(route,/throw Error\('La Central vinculó un identificador de pedido diferente\.'\)/);
+});
