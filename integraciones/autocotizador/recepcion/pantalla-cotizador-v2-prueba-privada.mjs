@@ -31,11 +31,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <iframe id="base" title="Cotizador V2 de prueba" src="/prueba-v2/cotizador?integrado=1&ensayoArchivos=1" loading="eager"></iframe></section>
 <section class="panel">
 <h2>Recepción de PDF por trabajo</h2>
-<div class="warning">Para este ensayo, al añadir trabajos con PDF deberás seleccionar nuevamente cada archivo. Se comprueba su SHA-256; no sirve otro PDF con el mismo nombre. Hasta confirmar el recibo sigue pendiente.</div>
+<div class="warning">Para este ensayo, seleccioná nuevamente cada PDF y confirmá formato, caras, copias y anillado para comparar con el cotizador original. Se comprueba su SHA-256; no sirve otro PDF con el mismo nombre. Hasta confirmar el recibo sigue pendiente.</div>
 <div class="cf-turnstile" data-sitekey="${sitekey}" data-action="documentos"></div>
 <div id="all" role="list" aria-label="Trabajos del cotizador"></div>
 <p id="state" role="status" aria-live="polite" class="state">Cotizá una impresión y agregala al pedido de prueba.</p>
-<p><small>No se transmite ningún PDF a la tienda pública. La verificación de Drive, el precio servidor, D1 y los cobros son pasos separados.</small></p>
+<p><small>No se transmite ningún PDF a la tienda pública. La verificación de Drive y el presupuesto preliminar del servidor son ensayos; D1 y los cobros siguen separados.</small></p>
 </section></main>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 <script type="module">
@@ -61,27 +61,42 @@ function render(){
    for(const [value,label] of [['bn','Blanco y negro'],['color','Color']]){
     const o=document.createElement('option');o.value=value;o.textContent=label;mode.append(o);
    }
-   const btn=document.createElement('button');btn.type='button';btn.textContent='Enviar y verificar PDF';
+   const field=(title,entries)=>{
+    const wrapper=document.createElement('label');wrapper.textContent=title;
+    const select=document.createElement('select');
+    for(const [v,t] of entries){const option=document.createElement('option');option.value=v;option.textContent=t;select.append(option)}
+    wrapper.append(select);area.append(wrapper);return select;
+   };
+   const formato=field('Formato', [['a4','A4'],['a3','A3']]);
+   const caras=field('Caras', [['simple','Simple faz'],['double','Doble faz']]);
+   const copias=field('Copias', Array.from({length:20},(_,i)=>[String(i+1),String(i+1)]));
+   const anillado=field('Anillado', [['ninguno','Sin anillado'],['juntos','Anillado conjunto']]);
+   const btn=document.createElement('button');btn.type='button';btn.textContent='Enviar, verificar y cotizar PDF';
    const msg=document.createElement('p');msg.className='state';
    btn.addEventListener('click',async()=>{
     const chosen=file.files?.[0],turnstileToken=window.turnstile?.getResponse();
     if(!chosen||!turnstileToken){msg.textContent='Seleccioná el PDF y completá la verificación de seguridad.';return}
     btn.disabled=true;file.disabled=true;mode.disabled=true;
+    for(const control of [formato,caras,copias,anillado])control.disabled=true;
     try{
      const result=await subirYVincularPdfCotizadorV2({
       archivo:chosen,referencia:r,orderId,modo:mode.value,turnstileToken,
+      opciones:{formato:formato.value,caras:caras.value,copias:Number(copias.value),anillado:anillado.value},
       origin:location.origin,
       onProgress:p=>{msg.textContent=p.phase==='transferencia'?'Transferencia: '+p.completed+' de '+p.total+' bloques':p.phase}
      });
-     msg.textContent='PDF recibido y verificado en Google · '+result.pages+' páginas · recibo '+result.receiptId+
-      '. Precio comercial y autorización de pago: PENDIENTES.';
+     const quote=result.cotizacionServidor;
+     msg.textContent='PDF recibido y verificado · '+result.pages+' páginas · recibo '+result.receiptId+
+      '. Presupuesto del servidor: '+(quote?new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(quote.totalArs):'SIN CONFIRMAR')+
+      '. Precio comercial definitivo y autorización de pago: PENDIENTES.';
      btn.textContent='PDF verificado';d.confirmacion=result;
     }catch(e){
      msg.textContent='No se confirmó la recepción: '+String(e.message||e);
      btn.disabled=false;file.disabled=false;mode.disabled=false;
+     for(const control of [formato,caras,copias,anillado])control.disabled=false;
     }finally{window.turnstile?.reset()}
    });
-   area.append(name,file,mode,btn,msg);div.append(area);
+   area.prepend(name,file,mode);area.append(btn,msg);div.append(area);
   }
   list.append(div);
  }
