@@ -674,6 +674,7 @@ test('Borrador PDF compuesto: HMAC → D1, vínculo exacto, copia/dúplex y pago
   await assert.rejects(registrarPdfCompuestoCentralFirmado({...args,env:noBinding}),/deshabilitado/);
   assert.equal(db.prepare('SELECT commercial_order_id FROM central_document_manifests WHERE web_order_id=?').get(doc.orderId).commercial_order_id,null);
   // Vincular luego al pedido comercial: borrador y original siguen el mismo order_id.
+  env.CENTRAL_PREPARE_ENABLED='PRIVATE_TEST_ONLY';
   const clientOrderId=randomUUID();
   const draftOrder=await call('/internal/central/prepare-order',{
    webOrderId:doc.orderId,clientOrderId,items:[]
