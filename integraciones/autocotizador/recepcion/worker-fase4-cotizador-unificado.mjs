@@ -13,6 +13,7 @@ import {fase4FichaCentralLotePrivada} from './fase4-ficha-central-lote-privada.m
 import {enviarCentralFirmada} from './enviar-central-firmada.mjs';
 import {prepararMixtoCentralFirmado} from './preparar-mixto-central.mjs';
 import {prepararDocumentosCentralFirmado} from './preparar-documentos-central.mjs';
+import {probarPuenteCentral} from './probar-puente-central.mjs';
 import {componerDesdeReciboVerificado} from './componer-desde-recibo-verificado.mjs';
 import {guardarPdfCompuestoPrivado} from './guardar-pdf-compuesto-privado.mjs';
 import {registrarPdfCompuestoCentralFirmado} from './registrar-pdf-compuesto-central.mjs';
@@ -1089,6 +1090,36 @@ function scriptRapido(){
 /** Inspección de ficha central en piloto, solo operador con clave independiente.
  * No publica originales, no crea pedidos D1 ni permite pago.
  */
+/** Prueba administrativa explícita, de solo verificación HMAC: no usa D1. */
+async function diagnosticoPuenteCentral(request,env){
+ if(request.method!=='POST')return closed();
+ if(!allowed(request,env))
+  return testResponse({ok:false,error:'Origen no permitido',paymentAuthorized:false},403);
+ const secret=env?.DOCS_CENTRAL_ADMIN_KEY;
+ if(typeof secret!=='string'||secret.length<32||
+    secret===env.DOCS_RELAY_KEY||secret===env.CENTRAL_BRIDGE_KEY)
+  return testResponse({ok:false,error:'Diagnóstico administrativo apagado',paymentAuthorized:false},503);
+ const actual=request.headers.get('Authorization')||'';
+ const expected='Bearer '+secret;
+ let different=actual.length===expected.length?0:1;
+ for(let i=0;i<expected.length;i++)
+  different|=expected.charCodeAt(i)^(actual.charCodeAt(i)||0);
+ if(different)return testResponse({ok:false,error:'Autorización necesaria',paymentAuthorized:false},401);
+ if(request.headers.get('Content-Type')!=='application/json')
+  return testResponse({ok:false,error:'Solicitud no válida',paymentAuthorized:false},400);
+ let input;
+ try{input=await readLimited(request)}catch{return testResponse({ok:false,error:'Solicitud no válida',paymentAuthorized:false},400)}
+ if(!input||typeof input!=='object'||Array.isArray(input)||
+    Object.keys(input).join(',')!=='operation'||input.operation!=='verify-only')
+  return testResponse({ok:false,error:'Solicitud no válida',paymentAuthorized:false},400);
+ try{
+  const result=await probarPuenteCentral({env});
+  return testResponse(result,200);
+ }catch{
+  return testResponse({ok:false,error:'No se pudo verificar firma interna; revisar compuertas privadas.',paymentAuthorized:false},503);
+ }
+}
+
 async function apiFichaCentralPrivada(request,env,sincronizar=false,mixto=false,lote=false,documental=false,compuesto=false,v2=false){
  if(request.method!=='POST')return closed();
  if(!allowed(request,env))
@@ -1330,6 +1361,7 @@ export default {
     if(page==='/api/ensayo-sincronizar-central-lote')return apiFichaCentralPrivada(request,env,true,false,true);
     if(page==='/api/ensayo-preparar-mixto-lote')return apiFichaCentralPrivada(request,env,false,true,true);
     if(page==='/api/ensayo-preparar-documentos')return apiFichaCentralPrivada(request,env,false,false,false,true);
+    if(page==='/api/ensayo-probar-puente-central')return diagnosticoPuenteCentral(request,env);
     if(page==='/api/ensayo-preparar-documentos-v2')return apiFichaCentralPrivada(request,env,false,false,false,true,false,true);
     if(page==='/api/ensayo-preparar-documentos-lote')return apiFichaCentralPrivada(request,env,false,false,true,true);
     if(page==='/api/ensayo-guardar-pdf-compuesto')return apiFichaCentralPrivada(request,env,false,false,false,false,true);
