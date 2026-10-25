@@ -35,7 +35,7 @@ async function sameOriginRpc(path,body,{fetcher,origin}){
  return data;
 }
 export async function subirYVincularPdfCotizadorV2({
- archivo,referencia,orderId,modo,turnstileToken,
+ archivo,referencia,orderId,modo,turnstileToken,opciones,
  origin,fetcher=fetch,subtle=crypto.subtle,onProgress=()=>{}
 }){
  const r=referencia;
@@ -53,6 +53,12 @@ export async function subirYVincularPdfCotizadorV2({
     typeof turnstileToken!=='string'||turnstileToken.length<10||
     typeof onProgress!=='function')
   throw Error('El archivo, el trabajo o la verificación no corresponden.');
+ if(opciones!==undefined&&(!opciones||typeof opciones!=='object'||Array.isArray(opciones)||
+    Object.keys(opciones).sort().join(',')!=='anillado,caras,copias,formato'||
+    !['a4','a3'].includes(opciones.formato)||!['simple','double'].includes(opciones.caras)||
+    !['ninguno','juntos'].includes(opciones.anillado)||
+    !Number.isSafeInteger(opciones.copias)||opciones.copias<1||opciones.copias>200))
+  throw Error('Opciones del presupuesto de servidor inválidas.');
  // Never accept an arbitrary HTTP destination from the caller: this is
  // a relative-only, fixed-path workflow pinned to one HTTPS test origin.
  const bytes=new Uint8Array(await archivo.arrayBuffer());
@@ -102,7 +108,8 @@ export async function subirYVincularPdfCotizadorV2({
   throw Error('La recepción quedó sin confirmar.');
  onProgress({phase:'verificacion',completed:parts,total:parts});
  const linked=await rpc('/api/ensayo-vincular-pdf-v2',{
-  referencia:r,sesion:session,expectedOrderId:orderId,expectedMode:modo
+  referencia:r,sesion:session,expectedOrderId:orderId,expectedMode:modo,
+  ...(opciones===undefined?{}:{opciones})
  });
  if(linked.schema!=='saber-v2-pdf-conciliado-privado-v1'||
     linked.localRef!==r.localRef||linked.orderId!==orderId||
@@ -111,6 +118,15 @@ export async function subirYVincularPdfCotizadorV2({
     linked.precioRecalculado!==false||
     linked.paymentAuthorized!==false||linked.listoParaProducir!==false)
   throw Error('Google no confirmó el PDF de este trabajo.');
+ const quote=linked.cotizacionServidor;
+ if(opciones!==undefined&&(!quote||
+    quote.estado!=='PRELIMINAR_VERIFICADA_SIN_PEDIDO'||
+    !Number.isSafeInteger(quote.totalArs)||quote.totalArs<=0||
+    quote.paginasOriginales!==r.paginas||quote.formato!==opciones.formato||
+    quote.caras!==opciones.caras||quote.copias!==opciones.copias||
+    quote.anillado!==opciones.anillado||quote.paymentAuthorized!==false||
+    linked.checkoutEnabled!==false))
+  throw Error('El servidor no confirmó el presupuesto documental.');
  onProgress({phase:'confirmado',completed:parts,total:parts});
  // Never return a bearer token; must not be persisted in the cart.
  return Object.freeze({
@@ -119,6 +135,11 @@ export async function subirYVincularPdfCotizadorV2({
   sha256:linked.sha256,pages:linked.pages,
   estado:linked.estado,reciboGoogleVerificado:true,
   precioRecalculado:false,paymentAuthorized:false,
-  listoParaProducir:false
+  listoParaProducir:false,
+  ...(opciones===undefined?{}:{cotizacionServidor:Object.freeze({
+   estado:quote.estado,totalArs:quote.totalArs,priceVersion:quote.priceVersion,
+   paginasOriginales:quote.paginasOriginales,formato:quote.formato,caras:quote.caras,
+   copias:quote.copias,anillado:quote.anillado,paymentAuthorized:false
+  })})
  });
 }
