@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {componerDocumentoPdfPrivado} from '../integraciones/autocotizador/recepcion/componer-pdf-documentos-privado.mjs';
 const require=createRequire(new URL('../integraciones/autocotizador/recepcion/package.json',import.meta.url));
-const {PDFDocument,degrees,rgb}=require('pdf-lib');
+const {PDFDocument,PDFName,degrees,rgb}=require('pdf-lib');
 async function original({count=5,rotation=0}={}){
  const doc=await PDFDocument.create();
  for(let i=0;i<count;i++){
@@ -82,7 +82,7 @@ test('PDF original no se rasteriza: páginas incrustadas como XObjects',async()=
  const r=await componerDocumentoPdfPrivado({pdfOriginal:await original({count:1}),paginas:[1]});
  const d=await PDFDocument.load(r.pdfBytes);
  const page=d.getPage(0),resource=page.node.Resources();
- const xobjects=resource.lookup('XObject');
+ const xobjects=resource.lookup(PDFName.of('XObject'));
  assert.ok(xobjects,'El PDF debe contener el recurso vectorial de la página original');
  assert.ok(r.pdfBytes.length>300);
 });
