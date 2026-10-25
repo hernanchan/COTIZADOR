@@ -67,7 +67,7 @@ function backend({resume=false,wrongServer=false,wrongQuote=false}={}){
      totalArs:wrongQuote?-1:2100,priceVersion:'ensayo-v1',
      paginasOriginales:3,formato:body.opciones.formato,
      caras:body.opciones.caras,copias:body.opciones.copias,
-     anillado:body.opciones.anillado,paymentAuthorized:false}}:verified;
+     anillado:body.opciones.anillado,materialColor:body.opciones.materialColor,paymentAuthorized:false}}:verified;
   }
   return Response.json({ok:true,...ret});
  };
@@ -142,7 +142,7 @@ test('jamás confirmar recepción si el servidor devuelve enlace o PDF incongrue
 
 test('opciones válidas transmitidas junto al recibo: presupuesto de servidor sin pago',async()=>{
  const t=backend();
- const opciones={formato:'a4',caras:'simple',copias:2,anillado:'ninguno'};
+ const opciones={formato:'a4',caras:'simple',copias:2,anillado:'ninguno',materialColor:'obra70'};
  const done=await subirYVincularPdfCotizadorV2({...t.args,opciones});
  assert.equal(done.cotizacionServidor.totalArs,2100);
  assert.equal(done.cotizacionServidor.copias,2);
@@ -153,13 +153,23 @@ test('opciones válidas transmitidas junto al recibo: presupuesto de servidor si
 test('el presupuesto inválido del servidor no habilita el pedido',async()=>{
  const t=backend({wrongQuote:true});
  await assert.rejects(subirYVincularPdfCotizadorV2({...t.args,
-  opciones:{formato:'a4',caras:'simple',copias:2,anillado:'ninguno'}
+  opciones:{formato:'a4',caras:'simple',copias:2,anillado:'ninguno',materialColor:'obra70'}
  }),/presupuesto documental/);
 });
 test('opciones imposibles de presupuesto se rechazan sin subir archivos',async()=>{
  const t=backend();
  await assert.rejects(subirYVincularPdfCotizadorV2({...t.args,
-  opciones:{formato:'a0',caras:'simple',copias:1,anillado:'ninguno'}
+  opciones:{formato:'a0',caras:'simple',copias:1,anillado:'ninguno',materialColor:'obra70'}
  }),/Opciones/);
  assert.equal(t.ops.length,0);
+});
+
+test('presupuesto de color A3 conserva material propio, nunca usa el de A4',async()=>{
+ const t=backend();
+ const opts={formato:'a3',caras:'simple',copias:1,anillado:'ninguno',
+  materialColor:'a3_color_obra80'};
+ const done=await subirYVincularPdfCotizadorV2({...t.args,opciones:opts});
+ assert.equal(done.cotizacionServidor.materialColor,'a3_color_obra80');
+ assert.equal(done.cotizacionServidor.formato,'a3');
+ assert.equal(done.paymentAuthorized,false);
 });
