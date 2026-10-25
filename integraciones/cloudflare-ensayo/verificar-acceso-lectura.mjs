@@ -15,7 +15,9 @@ const VALID_TOKEN=/^[A-Za-z0-9_\-]{20,300}$/;
 const DOCUMENTS_BINDINGS=Object.freeze(['SABER_CENTRAL','DOCS_SCRIPT_URL','DOCS_RELAY_KEY',
  'DOCS_ALLOWED_ORIGIN','DOCS_TURNSTILE_SITE_KEY','DOCS_TURNSTILE_SECRET',
  'DOCS_EXTENDED_RECEIVER_ENABLED','DOCS_V2_RECEIPT_LINK_ENABLED',
- 'DOCS_V2_PRIVATE_UI_ENABLED','DOCS_V2_PRIVATE_UI_SECRET']);
+ 'DOCS_V2_PRIVATE_UI_ENABLED','DOCS_V2_PRIVATE_UI_SECRET',
+ 'DOCS_CENTRAL_PROBE_ENABLED','DOCS_CENTRAL_ADMIN_KEY','CENTRAL_TEST_URL']);
+const CENTRAL_BINDINGS=Object.freeze(['CENTRAL_BRIDGE_ENABLED','CENTRAL_BRIDGE_PROBE_ENABLED']);
 export async function verificarWorkersEnsayoSoloLectura({
  accountId,token,fetcher=fetch
 }){
@@ -56,6 +58,10 @@ export async function verificarWorkersEnsayoSoloLectura({
    centralBridgeKeyConfigured:bindings===null?null:names.includes('CENTRAL_BRIDGE_KEY'),
    d1BindingConfigured:bindings===null?null:bindings.some(x=>x?.type==='d1'),
    serviceBindingConfigured:bindings===null?null:bindings.some(x=>x?.type==='service'),
+   centralBindingsPresent:name==='saber-pagos-pruebas'?Object.freeze(
+    Object.fromEntries(CENTRAL_BINDINGS.map(binding=>[
+     binding,bindings===null?null:names.includes(binding)
+    ]))):null,
    documentsBindingsPresent:name==='saber-documentos-pruebas'?Object.freeze(
     Object.fromEntries(DOCUMENTS_BINDINGS.map(binding=>[
      binding,bindings===null?null:bindings.some(x=>x?.name===binding&&(
@@ -86,6 +92,9 @@ if(process.argv[1]&&import.meta.url===new URL('file://'+process.argv[1]).href){
     'CENTRAL_BRIDGE_KEY='+value(w.centralBridgeKeyConfigured)+
     '; D1='+value(w.d1BindingConfigured)+
     '; Service Binding='+value(w.serviceBindingConfigured));
+   if(w.centralBindingsPresent)for(const name of CENTRAL_BINDINGS){
+    console.log('  '+name+': binding presente='+value(w.centralBindingsPresent[name]));
+   }
    if(w.documentsBindingsPresent)for(const name of DOCUMENTS_BINDINGS){
     console.log('  '+name+': binding presente='+value(w.documentsBindingsPresent[name]));
    }
