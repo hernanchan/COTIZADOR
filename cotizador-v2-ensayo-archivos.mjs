@@ -64,6 +64,8 @@ export async function leerPaginasPdfCotizador(file,{obtenerLibreria=loadPdfLib}=
 export function montarAsistentePdf(app,{leer=leerPaginasPdfCotizador,antesDeCotizar=()=>{}}={}){
  if(!app||!app.isConnected||!app.querySelector('#pages')||
     app.querySelector('#saberEnsayoPdf'))return false;
+ // El formulario se vuelve a crear al editar el trabajo: no heredar otro PDF.
+ seleccionPorFormulario.delete(app);
  const pagesInput=app.querySelector('#pages');
  const host=pagesInput.closest('.card');
  if(!host)return false;
