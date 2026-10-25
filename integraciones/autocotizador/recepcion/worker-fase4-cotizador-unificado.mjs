@@ -16,6 +16,7 @@ import {prepararDocumentosCentralFirmado} from './preparar-documentos-central.mj
 import {componerDesdeReciboVerificado} from './componer-desde-recibo-verificado.mjs';
 import {guardarPdfCompuestoPrivado} from './guardar-pdf-compuesto-privado.mjs';
 import {registrarPdfCompuestoCentralFirmado} from './registrar-pdf-compuesto-central.mjs';
+import {verificarVinculoCotizadorV2} from './verificar-vinculo-cotizador-v2.mjs';
 import cargaClienteJs from './carga-unica-cliente.txt';
 import {cotizarPloteosRapido} from '../pruebas/cotizar-ploteos-rapido.mjs';
 import plotClienteJs from './ploteos-rapido-cliente.txt';
@@ -835,6 +836,38 @@ async function fase4PrivateVerified(env,session,metrics=null,preferirInfo=false,
    throw Error('Google no guardó el conteo de páginas');
  return committed;
 }
+async function v2VincularPdf(request,env){
+ if(env?.DOCS_V2_RECEIPT_LINK_ENABLED!=='PRIVATE_TEST_ONLY'||
+    env?.DOCS_EXTENDED_RECEIVER_ENABLED!=='PRIVATE_TEST_ONLY')
+  return testResponse({ok:false,error:'Enlace V2 deshabilitado',paymentAuthorized:false},503);
+ if(request.method!=='POST')return closed();
+ if(!allowed(request,env))
+  return testResponse({ok:false,error:'Origen de recepción no autorizado',paymentAuthorized:false},403);
+ let input;
+ try{
+  input=await readLimited(request);
+  if(!input||typeof input!=='object'||Array.isArray(input)||
+     Object.keys(input).sort().join(',')!=='expectedMode,expectedOrderId,referencia,sesion'||
+     !input.sesion||Object.keys(input.sesion).sort().join(',')!=='token,uploadId'||
+     !phase4Session(input.sesion.uploadId)||!phase4Token(input.sesion.token)||
+     !/^WEB-[A-Za-z0-9_-]{5,80}$/.test(input.expectedOrderId||'')||
+     !['bn','color'].includes(input.expectedMode))
+   throw Error('Solicitud V2 inválida');
+ }catch(_){
+  return testResponse({ok:false,error:'Referencia o sesión de PDF inválida',paymentAuthorized:false},400);
+ }
+ try{
+  const recibo=await fase4PrivateVerified(env,input.sesion,null,false,DOCS_MAX);
+  const link=verificarVinculoCotizadorV2({
+   referencia:input.referencia,recibo,sessionId:input.sesion.uploadId,
+   expectedOrderId:input.expectedOrderId,expectedMode:input.expectedMode
+  });
+  return testResponse({...link,ok:true},200);
+ }catch(_){
+  return testResponse({ok:false,error:'El archivo de Google no coincide con el trabajo seleccionado. Seleccioná nuevamente el PDF correcto.',paymentAuthorized:false},422);
+ }
+}
+
 async function fase4Quote(request,env){
  if(request.method!=='POST')return closed();
  if(!allowed(request,env))return testResponse({ok:false,error:'Origen no permitido',paymentAuthorized:false},403);
@@ -1183,6 +1216,7 @@ export default {
     if(page==='/api/ensayo-cotizar-lote-ampliado')return fase4QuoteLote(request,env,true);
     if(page==='/api/ensayo-pdf')return fase4Transfer(request,env);
     if(page==='/api/ensayo-pdf-ampliado')return fase4Transfer(request,env,true);
+    if(page==='/api/ensayo-vincular-pdf-v2')return v2VincularPdf(request,env);
     if(page==='/api/ensayo-cotizar')return fase4Quote(request,env);
     if(page==='/prueba-presupuesto'&&request.method==='GET')return presupuestoHtml(env);
     if(page==='/api/presupuesto-pdf')return presupuestoPost(request,env);
