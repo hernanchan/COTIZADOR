@@ -44,16 +44,19 @@ export async function leerPaginasPdfCotizador(file,{obtenerLibreria=loadPdfLib}=
   pdf=await PDFDocument.load(array,{
    ignoreEncryption:false,updateMetadata:false,throwOnInvalidObject:true
   });
+  // Un PDF con cabecera válida puede fallar al leer su catálogo de páginas.
+  // La revisión del árbol de páginas también debe estar protegida.
+  const paginasLeidas=pdf.getPageCount();
+  if(!Number.isSafeInteger(paginasLeidas)||paginasLeidas<1||paginasLeidas>MAX_PAGES)
+   throw Error('El PDF excede el límite de páginas de este ensayo.');
+  return Object.freeze({nombre:file.name,paginas:paginasLeidas,bytes:file.size,
+   verificacion:'LOCAL_PRELIMINAR',subido:false,pagoAutorizado:false});
  }catch(err){
   if(/encrypt|password|protected/i.test(String(err?.message||'')))
    throw Error('El PDF está protegido con contraseña y requiere revisión.');
   throw Error('No pudimos leer las páginas del PDF.');
  }
- const pages=pdf.getPageCount();
- if(!Number.isSafeInteger(pages)||pages<1||pages>MAX_PAGES)
-  throw Error('El PDF excede el límite de páginas de este ensayo.');
- return Object.freeze({nombre:file.name,paginas:pages,bytes:file.size,
-  verificacion:'LOCAL_PRELIMINAR',subido:false,pagoAutorizado:false});
+
 }
 
 export function montarAsistentePdf(app){
@@ -87,7 +90,9 @@ export function montarAsistentePdf(app){
  let seq=0;
  input.onchange=async()=>{
   const current=++seq,file=input.files?.[0];
-  if(!file){status.textContent='Sin archivo seleccionado.';return}
+  if(!file){status.textContent='Sin archivo seleccionado.';
+   const calculate=app.querySelector('#calc');if(calculate)calculate.disabled=false;
+   return}
   const calculate=app.querySelector('#calc');
   if(calculate)calculate.disabled=true;
   status.textContent='Leyendo páginas del PDF…';
