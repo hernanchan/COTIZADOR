@@ -27,3 +27,18 @@ El token **Metadata Read-Only** solo sirve para verificar que los Workers de ens
 **La integración del acceso no está terminada hasta que el usuario coloque el secreto en GitHub y el chequeo de metadatos remotos se ejecute correctamente.** Antes de ese momento solo están demostradas las pruebas automatizadas con datos ficticios.
 
 Documentación externa: https://developers.cloudflare.com/workers/authorization/workers/ y https://developers.cloudflare.com/fundamentals/api/get-started/account-owned-tokens/ .
+
+
+## Auditoría real de Cloudflare — 25/10/2026
+
+La cuenta Cloudflare real fue leída mediante GitHub Environment `saber-cloudflare-pruebas`, sin obtener valores de secretos, sin desplegar y sin alterar D1 o DNS.
+
+**Prueba confirmada de los dos secretos de GitHub:** https://github.com/hernanchan/COTIZADOR/actions/runs/40195956280
+
+**Auditoría adicional de bindings exclusivamente por presencia de nombre:** https://github.com/hernanchan/COTIZADOR/actions/runs/40196191532
+
+- `saber-pagos-pruebas`: `CENTRAL_BRIDGE_KEY` presente y vínculo D1 presente. Sin Service Binding (no es requerido como caller para este flujo).
+- `saber-documentos-pruebas`: presentes `DOCS_SCRIPT_URL`, `DOCS_RELAY_KEY`, `DOCS_ALLOWED_ORIGIN`, `DOCS_TURNSTILE_SITE_KEY` y `DOCS_TURNSTILE_SECRET`. **No** aparece `SABER_CENTRAL` como Service Binding, por lo que no puede invocar la Central D1 mediante ese vínculo.
+- No aparecen configurados los nombres `DOCS_EXTENDED_RECEIVER_ENABLED`, `DOCS_V2_RECEIPT_LINK_ENABLED`, `DOCS_V2_PRIVATE_UI_ENABLED` ni `DOCS_V2_PRIVATE_UI_SECRET` en el Worker documental. Estas variables solo deben crearse y activarse dentro del entorno de prueba después de comprobar el código desplegado y de revisar sus barreras; nunca activar funciones sin confirmación de seguridad y autorización.
+
+**Límite:** metadata-read-only no habilita escritura ni confirma que el código de prueba de GitHub esté desplegado en Workers. Los resultados anteriores prueban existencia de *bindings* por nombre, **no** el contenido o vigencia de los secretos, el estado de Google Apps Script, el acceso real a Drive o la funcionalidad del PDF. Sigue pendiente revisar en Chrome `saber-documentos-pruebas → Settings → Bindings` para añadir de forma controlada la conexión `SABER_CENTRAL` hacia `saber-pagos-pruebas` y planificar un piloto privado sin cambiar producción.
