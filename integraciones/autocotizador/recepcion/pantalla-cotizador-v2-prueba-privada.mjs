@@ -107,10 +107,10 @@ function render(){
       currency:'ARS',maximumFractionDigits:0}).format(value);
      const comparable=item.references.length===1;
      const diferencia=quote&&comparable?quote.totalArs-item.price:null;
-     const aviso=diferencia===null?'La comparación requiere revisar los demás renglones del trabajo.'
-      :Math.abs(diferencia)<0.01?'Precios coincidentes para este trabajo.'
-      :'ATENCIÓN: diferencia con el cotizador de '+moneda(diferencia)+
-       '. Requiere revisión de tarifas, descuentos y opciones antes de cobrar.';
+     const aviso=diferencia===null?'No es posible comparar: el trabajo incluye más de un PDF.'
+      :Math.abs(diferencia)<0.01?'Importes numéricamente iguales; falta confirmar promociones, material y condiciones comerciales.'
+      :'ATENCIÓN: diferencia orientativa frente al cotizador de '+moneda(diferencia)+
+       '. Revisar promociones, materiales y opciones; el servidor todavía no confirmó el precio comercial final.';
      msg.textContent='PDF recibido y verificado · '+result.pages+' páginas · recibo '+result.receiptId+
       '. Presupuesto del servidor: '+(quote?moneda(quote.totalArs):'SIN CONFIRMAR')+
       '. '+aviso+' Pedido D1 y autorización de pago: PENDIENTES.';
