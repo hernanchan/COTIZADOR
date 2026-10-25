@@ -17,7 +17,7 @@ const ref={schema:'saber-pdf-local-pendiente-v1',
  verificadoServidor:false};
 const file={name:'archivo.pdf',size:bytes.length,
  arrayBuffer:async()=>Uint8Array.from(bytes).buffer};
-function backend({resume=false,wrongServer=false}={}){
+function backend({resume=false,wrongServer=false,wrongQuote=false}={}){
  const ops=[],blocks=[],progress=[],accepted=resume?[0]:[];
  const fetcher=async(url,options)=>{
   assert.ok(url.startsWith(origin+'/api/ensayo-'),'Sólo destino mismo origen');
@@ -62,7 +62,12 @@ function backend({resume=false,wrongServer=false}={}){
      {...original,sha256:'b'.repeat(64)}:original,
     sessionId:uploadId,expectedOrderId:orderId,expectedMode:'bn'
    });
-   ret=verified;
+   ret=body.opciones?{...verified,checkoutEnabled:false,
+    cotizacionServidor:{estado:'PRELIMINAR_VERIFICADA_SIN_PEDIDO',
+     totalArs:wrongQuote?-1:2100,priceVersion:'ensayo-v1',
+     paginasOriginales:3,formato:body.opciones.formato,
+     caras:body.opciones.caras,copias:body.opciones.copias,
+     anillado:body.opciones.anillado,paymentAuthorized:false}}:verified;
   }
   return Response.json({ok:true,...ret});
  };
@@ -133,4 +138,28 @@ test('jamás confirmar recepción si el servidor devuelve enlace o PDF incongrue
   return Response.json(data);
  };
  await assert.rejects(subirYVincularPdfCotizadorV2({...t.args,fetcher:corrupt}),/no confirmó/);
+});
+
+test('opciones válidas transmitidas junto al recibo: presupuesto de servidor sin pago',async()=>{
+ const t=backend();
+ const opciones={formato:'a4',caras:'simple',copias:2,anillado:'ninguno'};
+ const done=await subirYVincularPdfCotizadorV2({...t.args,opciones});
+ assert.equal(done.cotizacionServidor.totalArs,2100);
+ assert.equal(done.cotizacionServidor.copias,2);
+ assert.equal(done.paymentAuthorized,false);
+ assert.equal(done.precioRecalculado,false);
+ assert.doesNotMatch(JSON.stringify(done),/token|dataBase64|driveFileId/);
+});
+test('el presupuesto inválido del servidor no habilita el pedido',async()=>{
+ const t=backend({wrongQuote:true});
+ await assert.rejects(subirYVincularPdfCotizadorV2({...t.args,
+  opciones:{formato:'a4',caras:'simple',copias:2,anillado:'ninguno'}
+ }),/presupuesto documental/);
+});
+test('opciones imposibles de presupuesto se rechazan sin subir archivos',async()=>{
+ const t=backend();
+ await assert.rejects(subirYVincularPdfCotizadorV2({...t.args,
+  opciones:{formato:'a0',caras:'simple',copias:1,anillado:'ninguno'}
+ }),/Opciones/);
+ assert.equal(t.ops.length,0);
 });
