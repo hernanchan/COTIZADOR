@@ -288,3 +288,77 @@ test('rechazar composición alterada y un PDF de otro original antes de tocar Dr
  }),/no autorizado/);
  assert.equal(t.stats().uploads,0);
 });
+
+
+test('PDF original en Drive simulado → ficha y precio → imposición → borrador privado en Drive',async()=>{
+ const {createRequire}=await import('node:module');
+ const {webcrypto}=await import('node:crypto');
+ const {fase4FichaCentralPrivada}=await import('../integraciones/autocotizador/recepcion/fase4-ficha-central-privada.mjs');
+ const {componerDesdeReciboVerificado}=await import('../integraciones/autocotizador/recepcion/componer-desde-recibo-verificado.mjs');
+ const {guardarPdfCompuestoPrivado}=await import('../integraciones/autocotizador/recepcion/guardar-pdf-compuesto-privado.mjs');
+ const prices=JSON.parse(readFileSync(new URL('../precios-web.json',import.meta.url),'utf8'));
+ const require=createRequire(new URL('../integraciones/autocotizador/recepcion/package.json',import.meta.url));
+ const {PDFDocument,rgb}=require('pdf-lib');
+ const originalPdf=await PDFDocument.create();
+ for(let i=0;i<3;i++){
+  const p=originalPdf.addPage([595.276,841.89]);
+  p.drawText('PEDIDO SABER - PAGINA '+(i+1),{x:35,y:740,size:18,color:rgb(0.1,0.1,0.6)});
+ }
+ const bytes=Buffer.from(await originalPdf.save());
+ const t=setup(),orderId='WEB-PRUEBA-LOTE-20261024';
+ const meta={...t.createMeta('ficha1',{orderId,bytes:bytes.length}),
+  name:'original.pdf',sha256:sha(bytes),
+  parts:Math.ceil(bytes.length/(512*1024))};
+ const started=t.call({op:'multiStart',meta});
+ assert.equal(started.ok,true,JSON.stringify(started));
+ const source=JSON.parse(t.properties.get('FILE_'+started.uploadId));
+ source.receiptState='pages_verified';source.pageVerification='server';
+ source.pdfPages=3;source.driveFileId='ORIGINAL_VECTORES';
+ t.properties.set('FILE_'+started.uploadId,JSON.stringify(source));
+ t.payloads.set('ORIGINAL_VECTORES',bytes);
+ const consultarFirmado=p=>Promise.resolve(t.call(p));
+ const sesion={uploadId:started.uploadId,token:started.token};
+ const opciones={servicio:'auto',seleccion:'a4',paginasSeleccionadas:'',
+  copias:2,modo:'bn',caras:'double',papelPoster:'obra80',anillado:'ninguno',
+  grupoAnillado:'',materialColor:'',productoFoto:'',productoGrafica:'',
+  corteVariante:'gt3',corteMetros:1};
+ const verified=await fase4FichaCentralPrivada({sesion,opciones,
+  consultarFirmado,preciosServidor:prices});
+ assert.equal(verified.filesReceived,true);
+ assert.equal(verified.paymentAuthorized,false);
+ assert.ok(verified.importeVerificado>0);
+ const trabajo=verified.ficha.trabajos[0];
+ assert.equal(trabajo.servicio,'documentos');
+ assert.equal(trabajo.carasPresupuestadas,'double');
+ assert.equal(trabajo.copias,2);
+ const composed=await componerDesdeReciboVerificado({
+  manifiesto:verified,sesion,trabajoId:trabajo.idTrabajo,
+  consultarFirmado,subtle:webcrypto.subtle
+ });
+ assert.equal(composed.ficha.compuestoPaginas,8);
+ assert.equal(composed.ficha.guardadoEnDrive,false);
+ assert.equal(composed.ficha.compuestoSha256,sha(composed.pdfBytes));
+ t.properties.set('DOCS_PRINT_DRAFT_ENABLED','PRIVATE_TEST_ONLY');
+ const saved=await guardarPdfCompuestoPrivado({
+  ...composed,sesionOriginal:sesion,
+  consultarFirmado,habilitado:'PRIVATE_TEST_ONLY',
+  subtle:webcrypto.subtle
+ });
+ assert.equal(saved.orderId,verified.orderId);
+ assert.equal(saved.originalReceiptId,started.uploadId);
+ assert.equal(saved.sha256,composed.ficha.compuestoSha256);
+ assert.equal(saved.pages,8);
+ assert.equal(saved.guardadoEnDrive,true);
+ assert.equal(saved.pdfImprimibleVerificado,false);
+ assert.equal(saved.paymentAuthorized,false);
+ assert.equal(saved.descargaPrivadaHabilitada,false);
+ assert.equal(saved.listoParaProducir,false);
+ const end=JSON.parse(t.properties.get('FILE_'+saved.borradorReceiptId));
+ const stored=t.payloads.get(end.driveFileId);
+ assert.ok(stored);
+ const actual=await PDFDocument.load(stored);
+ assert.equal(actual.getPageCount(),8);
+ assert.equal(sha(stored),composed.ficha.compuestoSha256);
+ assert.ok(!JSON.stringify(saved).includes(started.token));
+ assert.ok(!JSON.stringify(saved).includes(end.driveFileId));
+});
