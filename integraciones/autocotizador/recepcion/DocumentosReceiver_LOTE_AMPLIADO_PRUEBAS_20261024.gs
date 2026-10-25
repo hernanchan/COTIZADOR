@@ -550,7 +550,7 @@ function docsPrintDraftRun(p,action){
  if(action==='part')return docsPart(p);
  if(action==='status')return docsStatus(p);
  if(action==='finish'){
-  if(s.receiptState==='pages_verified')return docsPrintDraftInfo(p);
+  if(s.receiptState==='pages_verified')return Object.assign({received:true},docsPrintDraftInfo(p));
   return docsFinish(p);
  }
  throw Error('Operación de borrador desconocida');
