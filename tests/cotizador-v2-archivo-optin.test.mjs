@@ -57,6 +57,7 @@ test('Lector opcional: 7 páginas de PDF real, sin transmisión ni confirmación
  assert.equal(calls,1);
  assert.deepEqual(result,{
   nombre:'archivo.pdf',paginas:7,bytes:file.size,
+  sha256:createHash('sha256').update(Buffer.from(await file.arrayBuffer())).digest('hex'),
   verificacion:'LOCAL_PRELIMINAR',subido:false,pagoAutorizado:false
  });
  assert.equal(Object.isFrozen(result),true);
@@ -129,7 +130,7 @@ test('Montaje del lector: sólo cambia páginas al leer bien, sin tocar el cálc
   let uploads=0;
   const mounted=montarAsistentePdf(ui.app,{
    leer:async file=>{uploads++;return {
-    nombre:file.name,paginas:12,verificacion:'LOCAL_PRELIMINAR',
+    nombre:file.name,paginas:12,bytes:1234,sha256:'a'.repeat(64),verificacion:'LOCAL_PRELIMINAR',
     subido:false,pagoAutorizado:false
    }}
   });
@@ -168,7 +169,7 @@ test('Si el cliente cambia PDF durante la lectura, el resultado viejo no puede r
   let calls=0;
   assert.equal(montarAsistentePdf(ui.app,{leer:async file=>{
    calls++;if(calls===1)return first;
-   return {nombre:file.name,paginas:17,bytes:1234,verificacion:'LOCAL_PRELIMINAR',subido:false,pagoAutorizado:false};
+   return {nombre:file.name,paginas:17,bytes:1234,sha256:'b'.repeat(64),verificacion:'LOCAL_PRELIMINAR',subido:false,pagoAutorizado:false};
   }}),true);
   const input=ui.input();
   input.files=[{name:'antiguo.pdf'}];
