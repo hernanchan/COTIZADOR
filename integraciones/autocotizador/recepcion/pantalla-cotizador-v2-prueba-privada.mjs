@@ -6,7 +6,7 @@
 export function paginaCotizadorV2PruebaPrivada(sitekey){
  if(typeof sitekey!=='string'||!/^[a-zA-Z0-9._-]{10,200}$/.test(sitekey))
   throw Error('Turnstile privado sin configurar');
- return \`<!doctype html><html lang="es"><head>
+ return `<!doctype html><html lang="es"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow,noarchive">
 <title>Librería Saber · Ensayo privado V2</title>
@@ -32,7 +32,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <section class="panel">
 <h2>Recepción de PDF por trabajo</h2>
 <div class="warning">Para este ensayo, al añadir trabajos con PDF deberás seleccionar nuevamente cada archivo. Se comprueba su SHA-256; no sirve otro PDF con el mismo nombre. Hasta confirmar el recibo sigue pendiente.</div>
-<div class="cf-turnstile" data-sitekey="\${sitekey}" data-action="documentos"></div>
+<div class="cf-turnstile" data-sitekey="${sitekey}" data-action="documentos"></div>
 <div id="all" role="list" aria-label="Trabajos del cotizador"></div>
 <p id="state" role="status" aria-live="polite" class="state">Cotizá una impresión y agregala al pedido de prueba.</p>
 <p><small>No se transmite ningún PDF a la tienda pública. La verificación de Drive, el precio servidor, D1 y los cobros son pasos separados.</small></p>
@@ -111,5 +111,5 @@ window.addEventListener('message',event=>{
  status.textContent='Se agregó un trabajo. Los PDF están pendientes hasta que Google confirme su recepción. Pedido de prueba: '+orderId;
  render();
 });
-</script></body></html>\`;
+</script></body></html>`;
 }
