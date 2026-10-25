@@ -1,0 +1,43 @@
+# SAFE Cloudflare preflight. Only metadata GET for two known test Workers.
+# No deploy, no D1 queries, no route/DNS changes, no payment operations.
+name: Saber - Cloudflare ensayos (solo lectura)
+on:
+  push:
+    branches:
+      - polaroids/express-pdf-unico-20261023
+    paths:
+      - '.github/workflows/cloudflare-lectura-privada.yml'
+      - 'integraciones/cloudflare-ensayo/**'
+      - 'tests/cloudflare-preflight-solo-lectura.test.mjs'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: saber-cloudflare-preflight-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  metadata-only:
+    if: github.ref == 'refs/heads/polaroids/express-pdf-unico-20261023'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Comprobar límites de seguridad sin credenciales
+        run: node --test tests/cloudflare-preflight-solo-lectura.test.mjs
+      - name: No acceder a Cloudflare sin autorización expresa de preflight
+        if: vars.SABER_CF_PREFLIGHT_ENABLED != 'true'
+        run: echo "Ensayo remoto no habilitado. Solo se ejecutaron pruebas locales."
+      - name: Consultar exclusivamente metadatos de dos Workers de prueba
+        if: vars.SABER_CF_PREFLIGHT_ENABLED == 'true'
+        env:
+          SABER_CF_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          SABER_CF_READONLY_TOKEN: ${{ secrets.SABER_CF_READONLY_TOKEN }}
+        run: node integraciones/cloudflare-ensayo/verificar-acceso-lectura.mjs
