@@ -12,6 +12,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  statuses: write
 concurrency:
   group: saber-cloudflare-preflight-${{ github.ref }}
   cancel-in-progress: true
@@ -57,3 +58,31 @@ jobs:
           SABER_CF_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
           SABER_CF_READONLY_TOKEN: ${{ secrets.SABER_CF_READONLY_TOKEN }}
         run: node integraciones/cloudflare-ensayo/verificar-acceso-lectura.mjs
+
+      - name: Publicar resultado seguro de la auditoría Cloudflare en el commit
+        if: ${{ always() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_SHA: ${{ github.sha }}
+          JOB_STATUS: ${{ job.status }}
+          CREDS_READY: ${{ steps.creds.outputs.ready }}
+        shell: bash
+        run: |
+          case "$JOB_STATUS" in
+            success)
+              if [ "$CREDS_READY" = "true" ]; then
+                state=success
+                description="Lectura Cloudflare completada; revisar bindings en logs privados"
+              else
+                state=failure
+                description="No se pudo auditar Cloudflare: faltan credenciales de lectura"
+              fi;;
+            *) state=failure; description="Auditoria de lectura Cloudflare no completada";;
+          esac
+          jq -n --arg state "$state" --arg context 'saber-cloudflare/metadata-readonly' \
+            --arg description "$description" \
+            --arg target_url "https://github.com/$GH_REPO/actions/runs/$GITHUB_RUN_ID" \
+            '{state:$state,context:$context,description:$description,target_url:$target_url}' \
+            > /tmp/saber-ci-status.json
+          gh api -X POST "repos/$GH_REPO/statuses/$GH_SHA" --input /tmp/saber-ci-status.json
