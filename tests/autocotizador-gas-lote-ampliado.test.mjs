@@ -374,7 +374,9 @@ test('la ruta de PDF compuesto existe sólo para operador y con interruptores ap
  assert.match(handler,/if\(!allowed\(request,env\)\)/);
  assert.match(handler,/DOCS_CENTRAL_ADMIN_KEY/);
  assert.match(handler,/if\(diff\)return testResponse/);
- assert.match(handler,/compuesto&&env\?\.DOCS_PRINT_DRAFT_ENABLED!=='PRIVATE_TEST_ONLY'/);
+ assert.match(handler,/compuesto&&\(env\?\.DOCS_PRINT_DRAFT_ENABLED!=='PRIVATE_TEST_ONLY'/);
+ assert.match(handler,/env\?\.DOCS_PRINT_DRAFT_CENTRAL_ENABLED!=='PRIVATE_TEST_ONLY'/);
+ assert.match(handler,/await registrarPdfCompuestoCentralFirmado/);
  assert.match(handler,/await fase4FichaCentralLotePrivada/);
  assert.match(handler,/await componerDesdeReciboVerificado/);
  assert.match(handler,/await guardarPdfCompuestoPrivado/);
