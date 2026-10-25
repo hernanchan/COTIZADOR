@@ -116,3 +116,20 @@ El test de integración incorporado a `tests/central-bridge-d1.test.mjs` con nom
 https://github.com/hernanchan/COTIZADOR/actions/runs/40144682575
 
 **Importante para la publicación:** este ensayo aporta evidencia real del *código conectado*, pero **no demuestra Cloudflare remoto ↔ Apps Script real ↔ Google Drive real ↔ pasarela sandbox** y no valida la interfaz pública de clientes. El receptor ampliado de 30 PDF aún no está instalado; tampoco están resueltos todos los productos/servicios de la web actual, la generación imprimible definitiva para todos los rubros, la carga JPG/PNG, la recuperación móvil real ni el circuito comercial con pago autorizado. Ninguna variable remota, Apps Script activo o archivo de `main` fue cambiado.
+
+
+## 24/10/2026 · Compra de documentos sin exigir Polaroids
+
+**Bloqueo funcional corregido en la rama aislada:** el flujo de compra unificada ya podía crear un pedido **Documentos + Polaroids + Tienda**, pero exigir `polaroidReference` obligatoriamente impedía el caso más frecuente: documentos solos o documentos junto a artículos de librería.
+
+Se creó el adaptador privado `integraciones/autocotizador/recepcion/preparar-documentos-central.mjs`, que firma HMAC contra `/internal/central/prepare-order`, usando exclusivamente el Service Binding `SABER_CENTRAL`. Solicita `clientOrderId` UUID, `webOrderId` de un manifiesto documental ya verificado en Google y líneas de catálogo `{code,qty}` **sin precios declarados por el comprador**; el Worker Central toma el importe documental comprobado y recalcula los SKU activos. Un pedido sólo documental se representa con `items:[]`. Responde siempre `checkoutEnabled:false`, `paymentAuthorized:false`, `state:'awaiting_payment'` y no genera preferencia en Mercado Pago.
+
+El Worker de recepción `worker-fase4-cotizador-unificado.mjs` expone sólo para **operador administrativo de ensayos** dos rutas nuevas, ambas después de autenticar `DOCS_CENTRAL_ADMIN_KEY` y origen: `POST /api/ensayo-preparar-documentos` para una sesión PDF y `POST /api/ensayo-preparar-documentos-lote` para varias. Reutilizan la verificación real de bytes/páginas/SHA de GAS y `enviarCentralFirmada` para registrar primero la ficha en D1, después preparan el pedido comercial sin Polaroids. El formato de entrada exige `clientOrderId` e `items`, junto con `sesion,opciones` (uno) o `sesiones` (varios).
+
+**Nuevo interruptor independiente, apagado por defecto y sin configurar remotamente:** `DOCS_ORDER_PREPARE_ENABLED=PRIVATE_TEST_ONLY`. También son imprescindibles `DOCS_CENTRAL_SYNC_ENABLED=PRIVATE_TEST_ONLY`, `CENTRAL_PREPARE_ENABLED=PRIVATE_TEST_ONLY`, secreto HMAC separado, binding y políticas de origen. **Ninguna bandera remota fue habilitada.**
+
+**Pruebas automatizadas ejecutadas:** `tests/autocotizador-documentos-central.test.mjs` valida firma HMAC, ausencia de fetch público, falta de interruptores o binding, URL ajena, SKU inválidos y rechazo de respuesta que habilite cobro. `tests/central-bridge-d1.test.mjs` incorporó una regresión sobre el Worker auténtico de Central con D1 SQLite local: dos documentos sin productos ($21.000) y dos documentos con dos `ABC-1` ($28.000), recibos registrados, renglones D1 correctos, sin Polaroids, reintento idempotente y respuesta HTTP 503 de checkout. Compilación documental y el resto de las pruebas continúan aprobadas.
+
+**CI:** commit `8eb3e47862b3a0a648526f14cc80aaf968b1a124`, corrida `40145138848`, conclusión `success` y ningún paso fallido. https://github.com/hernanchan/COTIZADOR/actions/runs/40145138848
+
+**Lo que falta antes del lanzamiento:** aún no está conectado a la interfaz normal del carrito del cliente, ni instalado/probado con Cloudflare D1 y Google Drive remotos. No hay pago sandbox end-to-end autorizado para estas rutas; el checkout se mantiene cerrado. La compra de *sólo tienda* conserva su flujo separado preexistente y también deberá integrar su interfaz definitiva. No se tocó `main` ni `libreriasaber.com.ar`.
