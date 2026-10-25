@@ -690,5 +690,7 @@ test('Borrador PDF compuesto: HMAC → D1, vínculo exacto, copia/dúplex y pago
  }finally{
   if(savedFlag===undefined)delete env.CENTRAL_PRINT_DRAFT_STAGE_ENABLED;
   else env.CENTRAL_PRINT_DRAFT_STAGE_ENABLED=savedFlag;
+  if(savedPrepare===undefined)delete env.CENTRAL_PREPARE_ENABLED;
+  else env.CENTRAL_PREPARE_ENABLED=savedPrepare;
  }
 });
