@@ -24,6 +24,7 @@ on:
       - 'integraciones/autocotizador/recepcion/componer-pdf-documentos-privado.mjs'
       - 'integraciones/autocotizador/recepcion/componer-desde-recibo-verificado.mjs'
       - 'integraciones/autocotizador/recepcion/guardar-pdf-compuesto-privado.mjs'
+      - 'integraciones/autocotizador/recepcion/registrar-pdf-compuesto-central.mjs'
       - 'integraciones/autocotizador/recepcion/ficha-produccion-central.mjs'
       - 'tests/autocotizador-componer-desde-recibo.test.mjs'
       - 'tests/autocotizador-componer-pdf-documentos.test.mjs'
