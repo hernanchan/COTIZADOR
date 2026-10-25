@@ -32,11 +32,27 @@ jobs:
           node-version: '22'
       - name: Comprobar límites de seguridad sin credenciales
         run: node --test tests/cloudflare-preflight-solo-lectura.test.mjs
-      - name: No acceder a Cloudflare sin autorización expresa de preflight
-        if: vars.SABER_CF_PREFLIGHT_ENABLED != 'true'
-        run: echo "Ensayo remoto no habilitado. Solo se ejecutaron pruebas locales."
+      # El usuario autorizó expresamente este ensayo GET de solo lectura.
+      # Sin credenciales completas no se realiza ninguna solicitud externa.
+      - name: Comprobar si están guardados los dos secretos
+        id: creds
+        env:
+          SABER_CF_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          SABER_CF_READONLY_TOKEN: ${{ secrets.SABER_CF_READONLY_TOKEN }}
+        shell: bash
+        run: |
+          if [ -z "$SABER_CF_ACCOUNT_ID" ]; then
+            echo "Falta configurar el secreto SABER_CF_ACCOUNT_ID."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          elif [ -z "$SABER_CF_READONLY_TOKEN" ]; then
+            echo "Falta configurar el secreto SABER_CF_READONLY_TOKEN."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Los dos secretos existen; se verificará solo metadata."
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: Consultar exclusivamente metadatos de dos Workers de prueba
-        if: vars.SABER_CF_PREFLIGHT_ENABLED == 'true'
+        if: steps.creds.outputs.ready == 'true'
         env:
           SABER_CF_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
           SABER_CF_READONLY_TOKEN: ${{ secrets.SABER_CF_READONLY_TOKEN }}
