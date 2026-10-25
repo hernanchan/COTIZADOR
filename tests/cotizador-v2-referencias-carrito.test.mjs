@@ -31,7 +31,7 @@ function referencia(i,name,pages){
  return {itemIndex:i,service:'impresiones',reference:{
   schema:'saber-pdf-local-pendiente-v1',
   localRef:'00000000-0000-4000-8000-'+String(i+1).padStart(12,'0'),
-  nombre:name,bytes:1234,paginas:pages,estado:'PENDIENTE_DE_ENVIO',
+  nombre:name,bytes:1234,paginas:pages,sha256:String(i+1).repeat(64),estado:'PENDIENTE_DE_ENVIO',
   recibido:false,verificadoServidor:false
  }};
 }
@@ -57,7 +57,7 @@ test('dos archivos se asocian con referencias distintas; lectura local no cambia
  try{
   const quotes=[],files=['primero.pdf','segundo.pdf'];let n=0;
   const read=async file=>({nombre:file.name,paginas:n===0?3:6,
-   bytes:1200,verificacion:'LOCAL_PRELIMINAR',subido:false,pagoAutorizado:false});
+   bytes:1200,sha256:(n===0?'a':'b').repeat(64),verificacion:'LOCAL_PRELIMINAR',subido:false,pagoAutorizado:false});
   assert.equal(montarAsistentePdf(ui.app,{
    leer:async file=>{const r=await read(file);n++;return r},
    antesDeCotizar:ref=>{if(ref)quotes.push(ref)}
