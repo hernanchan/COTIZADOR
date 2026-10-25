@@ -11,7 +11,7 @@ const {PDFDocument}=require('pdf-lib');
 const cotizador=readFileSync(new URL('../cotizador-web-v2.html',import.meta.url),'utf8');
 const shaOriginal='4bb9c519f0df5efea6c1e9bd3eff3f96fbed759e';
 const flag="const archivosEnsayoEnabled=new URLSearchParams(location.search).get('ensayoArchivos')==='1';";
-const extra="document.getElementById('calc').onclick=calcPrint;if(archivosEnsayoEnabled)import('./cotizador-v2-ensayo-archivos.mjs').then(m=>m.montarAsistentePdf(app)).catch(()=>{if(app.querySelector('#pages'))console.warn('El lector PDF de ensayo no está disponible. La cotización manual sigue operativa.');});}";
+const extra="document.getElementById('calc').onclick=calcPrint;if(archivosEnsayoEnabled)import('./cotizador-v2-ensayo-archivos.mjs').then(m=>m.montarAsistentePdf(app,{antesDeCotizar:ref=>{archivoParaTrabajo=ref}})).catch(()=>{if(app.querySelector('#pages'))console.warn('El lector PDF de ensayo no está disponible. La cotización manual sigue operativa.');});}";
 const original="document.getElementById('calc').onclick=calcPrint}";
 async function sample(pages){
  const doc=await PDFDocument.create();
@@ -22,7 +22,15 @@ async function sample(pages){
 test('Cotizador V2: al revertir sólo los dos puntos opt-in, hash Git original idéntico',()=>{
  assert.equal(cotizador.split(flag).length-1,1);
  assert.equal(cotizador.split(extra).length-1,1);
- const restored=cotizador.replace('\n'+flag,'').replace(extra,original);
+ const restored=cotizador
+  .replace('\n'+flag,'')
+  .replace('\nlet archivoParaTrabajo=null; // Solo en el ensayo: referencia local, nunca PDF ni autorización.','')
+  .replace(extra,original)
+  .replace("if(archivosEnsayoEnabled&&data.service==='impresiones'&&archivoParaTrabajo&&data.meta?.pages===archivoParaTrabajo.paginas)data.meta={...data.meta,archivoPdfEnsayo:archivoParaTrabajo};",'')
+  .replace("if(archivosEnsayoEnabled&&i.meta?.archivoPdfEnsayo){const extra=document.createElement('span');extra.textContent='PDF: '+i.meta.archivoPdfEnsayo.nombre+' · pendiente de envío y verificación';r.querySelector('.summary-main').appendChild(extra)}",'')
+  .replace("+(archivosEnsayoEnabled&&i.meta?.archivoPdfEnsayo?' · PDF pendiente: '+i.meta.archivoPdfEnsayo.nombre:'')",'')
+  .replace(",pdfDrafts=archivosEnsayoEnabled?t.items.map((i,index)=>i.meta?.archivoPdfEnsayo?{itemIndex:index,service:i.service,reference:i.meta.archivoPdfEnsayo}:null).filter(Boolean):[]",'')
+  .replace(",...(archivosEnsayoEnabled?{pdfDrafts}: {})",'');
  const blob=Buffer.from('blob '+Buffer.byteLength(restored)+'\0'+restored);
  assert.equal(createHash('sha1').update(blob).digest('hex'),shaOriginal);
 });
@@ -36,6 +44,9 @@ test('Cotizador V2 conserva las seis familias, motor de precios, promociones y c
  assert.match(cotizador,/const archivosEnsayoEnabled=new URLSearchParams/);
  assert.match(cotizador,/if\(archivosEnsayoEnabled\)import/);
  assert.equal(cotizador.split('ensayoArchivos').length-1,1);
+ assert.match(cotizador,/if\(archivosEnsayoEnabled&&data\.service==='impresiones'/);
+ assert.match(cotizador,/r\.querySelector\('\.summary-main'\)\.appendChild\(extra\)/);
+ assert.match(cotizador,/pdfDrafts=archivosEnsayoEnabled\?t\.items\.map/);
 });
 test('Lector opcional: 7 páginas de PDF real, sin transmisión ni confirmación de pago',async()=>{
  const file=await sample(7);
