@@ -1,0 +1,56 @@
+name: Saber - barrera previa a despliegue (solo GET)
+on:
+  push:
+    branches:
+      - polaroids/express-pdf-unico-20261023
+    paths:
+      - '.github/workflows/cloudflare-predeploy-privado.yml'
+      - 'integraciones/cloudflare-ensayo/validar-predeploy-solo-get.mjs'
+  workflow_dispatch:
+permissions:
+  contents: read
+  statuses: write
+concurrency:
+  group: saber-predeploy-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  solo-lectura:
+    if: github.ref == 'refs/heads/polaroids/express-pdf-unico-20261023'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Comparar rutas y bindings con Workers remotos sin escribir
+        env:
+          SABER_CF_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          SABER_CF_EDITOR_TOKEN: ${{ secrets.SABER_CF_EDITOR_TOKEN }}
+        run: node integraciones/cloudflare-ensayo/validar-predeploy-solo-get.mjs
+      - name: Registrar resultado de inspección estructural
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_SHA: ${{ github.sha }}
+          RESULT: ${{ job.status }}
+        shell: bash
+        run: |
+          if [ "$RESULT" = success ]; then
+            state=success
+            description="Estructura de despliegue revisada; NO hay autorización para publicar"
+          else
+            state=failure
+            description="Control de estructura fallido; no desplegar"
+          fi
+          jq -n --arg state "$state" --arg context "saber-cloudflare/predeploy-structure" \
+            --arg description "$description" \
+            --arg target_url "https://github.com/$GH_REPO/actions/runs/$GITHUB_RUN_ID" \
+            '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/saber-predeploy-status.json
+          gh api -X POST "repos/$GH_REPO/statuses/$GH_SHA" --input /tmp/saber-predeploy-status.json
