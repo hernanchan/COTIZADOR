@@ -851,11 +851,19 @@ async function v2VincularPdf(request,env){
  try{
   input=await readLimited(request);
   if(!input||typeof input!=='object'||Array.isArray(input)||
-     Object.keys(input).sort().join(',')!=='expectedMode,expectedOrderId,referencia,sesion'||
+     !['expectedMode,expectedOrderId,referencia,sesion','expectedMode,expectedOrderId,opciones,referencia,sesion'].includes(Object.keys(input).sort().join(','))||
      !input.sesion||Object.keys(input.sesion).sort().join(',')!=='token,uploadId'||
      !phase4Session(input.sesion.uploadId)||!phase4Token(input.sesion.token)||
      !/^WEB-[A-Za-z0-9_-]{5,80}$/.test(input.expectedOrderId||'')||
-     !['bn','color'].includes(input.expectedMode))
+     !['bn','color'].includes(input.expectedMode)||
+     (input.opciones!==undefined&&(
+       !input.opciones||typeof input.opciones!=='object'||Array.isArray(input.opciones)||
+       Object.keys(input.opciones).sort().join(',')!=='anillado,caras,copias,formato'||
+       !['a4','a3'].includes(input.opciones.formato)||
+       !['simple','double'].includes(input.opciones.caras)||
+       !['ninguno','juntos'].includes(input.opciones.anillado)||
+       !Number.isSafeInteger(input.opciones.copias)||
+       input.opciones.copias<1||input.opciones.copias>200)))
    throw Error('Solicitud V2 inválida');
  }catch(_){
   return testResponse({ok:false,error:'Referencia o sesión de PDF inválida',paymentAuthorized:false},400);
@@ -866,9 +874,31 @@ async function v2VincularPdf(request,env){
    referencia:input.referencia,recibo,sessionId:input.sesion.uploadId,
    expectedOrderId:input.expectedOrderId,expectedMode:input.expectedMode
   });
+  // La cotización es OPCIONAL para conservar el contrato del cliente V2 existente.
+  // Es preliminar de servidor, limitada a A4/A3, BN/color y materiales del piloto.
+  // El importe del navegador jamás es autoridad y no se prepara una orden comercial.
+  if(input.opciones!==undefined){
+   const o=input.opciones;
+   const budget=prepararPresupuestoDocumentos({
+    solicitud:{orderId:recibo.orderId,archivos:[{
+     id:recibo.fileId,nombre:recibo.name,modo:recibo.mode,orden:1
+    }],formato:o.formato,caras:o.caras,copias:o.copias,
+    anillado:o.anillado,materialColor:'obra70'},
+    recibosConfiables:[recibo],tarifasServidor:preciosPiloto
+   });
+   if(budget.paymentAuthorized!==false||
+      !Number.isSafeInteger(budget.quote?.total)||budget.quote.total<=0)
+    throw Error('Cotización documental no comprobada');
+   return testResponse({...link,ok:true,
+    cotizacionServidor:{estado:'PRELIMINAR_VERIFICADA_SIN_PEDIDO',
+     totalArs:budget.quote.total,priceVersion:budget.priceVersion,
+     paginasOriginales:recibo.pages,formato:o.formato,caras:o.caras,
+     copias:o.copias,anillado:o.anillado,paymentAuthorized:false},
+    paymentAuthorized:false,checkoutEnabled:false},200);
+  }
   return testResponse({...link,ok:true},200);
  }catch(_){
-  return testResponse({ok:false,error:'El archivo de Google no coincide con el trabajo seleccionado. Seleccioná nuevamente el PDF correcto.',paymentAuthorized:false},422);
+  return testResponse({ok:false,error:'No se pudo verificar y cotizar el PDF seleccionado. Revisá el archivo y las opciones.',paymentAuthorized:false},422);
  }
 }
 
