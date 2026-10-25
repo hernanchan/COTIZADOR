@@ -11,6 +11,8 @@ const LIB_URL='https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js';
 const MAX_BYTES=20*1024*1024;
 const MAX_PAGES=2000;
 let libraryPromise=null;
+// Sólo en memoria de esta vista: la tienda jamás recibe los bytes del PDF.
+const seleccionPorFormulario=new WeakMap();
 
 function loadPdfLib(){
  if(globalThis.PDFLib?.PDFDocument)return Promise.resolve(globalThis.PDFLib);
@@ -59,7 +61,7 @@ export async function leerPaginasPdfCotizador(file,{obtenerLibreria=loadPdfLib}=
 
 }
 
-export function montarAsistentePdf(app,{leer=leerPaginasPdfCotizador}={}){
+export function montarAsistentePdf(app,{leer=leerPaginasPdfCotizador,antesDeCotizar=()=>{}}={}){
  if(!app||!app.isConnected||!app.querySelector('#pages')||
     app.querySelector('#saberEnsayoPdf'))return false;
  const pagesInput=app.querySelector('#pages');
@@ -73,7 +75,7 @@ export function montarAsistentePdf(app,{leer=leerPaginasPdfCotizador}={}){
  heading.textContent='Leer páginas de un PDF (prueba privada)';
  const note=document.createElement('p');
  note.style.cssText='font-size:12px;color:#596d80;line-height:1.45';
- note.textContent='El PDF se analiza en este dispositivo. No se sube, no se adjunta al carrito y deberás enviarlo al confirmar el trabajo. Podés seguir cotizando manualmente.';
+ note.textContent='El PDF se analiza en este dispositivo. Al cotizar, su nombre se vincula a ese trabajo como pendiente de envío. No se sube a Drive, no se adjunta al carrito y deberás enviarlo para confirmarlo.';
  const label=document.createElement('label');
  label.className='field';
  label.textContent='Seleccionar un PDF · máximo 20 MB';
@@ -87,9 +89,22 @@ export function montarAsistentePdf(app,{leer=leerPaginasPdfCotizador}={}){
  status.textContent='Sin archivo seleccionado.';
  box.append(heading,note,label,status);
  host.parentNode.insertBefore(box,host);
+ const calculate=app.querySelector('#calc');
+ if(calculate&&typeof calculate.onclick==='function'){
+  const original=calculate.onclick;
+  calculate.onclick=function(event){
+   const actual=seleccionPorFormulario.get(app);
+   const pages=Number(pagesInput.value);
+   const ref=actual&&Number.isSafeInteger(pages)&&pages===actual.paginas
+    ?Object.freeze({...actual.referencia}):null;
+   antesDeCotizar(ref);
+   try{return original.call(this,event)}finally{antesDeCotizar(null)}
+  };
+ }
  let seq=0;
  input.onchange=async()=>{
   const current=++seq,file=input.files?.[0];
+  seleccionPorFormulario.delete(app);
   if(!file){status.textContent='Sin archivo seleccionado.';
    const calculate=app.querySelector('#calc');if(calculate)calculate.disabled=false;
    return}
@@ -99,6 +114,18 @@ export function montarAsistentePdf(app,{leer=leerPaginasPdfCotizador}={}){
   try{
    const read=await leer(file);
    if(current!==seq||!box.isConnected||!pagesInput.isConnected)return;
+   if(!Number.isSafeInteger(read.paginas)||read.paginas<1||
+      read.verificacion!=='LOCAL_PRELIMINAR'||read.subido!==false||
+      read.pagoAutorizado!==false)
+    throw Error('La lectura no devolvió una referencia preliminar.');
+   const id=globalThis.crypto?.randomUUID?.();
+   if(!/^[a-f0-9-]{36}$/i.test(id||''))
+    throw Error('No se pudo identificar el archivo de manera segura.');
+   seleccionPorFormulario.set(app,{file,paginas:read.paginas,
+    referencia:Object.freeze({schema:'saber-pdf-local-pendiente-v1',localRef:id,
+     nombre:read.nombre.slice(0,180),bytes:read.bytes,
+     paginas:read.paginas,estado:'PENDIENTE_DE_ENVIO',
+     recibido:false,verificadoServidor:false})});
    pagesInput.value=String(read.paginas);
    status.textContent=read.nombre+' · '+read.paginas+' páginas detectadas. Precio preliminar: confirmá tamaño, B/N o color, material, caras y copias. El PDF no se envió.';
   }catch(e){
