@@ -362,3 +362,27 @@ test('PDF original en Drive simulado → ficha y precio → imposición → borr
  assert.ok(!JSON.stringify(saved).includes(started.token));
  assert.ok(!JSON.stringify(saved).includes(end.driveFileId));
 });
+
+
+test('la ruta de PDF compuesto existe sólo para operador y con interruptores apagados',()=>{
+ const worker=readFileSync(new URL('../integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs',import.meta.url),'utf8');
+ const start=worker.indexOf('async function apiFichaCentralPrivada(');
+ const end=worker.indexOf('export default {',start);
+ const handler=worker.slice(start,end);
+ assert.match(worker,/page==='\/api\/ensayo-guardar-pdf-compuesto'/);
+ assert.match(handler,/request\.method!=='POST'/);
+ assert.match(handler,/if\(!allowed\(request,env\)\)/);
+ assert.match(handler,/DOCS_CENTRAL_ADMIN_KEY/);
+ assert.match(handler,/if\(diff\)return testResponse/);
+ assert.match(handler,/compuesto&&env\?\.DOCS_PRINT_DRAFT_ENABLED!=='PRIVATE_TEST_ONLY'/);
+ assert.match(handler,/await fase4FichaCentralLotePrivada/);
+ assert.match(handler,/await componerDesdeReciboVerificado/);
+ assert.match(handler,/await guardarPdfCompuestoPrivado/);
+ assert.match(handler,/guardarPdfCompuestoPrivado\(\{[\s\S]*?habilitado:env\.DOCS_PRINT_DRAFT_ENABLED/);
+ const exposed=handler.slice(handler.indexOf('if(compuesto){'),handler.indexOf('if(sincronizar||mixto||documental)'));
+ assert.doesNotMatch(exposed,/pdfBytes\s*:/);
+ assert.doesNotMatch(exposed,/dataBase64\s*:/);
+ assert.match(exposed,/paymentAuthorized:false/);
+ assert.match(exposed,/descargaPrivadaHabilitada:false/);
+ assert.match(exposed,/listoParaProducir:false/);
+});
