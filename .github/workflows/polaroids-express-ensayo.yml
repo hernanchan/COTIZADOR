@@ -22,6 +22,9 @@ on:
       - 'integraciones/autocotizador/recepcion/leer-pdf-fase4-privado.mjs'
       - 'integraciones/autocotizador/recepcion/fase4-ficha-central-lote-privada.mjs'
       - 'integraciones/autocotizador/recepcion/componer-pdf-documentos-privado.mjs'
+      - 'integraciones/autocotizador/recepcion/componer-desde-recibo-verificado.mjs'
+      - 'integraciones/autocotizador/recepcion/ficha-produccion-central.mjs'
+      - 'tests/autocotizador-componer-desde-recibo.test.mjs'
       - 'tests/autocotizador-componer-pdf-documentos.test.mjs'
       - 'tests/autocotizador-lote-ampliado.test.mjs'
       - 'integraciones/autocotizador/recepcion/pantalla-lote-pdf-ampliado.mjs'
@@ -95,6 +98,8 @@ jobs:
         run: node --test tests/autocotizador-lote-ampliado.test.mjs tests/autocotizador-lote-verificado.test.mjs
       - name: Ensayar Apps Script ampliado con 30 PDF, cuotas y Range sin Google real
         run: node --test tests/autocotizador-gas-lote-ampliado.test.mjs
+      - name: Verificar recepción HMAC con factura del servidor y composición PDF aislada
+        run: node --test tests/autocotizador-componer-desde-recibo.test.mjs
       - name: Probar composición vectorial privada de PDF documental A4 A3 y dúplex
         run: node --test tests/autocotizador-componer-pdf-documentos.test.mjs
       - name: Verificar lote de PDFs privados GAS antes de calcular y registrar D1
