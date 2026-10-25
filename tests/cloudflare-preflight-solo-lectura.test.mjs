@@ -88,3 +88,5 @@ test('Si bindings está ausente informa desconocido, no afirma incorrectamente a
 // Reejecución segura de verificación de metadatos tras actualización de secretos (2026-10-25).
 
 // Revisión de Service Binding SABER_CENTRAL, posterior a la configuración manual (solo GET).
+
+// Comprobación de presencia de clave compartida documental tras configuración del usuario (GET sin secretos).
