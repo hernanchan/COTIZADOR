@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {verificarWorkersEnsayoSoloLectura} from '../integraciones/cloudflare-ensayo/verificar-acceso-lectura.mjs';
 const accountId='0'.repeat(32), token='TESTONLY_'+'k'.repeat(35);
-const names=['saber-pagos-pruebas','saber-polaroids-express-pruebas'];
+const names=['saber-pagos-pruebas','saber-documentos-pruebas'];
 test('GET configuraciones: sólo los dos Workers de ensayo, ni POST ni D1',async()=>{
  const paths=[], methods=[];
  const fetcher=async(url,init)=>{
