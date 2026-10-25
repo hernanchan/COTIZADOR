@@ -59,7 +59,7 @@ export async function leerPaginasPdfCotizador(file,{obtenerLibreria=loadPdfLib}=
 
 }
 
-export function montarAsistentePdf(app){
+export function montarAsistentePdf(app,{leer=leerPaginasPdfCotizador}={}){
  if(!app||!app.isConnected||!app.querySelector('#pages')||
     app.querySelector('#saberEnsayoPdf'))return false;
  const pagesInput=app.querySelector('#pages');
@@ -97,7 +97,7 @@ export function montarAsistentePdf(app){
   if(calculate)calculate.disabled=true;
   status.textContent='Leyendo páginas del PDF…';
   try{
-   const read=await leerPaginasPdfCotizador(file);
+   const read=await leer(file);
    if(current!==seq||!box.isConnected||!pagesInput.isConnected)return;
    pagesInput.value=String(read.paginas);
    status.textContent=read.nombre+' · '+read.paginas+' páginas detectadas. Precio preliminar: confirmá tamaño, B/N o color, material, caras y copias. El PDF no se envió.';
