@@ -530,3 +530,58 @@ test('Pedido integral E2E: PDF auténticos de Drive simulado → HMAC → Centra
   }
  }
 });
+
+
+test('Pedido integral sin Polaroids: PDF verificados y tienda en una compra sin pago',async()=>{
+ const {prepararDocumentosCentralFirmado}=await import('../integraciones/autocotizador/recepcion/preparar-documentos-central.mjs');
+ const former=env.CENTRAL_PREPARE_ENABLED;env.CENTRAL_PREPARE_ENABLED='PRIVATE_TEST_ONLY';
+ const service={fetch:req=>context.worker.fetch(req,env)};
+ try{
+  for(const [i,items,expected] of [
+   [1,[],21000],
+   [2,[{code:'ABC-1',qty:2}],28000]
+  ]){
+   const doc=JSON.parse(JSON.stringify(packet));
+   doc.orderId='WEB-ORDEN-DOCUMENTOS-UNICA-20261024-'+i;
+   doc.ficha.orderId=doc.orderId;
+   doc.recibos[0].receiptId='DOC-3333333'+i+'-1234-4234-8234-1234567890ab';
+   doc.recibos[1].receiptId='DOC-4444444'+i+'-1234-4234-8234-1234567890ab';
+   doc.ficha.trabajos[0].reciboPrivado=doc.recibos[0].receiptId;
+   doc.ficha.trabajos[1].reciboPrivado=doc.recibos[1].receiptId;
+   assert.equal((await call('/internal/central/stage',doc)).status,201);
+   const clientOrderId=randomUUID();
+   const args={webOrderId:doc.orderId,clientOrderId,items,subtle:webcrypto.subtle,
+    requestId:randomUUID,env:{
+     ...env,DOCS_ORDER_PREPARE_ENABLED:'PRIVATE_TEST_ONLY',
+     DOCS_CENTRAL_SYNC_ENABLED:'PRIVATE_TEST_ONLY',
+     DOCS_CENTRAL_ADMIN_KEY:'admin-key-separate-from-bridge',
+     DOCS_RELAY_KEY:'google-key-separate-from-bridge',
+     CENTRAL_TEST_URL:'https://saber-pagos-pruebas.libreriasaber.workers.dev/internal/central/stage',
+     SABER_CENTRAL:service
+    }};
+   const prepared=await prepararDocumentosCentralFirmado(args);
+   assert.equal(prepared.created,true);
+   assert.equal(prepared.amountArs,expected);
+   assert.equal(prepared.checkoutEnabled,false);
+   assert.equal(prepared.paymentAuthorized,false);
+   const order=prepared.commercialOrderId;
+   const lines=db.prepare('SELECT sku,line_total_ars FROM order_items WHERE order_id=? ORDER BY line_number').all(order);
+   assert.deepEqual(lines.map(x=>x.sku),
+    items.length?['DOCS_VERIFIED','ABC-1']:['DOCS_VERIFIED']);
+   assert.equal(lines.reduce((n,x)=>n+x.line_total_ars,0),expected);
+   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM central_polaroids_express WHERE commercial_order_id=?').get(order).n,0);
+   assert.equal(db.prepare('SELECT status FROM orders WHERE id=?').get(order).status,'awaiting_payment');
+   const retried=await prepararDocumentosCentralFirmado(args);
+   assert.equal(retried.idempotent,true);
+   assert.equal(retried.commercialOrderId,order);
+   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM orders WHERE id=?').get(order).n,1);
+   const attempt=await context.worker.fetch(new Request(base+'/demo/checkout',{
+    method:'POST',headers:{Authorization:'Bearer '+env.DEMO_ADMIN_KEY,
+     'Content-Type':'application/json'},body:JSON.stringify({order_id:order})}),env);
+   assert.equal(attempt.status,503);
+  }
+ }finally{
+  if(former===undefined)delete env.CENTRAL_PREPARE_ENABLED;
+  else env.CENTRAL_PREPARE_ENABLED=former;
+ }
+});
