@@ -123,3 +123,23 @@ test('cotización comprobada A3 color usa el material real; papel A4 no puede pr
   recibosConfiables:[recibo],tarifasServidor:precios
  }),/papel/i);
 });
+
+test('preparar pedido V2 exige acceso administrativo, recibo coincidente y valida antes de escribir D1',()=>{
+ const src=readFileSync(new URL('../integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs',import.meta.url),'utf8');
+ assert.match(src,/page==='\/api\/ensayo-preparar-documentos-v2'/);
+ const a=src.indexOf('async function apiFichaCentralPrivada(');
+ const b=src.indexOf('function v2PrivateBrowserAuthorized(',a);
+ assert.ok(a>=0&&b>a);
+ const handler=src.slice(a,b);
+ const proof=handler.indexOf('verificarVinculoCotizadorV2(');
+ const validate=handler.indexOf("if(v2){\n    const recibido=result.recibos;");
+ const stage=handler.indexOf('await enviarCentralFirmada(',handler.indexOf('if(sincronizar||mixto||documental){'));
+ assert.ok(proof>=0&&validate>proof&&stage>validate,'Referencias y bytes se verifican antes de escribir D1');
+ assert.match(handler,/DOCS_CENTRAL_ADMIN_KEY/);
+ assert.match(handler,/DOCS_V2_RECEIPT_LINK_ENABLED/);
+ assert.match(handler,/DOCS_EXTENDED_RECEIVER_ENABLED/);
+ assert.match(handler,/recibido\[0\]\.sha256!==input\.referencia\.sha256/);
+ assert.match(handler,/recibido\[0\]\.pages!==input\.referencia\.paginas/);
+ assert.match(handler,/prepararDocumentosCentralFirmado/);
+ assert.doesNotMatch(handler,/checkoutEnabled:true|paymentAuthorized:true/);
+});
