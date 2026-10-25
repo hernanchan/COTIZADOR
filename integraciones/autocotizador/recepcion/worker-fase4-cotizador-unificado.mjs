@@ -15,6 +15,7 @@ import {prepararMixtoCentralFirmado} from './preparar-mixto-central.mjs';
 import {prepararDocumentosCentralFirmado} from './preparar-documentos-central.mjs';
 import {componerDesdeReciboVerificado} from './componer-desde-recibo-verificado.mjs';
 import {guardarPdfCompuestoPrivado} from './guardar-pdf-compuesto-privado.mjs';
+import {registrarPdfCompuestoCentralFirmado} from './registrar-pdf-compuesto-central.mjs';
 import cargaClienteJs from './carga-unica-cliente.txt';
 import {cotizarPloteosRapido} from '../pruebas/cotizar-ploteos-rapido.mjs';
 import plotClienteJs from './ploteos-rapido-cliente.txt';
@@ -1042,13 +1043,14 @@ async function apiFichaCentralPrivada(request,env,sincronizar=false,mixto=false,
     throw Error('Datos inválidos');
  }catch(_){return testResponse({ok:false,error:'Solicitud no válida',paymentAuthorized:false},400);}
  try{
-  if(compuesto&&env?.DOCS_PRINT_DRAFT_ENABLED!=='PRIVATE_TEST_ONLY')
+  if(compuesto&&(env?.DOCS_PRINT_DRAFT_ENABLED!=='PRIVATE_TEST_ONLY'||
+      env?.DOCS_PRINT_DRAFT_CENTRAL_ENABLED!=='PRIVATE_TEST_ONLY'))
     return testResponse({ok:false,error:'Composición de PDF privado deshabilitada',paymentAuthorized:false},503);
   if(mixto&&env?.DOCS_MIXED_PREPARE_ENABLED!=='PRIVATE_TEST_ONLY')
     return testResponse({ok:false,error:'Pedido mixto privado apagado',paymentAuthorized:false},503);
   if(documental&&env?.DOCS_ORDER_PREPARE_ENABLED!=='PRIVATE_TEST_ONLY')
     return testResponse({ok:false,error:'Compra de documentos privada apagada',paymentAuthorized:false},503);
-  if((sincronizar||mixto||documental)&&(env?.DOCS_CENTRAL_SYNC_ENABLED!=='PRIVATE_TEST_ONLY'||
+  if((sincronizar||mixto||documental||compuesto)&&(env?.DOCS_CENTRAL_SYNC_ENABLED!=='PRIVATE_TEST_ONLY'||
       typeof env?.CENTRAL_BRIDGE_KEY!=='string'||env.CENTRAL_BRIDGE_KEY.length<32||
       env.CENTRAL_BRIDGE_KEY===env.DOCS_CENTRAL_ADMIN_KEY||
       env.CENTRAL_BRIDGE_KEY===env.DOCS_RELAY_KEY))
@@ -1065,6 +1067,13 @@ async function apiFichaCentralPrivada(request,env,sincronizar=false,mixto=false,
    const trabajos=result.ficha?.trabajos||[];
    if(trabajos.length!==1||trabajos[0].servicio!=='documentos')
     return testResponse({ok:false,error:'Sólo documentos presupuestados pueden componerse automáticamente',paymentAuthorized:false},422);
+   const registrarOriginal=await enviarCentralFirmada({
+    verificacion:result,url:env.CENTRAL_TEST_URL,
+    clave:env.CENTRAL_BRIDGE_KEY,habilitado:env.DOCS_CENTRAL_SYNC_ENABLED,
+    service:env.SABER_CENTRAL
+   });
+   if(registrarOriginal.webOrderId!==result.orderId)
+    throw Error('La Central no identificó el pedido original.');
    const consultarFirmado=p=>postToScript(env,p,fetch,420000);
    const compuestoSeguro=await componerDesdeReciboVerificado({
     manifiesto:result,sesion:input.sesion,trabajoId:trabajos[0].idTrabajo,
@@ -1074,7 +1083,10 @@ async function apiFichaCentralPrivada(request,env,sincronizar=false,mixto=false,
     ...compuestoSeguro,sesionOriginal:input.sesion,
     consultarFirmado,habilitado:env.DOCS_PRINT_DRAFT_ENABLED
    });
-   return testResponse({ok:true,ordenWeb:guardado.orderId,
+   const registrado=await registrarPdfCompuestoCentralFirmado({guardado,env});
+   if(registrado.orderId!==result.orderId)
+    throw Error('La Central no confirmó el PDF compuesto del mismo pedido.');
+   return testResponse({ok:true,centralVinculada:true,ordenWeb:guardado.orderId,
     reciboOriginal:guardado.originalReceiptId,
     reciboBorrador:guardado.borradorReceiptId,
     sha256:guardado.sha256,paginas:guardado.pages,
