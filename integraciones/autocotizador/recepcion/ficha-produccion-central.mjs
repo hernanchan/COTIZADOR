@@ -48,6 +48,11 @@ export function prepararFichaCentral({pedidoVerificado}){
    formatoFinal:fila.formatoFinal||null,
    material:detalles.material||detalles.papel||fila.papelPoster||null,
    modo:detalles.modo||null,
+   // Procede del presupuesto recomputado; no aceptar opciones de impresión
+   // nuevas durante la preparación del PDF sin volver a presupuestar.
+   carasPresupuestadas:fila.destino==='documentos'?detalles.caras:null,
+   paginasPorCaraPresupuestadas:fila.destino==='documentos'?1:null,
+   tipoAnillado:fila.destino==='documentos'?detalles.anillado:null,
    productoId:detalles.productoId||null,
    variante:detalles.variante||null,
    metros:detalles.metros??null,
