@@ -12,6 +12,8 @@ on:
       - 'tests/autocotizador-central-binding.test.mjs'
       - 'integraciones/autocotizador/recepcion/preparar-mixto-central.mjs'
       - 'integraciones/autocotizador/recepcion/preparar-documentos-central.mjs'
+      - 'integraciones/autocotizador/recepcion/probar-puente-central.mjs'
+      - 'tests/autocotizador-probe-puente.test.mjs'
       - 'tests/autocotizador-documentos-central.test.mjs'
       - 'integraciones/autocotizador/recepcion/fase4-ficha-central-lote-privada.mjs'
       - 'tests/autocotizador-mixto-central.test.mjs'
@@ -134,6 +136,8 @@ jobs:
         run: node --test tests/autocotizador-mixto-central.test.mjs
       - name: Probar comunicación privada Documentos a Central D1
         run: node --test tests/autocotizador-central-binding.test.mjs
+      - name: Ensayar puente HMAC de solo diagnóstico sin escribir D1
+        run: node --test tests/autocotizador-probe-puente.test.mjs
       - name: Validar superficie privada Express y conexión interna
         run: node --test tests/polaroids-express-aislamiento.test.mjs tests/polaroids-express-bridge-check.test.mjs
       - name: Sintaxis de motor y editor
