@@ -1,0 +1,53 @@
+# Respaldo de seguridad: token Editor sólo para GET, NUNCA POST/PUT/DELETE.
+name: Saber - respaldar 2 Workers de prueba (solo GET)
+on:
+  push:
+    branches:
+      - polaroids/express-pdf-unico-20261023
+    paths:
+      - '.github/workflows/cloudflare-respaldo-privado.yml'
+      - 'integraciones/cloudflare-ensayo/respaldar-workers-solo-get.mjs'
+  workflow_dispatch:
+permissions:
+  contents: read
+  statuses: write
+jobs:
+  respaldar:
+    if: github.ref == 'refs/heads/polaroids/express-pdf-unico-20261023'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verificar y respaldar código actual sin modificar Cloudflare
+        env:
+          SABER_CF_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          SABER_CF_EDITOR_TOKEN: ${{ secrets.SABER_CF_EDITOR_TOKEN }}
+        run: node integraciones/cloudflare-ensayo/respaldar-workers-solo-get.mjs
+      - name: Conservar respaldo privado para rollback (7 días)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: saber-workers-respaldo-remoto-privado
+          path: artifacts/cloudflare-backup-private/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Publicar estado de respaldo sin datos sensibles
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_SHA: ${{ github.sha }}
+          STATUS: ${{ job.status }}
+        shell: bash
+        run: |
+          if [ "$STATUS" = success ]; then state=success; description="Ambos Workers respaldados por GET, sin despliegue"; else state=failure; description="Respaldo GET incompleto; despliegue bloqueado"; fi
+          jq -n --arg state "$state" --arg context "saber-cloudflare/backup-readonly" --arg description "$description" --arg target_url "https://github.com/$GH_REPO/actions/runs/$GITHUB_RUN_ID" '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/saber-backup-status.json
+          gh api -X POST "repos/$GH_REPO/statuses/$GH_SHA" --input /tmp/saber-backup-status.json
