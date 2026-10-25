@@ -613,6 +613,7 @@ test('Borrador PDF compuesto: HMAC → D1, vínculo exacto, copia/dúplex y pago
   listoParaProducir:false
  };
  const savedFlag=env.CENTRAL_PRINT_DRAFT_STAGE_ENABLED;
+ const savedPrepare=env.CENTRAL_PREPARE_ENABLED;
  const adapterEnv={
   ...env,DOCS_PRINT_DRAFT_CENTRAL_ENABLED:'PRIVATE_TEST_ONLY',
   DOCS_CENTRAL_SYNC_ENABLED:'PRIVATE_TEST_ONLY',
