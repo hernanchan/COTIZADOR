@@ -12,6 +12,10 @@ const EXPECTED_WORKERS=Object.freeze([
 ]);
 const HEX32=/^[a-f0-9]{32}$/i;
 const VALID_TOKEN=/^[A-Za-z0-9_\-]{20,300}$/;
+const DOCUMENTS_BINDINGS=Object.freeze(['SABER_CENTRAL','DOCS_SCRIPT_URL','DOCS_RELAY_KEY',
+ 'DOCS_ALLOWED_ORIGIN','DOCS_TURNSTILE_SITE_KEY','DOCS_TURNSTILE_SECRET',
+ 'DOCS_EXTENDED_RECEIVER_ENABLED','DOCS_V2_RECEIPT_LINK_ENABLED',
+ 'DOCS_V2_PRIVATE_UI_ENABLED','DOCS_V2_PRIVATE_UI_SECRET']);
 export async function verificarWorkersEnsayoSoloLectura({
  accountId,token,fetcher=fetch
 }){
@@ -51,7 +55,12 @@ export async function verificarWorkersEnsayoSoloLectura({
    metadataAccessible:true,
    centralBridgeKeyConfigured:bindings===null?null:names.includes('CENTRAL_BRIDGE_KEY'),
    d1BindingConfigured:bindings===null?null:bindings.some(x=>x?.type==='d1'),
-   serviceBindingConfigured:bindings===null?null:bindings.some(x=>x?.type==='service')
+   serviceBindingConfigured:bindings===null?null:bindings.some(x=>x?.type==='service'),
+   documentsBindingsPresent:name==='saber-documentos-pruebas'?Object.freeze(
+    Object.fromEntries(DOCUMENTS_BINDINGS.map(binding=>[
+     binding,bindings===null?null:bindings.some(x=>x?.name===binding&&(
+      binding==='SABER_CENTRAL'?x?.type==='service':true))
+    ]))):null
   }));
  }
  return Object.freeze({
@@ -77,6 +86,9 @@ if(process.argv[1]&&import.meta.url===new URL('file://'+process.argv[1]).href){
     'CENTRAL_BRIDGE_KEY='+value(w.centralBridgeKeyConfigured)+
     '; D1='+value(w.d1BindingConfigured)+
     '; Service Binding='+value(w.serviceBindingConfigured));
+   if(w.documentsBindingsPresent)for(const name of DOCUMENTS_BINDINGS){
+    console.log('  '+name+': binding presente='+value(w.documentsBindingsPresent[name]));
+   }
   }
   console.log('SIN DESPLIEGUES; SIN CAMBIOS D1; SIN COBROS; SITIO PÚBLICO INTACTO.');
  }catch(e){
