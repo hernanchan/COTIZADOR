@@ -17,6 +17,10 @@ import {componerDesdeReciboVerificado} from './componer-desde-recibo-verificado.
 import {guardarPdfCompuestoPrivado} from './guardar-pdf-compuesto-privado.mjs';
 import {registrarPdfCompuestoCentralFirmado} from './registrar-pdf-compuesto-central.mjs';
 import {verificarVinculoCotizadorV2} from './verificar-vinculo-cotizador-v2.mjs';
+import {paginaCotizadorV2PruebaPrivada} from './pantalla-cotizador-v2-prueba-privada.mjs';
+import cotizadorV2OriginalHtml from '../../../cotizador-web-v2.html';
+import v2ReaderClientJs from './cotizador-v2-ensayo-archivos.txt';
+import v2UploadClientJs from './subir-vincular-pdf-v2-privado.txt';
 import cargaClienteJs from './carga-unica-cliente.txt';
 import {cotizarPloteosRapido} from '../pruebas/cotizar-ploteos-rapido.mjs';
 import plotClienteJs from './ploteos-rapido-cliente.txt';
@@ -1165,9 +1169,80 @@ async function apiFichaCentralPrivada(request,env,sincronizar=false,mixto=false,
    paymentAuthorized:false,listoParaProducir:false},422);
  }
 }
+
+/**
+ * Ensayo mismo origen del cotizador V2 original. Requiere DOS capas:
+ * interruptor desactivado por defecto y contraseña independiente HTTP Basic.
+ * Las rutas públicas de documentos y la web comercial NO se alteran.
+ */
+function v2PrivateBrowserAuthorized(request,env){
+ if(env?.DOCS_V2_PRIVATE_UI_ENABLED!=='PRIVATE_TEST_ONLY'||
+   typeof env.DOCS_V2_PRIVATE_UI_SECRET!=='string'||
+   !/^[A-Za-z0-9_-]{32,128}$/.test(env.DOCS_V2_PRIVATE_UI_SECRET)||
+   env.DOCS_V2_PRIVATE_UI_SECRET===env.DOCS_CENTRAL_ADMIN_KEY||
+   env.DOCS_V2_PRIVATE_UI_SECRET===env.DOCS_RELAY_KEY||
+   env.DOCS_V2_PRIVATE_UI_SECRET===env.CENTRAL_BRIDGE_KEY)
+  return 'off';
+ const auth=request.headers.get('Authorization')||'';
+ if(!auth.startsWith('Basic ')||auth.length>400)return 'deny';
+ let provided;
+ try{provided=atob(auth.slice(6))}catch{return 'deny'}
+ const expected='operador:'+env.DOCS_V2_PRIVATE_UI_SECRET;
+ if(provided.length!==expected.length)return 'deny';
+ let diff=0;
+ for(let i=0;i<expected.length;i++)diff|=provided.charCodeAt(i)^expected.charCodeAt(i);
+ return diff===0?'allow':'deny';
+}
+function v2PrivateBrowserResponse(request,env,path){
+ if(request.method!=='GET')return closed();
+ const status=v2PrivateBrowserAuthorized(request,env);
+ if(status==='off')return testResponse({ok:false,error:'Ensayo privado deshabilitado'},503);
+ if(status==='deny')return new Response('Autenticación privada requerida',{
+  status:401,headers:{'WWW-Authenticate':'Basic realm="Saber V2 Ensayo Privado", charset="UTF-8"',
+   'Cache-Control':'no-store,private','X-Robots-Tag':'noindex,nofollow',
+   'X-Content-Type-Options':'nosniff'}
+ });
+ try{
+  const headers={'Cache-Control':'no-store,private',
+    'X-Robots-Tag':'noindex,nofollow,noarchive',
+    'X-Content-Type-Options':'nosniff',
+    'Referrer-Policy':'no-referrer',
+    'X-Frame-Options':'SAMEORIGIN'};
+  if(path==='/prueba-v2/'){
+   const html=paginaCotizadorV2PruebaPrivada(env.DOCS_TURNSTILE_SITE_KEY);
+   return new Response(html,{status:200,headers:{
+    ...headers,'Content-Type':'text/html; charset=utf-8'}});
+  }
+  if(path==='/prueba-v2/cotizador'){
+   // En la copia privada se apaga únicamente la telemetría de Google Analytics.
+   const html=cotizadorV2OriginalHtml.replace(
+    /<script async src="https:\/\/www\.googletagmanager\.com\/gtag\/js\?id=[^"]+"><\/script>\s*<script>window\.dataLayer=[\s\S]*?<\/script>/,'');
+   return new Response(html,{status:200,headers:{
+    ...headers,'Content-Type':'text/html; charset=utf-8'}});
+  }
+  if(path==='/prueba-v2/precios-web.json')
+   return new Response(JSON.stringify(preciosPiloto),{status:200,headers:{
+    ...headers,'Content-Type':'application/json; charset=utf-8'}});
+  if(path==='/prueba-v2/cotizador-v2-ensayo-archivos.mjs')
+   return new Response(v2ReaderClientJs,{status:200,headers:{
+    ...headers,'Content-Type':'text/javascript; charset=utf-8'}});
+  if(path==='/prueba-v2/subir-vincular-pdf.mjs')
+   return new Response(v2UploadClientJs,{status:200,headers:{
+    ...headers,'Content-Type':'text/javascript; charset=utf-8'}});
+  return closed();
+ }catch{
+  return testResponse({ok:false,error:'La pantalla privada no está lista'},503);
+ }
+}
+
 export default {
   async fetch(request, env, ctx) {
     const page=new URL(request.url).pathname;
+    if(page==='/prueba-v2/'||page==='/prueba-v2/cotizador'||
+       page==='/prueba-v2/precios-web.json'||
+       page==='/prueba-v2/cotizador-v2-ensayo-archivos.mjs'||
+       page==='/prueba-v2/subir-vincular-pdf.mjs')
+      return v2PrivateBrowserResponse(request,env,page);
     if(page==='/prueba-cotizador-pdf'&&request.method==='GET')return fase4Html(env);
     if(page==='/prueba-cotizador-lote'&&request.method==='GET')return pantallaLote(env);
     if(page==='/prueba-cotizador-lote-ampliado'&&request.method==='GET'){
