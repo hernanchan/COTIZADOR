@@ -1182,6 +1182,17 @@ async function apiFichaCentralPrivada(request,env,sincronizar=false,mixto=false,
     listoParaProducir:false},200);
   }
   if(sincronizar||mixto||documental){
+   // Antes de cualquier escritura en D1, garantizar asociación con el PDF
+   // íntegro que fue elegido y cotizado en el V2.
+   if(v2){
+    const recibido=result.recibos;
+    if(!Array.isArray(recibido)||recibido.length!==1||
+       recibido[0].receiptId!==input.sesion.uploadId||
+       recibido[0].sha256!==input.referencia.sha256||
+       recibido[0].bytes!==input.referencia.bytes||
+       recibido[0].pages!==input.referencia.paginas)
+     throw Error('La ficha comercial no corresponde al PDF V2.');
+   }
    const resultado=await enviarCentralFirmada({
     verificacion:result,url:env.CENTRAL_TEST_URL,
     clave:env.CENTRAL_BRIDGE_KEY,habilitado:env.DOCS_CENTRAL_SYNC_ENABLED,
@@ -1199,16 +1210,6 @@ async function apiFichaCentralPrivada(request,env,sincronizar=false,mixto=false,
      listoParaProducir:false},200);
    }
    if(documental){
-    if(v2){
-     const recibido=result.recibos;
-     if(!Array.isArray(recibido)||recibido.length!==1||
-        recibido[0].receiptId!==input.sesion.uploadId||
-        recibido[0].sha256!==input.referencia.sha256||
-        recibido[0].bytes!==input.referencia.bytes||
-        recibido[0].pages!==input.referencia.paginas||
-        resultado.webOrderId!==result.orderId)
-      throw Error('La ficha D1 no corresponde al archivo V2 verificado.');
-    }
     const commercial=await prepararDocumentosCentralFirmado({env,
      webOrderId:resultado.webOrderId,clientOrderId:input.clientOrderId,items:input.items});
     return testResponse({ok:true,carritoDocumental:true,
