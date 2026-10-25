@@ -8,7 +8,7 @@
  */
 const EXPECTED_WORKERS=Object.freeze([
  'saber-pagos-pruebas',
- 'saber-polaroids-express-pruebas'
+ 'saber-documentos-pruebas'
 ]);
 const HEX32=/^[a-f0-9]{32}$/i;
 const VALID_TOKEN=/^[A-Za-z0-9_\-]{20,300}$/;
