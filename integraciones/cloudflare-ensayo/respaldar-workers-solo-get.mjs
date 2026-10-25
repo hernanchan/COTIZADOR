@@ -8,6 +8,7 @@ if(!/^[a-f0-9]{32}$/i.test(account||'')||typeof token!=='string'||token.length<2
  throw Error('Cuenta o token editor no disponibles en el entorno protegido.');
 const root='https://api.cloudflare.com/client/v4/accounts/'+account+'/workers/scripts/';
 const out='artifacts/cloudflare-backup-private';
+const footprints=[];
 await mkdir(out,{recursive:true});
 for(const name of names){
  const saved=[];
@@ -40,8 +41,16 @@ for(const name of names){
    const ext=(response.headers.get('content-type')||'').includes('multipart/')?'multipart':'js';
    await writeFile(join(out,name+'.'+ext),buf,{mode:0o600});
    saved.push('script');
+   const text=new TextDecoder().decode(buf);
+   const tests=name==='saber-pagos-pruebas'?
+    ['\/health','\/internal\/central\/stage','\/internal\/central\/bridge-probe','\/admin\/api\/orders','\/checkout\/']:
+    ['\/prueba-google','\/api\/ensayo-preparar-documentos-v2','\/api\/ensayo-probar-puente-central','\/prueba-v2\/','\/api\/ensayo-carga-unica'];
+   footprints.push({worker:name,contentType:response.headers.get('content-type')||'unknown',
+    sourceBytes:buf.length,routeHints:Object.fromEntries(tests.map(t=>[t,text.includes(t)]))});
   }
  }
  console.log(name+': respaldo obtenido ('+saved.join(', ')+'). Sin publicación ni cambios.');
 }
+await writeFile(join(out,'route-inventory.json'),JSON.stringify(footprints,null,2)+'\n',{mode:0o600});
+for(const f of footprints)console.log(f.worker+': inventario de rutas generado; '+f.sourceBytes+' bytes respaldados.');
 console.log('BACKUP_2_WORKERS_OK. No se consultó D1; sin despliegue; sin cobros.');
