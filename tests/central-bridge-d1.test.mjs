@@ -694,3 +694,39 @@ test('Borrador PDF compuesto: HMAC → D1, vínculo exacto, copia/dúplex y pago
   else env.CENTRAL_PREPARE_ENABLED=savedPrepare;
  }
 });
+
+test('probe HMAC valida conexión sin leer ni escribir D1, y falla cerrado',async()=>{
+ const original=env.CENTRAL_BRIDGE_PROBE_ENABLED;
+ const secret=env.CENTRAL_BRIDGE_KEY;
+ const challenge=randomUUID();
+ const payload={schema:'saber-central-bridge-probe-v1',operation:'verify-only',challenge};
+ let dbCalls=0;
+ const previousDb=env.DB;
+ env.DB={prepare(){dbCalls++;throw Error('Probe jamás debe consultar D1')}};
+ try{
+  const off=await call('/internal/central/bridge-probe',payload,{requestId:challenge});
+  assert.equal(off.status,503);
+  env.CENTRAL_BRIDGE_PROBE_ENABLED='PRIVATE_TEST_ONLY';
+  const ok=await call('/internal/central/bridge-probe',payload,{requestId:challenge});
+  assert.equal(ok.status,200);
+  assert.equal(ok.result.challenge,challenge);
+  assert.equal(ok.result.verifiedSignature,true);
+  assert.equal(ok.result.dbTouched,false);
+  assert.equal(ok.result.orderCreated,false);
+  assert.equal(ok.result.paymentAuthorized,false);
+  assert.equal(ok.result.checkoutEnabled,false);
+  const tampered=await call('/internal/central/bridge-probe',payload,{
+   requestId:challenge,key:'a different signing key of adequate length'
+  });
+  assert.equal(tampered.status,401);
+  const other=await call('/internal/central/bridge-probe',payload,{requestId:randomUUID()});
+  assert.equal(other.status,422);
+  const external=await call('/internal/central/bridge-probe',payload,{requestId:challenge,origin:true});
+  assert.equal(external.status,403);
+  assert.equal(dbCalls,0);
+  assert.doesNotMatch(JSON.stringify(ok.result),new RegExp(secret));
+ }finally{
+  env.DB=previousDb;
+  env.CENTRAL_BRIDGE_PROBE_ENABLED=original;
+ }
+});
