@@ -84,3 +84,5 @@ test('Si bindings está ausente informa desconocido, no afirma incorrectamente a
  assert.equal(v.workers[0].centralBridgeKeyConfigured,null);
  assert.equal(v.workers[1].d1BindingConfigured,null);
 });
+
+// Reejecución segura de verificación de metadatos tras actualización de secretos (2026-10-25).
