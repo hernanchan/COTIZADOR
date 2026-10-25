@@ -51,8 +51,10 @@ export async function leerPaginasPdfCotizador(file,{obtenerLibreria=loadPdfLib}=
   const paginasLeidas=pdf.getPageCount();
   if(!Number.isSafeInteger(paginasLeidas)||paginasLeidas<1||paginasLeidas>MAX_PAGES)
    throw Error('El PDF excede el límite de páginas de este ensayo.');
+  const fingerprint=new Uint8Array(await crypto.subtle.digest('SHA-256',array));
+  const sha256=Array.from(fingerprint,b=>b.toString(16).padStart(2,'0')).join('');
   return Object.freeze({nombre:file.name,paginas:paginasLeidas,bytes:file.size,
-   verificacion:'LOCAL_PRELIMINAR',subido:false,pagoAutorizado:false});
+   sha256,verificacion:'LOCAL_PRELIMINAR',subido:false,pagoAutorizado:false});
  }catch(err){
   if(/encrypt|password|protected/i.test(String(err?.message||'')))
    throw Error('El PDF está protegido con contraseña y requiere revisión.');
@@ -117,6 +119,8 @@ export function montarAsistentePdf(app,{leer=leerPaginasPdfCotizador,antesDeCoti
    const read=await leer(file);
    if(current!==seq||!box.isConnected||!pagesInput.isConnected)return;
    if(!Number.isSafeInteger(read.paginas)||read.paginas<1||
+      !/^[a-f0-9]{64}$/.test(read.sha256||'')||
+      !Number.isSafeInteger(read.bytes)||read.bytes<5||read.bytes>MAX_BYTES||
       read.verificacion!=='LOCAL_PRELIMINAR'||read.subido!==false||
       read.pagoAutorizado!==false)
     throw Error('La lectura no devolvió una referencia preliminar.');
@@ -125,7 +129,7 @@ export function montarAsistentePdf(app,{leer=leerPaginasPdfCotizador,antesDeCoti
     throw Error('No se pudo identificar el archivo de manera segura.');
    seleccionPorFormulario.set(app,{file,paginas:read.paginas,
     referencia:Object.freeze({schema:'saber-pdf-local-pendiente-v1',localRef:id,
-     nombre:read.nombre.slice(0,180),bytes:read.bytes,
+     nombre:read.nombre.slice(0,180),bytes:read.bytes,sha256:read.sha256,
      paginas:read.paginas,estado:'PENDIENTE_DE_ENVIO',
      recibido:false,verificadoServidor:false})});
    pagesInput.value=String(read.paginas);
