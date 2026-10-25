@@ -190,6 +190,25 @@ async function centralReadSigned(req,env){
  catch(_){return {error:"Manifiesto JSON inválido",status:400}}
  return {requestId:id,raw,payload};
 }
+/** Probe de firma, únicamente pruebas: jamás consulta/escribe D1 ni genera pedido. */
+async function centralBridgeProbe(req,env){
+ if(env.CENTRAL_BRIDGE_PROBE_ENABLED!=="PRIVATE_TEST_ONLY")
+  return json({ok:false,reason:"probe_disabled",paymentAuthorized:false},503);
+ const signed=await centralReadSigned(req,env);
+ if(signed.error)return json({ok:false,reason:"signature_rejected",paymentAuthorized:false},signed.status);
+ const body=signed.payload;
+ if(!body||typeof body!=="object"||Array.isArray(body)||
+    Object.keys(body).sort().join(",")!=="challenge,operation,schema"||
+    body.schema!=="saber-central-bridge-probe-v1"||
+    body.operation!=="verify-only"||
+    typeof body.challenge!=="string"||
+    !CENTRAL_UUID.test(body.challenge)||
+    signed.requestId!==body.challenge)
+  return json({ok:false,reason:"probe_invalid",paymentAuthorized:false},422);
+ return json({ok:true,schema:"saber-central-bridge-probe-v1",
+  challenge:body.challenge,verifiedSignature:true,dbTouched:false,
+  orderCreated:false,paymentAuthorized:false,checkoutEnabled:false},200);
+}
 async function centralStage(req,env){
  const signed=await centralReadSigned(req,env);
  if(signed.error)return json({error:signed.error},signed.status);
@@ -1244,6 +1263,7 @@ export default {
    if(url.pathname==="/internal/central/polaroid-prepare-order")return await centralPolaroidPrepareOrder(req,env);
    if(url.pathname==="/internal/central/prepare-mixed-order")return await centralPrepareMixedOrder(req,env);
    if(url.pathname==="/internal/central/stage-print-draft")return await centralStagePrintDraft(req,env);
+   if(url.pathname==="/internal/central/bridge-probe")return await centralBridgeProbe(req,env);
    if(url.pathname==="/internal/central/stage")return await centralStage(req,env);
    if(url.pathname==="/internal/central/link")return await centralLink(req,env);
    if(url.pathname==="/internal/central/prepare-order")return await centralPrepareDraft(req,env);
