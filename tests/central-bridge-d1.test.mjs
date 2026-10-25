@@ -672,6 +672,19 @@ test('Borrador PDF compuesto: HMAC → D1, vínculo exacto, copia/dúplex y pago
   const noBinding={...adapterEnv,SABER_CENTRAL:null};
   await assert.rejects(registrarPdfCompuestoCentralFirmado({...args,env:noBinding}),/deshabilitado/);
   assert.equal(db.prepare('SELECT commercial_order_id FROM central_document_manifests WHERE web_order_id=?').get(doc.orderId).commercial_order_id,null);
+  // Vincular luego al pedido comercial: borrador y original siguen el mismo order_id.
+  const clientOrderId=randomUUID();
+  const draftOrder=await call('/internal/central/prepare-order',{
+   webOrderId:doc.orderId,clientOrderId,items:[]
+  });
+  assert.equal(draftOrder.status,201);
+  const commercialOrderId=draftOrder.result.commercial_order_id;
+  const linked=db.prepare('SELECT d.receipt_id,m.commercial_order_id,o.status,o.preference_id FROM central_document_print_drafts d JOIN central_document_manifests m ON m.web_order_id=d.web_order_id JOIN orders o ON o.id=m.commercial_order_id WHERE d.receipt_id=?').get(draft.borradorReceiptId);
+  assert.equal(linked.commercial_order_id,commercialOrderId);
+  assert.equal(linked.status,'awaiting_payment');
+  assert.equal(linked.preference_id,null);
+  assert.equal((await call('/internal/central/stage-print-draft',payload)).status,200);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM central_document_print_drafts WHERE web_order_id=?').get(doc.orderId).n,1);
  }finally{
   if(savedFlag===undefined)delete env.CENTRAL_PRINT_DRAFT_STAGE_ENABLED;
   else env.CENTRAL_PRINT_DRAFT_STAGE_ENABLED=savedFlag;
