@@ -37,6 +37,7 @@
   <script>
     (function(){
       var key='saberCartV1';
+      var ensayoArchivos=new URLSearchParams(location.search).get('ensayoArchivos')==='1';
       function readCart(){try{return JSON.parse(localStorage.getItem(key)||'[]')}catch(e){return []}}
       function updateStatus(){var cart=readCart();var count=cart.reduce(function(sum,item){return sum+(Number(item.qty)||1)},0);document.getElementById('cartStatus').textContent='Carrito '+count}
       // Se mantiene invisible hasta un lanzamiento expresamente aprobado.
@@ -55,6 +56,30 @@
         var item=event.data.payload;
         if(!item||item.type!=='print'||!Number(item.price))return;
         var cart=readCart();
+        // Solo en ensayo: conservar por trabajo una referencia declarativa.
+        // Nunca se reciben bytes ni archivos desde el iframe por postMessage.
+        var pdfDrafts=[];
+        if(ensayoArchivos&&Array.isArray(item.pdfDrafts)&&item.pdfDrafts.length<=30){
+          var received=new Set(),valid=true;
+          item.pdfDrafts.forEach(function(d){
+            var r=d&&d.reference;
+            if(!d||!Number.isSafeInteger(d.itemIndex)||d.itemIndex<0||
+               d.itemIndex>29||d.service!=='impresiones'||!r||
+               Object.keys(r).sort().join(',')!=='bytes,estado,localRef,nombre,paginas,recibido,schema,verificadoServidor'||
+               r.schema!=='saber-pdf-local-pendiente-v1'||
+               !/^[a-f0-9-]{36}$/i.test(r.localRef||'')||
+               received.has(r.localRef)||!Number.isSafeInteger(r.bytes)||
+               r.bytes<5||r.bytes>20*1024*1024||
+               !Number.isSafeInteger(r.paginas)||r.paginas<1||r.paginas>2000||
+               typeof r.nombre!=='string'||r.nombre.length>180||
+               !/\.pdf$/i.test(r.nombre)||r.estado!=='PENDIENTE_DE_ENVIO'||
+               r.recibido!==false||r.verificadoServidor!==false){valid=false;return}
+            received.add(r.localRef);
+            pdfDrafts.push({itemIndex:d.itemIndex,service:'impresiones',
+              reference:{...r}});
+          });
+          if(!valid)pdfDrafts=[];
+        }
         cart.push({
           id:String(item.id||('PRINT-'+Date.now())),
           type:'print',
@@ -62,7 +87,8 @@
           price:Number(item.price)||0,
           qty:1,
           detail:String(item.detail||''),
-          deposit:Number(item.deposit)||0
+          deposit:Number(item.deposit)||0,
+          ...(ensayoArchivos?{pdfDrafts}: {})
         });
         localStorage.setItem(key,JSON.stringify(cart));
         updateStatus();
