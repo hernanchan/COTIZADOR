@@ -54,10 +54,12 @@ export async function subirYVincularPdfCotizadorV2({
     typeof onProgress!=='function')
   throw Error('El archivo, el trabajo o la verificación no corresponden.');
  if(opciones!==undefined&&(!opciones||typeof opciones!=='object'||Array.isArray(opciones)||
-    Object.keys(opciones).sort().join(',')!=='anillado,caras,copias,formato'||
+    Object.keys(opciones).sort().join(',')!=='anillado,caras,copias,formato,materialColor'||
     !['a4','a3'].includes(opciones.formato)||!['simple','double'].includes(opciones.caras)||
     !['ninguno','juntos'].includes(opciones.anillado)||
-    !Number.isSafeInteger(opciones.copias)||opciones.copias<1||opciones.copias>200))
+    !Number.isSafeInteger(opciones.copias)||opciones.copias<1||opciones.copias>200||
+    typeof opciones.materialColor!=='string'||
+    !/^[A-Za-z0-9_-]{1,80}$/.test(opciones.materialColor)))
   throw Error('Opciones del presupuesto de servidor inválidas.');
  // Never accept an arbitrary HTTP destination from the caller: this is
  // a relative-only, fixed-path workflow pinned to one HTTPS test origin.
@@ -124,7 +126,8 @@ export async function subirYVincularPdfCotizadorV2({
     !Number.isSafeInteger(quote.totalArs)||quote.totalArs<=0||
     quote.paginasOriginales!==r.paginas||quote.formato!==opciones.formato||
     quote.caras!==opciones.caras||quote.copias!==opciones.copias||
-    quote.anillado!==opciones.anillado||quote.paymentAuthorized!==false||
+    quote.anillado!==opciones.anillado||quote.materialColor!==opciones.materialColor||
+    quote.paymentAuthorized!==false||
     linked.checkoutEnabled!==false))
   throw Error('El servidor no confirmó el presupuesto documental.');
  onProgress({phase:'confirmado',completed:parts,total:parts});
@@ -139,7 +142,8 @@ export async function subirYVincularPdfCotizadorV2({
   ...(opciones===undefined?{}:{cotizacionServidor:Object.freeze({
    estado:quote.estado,totalArs:quote.totalArs,priceVersion:quote.priceVersion,
    paginasOriginales:quote.paginasOriginales,formato:quote.formato,caras:quote.caras,
-   copias:quote.copias,anillado:quote.anillado,paymentAuthorized:false
+   copias:quote.copias,anillado:quote.anillado,materialColor:quote.materialColor,
+   paymentAuthorized:false
   })})
  });
 }
