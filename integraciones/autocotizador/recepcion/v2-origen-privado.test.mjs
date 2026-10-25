@@ -98,8 +98,9 @@ test('el generador de vista exige una clave pública Turnstile válida',()=>{
 
 test('diferencias de precio se marcan para revisión y no habilitan pagos',()=>{
  const html=paginaCotizadorV2PruebaPrivada(env.DOCS_TURNSTILE_SITE_KEY);
- assert.match(html,/diferencia con el cotizador/);
- assert.match(html,/Requiere revisión de tarifas, descuentos y opciones antes de cobrar/);
+ assert.match(html,/diferencia orientativa frente al cotizador/);
+ assert.match(html,/Revisar promociones, materiales y opciones/);
+ assert.match(html,/Importes numéricamente iguales; falta confirmar promociones/);
  assert.match(html,/Pedido D1 y autorización de pago: PENDIENTES/);
  assert.match(html,/item\.references\.length===1/);
  assert.doesNotMatch(html,/checkoutEnabled:true|paymentAuthorized:true/);
