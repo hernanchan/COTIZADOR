@@ -193,3 +193,98 @@ test('cada lectura privada usa un índice compacto aunque existan 110 sesiones',
  assert.equal(Buffer.from(result.dataBase64,'base64').length,256*1024);
  assert.ok(!JSON.stringify(result).includes(secret),'Nunca exponer clave HMAC');
 });
+
+
+
+test('borrador compuesto: original verificado → subida por bloques → SHA Drive → reintento',async()=>{
+ const {webcrypto}=await import('node:crypto');
+ const {guardarPdfCompuestoPrivado}=await import('../integraciones/autocotizador/recepcion/guardar-pdf-compuesto-privado.mjs');
+ const t=setup(),orderId='WEB-PRUEBA-LOTE-20261024';
+ const m=t.createMeta('original-v1',{orderId,bytes:1024*1024+1});
+ const original=t.call({op:'multiStart',meta:m});
+ assert.equal(original.ok,true,JSON.stringify(original));
+ const originState=JSON.parse(t.properties.get('FILE_'+original.uploadId));
+ originState.receiptState='pages_verified';originState.pageVerification='server';
+ originState.pdfPages=3;originState.driveFileId='FILE_ORIGINAL';
+ t.properties.set('FILE_'+original.uploadId,JSON.stringify(originState));
+ const composed=Buffer.alloc(590000,32);
+ composed.write('%PDF-1.7\n');
+ composed.write('%%EOF',composed.length-5);
+ const digest=sha(composed);
+ const ficha={schema:'saber-borrador-pdf-impresion-privado-v1',
+  estado:'COMPUESTO_EN_MEMORIA_PENDIENTE_DE_DRIVE',
+  orderId,fileId:m.fileId,documentoRecibo:original.uploadId,
+  compuestoSha256:digest,compuestoBytes:composed.length,compuestoPaginas:4,
+  guardadoEnDrive:false,pdfImprimibleVerificado:false,
+  descargaPrivadaHabilitada:false,paymentAuthorized:false,listoParaProducir:false};
+ const consultarFirmado=async p=>t.call(p);
+ const args={pdfBytes:new Uint8Array(composed),ficha,
+  sesionOriginal:{uploadId:original.uploadId,token:original.token},
+  consultarFirmado,habilitado:'PRIVATE_TEST_ONLY',subtle:webcrypto.subtle};
+ const countBefore=t.stats().uploads;
+ await assert.rejects(guardarPdfCompuestoPrivado({...args,habilitado:''}),/no autorizado/);
+ assert.equal(t.stats().uploads,countBefore);
+ assert.equal(t.call({op:'printDraftStart',originalToken:original.token,meta:{
+  orderId,fileId:m.fileId,originalReceiptId:original.uploadId,
+  sha256:digest,bytes:composed.length,pages:4,partBytes:512*1024,parts:2
+ }}).ok,false,'La guarda en Apps Script también comienza apagada');
+ assert.equal(t.stats().uploads,countBefore);
+ t.properties.set('DOCS_PRINT_DRAFT_ENABLED','PRIVATE_TEST_ONLY');
+ const saved=await guardarPdfCompuestoPrivado(args);
+ assert.equal(saved.schema,'saber-pdf-compuesto-drive-privado-v1');
+ assert.equal(saved.orderId,orderId);
+ assert.equal(saved.originalReceiptId,original.uploadId);
+ assert.equal(saved.sha256,digest);
+ assert.equal(saved.bytes,composed.length);
+ assert.equal(saved.pages,4);
+ assert.equal(saved.guardadoEnDrive,true);
+ assert.equal(saved.pdfImprimibleVerificado,false);
+ assert.equal(saved.paymentAuthorized,false);
+ assert.equal(saved.descargaPrivadaHabilitada,false);
+ assert.equal(saved.listoParaProducir,false);
+ assert.equal(t.stats().uploads,countBefore+1);
+ const savedState=JSON.parse(t.properties.get('FILE_'+saved.borradorReceiptId));
+ assert.equal(savedState.kind,'production_draft');
+ assert.equal(savedState.originalReceiptId,original.uploadId);
+ assert.equal(savedState.receiptState,'pages_verified');
+ assert.equal(savedState.pdfPages,4);
+ assert.ok(t.payloads.has(savedState.driveFileId));
+ assert.equal(sha(t.payloads.get(savedState.driveFileId)),digest);
+ const again=await guardarPdfCompuestoPrivado(args);
+ assert.equal(again.borradorReceiptId,saved.borradorReceiptId);
+ assert.equal(t.stats().uploads,countBefore+1,'No duplicar borrador al reintentar');
+ const receipt=t.call({op:'printDraftInfo',uploadId:saved.borradorReceiptId,
+  token:savedState.token});
+ assert.equal(receipt.ok,true);
+ assert.equal(receipt.status,'stored_private_draft');
+ assert.ok(!JSON.stringify(saved).includes(savedState.token));
+ assert.ok(!JSON.stringify(receipt).includes(savedState.driveFileId));
+});
+test('rechazar composición alterada y un PDF de otro original antes de tocar Drive',async()=>{
+ const {webcrypto}=await import('node:crypto');
+ const {guardarPdfCompuestoPrivado}=await import('../integraciones/autocotizador/recepcion/guardar-pdf-compuesto-privado.mjs');
+ const t=setup();
+ t.properties.set('DOCS_PRINT_DRAFT_ENABLED','PRIVATE_TEST_ONLY');
+ const bytes=Uint8Array.from(Buffer.from('%PDF-1.7\n'+' '.repeat(200)+'%%EOF'));
+ const sha256=sha(bytes);
+ const source={uploadId:'DOC-aaaaaaaa-1234-4234-8234-1234567890ab',token:'source-secret-not-real'};
+ const ficha={schema:'saber-borrador-pdf-impresion-privado-v1',
+  estado:'COMPUESTO_EN_MEMORIA_PENDIENTE_DE_DRIVE',
+  orderId:'WEB-PRUEBA-LOTE-20261024',fileId:'f1',
+  documentoRecibo:source.uploadId,compuestoSha256:sha256,
+  compuestoBytes:bytes.length,compuestoPaginas:1,
+  guardadoEnDrive:false,pdfImprimibleVerificado:false,
+  descargaPrivadaHabilitada:false,paymentAuthorized:false,listoParaProducir:false};
+ await assert.rejects(guardarPdfCompuestoPrivado({
+  pdfBytes:Uint8Array.from(bytes,b=>b===37?38:b),ficha,
+  sesionOriginal:source,consultarFirmado:async p=>t.call(p),
+  habilitado:'PRIVATE_TEST_ONLY',subtle:webcrypto.subtle
+ }),/cambió/);
+ const changed={...ficha,documentoRecibo:'DOC-bbbbbbbb-1234-4234-8234-1234567890ab'};
+ await assert.rejects(guardarPdfCompuestoPrivado({
+  pdfBytes:bytes,ficha:changed,sesionOriginal:source,
+  consultarFirmado:async p=>t.call(p),habilitado:'PRIVATE_TEST_ONLY',
+  subtle:webcrypto.subtle
+ }),/no autorizado/);
+ assert.equal(t.stats().uploads,0);
+});
