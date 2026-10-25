@@ -13,6 +13,8 @@ import {fase4FichaCentralLotePrivada} from './fase4-ficha-central-lote-privada.m
 import {enviarCentralFirmada} from './enviar-central-firmada.mjs';
 import {prepararMixtoCentralFirmado} from './preparar-mixto-central.mjs';
 import {prepararDocumentosCentralFirmado} from './preparar-documentos-central.mjs';
+import {componerDesdeReciboVerificado} from './componer-desde-recibo-verificado.mjs';
+import {guardarPdfCompuestoPrivado} from './guardar-pdf-compuesto-privado.mjs';
 import cargaClienteJs from './carga-unica-cliente.txt';
 import {cotizarPloteosRapido} from '../pruebas/cotizar-ploteos-rapido.mjs';
 import plotClienteJs from './ploteos-rapido-cliente.txt';
@@ -1016,7 +1018,7 @@ function scriptRapido(){
 /** Inspección de ficha central en piloto, solo operador con clave independiente.
  * No publica originales, no crea pedidos D1 ni permite pago.
  */
-async function apiFichaCentralPrivada(request,env,sincronizar=false,mixto=false,lote=false,documental=false){
+async function apiFichaCentralPrivada(request,env,sincronizar=false,mixto=false,lote=false,documental=false,compuesto=false){
  if(request.method!=='POST')return closed();
  if(!allowed(request,env))
   return testResponse({ok:false,error:'Origen no permitido',paymentAuthorized:false},403);
@@ -1040,6 +1042,8 @@ async function apiFichaCentralPrivada(request,env,sincronizar=false,mixto=false,
     throw Error('Datos inválidos');
  }catch(_){return testResponse({ok:false,error:'Solicitud no válida',paymentAuthorized:false},400);}
  try{
+  if(compuesto&&env?.DOCS_PRINT_DRAFT_ENABLED!=='PRIVATE_TEST_ONLY')
+    return testResponse({ok:false,error:'Composición de PDF privado deshabilitada',paymentAuthorized:false},503);
   if(mixto&&env?.DOCS_MIXED_PREPARE_ENABLED!=='PRIVATE_TEST_ONLY')
     return testResponse({ok:false,error:'Pedido mixto privado apagado',paymentAuthorized:false},503);
   if(documental&&env?.DOCS_ORDER_PREPARE_ENABLED!=='PRIVATE_TEST_ONLY')
@@ -1052,10 +1056,33 @@ async function apiFichaCentralPrivada(request,env,sincronizar=false,mixto=false,
   const parametros={consultarFirmado:p=>postToScript(env,p,fetch,420000),
    preciosServidor:preciosPiloto};
   const extended=env?.DOCS_EXTENDED_RECEIVER_ENABLED==='PRIVATE_TEST_ONLY';
-  const result=lote?
-   await fase4FichaCentralLotePrivada({...parametros,sesiones:input.sesiones,
+  const result=lote||compuesto?
+   await fase4FichaCentralLotePrivada({...parametros,
+    sesiones:lote?input.sesiones:[{sesion:input.sesion,opciones:input.opciones}],
     maxFiles:extended?30:5,maxFileBytes:extended?20*1024*1024:1024*1024}):
    await fase4FichaCentralPrivada({...parametros,sesion:input.sesion,opciones:input.opciones});
+  if(compuesto){
+   const trabajos=result.ficha?.trabajos||[];
+   if(trabajos.length!==1||trabajos[0].servicio!=='documentos')
+    return testResponse({ok:false,error:'Sólo documentos presupuestados pueden componerse automáticamente',paymentAuthorized:false},422);
+   const consultarFirmado=p=>postToScript(env,p,fetch,420000);
+   const compuestoSeguro=await componerDesdeReciboVerificado({
+    manifiesto:result,sesion:input.sesion,trabajoId:trabajos[0].idTrabajo,
+    consultarFirmado,maxFileBytes:extended?20*1024*1024:1024*1024
+   });
+   const guardado=await guardarPdfCompuestoPrivado({
+    ...compuestoSeguro,sesionOriginal:input.sesion,
+    consultarFirmado,habilitado:env.DOCS_PRINT_DRAFT_ENABLED
+   });
+   return testResponse({ok:true,ordenWeb:guardado.orderId,
+    reciboOriginal:guardado.originalReceiptId,
+    reciboBorrador:guardado.borradorReceiptId,
+    sha256:guardado.sha256,paginas:guardado.pages,
+    bytes:guardado.bytes,guardadoEnDrive:guardado.guardadoEnDrive,
+    estado:guardado.estado,checkoutEnabled:false,
+    paymentAuthorized:false,descargaPrivadaHabilitada:false,
+    listoParaProducir:false},200);
+  }
   if(sincronizar||mixto||documental){
    const resultado=await enviarCentralFirmada({
     verificacion:result,url:env.CENTRAL_TEST_URL,
@@ -1120,6 +1147,7 @@ export default {
     if(page==='/api/ensayo-preparar-mixto-lote')return apiFichaCentralPrivada(request,env,false,true,true);
     if(page==='/api/ensayo-preparar-documentos')return apiFichaCentralPrivada(request,env,false,false,false,true);
     if(page==='/api/ensayo-preparar-documentos-lote')return apiFichaCentralPrivada(request,env,false,false,true,true);
+    if(page==='/api/ensayo-guardar-pdf-compuesto')return apiFichaCentralPrivada(request,env,false,false,false,false,true);
     if(page==='/api/ensayo-carga-unica'){
       if(request.method!=='POST')return closed();
       try{
