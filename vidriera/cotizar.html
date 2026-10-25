@@ -65,12 +65,13 @@
             var r=d&&d.reference;
             if(!d||!Number.isSafeInteger(d.itemIndex)||d.itemIndex<0||
                d.itemIndex>29||d.service!=='impresiones'||!r||
-               Object.keys(r).sort().join(',')!=='bytes,estado,localRef,nombre,paginas,recibido,schema,verificadoServidor'||
+               Object.keys(r).sort().join(',')!=='bytes,estado,localRef,nombre,paginas,recibido,schema,sha256,verificadoServidor'||
                r.schema!=='saber-pdf-local-pendiente-v1'||
                !/^[a-f0-9-]{36}$/i.test(r.localRef||'')||
                received.has(r.localRef)||!Number.isSafeInteger(r.bytes)||
                r.bytes<5||r.bytes>20*1024*1024||
                !Number.isSafeInteger(r.paginas)||r.paginas<1||r.paginas>2000||
+               !/^[a-f0-9]{64}$/.test(r.sha256||'')||
                typeof r.nombre!=='string'||r.nombre.length>180||
                !/\.pdf$/i.test(r.nombre)||r.estado!=='PENDIENTE_DE_ENVIO'||
                r.recibido!==false||r.verificadoServidor!==false){valid=false;return}
