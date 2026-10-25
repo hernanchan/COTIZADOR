@@ -12,7 +12,7 @@ const sha=value=>createHash('sha256').update(Buffer.from(value)).digest('hex');
 function setup(){
  const properties=new Map([['DOCS_RELAY_KEY',secret],['DOCS_ROOT_FOLDER_ID','ROOT']]);
  let uploads=0,rangeRequests=0,wrongRange=false,propReads=0,bulkReads=0;
- const payloads=new Map();
+ const payloads=new Map(),uploadParts=new Map();
  const response=(code,headers={},bytes=Buffer.alloc(0),body='')=>({
   getResponseCode:()=>code,getAllHeaders:()=>headers,
   getBlob:()=>({getBytes:()=>Array.from(bytes)}),getContentText:()=>body
@@ -34,7 +34,12 @@ function setup(){
   })},
   LockService:{getScriptLock:()=>({tryLock:()=>true,releaseLock(){}})},
   ScriptApp:{getOAuthToken:()=> 'TEST_OAUTH'},
-  DriveApp:{getFolderById:()=>({createFolder:name=>({getId:()=> 'private-'+name})})},
+  DriveApp:{
+   Access:{PRIVATE:'private'},
+   getFolderById:()=>({getSharingAccess:()=> 'private',
+    createFolder:name=>({getId:()=> 'private-'+name})}),
+   getFileById:id=>({getBlob:()=>({getBytes:()=>Array.from(payloads.get(id)||[])})})
+  },
   ContentService:{MimeType:{JSON:'json'},createTextOutput:body=>({
    body,setMimeType(){return this}
   })},
@@ -43,13 +48,36 @@ function setup(){
     uploads++;
     return response(200,{Location:'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&upload_id='+uploads});
    }
+   if(opt.method==='put'&&url.includes('upload_id=')){
+    const id=url.split('upload_id=')[1],header=opt.headers['Content-Range'];
+    let uploaded=uploadParts.get(id)||Buffer.alloc(0);
+    if(/^bytes \*\/\d+$/.test(header)){
+     if(uploaded.length){
+      return response(308,{Range:'bytes=0-'+(uploaded.length-1)});
+     }
+     return response(308);
+    }
+    const match=/^bytes (\d+)-(\d+)\/(\d+)$/.exec(header);
+    assert.ok(match,'Drive recibió Content-Range inválido: '+header);
+    const start=Number(match[1]),end=Number(match[2]),total=Number(match[3]);
+    assert.equal(start,uploaded.length);
+    const part=Buffer.from(opt.payload);
+    assert.equal(part.length,end-start+1);
+    uploaded=Buffer.concat([uploaded,part]);uploadParts.set(id,uploaded);
+    if(uploaded.length===total){
+     const fileId='DRAFTFILE'+id;
+     payloads.set(fileId,uploaded);
+     return response(200,{},Buffer.alloc(0),JSON.stringify({id:fileId}));
+    }
+    return response(308,{Range:'bytes=0-'+(uploaded.length-1)});
+   }
    if(opt.method==='get'&&url.includes('?alt=media')){
-    assert.ok(opt.headers.Range,'Se debe pedir un fragmento, no el PDF entero');
+    const data=payloads.get(url.split('/files/')[1].split('?')[0]);
+    assert.ok(data);
+    if(!opt.headers.Range)return response(200,{},data);
     rangeRequests++;
     const match=/^bytes=(\d+)-(\d+)$/.exec(opt.headers.Range);
     assert.ok(match);
-    const data=payloads.get(url.split('/files/')[1].split('?')[0]);
-    assert.ok(data);
     const start=Number(match[1]),end=Number(match[2]);
     assert.ok(end<data.length);
     const headers={'Content-Range':wrongRange?'bytes 0-0/1':'bytes '+start+'-'+end+'/'+data.length};
