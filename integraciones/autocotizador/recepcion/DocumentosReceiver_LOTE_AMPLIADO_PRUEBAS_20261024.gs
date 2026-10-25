@@ -34,7 +34,7 @@ function docsVerifyEnvelope(env){
  var calculated=docsHex(Utilities.computeHmacSha256Signature(env.timestamp+'\n'+env.payloadJson,docsProp('DOCS_RELAY_KEY')));
  if(!docsEq(calculated,env.signature))throw Error('Firma inválida');
  var p=JSON.parse(env.payloadJson);
- if(!p||typeof p!=='object'||Array.isArray(p)||!['ping','start','status','part','finish','privatePilotInfo','privateReadPart','privateCommitPages','privateVerifiedStatus','multiStart','multiPart','multiStatus','multiFinish','multiInfo','multiReadPart','multiCommitPages','multiVerifiedStatus'].includes(p.op))throw Error('Operación inválida');
+ if(!p||typeof p!=='object'||Array.isArray(p)||!['ping','start','status','part','finish','privatePilotInfo','privateReadPart','privateCommitPages','privateVerifiedStatus','multiStart','multiPart','multiStatus','multiFinish','multiInfo','multiReadPart','multiCommitPages','multiVerifiedStatus','printDraftStart','printDraftPart','printDraftStatus','printDraftFinish','printDraftCommitPages','printDraftInfo'].includes(p.op))throw Error('Operación inválida');
  return p;
 }
 function doGet(){return docsJson({ok:false,error:'Servicio privado de documentos'});}
@@ -57,6 +57,12 @@ function docsPilotDispatch(p){
  if(p.op==='multiReadPart')return docsMultiReadPart(p);
  if(p.op==='multiCommitPages')return docsMultiCommitPages(p);
  if(p.op==='multiVerifiedStatus')return docsMultiVerifiedStatus(p);
+ if(p.op==='printDraftStart')return docsPrintDraftStart(p);
+ if(p.op==='printDraftPart')return docsPrintDraftRun(p,'part');
+ if(p.op==='printDraftStatus')return docsPrintDraftRun(p,'status');
+ if(p.op==='printDraftFinish')return docsPrintDraftRun(p,'finish');
+ if(p.op==='printDraftCommitPages')return docsPrintDraftCommitPages(p);
+ if(p.op==='printDraftInfo')return docsPrintDraftInfo(p);
  if(p.op==='privatePilotInfo')return docsPrivatePilotInfo(p);
  if(p.op==='privateReadPart')return docsPrivateReadPart(p);
  if(p.op==='privateCommitPages')return docsPrivateCommitPages(p);
@@ -483,4 +489,99 @@ function docsRun(p){
  if(p.op==='part')return docsPart(p);
  if(p.op==='finish')return docsFinish(p);
  throw Error('Operación no permitida');
+}
+
+
+/**
+ * Canal PRIVADO exclusivamente para PDF compuesto sin pago.
+ * HMAC backend + DOCS_PRINT_DRAFT_ENABLED, siempre apagado por defecto.
+ * No consume los 30 cupos destinados a PDF originales del cliente.
+ */
+function docsPrintDraftEnabled(){
+ if(docsStore().getProperty('DOCS_PRINT_DRAFT_ENABLED')!=='PRIVATE_TEST_ONLY')
+  throw Error('Almacenamiento de PDF compuesto deshabilitado');
+}
+function docsPrintDraftSession(p){
+ docsPrintDraftEnabled();
+ var s=docsAuth(p);
+ if(s.kind!=='production_draft'||!/^prod-[A-Za-z0-9_-]{1,70}$/.test(s.fileId)||
+    !/^DOC-[a-f0-9-]{36}$/i.test(s.originalReceiptId||'')||
+    !Number.isSafeInteger(s.expectedPages)||s.expectedPages<1||s.expectedPages>2000)
+  throw Error('Sesión no corresponde a un borrador de impresión');
+ return s;
+}
+function docsPrintDraftStart(p){
+ docsPrintDraftEnabled();
+ var m=p.meta;
+ if(!m||!/^WEB-[A-Za-z0-9_-]{5,80}$/.test(m.orderId||'')||
+    !/^[A-Za-z0-9_-]{1,70}$/.test(m.fileId||'')||
+    !/^DOC-[a-f0-9-]{36}$/i.test(m.originalReceiptId||'')||
+    !Number.isSafeInteger(m.pages)||m.pages<1||m.pages>2000||
+    !Number.isSafeInteger(m.bytes)||m.bytes<100||m.bytes>DOCS_MAX||
+    !/^[a-f0-9]{64}$/.test(m.sha256||'')||
+    m.partBytes!==DOCS_PART||m.parts!==Math.ceil(m.bytes/DOCS_PART))
+  throw Error('Metadatos del PDF compuesto fuera del contrato');
+ var original=docsMultiAuth({uploadId:m.originalReceiptId,token:p.originalToken});
+ if(original.kind||original.orderId!==m.orderId||original.fileId!==m.fileId||
+    original.receiptState!=='pages_verified'||original.pageVerification!=='server')
+  throw Error('El PDF compuesto no corresponde al original verificado');
+ var root=DriveApp.getFolderById(docsProp('DOCS_ROOT_FOLDER_ID'));
+ if(root.getSharingAccess()!==DriveApp.Access.PRIVATE)
+  throw Error('Carpeta de almacenamiento no privada');
+ var result=docsStart({meta:{orderId:m.orderId,fileId:'prod-'+m.fileId,
+  name:'BORRADOR_IMPRIMIR.pdf',mode:original.mode,bytes:m.bytes,
+  sha256:m.sha256,parts:m.parts,partBytes:DOCS_PART}});
+ var state=docsRead(result.uploadId);
+ if(state.kind&&state.kind!=='production_draft')
+  throw Error('Identificador reservado en otra sesión');
+ if(state.kind==='production_draft'){
+  if(state.originalReceiptId!==original.uploadId||state.expectedPages!==m.pages)
+   throw Error('Ya existe otro borrador de este documento');
+ }else{
+  state.kind='production_draft';state.originalReceiptId=original.uploadId;
+  state.originalSha256=original.sha256;state.expectedPages=m.pages;
+  docsSave(state);
+ }
+ return {uploadId:state.uploadId,token:result.token,orderId:state.orderId,
+  verified:false,guardadoEnDrive:false,paymentAuthorized:false};
+}
+function docsPrintDraftRun(p,action){
+ var s=docsPrintDraftSession(p);
+ if(action==='part')return docsPart(p);
+ if(action==='status')return docsStatus(p);
+ if(action==='finish'){
+  if(s.receiptState==='pages_verified')return docsPrintDraftInfo(p);
+  return docsFinish(p);
+ }
+ throw Error('Operación de borrador desconocida');
+}
+function docsPrintDraftCommitPages(p){
+ var s=docsPrintDraftSession(p);
+ if(s.receiptState!=='bytes_checked'&&s.receiptState!=='pages_verified')
+  throw Error('El archivo todavía no fue comprobado en Drive');
+ if(p.receiptId!==s.uploadId||p.sha256!==s.sha256||p.bytes!==s.bytes||
+    p.parserVersion!=='pdf-lib-1.17.1'||p.pages!==s.expectedPages)
+  throw Error('El compositor y el PDF recibido no coinciden');
+ // Descargar desde Drive, verificar SHA real y nunca aceptar sólo un OK.
+ docsPilotBlob(s);
+ if(s.receiptState==='pages_verified'){
+  if(s.pdfPages!==p.pages)throw Error('Conteo final incompatible');
+ }else{
+  s.pdfPages=p.pages;s.pageVerification='server';
+  s.receiptState='pages_verified';s.pageVerifiedAt=Date.now();docsSave(s);
+ }
+ return docsPrintDraftInfo(p);
+}
+function docsPrintDraftInfo(p){
+ var s=docsPrintDraftSession(p);
+ if(!s.driveFileId||s.receiptState!=='pages_verified'||
+    s.pageVerification!=='server'||s.pdfPages!==s.expectedPages)
+  throw Error('PDF privado todavía no verificado');
+ return {receiptId:s.uploadId,orderId:s.orderId,
+  fileId:s.fileId.substring(5),originalReceiptId:s.originalReceiptId,
+  sha256:s.sha256,bytes:s.bytes,pages:s.pdfPages,
+  status:'stored_private_draft',storageVerified:true,
+  guardadoEnDrive:true,pdfImprimibleVerificado:false,
+  paymentAuthorized:false,listoParaProducir:false,
+  descargaPrivadaHabilitada:false};
 }
