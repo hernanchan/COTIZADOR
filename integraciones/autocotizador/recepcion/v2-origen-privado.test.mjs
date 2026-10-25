@@ -105,3 +105,31 @@ test('diferencias de precio se marcan para revisión y no habilitan pagos',()=>{
  assert.match(html,/item\.references\.length===1/);
  assert.doesNotMatch(html,/checkoutEnabled:true|paymentAuthorized:true/);
 });
+
+test('la preparación D1 de V2 permanece cerrada sin administración y permisos independientes',async()=>{
+ const path='/api/ensayo-preparar-documentos-v2';
+ const admin='PrivateAdminOnly_'+'9'.repeat(40);
+ const headers={Origin:base,'Content-Type':'application/json'};
+ const body=JSON.stringify({sesion:{uploadId:'DOC-33333333-1234-4234-8234-1234567890ab',
+  token:'sample-test-token-123456789'},opciones:{},referencia:{},
+  clientOrderId:'12345678-1234-4234-8234-1234567890ab',items:[]});
+ const call=(settings,extra={})=>worker.fetch(new Request(base+path,{
+  method:'POST',headers:{...headers,...extra},body
+ }),settings);
+ const off=await call({...env,DOCS_CENTRAL_ADMIN_KEY:admin});
+ assert.notEqual(off.status,200,'La recepción no puede escribir en D1 sin compuertas');
+ const unauthorized=await call({...env,DOCS_CENTRAL_ADMIN_KEY:admin},{
+  Authorization:'Bearer incorrecto'
+ });
+ assert.equal(unauthorized.status,401);
+ const wrongOrigin=await worker.fetch(new Request(base+path,{
+  method:'POST',headers:{...headers,Origin:'https://otro.example',Authorization:'Bearer '+admin},
+  body
+ }),{...env,DOCS_CENTRAL_ADMIN_KEY:admin});
+ assert.equal(wrongOrigin.status,403);
+ const invalid=await call({...env,DOCS_CENTRAL_ADMIN_KEY:admin},{
+  Authorization:'Bearer '+admin
+ });
+ assert.equal(invalid.status,400,'No deben aceptarse referencias de archivo vacías');
+ assert.equal((await get(path,{},env,'GET')).status,503);
+});
