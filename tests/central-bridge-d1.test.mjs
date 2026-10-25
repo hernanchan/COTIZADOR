@@ -585,3 +585,95 @@ test('Pedido integral sin Polaroids: PDF verificados y tienda en una compra sin 
   else env.CENTRAL_PREPARE_ENABLED=former;
  }
 });
+
+
+test('Borrador PDF compuesto: HMAC → D1, vínculo exacto, copia/dúplex y pagos bloqueados',async()=>{
+ const {registrarPdfCompuestoCentralFirmado}=await import('../integraciones/autocotizador/recepcion/registrar-pdf-compuesto-central.mjs');
+ const doc=JSON.parse(JSON.stringify(packet));
+ doc.orderId='WEB-CENTRAL-IMPRESION-20261024';
+ doc.ficha.orderId=doc.orderId;
+ doc.recibos[0].receiptId='DOC-55555555-1234-4234-8234-1234567890ab';
+ doc.recibos[1].receiptId='DOC-66666666-1234-4234-8234-1234567890ab';
+ doc.ficha.trabajos[0]={
+  ...doc.ficha.trabajos[0],idTrabajo:'pdf1',servicio:'documentos',
+  reciboPrivado:doc.recibos[0].receiptId,
+  carasPresupuestadas:'double',paginasPorCaraPresupuestadas:1,
+  copias:3,paginasElegidas:[1]
+ };
+ doc.ficha.trabajos[1].reciboPrivado=doc.recibos[1].receiptId;
+ const draft={
+  schema:'saber-pdf-compuesto-drive-privado-v1',
+  orderId:doc.orderId,fileId:'f1',
+  originalReceiptId:doc.recibos[0].receiptId,
+  borradorReceiptId:'DOC-77777777-1234-4234-8234-1234567890ab',
+  sha256:'c'.repeat(64),bytes:8000,pages:6,
+  estado:'BORRADOR_VERIFICADO_EN_DRIVE_PAGO_PENDIENTE',
+  guardadoEnDrive:true,pdfImprimibleVerificado:false,
+  descargaPrivadaHabilitada:false,paymentAuthorized:false,
+  listoParaProducir:false
+ };
+ const savedFlag=env.CENTRAL_PRINT_DRAFT_STAGE_ENABLED;
+ const adapterEnv={
+  ...env,DOCS_PRINT_DRAFT_CENTRAL_ENABLED:'PRIVATE_TEST_ONLY',
+  DOCS_CENTRAL_SYNC_ENABLED:'PRIVATE_TEST_ONLY',
+  DOCS_RELAY_KEY:'separate-gas-bridge-secret',
+  DOCS_CENTRAL_ADMIN_KEY:'separate-admin-long-key',
+  CENTRAL_TEST_URL:'https://saber-pagos-pruebas.libreriasaber.workers.dev/internal/central/stage',
+  SABER_CENTRAL:{fetch:req=>context.worker.fetch(req,env)}
+ };
+ const args={guardado:draft,env:adapterEnv,subtle:webcrypto.subtle,
+  nuevoId:randomUUID};
+ try{
+  // Neither a missing flag nor missing original manifest may create D1 rows.
+  await assert.rejects(registrarPdfCompuestoCentralFirmado(args),/no aceptó/);
+  env.CENTRAL_PRINT_DRAFT_STAGE_ENABLED='PRIVATE_TEST_ONLY';
+  await assert.rejects(registrarPdfCompuestoCentralFirmado(args),/no aceptó/);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM central_document_print_drafts').get().n,0);
+  assert.equal((await call('/internal/central/stage',doc)).status,201);
+  // Direct forged call without HMAC or using a browser origin is rejected.
+  assert.equal((await call('/internal/central/stage-print-draft',{
+   schema:'saber-central-borrador-drive-v1'
+  },{key:'wrong-key'})).status,401);
+  const payload={
+   schema:'saber-central-borrador-drive-v1',orderId:draft.orderId,
+   fileId:draft.fileId,originalReceiptId:draft.originalReceiptId,
+   receiptId:draft.borradorReceiptId,sha256:draft.sha256,
+   bytes:draft.bytes,pages:draft.pages,estado:draft.estado,
+   guardadoEnDrive:true,pdfImprimibleVerificado:false,
+   descargaPrivadaHabilitada:false,paymentAuthorized:false,
+   listoParaProducir:false
+  };
+  assert.equal((await call('/internal/central/stage-print-draft',payload,{origin:true})).status,403);
+  assert.equal((await call('/internal/central/stage-print-draft',{...payload,pages:5})).status,409);
+  assert.equal((await call('/internal/central/stage-print-draft',{...payload,fileId:'f2'})).status,409);
+  assert.equal((await call('/internal/central/stage-print-draft',{...payload,orderId:'WEB-OTRO-PEDIDO-20261024'})).status,409);
+  assert.equal((await call('/internal/central/stage-print-draft',{...payload,paymentAuthorized:true})).status,422);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM central_document_print_drafts').get().n,0);
+  const created=await registrarPdfCompuestoCentralFirmado(args);
+  assert.equal(created.registered,true);
+  assert.equal(created.idempotent,false);
+  assert.equal(created.orderId,doc.orderId);
+  assert.equal(created.paymentAuthorized,false);
+  assert.equal(created.productionAuthorized,false);
+  const row=db.prepare('SELECT * FROM central_document_print_drafts WHERE web_order_id=?').get(doc.orderId);
+  assert.equal(row.receipt_id,draft.borradorReceiptId);
+  assert.equal(row.original_receipt_id,doc.recibos[0].receiptId);
+  assert.equal(row.file_id,'f1');
+  assert.equal(row.pages,6);
+  assert.equal(row.status,'stored_private_unpaid');
+  const retry=await registrarPdfCompuestoCentralFirmado(args);
+  assert.equal(retry.idempotent,true);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM central_document_print_drafts WHERE web_order_id=?').get(doc.orderId).n,1);
+  const other={...draft,borradorReceiptId:'DOC-88888888-1234-4234-8234-1234567890ab'};
+  await assert.rejects(registrarPdfCompuestoCentralFirmado({...args,guardado:other}),/no aceptó/);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM central_document_print_drafts WHERE web_order_id=?').get(doc.orderId).n,1);
+  const noKey={...adapterEnv,DOCS_PRINT_DRAFT_CENTRAL_ENABLED:''};
+  await assert.rejects(registrarPdfCompuestoCentralFirmado({...args,env:noKey}),/deshabilitado/);
+  const noBinding={...adapterEnv,SABER_CENTRAL:null};
+  await assert.rejects(registrarPdfCompuestoCentralFirmado({...args,env:noBinding}),/deshabilitado/);
+  assert.equal(db.prepare('SELECT commercial_order_id FROM central_document_manifests WHERE web_order_id=?').get(doc.orderId).commercial_order_id,null);
+ }finally{
+  if(savedFlag===undefined)delete env.CENTRAL_PRINT_DRAFT_STAGE_ENABLED;
+  else env.CENTRAL_PRINT_DRAFT_STAGE_ENABLED=savedFlag;
+ }
+});
