@@ -141,6 +141,8 @@ function centralSafeManifest(data){
    reciboPrivado:r.receiptId,sha256:r.sha256,paginasOriginales:r.pages,
    bytes:r.bytes,paginasElegidas:[...w.paginasElegidas],
    copias:copies??null,formatoFinal:texto(w.formatoFinal),
+   carasPresupuestadas:w.servicio==="documentos"?(w.carasPresupuestadas??null):null,
+   paginasPorCaraPresupuestadas:w.servicio==="documentos"?(w.paginasPorCaraPresupuestadas??null):null,
    material:texto(w.material),modo:texto(w.modo),productoId:texto(w.productoId),
    variante:texto(w.variante),metros:Number.isFinite(w.metros)&&w.metros>0?w.metros:null,
    descripcion:texto(w.descripcion,180),archivoFinalVerificado:false
@@ -156,6 +158,7 @@ async function centralTables(env){
  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_central_manifests_commercial_order ON central_document_manifests(commercial_order_id)").run();
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_bridge_requests (request_id TEXT PRIMARY KEY,request_hash TEXT NOT NULL,action TEXT NOT NULL CHECK(action IN ('stage','link')),created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_document_receipts (receipt_id TEXT PRIMARY KEY,web_order_id TEXT NOT NULL REFERENCES central_document_manifests(web_order_id) ON DELETE CASCADE,file_id TEXT NOT NULL,sha256 TEXT NOT NULL,UNIQUE(web_order_id,file_id))").run();
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_document_print_drafts (receipt_id TEXT PRIMARY KEY,web_order_id TEXT NOT NULL REFERENCES central_document_manifests(web_order_id) ON DELETE CASCADE,file_id TEXT NOT NULL,original_receipt_id TEXT NOT NULL UNIQUE REFERENCES central_document_receipts(receipt_id) ON DELETE RESTRICT,sha256 TEXT NOT NULL CHECK(length(sha256)=64),bytes INTEGER NOT NULL CHECK(bytes BETWEEN 100 AND 20971520),pages INTEGER NOT NULL CHECK(pages BETWEEN 1 AND 2000),status TEXT NOT NULL DEFAULT 'stored_private_unpaid' CHECK(status='stored_private_unpaid'),created_at TEXT NOT NULL DEFAULT (datetime('now')),UNIQUE(web_order_id,file_id))").run();
 }
 async function centralReadSigned(req,env){
  if(env.CENTRAL_BRIDGE_ENABLED!=="PRIVATE_TEST_ONLY"||
@@ -213,6 +216,79 @@ async function centralStage(req,env){
  return json({saved:true,idempotent:false,web_order_id:safe.webOrderId,
   estado:"VERIFICADO_PENDIENTE_DE_PEDIDO",paymentAuthorized:false},201);
 }
+
+/** Internal immutable link: private Drive draft PDF to verified web order.
+ * Only signed Worker-to-Worker calls, never customer references or payment.
+ */
+async function centralStagePrintDraft(req,env){
+ if(env.CENTRAL_PRINT_DRAFT_STAGE_ENABLED!=="PRIVATE_TEST_ONLY")
+  return json({error:"Registro de borradores privados deshabilitado"},503);
+ const signed=await centralReadSigned(req,env);
+ if(signed.error)return json({error:signed.error},signed.status);
+ const d=signed.payload;
+ if(!d||typeof d!=="object"||Array.isArray(d)||
+    Object.keys(d).sort().join(",")!==
+     "bytes,descargaPrivadaHabilitada,estado,fileId,guardadoEnDrive,listoParaProducir,orderId,originalReceiptId,pages,paymentAuthorized,pdfImprimibleVerificado,receiptId,schema,sha256"||
+    d.schema!=="saber-central-borrador-drive-v1"||
+    !CENTRAL_WEB.test(d.orderId||"")||!CENTRAL_FILE.test(d.fileId||"")||
+    !CENTRAL_RECEIPT.test(d.originalReceiptId||"")||
+    !CENTRAL_RECEIPT.test(d.receiptId||"")||
+    d.originalReceiptId===d.receiptId||
+    !CENTRAL_HEX.test(d.sha256||"")||
+    !Number.isSafeInteger(d.bytes)||d.bytes<100||d.bytes>20*1024*1024||
+    !Number.isSafeInteger(d.pages)||d.pages<1||d.pages>2000||
+    d.estado!=="BORRADOR_VERIFICADO_EN_DRIVE_PAGO_PENDIENTE"||
+    d.guardadoEnDrive!==true||d.pdfImprimibleVerificado!==false||
+    d.descargaPrivadaHabilitada!==false||d.paymentAuthorized!==false||
+    d.listoParaProducir!==false)
+  return json({error:"Borrador de impresión sin comprobación privada"},422);
+ await centralTables(env);
+ const [manifest,original]=await Promise.all([
+  env.DB.prepare("SELECT manifest_json,commercial_order_id FROM central_document_manifests WHERE web_order_id=?").bind(d.orderId).first(),
+  env.DB.prepare("SELECT receipt_id,file_id FROM central_document_receipts WHERE web_order_id=? AND receipt_id=?").bind(d.orderId,d.originalReceiptId).first()
+ ]);
+ if(!manifest||!original||original.file_id!==d.fileId)
+  return json({error:"El borrador no pertenece a un PDF original del pedido"},409);
+ let parsed;
+ try{parsed=JSON.parse(manifest.manifest_json)}
+ catch(_){return json({error:"No se pudo leer la ficha del pedido"},409)}
+ const jobs=parsed?.trabajos;
+ const job=Array.isArray(jobs)?jobs.find(x=>x.reciboPrivado===d.originalReceiptId):null;
+ // Prices, duplex and copy count are immutable after original checkout.
+ if(!job||job.servicio!=="documentos"||job.fileId!==d.fileId||
+    !["a4","a3"].includes(job.formatoFinal)||
+    !["simple","double"].includes(job.carasPresupuestadas)||
+    job.paginasPorCaraPresupuestadas!==1||
+    !Number.isSafeInteger(job.copias)||job.copias<1||job.copias>200||
+    !Array.isArray(job.paginasElegidas)||!job.paginasElegidas.length)
+  return json({error:"Este trabajo no tiene imposición documental cotizada"},409);
+ const faceCount=job.paginasElegidas.length;
+ const perGame=faceCount+(job.carasPresupuestadas==="double"&&faceCount%2===1?1:0);
+ if(d.pages!==perGame*job.copias)
+  return json({error:"El borrador cambió caras, copias o doble faz presupuestadas"},409);
+ const prev=await env.DB.prepare("SELECT * FROM central_document_print_drafts WHERE web_order_id=? AND file_id=?").bind(d.orderId,d.fileId).first();
+ const same=p=>Boolean(p&&p.receipt_id===d.receiptId&&
+  p.original_receipt_id===d.originalReceiptId&&p.sha256===d.sha256&&
+  p.bytes===d.bytes&&p.pages===d.pages);
+ if(prev)return same(prev)?
+  json({saved:true,idempotent:true,web_order_id:d.orderId,receipt_id:d.receiptId,
+   paymentAuthorized:false,productionAuthorized:false}):
+  json({error:"El pedido ya tiene un borrador distinto para el archivo"},409);
+ try{
+  await env.DB.prepare("INSERT INTO central_document_print_drafts(receipt_id,web_order_id,file_id,original_receipt_id,sha256,bytes,pages) VALUES(?,?,?,?,?,?,?)")
+   .bind(d.receiptId,d.orderId,d.fileId,d.originalReceiptId,d.sha256,d.bytes,d.pages).run();
+ }catch(_){
+  const raced=await env.DB.prepare("SELECT * FROM central_document_print_drafts WHERE web_order_id=? AND file_id=?").bind(d.orderId,d.fileId).first();
+  if(same(raced))return json({saved:true,idempotent:true,
+   web_order_id:d.orderId,receipt_id:d.receiptId,
+   paymentAuthorized:false,productionAuthorized:false});
+  return json({error:"Conflicto de registro de borrador"},409);
+ }
+ return json({saved:true,idempotent:false,web_order_id:d.orderId,
+  receipt_id:d.receiptId,paymentAuthorized:false,
+  productionAuthorized:false},201);
+}
+
 async function centralLink(req,env){
  const signed=await centralReadSigned(req,env);
  if(signed.error)return json({error:signed.error},signed.status);
@@ -1167,6 +1243,7 @@ export default {
    if(url.pathname==="/internal/central/polaroid-stage")return await centralPolaroidStage(req,env);
    if(url.pathname==="/internal/central/polaroid-prepare-order")return await centralPolaroidPrepareOrder(req,env);
    if(url.pathname==="/internal/central/prepare-mixed-order")return await centralPrepareMixedOrder(req,env);
+   if(url.pathname==="/internal/central/stage-print-draft")return await centralStagePrintDraft(req,env);
    if(url.pathname==="/internal/central/stage")return await centralStage(req,env);
    if(url.pathname==="/internal/central/link")return await centralLink(req,env);
    if(url.pathname==="/internal/central/prepare-order")return await centralPrepareDraft(req,env);
