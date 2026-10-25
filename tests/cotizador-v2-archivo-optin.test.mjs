@@ -75,3 +75,101 @@ test('El montaje sin formulario de impresiones no modifica otros servicios',()=>
  assert.equal(montarAsistentePdf({isConnected:false,querySelector:()=>null}),false);
  assert.equal(montarAsistentePdf({isConnected:true,querySelector:()=>null}),false);
 });
+
+
+function stubForm(){
+ let box=null;
+ const pages={value:'4',isConnected:true,closest:()=>host};
+ const calculate={disabled:false};
+ const parent={insertBefore(node){box=node;node.isConnected=true}};
+ const host={parentNode:parent};
+ const app={
+  isConnected:true,
+  querySelector(selector){
+   if(selector==='#pages')return pages;
+   if(selector==='#calc')return calculate;
+   if(selector==='#saberEnsayoPdf')return box;
+   return null;
+  }
+ };
+ const oldDocument=globalThis.document;
+ globalThis.document={
+  createElement(tag){
+   const node={
+    tag,id:'',className:'',style:{},textContent:'',
+    isConnected:false,children:[],
+    appendChild(child){this.children.push(child);return child},
+    append(...nodes){this.children.push(...nodes)},
+    setAttribute(name,val){this[name]=val}
+   };
+   return node;
+  }
+ };
+ return {
+  app,pages,calculate,
+  input:()=>box?.children[2]?.children[0],
+  status:()=>box?.children[3],
+  restore:()=>{globalThis.document=oldDocument}
+ };
+}
+test('Montaje del lector: sólo cambia páginas al leer bien, sin tocar el cálculo del cotizador',async()=>{
+ const ui=stubForm();
+ try{
+  let uploads=0;
+  const mounted=montarAsistentePdf(ui.app,{
+   leer:async file=>{uploads++;return {
+    nombre:file.name,paginas:12,verificacion:'LOCAL_PRELIMINAR',
+    subido:false,pagoAutorizado:false
+   }}
+  });
+  assert.equal(mounted,true);
+  assert.equal(montarAsistentePdf(ui.app),false,'Montar una sola vez');
+  assert.equal(ui.pages.value,'4');
+  const input=ui.input();
+  assert.equal(input.type,'file');
+  input.files=[{name:'capitulo.pdf'}];
+  await input.onchange();
+  assert.equal(ui.pages.value,'12');
+  assert.equal(ui.calculate.disabled,false);
+  assert.match(ui.status().textContent,/12 páginas detectadas/);
+  assert.match(ui.status().textContent,/no se envió/);
+  assert.equal(uploads,1);
+ }finally{ui.restore()}
+});
+test('PDF corrupto no borra las páginas que el cliente ingresó manualmente',async()=>{
+ const ui=stubForm();
+ try{
+  assert.equal(montarAsistentePdf(ui.app,{leer:async()=>{throw Error('PDF dañado')}}),true);
+  const input=ui.input();
+  input.files=[{name:'fallado.pdf'}];
+  await input.onchange();
+  assert.equal(ui.pages.value,'4');
+  assert.equal(ui.calculate.disabled,false);
+  assert.match(ui.status().textContent,/PDF dañado/);
+  assert.match(ui.status().textContent,/manualmente/);
+ }finally{ui.restore()}
+});
+test('Si el cliente cambia PDF durante la lectura, el resultado viejo no puede reemplazar al nuevo',async()=>{
+ const ui=stubForm();
+ try{
+  let release;
+  const first=new Promise(resolve=>{release=resolve});
+  let calls=0;
+  assert.equal(montarAsistentePdf(ui.app,{leer:async file=>{
+   calls++;if(calls===1)return first;
+   return {nombre:file.name,paginas:17};
+  }}),true);
+  const input=ui.input();
+  input.files=[{name:'antiguo.pdf'}];
+  const pending=input.onchange();
+  assert.equal(ui.calculate.disabled,true);
+  input.files=[{name:'nuevo.pdf'}];
+  await input.onchange();
+  release({nombre:'antiguo.pdf',paginas:3});
+  await pending;
+  assert.equal(ui.pages.value,'17');
+  assert.equal(ui.calculate.disabled,false);
+  assert.match(ui.status().textContent,/nuevo.pdf/);
+  assert.doesNotMatch(ui.status().textContent,/antiguo.pdf/);
+ }finally{ui.restore()}
+});
