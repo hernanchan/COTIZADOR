@@ -121,6 +121,24 @@ CREATE TABLE IF NOT EXISTS central_document_receipts (
  UNIQUE(web_order_id,file_id)
 );
 
+-- PDF documental compuesto en Drive privado: sólo referencia de borrador.
+-- No es pago confirmado, enlace Drive ni habilitación de producción.
+CREATE TABLE IF NOT EXISTS central_document_print_drafts (
+ receipt_id TEXT PRIMARY KEY,
+ web_order_id TEXT NOT NULL REFERENCES central_document_manifests(web_order_id) ON DELETE CASCADE,
+ file_id TEXT NOT NULL,
+ original_receipt_id TEXT NOT NULL UNIQUE REFERENCES central_document_receipts(receipt_id) ON DELETE RESTRICT,
+ sha256 TEXT NOT NULL CHECK(length(sha256)=64),
+ bytes INTEGER NOT NULL CHECK(bytes BETWEEN 100 AND 20971520),
+ pages INTEGER NOT NULL CHECK(pages BETWEEN 1 AND 2000),
+ status TEXT NOT NULL DEFAULT 'stored_private_unpaid'
+  CHECK(status='stored_private_unpaid'),
+ created_at TEXT NOT NULL DEFAULT (datetime('now')),
+ UNIQUE(web_order_id,file_id)
+);
+CREATE INDEX IF NOT EXISTS idx_document_print_drafts_order
+ ON central_document_print_drafts(web_order_id);
+
 -- Polaroids Express: un solo PDF imprimible verificado por pedido.
 -- Es un manifiesto, NO un archivo: nada de datos originales o Drive compartido.
 CREATE TABLE IF NOT EXISTS central_polaroids_express (
