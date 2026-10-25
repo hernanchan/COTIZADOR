@@ -103,9 +103,17 @@ function render(){
       onProgress:p=>{msg.textContent=p.phase==='transferencia'?'Transferencia: '+p.completed+' de '+p.total+' bloques':p.phase}
      });
      const quote=result.cotizacionServidor;
+     const moneda=value=>new Intl.NumberFormat('es-AR',{style:'currency',
+      currency:'ARS',maximumFractionDigits:0}).format(value);
+     const comparable=item.references.length===1;
+     const diferencia=quote&&comparable?quote.totalArs-item.price:null;
+     const aviso=diferencia===null?'La comparación requiere revisar los demás renglones del trabajo.'
+      :Math.abs(diferencia)<0.01?'Precios coincidentes para este trabajo.'
+      :'ATENCIÓN: diferencia con el cotizador de '+moneda(diferencia)+
+       '. Requiere revisión de tarifas, descuentos y opciones antes de cobrar.';
      msg.textContent='PDF recibido y verificado · '+result.pages+' páginas · recibo '+result.receiptId+
-      '. Presupuesto del servidor: '+(quote?new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(quote.totalArs):'SIN CONFIRMAR')+
-      '. Precio comercial definitivo y autorización de pago: PENDIENTES.';
+      '. Presupuesto del servidor: '+(quote?moneda(quote.totalArs):'SIN CONFIRMAR')+
+      '. '+aviso+' Pedido D1 y autorización de pago: PENDIENTES.';
      btn.textContent='PDF verificado';d.confirmacion=result;
     }catch(e){
      msg.textContent='No se confirmó la recepción: '+String(e.message||e);
