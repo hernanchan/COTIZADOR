@@ -1,0 +1,58 @@
+name: Saber - versiones HMAC inactivas (sin despliegue)
+on:
+  push:
+    branches:
+      - polaroids/express-pdf-unico-20261023
+    paths:
+      - '.github/workflows/cloudflare-versiones-inactivas.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  statuses: write
+concurrency:
+  group: saber-versiones-inactivas-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  stage:
+    if: github.ref == 'refs/heads/polaroids/express-pdf-unico-20261023'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Dependencias de compilar Worker documental
+        working-directory: integraciones/autocotizador/recepcion
+        run: npm ci --no-audit --no-fund
+      - name: Compilar Documentos sin publicar
+        working-directory: integraciones/autocotizador/recepcion
+        run: npm run build:unificado
+      - name: Ejecutar pruebas del puente sin D1
+        run: |
+          node --experimental-sqlite --test tests/central-bridge-d1.test.mjs
+          node --test tests/autocotizador-probe-puente.test.mjs
+      - name: Crear dos versiones INACTIVAS, herencia estricta de secretos
+        env:
+          SABER_CF_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          SABER_CF_EDITOR_TOKEN: ${{ secrets.SABER_CF_EDITOR_TOKEN }}
+        run: node integraciones/cloudflare-ensayo/crear-versiones-inactivas.mjs
+      - name: Publicar resultado sin secreto ni despliegue
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_SHA: ${{ github.sha }}
+          STATUS: ${{ job.status }}
+        shell: bash
+        run: |
+          if [ "$STATUS" = success ]; then state=success; description="Versiones inactivas listas; cero despliegues"; else state=failure; description="No se certificaron versiones inactivas; despliegue bloqueado"; fi
+          jq -n --arg state "$state" --arg context "saber-cloudflare/staged-versions" --arg description "$description" \
+            --arg target_url "https://github.com/$GH_REPO/actions/runs/$GITHUB_RUN_ID" \
+            '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/saber-stage-status.json
+          gh api -X POST "repos/$GH_REPO/statuses/$GH_SHA" --input /tmp/saber-stage-status.json
