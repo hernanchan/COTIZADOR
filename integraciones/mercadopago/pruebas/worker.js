@@ -436,8 +436,16 @@ async function centralPrepareDraft(req,env){
  catch(_){
   const other=await env.DB.prepare("SELECT request_hash,order_id FROM cart_requests WHERE client_order_id=?").bind(data.clientOrderId).first();
   if(other&&other.request_hash===hash){
-   return json({created:true,idempotent:true,commercial_order_id:other.order_id,
-    amount_ars:total,state:"awaiting_payment",checkoutEnabled:false,paymentAuthorized:false});
+   // Una colisión concurrente no autoriza devolver el total precalculado
+   // sin revisar el registro COMMIT de la transacción ganadora.
+   const [stored,linked]=await Promise.all([
+    env.DB.prepare("SELECT amount_ars,status FROM orders WHERE id=?").bind(other.order_id).first(),
+    env.DB.prepare("SELECT commercial_order_id FROM central_document_manifests WHERE web_order_id=?").bind(data.webOrderId).first()
+   ]);
+   if(stored&&linked?.commercial_order_id===other.order_id&&
+      stored.status==="awaiting_payment"&&stored.amount_ars===total)
+    return json({created:true,idempotent:true,commercial_order_id:other.order_id,
+     amount_ars:stored.amount_ars,state:stored.status,checkoutEnabled:false,paymentAuthorized:false});
   }
   return json({error:"Pedido concurrente o recepción reutilizada"},409);
  }
