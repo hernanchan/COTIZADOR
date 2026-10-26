@@ -39,8 +39,9 @@ Abrir carga múltiple con detección automática de medidas, CAD/Póster y rollo
 Este módulo calcula importes preliminares sin transmitir archivos. El registro de ploteos
 en D1 sigue desactivado hasta validar la recepción y el precio final del servidor.</p>
 </section></div>
-<main><section class="panel"><h2>Cotizador original, funciones completas</h2>
-<iframe id="base" title="Cotizador V2 de prueba" src="/prueba-v2/cotizador?integrado=1&ensayoArchivos=1" loading="eager"></iframe></section>
+<main><section class="panel"><h2>Cotizador inteligente de varios PDF</h2>
+<iframe id="smart" title="Análisis automático de PDF, tamaños, CAD y póster" src="/prueba-v2/carga-inteligente" loading="eager"></iframe>
+<p><small>Clasificación CAD/Póster y selección automática del rollo. Los ploteos todavía no se envían al registro privado.</small></p></section>
 <section class="panel">
 <h2>Recepción de PDF por trabajo</h2>
 <div class="warning">Para este ensayo, seleccioná nuevamente cada PDF y confirmá formato, caras, copias y anillado para comparar con el cotizador original. Se comprueba su SHA-256; no sirve otro PDF con el mismo nombre. Hasta confirmar el recibo sigue pendiente.</div>
@@ -55,11 +56,16 @@ en D1 sigue desactivado hasta validar la recepción y el precio final del servid
 <p id="register-status" role="status" aria-live="polite" class="state">Disponible únicamente cuando todos los PDF estén verificados. Sin pagos.</p>
 <p><small>No se transmite ningún PDF a la tienda pública. La verificación de Drive y el presupuesto preliminar del servidor son ensayos; D1 y los cobros siguen separados.</small></p>
 </section></main>
+<details style="max-width:1110px;margin:10px auto 25px;padding:0 14px"><summary style="cursor:pointer">Cotizador original (comparación comercial)</summary>
+<iframe id="base" title="Cotizador original de comparación" src="/prueba-v2/cotizador?integrado=1&ensayoArchivos=1" loading="lazy"></iframe>
+</details>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 <script type="module">
 import {subirYVincularPdfCotizadorV2} from '/prueba-v2/subir-vincular-pdf.mjs';
 import {prepararManifiestoDocumentalV2} from '/prueba-v2/preparar-manifiesto.mjs';
-const list=document.getElementById('all'),status=document.getElementById('state'),frame=document.getElementById('base'),summary=document.getElementById('order-summary');
+const list=document.getElementById('all'),status=document.getElementById('state'),
+ frame=document.getElementById('base'),smart=document.getElementById('smart'),
+ summary=document.getElementById('order-summary');
 const registerButton=document.getElementById('register-private'),registerStatus=document.getElementById('register-status');
 const sendAllButton=document.getElementById('send-all-pdf'),batchProgress=document.getElementById('batch-progress');
 let batchSending=false;
@@ -246,10 +252,21 @@ function render(){
     }catch(_){msg.textContent='No fue posible obtener los papeles del catálogo. No se puede presupuestar.'}
    };
    formato.addEventListener('change',updatePaper);
-   void updatePaper();
+   if(d.opcionesInteligentes?.formato)formato.value=d.opcionesInteligentes.formato;
+   void updatePaper().then(()=>{
+    if(d.opcionesInteligentes?.materialColor&&
+       [...papel.options].some(o=>o.value===d.opcionesInteligentes.materialColor))
+     papel.value=d.opcionesInteligentes.materialColor;
+   });
    const caras=field('Caras', [['simple','Simple faz'],['double','Doble faz']]);
    const copias=field('Copias', Array.from({length:200},(_,i)=>[String(i+1),String(i+1)]));
    const anillado=field('Anillado', [['ninguno','Sin anillado'],['juntos','Anillado conjunto']]);
+   if(d.opcionesInteligentes){
+    mode.value=d.opcionesInteligentes.modo;
+    caras.value=d.opcionesInteligentes.caras;
+    copias.value=String(d.opcionesInteligentes.copias);
+    anillado.value='ninguno';
+   }
    const btn=document.createElement('button');btn.type='button';btn.textContent='Reintentar solamente este PDF';
    btn.hidden=true;
    const msg=document.createElement('p');msg.className='state';
@@ -391,8 +408,58 @@ registerButton.addEventListener('click',async()=>{
    '. No se autorizó ningún cobro.';
  }finally{registering=false;updateSummary();}
 });
-window.addEventListener('message',event=>{
- if(event.origin!==location.origin||event.source!==frame.contentWindow)return;
+window.addEventListener('message',async event=>{
+ if(event.origin!==location.origin)return;
+ if(event.source===smart.contentWindow&&event.data?.type==='SABER_SMART_DOCUMENTS_TO_PRIVATE'){
+  const payload=event.data;
+  if(batchSending||registering||registeredOrder||!Array.isArray(payload.files)||
+     !Array.isArray(payload.options)||payload.files.length!==payload.options.length||
+     payload.files.length<1||payload.files.length>30||
+     !Number.isSafeInteger(payload.total)||payload.total<1){
+   batchStatus.textContent='Pedido inteligente inválido o recepción ocupada.';return;
+  }
+  const existing=all.flatMap(item=>item.references).length;
+  if(existing+payload.files.length>30){
+   batchStatus.textContent='El pedido supera los 30 PDF permitidos.';return;
+  }
+  // Ningún dato de la clasificación preliminar se trata como precio confirmado.
+  try{
+   const drafts=[],refs=new Set();
+   for(let i=0;i<payload.files.length;i++){
+    const file=payload.files[i],opt=payload.options[i];
+    if(!(file instanceof File)||!opt||file.size<5||file.size>20*1024*1024||
+       file.name!==opt.nombre||file.name.length>120||!/\\.pdf$/i.test(file.name)||
+       !Number.isSafeInteger(opt.paginas)||opt.paginas<1||opt.paginas>2000||
+       !['a4','a3'].includes(opt.formato)||
+       !['bn','color'].includes(opt.modo)||
+       !['simple','double'].includes(opt.caras)||
+       !Number.isSafeInteger(opt.copias)||opt.copias<1||opt.copias>200||
+       typeof opt.materialColor!=='string'||opt.materialColor.length>120)
+     throw Error('Un PDF o sus opciones no cumplen los límites del receptor privado.');
+    const header=new Uint8Array(await file.slice(0,5).arrayBuffer());
+    if(String.fromCharCode(...header)!=='%PDF-')
+     throw Error('Un archivo no tiene cabecera PDF válida.');
+    const sha=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',
+      await file.arrayBuffer())),n=>n.toString(16).padStart(2,'0')).join('');
+    const localRef=crypto.randomUUID();
+    if(refs.has(localRef)||used.has(localRef))throw Error('Referencia local duplicada.');
+    refs.add(localRef);
+    drafts.push({itemIndex:i,archivoLocal:file,opcionesInteligentes:opt,
+     reference:{schema:'saber-pdf-local-pendiente-v1',localRef,
+      nombre:file.name,bytes:file.size,paginas:opt.paginas,sha256:sha,
+      estado:'PENDIENTE_DE_ENVIO',recibido:false,verificadoServidor:false}});
+   }
+   drafts.forEach(d=>used.add(d.reference.localRef));
+   all.push({name:'Pedido inteligente · '+drafts.length+' PDF',
+    price:payload.total,references:drafts});
+   save();render();updateSummary();
+   status.textContent='Se asociaron '+drafts.length+
+    ' PDF con la cotización inteligente. Verificá las opciones y pulsá Enviar todos los PDF del pedido.';
+   batchStatus.textContent=drafts.length+' PDF listos para enviar, sin seleccionarlos otra vez.';
+  }catch(error){batchStatus.textContent='No se preparó la carga: '+String(error.message||error)}
+  return;
+ }
+ if(event.source!==frame.contentWindow)return;
  if(event.data?.type==='SABER_ARCHIVO_PDF_PRIVADO'){
   const {localRef,file}=event.data;
   if(!(file instanceof File)||typeof localRef!=='string')return;
