@@ -51,11 +51,14 @@ export async function subirYVincularPdfCotizadorV2({
     !archivo||archivo.name!==r.nombre||archivo.size!==r.bytes||
     typeof archivo.arrayBuffer!=='function'||
     !WEB.test(orderId||'')||!['bn','color'].includes(modo)||
-    typeof turnstileToken!=='string'||turnstileToken.length<10||
+    (sesionPrevia===null&&(typeof turnstileToken!=='string'||turnstileToken.length<10))||
     typeof onProgress!=='function'||typeof onSession!=='function'||
    (sesionPrevia!==null&&(!RECEIPT.test(sesionPrevia?.uploadId||'')||
     typeof sesionPrevia.token!=='string'||sesionPrevia.token.length<16||
-    sesionPrevia.token.length>256)))
+    sesionPrevia.token.length>256||
+    sesionPrevia.orderId!==orderId||sesionPrevia.localRef!==r.localRef||
+    sesionPrevia.sha256!==r.sha256||sesionPrevia.modo!==modo||
+    sesionPrevia.opcionesKey!==JSON.stringify(opciones??null))))
   throw Error('El archivo, el trabajo o la verificación no corresponden.');
  if(opciones!==undefined&&(!opciones||typeof opciones!=='object'||Array.isArray(opciones)||
     Object.keys(opciones).sort().join(',')!=='anillado,caras,copias,formato,materialColor'||
@@ -96,12 +99,14 @@ export async function subirYVincularPdfCotizadorV2({
  }
  // Guardar exclusivamente en memoria de la página tras verificar SHA local.
  // Si falla una transferencia, la próxima llamada consulta partes existentes.
- onSession(Object.freeze({...session}));
+ onSession(Object.freeze({...session,orderId,localRef:r.localRef,
+  sha256:r.sha256,modo,opcionesKey:JSON.stringify(opciones??null)}));
  const status=await rpc('/api/ensayo-pdf-ampliado',{op:'status',...session});
  if(status.uploadId!==session.uploadId||
     !Array.isArray(status.acceptedParts))
   throw Error('El estado de subida es incoherente.');
  const accepted=new Set(status.acceptedParts);
+ onProgress({phase:'estado',completed:accepted.size,total:parts});
  if(accepted.size!==status.acceptedParts.length||
     [...accepted].some(i=>!Number.isSafeInteger(i)||i<0||i>=parts))
   throw Error('El servidor informó fragmentos incompatibles.');
