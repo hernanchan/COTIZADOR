@@ -6,7 +6,7 @@ test('el resumen del carrito privado aparece al abrir y al restaurar',()=>{
  const html=paginaCotizadorV2PruebaPrivada('turnstile-site-key-test-2026');
  assert.match(html,/id="order-summary"/);
  assert.match(html,/function updateSummary\(\)/);
- const init=html.indexOf('updateSummary();\nwindow.addEventListener');
+ const init=html.indexOf('updateSummary();\nregisterButton.addEventListener');
  assert.ok(init>0,'el resumen se calcula aun si no se agregaron archivos');
  assert.match(html,/Cotización del servidor para archivos verificados:/);
  assert.match(html,/Registro en Central D1: PENDIENTE/);
