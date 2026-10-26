@@ -1,0 +1,74 @@
+name: Saber - habilitar compuertas de pedidos privados sin cobros
+on:
+  push:
+    branches: [polaroids/express-pdf-unico-20261023]
+    paths: [.github/workflows/saber-activar-compuertas-d1-privadas.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  statuses: write
+jobs:
+  enable:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Activar exclusivamente compuertas protegidas; conservar bindings
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts"
+          for worker in saber-pagos-pruebas saber-documentos-pruebas; do
+            curl -fsS --max-time 20 -H "Authorization: Bearer $TOKEN" "$root/$worker/settings" -o /tmp/settings-before.json
+            jq -e '.success==true and (.result.bindings|type=="array")' /tmp/settings-before.json >/dev/null
+            if [ "$worker" = saber-pagos-pruebas ]; then
+              jq -e '.result.bindings | any(.name=="DB") and any(.name=="CENTRAL_BRIDGE_KEY")' /tmp/settings-before.json >/dev/null
+              jq -e '.result.bindings | all(select(.name=="PAYMENTS_ENABLED" or .name=="MP_CHECKOUT_ENABLED"); .text!="true" and .text!="1" and .text!="PRIVATE_TEST_ONLY")' /tmp/settings-before.json >/dev/null
+              flags='["CENTRAL_PREPARE_ENABLED"]'
+            else
+              jq -e '.result.bindings | any(.name=="SABER_CENTRAL") and any(.name=="DOCS_CENTRAL_ADMIN_KEY") and any(.name=="CENTRAL_BRIDGE_KEY") and any(.name=="DOCS_SCRIPT_URL") and any(.name=="DOCS_RELAY_KEY")' /tmp/settings-before.json >/dev/null
+              flags='["DOCS_V2_RECEIPT_LINK_ENABLED","DOCS_EXTENDED_RECEIVER_ENABLED","DOCS_CENTRAL_SYNC_ENABLED","DOCS_ORDER_PREPARE_ENABLED"]'
+            fi
+            echo "$flags" >/tmp/flags.json
+            jq -n --slurpfile prev /tmp/settings-before.json --slurpfile flags /tmp/flags.json '
+              {settings:{bindings: (
+                [ $prev[0].result.bindings[]
+                 | select(.name as $name | ($flags[0]|index($name))==null)
+                 | {name,type:"inherit"} ] +
+                [ $flags[0][] | {name:.,type:"plain_text",text:"PRIVATE_TEST_ONLY"} ]
+              )}}' >/tmp/patch.json
+            http=$(curl --silent --show-error --max-time 25 --output /tmp/patch-response.json --write-out '%{http_code}' -X PATCH -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' --data-binary @/tmp/patch.json "$root/$worker/settings")
+            if [ "$http" != "200" ] || ! jq -e '.success==true' /tmp/patch-response.json >/dev/null; then
+              echo "FLAG_UPDATE_FAILED_$worker HTTP_$http"
+              jq -c '{errors:[.errors[]?|{code,message}]}' /tmp/patch-response.json
+              exit 1
+            fi
+            curl -fsS --max-time 20 -H "Authorization: Bearer $TOKEN" "$root/$worker/settings" -o /tmp/settings-after.json
+            jq -e --slurpfile prev /tmp/settings-before.json --slurpfile flags /tmp/flags.json '
+              .success==true and
+              ([.result.bindings[]|.name]|sort)==(
+                 ([ $prev[0].result.bindings[]|.name ] + $flags[0])|unique|sort
+              ) and
+              ([ $flags[0][] as $flag | .result.bindings[]|select(.name==$flag)|
+                select(.type=="plain_text" and .text=="PRIVATE_TEST_ONLY") ]|length)==($flags[0]|length)
+              ' /tmp/settings-after.json >/dev/null || { echo "FLAG_VERIFY_FAILED_$worker"; exit 1; }
+            echo "PRIVATE_FLAGS_CONFIGURED_$worker"
+          done
+          echo "NO_PUBLIC_WEB_NO_REAL_PAYMENTS"
+      - name: Registrar compuertas privadas
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_SHA: ${{ github.sha }}
+          STATUS: ${{ job.status }}
+        run: |
+          if [ "$STATUS" = success ]; then state=success; description="Compuertas D1 de prueba configuradas sin pagos"; else state=failure; description="Revisar configuracion privada D1"; fi
+          jq -n --arg state "$state" --arg context 'saber-d1/private-gates' --arg description "$description" --arg target_url "https://github.com/$GH_REPO/actions/runs/$GITHUB_RUN_ID" '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/status.json
+          gh api -X POST "repos/$GH_REPO/statuses/$GH_SHA" --input /tmp/status.json
