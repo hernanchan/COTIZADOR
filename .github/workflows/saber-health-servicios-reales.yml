@@ -29,6 +29,15 @@ jobs:
           SABER_CF_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
           SABER_CF_EDITOR_TOKEN: ${{ secrets.SABER_CF_EDITOR_TOKEN }}
         run: node integraciones/cloudflare-ensayo/auditar-compuertas-ensayo-get.mjs
+      - name: Comprobar que se vinculó el secreto temporal
+        env:
+          TEMP_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          if [ -z "$TEMP_TOKEN" ]; then
+            echo "TEMP_SECRET_NOT_AVAILABLE"
+            exit 1
+          fi
+          echo "TEMP_SECRET_PRESENT"
       - name: Registrar resultado comprobación real
         if: always()
         env:
