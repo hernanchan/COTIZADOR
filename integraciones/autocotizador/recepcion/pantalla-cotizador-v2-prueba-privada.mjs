@@ -35,12 +35,13 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <div class="cf-turnstile" data-sitekey="${sitekey}" data-action="documentos"></div>
 <div id="all" role="list" aria-label="Trabajos del cotizador"></div>
 <p id="state" role="status" aria-live="polite" class="state">Cotizá una impresión y agregala al pedido de prueba.</p>
+<section id="order-summary" class="warning" aria-label="Resumen privado del pedido" aria-live="polite"></section>
 <p><small>No se transmite ningún PDF a la tienda pública. La verificación de Drive y el presupuesto preliminar del servidor son ensayos; D1 y los cobros siguen separados.</small></p>
 </section></main>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 <script type="module">
 import {subirYVincularPdfCotizadorV2} from '/prueba-v2/subir-vincular-pdf.mjs';
-const list=document.getElementById('all'),status=document.getElementById('state'),frame=document.getElementById('base');
+const list=document.getElementById('all'),status=document.getElementById('state'),frame=document.getElementById('base'),summary=document.getElementById('order-summary');
 // Recuperación de metadatos no sensibles tras recarga o suspensión móvil.
  // Nunca conservar objetos File, base64, sesiones, credenciales ni confirmaciones.
 const RECOVERY_KEY='saber-v2-ensayo-metadatos-v1';
@@ -95,6 +96,24 @@ function save(){
   const encoded=JSON.stringify({orderId,items,savedAt:Date.now()});
   if(encoded.length<=RECOVERY_MAX_BYTES)sessionStorage.setItem(RECOVERY_KEY,encoded);
  }catch{/* Modo privado o cuota: la cotización sigue funcionando sin persistencia. */}
+}
+function updateSummary(){
+ const allRefs=all.flatMap(item=>item.references);
+ const verified=allRefs.filter(d=>d.confirmacion?.reciboGoogleVerificado===true&&
+  d.confirmacion?.paymentAuthorized===false&&
+  d.confirmacion?.cotizacionServidor?.estado==='PRELIMINAR_VERIFICADA_SIN_PEDIDO');
+ const value=verified.reduce((n,d)=>n+d.confirmacion.cotizacionServidor.totalArs,0);
+ const amount=Number.isSafeInteger(value)?new Intl.NumberFormat('es-AR',{
+  style:'currency',currency:'ARS',maximumFractionDigits:0}).format(value):'Requiere revisión';
+ const remaining=allRefs.length-verified.length;
+ summary.replaceChildren();
+ const title=document.createElement('strong');
+ title.textContent='Resumen del pedido · '+verified.length+' de '+allRefs.length+' PDF verificados';
+ const detail=document.createElement('p');
+ detail.textContent='Cotización del servidor para archivos verificados: '+amount+
+  '. '+(remaining?'Faltan '+remaining+' PDF.':'Todos los PDF declarados fueron verificados preliminarmente.')+
+  ' Registro en Central D1: PENDIENTE. Pago y producción: DESACTIVADOS.';
+ summary.append(title,detail);
 }
 const catalogPromise=fetch('/prueba-v2/precios-web.json',{credentials:'same-origin'})
  .then(r=>{if(!r.ok)throw Error('Catálogo no disponible');return r.json()});
@@ -166,7 +185,7 @@ function render(){
      msg.textContent='PDF recibido y verificado · '+result.pages+' páginas · recibo '+result.receiptId+
       '. Presupuesto del servidor: '+(quote?moneda(quote.totalArs):'SIN CONFIRMAR')+
       '. '+aviso+' Pedido D1 y autorización de pago: PENDIENTES.';
-     btn.textContent='PDF verificado';d.confirmacion=result;
+     btn.textContent='PDF verificado';d.confirmacion=result;updateSummary();
     }catch(e){
      msg.textContent='No se confirmó la recepción: '+String(e.message||e);
      btn.disabled=false;file.disabled=false;mode.disabled=false;
@@ -204,7 +223,7 @@ window.addEventListener('message',event=>{
  }
  refs.forEach(d=>used.add(d.reference.localRef));
  all.push({name:p.name,price:p.price,references:refs});
- save();
+ save();updateSummary();
  status.textContent='Se agregó un trabajo. Los PDF están pendientes hasta que Google confirme su recepción. Pedido de prueba: '+orderId;
  render();
 });
