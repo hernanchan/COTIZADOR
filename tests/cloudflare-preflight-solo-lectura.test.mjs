@@ -111,3 +111,5 @@ test('auditoría detecta sólo presencia de banderas del probe sin leer valores'
 });
 
 // Auditoría tras habilitación temporal de CENTRAL_BRIDGE_PROBE_ENABLED (26/10/2026).
+
+// Comprobar banderas DOCS_CENTRAL_PROBE_ENABLED y CENTRAL_TEST_URL en Cloudflare (solo GET).
