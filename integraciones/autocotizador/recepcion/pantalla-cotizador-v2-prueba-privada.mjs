@@ -168,7 +168,7 @@ function render(){
    const msg=document.createElement('p');msg.className='state';
    btn.addEventListener('click',async()=>{
     const chosen=file.files?.[0],turnstileToken=window.turnstile?.getResponse();
-    if(!chosen||!turnstileToken||!papel.value){msg.textContent='Seleccioná el PDF y completá la verificación de seguridad.';return}
+    if(!chosen||(!d.sesionTemporal&&!turnstileToken)||!papel.value){msg.textContent='Seleccioná el PDF y completá la verificación de seguridad.';return}
     btn.disabled=true;file.disabled=true;mode.disabled=true;
     for(const control of [formato,caras,copias,anillado,papel])control.disabled=true;
     try{
@@ -178,7 +178,7 @@ function render(){
       origin:location.origin,
       sesionPrevia:d.sesionTemporal||null,
       onSession:s=>{d.sesionTemporal=s;},
-      onProgress:p=>{msg.textContent=p.phase==='transferencia'?'Transferencia: '+p.completed+' de '+p.total+' bloques':p.phase}
+      onProgress:p=>{msg.textContent=['transferencia','estado','reanudacion'].includes(p.phase)?'PDF: '+p.completed+' de '+p.total+' bloques confirmados':p.phase}
      });
      const quote=result.cotizacionServidor;
      const moneda=value=>new Intl.NumberFormat('es-AR',{style:'currency',
