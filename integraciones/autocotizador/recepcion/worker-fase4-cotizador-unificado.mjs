@@ -1301,7 +1301,16 @@ async function apiPrepararDocumentosV2Lote(request,env){
   if(!input||typeof input!=='object'||Array.isArray(input)||
    Object.keys(input).sort().join(',')!=='clientOrderId,items,manifiesto,sesiones'||
    !Array.isArray(input.sesiones)||input.sesiones.length<1||
-   input.sesiones.length>30||input.sesiones.length!==input.manifiesto?.items?.length)
+   input.sesiones.length>30||input.sesiones.length!==input.manifiesto?.items?.length||
+   input.manifiesto.schema!=='saber-v2-manifiesto-preliminar-v1'||
+   !/^WEB-[A-Za-z0-9_-]{5,80}$/.test(input.manifiesto.orderId||'')||
+   !/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(input.clientOrderId||'')||
+   !Array.isArray(input.items)||input.items.length>50||
+   input.manifiesto.items.some((m,i)=>!m||
+    !/^DOC-[a-f0-9-]{36}$/i.test(m.reciboPrivado||'')||
+    input.sesiones[i]?.sesion?.uploadId!==m.reciboPrivado||
+    !/^[a-f0-9]{64}$/.test(m.sha256||''))||
+   new Set(input.manifiesto.items.map(m=>m.reciboPrivado)).size!==input.sesiones.length)
    throw Error('Pedido incorrecto');
  }catch{return testResponse({ok:false,error:'Pedido V2 inválido',paymentAuthorized:false},400);}
  try{
