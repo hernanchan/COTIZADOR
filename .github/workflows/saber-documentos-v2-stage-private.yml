@@ -25,6 +25,8 @@ jobs:
           npm install --no-audit --no-fund
           npm run build:unificado
           grep -q 'ensayo-preparar-documentos-v2-lote' dist/saber-documentos-cotizador-fase4.mjs
+          grep -q 'Arrastrá todos los PDF aquí' dist/saber-documentos-cotizador-fase4.mjs
+          grep -q 'SABER_SOLICITAR_PDF_PRIVADO' dist/saber-documentos-cotizador-fase4.mjs
       - name: Subir version aislada sin desplegar y heredando bindings
         env:
           ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
