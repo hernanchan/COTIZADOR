@@ -29,7 +29,7 @@ jobs:
           node-version: '22'
       - name: Dependencias de compilar Worker documental
         working-directory: integraciones/autocotizador/recepcion
-        run: npm ci --no-audit --no-fund
+        run: npm install --no-audit --no-fund
       - name: Compilar Documentos sin publicar
         working-directory: integraciones/autocotizador/recepcion
         run: npm run build:unificado
