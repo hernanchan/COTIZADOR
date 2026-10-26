@@ -16,7 +16,8 @@ test('bloqueo por 4 compuertas y por contraseña de operador antes de acceder a 
  assert.match(section,/DOCS_CENTRAL_SYNC_ENABLED/);
  assert.match(section,/DOCS_ORDER_PREPARE_ENABLED/);
  assert.match(section,/DOCS_CENTRAL_ADMIN_KEY/);
- assert.ok(section.indexOf('if(difference)')<section.indexOf('fase4FichaCentralLotePrivada('));
+ assert.ok(section.indexOf('v2PrivateBrowserAuthorized(request,env)')<section.indexOf('fase4FichaCentralLotePrivada('));
+ assert.match(section,/if\(difference&&v2PrivateBrowserAuthorized\(request,env\)!=='allow'\)/);
  assert.ok(section.indexOf('fase4FichaCentralLotePrivada(')<section.indexOf('registrarManifiestoV2EnCentral('));
  assert.ok(section.indexOf('registrarManifiestoV2EnCentral(')<section.indexOf('prepararDocumentosCentralFirmado('));
  assert.match(section,/checkoutEnabled:false,paymentAuthorized:false,listoParaProducir:false/);
