@@ -234,3 +234,48 @@ test('al consultar status se informa el progreso confirmado por Google',async()=
   phase:'estado',completed:1,total:2
  });
 });
+
+
+test('si Google acepta un bloque y se pierde la respuesta, consultar estado sin reenviarlo',async()=>{
+ const t=backend(),upstream=t.args.fetcher;
+ let lost=false,attempts=0,statusChecks=0;
+ const fetcher=async(url,opts)=>{
+  const p=JSON.parse(opts.body);
+  if(p.op==='part'&&p.index===0){
+   attempts++;
+   if(!lost){
+    lost=true;
+    await upstream(url,opts); // El servidor lo guardó pero su respuesta se perdió.
+    throw Error('Se interrumpió la respuesta después de guardar el bloque');
+   }
+  }
+  if(p.op==='status'&&lost){
+   statusChecks++;
+   return Response.json({ok:true,uploadId,acceptedParts:[0],receivedBytes:524288});
+  }
+  return upstream(url,opts);
+ };
+ const done=await subirYVincularPdfCotizadorV2({...t.args,fetcher});
+ assert.equal(done.reciboGoogleVerificado,true);
+ assert.equal(attempts,1,'no se reenvía el fragmento ya guardado');
+ assert.ok(statusChecks>=1);
+ assert.ok(t.progress.some(p=>p.phase==='recuperado'));
+ assert.equal(done.paymentAuthorized,false);
+});
+test('si Google no confirma un bloque tras el corte, detener el envío y conservar reintento',async()=>{
+ const t=backend(),upstream=t.args.fetcher;
+ let lost=false,otherSent=false;
+ const fetcher=async(url,opts)=>{
+  const p=JSON.parse(opts.body);
+  if(p.op==='part'&&p.index===0&&!lost){lost=true;throw Error('Red desconectada');}
+  if(p.op==='part'&&p.index===1)otherSent=true;
+  if(p.op==='status'&&lost)return Response.json({ok:true,uploadId,
+   acceptedParts:[],receivedBytes:0});
+  return upstream(url,opts);
+ };
+ let session=null;
+ await assert.rejects(subirYVincularPdfCotizadorV2({...t.args,fetcher,
+  onSession:s=>{session=s;}}),/Red desconectada/);
+ assert.equal(otherSent,false,'no saltear archivos pendientes');
+ assert.equal(session.orderId,orderId);
+});
