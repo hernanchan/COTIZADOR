@@ -36,6 +36,9 @@ jobs:
           jq -e '.success==true' /tmp/secret-response.json >/dev/null || { echo "SECRET_CONFIG_REJECTED"; exit 1; }
           rm -f /tmp/secret-response.json
           echo "PRIVATE_OPERATOR_SECRET_STORED_IN_TEST_WORKER"
+          curl -fsS --max-time 20 -H "Authorization: Bearer $TOKEN" "$root/settings" -o /tmp/check-sitekey.json
+          jq -r '.result.bindings | if any(.[]; .name=="DOCS_TURNSTILE_SITE_KEY") then "TURNSTILE_SITEKEY_PRESENT" else "TURNSTILE_SITEKEY_MISSING" end' /tmp/check-sitekey.json
+          rm -f /tmp/check-sitekey.json
           curl -fsS --max-time 20 -H "Authorization: Bearer $TOKEN" "$root/settings" -o /tmp/settings-before.json
           jq -e '.success==true and (.result.bindings|any(.[];.name=="DOCS_V2_PRIVATE_UI_SECRET"))' /tmp/settings-before.json >/dev/null
           jq -n --slurpfile before /tmp/settings-before.json '{bindings:([ $before[0].result.bindings[]|select(.name!="DOCS_V2_PRIVATE_UI_ENABLED")|{name,type:"inherit"} ] + [{name:"DOCS_V2_PRIVATE_UI_ENABLED",type:"plain_text",text:"PRIVATE_TEST_ONLY"}])}' >/tmp/settings-update.json
@@ -51,6 +54,9 @@ jobs:
           code=$(curl --silent --show-error --max-time 20 --output /tmp/private-home.html --write-out '%{http_code}' --user "operador:$PASSWORD" "$origin/prueba-v2/")
           if [ "$code" != 200 ] || ! grep -aq "Cotizador V2 en ensayo privado" /tmp/private-home.html; then
             echo "PORTAL_AUTH_VERIFICATION_FAILED_HTTP_$code"
+            if grep -aq "Ensayo privado deshabilitado" /tmp/private-home.html; then echo "PORTAL_SWITCH_OFF_OR_INVALID_SECRET"; fi
+            if grep -aq "Turnstile" /tmp/private-home.html; then echo "PORTAL_TURNSTILE_CONFIGURATION_REQUIRED"; fi
+            if grep -aq "No disponible" /tmp/private-home.html; then echo "PORTAL_OTHER_CONFIG_ERROR"; fi
             exit 1
           fi
           echo "PRIVATE_PORTAL_AUTHENTICATED_HTTP_200"
