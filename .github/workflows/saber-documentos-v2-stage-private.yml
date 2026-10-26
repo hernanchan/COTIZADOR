@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  statuses: write
 jobs:
   stage:
     runs-on: ubuntu-latest
@@ -52,3 +53,14 @@ jobs:
           jq -r '.result.id | "PRIVATE_VERSION_STAGED " + .' /tmp/upload-result.json
           rm -f /tmp/bindings.json /tmp/metadata.json /tmp/upload-result.json
           echo "NOT_DEPLOYED_NO_PRODUCTION_NO_PAYMENT"
+      - name: Registrar estado de version pre-despliegue
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_SHA: ${{ github.sha }}
+          STATUS: ${{ job.status }}
+        run: |
+          if [ "$STATUS" = success ]; then state=success; description="Version V2 cargada, sin desplegar"; else state=failure; description="Fallo carga version V2 sin desplegar"; fi
+          jq -n --arg state "$state" --arg context 'saber-documentos/stage-v2' --arg description "$description" --arg target_url "https://github.com/$GH_REPO/actions/runs/$GITHUB_RUN_ID" '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/saber-stage-status.json
+          gh api -X POST "repos/$GH_REPO/statuses/$GH_SHA" --input /tmp/saber-stage-status.json
