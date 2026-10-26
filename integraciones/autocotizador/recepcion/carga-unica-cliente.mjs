@@ -30,6 +30,18 @@ function importeArchivo(indice){
  if(plan.destino==='documentos'&&entries[indice].anillado==='grupo')return 'Incluido en el grupo';
  return d?pesos(d.subtotal):null;
 }
+// Sólo proponemos medidas reconocibles con tolerancia para CropBox y escaneos.
+/// Otros tamaños requieren confirmación explícita antes de cotizar.
+function tamañoEstandar(paginas){
+ if(!paginas?.length)return null;
+ const coincide=(p,a,b,margen)=>{
+  const x=Math.min(p.anchoCm,p.altoCm),y=Math.max(p.anchoCm,p.altoCm);
+  return Math.abs(x-a)<=margen&&Math.abs(y-b)<=margen;
+ };
+ if(paginas.every(p=>coincide(p,21,29.7,0.35)))return 'a4';
+ if(paginas.every(p=>coincide(p,29.7,42,0.35)))return 'a3';
+ return null;
+}
 const formatoOriginal=paginas=>{const v=paginas.map(p=>{const a=Math.min(p.anchoCm,p.altoCm),b=Math.max(p.anchoCm,p.altoCm);return Math.abs(a-21)<0.2&&Math.abs(b-29.7)<0.2?'a4':Math.abs(a-29.7)<0.2&&Math.abs(b-42)<0.2?'a3':null});return v.every(x=>x===v[0])?v[0]:null};
 const valor=(label,options,selected,change)=>{const l=texto('label',label+' '),sel=document.createElement('select');for(const [k,v] of options)sel.add(new Option(v,k));sel.value=selected;sel.onchange=()=>change(sel.value);l.append(sel);return l};
 function paginasElegidas(e){try{return seleccionarPaginas(e.paginas,e.paginasSeleccionadas)}catch(_){return null}}
@@ -166,10 +178,13 @@ $('archivos').addEventListener('change',async ev=>{
    e.paginas=x.paginas.map(p=>({...p,modo:'sin-clasificar'}));
    try{const clases=await clasificarPaginasPloteo(files[i]);for(const c of clases){if(['cad','poster'].includes(c.modo))e.paginas[c.numero-1].modo=c.modo;}}catch(_){}
    const suggested=clasificarDestino(e.paginas);
-   // No adivinar tamaño final, incluso cuando el PDF parece A4.
+   // Autodetección en formatos inequívocos; tamaños especiales siguen pendientes.
    e.requiereConfirmacion=suggested.requiereConfirmacion;
-   if(e.paginas.every(p=>Math.abs(Math.min(p.anchoCm,p.altoCm)-21)<0.2&&Math.abs(Math.max(p.anchoCm,p.altoCm)-29.7)<0.2))e.seleccion='a4';
-   else if(e.paginas.every(p=>Math.abs(Math.min(p.anchoCm,p.altoCm)-29.7)<0.2&&Math.abs(Math.max(p.anchoCm,p.altoCm)-42)<0.2))e.seleccion='a3';
+   const estandar=tamañoEstandar(e.paginas);
+   if(estandar)e.seleccion=estandar;
+   else if(e.paginas.some(p=>Math.max(p.anchoCm,p.altoCm)>42.03||
+       Math.min(p.anchoCm,p.altoCm)>29.73))
+    e.seleccion='original';
   }catch(ex){e.error=String(ex.message||ex)}
   render();
  }
@@ -181,7 +196,16 @@ async function cotizar(){
  $('resumenPedido').replaceChildren();
  ultimoPresupuesto=null;
  if(leyendo||!entries.length){out.textContent='Esperando archivos…';return}
- if(entries.some(e=>e.error||!e.paginas)){out.textContent='Hay documentos sin analizar correctamente. No se puede cotizar el conjunto.';return}
+ if(entries.some(e=>e.error||!e.paginas)){
+  const problem=entries.filter(e=>e.error||!e.paginas);
+  out.replaceChildren(texto('strong','Revisar '+problem.length+' archivo(s) antes de calcular el total'));
+  for(const e of problem){
+   const note=texto('p',e.name+' · '+(e.error||'El análisis del PDF todavía no terminó.'));
+   note.className='advertencia';out.append(note);
+  }
+  out.append(texto('p','Los otros PDF siguen cargados. No tenés que volver a seleccionarlos.'));
+  return;
+ }
  out.textContent='Calculando importes preliminares…';
  for(const e of entries){
   if(!e.paginas||e.modo!=='color')continue;
@@ -197,7 +221,11 @@ async function cotizar(){
  $('prepararPedido').disabled=!(d.estado==='PRELIMINAR'&&Number.isSafeInteger(d.total)&&d.total>0&&entries.every(e=>e.archivoOriginal));
  const ars=v=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(v);
  out.replaceChildren(texto('strong',d.total===null?'TOTAL INCOMPLETO':'TOTAL PRELIMINAR: '+ars(d.total)),texto('p','Impresiones (incluye anillados): '+ars(d.subtotalImpresiones)+' · Ploteos: '+ars(d.subtotalPloteos)+' · Stickers: '+ars(d.subtotalStickers||0)+' · Fotos: '+ars(d.subtotalFotos||0)+' · Corte: '+ars(d.subtotalCortes||0)+' · Gráfica: '+ars(d.subtotalGraficas||0)),texto('p','Anillados incluidos: '+ars(d.subtotalAnillados)));
- for(const p of d.pendientes)out.append(texto('p',p.nombre+': '+p.motivo));
+ for(const p of d.pendientes){
+  const warning=texto('p',p.nombre+': '+p.motivo+
+   '. Tocá Editar en ese archivo; el resto mantiene sus configuraciones.');
+  warning.className='advertencia';out.append(warning);
+ }
  if(d.plan.length)out.append(texto('p','Precio orientativo. Los archivos no se enviaron ni se autoriza el cobro.'));
  render();
  }catch(e){if(n===version){out.textContent='No fue posible cotizar: '+String(e.message||e);render()}}
