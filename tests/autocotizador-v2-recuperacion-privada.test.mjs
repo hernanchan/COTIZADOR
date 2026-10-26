@@ -6,7 +6,7 @@ const html=paginaCotizadorV2PruebaPrivada('0x4AAAAA_PRIVATESITEKEY_0123456789');
 const match=html.match(/<script type="module">([\s\S]*?)<\/script>/);
 test('script del portal V2 se analiza sintácticamente en el navegador',()=>{
  assert.ok(match,'Debe existir script de módulo');
- const clean=match[1].replace(/^import\s+\{[^}]+\}\s+from\s+[^;]+;\s*/,'');
+ const clean=match[1].replace(/^import[^\n]*;\s*/m,'');
  assert.doesNotThrow(()=>new vm.Script(clean),'JavaScript de la pantalla debe parsear');
 });
 test('recupera solo referencias PDF, nunca bytes ni credenciales',()=>{
