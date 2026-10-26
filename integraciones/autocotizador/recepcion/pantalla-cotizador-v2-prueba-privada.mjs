@@ -46,7 +46,7 @@ import {subirYVincularPdfCotizadorV2} from '/prueba-v2/subir-vincular-pdf.mjs';
 import {prepararManifiestoDocumentalV2} from '/prueba-v2/preparar-manifiesto.mjs';
 const list=document.getElementById('all'),status=document.getElementById('state'),frame=document.getElementById('base'),summary=document.getElementById('order-summary');
 const registerButton=document.getElementById('register-private'),registerStatus=document.getElementById('register-status');
-const clientOrderId=crypto.randomUUID();
+const newClientOrderId=()=>crypto.randomUUID();
 let registering=false,registeredOrder=null;
 // Recuperación de metadatos no sensibles tras recarga o suspensión móvil.
  // Nunca conservar objetos File, base64, sesiones, credenciales ni confirmaciones.
@@ -69,6 +69,7 @@ function restore(){
   if(!raw||raw.length>RECOVERY_MAX_BYTES)return null;
   const state=JSON.parse(raw);
   if(!state||!/^WEB-ENSAYO-[A-F0-9]{32}$/.test(state.orderId||'')||
+    !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(state.clientOrderId||'')||
     !Number.isSafeInteger(state.savedAt)||Date.now()-state.savedAt<0||
     Date.now()-state.savedAt>RECOVERY_MAX_AGE||!Array.isArray(state.items)||
     state.items.length>30)return null;
@@ -89,10 +90,11 @@ function restore(){
    }
    items.push({name:item.name,price:item.price,references:refs});
   }
-  return {orderId:state.orderId,items,seen};
+  return {orderId:state.orderId,clientOrderId:state.clientOrderId,items,seen};
  }catch{return null}
 }
 const previous=restore(),orderId=previous?.orderId||newOrderId();
+const clientOrderId=previous?.clientOrderId||newClientOrderId();
 const all=previous?.items||[],used=previous?.seen||new Set();
 function save(){
  try{
@@ -102,7 +104,7 @@ function save(){
     bytes:d.reference.bytes,paginas:d.reference.paginas,sha256:d.reference.sha256,
     estado:'PENDIENTE_DE_ENVIO',recibido:false,verificadoServidor:false
    }}))}));
-  const encoded=JSON.stringify({orderId,items,savedAt:Date.now()});
+  const encoded=JSON.stringify({orderId,clientOrderId,items,savedAt:Date.now()});
   if(encoded.length<=RECOVERY_MAX_BYTES)sessionStorage.setItem(RECOVERY_KEY,encoded);
  }catch{/* Modo privado o cuota: la cotización sigue funcionando sin persistencia. */}
 }
