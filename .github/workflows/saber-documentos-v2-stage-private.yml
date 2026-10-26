@@ -31,6 +31,8 @@ jobs:
           echo 'PDF_MEMORY_BRIDGE_VERIFIED'
           grep -Fq 'send-all-pdf' dist/saber-documentos-cotizador-fase4.mjs
           echo 'SINGLE_SEND_BUTTON_VERIFIED'
+          grep -Fq '/prueba-v2/carga-inteligente' dist/saber-documentos-cotizador-fase4.mjs
+          echo 'INTELLIGENT_QUOTER_PRIVATE_ROUTE_VERIFIED'
       - name: Subir version aislada sin desplegar y heredando bindings
         env:
           ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
