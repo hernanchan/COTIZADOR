@@ -810,3 +810,62 @@ test('V2 multifichero: manifiesto verificado -> Central D1 local -> recuperació
   else env.CENTRAL_PREPARE_ENABLED=previous;
  }
 });
+
+
+test('carrera D1: reintento sólo confirma el pedido realmente guardado y su importe',async()=>{
+ const doc=JSON.parse(JSON.stringify(packet));
+ doc.orderId='WEB-ENSAYO-CARRERA-D1-20261026';
+ doc.ficha.orderId=doc.orderId;
+ doc.recibos[0].receiptId='DOC-99999991-1234-4234-8234-1234567890ab';
+ doc.recibos[1].receiptId='DOC-99999992-1234-4234-8234-1234567890ab';
+ doc.ficha.trabajos[0].reciboPrivado=doc.recibos[0].receiptId;
+ doc.ficha.trabajos[1].reciboPrivado=doc.recibos[1].receiptId;
+ assert.equal((await call('/internal/central/stage',doc)).status,201);
+ const originalFlag=env.CENTRAL_PREPARE_ENABLED;
+ const originalDB=env.DB;
+ env.CENTRAL_PREPARE_ENABLED='PRIVATE_TEST_ONLY';
+ const payload={webOrderId:doc.orderId,clientOrderId:randomUUID(),items:[]};
+ try{
+  const first=await call('/internal/central/prepare-order',payload);
+  assert.equal(first.status,201,JSON.stringify(first.result));
+  const orderId=first.result.commercial_order_id;
+  const initial=first.result.amount_ars;
+  const originalPrepare=originalDB.prepare.bind(originalDB);
+  // Simula dos Workers que consultan a la vez: el segundo no ve todavía
+  // cart_requests antes de intentar INSERT, pero el primer pedido ya existe.
+  function hideFirstRead(){
+   let once=true;
+   env.DB={...originalDB,prepare(sql){
+    const statement=originalPrepare(sql);
+    if(once&&sql.includes('FROM cart_requests WHERE client_order_id=?')){
+     once=false;
+     return {bind(...args){
+      statement.bind(...args);
+      return {...statement,first:async()=>null};
+     }};
+    }
+    return statement;
+   }};
+  }
+  hideFirstRead();
+  const collision=await call('/internal/central/prepare-order',payload);
+  assert.equal(collision.status,200,JSON.stringify(collision.result));
+  assert.equal(collision.result.idempotent,true);
+  assert.equal(collision.result.commercial_order_id,orderId);
+  assert.equal(collision.result.amount_ars,initial);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM orders WHERE id=?').get(orderId).n,1);
+  // Si la transacción ganadora hubiera grabado otro importe, nunca
+  // devolver éxito desde la rama que recupera la colisión.
+  db.prepare('UPDATE orders SET amount_ars=?, deposit_ars=? WHERE id=?')
+   .run(initial+100,initial+100,orderId);
+  hideFirstRead();
+  const mismatch=await call('/internal/central/prepare-order',payload);
+  assert.equal(mismatch.status,409);
+  db.prepare('UPDATE orders SET amount_ars=?, deposit_ars=? WHERE id=?')
+   .run(initial,initial,orderId);
+ }finally{
+  env.DB=originalDB;
+  if(originalFlag===undefined)delete env.CENTRAL_PREPARE_ENABLED;
+  else env.CENTRAL_PREPARE_ENABLED=originalFlag;
+ }
+});
