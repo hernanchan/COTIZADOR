@@ -109,3 +109,5 @@ test('auditoría detecta sólo presencia de banderas del probe sin leer valores'
  assert.equal(found.workers[1].documentsBindingsPresent.DOCS_CENTRAL_ADMIN_KEY,true);
  assert.doesNotMatch(JSON.stringify(found),/PRIVATE_TEST_ONLY|saber-pagos-pruebas.*workers.dev|secret/);
 });
+
+// Auditoría tras habilitación temporal de CENTRAL_BRIDGE_PROBE_ENABLED (26/10/2026).
