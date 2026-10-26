@@ -40,7 +40,7 @@ for(const t of targets){
  const bytes=await readFile(t.path);
  if(bytes.length<500||bytes.length>3_000_000)throw Error(t.name+': compilado fuera de rango.');
  const src=bytes.toString('utf8');
- if(!(/export\\s+default|export\\s*\\{/.test(src)))throw Error(t.name+': módulo inválido.');
+ if(!(/export\s+default|export\s*\{/.test(src)))throw Error(t.name+': módulo inválido.');
  const essential=t.name==='saber-pagos-pruebas'?'/internal/central/bridge-probe':'/api/ensayo-probar-puente-central';
  if(!src.includes(essential))throw Error(t.name+': falta ruta de diagnóstico.');
  plan.push({...t,bytes,bindings:settings.bindings.map(b=>({name:b.name,type:'inherit'}))});
