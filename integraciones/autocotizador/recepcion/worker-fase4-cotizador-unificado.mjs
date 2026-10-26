@@ -13,6 +13,7 @@ import {fase4FichaCentralLotePrivada} from './fase4-ficha-central-lote-privada.m
 import {enviarCentralFirmada} from './enviar-central-firmada.mjs';
 import {prepararMixtoCentralFirmado} from './preparar-mixto-central.mjs';
 import {prepararDocumentosCentralFirmado} from './preparar-documentos-central.mjs';
+import {registrarManifiestoV2EnCentral} from './registrar-manifiesto-v2-central.mjs';
 import {probarPuenteCentral} from './probar-puente-central.mjs';
 import {componerDesdeReciboVerificado} from './componer-desde-recibo-verificado.mjs';
 import {guardarPdfCompuestoPrivado} from './guardar-pdf-compuesto-privado.mjs';
@@ -1266,6 +1267,66 @@ async function apiFichaCentralPrivada(request,env,sincronizar=false,mixto=false,
 }
 
 /**
+ * Compra documental V2 de VARIOS PDFs, privada y apagada por defecto.
+ * Cada PDF se descarga/verifica desde GAS/Drive con SHA y páginas; sólo
+ * después se compara con el manifiesto del carrito y se registra en D1.
+ * El importe proviene exclusivamente del servidor, no del navegador.
+ */
+async function apiPrepararDocumentosV2Lote(request,env){
+ if(request.method!=='POST')return closed();
+ if(!allowed(request,env))
+  return testResponse({ok:false,error:'Origen no permitido',paymentAuthorized:false},403);
+ const key=env?.DOCS_CENTRAL_ADMIN_KEY;
+ if(typeof key!=='string'||key.length<32||key===env.DOCS_RELAY_KEY||
+    key===env.CENTRAL_BRIDGE_KEY)
+  return testResponse({ok:false,error:'Acceso privado apagado',paymentAuthorized:false},503);
+ const expected='Bearer '+key,auth=request.headers.get('Authorization')||'';
+ let difference=auth.length===expected.length?0:1;
+ for(let i=0;i<expected.length;i++)
+  difference|=expected.charCodeAt(i)^(auth.charCodeAt(i)||0);
+ if(difference)return testResponse({ok:false,error:'Autorización requerida',paymentAuthorized:false},401);
+ if(env?.DOCS_V2_RECEIPT_LINK_ENABLED!=='PRIVATE_TEST_ONLY'||
+    env?.DOCS_EXTENDED_RECEIVER_ENABLED!=='PRIVATE_TEST_ONLY'||
+    env?.DOCS_CENTRAL_SYNC_ENABLED!=='PRIVATE_TEST_ONLY'||
+    env?.DOCS_ORDER_PREPARE_ENABLED!=='PRIVATE_TEST_ONLY')
+  return testResponse({ok:false,error:'Carrito V2 privado apagado',paymentAuthorized:false},503);
+ let input;
+ try{
+  input=await readLimited(request);
+  if(!input||typeof input!=='object'||Array.isArray(input)||
+   Object.keys(input).sort().join(',')!=='clientOrderId,items,manifiesto,sesiones'||
+   !Array.isArray(input.sesiones)||input.sesiones.length<1||
+   input.sesiones.length>30||input.sesiones.length!==input.manifiesto?.items?.length)
+   throw Error('Pedido incorrecto');
+ }catch{return testResponse({ok:false,error:'Pedido V2 inválido',paymentAuthorized:false},400);}
+ try{
+  const verificacion=await fase4FichaCentralLotePrivada({
+   sesiones:input.sesiones,
+   consultarFirmado:p=>postToScript(env,p,fetch,420000),
+   preciosServidor:preciosPiloto,maxFiles:30,maxFileBytes:20*1024*1024
+  });
+  const registrado=await registrarManifiestoV2EnCentral({
+   manifiesto:input.manifiesto,verificacion,env
+  });
+  if(registrado.orderId!==verificacion.orderId||registrado.archivos!==input.sesiones.length)
+   throw Error('Pedido V2 no concordante.');
+  const pedido=await prepararDocumentosCentralFirmado({
+   env,webOrderId:registrado.orderId,
+   clientOrderId:input.clientOrderId,items:input.items
+  });
+  return testResponse({
+   ok:true,carritoDocumentalV2:true,archivosVerificados:registrado.archivos,
+   webOrderId:registrado.orderId,orderId:pedido.commercialOrderId,
+   totalArs:pedido.amountArs,idempotent:pedido.idempotent,
+   checkoutEnabled:false,paymentAuthorized:false,listoParaProducir:false
+  },200);
+ }catch{
+  return testResponse({ok:false,error:'Pedido privado pendiente de revisión; no se autorizó pago.',
+   checkoutEnabled:false,paymentAuthorized:false,listoParaProducir:false},422);
+ }
+}
+
+/**
  * Ensayo mismo origen del cotizador V2 original. Requiere DOS capas:
  * interruptor desactivado por defecto y contraseña independiente HTTP Basic.
  * Las rutas públicas de documentos y la web comercial NO se alteran.
@@ -1363,6 +1424,7 @@ export default {
     if(page==='/api/ensayo-preparar-documentos')return apiFichaCentralPrivada(request,env,false,false,false,true);
     if(page==='/api/ensayo-probar-puente-central')return diagnosticoPuenteCentral(request,env);
     if(page==='/api/ensayo-preparar-documentos-v2')return apiFichaCentralPrivada(request,env,false,false,false,true,false,true);
+    if(page==='/api/ensayo-preparar-documentos-v2-lote')return apiPrepararDocumentosV2Lote(request,env);
     if(page==='/api/ensayo-preparar-documentos-lote')return apiFichaCentralPrivada(request,env,false,false,true,true);
     if(page==='/api/ensayo-guardar-pdf-compuesto')return apiFichaCentralPrivada(request,env,false,false,false,false,true);
     if(page==='/api/ensayo-carga-unica'){
