@@ -176,6 +176,8 @@ function render(){
       archivo:chosen,referencia:r,orderId,modo:mode.value,turnstileToken,
       opciones:{formato:formato.value,caras:caras.value,copias:Number(copias.value),anillado:anillado.value,materialColor:papel.value},
       origin:location.origin,
+      sesionPrevia:d.sesionTemporal||null,
+      onSession:s=>{d.sesionTemporal=s;},
       onProgress:p=>{msg.textContent=p.phase==='transferencia'?'Transferencia: '+p.completed+' de '+p.total+' bloques':p.phase}
      });
      const quote=result.cotizacionServidor;
@@ -190,11 +192,13 @@ function render(){
      msg.textContent='PDF recibido y verificado · '+result.pages+' páginas · recibo '+result.receiptId+
       '. Presupuesto del servidor: '+(quote?moneda(quote.totalArs):'SIN CONFIRMAR')+
       '. '+aviso+' Pedido D1 y autorización de pago: PENDIENTES.';
-     btn.textContent='PDF verificado';d.confirmacion=result;updateSummary();
+     btn.textContent='PDF verificado';d.confirmacion=result;
+     delete d.sesionTemporal;updateSummary();
     }catch(e){
-     msg.textContent='No se confirmó la recepción: '+String(e.message||e);
+     msg.textContent='No se confirmó la recepción: '+String(e.message||e)+
+      (d.sesionTemporal?' Podés reintentar este PDF sin volver a enviar los bloques aceptados mientras permanezcas en esta página.':'');
      btn.disabled=false;file.disabled=false;mode.disabled=false;
-     for(const control of [formato,caras,copias,anillado])control.disabled=false;
+     for(const control of [formato,caras,copias,anillado,papel])control.disabled=false;
     }finally{window.turnstile?.reset()}
    });
    area.prepend(name,file,mode);area.append(btn,msg);div.append(area);
