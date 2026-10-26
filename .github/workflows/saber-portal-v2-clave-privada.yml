@@ -1,0 +1,62 @@
+name: Saber - configurar clave privada del portal V2
+on:
+  push:
+    branches: [polaroids/express-pdf-unico-20261023]
+    paths: [.github/workflows/saber-portal-v2-clave-privada.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  statuses: write
+jobs:
+  configure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Guardar clave solo en Worker de prueba y activar acceso privado
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+          PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          if [[ ! "$PASSWORD" =~ ^[A-Za-z0-9_-]{32,128}$ ]]; then
+            echo "MISSING_OR_INVALID_OPERATOR_PASSWORD_SECRET"
+            exit 1
+          fi
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-documentos-pruebas"
+          jq -n --arg password "$PASSWORD" '{name:"DOCS_V2_PRIVATE_UI_SECRET",type:"secret_text",text:$password}' >/tmp/secret.json
+          status=$(curl --silent --show-error --max-time 25 --output /tmp/secret-response.json --write-out '%{http_code}' -X PUT -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' --data-binary @/tmp/secret.json "$root/secrets")
+          rm -f /tmp/secret.json
+          if [ "$status" != 200 ] && [ "$status" != 201 ]; then echo "SECRET_CONFIG_FAILED_HTTP_$status"; exit 1; fi
+          jq -e '.success==true' /tmp/secret-response.json >/dev/null || { echo "SECRET_CONFIG_REJECTED"; exit 1; }
+          rm -f /tmp/secret-response.json
+          echo "PRIVATE_OPERATOR_SECRET_STORED_IN_TEST_WORKER"
+          curl -fsS --max-time 20 -H "Authorization: Bearer $TOKEN" "$root/settings" -o /tmp/settings-before.json
+          jq -e '.success==true and (.result.bindings|any(.[];.name=="DOCS_V2_PRIVATE_UI_SECRET"))' /tmp/settings-before.json >/dev/null
+          jq -n --slurpfile before /tmp/settings-before.json '{bindings:([ $before[0].result.bindings[]|select(.name!="DOCS_V2_PRIVATE_UI_ENABLED")|{name,type:"inherit"} ] + [{name:"DOCS_V2_PRIVATE_UI_ENABLED",type:"plain_text",text:"PRIVATE_TEST_ONLY"}])}' >/tmp/settings-update.json
+          status=$(curl --silent --show-error --max-time 25 --output /tmp/update-response.json --write-out '%{http_code}' -X PATCH -H "Authorization: Bearer $TOKEN" -F "settings=@/tmp/settings-update.json;type=application/json" "$root/settings")
+          rm -f /tmp/settings-update.json
+          if [ "$status" != 200 ] || ! jq -e '.success==true' /tmp/update-response.json >/dev/null; then
+            echo "PRIVATE_PORTAL_FLAG_FAILED_HTTP_$status"; exit 1
+          fi
+          curl -fsS --max-time 20 -H "Authorization: Bearer $TOKEN" "$root/settings" -o /tmp/settings-after.json
+          jq -e '.result.bindings|any(.[];.name=="DOCS_V2_PRIVATE_UI_ENABLED" and .type=="plain_text" and .text=="PRIVATE_TEST_ONLY")' /tmp/settings-after.json >/dev/null
+          jq -e '.result.bindings|any(.[];.name=="DOCS_V2_PRIVATE_UI_SECRET")' /tmp/settings-after.json >/dev/null
+          echo "PRIVATE_PORTAL_ENABLED_NO_PUBLIC_WEB_NO_PAYMENTS"
+          rm -f /tmp/settings-before.json /tmp/settings-after.json /tmp/update-response.json
+      - name: Registrar acceso privado
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_SHA: ${{ github.sha }}
+          STATUS: ${{ job.status }}
+        run: |
+          if [ "$STATUS" = success ]; then state=success; description="Portal V2 protegido configurado"; else state=failure; description="Revisar secreto de operador o portal V2"; fi
+          jq -n --arg state "$state" --arg context 'saber-v2/private-login' --arg description "$description" --arg target_url "https://github.com/$GH_REPO/actions/runs/$GITHUB_RUN_ID" '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/status.json
+          gh api -X POST "repos/$GH_REPO/statuses/$GH_SHA" --input /tmp/status.json
