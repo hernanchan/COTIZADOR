@@ -45,7 +45,7 @@ jobs:
           curl --silent --show-error --max-time 60 \
             -H "Authorization: Bearer $TOKEN" \
             -F "metadata=@/tmp/metadata.json;type=application/json" \
-            -F "index.mjs=@integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs;type=application/javascript+module" \
+            -F "index.mjs=@integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs;filename=index.mjs;type=application/javascript+module" \
             "$root/versions?bindings_inherit=strict" -o /tmp/upload-result.json
           if ! jq -e '.success==true and (.result.id|type=="string")' /tmp/upload-result.json >/dev/null; then
             echo "VERSION_STAGE_FAILED"; jq -c '{success,errors:[.errors[]?|{code,message}]}' /tmp/upload-result.json; exit 1
