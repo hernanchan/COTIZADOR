@@ -30,6 +30,15 @@ button:disabled{opacity:.45;cursor:not-allowed}
 @media(max-width:840px){main{display:block}.panel{margin-bottom:14px}iframe{min-height:740px}}
 </style></head><body>
 <header><h1>LIBRERÍA SABER · Cotizador V2 en ensayo privado</h1><small style="color:#d5e3f0">Sin cobros, sin órdenes de producción y sin publicación comercial.</small></header>
+<div style="max-width:1110px;margin:16px auto 0;padding:0 14px">
+<section style="background:#fff;padding:16px;border-radius:12px;border:1px solid #bfd2e0">
+<strong style="display:block;margin-bottom:6px">Cotizador inteligente de archivos</strong>
+<a href="/prueba-v2/carga-inteligente" style="font-weight:700;color:#075b88">
+Abrir carga múltiple con detección automática de medidas, CAD/Póster y rollo</a>
+<p style="margin:8px 0 0;font-size:13px;color:#516578">
+Este módulo calcula importes preliminares sin transmitir archivos. El registro de ploteos
+en D1 sigue desactivado hasta validar la recepción y el precio final del servidor.</p>
+</section></div>
 <main><section class="panel"><h2>Cotizador original, funciones completas</h2>
 <iframe id="base" title="Cotizador V2 de prueba" src="/prueba-v2/cotizador?integrado=1&ensayoArchivos=1" loading="eager"></iframe></section>
 <section class="panel">
