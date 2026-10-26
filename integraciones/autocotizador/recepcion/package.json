@@ -8,13 +8,14 @@
     "build:pilot": "esbuild ./worker-fase2-validar-pdf.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --outfile=./dist/saber-documentos-validacion-fase2.mjs",
     "test": "node --test ./validacion-fase2.test.mjs ./presupuesto-fase3.test.mjs",
     "build:quote": "esbuild ./worker-fase3-presupuesto-pdf.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --outfile=./dist/saber-documentos-presupuesto-fase3.mjs",
-    "build:unificado": "npm run build:fast-client && npm run build:plot-client && npm run build:intake-client && npm run build:v2-reader && npm run build:v2-upload && esbuild ./worker-fase4-cotizador-unificado.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --loader:.html=text --outfile=./dist/saber-documentos-cotizador-fase4.mjs",
+    "build:unificado": "npm run build:fast-client && npm run build:plot-client && npm run build:intake-client && npm run build:v2-reader && npm run build:v2-upload && npm run build:v2-manifest && esbuild ./worker-fase4-cotizador-unificado.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --loader:.html=text --outfile=./dist/saber-documentos-cotizador-fase4.mjs",
     "test:unificado": "node --test ./fase4-e2e.test.mjs ./lectura-local-pdf.test.mjs",
     "build:fast-client": "esbuild ./cotizador-rapido-cliente.mjs --bundle --minify --platform=browser --format=iife --target=es2022 --outfile=./cotizador-rapido-cliente.txt",
     "build:intake-client": "esbuild ./carga-unica-cliente.mjs --bundle --minify --platform=browser --format=iife --target=es2022 --outfile=./carga-unica-cliente.txt",
     "build:plot-client": "esbuild ./ploteos-rapido-cliente.mjs --bundle --minify --platform=browser --format=iife --target=es2022 --outfile=./ploteos-rapido-cliente.txt",
     "build:v2-reader": "esbuild ../../../cotizador-v2-ensayo-archivos.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --outfile=./cotizador-v2-ensayo-archivos.txt",
-    "build:v2-upload": "esbuild ./subir-vincular-pdf-v2-privado.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --outfile=./subir-vincular-pdf-v2-privado.txt"
+    "build:v2-upload": "esbuild ./subir-vincular-pdf-v2-privado.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --outfile=./subir-vincular-pdf-v2-privado.txt",
+    "build:v2-manifest": "esbuild ./preparar-manifiesto-v2-documental.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --outfile=./preparar-manifiesto-v2-documental.txt"
   },
   "dependencies": {
     "pdf-lib": "1.17.1"
