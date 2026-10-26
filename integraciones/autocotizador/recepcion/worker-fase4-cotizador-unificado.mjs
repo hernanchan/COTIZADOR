@@ -1387,7 +1387,7 @@ function v2PrivateBrowserResponse(request,env,path){
    // Reutiliza el analizador consolidado CAD/Póster/rollos sin derivar
    // a la ruta de prueba pública ni recibir originales por esta pantalla.
    const html=paginaCargaUnica().replace(
-    /<script src="\\/prueba-carga-unica.js" defer><\\/script>/,
+    '<script src="/prueba-carga-unica.js" defer></script>',
     '<script src="/prueba-v2/carga-inteligente.js" defer></script>'
    ).replace(
     'Prueba privada de clasificación.',
