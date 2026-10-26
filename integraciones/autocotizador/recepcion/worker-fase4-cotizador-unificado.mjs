@@ -23,6 +23,7 @@ import {paginaCotizadorV2PruebaPrivada} from './pantalla-cotizador-v2-prueba-pri
 import cotizadorV2OriginalHtml from '../../../cotizador-web-v2.html';
 import v2ReaderClientJs from './cotizador-v2-ensayo-archivos.txt';
 import v2UploadClientJs from './subir-vincular-pdf-v2-privado.txt';
+import v2ManifestClientJs from './preparar-manifiesto-v2-documental.txt';
 import cargaClienteJs from './carga-unica-cliente.txt';
 import {cotizarPloteosRapido} from '../pruebas/cotizar-ploteos-rapido.mjs';
 import plotClienteJs from './ploteos-rapido-cliente.txt';
@@ -1386,6 +1387,9 @@ function v2PrivateBrowserResponse(request,env,path){
   if(path==='/prueba-v2/cotizador-v2-ensayo-archivos.mjs')
    return new Response(v2ReaderClientJs,{status:200,headers:{
     ...headers,'Content-Type':'text/javascript; charset=utf-8'}});
+  if(path==='/prueba-v2/preparar-manifiesto.mjs')
+   return new Response(v2ManifestClientJs,{status:200,headers:{
+    ...headers,'Content-Type':'text/javascript; charset=utf-8'}});
   if(path==='/prueba-v2/subir-vincular-pdf.mjs')
    return new Response(v2UploadClientJs,{status:200,headers:{
     ...headers,'Content-Type':'text/javascript; charset=utf-8'}});
@@ -1401,7 +1405,8 @@ export default {
     if(page==='/prueba-v2/'||page==='/prueba-v2/cotizador'||
        page==='/prueba-v2/precios-web.json'||
        page==='/prueba-v2/cotizador-v2-ensayo-archivos.mjs'||
-       page==='/prueba-v2/subir-vincular-pdf.mjs')
+       page==='/prueba-v2/subir-vincular-pdf.mjs'||
+       page==='/prueba-v2/preparar-manifiesto.mjs')
       return v2PrivateBrowserResponse(request,env,page);
     if(page==='/prueba-cotizador-pdf'&&request.method==='GET')return fase4Html(env);
     if(page==='/prueba-cotizador-lote'&&request.method==='GET')return pantallaLote(env);
