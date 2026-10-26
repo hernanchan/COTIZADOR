@@ -24,6 +24,9 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .state{white-space:pre-wrap;overflow-wrap:anywhere;color:#0a3158;font-size:13px}
 .warning{background:#fff2db;border-left:4px solid #f7931e;padding:10px;margin-bottom:12px}
 .cf-turnstile{margin:15px 0}
+#drop-pdf{display:block;border:2px dashed #8faec5;background:#f4f9fd;border-radius:12px;padding:16px;margin:12px 0;cursor:pointer}
+#drop-pdf.dragging{background:#dfedfb;border-color:#095f8f}
+#drop-pdf input{display:block;margin-top:8px}
 @media(max-width:840px){main{display:block}.panel{margin-bottom:14px}iframe{min-height:740px}}
 </style></head><body>
 <header><h1>LIBRERÍA SABER · Cotizador V2 en ensayo privado</h1><small style="color:#d5e3f0">Sin cobros, sin órdenes de producción y sin publicación comercial.</small></header>
@@ -32,6 +35,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <section class="panel">
 <h2>Recepción de PDF por trabajo</h2>
 <div class="warning">Para este ensayo, seleccioná nuevamente cada PDF y confirmá formato, caras, copias y anillado para comparar con el cotizador original. Se comprueba su SHA-256; no sirve otro PDF con el mismo nombre. Hasta confirmar el recibo sigue pendiente.</div>
+<div id="drop-pdf"><strong>Arrastrá todos los PDF aquí</strong> o seleccioná varios de una vez para asociarlos a los trabajos del carrito.<input id="batch-files" type="file" accept=".pdf,application/pdf" multiple><p id="batch-status" class="state" role="status">Los PDF se asignan por nombre y tamaño al trabajo correspondiente. La recepción sigue protegida.</p></div>
 <div class="cf-turnstile" data-sitekey="${sitekey}" data-action="documentos"></div>
 <div id="all" role="list" aria-label="Trabajos del cotizador"></div>
 <p id="state" role="status" aria-live="polite" class="state">Cotizá una impresión y agregala al pedido de prueba.</p>
@@ -46,6 +50,49 @@ import {subirYVincularPdfCotizadorV2} from '/prueba-v2/subir-vincular-pdf.mjs';
 import {prepararManifiestoDocumentalV2} from '/prueba-v2/preparar-manifiesto.mjs';
 const list=document.getElementById('all'),status=document.getElementById('state'),frame=document.getElementById('base'),summary=document.getElementById('order-summary');
 const registerButton=document.getElementById('register-private'),registerStatus=document.getElementById('register-status');
+const dropPdf=document.getElementById('drop-pdf'),batchFiles=document.getElementById('batch-files'),batchStatus=document.getElementById('batch-status');
+function assignFiles(files){
+ const chosen=Array.from(files||[]);
+ if(!chosen.length)return;
+ if(chosen.some(file=>!(file instanceof File)||!/\\.pdf$/i.test(file.name))){
+  batchStatus.textContent='Solo se admiten archivos PDF.';return;
+ }
+ const refs=all.flatMap(item=>item.references).filter(d=>!d.confirmacion);
+ if(chosen.length>30||refs.length>30){
+  batchStatus.textContent='El máximo del ensayo es de 30 PDF.';return;
+ }
+ let assigned=0,unmatched=0,ambiguous=0;
+ for(const file of chosen){
+  const matches=refs.filter(d=>!d.archivoLocal&&
+   d.reference.nombre===file.name&&d.reference.bytes===file.size);
+  if(matches.length!==1){
+   if(matches.length>1)ambiguous++;else unmatched++;
+   continue;
+  }
+  matches[0].archivoLocal=file;assigned++;
+ }
+ render();
+ batchStatus.textContent=assigned+' PDF asociados a los trabajos. '+
+  (unmatched?unmatched+' sin coincidencia (primero agregá esos trabajos al carrito). ':'')+
+  (ambiguous?ambiguous+' con nombre y tamaño duplicados, requieren selección individual. ':'')+
+  'La validación SHA-256 se realizará durante el envío seguro.';
+}
+batchFiles.addEventListener('change',()=>{assignFiles(batchFiles.files);batchFiles.value='';});
+for(const evt of ['dragenter','dragover']){
+ dropPdf.addEventListener(evt,event=>{
+  if(!event.dataTransfer?.types?.includes('Files'))return;
+  event.preventDefault();event.dataTransfer.dropEffect='copy';
+  dropPdf.classList.add('dragging');
+ });
+}
+dropPdf.addEventListener('dragleave',event=>{
+ if(!dropPdf.contains(event.relatedTarget))dropPdf.classList.remove('dragging');
+});
+dropPdf.addEventListener('drop',event=>{
+ event.preventDefault();dropPdf.classList.remove('dragging');
+ assignFiles(event.dataTransfer?.files);
+});
+
 const newClientOrderId=()=>crypto.randomUUID();
 let registering=false,registeredOrder=null;
 // Recuperación de metadatos no sensibles tras recarga o suspensión móvil.
