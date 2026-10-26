@@ -1,0 +1,42 @@
+name: Saber - inspeccionar URLs de versiones privadas
+on:
+  push:
+    branches: [polaroids/express-pdf-unico-20261023]
+    paths:
+      - '.github/workflows/cloudflare-smoke-versiones.yml'
+      - 'integraciones/cloudflare-ensayo/smoke-urls-versiones.mjs'
+  workflow_dispatch:
+permissions:
+  contents: read
+  statuses: write
+jobs:
+  smoke:
+    if: github.ref == 'refs/heads/polaroids/express-pdf-unico-20261023'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Leer URLs de versiones HMAC y probar GET inocuos
+        env:
+          SABER_CF_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          SABER_CF_EDITOR_TOKEN: ${{ secrets.SABER_CF_EDITOR_TOKEN }}
+        run: node integraciones/cloudflare-ensayo/smoke-urls-versiones.mjs
+      - name: Publicar resultado de prueba inocua
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_SHA: ${{ github.sha }}
+          STATUS: ${{ job.status }}
+        run: |
+          if [ "$STATUS" = success ]; then state=success; description="Inspeccion sin despliegue finalizada; ver log"; else state=failure; description="Inspeccion versiones fallida"; fi
+          jq -n --arg state "$state" --arg context "saber-cloudflare/staged-url-smoke" --arg description "$description" --arg target_url "https://github.com/$GH_REPO/actions/runs/$GITHUB_RUN_ID" '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/saber-url-smoke.json
+          gh api -X POST "repos/$GH_REPO/statuses/$GH_SHA" --input /tmp/saber-url-smoke.json
