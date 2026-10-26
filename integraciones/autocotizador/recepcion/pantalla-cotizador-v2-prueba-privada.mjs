@@ -41,9 +41,61 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <script type="module">
 import {subirYVincularPdfCotizadorV2} from '/prueba-v2/subir-vincular-pdf.mjs';
 const list=document.getElementById('all'),status=document.getElementById('state'),frame=document.getElementById('base');
-const random=new Uint8Array(16);crypto.getRandomValues(random);
-const orderId='WEB-ENSAYO-'+Array.from(random,b=>b.toString(16).padStart(2,'0')).join('').toUpperCase();
-const all=[],used=new Set();
+// Recuperación de metadatos no sensibles tras recarga o suspensión móvil.
+ // Nunca conservar objetos File, base64, sesiones, credenciales ni confirmaciones.
+const RECOVERY_KEY='saber-v2-ensayo-metadatos-v1';
+const RECOVERY_MAX_AGE=12*60*60*1000;
+const RECOVERY_MAX_BYTES=25000;
+const newOrderId=()=>{
+ const random=new Uint8Array(16);crypto.getRandomValues(random);
+ return 'WEB-ENSAYO-'+Array.from(random,b=>b.toString(16).padStart(2,'0')).join('').toUpperCase();
+};
+const safeRef=r=>r&&r.schema==='saber-pdf-local-pendiente-v1'&&
+ /^[a-f0-9-]{36}$/i.test(r.localRef||'')&&/^[a-f0-9]{64}$/.test(r.sha256||'')&&
+ Number.isSafeInteger(r.bytes)&&r.bytes>=5&&r.bytes<=20*1024*1024&&
+ Number.isSafeInteger(r.paginas)&&r.paginas>=1&&r.paginas<=2000&&
+ typeof r.nombre==='string'&&r.nombre.length<=120&&/\\.pdf$/i.test(r.nombre)&&
+ r.estado==='PENDIENTE_DE_ENVIO'&&r.recibido===false&&r.verificadoServidor===false;
+function restore(){
+ try{
+  const raw=sessionStorage.getItem(RECOVERY_KEY);
+  if(!raw||raw.length>RECOVERY_MAX_BYTES)return null;
+  const state=JSON.parse(raw);
+  if(!state||!/^WEB-ENSAYO-[A-F0-9]{32}$/.test(state.orderId||'')||
+    !Number.isSafeInteger(state.savedAt)||Date.now()-state.savedAt<0||
+    Date.now()-state.savedAt>RECOVERY_MAX_AGE||!Array.isArray(state.items)||
+    state.items.length>30)return null;
+  const seen=new Set(),items=[];
+  for(const item of state.items){
+   if(!item||typeof item.name!=='string'||item.name.length>120||
+    !Number.isFinite(item.price)||item.price<=0||
+    !Array.isArray(item.references)||item.references.length>30)return null;
+   const refs=[];
+   for(const d of item.references){
+    if(!d||!Number.isSafeInteger(d.itemIndex)||d.itemIndex<0||d.itemIndex>29||
+     !safeRef(d.reference)||seen.has(d.reference.localRef))return null;
+    seen.add(d.reference.localRef);
+    refs.push({itemIndex:d.itemIndex,reference:d.reference});
+   }
+   items.push({name:item.name,price:item.price,references:refs});
+  }
+  return {orderId:state.orderId,items,seen};
+ }catch{return null}
+}
+const previous=restore(),orderId=previous?.orderId||newOrderId();
+const all=previous?.items||[],used=previous?.seen||new Set();
+function save(){
+ try{
+  const items=all.map(item=>({name:item.name,price:item.price,
+   references:item.references.map(d=>({itemIndex:d.itemIndex,reference:{
+    schema:d.reference.schema,localRef:d.reference.localRef,nombre:d.reference.nombre,
+    bytes:d.reference.bytes,paginas:d.reference.paginas,sha256:d.reference.sha256,
+    estado:'PENDIENTE_DE_ENVIO',recibido:false,verificadoServidor:false
+   }}))}));
+  const encoded=JSON.stringify({orderId,items,savedAt:Date.now()});
+  if(encoded.length<=RECOVERY_MAX_BYTES)sessionStorage.setItem(RECOVERY_KEY,encoded);
+ }catch{/* Modo privado o cuota: la cotización sigue funcionando sin persistencia. */}
+}
 const catalogPromise=fetch('/prueba-v2/precios-web.json',{credentials:'same-origin'})
  .then(r=>{if(!r.ok)throw Error('Catálogo no disponible');return r.json()});
 function render(){
@@ -126,6 +178,10 @@ function render(){
   list.append(div);
  }
 }
+if(previous?.items.length){
+ status.textContent='Trabajos recuperados después de recargar. Volvé a seleccionar cada PDF: las fotos y archivos nunca se guardan en el navegador. Pedido de prueba: '+orderId;
+ render();
+}
 window.addEventListener('message',event=>{
  if(event.origin!==location.origin||event.source!==frame.contentWindow)return;
  if(event.data?.type!=='SABER_ADD_PRINT')return;
@@ -148,6 +204,7 @@ window.addEventListener('message',event=>{
  }
  refs.forEach(d=>used.add(d.reference.localRef));
  all.push({name:p.name,price:p.price,references:refs});
+ save();
  status.textContent='Se agregó un trabajo. Los PDF están pendientes hasta que Google confirme su recepción. Pedido de prueba: '+orderId;
  render();
 });
