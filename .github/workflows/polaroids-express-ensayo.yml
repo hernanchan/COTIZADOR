@@ -14,6 +14,8 @@ on:
       - 'integraciones/autocotizador/recepcion/preparar-documentos-central.mjs'
       - 'integraciones/autocotizador/recepcion/probar-puente-central.mjs'
       - 'tests/autocotizador-probe-puente.test.mjs'
+      - 'tests/autocotizador-v2-recuperacion-privada.test.mjs'
+      - 'integraciones/autocotizador/recepcion/pantalla-cotizador-v2-prueba-privada.mjs'
       - 'tests/autocotizador-documentos-central.test.mjs'
       - 'integraciones/autocotizador/recepcion/fase4-ficha-central-lote-privada.mjs'
       - 'tests/autocotizador-mixto-central.test.mjs'
@@ -129,6 +131,8 @@ jobs:
           path: artifacts/diagnostico-puente/
           if-no-files-found: error
           retention-days: 7
+      - name: Probar recuperación de referencias V2 tras recarga sin almacenar PDFs
+        run: node --test tests/autocotizador-v2-recuperacion-privada.test.mjs
       - name: Verificar portal V2 same-origin y autenticación privada real del Worker
         run: node --test integraciones/autocotizador/recepcion/v2-origen-privado.test.mjs
       - name: Revisar UI ampliada, rutas privadas y JS del navegador
