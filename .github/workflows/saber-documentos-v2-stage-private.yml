@@ -42,13 +42,13 @@ jobs:
           done
           jq -n --arg commit "$GITHUB_SHA" --slurpfile settings /tmp/bindings.json \
             '{main_module:"index.mjs",annotations:{"workers/message":"Libreria Saber V2 prueba privada, no desplegada","workers/commit_sha":$commit},bindings:[$settings[0].result.bindings[]|{name,type:"inherit"}]}' > /tmp/metadata.json
-          curl --silent --show-error --max-time 60 --fail-with-body \
+          curl --silent --show-error --max-time 60 \
             -H "Authorization: Bearer $TOKEN" \
             -F "metadata=@/tmp/metadata.json;type=application/json" \
             -F "index.mjs=@integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs;type=application/javascript+module" \
             "$root/versions?bindings_inherit=strict" -o /tmp/upload-result.json
           if ! jq -e '.success==true and (.result.id|type=="string")' /tmp/upload-result.json >/dev/null; then
-            echo "VERSION_STAGE_FAILED"; jq -c '{success,errors}' /tmp/upload-result.json; exit 1
+            echo "VERSION_STAGE_FAILED"; jq -c '{success,errors:[.errors[]?|{code,message}]}' /tmp/upload-result.json; exit 1
           fi
           jq -r '.result.id | "PRIVATE_VERSION_STAGED " + .' /tmp/upload-result.json
           rm -f /tmp/bindings.json /tmp/metadata.json /tmp/upload-result.json
