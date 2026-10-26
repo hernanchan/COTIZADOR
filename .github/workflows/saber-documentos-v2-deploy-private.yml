@@ -23,7 +23,7 @@ jobs:
         run: |
           set -euo pipefail
           worker=saber-documentos-pruebas
-          new_version=f2848e89-5cc7-42a9-8a45-090a8ac482f5
+          new_version=ccd275b5-bac0-4177-8d84-f3f41d4976e1
           root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/$worker"
           curl -fsS --max-time 20 -H "Authorization: Bearer $TOKEN" "$root/deployments" -o /tmp/deployments-before.json
           jq -e '.success==true and (.result.deployments|type=="array") and (.result.deployments|length>0)' /tmp/deployments-before.json >/dev/null
@@ -51,6 +51,7 @@ jobs:
           if ! grep -aq 'batch-files' /tmp/live-script; then rollback; exit 1; fi
           if ! grep -aq 'send-all-pdf' /tmp/live-script; then rollback; exit 1; fi
           if ! grep -aq '/prueba-v2/carga-inteligente' /tmp/live-script; then rollback; exit 1; fi
+          if ! grep -aq 'SABER_SMART_DOCUMENTS_TO_PRIVATE' /tmp/live-script; then rollback; exit 1; fi
           if ! grep -aq 'SABER_SOLICITAR_PDF_PRIVADO' /tmp/live-script; then rollback; exit 1; fi
           curl -fsS --max-time 20 -H "Authorization: Bearer $TOKEN" "$root/settings" -o /tmp/bindings-after.json || { rollback; exit 1; }
           jq -r '.result.bindings[] | [.name,.type] | @tsv' /tmp/bindings-after.json | sort >/tmp/binding-signature-after
