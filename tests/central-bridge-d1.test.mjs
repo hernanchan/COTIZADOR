@@ -730,3 +730,83 @@ test('probe HMAC valida conexión sin leer ni escribir D1, y falla cerrado',asyn
   env.CENTRAL_BRIDGE_PROBE_ENABLED=original;
  }
 });
+
+
+test('V2 multifichero: manifiesto verificado -> Central D1 local -> recuperación e idempotencia',async()=>{
+ const {prepararManifiestoDocumentalV2}=await import('../integraciones/autocotizador/recepcion/preparar-manifiesto-v2-documental.mjs');
+ const {registrarManifiestoV2EnCentral}=await import('../integraciones/autocotizador/recepcion/registrar-manifiesto-v2-central.mjs');
+ const {prepararDocumentosCentralFirmado}=await import('../integraciones/autocotizador/recepcion/preparar-documentos-central.mjs');
+ const original=JSON.parse(JSON.stringify(packet));
+ original.orderId='WEB-CARRITO-V2-PERSISTENTE-20261026';
+ original.ficha.orderId=original.orderId;
+ original.recibos.forEach((r,i)=>{r.receiptId='DOC-'+(i===0?'aaaa1111':'bbbb2222')+'-1234-4234-8234-1234567890ab';});
+ original.ficha.trabajos.forEach((w,i)=>{w.reciboPrivado=original.recibos[i].receiptId;});
+ const trabajos=original.recibos.map((r,i)=>({vinculo:{
+  schema:'saber-v2-pdf-conciliado-privado-v1',
+  orderId:original.orderId,localRef:randomUUID(),receiptId:r.receiptId,
+  sha256:r.sha256,pages:r.pages,
+  estado:'RECIBO_VERIFICADO_NO_CONCILIADO_CON_PRECIO',
+  reciboGoogleVerificado:true,precioRecalculado:false,
+  paymentAuthorized:false,listoParaProducir:false,
+  cotizacionServidor:{estado:'PRELIMINAR_VERIFICADA_SIN_PEDIDO',
+   totalArs:12000,priceVersion:'solo-referencia',
+   paginasOriginales:r.pages,formato:'a4',caras:'simple',copias:1,
+   anillado:'ninguno',materialColor:'obra70',paymentAuthorized:false}
+ }}));
+ const borrador=prepararManifiestoDocumentalV2({orderId:original.orderId,trabajos});
+ assert.equal(borrador.totalOrientativo,24000,'Precio local deliberadamente distinto');
+ const validated={...original,pagoConfirmado:false,
+  schema:'saber-central-recepcion-verificada-v1',filesReceived:true,
+  paymentAuthorized:false,listoParaProducir:false};
+ const service={fetch:req=>context.worker.fetch(req,env)};
+ const docEnv={
+  DOCS_CENTRAL_SYNC_ENABLED:'PRIVATE_TEST_ONLY',
+  DOCS_ORDER_PREPARE_ENABLED:'PRIVATE_TEST_ONLY',
+  CENTRAL_BRIDGE_KEY:env.CENTRAL_BRIDGE_KEY,
+  DOCS_CENTRAL_ADMIN_KEY:'administrative-secret-local-not-hmac',
+  DOCS_RELAY_KEY:'google-secret-local-not-hmac',
+  CENTRAL_TEST_URL:'https://saber-pagos-pruebas.libreriasaber.workers.dev/internal/central/stage',
+  SABER_CENTRAL:service
+ };
+ const previous=env.CENTRAL_PREPARE_ENABLED;
+ env.CENTRAL_PREPARE_ENABLED='PRIVATE_TEST_ONLY';
+ try{
+  const first=await registrarManifiestoV2EnCentral({
+   manifiesto:borrador,verificacion:validated,env:docEnv
+  });
+  assert.equal(first.registeredInD1,true);
+  assert.equal(first.idempotent,false);
+  assert.equal(first.importeServidor,21000,'Importe del servidor, no del cliente');
+  const again=await registrarManifiestoV2EnCentral({
+   manifiesto:borrador,verificacion:validated,env:docEnv
+  });
+  assert.equal(again.registeredInD1,true);
+  assert.equal(again.idempotent,true);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM central_document_manifests WHERE web_order_id=?').get(original.orderId).n,1);
+  const clientOrderId=randomUUID();
+  const args={env:docEnv,webOrderId:original.orderId,
+   clientOrderId,items:[],subtle:webcrypto.subtle,requestId:randomUUID};
+  const commercial=await prepararDocumentosCentralFirmado(args);
+  assert.equal(commercial.created,true);
+  assert.equal(commercial.amountArs,21000);
+  assert.equal(commercial.checkoutEnabled,false);
+  assert.equal(commercial.paymentAuthorized,false);
+  const record=db.prepare('SELECT id,status,amount_ars,preference_id,payment_id FROM orders WHERE id=?')
+   .get(commercial.commercialOrderId);
+  assert.equal(record.status,'awaiting_payment');
+  assert.equal(record.amount_ars,21000);
+  assert.equal(record.preference_id,null);
+  assert.equal(record.payment_id,null);
+  const third=await prepararDocumentosCentralFirmado(args);
+  assert.equal(third.idempotent,true);
+  assert.equal(third.commercialOrderId,commercial.commercialOrderId);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM orders WHERE id=?').get(commercial.commercialOrderId).n,1);
+  const references=db.prepare('SELECT receipt_id FROM central_document_receipts WHERE web_order_id=?').all(original.orderId);
+  assert.equal(references.length,2);
+  const row=db.prepare('SELECT commercial_order_id FROM central_document_manifests WHERE web_order_id=?').get(original.orderId);
+  assert.equal(row.commercial_order_id,commercial.commercialOrderId);
+ }finally{
+  if(previous===undefined)delete env.CENTRAL_PREPARE_ENABLED;
+  else env.CENTRAL_PREPARE_ENABLED=previous;
+ }
+});
