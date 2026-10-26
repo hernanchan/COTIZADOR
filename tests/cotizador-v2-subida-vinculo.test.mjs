@@ -93,7 +93,7 @@ test('transferencia 2 bloques PDF -> Google verificado -> enlace local sin token
  assert.equal(done.listoParaProducir,false);
  assert.equal(Object.isFrozen(done),true);
  assert.deepEqual(t.progress.map(x=>x.phase),[
-  'inicio','transferencia','transferencia','verificacion','confirmado'
+  'inicio','estado','transferencia','transferencia','verificacion','confirmado'
  ]);
  assert.doesNotMatch(JSON.stringify(done),/token|dataBase64|driveFileId/);
 });
@@ -194,8 +194,8 @@ test('corte de conexión: la segunda llamada continúa con la misma sesión sin 
  let saved=null;
  const props={...t.args,fetcher,onSession:s=>{saved=s;}};
  await assert.rejects(subirYVincularPdfCotizadorV2(props),/interrumpida/);
- assert.deepEqual(saved,{uploadId,token});
- const recovered=await subirYVincularPdfCotizadorV2({...props,sesionPrevia:saved});
+ assert.deepEqual(saved,{uploadId,token,orderId,localRef:id,sha256,modo:'bn',opcionesKey:'null'});
+ const recovered=await subirYVincularPdfCotizadorV2({...props,sesionPrevia:saved,turnstileToken:''});
  assert.equal(recovered.reciboGoogleVerificado,true);
  assert.equal(started,1,'El segundo intento NO crea otra sesión');
  assert.deepEqual(parts,[0,1,1],'Sólo se reintenta el bloque no aceptado');
@@ -208,4 +208,29 @@ test('una sesión anterior malformada no provoca llamadas a recepción',async()=
   sesionPrevia:{uploadId:'DOC-ajeno',token:'invalid'}
  }),/no corresponden/);
  assert.equal(t.ops.length,0);
+});
+
+test('no reanudar una sesión de otro pedido, PDF u opciones aunque coincida el archivo',async()=>{
+ const t=backend();
+ const s={uploadId,token,orderId,localRef:id,sha256,modo:'bn',opcionesKey:'null'};
+ for(const altered of [
+  {...s,orderId:'WEB-OTRO-ENSAYO'},
+  {...s,sha256:'a'.repeat(64)},
+  {...s,modo:'color'},
+  {...s,opcionesKey:'{}'},
+  {...s,localRef:'22222222-1234-4234-8234-1234567890ab'}
+ ]){
+  await assert.rejects(subirYVincularPdfCotizadorV2({
+   ...t.args,sesionPrevia:altered,turnstileToken:''
+  }),/no corresponden/);
+ }
+ assert.equal(t.ops.length,0);
+});
+test('al consultar status se informa el progreso confirmado por Google',async()=>{
+ const t=backend({resume:true});
+ const output=await subirYVincularPdfCotizadorV2(t.args);
+ assert.equal(output.reciboGoogleVerificado,true);
+ assert.deepEqual(t.progress.find(p=>p.phase==='estado'),{
+  phase:'estado',completed:1,total:2
+ });
 });
