@@ -133,3 +133,34 @@ test('la preparación D1 de V2 permanece cerrada sin administración y permisos 
  assert.equal(invalid.status,503,'No se habilita D1 cuando faltan los interruptores privados');
  assert.equal((await get(path,{},env,'GET')).status,503);
 });
+
+
+test('lote V2 descarta recibos ajenos antes de leer Google o registrar D1',async()=>{
+ const admin='PrivateAdminOnly_'+'9'.repeat(40);
+ const flags={...env,DOCS_CENTRAL_ADMIN_KEY:admin,
+  DOCS_V2_RECEIPT_LINK_ENABLED:'PRIVATE_TEST_ONLY',
+  DOCS_EXTENDED_RECEIVER_ENABLED:'PRIVATE_TEST_ONLY',
+  DOCS_CENTRAL_SYNC_ENABLED:'PRIVATE_TEST_ONLY',
+  DOCS_ORDER_PREPARE_ENABLED:'PRIVATE_TEST_ONLY'};
+ const orderId='WEB-ENSAYO-PRECHECK-20261026';
+ const expected='DOC-12345678-1234-4234-8234-1234567890ab';
+ const different='DOC-87654321-1234-4234-8234-1234567890ab';
+ const body={clientOrderId:'12345678-1234-4234-8234-1234567890ab',
+  items:[],manifiesto:{schema:'saber-v2-manifiesto-preliminar-v1',orderId,
+   items:[{reciboPrivado:expected,sha256:'a'.repeat(64)}]},
+  sesiones:[{sesion:{uploadId:different,token:'t'.repeat(30)},opciones:{}}]};
+ const call=async data=>worker.fetch(new Request(base+'/api/ensayo-preparar-documentos-v2-lote',{
+  method:'POST',headers:{Origin:base,'Content-Type':'application/json',Authorization:authorization},
+  body:JSON.stringify(data)
+ }),flags);
+ const mismatch=await call(body);
+ assert.equal(mismatch.status,400);
+ assert.equal((await mismatch.json()).paymentAuthorized,false);
+ const repeated=await call({...body,manifiesto:{...body.manifiesto,
+  items:[body.manifiesto.items[0],body.manifiesto.items[0]]},
+  sesiones:[{sesion:{uploadId:expected,token:'t'.repeat(30)},opciones:{}},
+   {sesion:{uploadId:expected,token:'t'.repeat(30)},opciones:{}}]});
+ assert.equal(repeated.status,400);
+ const badClient=await call({...body,clientOrderId:'nuevo-cada-recarga'});
+ assert.equal(badClient.status,400);
+});
