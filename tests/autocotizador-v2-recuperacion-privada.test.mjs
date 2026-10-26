@@ -30,3 +30,40 @@ test('la recuperación contabiliza hasta 30 PDF entre todos los trabajos, no por
  assert.match(html,/Carrito recuperado:/);
  assert.match(html,/Ningún pago ni pedido quedó confirmado/);
 });
+
+
+test('restauración ejecutada: admite 30 referencias pero descarta 31 repartidas en varios trabajos',()=>{
+ const source=match[1];
+ const beginning=source.indexOf('const RECOVERY_KEY=');
+ const end=source.indexOf('const previous=restore()');
+ assert.ok(beginning>=0&&end>beginning);
+ const code=source.slice(beginning,end)+'\nglobalThis.testRestore=restore;';
+ let saved='';
+ const ctx=vm.createContext({
+  Date,sessionStorage:{getItem(){return saved}},
+  crypto:{getRandomValues(bytes){return bytes}},
+  console
+ });
+ new vm.Script(code).runInContext(ctx);
+ const reference=n=>({
+  schema:'saber-pdf-local-pendiente-v1',
+  localRef:'12345678-1234-4234-8234-'+String(n).padStart(12,'0'),
+  nombre:'doc-'+n+'.pdf',bytes:200,paginas:1,sha256:String(n).padStart(64,'a'),
+  estado:'PENDIENTE_DE_ENVIO',recibido:false,verificadoServidor:false
+ });
+ const orderId='WEB-ENSAYO-'+('A'.repeat(32));
+ const make=count=>JSON.stringify({orderId,savedAt:Date.now(),
+  items:Array.from({length:Math.ceil(count/10)},(_,i)=>({
+   name:'Trabajo '+i,price:500,
+   references:Array.from({length:Math.min(10,count-i*10)},(_,j)=>({
+    itemIndex:j,reference:reference(i*10+j+1)
+   }))
+  }))
+ });
+ saved=make(30);
+ const recovered=ctx.testRestore();
+ assert.equal(recovered.items.length,3);
+ assert.equal(recovered.seen.size,30);
+ saved=make(31);
+ assert.equal(ctx.testRestore(),null);
+});
