@@ -82,6 +82,9 @@ jobs:
       - name: Dependencia PDF en entorno aislado (no desplegar)
         working-directory: integraciones/autocotizador/recepcion
         run: npm install --no-audit --no-fund
+      - name: Compilar Worker documental V2 completo sin publicar
+        working-directory: integraciones/autocotizador/recepcion
+        run: npm run build:unificado
       - name: Instalar motor Express de Cloudflare Pages (sin despliegue)
         working-directory: integraciones/polaroids/express
         run: npm install --no-audit --no-fund
