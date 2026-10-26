@@ -67,6 +67,7 @@ function restore(){
     Date.now()-state.savedAt>RECOVERY_MAX_AGE||!Array.isArray(state.items)||
     state.items.length>30)return null;
   const seen=new Set(),items=[];
+  let totalReferences=0;
   for(const item of state.items){
    if(!item||typeof item.name!=='string'||item.name.length>120||
     !Number.isFinite(item.price)||item.price<=0||
@@ -77,6 +78,8 @@ function restore(){
      !safeRef(d.reference)||seen.has(d.reference.localRef))return null;
     seen.add(d.reference.localRef);
     refs.push({itemIndex:d.itemIndex,reference:d.reference});
+    totalReferences++;
+    if(totalReferences>30)return null;
    }
    items.push({name:item.name,price:item.price,references:refs});
   }
@@ -200,7 +203,7 @@ function render(){
  }
 }
 if(previous?.items.length){
- status.textContent='Trabajos recuperados después de recargar. Volvé a seleccionar cada PDF: las fotos y archivos nunca se guardan en el navegador. Pedido de prueba: '+orderId;
+ status.textContent='Carrito recuperado: '+previous.seen.size+' referencia(s) de PDF pendiente(s) de nueva verificación. Volvé a seleccionar cada PDF: las fotos y archivos nunca se guardan en el navegador. Ningún pago ni pedido quedó confirmado. Pedido de prueba: '+orderId;
  render();
 }
 updateSummary();
