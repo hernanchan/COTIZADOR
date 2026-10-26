@@ -21,3 +21,12 @@ test('recupera solo referencias PDF, nunca bytes ni credenciales',()=>{
  assert.doesNotMatch(save,/dataBase64|uploadToken|turnstileToken|session\.token|File\(|arrayBuffer/);
  assert.match(html,/Volvé a seleccionar cada PDF/);
 });
+
+
+test('la recuperación contabiliza hasta 30 PDF entre todos los trabajos, no por línea',()=>{
+ assert.match(html,/let totalReferences=0/);
+ assert.match(html,/totalReferences\+\+/);
+ assert.match(html,/if\(totalReferences>30\)return null/);
+ assert.match(html,/Carrito recuperado:/);
+ assert.match(html,/Ningún pago ni pedido quedó confirmado/);
+});
