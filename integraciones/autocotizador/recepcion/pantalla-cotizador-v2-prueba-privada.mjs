@@ -201,6 +201,7 @@ if(previous?.items.length){
  status.textContent='Trabajos recuperados después de recargar. Volvé a seleccionar cada PDF: las fotos y archivos nunca se guardan en el navegador. Pedido de prueba: '+orderId;
  render();
 }
+updateSummary();
 window.addEventListener('message',event=>{
  if(event.origin!==location.origin||event.source!==frame.contentWindow)return;
  if(event.data?.type!=='SABER_ADD_PRINT')return;
