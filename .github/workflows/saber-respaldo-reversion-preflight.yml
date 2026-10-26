@@ -35,10 +35,10 @@ jobs:
             sha256sum /tmp/saber-current-worker | cut -d ' ' -f1 | sed "s/^/CURRENT_SCRIPT_SHA256_$worker /"
             for path in versions deployments; do
               status=$(curl --silent --show-error --max-time 15 --output /tmp/saber-cf-version-response --write-out '%{http_code}' -H "Authorization: Bearer $TOKEN" -H 'Accept: application/json' "$root/$worker/$path")
-              echo "CURRENT_$path_GET_$worker HTTP_$status"
+              echo "CURRENT_${path}_GET_$worker HTTP_$status"
               if [ "$status" = "200" ] && jq -e '.success == true' /tmp/saber-cf-version-response >/dev/null; then
-                echo "CURRENT_$path_AVAILABLE_$worker"
-                jq -r '.result | if type == "object" then (.items // .versions // .deployments // []) else . end | if type=="array" then length else 0 end' /tmp/saber-cf-version-response | sed "s/^/CURRENT_$path_COUNT_$worker /"
+                echo "CURRENT_${path}_AVAILABLE_$worker"
+                jq -r '.result | if type == "object" then (.items // .versions // .deployments // []) else . end | if type=="array" then length else 0 end' /tmp/saber-cf-version-response | sed "s/^/CURRENT_${path}_COUNT_$worker /"
               fi
             done
           done
