@@ -106,12 +106,14 @@ function updateSummary(){
  const amount=Number.isSafeInteger(value)?new Intl.NumberFormat('es-AR',{
   style:'currency',currency:'ARS',maximumFractionDigits:0}).format(value):'Requiere revisión';
  const remaining=allRefs.length-verified.length;
+ const withoutPdf=all.filter(item=>item.references.length===0).length;
  summary.replaceChildren();
  const title=document.createElement('strong');
  title.textContent='Resumen del pedido · '+verified.length+' de '+allRefs.length+' PDF verificados';
  const detail=document.createElement('p');
  detail.textContent='Cotización del servidor para archivos verificados: '+amount+
   '. '+(remaining?'Faltan '+remaining+' PDF.':'Todos los PDF declarados fueron verificados preliminarmente.')+
+   (withoutPdf?' Trabajos sin PDF asociado: '+withoutPdf+'; requieren revisión manual.':'')+
   ' Registro en Central D1: PENDIENTE. Pago y producción: DESACTIVADOS.';
  summary.append(title,detail);
 }
