@@ -1,0 +1,66 @@
+name: Saber - desplegar Documentos V2 solo en pruebas con rollback
+on:
+  push:
+    branches: [polaroids/express-pdf-unico-20261023]
+    paths: [.github/workflows/saber-documentos-v2-deploy-private.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  statuses: write
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Desplegar version validada y revertir automaticamente ante error
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          worker=saber-documentos-pruebas
+          new_version=b27560f0-334e-4826-b340-b5b15173eb57
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/$worker"
+          curl -fsS --max-time 20 -H "Authorization: Bearer $TOKEN" "$root/deployments" -o /tmp/deployments-before.json
+          jq -e '.success==true and (.result.deployments|type=="array") and (.result.deployments|length>0)' /tmp/deployments-before.json >/dev/null
+          old_version=$(jq -r '.result.deployments[0].versions | select(length==1 and .[0].percentage==100) | .[0].version_id' /tmp/deployments-before.json)
+          [[ "$old_version" =~ ^[0-9a-f-]{36}$ ]] && [ "$old_version" != "$new_version" ] || { echo "ROLLBACK_VERSION_NOT_UNAMBIGUOUS"; exit 1; }
+          echo "ROLLBACK_VERSION_READY"
+          curl -fsS --max-time 20 -H "Authorization: Bearer $TOKEN" "$root/settings" -o /tmp/bindings-before.json
+          jq -r '.result.bindings[] | [.name,.type] | @tsv' /tmp/bindings-before.json | sort >/tmp/binding-signature-before
+          jq -n --arg id "$new_version" '{strategy:"percentage",versions:[{version_id:$id,percentage:100}],annotations:{"workers/message":"Libreria Saber Documentos V2 privado, pagos cerrados"}}' > /tmp/new-deployment.json
+          rollback() {
+            echo "DEPLOY_VERIFY_FAILED_ATTEMPTING_ROLLBACK"
+            jq -n --arg id "$old_version" '{strategy:"percentage",versions:[{version_id:$id,percentage:100}],annotations:{"workers/message":"Automatic rollback Documentos V2 private test"}}' >/tmp/rollback.json
+            curl --silent --show-error --max-time 20 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' --data-binary @/tmp/rollback.json "$root/deployments" -o /tmp/rollback-result.json || true
+            if jq -e '.success==true' /tmp/rollback-result.json >/dev/null 2>&1; then echo "ROLLBACK_ACCEPTED"; else echo "ROLLBACK_FAILED_MANUAL_REVIEW_REQUIRED"; fi
+          }
+          http=$(curl --silent --show-error --max-time 30 --output /tmp/deploy-result.json --write-out '%{http_code}' -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' --data-binary @/tmp/new-deployment.json "$root/deployments")
+          if [ "$http" != "200" ] || ! jq -e '.success==true' /tmp/deploy-result.json >/dev/null; then
+            echo "DEPLOY_REJECTED_HTTP_$http"
+            jq -c '{errors:[.errors[]?|{code,message}]}' /tmp/deploy-result.json
+            exit 1
+          fi
+          echo "PRIVATE_DEPLOYMENT_CREATED"
+          if ! curl -fsS --max-time 20 -H "Authorization: Bearer $TOKEN" "$root" -o /tmp/live-script; then rollback; exit 1; fi
+          if ! grep -aq 'ensayo-preparar-documentos-v2-lote' /tmp/live-script; then rollback; exit 1; fi
+          curl -fsS --max-time 20 -H "Authorization: Bearer $TOKEN" "$root/settings" -o /tmp/bindings-after.json || { rollback; exit 1; }
+          jq -r '.result.bindings[] | [.name,.type] | @tsv' /tmp/bindings-after.json | sort >/tmp/binding-signature-after
+          if ! diff -q /tmp/binding-signature-before /tmp/binding-signature-after >/dev/null; then rollback; exit 1; fi
+          echo "PRIVATE_V2_DEPLOYED_ROUTES_PRESENT_BINDINGS_PRESERVED"
+          echo "NO_FLAGS_TOUCHED_NO_PAYMENTS_NO_PUBLIC_WEB"
+      - name: Registrar despliegue real
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_SHA: ${{ github.sha }}
+          STATUS: ${{ job.status }}
+        run: |
+          if [ "$STATUS" = success ]; then state=success; description="Documentos V2 privado desplegado y verificado"; else state=failure; description="Revisar despliegue V2 o rollback"; fi
+          jq -n --arg state "$state" --arg context 'saber-documentos/deploy-v2' --arg description "$description" --arg target_url "https://github.com/$GH_REPO/actions/runs/$GITHUB_RUN_ID" '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/deploy-status.json
+          gh api -X POST "repos/$GH_REPO/statuses/$GH_SHA" --input /tmp/deploy-status.json
