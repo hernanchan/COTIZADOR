@@ -36,3 +36,12 @@ Prioridad: cerrar los P0 existentes con pruebas trazables; no crear módulos par
 - **Paquete sin despliegue**: https://github.com/hernanchan/COTIZADOR/actions/runs/40207300153. Artefactos de Workers no constituyen copia de seguridad de código efectivamente desplegado.
 - **Próximo paso bloqueante**: contrastar scripts y bindings remotos con el paquete antes de reemplazar Workers; obtener acceso autorizado que permita respaldo/restauración y publicación solo en los dos Workers aislados. Luego probar el diagnóstico HMAC con bandera temporal, sin pagos ni D1 y apagarlo.
 - **No solicitar reinicios sucesivos de banderas al usuario**: agrupar en una operación controlada, reversible y verificable.
+
+
+## Actualización verificable — 26/10/2026 (después del cierre HMAC)
+- [x] **P0 Conectividad Documentos → Central:** ambos Workers de pruebas instalados al 100 % con sus Service Bindings, D1 y secretos conservados: [auditoría remota](https://github.com/hernanchan/COTIZADOR/actions/runs/40314872451).
+- [x] **Firma HMAC real:** una petición administrativa `verify-only` fue aceptada por Documentos y firmada hacia la Central; la respuesta certificó `signed:true`, `dbTouched:false`, `orderCreated:false`, `paymentAuthorized:false` y `checkoutEnabled:false`. [Ensayo real](https://github.com/hernanchan/COTIZADOR/actions/runs/40317987541).
+- [x] **Diagnósticos cerrados:** `CENTRAL_BRIDGE_PROBE_ENABLED=OFF` y `DOCS_CENTRAL_PROBE_ENABLED=OFF`, comprobados por GET en ambos Workers: [auditoría](https://github.com/hernanchan/COTIZADOR/actions/runs/40318616219).
+- [ ] **Siguiente P0 prioritario — compra documental completa:** vincular explícitamente el carrito V2 con el backend privado de recepción, exigir PDF verificado por GAS/Drive, recalcular en servidor, persistir manifiesto y pedido en Central D1 y comprobar idempotencia/reintentos. El archivo `preparar-documentos-central.mjs` aporta un adaptador privado de preparación comercial, pero su existencia y pruebas unitarias **no** demuestran que cada renglón V2 quede persistido en D1.
+- [ ] **Ensayo real de pedido sintético, no cobrado:** pendiente; requiere compuertas comerciales privadas distintas de las de HMAC. **No** habilitar `DOCS_CENTRAL_SYNC_ENABLED` ni `DOCS_ORDER_PREPARE_ENABLED` por defecto, ni escribir D1 antes de validar condiciones y mecanismo de limpieza de ensayos.
+- **Estado de lanzamiento: NO-GO.** Proteger `main`, sitio público, recepción de fotografías y cobros. La conexión HMAC queda cerrada; no pedir al usuario repetir los mismos pasos.
