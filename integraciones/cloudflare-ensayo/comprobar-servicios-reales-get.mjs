@@ -1,18 +1,30 @@
-/** Diagnóstico de los Workers de ensayo. GET únicamente; nunca crear pedidos ni pagos. */
-const hosts=[
- {name:'central',host:'saber-pagos-pruebas.hernanchan.workers.dev',path:'/'},
- {name:'documentos',host:'saber-documentos-pruebas.hernanchan.workers.dev',path:'/'},
- {name:'polaroids',host:'saber-polaroids-express-pruebas.hernanchan.workers.dev',path:'/'}
+/** Diagnóstico GET de Workers aislados, sin tocar D1 ni emitir pagos. */
+const probes=[
+ {service:'central',url:'https://saber-pagos-pruebas.libreriasaber.workers.dev/health'},
+ {service:'documentos',url:'https://saber-documentos-pruebas.libreriasaber.workers.dev/'}
 ];
-const results=[];
-for(const t of hosts){
- let result={service:t.name,reachable:false,http:null};
+let errors=0;
+for(const probe of probes){
  try{
-  const url='https://'+t.host+t.path;
-  const response=await fetch(url,{method:'GET',redirect:'manual',signal:AbortSignal.timeout(12000)});
-  result={service:t.name,reachable:true,http:response.status};
- }catch(err){result.error=err?.name||'NetworkError'}
- results.push(result);
+  const response=await fetch(probe.url,{method:'GET',redirect:'manual',
+   signal:AbortSignal.timeout(12000)});
+  let payload=null;
+  if(probe.service==='central'&&response.ok){
+   const t=await response.text();
+   try{const data=JSON.parse(t);
+    payload={environment:data?.environment,databaseReady:data?.databaseReady,
+     configured:data?.configured,paymentsEnabled:data?.paymentsEnabled};
+   }catch{payload={invalidJson:true}}
+  }
+  console.log('READ_ONLY_LIVE_CHECK',JSON.stringify({service:probe.service,
+   status:response.status,health:payload}));
+  if(probe.service==='central'&&(response.status!==200||payload?.environment!=='test'||
+    payload?.databaseReady!==true||payload?.paymentsEnabled!==false))errors++;
+ }catch(e){
+  errors++;
+  console.log('READ_ONLY_LIVE_CHECK',JSON.stringify({service:probe.service,
+   error:e?.name||'NetworkError'}));
+ }
 }
-for(const r of results)console.log('LIVE_GET_DIAGNOSTIC',JSON.stringify(r));
 console.log('READ_ONLY_NO_PAYMENTS_NO_WRITES');
+if(errors)process.exitCode=1;
