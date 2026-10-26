@@ -78,3 +78,5 @@ test('rechaza respuesta de Central que pretende habilitar cobro o confirmar sin 
   ...input,env:{...env,SABER_CENTRAL:b.binding}
  }),/no confirmó/);
 });
+
+// Regresión de cierre HMAC remoto 26/10/2026: mantener bloqueo de checkout y escritura comercial sin consentimiento.
