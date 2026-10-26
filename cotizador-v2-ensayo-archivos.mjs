@@ -13,6 +13,25 @@ const MAX_PAGES=2000;
 let libraryPromise=null;
 // Sólo en memoria de esta vista: la tienda jamás recibe los bytes del PDF.
 const seleccionPorFormulario=new WeakMap();
+// Archivos conservados ÚNICAMENTE en memoria de esta pestaña, nunca en carrito,
+// GitHub, almacenamiento local ni enlaces públicos.
+const archivosPendientesPrivados=new Map();
+if(typeof window!=='undefined'){
+ window.addEventListener('message',event=>{
+  if(event.source!==window.parent||event.origin!==location.origin||
+     event.data?.type!=='SABER_SOLICITAR_PDF_PRIVADO')return;
+  try{
+   if(window.parent.location.pathname!=='/prueba-v2/'||
+      location.pathname!=='/prueba-v2/cotizador')return;
+  }catch{return}
+  const ref=event.data.localRef;
+  if(typeof ref!=='string'||!/^[a-f0-9-]{36}$/i.test(ref))return;
+  const record=archivosPendientesPrivados.get(ref);
+  if(!record||record.file.size!==record.bytes||record.file.name!==record.name)return;
+  window.parent.postMessage({type:'SABER_ARCHIVO_PDF_PRIVADO',
+   localRef:ref,file:record.file},location.origin);
+ });
+}
 
 function loadPdfLib(){
  if(globalThis.PDFLib?.PDFDocument)return Promise.resolve(globalThis.PDFLib);
@@ -127,6 +146,10 @@ export function montarAsistentePdf(app,{leer=leerPaginasPdfCotizador,antesDeCoti
    const id=globalThis.crypto?.randomUUID?.();
    if(!/^[a-f0-9-]{36}$/i.test(id||''))
     throw Error('No se pudo identificar el archivo de manera segura.');
+   archivosPendientesPrivados.set(id,{file,name:file.name,bytes:file.size});
+   // Limitar memoria, sin retener indefinidamente archivos históricos.
+   while(archivosPendientesPrivados.size>30)
+    archivosPendientesPrivados.delete(archivosPendientesPrivados.keys().next().value);
    seleccionPorFormulario.set(app,{file,paginas:read.paginas,
     referencia:Object.freeze({schema:'saber-pdf-local-pendiente-v1',localRef:id,
      nombre:read.nombre.slice(0,180),bytes:read.bytes,sha256:read.sha256,
