@@ -45,7 +45,7 @@ function workerWith(sqlite){
  const env={
   DB:dbAdapter(sqlite),
   CENTRAL_BRIDGE_KEY:key,CENTRAL_BRIDGE_ENABLED:'PRIVATE_TEST_ONLY',
-  CENTRAL_PREPARE_ENABLED:'PRIVATE_TEST_ONLY',MP_TEST_ACCESS_TOKEN:'FAKE',
+  CENTRAL_PREPARE_ENABLED:'PRIVATE_TEST_ONLY',MP_TEST_ACCESS_TOKEN:'FAKE',MP_TEST_SELLER_ID:'local-seller-only',
   DEMO_ADMIN_KEY:'local-only-admin-password',
   MP_WEBHOOK_SECRET:'local-mp-secret',
   TEST_WEBHOOK_URL:'https://test.example/webhook'
