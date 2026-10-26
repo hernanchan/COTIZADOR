@@ -5,6 +5,7 @@ on:
     paths:
       - .github/workflows/saber-health-servicios-reales.yml
       - integraciones/cloudflare-ensayo/comprobar-servicios-reales-get.mjs
+      - integraciones/cloudflare-ensayo/auditar-compuertas-ensayo-get.mjs
   workflow_dispatch:
 permissions:
   contents: read
@@ -12,6 +13,9 @@ permissions:
 jobs:
   health:
     runs-on: ubuntu-latest
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
     timeout-minutes: 3
     steps:
       - uses: actions/checkout@v4
@@ -20,6 +24,11 @@ jobs:
           node-version: '22'
       - name: Diagnosticar Central y Documentos mediante GET sin escrituras
         run: node integraciones/cloudflare-ensayo/comprobar-servicios-reales-get.mjs
+      - name: Auditar GET compuertas sin cambiar estado
+        env:
+          SABER_CF_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          SABER_CF_EDITOR_TOKEN: ${{ secrets.SABER_CF_EDITOR_TOKEN }}
+        run: node integraciones/cloudflare-ensayo/auditar-compuertas-ensayo-get.mjs
       - name: Registrar resultado comprobación real
         if: always()
         env:
