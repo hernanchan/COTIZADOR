@@ -1,0 +1,54 @@
+name: Saber - subir version Documentos V2 sin desplegar
+on:
+  push:
+    branches: [polaroids/express-pdf-unico-20261023]
+    paths: [.github/workflows/saber-documentos-v2-stage-private.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Compilar Documentos V2
+        working-directory: integraciones/autocotizador/recepcion
+        run: |
+          npm install --no-audit --no-fund
+          npm run build:unificado
+          grep -q 'ensayo-preparar-documentos-v2-lote' dist/saber-documentos-cotizador-fase4.mjs
+      - name: Subir version aislada sin desplegar y heredando bindings
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          worker=saber-documentos-pruebas
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/$worker"
+          curl -fsS --max-time 20 -H "Authorization: Bearer $TOKEN" -H 'Accept: application/json' "$root/settings" -o /tmp/bindings.json
+          jq -e '.success == true and (.result.bindings|type=="array")' /tmp/bindings.json >/dev/null
+          for binding in SABER_CENTRAL DOCS_CENTRAL_ADMIN_KEY DOCS_SCRIPT_URL DOCS_RELAY_KEY CENTRAL_BRIDGE_KEY; do
+            jq -e --arg name "$binding" '.result.bindings | any(.name==$name)' /tmp/bindings.json >/dev/null
+          done
+          jq -n --arg commit "$GITHUB_SHA" --slurpfile settings /tmp/bindings.json \
+            '{main_module:"index.mjs",annotations:{"workers/message":"Libreria Saber V2 prueba privada, no desplegada","workers/commit_sha":$commit},bindings:[$settings[0].result.bindings[]|{name,type:"inherit"}]}' > /tmp/metadata.json
+          curl --silent --show-error --max-time 60 --fail-with-body \
+            -H "Authorization: Bearer $TOKEN" \
+            -F "metadata=@/tmp/metadata.json;type=application/json" \
+            -F "index.mjs=@integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs;type=application/javascript+module" \
+            "$root/versions?bindings_inherit=strict" -o /tmp/upload-result.json
+          if ! jq -e '.success==true and (.result.id|type=="string")' /tmp/upload-result.json >/dev/null; then
+            echo "VERSION_STAGE_FAILED"; jq -c '{success,errors}' /tmp/upload-result.json; exit 1
+          fi
+          jq -r '.result.id | "PRIVATE_VERSION_STAGED " + .' /tmp/upload-result.json
+          rm -f /tmp/bindings.json /tmp/metadata.json /tmp/upload-result.json
+          echo "NOT_DEPLOYED_NO_PRODUCTION_NO_PAYMENT"
