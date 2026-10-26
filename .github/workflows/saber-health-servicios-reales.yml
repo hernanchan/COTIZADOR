@@ -63,6 +63,27 @@ jobs:
             echo "WORKER_SETTINGS_READABLE_$worker"
           done
           rm -f /tmp/saber-worker-settings.json
+      - name: Confirmar activacion privada desde Cloudflare sin escrituras
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts"
+          for worker in saber-pagos-pruebas saber-documentos-pruebas; do
+            curl -fsS --max-time 20 -H "Authorization: Bearer $TOKEN" "$root/$worker/settings" -o /tmp/flags-read.json
+            if [ "$worker" = saber-pagos-pruebas ]; then
+              flags='["CENTRAL_PREPARE_ENABLED"]'
+            else
+              flags='["DOCS_V2_RECEIPT_LINK_ENABLED","DOCS_EXTENDED_RECEIVER_ENABLED","DOCS_CENTRAL_SYNC_ENABLED","DOCS_ORDER_PREPARE_ENABLED"]'
+            fi
+            echo "$flags" | jq -c . >/tmp/expected-flags.json
+            jq -e --slurpfile expected /tmp/expected-flags.json '
+              .success==true and ([.result.bindings[]|select(.type=="plain_text" and .text=="PRIVATE_TEST_ONLY")|.name] as $enabled | all($expected[0][]; . as $name | $enabled|index($name)!=null))' /tmp/flags-read.json >/dev/null
+            echo "PRIVATELY_CONFIGURED_REMOTE $worker"
+          done
+          echo "NO_WRITES_NO_PAYMENTS"
       - name: Registrar resultado comprobación real
         if: always()
         env:
