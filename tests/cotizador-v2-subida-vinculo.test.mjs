@@ -173,3 +173,39 @@ test('presupuesto de color A3 conserva material propio, nunca usa el de A4',asyn
  assert.equal(done.cotizacionServidor.formato,'a3');
  assert.equal(done.paymentAuthorized,false);
 });
+
+
+test('corte de conexión: la segunda llamada continúa con la misma sesión sin repetir inicio ni bloque 0',async()=>{
+ const t=backend();
+ const upstream=t.args.fetcher;
+ let broken=false,started=0,parts=[];
+ const fetcher=async(url,options)=>{
+  const body=JSON.parse(options.body);
+  if(body.op==='start')started++;
+  if(body.op==='part'){
+   parts.push(body.index);
+   if(body.index===1&&!broken){broken=true;throw Error('Conexión del celular interrumpida');}
+  }
+  if(body.op==='status'&&broken){
+   return Response.json({ok:true,uploadId,acceptedParts:[0],receivedBytes:524288});
+  }
+  return upstream(url,options);
+ };
+ let saved=null;
+ const props={...t.args,fetcher,onSession:s=>{saved=s;}};
+ await assert.rejects(subirYVincularPdfCotizadorV2(props),/interrumpida/);
+ assert.deepEqual(saved,{uploadId,token});
+ const recovered=await subirYVincularPdfCotizadorV2({...props,sesionPrevia:saved});
+ assert.equal(recovered.reciboGoogleVerificado,true);
+ assert.equal(started,1,'El segundo intento NO crea otra sesión');
+ assert.deepEqual(parts,[0,1,1],'Sólo se reintenta el bloque no aceptado');
+ assert.equal(recovered.paymentAuthorized,false);
+ assert.doesNotMatch(JSON.stringify(recovered),/token|dataBase64/);
+});
+test('una sesión anterior malformada no provoca llamadas a recepción',async()=>{
+ const t=backend();
+ await assert.rejects(subirYVincularPdfCotizadorV2({...t.args,
+  sesionPrevia:{uploadId:'DOC-ajeno',token:'invalid'}
+ }),/no corresponden/);
+ assert.equal(t.ops.length,0);
+});
