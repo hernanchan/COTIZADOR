@@ -37,13 +37,13 @@ jobs:
             fi
             echo "$flags" >/tmp/flags.json
             jq -n --slurpfile prev /tmp/settings-before.json --slurpfile flags /tmp/flags.json '
-              {settings:{bindings: (
+              {bindings: (
                 [ $prev[0].result.bindings[]
                  | select(.name as $name | ($flags[0]|index($name))==null)
                  | {name,type:"inherit"} ] +
                 [ $flags[0][] | {name:.,type:"plain_text",text:"PRIVATE_TEST_ONLY"} ]
-              )}}' >/tmp/patch.json
-            http=$(curl --silent --show-error --max-time 25 --output /tmp/patch-response.json --write-out '%{http_code}' -X PATCH -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' --data-binary @/tmp/patch.json "$root/$worker/settings")
+              )}' >/tmp/patch.json
+            http=$(curl --silent --show-error --max-time 25 --output /tmp/patch-response.json --write-out '%{http_code}' -X PATCH -H "Authorization: Bearer $TOKEN" -F "settings=@/tmp/patch.json;type=application/json" "$root/$worker/settings")
             if [ "$http" != "200" ] || ! jq -e '.success==true' /tmp/patch-response.json >/dev/null; then
               echo "FLAG_UPDATE_FAILED_$worker HTTP_$http"
               jq -c '{errors:[.errors[]?|{code,message}]}' /tmp/patch-response.json
