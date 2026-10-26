@@ -36,7 +36,8 @@ async function sameOriginRpc(path,body,{fetcher,origin}){
 }
 export async function subirYVincularPdfCotizadorV2({
  archivo,referencia,orderId,modo,turnstileToken,opciones,
- origin,fetcher=fetch,subtle=crypto.subtle,onProgress=()=>{}
+ origin,fetcher=fetch,subtle=crypto.subtle,onProgress=()=>{},
+ sesionPrevia=null,onSession=()=>{}
 }){
  const r=referencia;
  if(!r||r.schema!=='saber-pdf-local-pendiente-v1'||
@@ -51,7 +52,10 @@ export async function subirYVincularPdfCotizadorV2({
     typeof archivo.arrayBuffer!=='function'||
     !WEB.test(orderId||'')||!['bn','color'].includes(modo)||
     typeof turnstileToken!=='string'||turnstileToken.length<10||
-    typeof onProgress!=='function')
+    typeof onProgress!=='function'||typeof onSession!=='function'||
+   (sesionPrevia!==null&&(!RECEIPT.test(sesionPrevia?.uploadId||'')||
+    typeof sesionPrevia.token!=='string'||sesionPrevia.token.length<16||
+    sesionPrevia.token.length>256)))
   throw Error('El archivo, el trabajo o la verificación no corresponden.');
  if(opciones!==undefined&&(!opciones||typeof opciones!=='object'||Array.isArray(opciones)||
     Object.keys(opciones).sort().join(',')!=='anillado,caras,copias,formato,materialColor'||
@@ -71,17 +75,28 @@ export async function subirYVincularPdfCotizadorV2({
  const rpc=(path,payload)=>sameOriginRpc(path,payload,{fetcher,origin});
  const parts=Math.ceil(bytes.length/PART);
  onProgress({phase:'inicio',completed:0,total:parts});
- const start=await rpc('/api/ensayo-pdf-ampliado',{op:'start',turnstileToken,
-  meta:{orderId,fileId:'pdf-'+r.sha256.slice(0,24),
-   name:r.nombre,mode:modo,bytes:r.bytes,sha256:r.sha256,
-   partBytes:PART,parts}
- });
- if(!RECEIPT.test(start.uploadId||'')||
-    typeof start.token!=='string'||start.token.length<16||
-    start.paymentAuthorized!==false||
-    start.orderId!==orderId)
-  throw Error('El servidor no confirmó una sesión privada.');
- const session={uploadId:start.uploadId,token:start.token};
+ let session;
+ if(sesionPrevia){
+  // Sólo reintentar dentro de esta pestaña. No conservar la credencial
+  // bearer de GAS en localStorage ni sessionStorage.
+  session={uploadId:sesionPrevia.uploadId,token:sesionPrevia.token};
+  onProgress({phase:'reanudacion',completed:0,total:parts});
+ }else{
+  const start=await rpc('/api/ensayo-pdf-ampliado',{op:'start',turnstileToken,
+   meta:{orderId,fileId:'pdf-'+r.sha256.slice(0,24),
+    name:r.nombre,mode:modo,bytes:r.bytes,sha256:r.sha256,
+    partBytes:PART,parts}
+  });
+  if(!RECEIPT.test(start.uploadId||'')||
+     typeof start.token!=='string'||start.token.length<16||
+     start.token.length>256||start.paymentAuthorized!==false||
+     start.orderId!==orderId)
+   throw Error('El servidor no confirmó una sesión privada.');
+  session={uploadId:start.uploadId,token:start.token};
+ }
+ // Guardar exclusivamente en memoria de la página tras verificar SHA local.
+ // Si falla una transferencia, la próxima llamada consulta partes existentes.
+ onSession(Object.freeze({...session}));
  const status=await rpc('/api/ensayo-pdf-ampliado',{op:'status',...session});
  if(status.uploadId!==session.uploadId||
     !Array.isArray(status.acceptedParts))
