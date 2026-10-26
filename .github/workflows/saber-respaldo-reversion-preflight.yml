@@ -1,0 +1,57 @@
+name: Saber - verificar respaldo y reversión privada
+on:
+  push:
+    branches: [polaroids/express-pdf-unico-20261023]
+    paths:
+      - .github/workflows/saber-respaldo-reversion-preflight.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  statuses: write
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Verificar respaldo y despliegues vigentes sin escrituras
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts"
+          for worker in saber-documentos-pruebas saber-pagos-pruebas; do
+            status=$(curl --silent --show-error --max-time 15 --output /tmp/saber-current-worker --write-out '%{http_code}' -H "Authorization: Bearer $TOKEN" "$root/$worker")
+            echo "CURRENT_SCRIPT_GET_$worker HTTP_$status"
+            if [ "$status" != "200" ] || [ ! -s /tmp/saber-current-worker ]; then
+              echo "BLOCKED_NO_RETRIEVABLE_CURRENT_SCRIPT_$worker"
+              exit 1
+            fi
+            sha256sum /tmp/saber-current-worker | cut -d ' ' -f1 | sed "s/^/CURRENT_SCRIPT_SHA256_$worker /"
+            for path in versions deployments; do
+              status=$(curl --silent --show-error --max-time 15 --output /tmp/saber-cf-version-response --write-out '%{http_code}' -H "Authorization: Bearer $TOKEN" -H 'Accept: application/json' "$root/$worker/$path")
+              echo "CURRENT_$path_GET_$worker HTTP_$status"
+              if [ "$status" = "200" ] && jq -e '.success == true' /tmp/saber-cf-version-response >/dev/null; then
+                echo "CURRENT_$path_AVAILABLE_$worker"
+                jq -r '.result | if type == "object" then (.items // .versions // .deployments // []) else . end | if type=="array" then length else 0 end' /tmp/saber-cf-version-response | sed "s/^/CURRENT_$path_COUNT_$worker /"
+              fi
+            done
+          done
+          rm -f /tmp/saber-current-worker /tmp/saber-cf-version-response
+          echo 'READ_ONLY_BACKUP_PREFLIGHT_COMPLETE'
+      - name: Registrar diagnóstico de reversión
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_SHA: ${{ github.sha }}
+          STATUS: ${{ job.status }}
+        run: |
+          if [ "$STATUS" = success ]; then state=success; description="Scripts existentes recuperables: sólo GET"; else state=failure; description="Respaldo remoto insuficiente: detener cambios"; fi
+          jq -n --arg state "$state" --arg context 'saber-cloudflare/rollback-preflight' --arg description "$description" --arg target_url "https://github.com/$GH_REPO/actions/runs/$GITHUB_RUN_ID" '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/saber-rollback.json
+          gh api -X POST "repos/$GH_REPO/statuses/$GH_SHA" --input /tmp/saber-rollback.json
