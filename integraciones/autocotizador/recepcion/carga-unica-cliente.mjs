@@ -209,6 +209,56 @@ async function iniciar(){
 }
 iniciar();
 
+
+// El puente de recepción sólo existe dentro del portal privado autenticado.
+// La clasificación local sirve para cotizar; el servidor verifica cada PDF
+// nuevamente antes de generar una orden. Ningún ploteo se registra aquí.
+if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
+ const bridgeButton=document.createElement('button');
+ bridgeButton.type='button';bridgeButton.id='enviar-cotizacion-inteligente';
+ bridgeButton.textContent='Agregar PDF al envío privado';
+ const info=document.createElement('p');
+ info.className='pie';info.setAttribute('role','status');
+ info.textContent='Para este ensayo el envío integrado admite sólo PDF completos A4/A3 sin anillado. Los ploteos se cotizan, pero quedan pendientes de integración con el servidor.';
+ const resumen=$('resumenPedido');
+ resumen?.parentNode?.insertBefore(bridgeButton,resumen);
+ bridgeButton.insertAdjacentElement('afterend',info);
+ bridgeButton.addEventListener('click',()=>{
+  try{
+   if(leyendo||!ultimoPresupuesto||ultimoPresupuesto.estado!=='PRELIMINAR'||
+      !Number.isSafeInteger(ultimoPresupuesto.total)||ultimoPresupuesto.total<1||
+      entries.length<1||entries.length>30||
+      ultimoPresupuesto.plan?.length!==entries.length)
+    throw Error('Completá primero la cotización de todos los documentos.');
+   const files=[],options=[];
+   for(let i=0;i<entries.length;i++){
+    const e=entries[i],plan=ultimoPresupuesto.plan.find(p=>p.indice===i);
+    if(!plan||plan.destino!=='documentos')
+     throw Error('Los ploteos y otros servicios se calculan automáticamente, pero su recepción privada todavía requiere la validación del servidor.');
+    if(!e.archivoOriginal||!Number.isSafeInteger(e.archivoOriginal.size)||
+       e.archivoOriginal.size<5||e.archivoOriginal.size>20*1024*1024||
+       e.name.length>120||!/\\.pdf$/i.test(e.name))
+     throw Error('La recepción privada admite PDF de hasta 20 MB por archivo.');
+    if(e.anillado!=='ninguno')
+     throw Error('El anillado está disponible para cotizar, pero su registro privado todavía requiere validación.');
+    if(!Array.isArray(e.paginas)||e.paginas.length<1||
+       e.paginas.length>2000||plan.paginasElegidas.length!==e.paginas.length)
+     throw Error('El envío directo admite PDF completos, sin selección parcial de páginas.');
+    if(!['a4','a3'].includes(plan.formatoFinal)||
+       !['bn','color'].includes(e.modo)||!['simple','double'].includes(e.caras)||
+       !Number.isSafeInteger(e.copias)||e.copias<1||e.copias>200)
+     throw Error('Formato, copias o impresión no admitidos por la recepción privada.');
+    files.push(e.archivoOriginal);
+    options.push({formato:plan.formatoFinal,modo:e.modo,caras:e.caras,
+     copias:e.copias,materialColor:e.materialColor,
+     paginas:e.paginas.length,nombre:e.name});
+   }
+   window.parent.postMessage({type:'SABER_SMART_DOCUMENTS_TO_PRIVATE',
+    files,options,total:ultimoPresupuesto.total},location.origin);
+   info.textContent='Documentos enviados a la cola del portal privado. El envío a Drive se realizará únicamente al pulsar «Enviar todos los PDF del pedido».';
+  }catch(error){info.textContent=String(error.message||error)}
+ });
+}
 $('prepararPedido').addEventListener('click',()=>{
  const contenedor=$('resumenPedido');contenedor.replaceChildren();
  try{
