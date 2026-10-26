@@ -84,6 +84,19 @@ jobs:
             echo "PRIVATELY_CONFIGURED_REMOTE $worker"
           done
           echo "NO_WRITES_NO_PAYMENTS"
+      - name: Prueba negativa de seguridad V2 real sin datos ni escrituras
+        shell: bash
+        run: |
+          set -euo pipefail
+          origin=https://saber-documentos-pruebas.libreriasaber.workers.dev
+          code=$(curl --silent --show-error --max-time 12 --output /tmp/saber-private-response --write-out '%{http_code}' "$origin/prueba-v2/")
+          if [ "$code" != 503 ] && [ "$code" != 401 ]; then echo "PRIVATE_PORTAL_UNEXPECTED_STATUS_$code"; exit 1; fi
+          echo "PRIVATE_PORTAL_CLOSED_TO_ANONYMOUS_HTTP_$code"
+          code=$(curl --silent --show-error --max-time 12 --output /tmp/saber-noauth-response --write-out '%{http_code}' -X POST -H "Origin: $origin" -H 'Content-Type: application/json' -d '{}' "$origin/api/ensayo-preparar-documentos-v2-lote")
+          if [ "$code" != 401 ] && [ "$code" != 403 ] && [ "$code" != 503 ]; then echo "V2_PREPARE_UNEXPECTED_STATUS_$code"; exit 1; fi
+          echo "V2_PREPARE_REJECTS_ANONYMOUS_HTTP_$code"
+          rm -f /tmp/saber-private-response /tmp/saber-noauth-response
+          echo "NEGATIVE_SECURITY_TEST_NO_VALID_ORDER_NO_PAYMENT"
       - name: Registrar resultado comprobación real
         if: always()
         env:
