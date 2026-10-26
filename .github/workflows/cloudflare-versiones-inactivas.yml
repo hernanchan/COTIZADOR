@@ -5,6 +5,7 @@ on:
       - polaroids/express-pdf-unico-20261023
     paths:
       - '.github/workflows/cloudflare-versiones-inactivas.yml'
+      - 'integraciones/cloudflare-ensayo/crear-versiones-inactivas.mjs'
   workflow_dispatch:
 permissions:
   contents: read
