@@ -38,6 +38,17 @@ jobs:
             exit 1
           fi
           echo "TEMP_SECRET_PRESENT"
+      - name: Verificar token temporal con Cloudflare sin escrituras
+        env:
+          TEMP_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          http=$(curl --silent --output /tmp/saber-token-verify.json --write-out '%{http_code}' --max-time 15 --header "Authorization: Bearer $TEMP_TOKEN" --header 'Accept: application/json' 'https://api.cloudflare.com/client/v4/user/tokens/verify')
+          if [ "$http" != "200" ] || ! jq -e '.success == true and .result.status == "active"' /tmp/saber-token-verify.json >/dev/null; then
+            echo "CLOUDFLARE_TOKEN_VERIFY_FAILED_HTTP_$http"
+            exit 1
+          fi
+          rm -f /tmp/saber-token-verify.json
+          echo "CLOUDFLARE_TEMP_TOKEN_ACTIVE"
       - name: Registrar resultado comprobación real
         if: always()
         env:
