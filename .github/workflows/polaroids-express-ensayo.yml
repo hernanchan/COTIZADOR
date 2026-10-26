@@ -94,6 +94,13 @@ jobs:
           grep -Fq 'reanudacion' subir-vincular-pdf-v2-privado.txt
           grep -Fq 'Estado remoto incompatible tras un corte' subir-vincular-pdf-v2-privado.txt
           echo 'DOCUMENTOS_V2_BUNDLE_VERIFIED'
+      - name: Guardar Worker documental V2 compilado para despliegue privado controlado
+        uses: actions/upload-artifact@v4
+        with:
+          name: saber-documentos-v2-worker-privado
+          path: integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
+          if-no-files-found: error
+          retention-days: 3
       - name: Instalar motor Express de Cloudflare Pages (sin despliegue)
         working-directory: integraciones/polaroids/express
         run: npm install --no-audit --no-fund
