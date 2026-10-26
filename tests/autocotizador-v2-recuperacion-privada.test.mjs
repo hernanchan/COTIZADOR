@@ -52,7 +52,8 @@ test('restauración ejecutada: admite 30 referencias pero descarta 31 repartidas
   estado:'PENDIENTE_DE_ENVIO',recibido:false,verificadoServidor:false
  });
  const orderId='WEB-ENSAYO-'+('A'.repeat(32));
- const make=count=>JSON.stringify({orderId,savedAt:Date.now(),
+ const clientOrderId='12345678-1234-4234-8234-1234567890ab';
+ const make=count=>JSON.stringify({orderId,clientOrderId,savedAt:Date.now(),
   items:Array.from({length:Math.ceil(count/10)},(_,i)=>({
    name:'Trabajo '+i,price:500,
    references:Array.from({length:Math.min(10,count-i*10)},(_,j)=>({
@@ -64,6 +65,15 @@ test('restauración ejecutada: admite 30 referencias pero descarta 31 repartidas
  const recovered=ctx.testRestore();
  assert.equal(recovered.items.length,3);
  assert.equal(recovered.seen.size,30);
+ assert.equal(recovered.clientOrderId,clientOrderId);
  saved=make(31);
  assert.equal(ctx.testRestore(),null);
+});
+
+test('recuperación conserva la misma identidad comercial y rechaza claves manipuladas',()=>{
+ const src=match[1];
+ assert.match(src,/clientOrderId=previous\?\.clientOrderId\|\|newClientOrderId\(\)/);
+ assert.match(src,/JSON\.stringify\(\{orderId,clientOrderId,items,savedAt:Date\.now\(\)\}\)/);
+ assert.match(src,/state\.clientOrderId/);
+ assert.match(src,/clientOrderId,items:\[\],manifiesto,sesiones/);
 });
