@@ -42,6 +42,9 @@ jobs:
           grep -Fq 'id="smart"' /tmp/portal
           grep -Fq 'SABER_SMART_DOCUMENTS_TO_PRIVATE' /tmp/portal
           grep -Fq 'send-all-pdf' /tmp/portal
+          grep -Fq 'recepcion-avanzada' /tmp/portal
+          grep -Fq 'SABER_SMART_RESIZE' /tmp/portal
+          echo "UNIFIED_FULL_WIDTH_PORTAL_PRIVATE_HTTP_200"
           echo "INTEGRATED_SINGLE_SCREEN_PRIVATE_HTTP_200"
           rm -f /tmp/portal
           rm -f /tmp/anonymous /tmp/page /tmp/client
