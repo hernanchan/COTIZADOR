@@ -19,3 +19,18 @@ test('la pantalla mantiene presentación adaptable y prohíbe exponer credencial
  assert.match(html,/sessionStorage/);
  assert.match(html,/save\(\);updateSummary\(\)/);
 });
+
+
+test('el portal privado prepara un único pedido desde PDF verificados sin clave administrativa',()=>{
+ const html=paginaCotizadorV2PruebaPrivada('turnstile-site-key-test-2026');
+ assert.match(html,/id="register-private"/);
+ assert.match(html,/prepararManifiestoDocumentalV2/);
+ assert.match(html,/api\/ensayo-preparar-documentos-v2-lote/);
+ assert.match(html,/clientOrderId,items:\[\],manifiesto,sesiones/);
+ assert.match(html,/d\.sesionConfirmada=d\.sesionTemporal/);
+ assert.match(html,/delete d\.sesionConfirmada/);
+ assert.match(html,/registeredOrder=result\.orderId/);
+ assert.match(html,/result\.paymentAuthorized!==false/);
+ assert.match(html,/sin anillado conjunto ni trabajos sin archivo/);
+ assert.doesNotMatch(html,/x-saber-signature|CENTRAL_BRIDGE_KEY|DOCS_CENTRAL_ADMIN_KEY/);
+});
