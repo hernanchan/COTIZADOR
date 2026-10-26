@@ -47,6 +47,14 @@ jobs:
           curl -fsS --max-time 20 -H "Authorization: Bearer $TOKEN" "$root/settings" -o /tmp/settings-after.json
           jq -e '.result.bindings|any(.[];.name=="DOCS_V2_PRIVATE_UI_ENABLED" and .type=="plain_text" and .text=="PRIVATE_TEST_ONLY")' /tmp/settings-after.json >/dev/null
           jq -e '.result.bindings|any(.[];.name=="DOCS_V2_PRIVATE_UI_SECRET")' /tmp/settings-after.json >/dev/null
+          origin=https://saber-documentos-pruebas.libreriasaber.workers.dev
+          code=$(curl --silent --show-error --max-time 20 --output /tmp/private-home.html --write-out '%{http_code}' --user "operador:$PASSWORD" "$origin/prueba-v2/")
+          if [ "$code" != 200 ] || ! grep -aq "Cotizador V2 en ensayo privado" /tmp/private-home.html; then
+            echo "PORTAL_AUTH_VERIFICATION_FAILED_HTTP_$code"
+            exit 1
+          fi
+          echo "PRIVATE_PORTAL_AUTHENTICATED_HTTP_200"
+          rm -f /tmp/private-home.html
           echo "PRIVATE_PORTAL_ENABLED_NO_PUBLIC_WEB_NO_PAYMENTS"
           rm -f /tmp/settings-before.json /tmp/settings-after.json /tmp/update-response.json
       - name: Registrar acceso privado
