@@ -114,10 +114,29 @@ export async function subirYVincularPdfCotizadorV2({
   if(accepted.has(index))continue;
   const part=bytes.subarray(index*PART,Math.min(bytes.length,(index+1)*PART));
   const proof=await digest(part,subtle);
-  const received=await rpc('/api/ensayo-pdf-ampliado',{
-   op:'part',...session,index,bytes:part.length,
-   sha256:proof,dataBase64:asBase64(part)
-  });
+  let received;
+  try{
+   received=await rpc('/api/ensayo-pdf-ampliado',{
+    op:'part',...session,index,bytes:part.length,
+    sha256:proof,dataBase64:asBase64(part)
+   });
+  }catch(error){
+   // Si la conexión se corta después de que Google aceptó el bloque,
+   // nunca repetirlo a ciegas. Consultar primero el estado autenticado.
+   // Si falla el estado, conservar la sesión para reintento manual.
+   let remote;
+   try{remote=await rpc('/api/ensayo-pdf-ampliado',{
+    op:'status',...session
+   });}catch{throw error;}
+   if(remote.uploadId!==session.uploadId||
+      !Array.isArray(remote.acceptedParts)||
+      new Set(remote.acceptedParts).size!==remote.acceptedParts.length||
+      remote.acceptedParts.some(i=>!Number.isSafeInteger(i)||i<0||i>=parts))
+    throw Error('Estado remoto incompatible tras un corte de conexión.');
+   if(!remote.acceptedParts.includes(index))throw error;
+   received={accepted:true,index};
+   onProgress({phase:'recuperado',completed:index+1,total:parts});
+  }
   if(received.accepted!==true||received.index!==index)
    throw Error('Un fragmento del PDF no fue aceptado.');
   onProgress({phase:'transferencia',completed:index+1,total:parts});
