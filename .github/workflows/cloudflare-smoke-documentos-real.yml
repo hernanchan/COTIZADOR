@@ -1,0 +1,36 @@
+name: Saber - validar Documentos activado (GET)
+on:
+  push:
+    branches: [polaroids/express-pdf-unico-20261023]
+    paths:
+      - '.github/workflows/cloudflare-smoke-documentos-real.yml'
+      - 'integraciones/cloudflare-ensayo/smoke-documentos-real-get.mjs'
+  workflow_dispatch:
+permissions:
+  contents: read
+  statuses: write
+jobs:
+  check:
+    if: github.ref == 'refs/heads/polaroids/express-pdf-unico-20261023'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Comprobar rutas GET del Worker documental real
+        run: node integraciones/cloudflare-ensayo/smoke-documentos-real-get.mjs
+      - name: Registrar resultado
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_SHA: ${{ github.sha }}
+          STATUS: ${{ job.status }}
+        run: |
+          if [ "$STATUS" = success ]; then state=success; description="Worker Documentos real: rutas GET cerradas"; else state=failure; description="Worker Documentos: revisar seguridad de rutas GET"; fi
+          jq -n --arg state "$state" --arg context "saber-cloudflare/docs-real-smoke" --arg description "$description" --arg target_url "https://github.com/$GH_REPO/actions/runs/$GITHUB_RUN_ID" '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/docs-smoke-status.json
+          gh api -X POST "repos/$GH_REPO/statuses/$GH_SHA" --input /tmp/docs-smoke-status.json
