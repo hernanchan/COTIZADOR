@@ -33,6 +33,14 @@ jobs:
               exit 1
             fi
             sha256sum /tmp/saber-current-worker | cut -d ' ' -f1 | sed "s/^/CURRENT_SCRIPT_SHA256_$worker /"
+            if [ "$worker" = "saber-documentos-pruebas" ]; then
+              for marker in 'ensayo-preparar-documentos-v2-lote' 'prueba-v2/'; do
+                if grep -aq "$marker" /tmp/saber-current-worker; then echo "DOC_REMOTE_MARKER_PRESENT $marker"; else echo "DOC_REMOTE_MARKER_MISSING $marker"; fi
+              done
+            fi
+            if [ "$worker" = "saber-pagos-pruebas" ]; then
+              if grep -aq '/internal/central/prepare-order' /tmp/saber-current-worker; then echo 'CENTRAL_PREPARE_ROUTE_PRESENT'; else echo 'CENTRAL_PREPARE_ROUTE_MISSING'; fi
+            fi
             for path in versions deployments; do
               status=$(curl --silent --show-error --max-time 15 --output /tmp/saber-cf-version-response --write-out '%{http_code}' -H "Authorization: Bearer $TOKEN" -H 'Accept: application/json' "$root/$worker/$path")
               echo "CURRENT_${path}_GET_$worker HTTP_$status"
