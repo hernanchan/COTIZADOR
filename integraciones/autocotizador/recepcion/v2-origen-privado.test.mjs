@@ -53,7 +53,7 @@ test('portal copia V2 solo desde el mismo origen; no enlaza a GitHub Pages',asyn
  assert.doesNotMatch(h,/dataBase64|driveFileId|CENTRAL_BRIDGE_KEY|DOCS_RELAY_KEY/);
  const source=h.match(/<script type="module">([\s\S]*?)<\/script>/)?.[1];
  assert.ok(source&&source.length>800);
- assert.doesNotThrow(()=>new Function(source.replace(/^import \{[^\n]*\} from [^\n]+;\s*/m,'')));
+ assert.doesNotThrow(()=>new Function(source.replace(/^import \{[^\n]*\} from [^\n]+;\s*/gm,'')));
 });
 test('cotizador V2 y precios originales disponibles sin pedir GitHub Pages',async()=>{
  const r=await get('/prueba-v2/cotizador?integrado=1&ensayoArchivos=1');
