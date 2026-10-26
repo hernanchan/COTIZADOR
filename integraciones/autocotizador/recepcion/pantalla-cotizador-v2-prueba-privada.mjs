@@ -210,6 +210,7 @@ window.addEventListener('message',event=>{
     !Number.isFinite(p.price)||p.price<=0||
     !Array.isArray(p.pdfDrafts)||p.pdfDrafts.length>30)return;
  const refs=[],seen=new Set();
+ if(all.reduce((n,item)=>n+item.references.length,0)+p.pdfDrafts.length>30)return;
  for(const d of p.pdfDrafts){
   const r=d?.reference;
   if(!d||d.service!=='impresiones'||!Number.isSafeInteger(d.itemIndex)||
