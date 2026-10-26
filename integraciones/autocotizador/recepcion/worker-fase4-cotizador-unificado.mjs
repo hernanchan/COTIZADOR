@@ -1383,6 +1383,22 @@ function v2PrivateBrowserResponse(request,env,path){
    return new Response(html,{status:200,headers:{
     ...headers,'Content-Type':'text/html; charset=utf-8'}});
   }
+  if(path==='/prueba-v2/carga-inteligente'){
+   // Reutiliza el analizador consolidado CAD/Póster/rollos sin derivar
+   // a la ruta de prueba pública ni recibir originales por esta pantalla.
+   const html=paginaCargaUnica().replace(
+    /<script src="\\/prueba-carga-unica.js" defer><\\/script>/,
+    '<script src="/prueba-v2/carga-inteligente.js" defer></script>'
+   ).replace(
+    'Prueba privada de clasificación.',
+    'Cotizador inteligente privado: análisis automático de tamaños, CAD/Póster y rollo.'
+   );
+   return new Response(html,{status:200,headers:{
+    ...headers,'Content-Type':'text/html; charset=utf-8'}});
+  }
+  if(path==='/prueba-v2/carga-inteligente.js')
+   return new Response(cargaClienteJs,{status:200,headers:{
+    ...headers,'Content-Type':'text/javascript; charset=utf-8'}});
   if(path==='/prueba-v2/cotizador'){
    // En la copia privada se apaga únicamente la telemetría de Google Analytics.
    const html=cotizadorV2OriginalHtml.replace(
@@ -1412,6 +1428,8 @@ export default {
   async fetch(request, env, ctx) {
     const page=new URL(request.url).pathname;
     if(page==='/prueba-v2/'||page==='/prueba-v2/cotizador'||
+       page==='/prueba-v2/carga-inteligente'||
+       page==='/prueba-v2/carga-inteligente.js'||
        page==='/prueba-v2/precios-web.json'||
        page==='/prueba-v2/cotizador-v2-ensayo-archivos.mjs'||
        page==='/prueba-v2/subir-vincular-pdf.mjs'||
