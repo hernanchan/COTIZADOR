@@ -19,6 +19,9 @@ label{display:flex;flex-direction:column;gap:7px;font-weight:650;font-size:16px;
 input,select{font:inherit;font-weight:400;width:100%;min-width:0;padding:12px;border:1px solid #a1b3c3;border-radius:9px;background:#fff;color:#18334a;min-height:48px}
 input:focus,select:focus{outline:3px solid #bedcf4;border-color:#2878ad}
 #archivos{width:100%;max-width:620px;border:2px dashed #9fb8cd;background:#f5faff;padding:20px;min-height:68px}
+#zonaArchivos{border:2px dashed #8fabc2;background:#f5faff;border-radius:12px;padding:20px;margin:18px 0;transition:background .15s,border-color .15s}
+#zonaArchivos.arrastrando{background:#dfedfa;border-color:#0c6193}
+#zonaArchivos p{margin:0 0 12px;color:#375873}
 #estado{margin:12px 0;color:#556a7d;font-size:15px}
 #presupuesto{background:#eaf3fa;border:1px solid #bad2e7;padding:22px 26px;position:sticky;top:8px;z-index:3;box-shadow:0 4px 10px #173c5210}
 #presupuesto strong{font-size:25px;color:#113d61;line-height:1.4}
@@ -45,5 +48,34 @@ h2{font-size:19px;margin:20px 0 7px}
 #resumenPedido{margin:12px 0}#resumenPedido li{padding:5px 0;overflow-wrap:anywhere}#resumenPedido .advertencia{background:#fff1da;border-left:4px solid #d99428;padding:12px}
 @media(max-width:720px){.fila{grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;padding:12px}.fila-principal{grid-column:1/-1}.precio-archivo{text-align:left}.editar{justify-self:end}.panel-edicion .controles{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:440px){.panel-edicion .controles{grid-template-columns:1fr}}
-</style></head><body><main><h1>Una sola carga · Tamaño final</h1><p class="nota"><strong>Prueba privada de clasificación.</strong> Seleccioná varios PDF sin elegir de antemano entre impresiones y ploteos. Confirmá en qué tamaño querés imprimir cada archivo: el original puede ser A2, aunque quieras A4. Sin envío de originales, pedidos ni pagos. Presupuestos orientativos sin validez comercial hasta verificar los archivos. La clasificación CAD/Póster y las tarifas existentes no se modifican.</p><label for="archivos">Agregar PDF (hasta 30)</label><input id="archivos" type="file" accept=".pdf,application/pdf" multiple><p id="estado" role="status">Cargando…</p><h2>Resumen del presupuesto</h2><section class="archivo" id="presupuesto" aria-live="polite">Esperando archivos…</section><button id="prepararPedido" type="button" disabled>Revisar pedido (sin enviar)</button><section id="resumenPedido" aria-live="polite"></section><h2>Configuración de tus archivos</h2><div id="lista"></div><p><a href="/prueba-cotizador-conjunto">Volver a los presupuestos de prueba</a></p></main><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script><script src="/prueba-carga-unica.js" defer></script></body></html>`;
+</style></head><body><main><h1>Una sola carga · Tamaño final</h1><p class="nota"><strong>Prueba privada de clasificación.</strong> Seleccioná varios PDF sin elegir de antemano entre impresiones y ploteos. Confirmá en qué tamaño querés imprimir cada archivo: el original puede ser A2, aunque quieras A4. Sin envío de originales, pedidos ni pagos. Presupuestos orientativos sin validez comercial hasta verificar los archivos. La clasificación CAD/Póster y las tarifas existentes no se modifican.</p><div id="zonaArchivos"><p><strong>Arrastrá aquí tus PDF</strong> o elegilos desde tu equipo. Podés seleccionar varios a la vez (hasta 30).</p><label for="archivos">Agregar varios PDF</label><input id="archivos" type="file" accept=".pdf,application/pdf" multiple></div><p id="estado" role="status">Cargando…</p><h2>Resumen del presupuesto</h2><section class="archivo" id="presupuesto" aria-live="polite">Esperando archivos…</section><button id="prepararPedido" type="button" disabled>Revisar pedido (sin enviar)</button><section id="resumenPedido" aria-live="polite"></section><h2>Configuración de tus archivos</h2><div id="lista"></div><p><a href="/prueba-cotizador-conjunto">Volver a los presupuestos de prueba</a></p></main><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script><script src="/prueba-carga-unica.js" defer></script><script>
+document.addEventListener('DOMContentLoaded',()=>{
+ const zona=document.getElementById('zonaArchivos');
+ const input=document.getElementById('archivos');
+ if(!zona||!input)return;
+ for(const type of ['dragenter','dragover']){
+  zona.addEventListener(type,event=>{
+   if(!event.dataTransfer?.types?.includes('Files'))return;
+   event.preventDefault();event.dataTransfer.dropEffect='copy';
+   zona.classList.add('arrastrando');
+  });
+ }
+ zona.addEventListener('dragleave',event=>{
+  if(!zona.contains(event.relatedTarget))zona.classList.remove('arrastrando');
+ });
+ zona.addEventListener('drop',event=>{
+  event.preventDefault();zona.classList.remove('arrastrando');
+  const archivos=Array.from(event.dataTransfer?.files||[]);
+  if(!archivos.length)return;
+  if(archivos.some(file=>!file.name.toLowerCase().endsWith('.pdf'))){
+   document.getElementById('estado').textContent='Solo se admiten archivos PDF.';
+   return;
+  }
+  const transfer=new DataTransfer();
+  archivos.forEach(file=>transfer.items.add(file));
+  input.files=transfer.files;
+  input.dispatchEvent(new Event('change',{bubbles:true}));
+ });
+});
+</script></body></html>`;
 }
