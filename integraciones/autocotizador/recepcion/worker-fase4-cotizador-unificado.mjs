@@ -1392,6 +1392,36 @@ function v2PrivateBrowserResponse(request,env,path){
    ).replace(
     'Prueba privada de clasificación.',
     'Cotizador inteligente privado: análisis automático de tamaños, CAD/Póster y rollo.'
+   ).replace(
+    '</head><body>',
+    `<style>
+     body{background:transparent}main{width:100%;max-width:none;margin:0;padding:16px 18px 24px;box-shadow:none}
+     #zonaArchivos{padding:26px;border:2px dashed #5689af;background:#f1f8ff;border-radius:14px}
+     #zonaArchivos p{font-size:18px}#zonaArchivos input{max-width:650px}
+     main>h1{display:none}main>.nota{display:none}
+     main>p:has(a[href="/prueba-cotizador-conjunto"]){display:none}
+     #prepararPedido{display:none}
+     #enviar-cotizacion-inteligente{border:0;border-radius:10px;padding:14px 20px;background:#0a5583;color:white;font-weight:700;font-size:16px;cursor:pointer}
+     #lista{margin-bottom:20px}
+     @media(max-width:720px){main{padding:12px 4px 20px}#zonaArchivos{padding:15px}}
+     </style></head><body>`
+   ).replace(
+    '</body></html>',
+    `<script>
+      if(window.parent!==window&&location.pathname==='/prueba-v2/carga-inteligente'){
+       let previous=0;
+       const inform=()=>{
+        const height=Math.ceil(document.documentElement.scrollHeight);
+        if(height!==previous&&height>300){
+         previous=height;
+         window.parent.postMessage({type:'SABER_SMART_RESIZE',height},location.origin);
+        }
+       };
+       new ResizeObserver(inform).observe(document.body);
+       addEventListener('load',inform);
+       inform();
+      }
+     </script></body></html>`
    );
    return new Response(html,{status:200,headers:{
     ...headers,'Content-Type':'text/html; charset=utf-8'}});
