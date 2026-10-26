@@ -153,6 +153,11 @@ function render(){
     area.append(name,confirmed);div.append(area);continue;
    }
    const file=document.createElement('input');file.type='file';file.accept='.pdf,application/pdf';
+   if(d.archivoLocal instanceof File){
+    const kept=document.createElement('p');kept.className='state';
+    kept.textContent='Archivo recuperado del cotizador en esta pestaña. No hace falta seleccionarlo otra vez.';
+    area.append(kept);file.hidden=true;
+   }
    const mode=document.createElement('select');
    for(const [value,label] of [['bn','Blanco y negro'],['color','Color']]){
     const o=document.createElement('option');o.value=value;o.textContent=label;mode.append(o);
@@ -185,7 +190,7 @@ function render(){
    const btn=document.createElement('button');btn.type='button';btn.textContent='Enviar, verificar y cotizar PDF';
    const msg=document.createElement('p');msg.className='state';
    btn.addEventListener('click',async()=>{
-    const chosen=file.files?.[0],turnstileToken=window.turnstile?.getResponse();
+    const chosen=d.archivoLocal||file.files?.[0],turnstileToken=window.turnstile?.getResponse();
     if(!chosen||(!d.sesionTemporal&&!turnstileToken)||!papel.value){msg.textContent='Seleccioná el PDF y completá la verificación de seguridad.';return}
     btn.disabled=true;file.disabled=true;mode.disabled=true;
     for(const control of [formato,caras,copias,anillado,papel])control.disabled=true;
@@ -282,6 +287,17 @@ registerButton.addEventListener('click',async()=>{
 });
 window.addEventListener('message',event=>{
  if(event.origin!==location.origin||event.source!==frame.contentWindow)return;
+ if(event.data?.type==='SABER_ARCHIVO_PDF_PRIVADO'){
+  const {localRef,file}=event.data;
+  if(!(file instanceof File)||typeof localRef!=='string')return;
+  for(const item of all)for(const d of item.references){
+   if(d.reference.localRef!==localRef||d.confirmacion)continue;
+   if(file.name!==d.reference.nombre||file.size!==d.reference.bytes)continue;
+   d.archivoLocal=file;
+   render();return;
+  }
+  return;
+ }
  if(event.data?.type!=='SABER_ADD_PRINT')return;
  const p=event.data.payload;
  if(!p||p.type!=='print'||typeof p.name!=='string'||
@@ -304,6 +320,11 @@ window.addEventListener('message',event=>{
  refs.forEach(d=>used.add(d.reference.localRef));
  all.push({name:p.name,price:p.price,references:refs});
  save();updateSummary();
+ // Solicitar por canal mismo-origen los objetos File locales correspondientes.
+ // La huella SHA-256 sigue revalidándose antes de aceptar cada recepción.
+ for(const d of refs)frame.contentWindow.postMessage({
+  type:'SABER_SOLICITAR_PDF_PRIVADO',localRef:d.reference.localRef
+ },location.origin);
  status.textContent='Se agregó un trabajo. Los PDF están pendientes hasta que Google confirme su recepción. Pedido de prueba: '+orderId;
  render();
 });
