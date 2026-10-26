@@ -834,14 +834,24 @@ test('carrera D1: reintento sólo confirma el pedido realmente guardado y su imp
   // Simula dos Workers que consultan a la vez: el segundo no ve todavía
   // cart_requests antes de intentar INSERT, pero el primer pedido ya existe.
   function hideFirstRead(){
-   let once=true;
+   let cartMiss=true,manifestMiss=true;
    env.DB={...originalDB,prepare(sql){
     const statement=originalPrepare(sql);
-    if(once&&sql.includes('FROM cart_requests WHERE client_order_id=?')){
-     once=false;
+    if(cartMiss&&sql.includes('FROM cart_requests WHERE client_order_id=?')){
+     cartMiss=false;
      return {bind(...args){
       statement.bind(...args);
       return {...statement,first:async()=>null};
+     }};
+    }
+    if(manifestMiss&&sql.includes('SELECT amount_ars,manifest_json,commercial_order_id FROM central_document_manifests')){
+     manifestMiss=false;
+     return {bind(...args){
+      statement.bind(...args);
+      return {...statement,first:async()=>{
+       const found=await statement.first();
+       return found?{...found,commercial_order_id:null}:null;
+      }};
      }};
     }
     return statement;
