@@ -37,6 +37,13 @@ jobs:
           if [ "$code" != 200 ]; then echo "PRIVATE_JS_FAILED_HTTP_$code"; exit 1; fi
           grep -Fq 'clasificarPaginasPloteo' /tmp/client || grep -Fq 'sin-clasificar' /tmp/client
           echo "CAD_POSTER_ANALYZER_CLIENT_PRESENT"
+          code=$(curl -sS --max-time 20 -u "operador:$PASSWORD" -o /tmp/portal -w '%{http_code}' "$root/")
+          if [ "$code" != 200 ]; then echo "INTEGRATED_PORTAL_FAILED_HTTP_$code"; exit 1; fi
+          grep -Fq 'id="smart"' /tmp/portal
+          grep -Fq 'SABER_SMART_DOCUMENTS_TO_PRIVATE' /tmp/portal
+          grep -Fq 'send-all-pdf' /tmp/portal
+          echo "INTEGRATED_SINGLE_SCREEN_PRIVATE_HTTP_200"
+          rm -f /tmp/portal
           rm -f /tmp/anonymous /tmp/page /tmp/client
           echo "READ_ONLY_NO_PAYMENTS_NO_PUBLIC_WEBSITE"
       - name: Estado real de acceso inteligente
