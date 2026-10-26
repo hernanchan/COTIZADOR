@@ -1,0 +1,21 @@
+name: Saber - salud servicios reales sin cobros
+on:
+  push:
+    branches: [polaroids/express-pdf-unico-20261023]
+    paths:
+      - .github/workflows/saber-health-servicios-reales.yml
+      - integraciones/cloudflare-ensayo/comprobar-servicios-reales-get.mjs
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Diagnosticar Central y Documentos mediante GET sin escrituras
+        run: node integraciones/cloudflare-ensayo/comprobar-servicios-reales-get.mjs
