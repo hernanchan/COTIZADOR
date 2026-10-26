@@ -1284,7 +1284,11 @@ async function apiPrepararDocumentosV2Lote(request,env){
  let difference=auth.length===expected.length?0:1;
  for(let i=0;i<expected.length;i++)
   difference|=expected.charCodeAt(i)^(auth.charCodeAt(i)||0);
- if(difference)return testResponse({ok:false,error:'Autorización requerida',paymentAuthorized:false},401);
+ // El operador también puede iniciar el ensayo desde el portal Basic
+ // del MISMO Worker: nunca se entrega DOCS_CENTRAL_ADMIN_KEY al JavaScript.
+ // Se exigen las mismas compuertas privadas y origen explícito.
+ if(difference&&v2PrivateBrowserAuthorized(request,env)!=='allow')
+  return testResponse({ok:false,error:'Autorización requerida',paymentAuthorized:false},401);
  if(env?.DOCS_V2_RECEIPT_LINK_ENABLED!=='PRIVATE_TEST_ONLY'||
     env?.DOCS_EXTENDED_RECEIVER_ENABLED!=='PRIVATE_TEST_ONLY'||
     env?.DOCS_CENTRAL_SYNC_ENABLED!=='PRIVATE_TEST_ONLY'||
