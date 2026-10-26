@@ -13,10 +13,10 @@ export function paginaCotizadorV2PruebaPrivada(sitekey){
 <style>
 *{box-sizing:border-box}body{margin:0;font:15px system-ui,Arial,sans-serif;background:#edf2f8;color:#19334b}
 header{background:#0a3158;color:#fff;padding:15px max(15px,calc((100vw - 1110px)/2))}
-main{max-width:1110px;margin:16px auto;padding:0 14px;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(300px,.85fr);gap:16px}
+main{max-width:1140px;margin:12px auto;padding:0 14px;display:block}
 .panel{background:#fff;padding:15px;border:1px solid #cbd5e1;border-radius:13px;min-width:0}
 h1{font-size:19px;margin:0 0 4px}h2{font-size:17px;margin:0 0 12px}p{line-height:1.5}
-small{color:#536475}iframe{border:0;width:100%;min-height:850px}
+small{color:#536475}iframe{border:0;width:100%;display:block}#smart{height:1050px;overflow:hidden}#base{min-height:750px}
 .entry{border-top:1px solid #dce4ec;padding:13px 0}
 input,select,button{font:inherit;max-width:100%}input[type=file],select{display:block;width:100%;padding:8px;margin:8px 0;border:1px solid #b9c8d8;border-radius:7px}
 button{border:0;background:#0a5583;color:#fff;padding:10px 15px;border-radius:8px;cursor:pointer}
@@ -30,22 +30,14 @@ button:disabled{opacity:.45;cursor:not-allowed}
 @media(max-width:840px){main{display:block}.panel{margin-bottom:14px}iframe{min-height:740px}}
 </style></head><body>
 <header><h1>LIBRERÍA SABER · Cotizador V2 en ensayo privado</h1><small style="color:#d5e3f0">Sin cobros, sin órdenes de producción y sin publicación comercial.</small></header>
-<div style="max-width:1110px;margin:16px auto 0;padding:0 14px">
-<section style="background:#fff;padding:16px;border-radius:12px;border:1px solid #bfd2e0">
-<strong style="display:block;margin-bottom:6px">Cotizador inteligente de archivos</strong>
-<a href="/prueba-v2/carga-inteligente" style="font-weight:700;color:#075b88">
-Abrir carga múltiple con detección automática de medidas, CAD/Póster y rollo</a>
-<p style="margin:8px 0 0;font-size:13px;color:#516578">
-Este módulo calcula importes preliminares sin transmitir archivos. El registro de ploteos
-en D1 sigue desactivado hasta validar la recepción y el precio final del servidor.</p>
-</section></div>
-<main><section class="panel"><h2>Cotizador inteligente de varios PDF</h2>
+<div style="max-width:1140px;margin:18px auto 0;padding:0 14px">
+<section style="padding:8px 3px 4px"><h2 style="margin:0 0 5px;font-size:22px;color:#123852">Cargá tus archivos una sola vez</h2><p style="margin:0;color:#52677a">Arrastrá todos los PDF juntos, revisá el presupuesto y después prepará el envío. Los ploteos se cotizan automáticamente; su recepción sigue en pruebas.</p></section></div>
+<main><section class="panel" style="padding:0;border:0;background:transparent">
 <iframe id="smart" title="Análisis automático de PDF, tamaños, CAD y póster" src="/prueba-v2/carga-inteligente" loading="eager"></iframe>
-<p><small>Clasificación CAD/Póster y selección automática del rollo. Los ploteos todavía no se envían al registro privado.</small></p></section>
-<section class="panel">
-<h2>Recepción de PDF por trabajo</h2>
-<div class="warning">Para este ensayo, seleccioná nuevamente cada PDF y confirmá formato, caras, copias y anillado para comparar con el cotizador original. Se comprueba su SHA-256; no sirve otro PDF con el mismo nombre. Hasta confirmar el recibo sigue pendiente.</div>
-<div id="drop-pdf"><strong>Arrastrá todos los PDF aquí</strong> o seleccioná varios de una vez para asociarlos a los trabajos del carrito.<input id="batch-files" type="file" accept=".pdf,application/pdf" multiple><p id="batch-status" class="state" role="status">Los PDF se asignan por nombre y tamaño al trabajo correspondiente. La recepción sigue protegida.</p></div>
+</section>
+<details id="recepcion-avanzada" class="panel" style="margin-top:14px"><summary style="font-size:16px;font-weight:700;cursor:pointer;padding:5px 0">Paso 2 · Enviar los PDF y registrar el pedido (ensayo privado)</summary><div style="padding-top:12px">
+<div class="warning">Los documentos A4/A3 compatibles se trasladan desde la cotización a esta etapa. Sólo confirmamos la recepción después de verificar el PDF original y su presupuesto en el servidor. Los ploteos no se envían todavía.</div>
+<div id="drop-pdf" style="display:none"><strong>Recuperación manual de PDF para trabajos antiguos</strong><input id="batch-files" type="file" accept=".pdf,application/pdf" multiple><p id="batch-status" class="state" role="status">Los PDF se asignan por nombre y tamaño al trabajo correspondiente. La recepción sigue protegida.</p></div>
 <div class="cf-turnstile" data-sitekey="${sitekey}" data-action="documentos"></div>
 <div id="all" role="list" aria-label="Trabajos del cotizador"></div>
 <p id="state" role="status" aria-live="polite" class="state">Cotizá una impresión y agregala al pedido de prueba.</p>
@@ -55,7 +47,7 @@ en D1 sigue desactivado hasta validar la recepción y el precio final del servid
 <button id="register-private" type="button" disabled>Registrar pedido de prueba en la Central</button>
 <p id="register-status" role="status" aria-live="polite" class="state">Disponible únicamente cuando todos los PDF estén verificados. Sin pagos.</p>
 <p><small>No se transmite ningún PDF a la tienda pública. La verificación de Drive y el presupuesto preliminar del servidor son ensayos; D1 y los cobros siguen separados.</small></p>
-</section></main>
+</div></details></main>
 <details style="max-width:1110px;margin:10px auto 25px;padding:0 14px"><summary style="cursor:pointer">Cotizador original (comparación comercial)</summary>
 <iframe id="base" title="Cotizador original de comparación" src="/prueba-v2/cotizador?integrado=1&ensayoArchivos=1" loading="lazy"></iframe>
 </details>
@@ -410,6 +402,12 @@ registerButton.addEventListener('click',async()=>{
 });
 window.addEventListener('message',async event=>{
  if(event.origin!==location.origin)return;
+ if(event.source===smart.contentWindow&&event.data?.type==='SABER_SMART_RESIZE'){
+  const height=Number(event.data.height);
+  if(Number.isFinite(height)&&height>=300&&height<=40000)
+   smart.style.height=Math.ceil(height+12)+'px';
+  return;
+ }
  if(event.source===smart.contentWindow&&event.data?.type==='SABER_SMART_DOCUMENTS_TO_PRIVATE'){
   const payload=event.data;
   if(batchSending||registering||registeredOrder||!Array.isArray(payload.files)||
@@ -453,6 +451,7 @@ window.addEventListener('message',async event=>{
    all.push({name:'Pedido inteligente · '+drafts.length+' PDF',
     price:payload.total,references:drafts});
    save();render();updateSummary();
+   document.getElementById('recepcion-avanzada').open=true;
    status.textContent='Se asociaron '+drafts.length+
     ' PDF con la cotización inteligente. Verificá las opciones y pulsá Enviar todos los PDF del pedido.';
    batchStatus.textContent=drafts.length+' PDF listos para enviar, sin seleccionarlos otra vez.';
