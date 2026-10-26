@@ -18,7 +18,7 @@ for(const item of versions){
  const urls=Array.isArray(data.result.urls)?data.result.urls:[];
  const valid=urls.filter(u=>{try{const v=new URL(u);return v.protocol==='https:'&&v.hostname.endsWith('.workers.dev')&&
   v.username===''&&v.password===''&&v.port===''&&v.pathname==='/'&&v.search===''&&v.hash==='';}catch{return false;}});
- if(valid.length!==1){console.log(item.name+': sin URL única de versión segura; comprobación pospuesta.');continue;}
+ if(valid.length!==1){console.log(item.name+': URL no utilizable; entradas API='+urls.length+', HTTPS workers.dev seguros='+valid.length+'; comprobación pospuesta.');continue;}
  const target=new URL(valid[0]);target.pathname=item.path;
  // GET sólo: nunca puede invocar endpoints de escritura que requieren POST.
  const reply=await fetch(target,{method:'GET',redirect:'error',headers:{Accept:'application/json'},signal:AbortSignal.timeout(15000)});
