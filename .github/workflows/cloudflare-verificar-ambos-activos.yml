@@ -1,0 +1,42 @@
+name: Saber - verificar ambos Workers activos
+on:
+  push:
+    branches: [polaroids/express-pdf-unico-20261023]
+    paths:
+      - '.github/workflows/cloudflare-verificar-ambos-activos.yml'
+      - 'integraciones/cloudflare-ensayo/verificar-ambas-promociones.mjs'
+  workflow_dispatch:
+permissions:
+  contents: read
+  statuses: write
+jobs:
+  check:
+    if: github.ref == 'refs/heads/polaroids/express-pdf-unico-20261023'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Comprobar Central y Documentos activos, bindings y /health
+        env:
+          SABER_CF_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          SABER_CF_EDITOR_TOKEN: ${{ secrets.SABER_CF_EDITOR_TOKEN }}
+        run: node integraciones/cloudflare-ensayo/verificar-ambas-promociones.mjs
+      - name: Registrar resultado
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_SHA: ${{ github.sha }}
+          STATUS: ${{ job.status }}
+        run: |
+          if [ "$STATUS" = success ]; then state=success; description="Central y Documentos al 100%, salud y bindings OK"; else state=failure; description="Promoción no verificada; revisar log"; fi
+          jq -n --arg state "$state" --arg context 'saber-cloudflare/both-active' --arg description "$description" --arg target_url "https://github.com/$GH_REPO/actions/runs/$GITHUB_RUN_ID" '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/saber-both-active.json
+          gh api -X POST "repos/$GH_REPO/statuses/$GH_SHA" --input /tmp/saber-both-active.json
