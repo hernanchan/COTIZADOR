@@ -145,6 +145,13 @@ function render(){
   for(const d of item.references){
    const r=d.reference,area=document.createElement('div'),name=document.createElement('p');
    name.textContent='Trabajo '+(d.itemIndex+1)+': '+r.nombre+' · '+r.paginas+' páginas (pendiente)';
+   if(d.confirmacion && d.sesionConfirmada){
+    name.textContent='Trabajo '+(d.itemIndex+1)+': '+r.nombre+' · '+d.confirmacion.pages+' páginas (PDF verificado)';
+    const confirmed=document.createElement('p');
+    confirmed.className='state';
+    confirmed.textContent='PDF ya confirmado, recibo '+d.confirmacion.receiptId+'. No hace falta volver a subirlo.';
+    area.append(name,confirmed);div.append(area);continue;
+   }
    const file=document.createElement('input');file.type='file';file.accept='.pdf,application/pdf';
    const mode=document.createElement('select');
    for(const [value,label] of [['bn','Blanco y negro'],['color','Color']]){
