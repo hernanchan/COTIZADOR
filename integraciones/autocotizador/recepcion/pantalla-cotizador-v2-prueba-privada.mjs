@@ -36,12 +36,18 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <div id="all" role="list" aria-label="Trabajos del cotizador"></div>
 <p id="state" role="status" aria-live="polite" class="state">Cotizá una impresión y agregala al pedido de prueba.</p>
 <section id="order-summary" class="warning" aria-label="Resumen privado del pedido" aria-live="polite"></section>
+<button id="register-private" type="button" disabled>Registrar pedido de prueba en la Central</button>
+<p id="register-status" role="status" aria-live="polite" class="state">Disponible únicamente cuando todos los PDF estén verificados. Sin pagos.</p>
 <p><small>No se transmite ningún PDF a la tienda pública. La verificación de Drive y el presupuesto preliminar del servidor son ensayos; D1 y los cobros siguen separados.</small></p>
 </section></main>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 <script type="module">
 import {subirYVincularPdfCotizadorV2} from '/prueba-v2/subir-vincular-pdf.mjs';
+import {prepararManifiestoDocumentalV2} from '/prueba-v2/preparar-manifiesto.mjs';
 const list=document.getElementById('all'),status=document.getElementById('state'),frame=document.getElementById('base'),summary=document.getElementById('order-summary');
+const registerButton=document.getElementById('register-private'),registerStatus=document.getElementById('register-status');
+const clientOrderId=crypto.randomUUID();
+let registering=false,registeredOrder=null;
 // Recuperación de metadatos no sensibles tras recarga o suspensión móvil.
  // Nunca conservar objetos File, base64, sesiones, credenciales ni confirmaciones.
 const RECOVERY_KEY='saber-v2-ensayo-metadatos-v1';
@@ -119,7 +125,10 @@ function updateSummary(){
    (withoutPdf?' Trabajos sin PDF asociado: '+withoutPdf+'; requieren revisión manual.':'')+
   ' Registro en Central D1: PENDIENTE. Pago y producción: DESACTIVADOS.';
  summary.append(title,detail);
+ registerButton.disabled=registering||Boolean(registeredOrder)||verified.length===0||
+  remaining!==0||withoutPdf!==0||verified.some(d=>!d.sesionConfirmada||!d.modoConfirmado);
 }
+
 const catalogPromise=fetch('/prueba-v2/precios-web.json',{credentials:'same-origin'})
  .then(r=>{if(!r.ok)throw Error('Catálogo no disponible');return r.json()});
 function render(){
@@ -193,6 +202,8 @@ function render(){
       '. Presupuesto del servidor: '+(quote?moneda(quote.totalArs):'SIN CONFIRMAR')+
       '. '+aviso+' Pedido D1 y autorización de pago: PENDIENTES.';
      btn.textContent='PDF verificado';d.confirmacion=result;
+     d.sesionConfirmada=d.sesionTemporal;
+     d.modoConfirmado=mode.value;
      delete d.sesionTemporal;updateSummary();
     }catch(e){
      msg.textContent='No se confirmó la recepción: '+String(e.message||e)+
@@ -211,6 +222,55 @@ if(previous?.items.length){
  render();
 }
 updateSummary();
+registerButton.addEventListener('click',async()=>{
+ if(registering||registeredOrder)return;
+ const entries=all.flatMap(item=>item.references);
+ if(!entries.length||entries.length>30||all.some(item=>!item.references.length)||
+    entries.some(d=>!d.confirmacion||!d.sesionConfirmada||
+      !['bn','color'].includes(d.modoConfirmado)||
+      d.confirmacion.cotizacionServidor?.anillado!=='ninguno')){
+  registerStatus.textContent='Este ensayo sólo permite PDF verificados sin anillado conjunto ni trabajos sin archivo.';
+  return;
+ }
+ registering=true;updateSummary();
+ try{
+  const manifiesto=prepararManifiestoDocumentalV2({
+   orderId,trabajos:entries.map(d=>({vinculo:d.confirmacion}))
+  });
+  const sesiones=entries.map(d=>{
+   const q=d.confirmacion.cotizacionServidor;
+   return {sesion:{uploadId:d.sesionConfirmada.uploadId,token:d.sesionConfirmada.token},
+    opciones:{servicio:'auto',seleccion:q.formato,paginasSeleccionadas:'',
+     copias:q.copias,modo:d.modoConfirmado,caras:q.caras,
+     papelPoster:'obra80',anillado:'ninguno',grupoAnillado:'',
+     materialColor:q.materialColor,productoFoto:'',productoGrafica:'',
+     corteVariante:'gt3',corteMetros:1}};
+  });
+  const response=await fetch('/api/ensayo-preparar-documentos-v2-lote',{
+   method:'POST',credentials:'same-origin',redirect:'error',
+   headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({clientOrderId,items:[],manifiesto,sesiones})
+  });
+  const result=await response.json().catch(()=>null);
+  if(!response.ok||result?.ok!==true||result.carritoDocumentalV2!==true||
+     result.webOrderId!==orderId||typeof result.orderId!=='string'||
+     result.archivosVerificados!==entries.length||
+     !Number.isSafeInteger(result.totalArs)||result.totalArs<1||
+     result.checkoutEnabled!==false||result.paymentAuthorized!==false||
+     result.listoParaProducir!==false)
+   throw Error(result?.error||'La Central no confirmó este pedido.');
+  registeredOrder=result.orderId;
+  // El recibo de cliente no lleva sesiones ni tokens de Google.
+  registerStatus.textContent='Pedido de ensayo registrado y comprobado: '+registeredOrder+
+   '. '+entries.length+' PDF; total verificado por servidor: '+
+   new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(result.totalArs)+
+   '. Pago y producción: DESACTIVADOS.';
+  for(const d of entries)delete d.sesionConfirmada;
+ }catch(error){
+  registerStatus.textContent='Pedido NO confirmado: '+String(error.message||error)+
+   '. No se autorizó ningún cobro.';
+ }finally{registering=false;updateSummary();}
+});
 window.addEventListener('message',event=>{
  if(event.origin!==location.origin||event.source!==frame.contentWindow)return;
  if(event.data?.type!=='SABER_ADD_PRINT')return;
