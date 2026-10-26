@@ -28,11 +28,11 @@ jobs:
             curl -fsS --max-time 20 -H "Authorization: Bearer $TOKEN" "$root/$worker/settings" -o /tmp/settings-before.json
             jq -e '.success==true and (.result.bindings|type=="array")' /tmp/settings-before.json >/dev/null
             if [ "$worker" = saber-pagos-pruebas ]; then
-              jq -e '.result.bindings | any(.name=="DB") and any(.name=="CENTRAL_BRIDGE_KEY")' /tmp/settings-before.json >/dev/null
-              jq -e '.result.bindings | all(select(.name=="PAYMENTS_ENABLED" or .name=="MP_CHECKOUT_ENABLED"); .text!="true" and .text!="1" and .text!="PRIVATE_TEST_ONLY")' /tmp/settings-before.json >/dev/null
+              jq -e '.result.bindings | any(.[]; .name=="DB") and any(.[]; .name=="CENTRAL_BRIDGE_KEY")' /tmp/settings-before.json >/dev/null
+              jq -e '.result.bindings | all(.[]; select(.name=="PAYMENTS_ENABLED" or .name=="MP_CHECKOUT_ENABLED") | .text!="true" and .text!="1" and .text!="PRIVATE_TEST_ONLY")' /tmp/settings-before.json >/dev/null
               flags='["CENTRAL_PREPARE_ENABLED"]'
             else
-              jq -e '.result.bindings | any(.name=="SABER_CENTRAL") and any(.name=="DOCS_CENTRAL_ADMIN_KEY") and any(.name=="CENTRAL_BRIDGE_KEY") and any(.name=="DOCS_SCRIPT_URL") and any(.name=="DOCS_RELAY_KEY")' /tmp/settings-before.json >/dev/null
+              jq -e '.result.bindings | any(.[]; .name=="SABER_CENTRAL") and any(.[]; .name=="DOCS_CENTRAL_ADMIN_KEY") and any(.[]; .name=="CENTRAL_BRIDGE_KEY") and any(.[]; .name=="DOCS_SCRIPT_URL") and any(.[]; .name=="DOCS_RELAY_KEY")' /tmp/settings-before.json >/dev/null
               flags='["DOCS_V2_RECEIPT_LINK_ENABLED","DOCS_EXTENDED_RECEIVER_ENABLED","DOCS_CENTRAL_SYNC_ENABLED","DOCS_ORDER_PREPARE_ENABLED"]'
             fi
             echo "$flags" >/tmp/flags.json
