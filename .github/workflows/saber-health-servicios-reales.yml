@@ -49,6 +49,20 @@ jobs:
           fi
           rm -f /tmp/saber-token-verify.json
           echo "CLOUDFLARE_TEMP_TOKEN_ACTIVE"
+      - name: Comprobar permisos de lectura del token en Workers aislados
+        env:
+          TEMP_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+        run: |
+          for worker in saber-documentos-pruebas saber-pagos-pruebas; do
+            http=$(curl --silent --output /tmp/saber-worker-settings.json --write-out '%{http_code}' --max-time 15 --header "Authorization: Bearer $TEMP_TOKEN" --header 'Accept: application/json' "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/$worker/settings")
+            if [ "$http" != "200" ] || ! jq -e '.success == true and (.result.bindings | type == "array")' /tmp/saber-worker-settings.json >/dev/null; then
+              echo "WORKER_SETTINGS_ACCESS_FAILED_$worker HTTP_$http"
+              exit 1
+            fi
+            echo "WORKER_SETTINGS_READABLE_$worker"
+          done
+          rm -f /tmp/saber-worker-settings.json
       - name: Registrar resultado comprobación real
         if: always()
         env:
