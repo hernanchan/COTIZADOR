@@ -1,0 +1,41 @@
+name: Saber - prueba real HMAC (sin pedidos ni pagos)
+on:
+  push:
+    branches: [polaroids/express-pdf-unico-20261023]
+    paths:
+      - .github/workflows/cloudflare-probar-hmac-real.yml
+      - integraciones/cloudflare-ensayo/probar-hmac-real-desde-actions.mjs
+  workflow_dispatch:
+permissions:
+  contents: read
+  statuses: write
+jobs:
+  bridge:
+    if: github.ref == 'refs/heads/polaroids/express-pdf-unico-20261023'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Comprobar firma privada sin tocar D1
+        env:
+          SABER_DOCS_CENTRAL_ADMIN_KEY: ${{ secrets.SABER_DOCS_CENTRAL_ADMIN_KEY }}
+        run: node integraciones/cloudflare-ensayo/probar-hmac-real-desde-actions.mjs
+      - name: Registrar solo éxito o fallo del diagnóstico
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_SHA: ${{ github.sha }}
+          STATUS: ${{ job.status }}
+        run: |
+          if [ "$STATUS" = success ]; then state=success; description="Puente HMAC real confirmado, sin D1 ni pagos"; else state=failure; description="No se confirmó el puente HMAC real"; fi
+          jq -n --arg state "$state" --arg context 'saber-cloudflare/real-hmac' --arg description "$description" --arg target_url "https://github.com/$GH_REPO/actions/runs/$GITHUB_RUN_ID" '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/saber-hmac-status.json
+          gh api -X POST "repos/$GH_REPO/statuses/$GH_SHA" --input /tmp/saber-hmac-status.json
