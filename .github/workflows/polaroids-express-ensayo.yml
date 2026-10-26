@@ -85,6 +85,15 @@ jobs:
       - name: Compilar Worker documental V2 completo sin publicar
         working-directory: integraciones/autocotizador/recepcion
         run: npm run build:unificado
+      - name: Comprobar que el paquete final contiene las funciones V2 recientes
+        working-directory: integraciones/autocotizador/recepcion
+        run: |
+          test -s dist/saber-documentos-cotizador-fase4.mjs
+          test -s subir-vincular-pdf-v2-privado.txt
+          grep -Fq 'ensayo-preparar-documentos-v2-lote' dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq 'reanudacion' subir-vincular-pdf-v2-privado.txt
+          grep -Fq 'Estado remoto incompatible tras un corte' subir-vincular-pdf-v2-privado.txt
+          echo 'DOCUMENTOS_V2_BUNDLE_VERIFIED'
       - name: Instalar motor Express de Cloudflare Pages (sin despliegue)
         working-directory: integraciones/polaroids/express
         run: npm install --no-audit --no-fund
