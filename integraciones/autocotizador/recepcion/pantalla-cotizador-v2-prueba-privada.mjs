@@ -75,7 +75,7 @@ function assignFiles(files){
   }
   matches[0].archivoLocal=file;assigned++;
  }
- render();
+ render();updateSummary();
  batchStatus.textContent=assigned+' PDF asociados a los trabajos. '+
   (unmatched?unmatched+' sin coincidencia (primero agregá esos trabajos al carrito). ':'')+
   (ambiguous?ambiguous+' con nombre y tamaño duplicados, requieren selección individual. ':'')+
@@ -391,7 +391,7 @@ window.addEventListener('message',event=>{
    if(d.reference.localRef!==localRef||d.confirmacion)continue;
    if(file.name!==d.reference.nombre||file.size!==d.reference.bytes)continue;
    d.archivoLocal=file;
-   render();return;
+   render();updateSummary();return;
   }
   return;
  }
