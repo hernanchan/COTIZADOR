@@ -47,6 +47,7 @@ on:
       - 'tests/cotizador-v2-subida-vinculo.test.mjs'
       - 'tests/cotizador-v2-manifiesto-documental.test.mjs'
       - 'tests/cotizador-v2-registro-central.test.mjs'
+      - 'tests/cotizador-v2-ruta-pedido-lote.test.mjs'
       - 'integraciones/autocotizador/recepcion/registrar-manifiesto-v2-central.mjs'
       - 'integraciones/autocotizador/recepcion/preparar-manifiesto-v2-documental.mjs'
       - 'integraciones/cloudflare-ensayo/verificar-acceso-lectura.mjs'
@@ -99,7 +100,7 @@ jobs:
           retention-days: 7
       # Incluye compra mixta documentos, Express y catálogo sin checkout.
       - name: Verificar paridad cotizador V2 y lector PDF opt-in
-        run: node --test tests/cotizador-v2-archivo-optin.test.mjs tests/cotizador-v2-referencias-carrito.test.mjs tests/cotizador-v2-vinculo-servidor.test.mjs tests/cotizador-v2-subida-vinculo.test.mjs tests/cotizador-v2-manifiesto-documental.test.mjs tests/cotizador-v2-registro-central.test.mjs
+        run: node --test tests/cotizador-v2-archivo-optin.test.mjs tests/cotizador-v2-referencias-carrito.test.mjs tests/cotizador-v2-vinculo-servidor.test.mjs tests/cotizador-v2-subida-vinculo.test.mjs tests/cotizador-v2-manifiesto-documental.test.mjs tests/cotizador-v2-registro-central.test.mjs tests/cotizador-v2-ruta-pedido-lote.test.mjs
       - name: Validar acceso Cloudflare solo GET, alcance dos Workers y secretos protegidos
         run: node --test tests/cloudflare-preflight-solo-lectura.test.mjs
       - name: Probar Central D1 con PDF Express y controles de acceso
