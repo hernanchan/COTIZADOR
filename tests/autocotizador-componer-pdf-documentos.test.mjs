@@ -115,3 +115,21 @@ test('presupuesto de caras: rechazar trabajo excesivo antes de reservar memoria'
   copias:200, paginasPorCara:1
  }),/máximo de caras/);
 });
+
+test('PDF válido con página en blanco sin /Contents no falla ni cambia orden',async()=>{
+ const d=await PDFDocument.create();
+ d.addPage([595.2756,841.8898]);
+ d.addPage([595.2756,841.8898]).drawText('PÁGINA 2',{x:40,y:700,size:20});
+ d.addPage([595.2756,841.8898]);
+ const res=await componerDocumentoPdfPrivado({
+  pdfOriginal:await d.save(),paginas:[1,2,3],
+  paginasPorCara:2,dobleFaz:true
+ });
+ assert.equal((await PDFDocument.load(res.pdfBytes)).getPageCount(),2);
+ assert.equal(res.ficha.hojasFisicas,1);
+ assert.deepEqual(res.ficha.caras.flatMap(c=>c.paginas.map(p=>p.paginaOriginal)),[1,2,3]);
+ assert.equal(res.ficha.caras[0].paginas[0].enBlanco,true);
+ assert.equal(res.ficha.caras[0].paginas[1].enBlanco,undefined);
+ assert.equal(res.ficha.caras[1].paginas[0].enBlanco,true);
+ assert.equal(res.ficha.listoParaProducir,false);
+});
