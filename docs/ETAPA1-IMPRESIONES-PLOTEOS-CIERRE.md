@@ -75,3 +75,12 @@ Se confirmó una **incompatibilidad entre cotización y recepción**, no una fal
 - Las cotizaciones verificadas se muestran en el resumen, pero **el registro en D1 y los pagos permanecen bloqueados para ploteos**. No se guarda el archivo original en localStorage ni sessionStorage.
 - GitHub Actions `40585879038`: pruebas de regresión, compilación unificada del Worker y sintaxis completadas con éxito.
 - Pendiente imprescindible: desplegar únicamente la versión de ensayo privado mediante proceso controlado, comprobar recepción real y reintentos en navegador/Drive, extender el manifiesto/registro D1 a ploteos y anillados, y ensayar el pedido completo antes de cualquier publicación comercial.
+
+## Manifiesto mixto para Central — 27-10-2026
+
+- `prepararManifiestoDocumentalV2` admite ahora un renglón `ploteoVerificado` (cotización privada del servidor) además de los renglones documentales existentes. Verifica identificadores, SHA-256, recibos, páginas, opciones por página, copia y papel, y mantiene el estado sin autorización de pago.
+- `pantalla-cotizador-v2-prueba-privada.mjs` puede preparar un pedido mixto con sesiones confirmadas de documentos y ploteos para `/api/ensayo-preparar-documentos-v2-lote`. Un ploteo sin presupuestar o sin verificar mantiene bloqueada la operación.
+- `registrar-manifiesto-v2-central.mjs` exige correspondencia de cada renglón de ploteos con la ficha **calculada a partir del PDF verificado en el servidor**, incluidos página, rollo, papel y copias, antes de permitir la operación HMAC de stage.
+- Prueba `fase1-ploteo-central-manifiesto.test.mjs`: genera un PDF A0, simula recibo privado firmado/Drive, vuelve a leer los bytes del PDF, calcula CAD, crea la ficha, prepara el manifiesto y lo concilia sin escribir en D1.
+- GitHub Actions `40586733737`: batería nueva, compilación del Worker y regresiones anteriores completas **en verde**.
+- **No hay prueba real con acceso a Google Drive ni D1, ni despliegue de Cloudflare**: falta verificar la persistencia en el Worker de pruebas antes de publicar. No declarar cerrada la primera etapa con CI solamente.
