@@ -96,3 +96,38 @@ test('31 PDF deben ser rechazados antes de cualquier precio',()=>{
  const files=Array.from({length:31},(_,i)=>archivo('excede-'+i+'.pdf'));
  assert.throws(()=>cotizarCargaUnica({precios,archivos:files}),/Cantidad de archivos inválida/);
 });
+
+function planoMixto(papelPoster='obra80'){
+ return {nombre:'plano-y-poster.pdf',servicio:'auto',seleccion:'original',
+  paginasSeleccionadas:'',copias:1,modo:'bn',caras:'simple',
+  anillado:'ninguno',grupoAnillado:'',materialColor:'',papelPoster,
+  paginas:[
+   {numero:1,anchoCm:120,altoCm:60,modo:'cad'},
+   {numero:2,anchoCm:125,altoCm:60.96,modo:'poster'}]};
+}
+test('PDF mixto CAD/póster: rollo 90 por la página más ancha y cobro por clase',()=>{
+ const r=cotizarCargaUnica({precios,archivos:[planoMixto()]});
+ assert.equal(r.estado,'PRELIMINAR');
+ assert.equal(r.plan[0].destino,'ploteos');
+ assert.equal(r.detallePloteos[0].material,'rollo90');
+ assert.deepEqual(r.detallePloteos[0].paginas.map(p=>p.modo),['cad','poster']);
+ assert.equal(r.detallePloteos[0].subtotal,Math.ceil((1.2*6024+1.25*9912)/100)*100);
+ assert.equal(r.paymentAuthorized,false);
+});
+test('papel recubierto se factura sólo en la página Póster',()=>{
+ const r=cotizarCargaUnica({precios,archivos:[planoMixto('recubierto')]});
+ assert.equal(r.estado,'PRELIMINAR');
+ const paginas=r.detallePloteos[0].paginas;
+ assert.deepEqual(paginas.map(p=>p.material),['rollo90','rec90']);
+ assert.deepEqual(paginas.map(p=>p.papel),['obra80','recubierto']);
+ assert.equal(r.total,Math.ceil((1.2*6024+1.25*22204)/100)*100);
+});
+test('ploteo sin clasificación visual no recibe importe preliminar',()=>{
+ const f=planoMixto();
+ f.paginas[1].modo='sin-clasificar';
+ const r=cotizarCargaUnica({precios,archivos:[f]});
+ assert.equal(r.estado,'INCOMPLETO');
+ assert.equal(r.total,null);
+ assert.equal(r.paymentAuthorized,false);
+ assert.match(r.pendientes[0].motivo,/Clasificación visual/);
+});
