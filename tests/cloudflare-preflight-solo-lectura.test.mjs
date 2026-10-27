@@ -113,3 +113,28 @@ test('auditoría detecta sólo presencia de banderas del probe sin leer valores'
 // Auditoría tras habilitación temporal de CENTRAL_BRIDGE_PROBE_ENABLED (26/10/2026).
 
 // Comprobar banderas DOCS_CENTRAL_PROBE_ENABLED y CENTRAL_TEST_URL en Cloudflare (solo GET).
+
+test('identifica las dos banderas de composición privada ausentes sin leer sus valores',async()=>{
+ const result=await verificarWorkersEnsayoSoloLectura({accountId,token,fetcher:async()=>({
+  ok:true,status:200,json:async()=>({success:true,result:{bindings:[
+   {name:'CENTRAL_BRIDGE_KEY',type:'secret_text'},
+   {name:'SABER_CENTRAL',type:'service'},
+   {name:'DOCS_PRINT_DRAFT_ENABLED',type:'plain_text',text:'PRIVATE_TEST_ONLY'}
+  ]}})
+ })});
+ assert.deepEqual(result.privatePdfDraftMissingBindings,['DOCS_PRINT_DRAFT_CENTRAL_ENABLED']);
+ assert.deepEqual(result.privatePdfDraftUnknownBindings,[]);
+ assert.equal(result.privatePdfDraftConfigPresent,false);
+ assert.equal(result.privatePdfDraftEnabled,false);
+ assert.doesNotMatch(JSON.stringify(result),/PRIVATE_TEST_ONLY|Bearer/);
+});
+test('si faltan los metadatos no declara ni ausencia ni aptitud del compositor',async()=>{
+ const result=await verificarWorkersEnsayoSoloLectura({accountId,token,
+  fetcher:async()=>({ok:true,status:200,json:async()=>({success:true,result:{}})})
+ });
+ assert.deepEqual(result.privatePdfDraftMissingBindings,[]);
+ assert.deepEqual(result.privatePdfDraftUnknownBindings,[
+  'DOCS_PRINT_DRAFT_ENABLED','DOCS_PRINT_DRAFT_CENTRAL_ENABLED'
+ ]);
+ assert.equal(result.privatePdfDraftConfigPresent,false);
+});
