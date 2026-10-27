@@ -10,10 +10,11 @@ import {cotizarPloteosRapido,rolloEstandarAutomatico} from '../pruebas/cotizar-p
 const PLANO=['cad','poster'];
 const VALORACION='PRELIMINAR_SIN_VERIFICAR';
 function validarArchivo(a,i){
- if(!a||!['anillado,caras,copias,grupoAnillado,materialColor,modo,nombre,paginas,papelPoster,seleccion','anillado,caras,copias,grupoAnillado,materialColor,modo,nombre,paginas,paginasSeleccionadas,papelPoster,seleccion','anillado,caras,copias,grupoAnillado,materialColor,modo,nombre,paginas,papelPoster,seleccion,servicio','anillado,caras,copias,grupoAnillado,materialColor,modo,nombre,paginas,papelPoster,productoFoto,seleccion,servicio','anillado,caras,copias,grupoAnillado,materialColor,modo,nombre,paginas,paginasSeleccionadas,papelPoster,seleccion,servicio','anillado,caras,copias,grupoAnillado,materialColor,modo,nombre,paginas,paginasSeleccionadas,papelPoster,productoFoto,seleccion,servicio','anillado,caras,copias,corteMetros,corteVariante,grupoAnillado,materialColor,modo,nombre,paginas,paginasSeleccionadas,papelPoster,productoFoto,seleccion,servicio','anillado,caras,copias,corteMetros,corteVariante,grupoAnillado,materialColor,modo,nombre,paginas,paginasSeleccionadas,papelPoster,productoFoto,productoGrafica,seleccion,servicio'].includes(Object.keys(a).sort().join(','))||
+ if(!a||!['anillado,caras,copias,grupoAnillado,materialColor,modo,nombre,paginas,papelPoster,seleccion','anillado,caras,copias,grupoAnillado,materialColor,modo,nombre,paginas,paginasSeleccionadas,papelPoster,seleccion','anillado,caras,copias,grupoAnillado,materialColor,modo,nombre,paginas,papelPoster,seleccion,servicio','anillado,caras,copias,grupoAnillado,materialColor,modo,nombre,paginas,papelPoster,productoFoto,seleccion,servicio','anillado,caras,copias,grupoAnillado,materialColor,modo,nombre,paginas,paginasSeleccionadas,papelPoster,seleccion,servicio','anillado,caras,copias,grupoAnillado,materialColor,modo,nombre,paginas,paginasSeleccionadas,papelPoster,productoFoto,seleccion,servicio','anillado,caras,copias,corteMetros,corteVariante,grupoAnillado,materialColor,modo,nombre,paginas,paginasSeleccionadas,papelPoster,productoFoto,seleccion,servicio','anillado,caras,copias,corteMetros,corteVariante,grupoAnillado,materialColor,modo,nombre,paginas,paginasSeleccionadas,papelPoster,productoFoto,productoGrafica,seleccion,servicio'].includes(Object.keys(a).filter(k=>k!=='paginasPorHoja').sort().join(','))||
  typeof a.nombre!=='string'||!a.nombre.trim()||a.nombre.length>160||
  !Array.isArray(a.paginas)||a.paginas.length<1||a.paginas.length>2000||
  !Number.isSafeInteger(a.copias)||a.copias<1||a.copias>500||
+ ![1,2,4,9].includes(a.paginasPorHoja??1)||
  (a.paginasSeleccionadas!==undefined&&(typeof a.paginasSeleccionadas!=='string'||a.paginasSeleccionadas.length>500))||
  !(a.servicio===undefined||['auto','stickers','fotos','corte','grafica'].includes(a.servicio))||
  (a.productoFoto!==undefined&&typeof a.productoFoto!=='string')||
@@ -83,12 +84,17 @@ export function cotizarCargaUnica({archivos,precios}){
    if(a.modo==='color'&&!catalogo.some(m=>m.id===a.materialColor)){
     pendientes.push({indice:i,nombre:a.nombre,motivo:'Material incompatible con formato final'});return;
    }
-   documentos.push({id,nombre:a.nombre,paginas:seleccionadas.length,copias:a.copias,
+   documentos.push({id,nombre:a.nombre,paginas:seleccionadas.length,
+    paginasPorHoja:a.paginasPorHoja??1,copias:a.copias,
     formato,modo:a.modo,caras:a.caras,anillado:a.anillado,grupoAnillado:a.grupoAnillado,
     materialColor:a.modo==='color'?a.materialColor:'estandar',orden:i+1});
    plan.push({indice:i,nombre:a.nombre,origen:seleccionadas.map(p=>({numero:p.numero,anchoCm:p.anchoCm,altoCm:p.altoCm})),
-    paginasElegidas:seleccionadas.map(p=>p.numero),formatoFinal:formato,ajuste:d.cambioEscala?'proporcional_sin_recorte':'sin_escalado',destino:'documentos',id});
+    paginasElegidas:seleccionadas.map(p=>p.numero),paginasPorHoja:a.paginasPorHoja??1,
+    formatoFinal:formato,ajuste:d.cambioEscala?'proporcional_sin_recorte':'sin_escalado',destino:'documentos',id});
    return;
+  }
+  if((a.paginasPorHoja??1)!==1){
+   pendientes.push({indice:i,nombre:a.nombre,motivo:'Composición múltiple por hoja sólo admitida en documentos A4/A3'});return;
   }
   if(seleccionadas.some(p=>!PLANO.includes(p.modo))){
    pendientes.push({indice:i,nombre:a.nombre,motivo:'Clasificación visual CAD/Póster pendiente'});return;
