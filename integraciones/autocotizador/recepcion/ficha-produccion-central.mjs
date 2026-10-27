@@ -38,6 +38,12 @@ export function prepararFichaCentral({pedidoVerificado}){
   const detalles=desglose?.find(x=>x.id===fila.id);
   if(!detalles||detalles.nombre!==origen.nombre)
    throw Error('El trabajo no coincide con su desglose.');
+  if(fila.destino==='documentos'&&(
+     ![1,2,4,9].includes(detalles.paginasPorHoja??1)||
+     (fila.paginasPorHoja??1)!==(detalles.paginasPorHoja??1)||
+     (detalles.carasPorJuego??Math.ceil(fila.paginasElegidas.length/(detalles.paginasPorHoja??1)))!==
+       Math.ceil(fila.paginasElegidas.length/(detalles.paginasPorHoja??1))))
+   throw Error('Composición documental distinta del presupuesto verificado.');
   lineas.push({
    orden:fila.indice+1,idTrabajo:fila.id,servicio:fila.destino,
    nombreOriginal:origen.nombre,
@@ -51,7 +57,9 @@ export function prepararFichaCentral({pedidoVerificado}){
    // Procede del presupuesto recomputado; no aceptar opciones de impresión
    // nuevas durante la preparación del PDF sin volver a presupuestar.
    carasPresupuestadas:fila.destino==='documentos'?detalles.caras:null,
-   paginasPorCaraPresupuestadas:fila.destino==='documentos'?1:null,
+   paginasPorCaraPresupuestadas:fila.destino==='documentos'?(detalles.paginasPorHoja??1):null,
+   carasPorJuegoPresupuestadas:fila.destino==='documentos'?(detalles.carasPorJuego??detalles.paginas):null,
+   hojasPorJuegoPresupuestadas:fila.destino==='documentos'?(detalles.hojasPorJuego??Math.ceil(detalles.paginas/(detalles.caras==='double'?2:1))):null,
    tipoAnillado:fila.destino==='documentos'?detalles.anillado:null,
    productoId:detalles.productoId||null,
    variante:detalles.variante||null,
