@@ -344,18 +344,22 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
     const e=entries[i],plan=ultimoPresupuesto.plan.find(p=>p.indice===i);
     if(!plan)throw Error('No se encontró la clasificación de este trabajo.');
     if(plan.destino==='ploteos'){
-     // Pasar la instrucción local de ploteo al portal de pruebas por el
-     // mismo canal; no la convierte en PDF recibido ni habilita cobros.
-     // El backend todavía debe validar el PDF antes de incorporarlo a Central.
+     if(!e.archivoOriginal||e.archivoOriginal.size<5||
+        e.archivoOriginal.size>20*1024*1024||!/\.pdf$/i.test(e.name)||
+        e.name.length>120||e.anillado!=='ninguno'||
+        !Array.isArray(e.paginas)||e.paginas.length<1||
+        plan.paginasElegidas.length!==e.paginas.length)
+      throw Error('El ploteo privado requiere PDF completo de hasta 20 MB, sin anillado.');
      const clasificacionCliente=e.paginas.map((p,j)=>({
       numero:j+1,anchoCm:p.anchoCm,altoCm:p.altoCm,modo:p.modo
      }));
      if(clasificacionCliente.some(p=>!['cad','poster'].includes(p.modo)))
       throw Error('Hay páginas de ploteo sin clasificación.');
      window.parent.postMessage({type:'SABER_FASE1_PLOTEO_PRELIMINAR',
-      nombre:e.name,copias:e.copias,papelPoster:e.papelPoster,
+      file:e.archivoOriginal,nombre:e.name,modo:e.modo,
+      copias:e.copias,papelPoster:e.papelPoster,
       clasificacionCliente,precioPreliminar:ultimoPresupuesto.total},location.origin);
-     throw Error('Ploteo clasificado y comunicado al portal privado. La recepción continúa bloqueada hasta cerrar su validación en el servidor.');
+     continue;
     }
     if(plan.destino!=='documentos')
      throw Error('Este servicio queda fuera de la primera etapa.');
@@ -380,9 +384,9 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
      paginasPorHoja:e.paginasPorHoja??1,
      paginas:e.paginas.length,nombre:e.name});
    }
-   window.parent.postMessage({type:'SABER_SMART_DOCUMENTS_TO_PRIVATE',
+   if(files.length)window.parent.postMessage({type:'SABER_SMART_DOCUMENTS_TO_PRIVATE',
     files,options,total:ultimoPresupuesto.total},location.origin);
-   info.textContent='Documentos enviados a la cola del portal privado. El envío a Drive se realizará únicamente al pulsar «Enviar todos los PDF del pedido».';
+   info.textContent='Los documentos y ploteos se enviaron a la cola privada. El envío a Drive requiere pulsar «Enviar todos los PDF del pedido».';
   }catch(error){info.textContent=String(error.message||error)}
  });
 }
