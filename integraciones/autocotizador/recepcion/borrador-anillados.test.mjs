@@ -37,3 +37,19 @@ test('rechaza un grupo con un solo documento',()=>{
   cotizacion:cotizacion(),archivos:documentos
  }),/incompatible/);
 });
+
+test('conserva hojas físicas de imposición y rechaza discordancias con precio',()=>{
+ const documentos=[archivo('apunte1.pdf'),archivo('apunte2.pdf')];
+ documentos[0].paginasPorHoja=4;
+ const quote=cotizacion();
+ quote.plan[0].paginasPorHoja=4;
+ quote.detalleImpresiones[0].paginasPorHoja=4;
+ const borrador=prepararBorradorPedido({cotizacion:quote,archivos:documentos});
+ assert.equal(borrador.items[0].paginasPorHoja,4);
+ assert.equal(borrador.items[0].carasPorJuego,1);
+ assert.equal(borrador.items[0].hojasPorJuego,1);
+ assert.equal(borrador.paymentAuthorized,false);
+ quote.detalleImpresiones[0].paginasPorHoja=1;
+ assert.throws(()=>prepararBorradorPedido({cotizacion:quote,archivos:documentos}),
+  /no coincide/);
+});
