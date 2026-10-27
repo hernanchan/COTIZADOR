@@ -10,16 +10,18 @@ test('portal privado genera JS sintacticamente valido',()=>{
  assert.ok(script);
  assert.doesNotThrow(()=>new Script(script.replace(/^import [^\n]+;\s*$/gm,'')));
 });
-test('clasificacion de CAD/poster sale del navegador sin envio PDF',()=>{
+test('clasificacion de CAD/poster y archivo original pasan al portal privado',()=>{
  assert.match(source,/SABER_FASE1_PLOTEO_PRELIMINAR/);
  assert.match(source,/clasificacionCliente=e\.paginas\.map/);
  assert.match(source,/numero:j\+1,anchoCm:p\.anchoCm,altoCm:p\.altoCm,modo:p\.modo/);
- assert.match(source,/throw Error\('Ploteo clasificado y comunicado al portal privado/);
+ assert.match(source,/file:e\.archivoOriginal/);
  assert.match(script,/SABER_FASE1_PLOTEO_PRELIMINAR/);
- assert.match(script,/NO se adjuntó ni recibió el PDF/);
+ assert.match(script,/PDF preparado en memoria para la recepción privada/);
+ assert.match(script,/api\/ensayo-cotizar-ploteo-verificado/);
+ assert.match(script,/subirYVincularPdfCotizadorV2/);
  assert.match(source,/plan\.destino!=='documentos'/);
 });
-test('instrucciones de ploteo no se confunden con alta real de pedido',()=>{
+test('instrucciones de ploteo no se confunden con registro D1 del pedido',()=>{
  const marker=source.indexOf("if(plan.destino==='ploteos')");
  const end=source.indexOf("if(plan.destino!=='documentos')",marker);
  const segment=source.slice(marker,end);
