@@ -1,3 +1,15 @@
+## 27/10/2026 — Etapa 1: validación integrada y rendimiento (plan maestro)
+
+**Frente único:** cerrar cotizador inteligente y paridad comercial antes de avanzar a recepción y Central. No confundir esta CI con validación en navegador real.
+
+- Corrección de integridad: al excluir un grupo de anillado incompatible, ahora se reindexan conjuntamente IDs de líneas y del plan, evitando asociar precio de otro PDF. CI aprobada: https://github.com/hernanchan/COTIZADOR/actions/runs/40493019030
+- Pruebas con `precios-web.json` comercial: A4 B/N escalas, A3 color, materiales incompatibles, anillado conjunto, separación de tarifas; CI aprobada: https://github.com/hernanchan/COTIZADOR/actions/runs/40493221358
+- Límites de lote 10/11 y 30/31 PDF, doble faz, descuento por volumen; CI aprobada: https://github.com/hernanchan/COTIZADOR/actions/runs/40493476747
+- Precio preliminar visible en encabezado del portal privado y estado inválido mientras se recalcula. Se comprueban origen y ventana del iframe; sin habilitar pagos. CI aprobada: https://github.com/hernanchan/COTIZADOR/actions/runs/40493644069
+- Ploteos mixtos CAD/Póster, rollo automático y material recubierto solo en páginas Póster, bloqueo de páginas sin clasificar: CI aprobada en trabajo https://github.com/hernanchan/COTIZADOR/actions/runs/40493743484
+- Se incorporó lectura local con concurrencia máxima de 3 para PDF de hasta 12 MiB cada uno, serial para lotes con PDF mayores. **No hay benchmark real PC/Android de mejora de velocidad**; verificar antes de aprobar. Revisión CI en https://github.com/hernanchan/COTIZADOR/actions/runs/40493787559
+- **No se desplegó este bloque en Cloudflare ni en la web pública.** No se activaron recepción comercial ni cobros. Restan ensayo visual Chrome/Android, paridad funcional de materiales/cupones y aceptación UX antes de cerrar Etapa 1.
+
 ## 27/10/2026 — Continuidad UX V2 y anillado: bloqueo verificado
 
 - En portal privado V2, la carga inteligente transmite opciones `formato`, `modo`, `caras`, `copias` y `materialColor` para PDF A4/A3 sin anillado. La segunda etapa ya reutiliza estos datos y ahora muestra los controles de revisión contraídos en vez de pedirlos otra vez.
