@@ -84,3 +84,11 @@ Se confirmó una **incompatibilidad entre cotización y recepción**, no una fal
 - Prueba `fase1-ploteo-central-manifiesto.test.mjs`: genera un PDF A0, simula recibo privado firmado/Drive, vuelve a leer los bytes del PDF, calcula CAD, crea la ficha, prepara el manifiesto y lo concilia sin escribir en D1.
 - GitHub Actions `40586733737`: batería nueva, compilación del Worker y regresiones anteriores completas **en verde**.
 - **No hay prueba real con acceso a Google Drive ni D1, ni despliegue de Cloudflare**: falta verificar la persistencia en el Worker de pruebas antes de publicar. No declarar cerrada la primera etapa con CI solamente.
+
+## Ensayo integrado de tres PDF reales en CI
+
+- Se añadieron pruebas que generan y leen **dos PDF A4 diferentes y un PDF A0 CAD** desde sus bytes, simulan las respuestas autenticadas de Drive y comprueban: SHA-256, páginas, dimensiones, clasificación, precios oficiales, ficha única de tres trabajos y conciliación de manifiesto para la Central.
+- Una modificación de los bytes del tercer PDF cancela el pedido entero.
+- GitHub Actions `40587938357` **aprobada**; incluye compilación del Worker y regresiones.
+- Este ensayo NO equivale a un upload real hacia Google ni una escritura real D1. La prueba real privada sigue siendo requisito obligatorio antes de presentar la etapa.
+- Se inspeccionó `.github/workflows/saber-documentos-v2-stage-private.yml`: su versión actual carga un artefacto de Cloudflare sin desplegarlo y apunta a la rama histórica de Polaroids; no promoverlo automáticamente hasta asegurar el flujo de pruebas sin modificar la web vigente.
