@@ -131,3 +131,37 @@ test('ploteo sin clasificación visual no recibe importe preliminar',()=>{
  assert.equal(r.paymentAuthorized,false);
  assert.match(r.pendientes[0].motivo,/Clasificación visual/);
 });
+
+test('color A4 con papeles diferentes no comparte escala de descuento',()=>{
+ const r=cotizarCargaUnica({precios,archivos:[
+  archivo('obra.pdf',{cantidad:7,modo:'color',materialColor:'obra70'}),
+  archivo('foto.pdf',{cantidad:5,modo:'color',materialColor:'fotografico'})
+ ]});
+ assert.equal(r.estado,'PRELIMINAR');
+ assert.equal(r.total,7*200+5*1600);
+ assert.equal(r.detalleImpresiones[0].precioUnitario,200);
+ assert.equal(r.detalleImpresiones[1].precioUnitario,1600);
+ assert.equal(r.paymentAuthorized,false);
+});
+test('B/N y color A4 del mismo anillado conservan impresiones separadas y un armado',()=>{
+ const r=cotizarCargaUnica({precios,archivos:[
+  archivo('texto.pdf',{cantidad:12,anillado:'grupo',grupoAnillado:'2'}),
+  archivo('laminas.pdf',{cantidad:4,modo:'color',materialColor:'obra70',
+   anillado:'grupo',grupoAnillado:'2'})
+ ]});
+ assert.equal(r.estado,'PRELIMINAR');
+ assert.equal(r.subtotalAnillados,2330);
+ assert.equal(r.subtotalImpresiones,12*84+4*200+2330);
+ assert.equal(r.total,12*84+4*200+2330);
+ assert.deepEqual(r.detalleArmados[0].archivos,['pdf1','pdf2']);
+ assert.equal(r.detalleArmados[0].hojasPorJuego,16);
+});
+test('un archivo con selección parcial de páginas no cobra las descartadas',()=>{
+ const f=archivo('seleccion.pdf',{cantidad:12});
+ f.paginasSeleccionadas='1-3,8';
+ const r=cotizarCargaUnica({precios,archivos:[f]});
+ assert.equal(r.estado,'PRELIMINAR');
+ assert.equal(r.total,400);
+ assert.deepEqual(r.plan[0].paginasElegidas,[1,2,3,8]);
+ assert.equal(r.paymentAuthorized,false);
+});
