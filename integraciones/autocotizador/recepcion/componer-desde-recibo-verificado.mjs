@@ -51,6 +51,27 @@ export async function componerDesdeReciboVerificado({
     trabajo.hojasPorJuegoPresupuestadas!==Math.ceil(trabajo.carasPorJuegoPresupuestadas/(trabajo.carasPresupuestadas==='double'?2:1))||
     !Array.isArray(trabajo.paginasElegidas)||!trabajo.paginasElegidas.length)
   throw Error('Trabajo no apto: composición o tarifa requieren revisión.');
+ // La ficha puede ser coherente consigo misma y aun así no corresponder
+ // al precio recalculado: exigir identidad de línea, opciones y cantidades.
+ const cotizacion=manifiesto.cotizacion;
+ const plan=cotizacion?.plan?.filter(p=>p.id===trabajo.idTrabajo&&
+   p.destino==='documentos');
+ const desglose=cotizacion?.detalleImpresiones?.filter(d=>d.id===trabajo.idTrabajo);
+ if(cotizacion?.estado!=='PRELIMINAR'||cotizacion.paymentAuthorized!==false||
+    !Number.isSafeInteger(cotizacion.total)||cotizacion.total<1||
+    cotizacion.total!==manifiesto.importeVerificado||
+    plan?.length!==1||desglose?.length!==1||
+    plan[0].nombre!==trabajo.nombreOriginal||
+    desglose[0].nombre!==trabajo.nombreOriginal||
+    (plan[0].paginasPorHoja??1)!==trabajo.paginasPorCaraPresupuestadas||
+    (desglose[0].paginasPorHoja??1)!==trabajo.paginasPorCaraPresupuestadas||
+    desglose[0].caras!==trabajo.carasPresupuestadas||
+    desglose[0].copias!==trabajo.copias||
+    plan[0].formatoFinal!==trabajo.formatoFinal||
+    JSON.stringify(plan[0].paginasElegidas)!==JSON.stringify(trabajo.paginasElegidas)||
+    Math.ceil(plan[0].paginasElegidas.length/trabajo.paginasPorCaraPresupuestadas)!==
+      trabajo.carasPorJuegoPresupuestadas)
+  throw Error('Composición distinta del presupuesto recalculado por servidor.');
  const r=manifiesto.recibos.find(x=>x.receiptId===trabajo.reciboPrivado);
  if(!r||manifiesto.recibos.filter(x=>x.receiptId===trabajo.reciboPrivado).length!==1||
     r.fileId!==trabajo.fileId||r.sha256!==trabajo.sha256||
