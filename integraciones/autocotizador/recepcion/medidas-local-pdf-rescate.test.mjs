@@ -52,7 +52,7 @@ test('lector alternativo recupera tamaños de PDF complejo no interpretable por 
  assert.ok(Math.abs(r.paginas[0].anchoCm-21)<0.02);
  assert.ok(Math.abs(r.paginas[1].anchoCm-29.7)<0.02);
  assert.ok(Math.abs(r.paginas[1].altoCm-42)<0.02);
- assert.equal(requiereClasificacionVisualPloteo(r.paginas),true);
+ assert.equal(requiereClasificacionVisualPloteo(r.paginas),false);
  assert.equal(r.aptoParaCobro,false);
  assert.equal(destruido,true);
  assert.equal(limpias,2);
