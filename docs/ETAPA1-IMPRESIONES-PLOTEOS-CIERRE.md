@@ -92,3 +92,11 @@ Se confirmó una **incompatibilidad entre cotización y recepción**, no una fal
 - GitHub Actions `40587938357` **aprobada**; incluye compilación del Worker y regresiones.
 - Este ensayo NO equivale a un upload real hacia Google ni una escritura real D1. La prueba real privada sigue siendo requisito obligatorio antes de presentar la etapa.
 - Se inspeccionó `.github/workflows/saber-documentos-v2-stage-private.yml`: su versión actual carga un artefacto de Cloudflare sin desplegarlo y apunta a la rama histórica de Polaroids; no promoverlo automáticamente hasta asegurar el flujo de pruebas sin modificar la web vigente.
+
+## Versión Cloudflare preparada — 27-10-2026
+
+- Workflow `.github/workflows/fase1-version-privada.yml` compiló el bundle y volvió a ejecutar las pruebas de PDF antes de cualquier transferencia.
+- GitHub Actions: `40590247833`; operación `POST /versions?bindings_inherit=strict` exitosa sobre Worker de ensayo `saber-documentos-pruebas`.
+- Cloudflare confirmó versión no desplegada: `18779e7c-05f9-4f33-9fa0-dd2955942492` del commit `2c09e2324c45f481a9b14aae8b7a6f10dff684f3`.
+- **No se ejecutó `deployments`, ni modificación de rutas, dominio, Worker activo o pagos**.
+- El ensayo real Drive/D1 todavía necesita que esa versión se promueva de manera controlada sólo en el entorno de pruebas, previa comprobación del despliegue activo y estrategia de reversión. Se debe verificar PDF real 2×A4 + 1×A0 sin datos de clientes y borrar registros de ensayo cuando se complete.
