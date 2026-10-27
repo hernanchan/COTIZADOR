@@ -10,6 +10,7 @@ on:
       - 'integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs'
       - 'tests/fase1-puente-clasificacion.test.mjs'
       - 'integraciones/autocotizador/recepcion/carga-unica-cliente.mjs'
+      - 'integraciones/autocotizador/recepcion/carga-unica-pdf-regresion.test.mjs'
       - 'integraciones/autocotizador/recepcion/pantalla-cotizador-v2-prueba-privada.mjs'
       - 'tests/fase1-frontera-recepcion.test.mjs'
       - '.github/workflows/fase1-contrato-servidor.yml'
