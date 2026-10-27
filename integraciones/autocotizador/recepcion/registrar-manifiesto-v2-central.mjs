@@ -45,6 +45,26 @@ export function conciliarManifiestoV2ConServidor({manifiesto,verificacion}){
   vistos.add(recibo.receiptId);
  }
  if(vistos.size!==m.items.length)throw Error('Faltan PDFs verificados.');
+ // Para CAD/Póster exigir la ficha recalculada por el servidor y comprobar
+ // correspondencia uno-a-uno con el recibo. No usar el precio del navegador.
+ const trabajos=v.ficha?.trabajos;
+ if(!Array.isArray(trabajos)||trabajos.length!==m.items.length)
+  throw Error('La Central no dispone de todos los trabajos verificados.');
+ for(const item of m.items){
+  if(item.opciones?.servicio!=='ploteos')continue;
+  const ficha=trabajos.find(t=>t.reciboPrivado===item.reciboPrivado);
+  if(!ficha||ficha.servicio!=='ploteos'||
+     ficha.sha256!==item.sha256||ficha.paginasOriginales!==item.paginas||
+     !Array.isArray(ficha.planoPorPagina)||
+     ficha.planoPorPagina.length!==item.paginas||
+     ficha.planoPorPagina.some((p,i)=>p.numeroOriginal!==i+1||
+      !['cad','poster'].includes(p.modo)||
+      !/^(rollo|rec)\\d+$/.test(p.rollo||'')||
+      !['obra80','recubierto'].includes(p.papel))||
+     ficha.copias!==item.opciones.copias||
+     ficha.pdfImprimibleVerificado!==false)
+   throw Error('El ploteo no coincide con la ficha verificada del servidor.');
+ }
  // No aceptar total local como precio; ni rechazar una modificación legítima
  // de tarifa: la autoridad es la cotización comprobada por el servidor.
  return Object.freeze({
