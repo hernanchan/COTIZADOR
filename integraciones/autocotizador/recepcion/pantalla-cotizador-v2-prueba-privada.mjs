@@ -23,6 +23,7 @@ button{border:0;background:#0a5583;color:#fff;padding:10px 15px;border-radius:8p
 button:disabled{opacity:.45;cursor:not-allowed}
 .state{white-space:pre-wrap;overflow-wrap:anywhere;color:#0a3158;font-size:13px}
 .warning{background:#fff2db;border-left:4px solid #f7931e;padding:10px;margin-bottom:12px}
+#precio-smart{position:sticky;top:0;z-index:10;background:#eaf3fa;border-bottom:2px solid #aecce5;padding:9px max(15px,calc((100vw - 1110px)/2));font-size:16px;font-weight:750;color:#0a3158;box-shadow:0 3px 9px #0a315812}
 .cf-turnstile{margin:15px 0}
 #drop-pdf{display:block;border:2px dashed #8faec5;background:#f4f9fd;border-radius:12px;padding:16px;margin:12px 0;cursor:pointer}
 #drop-pdf.dragging{background:#dfedfb;border-color:#095f8f}
@@ -30,6 +31,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 @media(max-width:840px){main{display:block}.panel{margin-bottom:14px}iframe{min-height:740px}}
 </style></head><body>
 <header><h1>LIBRERÍA SABER · Cotizador V2 en ensayo privado</h1><small style="color:#d5e3f0">Sin cobros, sin órdenes de producción y sin publicación comercial.</small></header>
+<div id="precio-smart" role="status" aria-live="polite">Presupuesto preliminar: todavía sin cotizar · No autoriza cobro</div>
 <div style="max-width:1140px;margin:18px auto 0;padding:0 14px">
 <section style="padding:8px 3px 4px"><h2 style="margin:0 0 5px;font-size:22px;color:#123852">Cargá tus archivos una sola vez</h2><p style="margin:0;color:#52677a">Arrastrá todos los PDF juntos, revisá el presupuesto y después prepará el envío. Los ploteos se cotizan automáticamente; su recepción sigue en pruebas.</p></section></div>
 <main><section class="panel" style="padding:0;border:0;background:transparent">
@@ -423,6 +425,19 @@ registerButton.addEventListener('click',async()=>{
 });
 window.addEventListener('message',async event=>{
  if(event.origin!==location.origin)return;
+ if(event.source===smart.contentWindow&&event.data?.type==='SABER_SMART_PRICE_STATE'){
+  const status=event.data.estado;
+  const price=event.data.total;
+  const headerPrice=document.getElementById('precio-smart');
+  if(status==='listo'&&Number.isSafeInteger(price)&&price>0)
+   headerPrice.textContent='Total preliminar: '+new Intl.NumberFormat('es-AR',{
+    style:'currency',currency:'ARS',maximumFractionDigits:0}).format(price)+' · Sin cobro autorizado';
+  else if(status==='calculando')headerPrice.textContent='Recalculando presupuesto…';
+  else if(status==='incompleto')headerPrice.textContent='Presupuesto incompleto · Corregí los archivos pendientes';
+  else if(status==='error')headerPrice.textContent='Sin presupuesto · Revisá el error en la carga';
+  else if(status==='esperando')headerPrice.textContent='Presupuesto preliminar: todavía sin cotizar';
+  return;
+ }
  if(event.source===smart.contentWindow&&event.data?.type==='SABER_SMART_RESIZE'){
   const height=Number(event.data.height);
   if(Number.isFinite(height)&&height>=300&&height<=40000)
