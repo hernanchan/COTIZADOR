@@ -46,6 +46,12 @@ Objetivo: entregar el sistema original + V2 completamente integrado y verificabl
 7. Antes de agotarse la conversación, redactar un prompt de relevo completo y registrar estado con rama/commit, etapa, cambios comprobados y bloqueo siguiente.
 8. Evitar reportar porcentajes inventados, promesas de 100 % sin errores o éxitos de CI no verificados.
 
+## Brecha bloqueante de paridad detectada — 27/10/2026
+
+**Composición 2/4/9 páginas por hoja (N-up):** la pantalla `carga-unica-cliente.mjs` y el contrato de `cotizar-carga-unica.mjs` aún no incluyen el parámetro de imposición; las tarifas actuales se calculan a partir de páginas seleccionadas, no de hojas impuestas. **No simular esa opción reduciendo páginas o precios sin definir la hoja física, caras impresas, descuentos y anillado real.** Resolver en esta misma Etapa 1 con contrato común navegador/servidor, pruebas comerciales de 1/2/4/9 por hoja, páginas impares y doble faz, y validación contra el cotizador original. No pasar a Etapa 2 hasta que quede cubierta.
+
+**Paridad de materiales y modalidades:** pruebas con tarifa real A4/A3, mezcla B/N-color, anillado y ploteos ya existen en CI; la cobertura de promociones y cupones, validación móvil con PDF reales y tiempos p50/p95 sigue pendiente. No marcar Etapa 1 como concluida con solo casos de unidad.
+
 ## Estado de corte al 27/10/2026
 **Etapa activa: 1, cierre funcional y paridad comercial.** Existen componentes de cotización rápida, CAD/Póster y carga única, pero aún no se confirmó una UX integrada aceptada con todas las opciones del cotizador vigente. Etapa 2 tiene piezas y pruebas locales, pero el recorrido remoto completo con D1 aún no fue aceptado. Cambios recientes sobre borrador de anillados y suite CI son parciales; comprobar ejecución y resultado antes de tratarlos como validados.
 
