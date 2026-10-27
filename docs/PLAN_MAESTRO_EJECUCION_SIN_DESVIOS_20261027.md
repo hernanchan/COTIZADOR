@@ -69,6 +69,19 @@ Objetivo: entregar el sistema original + V2 completamente integrado y verificabl
 - CI aprobada: https://github.com/hernanchan/COTIZADOR/actions/runs/40496085795
 - **No significa recepción comercial habilitada**: el puente del portal privado sigue rechazando N-up distinto de 1, ya que resta conducir el contrato hasta el pedido real, ensayo PC/Android y revisión visual de orden, orientación y doble faz de archivos PDF originales. Mantener esa barrera hasta prueba extremo a extremo; no publicar web ni cobros.
 
+## Cierre del contrato N-up entre carga y recepción V2 — 27/10/2026
+
+**Código unido en rama privada, CI aprobada, sin despliegue remoto:**
+
+- La carga inteligente transfiere `paginasPorHoja` 1/2/4/9 al portal junto con el archivo real y sus opciones de impresión.
+- El portal V2 conserva el valor y lo envía al vínculo del recibo; el cliente V2 exige igualdad exacta de la respuesta de cotización del servidor.
+- Para N-up 2/4/9, el Worker no confía en un subtotal del navegador: recupera el original por el receptor firmado, verifica SHA-256, lee dimensiones reales y calcula el importe desde `precios-web.json`. Un PDF superior a A3 se rechaza.
+- En el paso de registro de lote, `paginasPorHoja` se conserva para recotización servidor → ficha de la Central. El compositor privado previamente probado recibe el número real de páginas por cara y rechaza diferencias con presupuesto.
+- Pruebas nuevas con catálogo real: 9 páginas 4-up doble faz con dos juegos; A3 color 2-up; rechazo de recibos inválidos y de PDF que exceden A3.
+- **CI de integración y seguridad aprobada:** https://github.com/hernanchan/COTIZADOR/actions/runs/40497119851
+- **Pendiente verificable para cerrar etapa:** desplegar exclusivamente en el entorno de ensayo autorizado, efectuar carga de un PDF original, comprobar recibo GAS, cotización y registro en D1, generar y revisar el PDF final privado y comparar visualmente composición de caras y orientación. Ninguna de estas pruebas remotas se declara realizada.
+- Producción `libreriasaber.com.ar`, pagos, recepción comercial y gastos siguen sin modificación.
+
 ## Estado de corte al 27/10/2026
 **Etapa activa: 1, cierre funcional y paridad comercial.** Existen componentes de cotización rápida, CAD/Póster y carga única, pero aún no se confirmó una UX integrada aceptada con todas las opciones del cotizador vigente. Etapa 2 tiene piezas y pruebas locales, pero el recorrido remoto completo con D1 aún no fue aceptado. Cambios recientes sobre borrador de anillados y suite CI son parciales; comprobar ejecución y resultado antes de tratarlos como validados.
 
