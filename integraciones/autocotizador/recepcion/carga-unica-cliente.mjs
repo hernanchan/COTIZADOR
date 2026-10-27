@@ -89,19 +89,21 @@ function render(){
   const boton=texto('button',abierto===i?'Cerrar':'Editar');
   boton.className='editar';boton.type='button';boton.setAttribute('aria-expanded',String(abierto===i));
   boton.onclick=()=>{abierto=abierto===i?-1:i;render()};
-  fila.append(boton);
+  const acciones=document.createElement('div');acciones.className='acciones-archivo';
+  acciones.append(boton);
   const quitar=texto('button','Quitar');
   quitar.type='button';quitar.className='editar';
-  quitar.style.color='#9d3434';
+  quitar.style.color='#9d3434';quitar.disabled=leyendo;
   quitar.setAttribute('aria-label','Quitar archivo '+e.name);
   quitar.onclick=()=>{
+   if(leyendo)return; // Evita cambiar índices durante análisis asincrónico.
    entries.splice(i,1);
    if(abierto===i)abierto=-1;
    else if(abierto>i)abierto--;
    cambio();
    $('estado').textContent=entries.length+' PDF en la lista. No hace falta volver a cargar los restantes.';
   };
-  fila.append(quitar);card.append(fila);
+  acciones.append(quitar);fila.append(acciones);card.append(fila);
   if(abierto!==i){lista.append(card);continue}
   const panel=document.createElement('div');panel.className='panel-edicion';
   if(e.error){panel.append(texto('p','Error: '+e.error));card.append(panel);lista.append(card);continue}
