@@ -52,7 +52,9 @@ export function prepararBorradorPedido({cotizacion,archivos}){
   lineas.push(Object.freeze({
    referenciaLocal:'archivo-'+(item.indice+1),nombre:entrada.name,
    servicio:item.destino,paginasElegidas:[...refs],paginasOriginales:entrada.paginas.length,
-   bytes:entrada.file.size,copias:entrada.copias,descripcion:calculo.descripcion||calculo.familia||'',
+   bytes:entrada.file.size,copias:entrada.copias,
+   anillado:entrada.anillado||'ninguno',grupoAnillado:entrada.grupoAnillado||'',
+   ordenArmado:item.indice+1,descripcion:calculo.descripcion||calculo.familia||'',
    subtotalReferencia:entero(calculo.subtotal)?calculo.subtotal:null,
    estadoArchivo:'SIN_ENVIAR',reciboServidor:null,verificacionServidor:false
   }));
