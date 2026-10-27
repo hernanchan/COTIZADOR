@@ -8,6 +8,7 @@ import {paginaCotizadorConjunto} from './cotizador-conjunto-pagina.mjs';
 import {paginaCargaUnica} from './carga-unica-pagina.mjs';
 import {cotizarCargaUnica} from './cotizar-carga-unica.mjs';
 import {cotizarNupReciboVerificado} from './cotizar-nup-recibo-verificado.mjs';
+import {cotizarPloteoReciboVerificado} from './cotizar-ploteo-recibo-verificado.mjs';
 import {leerPdfFase4Privado} from './leer-pdf-fase4-privado.mjs';
 import {medidasPdfServidor} from './medidas-pdf-servidor.mjs';
 import {GRAFICA_COMERCIAL} from './cotizar-grafica.mjs';
@@ -846,6 +847,57 @@ async function fase4PrivateVerified(env,session,metrics=null,preferirInfo=false,
    throw Error('Google no guardó el conteo de páginas');
  return committed;
 }
+/** Sólo presupuesto privado de ploteo de PDF ya guardado y verificado.
+ * No registra órdenes, no escribe en D1 y no emite autorización de pago.
+ */
+async function v2CotizarPloteoVerificado(request,env){
+ if(request.method!=='POST')return closed();
+ if(!allowed(request,env)||v2PrivateBrowserAuthorized(request,env)!=='allow')
+  return testResponse({ok:false,error:'Acceso privado requerido',paymentAuthorized:false},401);
+ if(env?.DOCS_V2_RECEIPT_LINK_ENABLED!=='PRIVATE_TEST_ONLY'||
+    env?.DOCS_EXTENDED_RECEIVER_ENABLED!=='PRIVATE_TEST_ONLY')
+  return testResponse({ok:false,error:'Recepción privada deshabilitada',paymentAuthorized:false},503);
+ let input;
+ try{
+  input=await readLimited(request);
+  if(!input||typeof input!=='object'||Array.isArray(input)||
+     Object.keys(input).sort().join(',')!=='clasificacionCliente,copias,expectedMode,expectedOrderId,papelPoster,sesion'||
+     !input.sesion||Object.keys(input.sesion).sort().join(',')!=='token,uploadId'||
+     !phase4Session(input.sesion.uploadId)||!phase4Token(input.sesion.token)||
+     !/^WEB-[A-Za-z0-9_-]{5,80}$/.test(input.expectedOrderId||'')||
+     !['bn','color'].includes(input.expectedMode)||
+     !Number.isSafeInteger(input.copias)||input.copias<1||input.copias>200||
+     !['obra80','recubierto'].includes(input.papelPoster)||
+     !Array.isArray(input.clasificacionCliente)||input.clasificacionCliente.length<1||
+     input.clasificacionCliente.length>2000)
+   throw Error('Datos incorrectos');
+ }catch{
+  return testResponse({ok:false,error:'Instrucciones de ploteo inválidas',paymentAuthorized:false},400);
+ }
+ try{
+  const recibo=await fase4PrivateVerified(env,input.sesion,null,false,DOCS_MAX);
+  if(recibo.orderId!==input.expectedOrderId||recibo.mode!==input.expectedMode||
+     recibo.paymentAuthorized!==false||recibo.receiptId!==input.sesion.uploadId)
+   throw Error('Recibo no corresponde al trabajo.');
+  const original=await leerPdfFase4Privado({
+   session:input.sesion,receiptId:recibo.receiptId,
+   bytes:recibo.bytes,sha256:recibo.sha256,maxFileBytes:DOCS_MAX,
+   consultarFirmado:p=>postToScript(env,p,fetch,420000)
+  });
+  const medidas=await medidasPdfServidor(original);
+  const quote=cotizarPloteoReciboVerificado({
+   recibo,medidas,clasificacionCliente:input.clasificacionCliente,
+   copias:input.copias,papelPoster:input.papelPoster,precios:preciosPiloto
+  });
+  return testResponse({ok:true,orderId:recibo.orderId,receiptId:recibo.receiptId,
+   sha256:recibo.sha256,quote,checkoutEnabled:false,
+   paymentAuthorized:false,listoParaProducir:false},200);
+ }catch(_){
+  return testResponse({ok:false,error:'No se pudo verificar o cotizar el ploteo; requiere revisión.',
+   checkoutEnabled:false,paymentAuthorized:false,listoParaProducir:false},422);
+ }
+}
+
 async function v2VincularPdf(request,env){
  if(env?.DOCS_V2_RECEIPT_LINK_ENABLED!=='PRIVATE_TEST_ONLY'||
     env?.DOCS_EXTENDED_RECEIVER_ENABLED!=='PRIVATE_TEST_ONLY')
@@ -1538,6 +1590,7 @@ export default {
     if(page==='/api/ensayo-pdf')return fase4Transfer(request,env);
     if(page==='/api/ensayo-pdf-ampliado')return fase4Transfer(request,env,true);
     if(page==='/api/ensayo-vincular-pdf-v2')return v2VincularPdf(request,env);
+    if(page==='/api/ensayo-cotizar-ploteo-verificado')return v2CotizarPloteoVerificado(request,env);
     if(page==='/api/ensayo-cotizar')return fase4Quote(request,env);
     if(page==='/prueba-presupuesto'&&request.method==='GET')return presupuestoHtml(env);
     if(page==='/api/presupuesto-pdf')return presupuestoPost(request,env);
