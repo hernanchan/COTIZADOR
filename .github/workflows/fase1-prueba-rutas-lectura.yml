@@ -1,0 +1,35 @@
+name: Fase 1 - enlace privado y rutas sin escritura
+on:
+  push:
+    branches: [fase1/impresiones-ploteos-20261027]
+    paths: [.github/workflows/fase1-prueba-rutas-lectura.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Verificar URL de ensayo y bloqueo de acceso
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers"
+          curl -fsS -H "Authorization: Bearer $TOKEN" "$base/subdomain" >/tmp/saber-subdomain.json
+          domain=$(jq -r 'if .success==true then .result.subdomain else empty end' /tmp/saber-subdomain.json)
+          test -n "$domain"
+          host="saber-documentos-pruebas.$domain.workers.dev"
+          echo "ENSAYO_PRIVATE_URL=https://$host/prueba-v2/"
+          code=$(curl -sS --max-time 20 -o /tmp/saber-response.txt -w '%{http_code}' "https://$host/prueba-v2/")
+          test "$code" = '401'
+          echo "UNAUTHENTICATED_UI_BLOCKED_401"
+          test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "https://$host/api/ensayo-cotizar-ploteo-verificado")" = '503'
+          echo "PLOT_POST_ROUTE_NOT_ACCESSIBLE_WITH_GET"
+          echo "READ_ONLY_SMOKE_OK"
