@@ -5,6 +5,9 @@ on:
       - fase1/impresiones-ploteos-20261027
     paths:
       - 'tests/fase1-contrato-servidor.test.mjs'
+      - 'tests/fase1-puente-clasificacion.test.mjs'
+      - 'integraciones/autocotizador/recepcion/carga-unica-cliente.mjs'
+      - 'integraciones/autocotizador/recepcion/pantalla-cotizador-v2-prueba-privada.mjs'
       - 'tests/fase1-frontera-recepcion.test.mjs'
       - '.github/workflows/fase1-contrato-servidor.yml'
   workflow_dispatch:
@@ -23,7 +26,7 @@ jobs:
         working-directory: integraciones/autocotizador/recepcion
         run: npm install --no-audit --no-fund
       - name: Probar limite entre cotizacion y recepcion
-        run: node --test tests/fase1-frontera-recepcion.test.mjs tests/fase1-contrato-servidor.test.mjs
+        run: node --test tests/fase1-frontera-recepcion.test.mjs tests/fase1-contrato-servidor.test.mjs tests/fase1-puente-clasificacion.test.mjs
       - name: Regresion previa del servidor
         run: node --test tests/autocotizador-pedido-verificado.test.mjs tests/autocotizador-puente-central.test.mjs tests/autocotizador-regla-comercial-ploteos.test.mjs
       - name: Confirmacion de aislamiento
