@@ -23,7 +23,7 @@ jobs:
         run: |
           set -euo pipefail
           worker=saber-documentos-pruebas
-          new_version=45d0a63b-3c4e-4023-8f04-0799def6e302
+          new_version=42ef6868-0b14-42e8-8d68-b589f6127b42
           root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/$worker"
           curl -fsS --max-time 20 -H "Authorization: Bearer $TOKEN" "$root/deployments" -o /tmp/deployments-before.json
           jq -e '.success==true and (.result.deployments|type=="array") and (.result.deployments|length>0)' /tmp/deployments-before.json >/dev/null
@@ -52,7 +52,8 @@ jobs:
           if ! grep -aq 'send-all-pdf' /tmp/live-script; then rollback; exit 1; fi
           if ! grep -aq '/prueba-v2/carga-inteligente' /tmp/live-script; then rollback; exit 1; fi
           if ! grep -aq 'SABER_SMART_DOCUMENTS_TO_PRIVATE' /tmp/live-script; then rollback; exit 1; fi
-          if ! grep -aq 'Los otros PDF siguen cargados' /tmp/live-script; then rollback; exit 1; fi
+          if ! grep -aq 'SUBTOTAL DE PDF COTIZABLES' /tmp/live-script; then rollback; exit 1; fi
+          if ! grep -aq 'acciones-archivo' /tmp/live-script; then rollback; exit 1; fi
           if ! grep -aq 'recepcion-avanzada' /tmp/live-script; then rollback; exit 1; fi
           if ! grep -aq 'SABER_SMART_RESIZE' /tmp/live-script; then rollback; exit 1; fi
           if ! grep -aq 'SABER_SOLICITAR_PDF_PRIVADO' /tmp/live-script; then rollback; exit 1; fi
