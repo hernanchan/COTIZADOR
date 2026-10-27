@@ -61,7 +61,10 @@ export async function subirYVincularPdfCotizadorV2({
     sesionPrevia.opcionesKey!==JSON.stringify(opciones??null))))
   throw Error('El archivo, el trabajo o la verificación no corresponden.');
  if(opciones!==undefined&&(!opciones||typeof opciones!=='object'||Array.isArray(opciones)||
-    Object.keys(opciones).sort().join(',')!=='anillado,caras,copias,formato,materialColor'||
+    !['anillado,caras,copias,formato,materialColor',
+      'anillado,caras,copias,formato,materialColor,paginasPorHoja']
+      .includes(Object.keys(opciones).sort().join(','))||
+    ![1,2,4,9].includes(opciones.paginasPorHoja??1)||
     !['a4','a3'].includes(opciones.formato)||!['simple','double'].includes(opciones.caras)||
     !['ninguno','juntos'].includes(opciones.anillado)||
     !Number.isSafeInteger(opciones.copias)||opciones.copias<1||opciones.copias>200||
@@ -166,6 +169,7 @@ export async function subirYVincularPdfCotizadorV2({
     quote.paginasOriginales!==r.paginas||quote.formato!==opciones.formato||
     quote.caras!==opciones.caras||quote.copias!==opciones.copias||
     quote.anillado!==opciones.anillado||quote.materialColor!==opciones.materialColor||
+    (quote.paginasPorHoja??1)!==(opciones.paginasPorHoja??1)||
     quote.paymentAuthorized!==false||
     linked.checkoutEnabled!==false))
   throw Error('El servidor no confirmó el presupuesto documental.');
@@ -182,6 +186,7 @@ export async function subirYVincularPdfCotizadorV2({
    estado:quote.estado,totalArs:quote.totalArs,priceVersion:quote.priceVersion,
    paginasOriginales:quote.paginasOriginales,formato:quote.formato,caras:quote.caras,
    copias:quote.copias,anillado:quote.anillado,materialColor:quote.materialColor,
+   paginasPorHoja:quote.paginasPorHoja??1,
    paymentAuthorized:false
   })})
  });
