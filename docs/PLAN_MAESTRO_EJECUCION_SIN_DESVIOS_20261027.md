@@ -46,6 +46,14 @@ Objetivo: entregar el sistema original + V2 completamente integrado y verificabl
 7. Antes de agotarse la conversación, redactar un prompt de relevo completo y registrar estado con rama/commit, etapa, cambios comprobados y bloqueo siguiente.
 8. Evitar reportar porcentajes inventados, promesas de 100 % sin errores o éxitos de CI no verificados.
 
+## Avance de imposición documental — 27/10/2026
+
+- Etapa 1: implementado presupuesto preliminar con 1/2/4/9 páginas originales **por cara impresa** en cada PDF documental, incorporando redondeo de caras, hojas físicas y tarifas según escala de caras efectivamente impresas. Anillados individuales y conjuntos usan hojas físicas; cada archivo redondea independientemente antes de formar un grupo.
+- Nuevas pruebas de precios con catálogo original: páginas impares, doble faz, grupos de anillado, descuentos compartidos, rechazo de valores arbitrarios y ploteo no compatible. CI exitosa: https://github.com/hernanchan/COTIZADOR/actions/runs/40495662043
+- Interfaz de carga: selector por PDF y resumen. Borrador preliminar conserva páginas por cara, caras y hojas por juego; no autoriza pagos ni producción.
+- **Pendiente para funcionalidad real:** generar en backend el PDF físicamente impuesto, comprobar visualmente orden y orientación (A4/A3, márgenes, 2/4/9 y doble faz), verificar con PDF real y conservar el resultado bajo acceso privado. Hasta entonces la recepción protegida bloquea 2/4/9 para no registrar un original que no coincida con la instrucción. No marcar imposición como funcional de extremo a extremo.
+- Sin publicación de la web, sin cobros ni cambios en Central D1. Las pruebas de integración restantes deberán verificarse contra la ejecución más reciente de Actions.
+
 ## Brecha bloqueante de paridad detectada — 27/10/2026
 
 **Composición 2/4/9 páginas por hoja (N-up):** la pantalla `carga-unica-cliente.mjs` y el contrato de `cotizar-carga-unica.mjs` aún no incluyen el parámetro de imposición; las tarifas actuales se calculan a partir de páginas seleccionadas, no de hojas impuestas. **No simular esa opción reduciendo páginas o precios sin definir la hoja física, caras impresas, descuentos y anillado real.** Resolver en esta misma Etapa 1 con contrato común navegador/servidor, pruebas comerciales de 1/2/4/9 por hoja, páginas impares y doble faz, y validación contra el cotizador original. No pasar a Etapa 2 hasta que quede cubierta.
