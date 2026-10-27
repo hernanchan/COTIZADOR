@@ -342,8 +342,23 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
    const files=[],options=[];
    for(let i=0;i<entries.length;i++){
     const e=entries[i],plan=ultimoPresupuesto.plan.find(p=>p.indice===i);
-    if(!plan||plan.destino!=='documentos')
-     throw Error('Los ploteos y otros servicios se calculan automáticamente, pero su recepción privada todavía requiere la validación del servidor.');
+    if(!plan)throw Error('No se encontró la clasificación de este trabajo.');
+    if(plan.destino==='ploteos'){
+     // Pasar la instrucción local de ploteo al portal de pruebas por el
+     // mismo canal; no la convierte en PDF recibido ni habilita cobros.
+     // El backend todavía debe validar el PDF antes de incorporarlo a Central.
+     const clasificacionCliente=e.paginas.map((p,j)=>({
+      numero:j+1,anchoCm:p.anchoCm,altoCm:p.altoCm,modo:p.modo
+     }));
+     if(clasificacionCliente.some(p=>!['cad','poster'].includes(p.modo)))
+      throw Error('Hay páginas de ploteo sin clasificación.');
+     window.parent.postMessage({type:'SABER_FASE1_PLOTEO_PRELIMINAR',
+      nombre:e.name,copias:e.copias,papelPoster:e.papelPoster,
+      clasificacionCliente,precioPreliminar:ultimoPresupuesto.total},location.origin);
+     throw Error('Ploteo clasificado y comunicado al portal privado. La recepción continúa bloqueada hasta cerrar su validación en el servidor.');
+    }
+    if(plan.destino!=='documentos')
+     throw Error('Este servicio queda fuera de la primera etapa.');
     if(!e.archivoOriginal||!Number.isSafeInteger(e.archivoOriginal.size)||
        e.archivoOriginal.size<5||e.archivoOriginal.size>20*1024*1024||
        e.name.length>120||!/\.pdf$/i.test(e.name))
