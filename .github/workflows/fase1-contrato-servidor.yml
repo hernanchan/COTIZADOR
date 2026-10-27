@@ -7,6 +7,7 @@ on:
       - 'tests/fase1-contrato-servidor.test.mjs'
       - 'tests/fase1-ploteo-recibo-verificado.test.mjs'
       - 'integraciones/autocotizador/recepcion/cotizar-ploteo-recibo-verificado.mjs'
+      - 'integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs'
       - 'tests/fase1-puente-clasificacion.test.mjs'
       - 'integraciones/autocotizador/recepcion/carga-unica-cliente.mjs'
       - 'integraciones/autocotizador/recepcion/pantalla-cotizador-v2-prueba-privada.mjs'
@@ -28,7 +29,12 @@ jobs:
         working-directory: integraciones/autocotizador/recepcion
         run: npm install --no-audit --no-fund
       - name: Probar limite entre cotizacion y recepcion
-        run: node --test tests/fase1-frontera-recepcion.test.mjs tests/fase1-contrato-servidor.test.mjs tests/fase1-puente-clasificacion.test.mjs
+        run: node --test tests/fase1-frontera-recepcion.test.mjs tests/fase1-contrato-servidor.test.mjs tests/fase1-puente-clasificacion.test.mjs tests/fase1-ploteo-recibo-verificado.test.mjs
+      - name: Compilar y verificar el Worker aislado
+        working-directory: integraciones/autocotizador/recepcion
+        run: |
+          npm run build:unificado
+          node --check dist/saber-documentos-cotizador-fase4.mjs
       - name: Regresion previa del servidor
         run: node --test tests/autocotizador-pedido-verificado.test.mjs tests/autocotizador-puente-central.test.mjs tests/autocotizador-regla-comercial-ploteos.test.mjs
       - name: Confirmacion de aislamiento
