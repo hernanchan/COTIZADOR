@@ -7,6 +7,7 @@ on:
       - 'tests/fase1-contrato-servidor.test.mjs'
       - 'tests/fase1-ploteo-recibo-verificado.test.mjs'
       - 'tests/fase1-ploteo-central-manifiesto.test.mjs'
+      - 'tests/fase1-pedido-mixto-realpdf.test.mjs'
       - 'integraciones/autocotizador/recepcion/preparar-manifiesto-v2-documental.mjs'
       - 'integraciones/autocotizador/recepcion/registrar-manifiesto-v2-central.mjs'
       - 'integraciones/autocotizador/recepcion/cotizar-ploteo-recibo-verificado.mjs'
@@ -33,7 +34,7 @@ jobs:
         working-directory: integraciones/autocotizador/recepcion
         run: npm install --no-audit --no-fund
       - name: Probar limite entre cotizacion y recepcion
-        run: node --test tests/fase1-frontera-recepcion.test.mjs tests/fase1-contrato-servidor.test.mjs tests/fase1-puente-clasificacion.test.mjs tests/fase1-ploteo-recibo-verificado.test.mjs tests/fase1-ploteo-central-manifiesto.test.mjs
+        run: node --test tests/fase1-frontera-recepcion.test.mjs tests/fase1-contrato-servidor.test.mjs tests/fase1-puente-clasificacion.test.mjs tests/fase1-ploteo-recibo-verificado.test.mjs tests/fase1-ploteo-central-manifiesto.test.mjs tests/fase1-pedido-mixto-realpdf.test.mjs
       - name: Compilar y verificar el Worker aislado
         working-directory: integraciones/autocotizador/recepcion
         run: |
