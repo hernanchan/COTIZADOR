@@ -71,7 +71,15 @@ export async function verificarWorkersEnsayoSoloLectura({
     ]))):null
   }));
  }
+ const documentos=findings.find(w=>w.worker==='saber-documentos-pruebas');
+ const requeridos=['DOCS_PRINT_DRAFT_ENABLED','DOCS_PRINT_DRAFT_CENTRAL_ENABLED'];
+ const faltantes=requeridos.filter(name=>documentos?.documentsBindingsPresent?.[name]===false);
+ const desconocidos=requeridos.filter(name=>documentos?.documentsBindingsPresent?.[name]===null);
  return Object.freeze({
+  privatePdfDraftConfigPresent:faltantes.length===0&&desconocidos.length===0,
+  privatePdfDraftMissingBindings:Object.freeze(faltantes),
+  privatePdfDraftUnknownBindings:Object.freeze(desconocidos),
+  privatePdfDraftEnabled:false, // No se leen valores; nunca inferir habilitación.
   schema:'saber-cloudflare-lectura-ensayo-v1',
   scope:'METADATA_ONLY',
   methodsUsed:['GET','GET'],
@@ -101,6 +109,11 @@ if(process.argv[1]&&import.meta.url===new URL('file://'+process.argv[1]).href){
     console.log('  '+name+': binding presente='+value(w.documentsBindingsPresent[name]));
    }
   }
+  if(r.privatePdfDraftMissingBindings.length)
+   console.log('ENSAYO PDF COMPUESTO NO PREPARADO: bindings ausentes: '+r.privatePdfDraftMissingBindings.join(', '));
+  else if(r.privatePdfDraftUnknownBindings.length)
+   console.log('ENSAYO PDF COMPUESTO INDETERMINADO: presencia de bindings no confirmada.');
+  else console.log('ENSAYO PDF COMPUESTO: nombres de bindings presentes; valores/activación NO comprobados.');
   console.log('SIN DESPLIEGUES; SIN CAMBIOS D1; SIN COBROS; SITIO PÚBLICO INTACTO.');
  }catch(e){
   // Deliberately omit HTTP bodies, responses and secret values from Actions logs.
