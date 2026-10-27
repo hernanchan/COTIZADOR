@@ -86,7 +86,8 @@ function render(){
    const material=e.modo==='color'?'Color':'B/N';
    const extra=e.servicio==='grafica'?' · '+(productosGrafica.find(p=>p.id===e.productoGrafica)?.name||'Elegir variante'):e.servicio==='corte'?' · '+e.corteMetros+' m':e.servicio==='fotos'?' · '+(productosFoto.find(p=>p.id===e.productoFoto)?.name||'Elegir producto'):e.servicio==='stickers'?' · Adhesivo fotográfico':d.destino==='documentos'?(' · '+material+(e.anillado==='individual'?' · Anillado':e.anillado==='grupo'?' · Grupo '+e.grupoAnillado:'')):
     (elegidas.some(p=>p.modo==='poster')?' · '+(e.papelPoster==='recubierto'?'Recubierto':'Obra 80 g'):'');
-   resumen.textContent=(e.paginasSeleccionadas?(e.paginasSeleccionadas+' de '+e.paginas.length):(e.paginas.length+' pág.'))+' · '+tipo+(d.confirmado?' '+(d.tamanoFinal==='original'?'original':d.tamanoFinal.toUpperCase()):'')+' · '+e.copias+(e.servicio==='grafica'?' lote(s)':' copia(s)')+((d.confirmado||independiente)?extra:'');
+   const nup=d.destino==='documentos'&&(e.paginasPorHoja??1)>1?' · '+e.paginasPorHoja+' por cara':'';
+   resumen.textContent=(e.paginasSeleccionadas?(e.paginasSeleccionadas+' de '+e.paginas.length):(e.paginas.length+' pág.'))+' · '+tipo+(d.confirmado?' '+(d.tamanoFinal==='original'?'original':d.tamanoFinal.toUpperCase()):'')+' · '+e.copias+(e.servicio==='grafica'?' lote(s)':' copia(s)')+((d.confirmado||independiente)?extra+nup:'');
   }else resumen.textContent=e.error?'Error de lectura':'Analizando PDF…';
   principal.append(resumen);fila.append(principal);
   const importe=texto('span',importeArchivo(i)||(e.error?'Revisar':(e.seleccion==='sin-confirmar'&&!['fotos','corte','grafica'].includes(e.servicio))?'Pendiente':'Por calcular'));
@@ -183,6 +184,8 @@ function render(){
    }else if(decision.destino==='documentos'){
     controles.append(valor('Impresión', [['bn','Blanco y negro'],['color','Color']],e.modo,v=>{e.modo=v;cambio()}));
     controles.append(valor('Caras', [['simple','Simple faz'],['double','Doble faz']],e.caras,v=>{e.caras=v;cambio()}));
+    controles.append(valor('Páginas por cara',[['1','1 página'],['2','2 páginas'],['4','4 páginas'],['9','9 páginas']],String(e.paginasPorHoja??1),v=>{e.paginasPorHoja=Number(v);cambio()}));
+    panel.append(texto('p','Las páginas se reducen proporcionalmente dentro de cada cara impresa. La doble faz utiliza dos caras por hoja física.'));
     const formato=decision.tamanoFinal==='original'?formatoOriginal(paginas):decision.tamanoFinal;
     if(e.modo==='color'&&['a4','a3'].includes(formato)){
      const disponibles=catalogo[formato]||[];
@@ -236,7 +239,7 @@ $('archivos').addEventListener('change',async ev=>{
  leyendo=true;
  // Mantener fichas compactas al cargar un lote; cada PDF se edita sólo si hace falta.
  if(!entries.length)abierto=-1;
- for(const f of files)entries.push({name:f.name,archivoOriginal:f,paginas:null,seleccion:'sin-confirmar',error:null,copias:1,modo:'bn',caras:'simple',papelPoster:'obra80',anillado:'ninguno',grupoAnillado:'',materialColor:'',paginasSeleccionadas:'',servicio:'auto',productoFoto:'',productoGrafica:'',corteVariante:'gt3',corteMetros:1});
+ for(const f of files)entries.push({name:f.name,archivoOriginal:f,paginas:null,seleccion:'sin-confirmar',error:null,copias:1,modo:'bn',caras:'simple',papelPoster:'obra80',anillado:'ninguno',grupoAnillado:'',paginasPorHoja:1,materialColor:'',paginasSeleccionadas:'',servicio:'auto',productoFoto:'',productoGrafica:'',corteVariante:'gt3',corteMetros:1});
  render();
  const start=entries.length-files.length;
  // Lotes pequeños: lectura de hasta tres PDF en paralelo, sin cargar Google.
