@@ -339,7 +339,7 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
       entries.length<1||entries.length>30||
       ultimoPresupuesto.plan?.length!==entries.length)
     throw Error('Completá primero la cotización de todos los documentos.');
-   const files=[],options=[];
+   const files=[],options=[],ploteosPendientes=[];
    for(let i=0;i<entries.length;i++){
     const e=entries[i],plan=ultimoPresupuesto.plan.find(p=>p.indice===i);
     if(!plan)throw Error('No se encontró la clasificación de este trabajo.');
@@ -355,10 +355,13 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
      }));
      if(clasificacionCliente.some(p=>!['cad','poster'].includes(p.modo)))
       throw Error('Hay páginas de ploteo sin clasificación.');
-     window.parent.postMessage({type:'SABER_FASE1_PLOTEO_PRELIMINAR',
+     const precio=ultimoPresupuesto.detallePloteos?.find(x=>x.id===plan.id)?.subtotal;
+     if(!Number.isSafeInteger(precio)||precio<1)
+      throw Error('El ploteo no tiene subtotal verificable.');
+     ploteosPendientes.push({type:'SABER_FASE1_PLOTEO_PRELIMINAR',
       file:e.archivoOriginal,nombre:e.name,modo:e.modo,
       copias:e.copias,papelPoster:e.papelPoster,
-      clasificacionCliente,precioPreliminar:importeArchivo(i)},location.origin);
+      clasificacionCliente,precioPreliminar:precio});
      continue;
     }
     if(plan.destino!=='documentos')
@@ -384,8 +387,16 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
      paginasPorHoja:e.paginasPorHoja??1,
      paginas:e.paginas.length,nombre:e.name});
    }
-   if(files.length)window.parent.postMessage({type:'SABER_SMART_DOCUMENTS_TO_PRIVATE',
-    files,options,total:ultimoPresupuesto.total},location.origin);
+   if(files.length){
+    const totalDocumentos=ploteosPendientes.length?
+     ultimoPresupuesto.subtotalImpresiones:ultimoPresupuesto.total;
+    if(!Number.isSafeInteger(totalDocumentos)||totalDocumentos<1)
+     throw Error('Las impresiones no tienen subtotal de pedido válido.');
+    window.parent.postMessage({type:'SABER_SMART_DOCUMENTS_TO_PRIVATE',
+     files,options,total:totalDocumentos},location.origin);
+   }
+   for(const trabajo of ploteosPendientes)
+    window.parent.postMessage(trabajo,location.origin);
    info.textContent='Los documentos y ploteos se enviaron a la cola privada. El envío a Drive requiere pulsar «Enviar todos los PDF del pedido».';
   }catch(error){info.textContent=String(error.message||error)}
  });
