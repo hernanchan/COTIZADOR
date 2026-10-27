@@ -31,6 +31,6 @@ jobs:
         run: |
           npm run build:unificado
           node --check dist/saber-documentos-cotizador-fase4.mjs
-          node --check carga-unica-cliente.txt
+          node --check < carga-unica-cliente.txt
       - name: Confirmar ausencia de despliegue
         run: echo 'NO DEPLOY - NO PAYMENT - NO COMMERCIAL SITE MODIFICATION'
