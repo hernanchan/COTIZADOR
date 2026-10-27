@@ -429,6 +429,28 @@ registerButton.addEventListener('click',async()=>{
 });
 window.addEventListener('message',async event=>{
  if(event.origin!==location.origin)return;
+ if(event.source===smart.contentWindow&&event.data?.type==='SABER_FASE1_PLOTEO_PRELIMINAR'){
+  const p=event.data;
+  const paginas=p.clasificacionCliente;
+  if(typeof p.nombre!=='string'||p.nombre.length>120||
+     !Number.isSafeInteger(p.copias)||p.copias<1||p.copias>200||
+     !['obra80','recubierto'].includes(p.papelPoster)||
+     !Array.isArray(paginas)||paginas.length<1||paginas.length>2000||
+     paginas.some((q,i)=>!q||q.numero!==i+1||
+      !['cad','poster'].includes(q.modo)||
+      !Number.isFinite(q.anchoCm)||!Number.isFinite(q.altoCm)||
+      q.anchoCm<=0||q.altoCm<=0||q.anchoCm>2000||q.altoCm>2000)){
+   batchStatus.textContent='La clasificación preliminar del ploteo no es válida.';
+   return;
+  }
+  const cad=paginas.filter(x=>x.modo==='cad').length;
+  const poster=paginas.length-cad;
+  batchStatus.textContent='Ploteo analizado: '+p.nombre+' · '+cad+
+   ' página(s) CAD y '+poster+' Póster. Las instrucciones llegaron al portal; '+
+   'NO se adjuntó ni recibió el PDF y no se autorizó cobro. Falta integrar '+
+   'el contrato de recepción de ploteos en el servidor.';
+  return;
+ }
  if(event.source===smart.contentWindow&&event.data?.type==='SABER_SMART_PRICE_STATE'){
   const status=event.data.estado;
   const price=event.data.total;
