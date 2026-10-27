@@ -22,6 +22,8 @@ on:
       - 'tests/autocotizador-paridad-ids-grupos.test.mjs'
       - 'tests/autocotizador-paridad-catalogo-real.test.mjs'
       - 'tests/autocotizador-imposicion-nup.test.mjs'
+      - 'tests/autocotizador-nup-recibo-verificado.test.mjs'
+      - 'integraciones/autocotizador/recepcion/cotizar-nup-recibo-verificado.mjs'
       - 'integraciones/autocotizador/pruebas/cotizar-documentos-individuales.mjs'
       - 'tests/autocotizador-precio-cabecera-privada.test.mjs'
       - 'integraciones/autocotizador/recepcion/carga-unica-pagina.mjs'
@@ -136,7 +138,7 @@ jobs:
           retention-days: 7
       # Incluye compra mixta documentos, Express y catálogo sin checkout.
       - name: Asegurar subtotal parcial sin cobros y conservación de PDFs legibles
-        run: node --test tests/autocotizador-lote-parcial.test.mjs tests/autocotizador-paridad-ids-grupos.test.mjs tests/autocotizador-paridad-catalogo-real.test.mjs tests/autocotizador-precio-cabecera-privada.test.mjs tests/autocotizador-imposicion-nup.test.mjs
+        run: node --test tests/autocotizador-lote-parcial.test.mjs tests/autocotizador-paridad-ids-grupos.test.mjs tests/autocotizador-paridad-catalogo-real.test.mjs tests/autocotizador-precio-cabecera-privada.test.mjs tests/autocotizador-imposicion-nup.test.mjs tests/autocotizador-nup-recibo-verificado.test.mjs
       - name: Verificar paridad cotizador V2 y lector PDF opt-in
         run: node --test tests/cotizador-v2-archivo-optin.test.mjs tests/cotizador-v2-referencias-carrito.test.mjs tests/cotizador-v2-vinculo-servidor.test.mjs tests/cotizador-v2-subida-vinculo.test.mjs tests/cotizador-v2-manifiesto-documental.test.mjs tests/cotizador-v2-registro-central.test.mjs tests/cotizador-v2-ruta-pedido-lote.test.mjs tests/cotizador-v2-resumen-vista.test.mjs tests/cotizador-v2-limites-carrito.test.mjs
       - name: Validar acceso Cloudflare solo GET, alcance dos Workers y secretos protegidos
