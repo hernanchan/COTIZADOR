@@ -158,6 +158,11 @@ const clientOrderId=previous?.clientOrderId||newClientOrderId();
 const all=previous?.items||[],used=previous?.seen||new Set();
 function save(){
  try{
+  // No conservar referencias de ploteo sin su clasificación: una pestaña
+  // restaurada debe volver a analizar ese PDF, nunca transformarlo en A4/A3.
+  if(all.some(item=>item.references.some(d=>d.ploteo))){
+   sessionStorage.removeItem(RECOVERY_KEY);return;
+  }
   const items=all.map(item=>({name:item.name,price:item.price,
    references:item.references.map(d=>({itemIndex:d.itemIndex,reference:{
     schema:d.reference.schema,localRef:d.reference.localRef,nombre:d.reference.nombre,
@@ -443,12 +448,40 @@ window.addEventListener('message',async event=>{
    batchStatus.textContent='La clasificación preliminar del ploteo no es válida.';
    return;
   }
+  if(!(p.file instanceof File)||p.file.name!==p.nombre||
+     p.file.size<5||p.file.size>20*1024*1024||
+     !/\.pdf$/i.test(p.nombre)||!['bn','color'].includes(p.modo)||
+     !Number.isSafeInteger(p.precioPreliminar)||p.precioPreliminar<1||
+     batchSending||registering||registeredOrder||
+     all.flatMap(item=>item.references).length>=30){
+   batchStatus.textContent='El archivo de ploteo no cumple las condiciones del ensayo privado.';
+   return;
+  }
+  try{
+   const header=new Uint8Array(await p.file.slice(0,5).arrayBuffer());
+   if(String.fromCharCode(...header)!=='%PDF-')throw Error('Cabecera PDF inválida.');
+   const sha=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',
+     await p.file.arrayBuffer())),n=>n.toString(16).padStart(2,'0')).join('');
+   const localRef=crypto.randomUUID();
+   if(used.has(localRef))throw Error('Referencia repetida.');
+   used.add(localRef);
+   all.push({name:'Ploteo · '+p.nombre,price:p.precioPreliminar,
+    references:[{itemIndex:0,archivoLocal:p.file,
+     ploteo:{modo:p.modo,copias:p.copias,papelPoster:p.papelPoster,
+      clasificacionCliente:paginas},
+     reference:{schema:'saber-pdf-local-pendiente-v1',localRef,
+      nombre:p.nombre,bytes:p.file.size,paginas:paginas.length,sha256:sha,
+      estado:'PENDIENTE_DE_ENVIO',recibido:false,verificadoServidor:false}}]});
+   save();render();updateSummary();
+   document.getElementById('recepcion-avanzada').open=true;
+  }catch(error){
+   batchStatus.textContent='Ploteo sin preparar: '+String(error.message||error);return;
+  }
   const cad=paginas.filter(x=>x.modo==='cad').length;
   const poster=paginas.length-cad;
   batchStatus.textContent='Ploteo analizado: '+p.nombre+' · '+cad+
-   ' página(s) CAD y '+poster+' Póster. Las instrucciones llegaron al portal; '+
-   'NO se adjuntó ni recibió el PDF y no se autorizó cobro. Falta integrar '+
-   'el contrato de recepción de ploteos en el servidor.';
+   ' página(s) CAD y '+poster+' Póster. PDF preparado en memoria para la recepción privada. '+
+   'Falta pulsar «Enviar todos los PDF del pedido». La Central D1 continúa bloqueada para ploteos.';
   return;
  }
  if(event.source===smart.contentWindow&&event.data?.type==='SABER_SMART_PRICE_STATE'){
