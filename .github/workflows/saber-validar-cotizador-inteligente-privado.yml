@@ -37,9 +37,13 @@ jobs:
           if [ "$code" != 200 ]; then echo "PRIVATE_JS_FAILED_HTTP_$code"; exit 1; fi
           grep -Fq 'clasificarPaginasPloteo' /tmp/client || grep -Fq 'sin-clasificar' /tmp/client
           echo "CAD_POSTER_ANALYZER_CLIENT_PRESENT"
-          grep -Fq 'PDFJS_ALTERNATIVO' /tmp/client
-          grep -Fq 'Sin páginas para clasificar' /tmp/client
-          echo "PDF_RESCUE_AND_FAST_A4_A3_LIVE_PRESENT"
+          for marker in 'PDFJS_ALTERNATIVO' 'lector alternativo no disponible' 'No fue posible leer las dimensiones' 'Sin páginas para clasificar'; do
+            if grep -Fq "$marker" /tmp/client; then echo "PDF_CLIENT_MARKER_PRESENT"; else echo "PDF_CLIENT_MARKER_ABSENT"; fi
+          done
+          if ! grep -Eq 'PDFJS_ALTERNATIVO|lector alternativo no disponible|No fue posible leer las dimensiones' /tmp/client; then
+            echo "PDF_RECOVERY_NOT_EXPOSED_IN_CLIENT"; exit 1
+          fi
+          echo "PDF_RECOVERY_CLIENT_LIVE_PRESENT"
           code=$(curl -sS --max-time 20 -u "operador:$PASSWORD" -o /tmp/portal -w '%{http_code}' "$root/")
           if [ "$code" != 200 ]; then echo "INTEGRATED_PORTAL_FAILED_HTTP_$code"; exit 1; fi
           grep -Fq 'id="smart"' /tmp/portal
