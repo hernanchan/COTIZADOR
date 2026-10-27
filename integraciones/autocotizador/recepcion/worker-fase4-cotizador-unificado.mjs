@@ -778,10 +778,24 @@ async function fase4Transfer(request,env,extended=false){
  p.op=({start:'multiStart',part:'multiPart',finish:'multiFinish',status:'multiStatus'})[o.op];
  try {
    const response=await postToScript(env,p,fetch);
-   if(!response.ok)return testResponse({ok:false,error:'Google no pudo recibir el PDF o se agotó el cupo de recepción privada',
+   if(!response.ok){
+    // Un rechazo de Apps Script no equivale necesariamente a un cupo agotado.
+    // Sólo exponer fase y categoría segura; nunca tokens ni errores internos GAS.
+    const hint=String(response.code||response.errorCode||response.error||'').toLowerCase();
+    const categoria=/quota|cupo|limit|l[ií]mite|exceed/.test(hint)?'CUPO':
+      /duplicate|duplicad|already|existe/.test(hint)?'DUPLICADO':
+      /expired|expir|session|sesion|sesi[oó]n|token/.test(hint)?'SESION':
+      /size|bytes|sha|hash|part|fragment/.test(hint)?'ARCHIVO':
+      'RECHAZO_RECEPTOR';
+    return testResponse({ok:false,phase:o.op,reasonCode:categoria,
+     error:'El receptor privado rechazó la operación '+o.op+
+      ' (código '+categoria+'). No se confirmó el PDF.',
      paymentAuthorized:false},422);
+   }
    return testResponse({...response,ok:true,paymentAuthorized:false},200);
- }catch(_){return testResponse({ok:false,error:'No se confirmó la recepción. Comprobá el estado antes de reintentar',
+ }catch(_){return testResponse({ok:false,phase:o.op,reasonCode:'CONEXION',
+    error:'No se pudo confirmar la operación '+o.op+
+     ' por un problema de conexión con el receptor. Consultá el estado antes de reintentar.',
     paymentAuthorized:false},502)}
 }
 async function fase4PrivateVerified(env,session,metrics=null,preferirInfo=false,maxFileBytes=FASE4_QUOTA_BYTES){
