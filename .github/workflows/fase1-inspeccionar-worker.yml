@@ -1,0 +1,44 @@
+name: Fase 1 - comprobar Worker privado y version activa
+on:
+  push:
+    branches: [fase1/impresiones-ploteos-20261027]
+    paths: [.github/workflows/fase1-inspeccionar-worker.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspection:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Comprobar version activa y capacidad de volver atras sin modificar Cloudflare
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          ROOT="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-documentos-pruebas"
+          trap 'rm -f /tmp/saber-deployments.json /tmp/saber-target.json /tmp/saber-settings.json' EXIT
+          curl -fsS --max-time 25 -H "Authorization: Bearer $TOKEN" "$ROOT/deployments" >/tmp/saber-deployments.json
+          jq -e '.success==true and (.result.deployments | type=="array" and length>0)' /tmp/saber-deployments.json >/dev/null
+          jq -c '.result.deployments[0] | {id,created_on,versions}' /tmp/saber-deployments.json
+          jq -e '.result.deployments[0].versions|length==1 and .[0].percentage==100' /tmp/saber-deployments.json >/dev/null
+          old=$(jq -r '.result.deployments[0].versions[0].version_id' /tmp/saber-deployments.json)
+          test -n "$old" && test "$old" != "null"
+          target="18779e7c-05f9-4f33-9fa0-dd2955942492"
+          test "$old" != "$target"
+          curl -fsS --max-time 25 -H "Authorization: Bearer $TOKEN" "$ROOT/versions/$target" >/tmp/saber-target.json
+          jq -e '.success==true and .result.id=="18779e7c-05f9-4f33-9fa0-dd2955942492"' /tmp/saber-target.json >/dev/null
+          curl -fsS --max-time 25 -H "Authorization: Bearer $TOKEN" "$ROOT/settings" >/tmp/saber-settings.json
+          jq -e '.success==true and (.result.bindings|type=="array")' /tmp/saber-settings.json >/dev/null
+          for binding in SABER_CENTRAL DOCS_CENTRAL_ADMIN_KEY DOCS_SCRIPT_URL DOCS_RELAY_KEY CENTRAL_BRIDGE_KEY; do
+            jq -e --arg binding "$binding" '.result.bindings|any(.name==$binding)' /tmp/saber-settings.json >/dev/null
+          done
+          echo "FASE1_OLD_VERSION=$old"
+          echo "FASE1_NEW_VERSION=$target"
+          echo "PREFLIGHT_OK_NO_DEPLOY"
