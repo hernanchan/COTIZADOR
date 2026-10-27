@@ -8,9 +8,10 @@ const smart=readFileSync(new URL('carga-unica-cliente.mjs',dir),'utf8');
 const portal=readFileSync(new URL('pantalla-cotizador-v2-prueba-privada.mjs',dir),'utf8');
 const manifest=readFileSync(new URL('preparar-manifiesto-v2-documental.mjs',dir),'utf8');
 
-test('primera etapa: no presentar ploteos como recepcion privada ya integrada',()=>{
+test('primera etapa: ploteos ingresan a ensayo sin registro comercial',()=>{
  assert.match(smart,/plan\.destino!=='documentos'/);
- assert.match(smart,/La recepción continúa bloqueada hasta cerrar su validación en el servidor/);
+ assert.match(portal,/allRefs\.some\(d=>d\.ploteo\)/);
+ assert.match(portal,/Registro D1 del ploteo: PENDIENTE/);
 });
 test('primera etapa: no permitir anillado sin contrato backend',()=>{
  assert.match(smart,/e\.anillado!=='ninguno'/);
