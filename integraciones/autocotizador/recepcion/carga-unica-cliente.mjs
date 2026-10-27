@@ -358,7 +358,7 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
      window.parent.postMessage({type:'SABER_FASE1_PLOTEO_PRELIMINAR',
       file:e.archivoOriginal,nombre:e.name,modo:e.modo,
       copias:e.copias,papelPoster:e.papelPoster,
-      clasificacionCliente,precioPreliminar:ultimoPresupuesto.total},location.origin);
+      clasificacionCliente,precioPreliminar:importeArchivo(i)},location.origin);
      continue;
     }
     if(plan.destino!=='documentos')
