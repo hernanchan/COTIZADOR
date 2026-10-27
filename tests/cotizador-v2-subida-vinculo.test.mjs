@@ -67,7 +67,8 @@ function backend({resume=false,wrongServer=false,wrongQuote=false}={}){
      totalArs:wrongQuote?-1:2100,priceVersion:'ensayo-v1',
      paginasOriginales:3,formato:body.opciones.formato,
      caras:body.opciones.caras,copias:body.opciones.copias,
-     anillado:body.opciones.anillado,materialColor:body.opciones.materialColor,paymentAuthorized:false}}:verified;
+     anillado:body.opciones.anillado,materialColor:body.opciones.materialColor,
+     paginasPorHoja:body.opciones.paginasPorHoja??1,paymentAuthorized:false}}:verified;
   }
   return Response.json({ok:true,...ret});
  };
@@ -278,4 +279,32 @@ test('si Google no confirma un bloque tras el corte, detener el envío y conserv
   onSession:s=>{session=s;}}),/Red desconectada/);
  assert.equal(otherSent,false,'no saltear archivos pendientes');
  assert.equal(session.orderId,orderId);
+});
+
+test('N-up 2, 4, 9 se conserva tras envío, verificación y recotización del servidor',async()=>{
+ for(const paginasPorHoja of [2,4,9]){
+  const t=backend();
+  const opciones={formato:'a4',caras:'double',copias:2,
+   anillado:'ninguno',materialColor:'obra70',paginasPorHoja};
+  const done=await subirYVincularPdfCotizadorV2({...t.args,opciones});
+  assert.equal(done.cotizacionServidor.paginasPorHoja,paginasPorHoja);
+  assert.equal(done.cotizacionServidor.totalArs,2100);
+  assert.equal(done.paymentAuthorized,false);
+  assert.doesNotMatch(JSON.stringify(done),/token|dataBase64/);
+ }
+});
+test('no permitir N-up distinto del presupuestado antes de continuar el pedido',async()=>{
+ const t=backend();
+ const original=t.args.fetcher;
+ const fetcher=async(url,options)=>{
+  const response=await original(url,options);
+  if(!url.endsWith('/api/ensayo-vincular-pdf-v2'))return response;
+  const data=await response.json();
+  data.cotizacionServidor.paginasPorHoja=1;
+  return Response.json(data);
+ };
+ await assert.rejects(subirYVincularPdfCotizadorV2({...t.args,fetcher,
+  opciones:{formato:'a4',caras:'simple',copias:1,anillado:'ninguno',
+   materialColor:'obra70',paginasPorHoja:4}
+ }),/presupuesto documental/);
 });
