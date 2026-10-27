@@ -45,6 +45,7 @@ on:
       - 'integraciones/autocotizador/recepcion/ficha-produccion-central.mjs'
       - 'tests/autocotizador-componer-desde-recibo.test.mjs'
       - 'tests/autocotizador-componer-pdf-documentos.test.mjs'
+      - 'tests/autocotizador-nup-prueba-visual.test.mjs'
       - 'tests/autocotizador-lote-ampliado.test.mjs'
       - 'integraciones/autocotizador/recepcion/pantalla-lote-pdf-ampliado.mjs'
       - 'tests/autocotizador-lote-ampliado-pantalla.test.mjs'
@@ -194,6 +195,15 @@ jobs:
         run: node --test tests/autocotizador-componer-desde-recibo.test.mjs
       - name: Probar composición vectorial privada de PDF documental A4 A3 y dúplex
         run: node --test tests/autocotizador-componer-pdf-documentos.test.mjs
+      - name: Generar PDF de control A4 y A3, 2/4/9 páginas por cara y doble faz
+        run: node --test tests/autocotizador-nup-prueba-visual.test.mjs
+      - name: Conservar PDF de control vectorial para inspección de impresión
+        uses: actions/upload-artifact@v4
+        with:
+          name: saber-documentos-nup-a4-a3-control-visual
+          path: artifacts/nup-control/*.pdf
+          if-no-files-found: error
+          retention-days: 7
       - name: Verificar lote de PDFs privados GAS antes de calcular y registrar D1
         run: node --test tests/autocotizador-ficha-lote-gas.test.mjs
       - name: Verificar pedido de documentos y tienda sin Polaroids y sin cobro
