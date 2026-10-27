@@ -106,7 +106,29 @@ function render(){
   acciones.append(quitar);fila.append(acciones);card.append(fila);
   if(abierto!==i){lista.append(card);continue}
   const panel=document.createElement('div');panel.className='panel-edicion';
-  if(e.error){panel.append(texto('p','Error: '+e.error));card.append(panel);lista.append(card);continue}
+  if(e.error){
+   const error=texto('p','No pudimos analizar este PDF: '+e.error);
+   error.className='advertencia';panel.append(error);
+   const reemplazar=document.createElement('label');
+   reemplazar.textContent='Reemplazar únicamente este PDF';
+   const input=document.createElement('input');
+   input.type='file';input.accept='.pdf,application/pdf';input.disabled=leyendo;
+   input.onchange=async()=>{
+    const file=input.files?.[0];input.value='';
+    if(!file||leyendo)return;
+    if(!/\\.pdf$/i.test(file.name)||file.size<5||file.size>250*1024*1024){
+     $('estado').textContent='Elegí un PDF válido, de hasta 250 MB.';return;
+    }
+    leyendo=true;version++;ultimoPresupuesto=null;
+    e.name=file.name;e.archivoOriginal=file;e.error=null;e.paginas=null;
+    e.seleccion='sin-confirmar';e.paginasSeleccionadas='';
+    render();
+    try{await analizarArchivoPDF(e,file)}
+    finally{leyendo=false;render();cotizar()}
+   };
+   reemplazar.append(input);panel.append(reemplazar);
+   card.append(panel);lista.append(card);continue;
+  }
   if(!e.paginas){panel.append(texto('p','Analizando medidas…'));card.append(panel);lista.append(card);continue}
   const multiples=e.paginas.length>1;
   const medidas=e.paginas.map(p=>p.anchoCm.toFixed(2)+' × '+p.altoCm.toFixed(2)+' cm');
@@ -177,6 +199,27 @@ function render(){
  }
  $('estado').textContent=leyendo?'Analizando archivos…':entries.length?'Identificados '+entries.length+' PDF. Cotización orientativa, sin subir originales.':'Seleccioná tus PDF para comenzar.';
 }
+async function analizarArchivoPDF(e,file){
+ try{
+  const x=await leerMedidasPloteo(file,{maxPaginas:2000});
+  e.paginas=x.paginas.map(p=>({...p,modo:'sin-clasificar'}));
+  try{
+   const clases=await clasificarPaginasPloteo(file);
+   for(const item of clases){
+    if(['cad','poster'].includes(item.modo)&&e.paginas[item.numero-1])
+     e.paginas[item.numero-1].modo=item.modo;
+   }
+  }catch(_){/* El análisis visual pendiente no invalida dimensiones comprobadas. */}
+  const suggested=clasificarDestino(e.paginas);
+  e.requiereConfirmacion=suggested.requiereConfirmacion;
+  const estandar=tamañoEstandar(e.paginas);
+  if(estandar)e.seleccion=estandar;
+  else if(e.paginas.some(p=>Math.max(p.anchoCm,p.altoCm)>42.03||
+      Math.min(p.anchoCm,p.altoCm)>29.73))
+   e.seleccion='original';
+  e.error=null;
+ }catch(ex){e.error=String(ex.message||ex);e.paginas=null}
+}
 $('archivos').addEventListener('change',async ev=>{
  if(leyendo)return;
  const files=[...(ev.target.files||[])];ev.target.value='';
@@ -188,19 +231,7 @@ $('archivos').addEventListener('change',async ev=>{
  const start=entries.length-files.length;
  for(let i=0;i<files.length;i++){
   const e=entries[start+i];
-  try{
-   const x=await leerMedidasPloteo(files[i],{maxPaginas:2000});
-   e.paginas=x.paginas.map(p=>({...p,modo:'sin-clasificar'}));
-   try{const clases=await clasificarPaginasPloteo(files[i]);for(const c of clases){if(['cad','poster'].includes(c.modo))e.paginas[c.numero-1].modo=c.modo;}}catch(_){}
-   const suggested=clasificarDestino(e.paginas);
-   // Autodetección en formatos inequívocos; tamaños especiales siguen pendientes.
-   e.requiereConfirmacion=suggested.requiereConfirmacion;
-   const estandar=tamañoEstandar(e.paginas);
-   if(estandar)e.seleccion=estandar;
-   else if(e.paginas.some(p=>Math.max(p.anchoCm,p.altoCm)>42.03||
-       Math.min(p.anchoCm,p.altoCm)>29.73))
-    e.seleccion='original';
-  }catch(ex){e.error=String(ex.message||ex)}
+  await analizarArchivoPDF(e,files[i]);
   render();
  }
  leyendo=false;render();cotizar();
