@@ -40,7 +40,16 @@ export async function componerDocumentoPdfPrivado({
   return !Number.isInteger(angle)||((angle%360+360)%360)!==0;
  }))throw Error('Páginas rotadas: requieren revisión para evitar cambios de diseño.');
  const out=await PDFDocument.create();
- const embedded=await out.embedPdf(pdfOriginal,paginas.map(p=>p-1));
+ // Un PDF válido puede tener páginas sin /Contents (completamente en blanco).
+ // pdf-lib no permite incrustarlas; conservar su posición como espacio blanco
+ // sin rasterizar ni desplazar el resto de las páginas.
+ const positions=paginas.map((p,i)=>original.getPage(p-1).node.Contents()?i:-1)
+  .filter(i=>i>=0);
+ const sourcePages=positions.map(i=>paginas[i]-1);
+ const embeddedNonBlank=sourcePages.length?
+  await out.embedPdf(pdfOriginal,sourcePages):[];
+ const embedded=paginas.map(()=>null);
+ for(let i=0;i<positions.length;i++)embedded[positions[i]]=embeddedNonBlank[i];
  const size=TAMANOS[formatoHoja],landscape=orientacion==='horizontal';
  const width=landscape?size[1]:size[0],height=landscape?size[0]:size[1];
  const margin=margenMm*72/25.4,usableW=width-2*margin,usableH=height-2*margin;
@@ -56,6 +65,11 @@ export async function componerDocumentoPdfPrivado({
     const index=face*paginasPorCara+pos;
     if(index>=paginas.length)break;
     const embeddedPage=embedded[index];
+    if(!embeddedPage){
+     layout.push({paginaOriginal:paginas[index],posicion:pos+1,
+      enBlanco:true,x:null,y:null,ancho:0,alto:0});
+     continue;
+    }
     if(!(embeddedPage.width>0&&embeddedPage.height>0))
      throw Error('Origen sin dimensiones válidas.');
     const scale=Math.min(boxW/embeddedPage.width,boxH/embeddedPage.height);
