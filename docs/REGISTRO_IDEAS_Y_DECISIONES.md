@@ -1,3 +1,10 @@
+## 27/10/2026 — Continuidad UX V2 y anillado: bloqueo verificado
+
+- En portal privado V2, la carga inteligente transmite opciones `formato`, `modo`, `caras`, `copias` y `materialColor` para PDF A4/A3 sin anillado. La segunda etapa ya reutiliza estos datos y ahora muestra los controles de revisión contraídos en vez de pedirlos otra vez.
+- Cotizador inteligente admite `anillado` individual y por grupo (1 a 5) a nivel de presupuesto preliminar. **No está integrado a la ruta de recepción privada**: `carga-unica-cliente.mjs` rechaza explícitamente documentos anillados al transferirlos; el registro de pedidos V2 en Central solo admite sin anillado.
+- Corrección UX guardada en la rama: la recepción privada no ofrece `juntos` como opción engañosa y avisa el límite. **No habilitar anillados reales ni afirmar que el módulo está terminado** hasta extender contrato de transferencia de grupos, orden de archivos, cálculo servidor y manifiesto D1, con pruebas de compatibilidad de tamaños, copias y doble faz.
+- Estos cambios son solo código: no hay evidencia todavía de CI compilada o prueba visual en Chrome. No se desplegó ni se modificó la web pública, la central remota, Apps Script o pagos.
+
 ## Bloc de pendientes confirmado por usuario — 22/10/2026
 
 **Origen:** comentarios del titular tras probar satisfactoriamente la velocidad, el cálculo por archivo y el anillado conjunto del prototipo `/prueba-cotizador-rapido`. **Son requisitos pendientes, no funciones terminadas. No perder ni descartar estos puntos al continuar el proyecto.**
