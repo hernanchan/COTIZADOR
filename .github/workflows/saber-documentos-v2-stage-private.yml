@@ -36,7 +36,7 @@ jobs:
           grep -Fq 'SABER_SMART_DOCUMENTS_TO_PRIVATE' dist/saber-documentos-cotizador-fase4.mjs
           grep -Fq 'enviar-cotizacion-inteligente' dist/saber-documentos-cotizador-fase4.mjs
           echo 'SMART_TO_PRIVATE_UPLOAD_BRIDGE_VERIFIED'
-          grep -Fq 'Los otros PDF siguen cargados' dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq 'No hay PDF aptos para cotizar' dist/saber-documentos-cotizador-fase4.mjs
           echo 'ERROR_BY_FILE_UI_VERIFIED'
           grep -Fq 'recepcion-avanzada' dist/saber-documentos-cotizador-fase4.mjs
           grep -Fq 'SABER_SMART_RESIZE' dist/saber-documentos-cotizador-fase4.mjs
