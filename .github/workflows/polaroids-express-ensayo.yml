@@ -62,6 +62,8 @@ on:
       - 'integraciones/autocotizador/recepcion/subir-vincular-pdf-v2-privado.mjs'
       - 'integraciones/autocotizador/recepcion/pantalla-cotizador-v2-prueba-privada.mjs'
       - 'integraciones/autocotizador/recepcion/package.json'
+      - 'integraciones/autocotizador/recepcion/preparar-borrador-pedido.mjs'
+      - 'integraciones/autocotizador/recepcion/borrador-anillados.test.mjs'
       - 'integraciones/autocotizador/recepcion/v2-origen-privado.test.mjs'
       - 'integraciones/autocotizador/recepcion/verificar-vinculo-cotizador-v2.mjs'
       - 'vidriera/cotizar.html'
@@ -85,6 +87,8 @@ jobs:
       - name: Dependencia PDF en entorno aislado (no desplegar)
         working-directory: integraciones/autocotizador/recepcion
         run: npm install --no-audit --no-fund
+      - name: Probar borrador y grupos de anillado sin cobros
+        run: node --test integraciones/autocotizador/recepcion/borrador-anillados.test.mjs
       - name: Compilar Worker documental V2 completo sin publicar
         working-directory: integraciones/autocotizador/recepcion
         run: npm run build:unificado
