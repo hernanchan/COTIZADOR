@@ -230,7 +230,8 @@ async function cotizar(){
   const disponibles=catalogo[formato]||[];
   if(!e.materialColor&&disponibles.length)e.materialColor=disponibles[0].id;
  }
- const archivos=lote.archivos;
+ // Los materiales de color se completan antes de formar el payload.
+ const archivos=prepararLoteParcial(entries).archivos;
  try{const r=await fetch('/api/ensayo-carga-unica',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({archivos})});const respuesta=await r.json();if(n!==version)return;
  if(!r.ok||respuesta.ok!==true||respuesta.paymentAuthorized!==false)
   throw Error(respuesta.error||'Sin cotización');
