@@ -46,6 +46,7 @@ on:
       - 'tests/autocotizador-componer-desde-recibo.test.mjs'
       - 'tests/autocotizador-componer-pdf-documentos.test.mjs'
       - 'tests/autocotizador-nup-prueba-visual.test.mjs'
+      - 'tests/autocotizador-circuito-30pdf-nup.test.mjs'
       - 'tests/autocotizador-lote-ampliado.test.mjs'
       - 'integraciones/autocotizador/recepcion/pantalla-lote-pdf-ampliado.mjs'
       - 'tests/autocotizador-lote-ampliado-pantalla.test.mjs'
@@ -204,6 +205,8 @@ jobs:
           path: artifacts/nup-control/*.pdf
           if-no-files-found: error
           retention-days: 7
+      - name: Verificar un pedido de 30 PDFs desde recibos SHA hasta composiciones vectoriales
+        run: node --test tests/autocotizador-circuito-30pdf-nup.test.mjs
       - name: Verificar lote de PDFs privados GAS antes de calcular y registrar D1
         run: node --test tests/autocotizador-ficha-lote-gas.test.mjs
       - name: Verificar pedido de documentos y tienda sin Polaroids y sin cobro
