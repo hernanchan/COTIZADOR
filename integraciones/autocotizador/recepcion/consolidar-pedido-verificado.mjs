@@ -38,12 +38,29 @@ export function consolidarPedidoVerificado({orderId,configuraciones,recibosServi
      !/\.pdf$/i.test(verificado.name||'')||
      (Array.isArray(config.paginas)&&config.paginas.length!==verificado.pageCount))
    throw Error('Archivo de pedido sin recibo coincidente.');
+  // Medidas y páginas: exclusivamente desde los bytes verificados de Drive.
+  // CAD/Póster: instrucción del cliente (clasificador visual local), jamás
+  // una supuesta clasificación visual del validador PDF de servidor.
+  // Rechazar instrucciones manipuladas o de otro PDF en vez de recalcular
+  // sobre dimensiones declaradas en el navegador.
   const paginas=verificado.pageMetrics.map((x,i)=>{
    if(!x||!Number.isFinite(x.anchoCm)||!Number.isFinite(x.altoCm)||
       x.anchoCm<=0||x.altoCm<=0||x.anchoCm>2000||x.altoCm>2000||
       !['cad','poster','sin-clasificar'].includes(x.modo))
-    throw Error('El servidor no confirmó las medidas o clasificación del PDF.');
-   return {numero:i+1,anchoCm:x.anchoCm,altoCm:x.altoCm,modo:x.modo};
+    throw Error('El servidor no confirmó las medidas del PDF.');
+   const instruccion=Array.isArray(config.paginas)?config.paginas[i]:null;
+   if(instruccion&&(
+      instruccion.numero!==i+1||
+      !Number.isFinite(instruccion.anchoCm)||!Number.isFinite(instruccion.altoCm)||
+      Math.abs(instruccion.anchoCm-x.anchoCm)>0.15||
+      Math.abs(instruccion.altoCm-x.altoCm)>0.15||
+      !['cad','poster','sin-clasificar'].includes(instruccion.modo)))
+    throw Error('La clasificación enviada no corresponde a las páginas del PDF verificado.');
+   if(x.modo!=='sin-clasificar'&&instruccion&&instruccion.modo!=='sin-clasificar'&&
+      x.modo!==instruccion.modo)
+    throw Error('Clasificación de impresión inconsistente con el recibo.');
+   const modo=x.modo!=='sin-clasificar'?x.modo:(instruccion?.modo||'sin-clasificar');
+   return {numero:i+1,anchoCm:x.anchoCm,altoCm:x.altoCm,modo};
   });
   const {fileId:descartado,paginas:declaradas,...opciones}=config;
   return {...opciones,paginas};
