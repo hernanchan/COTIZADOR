@@ -59,7 +59,7 @@ export function conciliarManifiestoV2ConServidor({manifiesto,verificacion}){
      ficha.planoPorPagina.length!==item.paginas||
      ficha.planoPorPagina.some((p,i)=>p.numeroOriginal!==i+1||
       !['cad','poster'].includes(p.modo)||
-      !/^(rollo|rec)\\d+$/.test(p.rollo||'')||
+      !/^(rollo|rec)\d+$/.test(p.rollo||'')||
       !['obra80','recubierto'].includes(p.papel))||
      ficha.copias!==item.opciones.copias||
      ficha.pdfImprimibleVerificado!==false)
