@@ -23,7 +23,7 @@ jobs:
         working-directory: integraciones/autocotizador/recepcion
         run: |
           npm install --no-audit --no-fund
-          node --test medidas-local-pdf-rescate.test.mjs
+          node --test medidas-local-pdf-rescate.test.mjs lectura-local-pdf.test.mjs
           npm run build:unificado
           grep -q 'ensayo-preparar-documentos-v2-lote' dist/saber-documentos-cotizador-fase4.mjs
           grep -Fq 'batch-files' dist/saber-documentos-cotizador-fase4.mjs
