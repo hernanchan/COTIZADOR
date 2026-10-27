@@ -197,7 +197,7 @@ function updateSummary(){
  sendAllButton.disabled=batchSending||registering||Boolean(registeredOrder)||
   allRefs.length===0||allRefs.every(d=>Boolean(d.confirmacion))||
   allRefs.some(d=>!d.confirmacion&&!d.archivoLocal);
- registerButton.disabled=registering||Boolean(registeredOrder)||allRefs.some(d=>d.ploteo)||verified.length===0||
+ registerButton.disabled=registering||Boolean(registeredOrder)||verified.length===0||
   remaining!==0||withoutPdf!==0||verified.some(d=>!d.sesionConfirmada||!d.modoConfirmado);
 }
 
@@ -463,24 +463,30 @@ registerButton.addEventListener('click',async()=>{
  if(!entries.length||entries.length>30||all.some(item=>!item.references.length)||
     entries.some(d=>!d.confirmacion||!d.sesionConfirmada||
       !['bn','color'].includes(d.modoConfirmado)||
-      d.confirmacion.cotizacionServidor?.anillado!=='ninguno')){
+      (d.ploteo?d.ploteoVerificado?.estado!=='PRELIMINAR_VERIFICADA_SIN_PEDIDO':
+       d.confirmacion.cotizacionServidor?.anillado!=='ninguno'))){
   registerStatus.textContent='Este ensayo sólo permite PDF verificados sin anillado conjunto ni trabajos sin archivo.';
   return;
  }
  registering=true;updateSummary();
  try{
   const manifiesto=prepararManifiestoDocumentalV2({
-   orderId,trabajos:entries.map(d=>({vinculo:d.confirmacion}))
+   orderId,trabajos:entries.map(d=>({
+    vinculo:d.confirmacion,
+    ...(d.ploteo?{ploteoVerificado:d.ploteoVerificado}:{})
+   }))
   });
   const sesiones=entries.map(d=>{
-   const q=d.confirmacion.cotizacionServidor;
+   const q=d.ploteoVerificado||d.confirmacion.cotizacionServidor;
+   const plot=d.ploteo;
    return {sesion:{uploadId:d.sesionConfirmada.uploadId,token:d.sesionConfirmada.token},
-    opciones:{servicio:'auto',seleccion:q.formato,paginasSeleccionadas:'',
-     copias:q.copias,modo:d.modoConfirmado,caras:q.caras,
-     paginasPorHoja:q.paginasPorHoja??1,
-     papelPoster:'obra80',anillado:'ninguno',grupoAnillado:'',
-     materialColor:q.materialColor,productoFoto:'',productoGrafica:'',
-     corteVariante:'gt3',corteMetros:1}};
+    opciones:{servicio:'auto',seleccion:plot?'original':q.formato,paginasSeleccionadas:'',
+     copias:q.copias,modo:d.modoConfirmado,caras:plot?'simple':q.caras,
+     paginasPorHoja:plot?1:(q.paginasPorHoja??1),
+     papelPoster:plot?q.papelPoster:'obra80',anillado:'ninguno',grupoAnillado:'',
+     materialColor:plot?'':q.materialColor,productoFoto:'',productoGrafica:'',
+     corteVariante:'gt3',corteMetros:1,
+     ...(plot?{clasificacionCliente:plot.clasificacionCliente}:{})}};
   });
   const response=await fetch('/api/ensayo-preparar-documentos-v2-lote',{
    method:'POST',credentials:'same-origin',redirect:'error',
