@@ -20,6 +20,7 @@ export function prepararLoteParcial(entries){
    productoFoto:e.productoFoto||'',productoGrafica:e.productoGrafica||'',
    corteVariante:e.corteVariante,corteMetros:e.corteMetros,
    copias:e.copias,modo:e.modo,caras:e.caras,
+   paginasPorHoja:e.paginasPorHoja??1,
    papelPoster:e.papelPoster,anillado:e.anillado,
    grupoAnillado:e.grupoAnillado,materialColor:e.materialColor
   });
