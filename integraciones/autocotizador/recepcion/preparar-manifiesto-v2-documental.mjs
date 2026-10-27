@@ -35,9 +35,9 @@ export function prepararManifiestoDocumentalV2({orderId,trabajos}){
       plot.paginas.some((p,i)=>!p||p.numero!==i+1||
        !['cad','poster'].includes(p.modo)||
        !Number.isFinite(p.anchoCm)||!Number.isFinite(p.altoCm)||
-       !/^(rollo|rec)\\d+$/.test(p.rollo||'')||
+       !/^(rollo|rec)\d+$/.test(p.rollo||'')||
        !['obra80','recubierto'].includes(p.papel)||
-       (p.modo==='cad'&&(p.papel!=='obra80'||!/^rollo\\d+$/.test(p.rollo)))||
+       (p.modo==='cad'&&(p.papel!=='obra80'||!/^rollo\d+$/.test(p.rollo)))||
        (p.modo==='poster'&&p.papel!==plot.papelPoster))||
       plot.paymentAuthorized!==false||plot.checkoutEnabled!==false||
       receipts.has(v.receiptId)||localRefs.has(v.localRef)||
