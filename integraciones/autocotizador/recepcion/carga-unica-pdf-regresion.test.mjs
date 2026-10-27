@@ -32,7 +32,7 @@ test('ambas validaciones aceptan MUEBLES.pdf de 2.35 MB y rechazan extensiones a
 
 test('el archivo valido conserva la transferencia al portal privado',()=>{
  assert.match(source,/SABER_SMART_DOCUMENTS_TO_PRIVATE/);
- assert.match(source,/files,options,total:ultimoPresupuesto\.total/);
+ assert.match(source,/files,options,total:totalDocumentos/);
  assert.match(source,/archivoOriginal/);
 });
 
