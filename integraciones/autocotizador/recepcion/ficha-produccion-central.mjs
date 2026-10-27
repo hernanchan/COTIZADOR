@@ -44,6 +44,31 @@ export function prepararFichaCentral({pedidoVerificado}){
      (detalles.carasPorJuego??Math.ceil(fila.paginasElegidas.length/(detalles.paginasPorHoja??1)))!==
        Math.ceil(fila.paginasElegidas.length/(detalles.paginasPorHoja??1))))
    throw Error('Composición documental distinta del presupuesto verificado.');
+  // La ficha de ploteo sólo admite las páginas, rollos y papeles derivados
+  // del presupuesto recalculado por el servidor, nunca valores adicionales del cliente.
+  let planoPorPagina=null;
+  if(fila.destino==='ploteos'){
+   if(!Array.isArray(detalles.paginas)||
+      detalles.paginas.length!==fila.paginasElegidas.length||
+      !Number.isSafeInteger(detalles.copias)||detalles.copias<1||
+      !['obra80','recubierto'].includes(detalles.papelPoster))
+    throw Error('Falta el desglose verificable de ploteos por página.');
+   planoPorPagina=detalles.paginas.map((pag,i)=>{
+    const origenNumero=fila.paginasElegidas[i];
+    if(pag.numero!==i+1||!['cad','poster'].includes(pag.modo)||
+       !Number.isFinite(pag.anchoCm)||!Number.isFinite(pag.altoCm)||
+       typeof pag.material!=='string'||!/^(rollo|rec)\d+$/.test(pag.material)||
+       !['obra80','recubierto'].includes(pag.papel)||
+       (pag.modo==='cad'&&(pag.papel!=='obra80'||!/^rollo\d+$/.test(pag.material)))||
+       (pag.modo==='poster'&&pag.papel!==detalles.papelPoster)||
+       !Array.isArray(fila.origen)||!fila.origen.some(p=>p.numero===origenNumero&&
+        Math.abs(p.anchoCm-pag.anchoCm)<0.001&&
+        Math.abs(p.altoCm-pag.altoCm)<0.001))
+     throw Error('Página de ploteo distinta del original presupuestado.');
+    return Object.freeze({numeroOriginal:origenNumero,modo:pag.modo,
+     anchoCm:pag.anchoCm,altoCm:pag.altoCm,rollo:pag.material,papel:pag.papel});
+   });
+  }
   lineas.push({
    orden:fila.indice+1,idTrabajo:fila.id,servicio:fila.destino,
    nombreOriginal:origen.nombre,
@@ -54,6 +79,7 @@ export function prepararFichaCentral({pedidoVerificado}){
    formatoFinal:fila.formatoFinal||null,
    material:detalles.material||detalles.papel||fila.papelPoster||null,
    modo:detalles.modo||null,
+   planoPorPagina,
    // Procede del presupuesto recomputado; no aceptar opciones de impresión
    // nuevas durante la preparación del PDF sin volver a presupuestar.
    carasPresupuestadas:fila.destino==='documentos'?detalles.caras:null,
