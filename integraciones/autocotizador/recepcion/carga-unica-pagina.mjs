@@ -43,7 +43,7 @@ input:focus,select:focus{outline:3px solid #bedcf4;border-color:#2878ad}
 .panel-edicion .controles{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 16px;margin:12px 0 0}
 .panel-edicion label{font-size:14px;gap:4px}
 .panel-edicion input,.panel-edicion select{font-size:15px;min-height:42px;padding:8px}
-#presupuesto{position:static;padding:12px 18px;box-shadow:none}
+#presupuesto{position:sticky;top:8px;padding:12px 18px;box-shadow:0 4px 12px #173c5215;max-height:38vh;overflow:auto}
 #presupuesto strong{font-size:22px}#presupuesto p{font-size:14px;margin:4px 0}
 h2{font-size:19px;margin:20px 0 7px}
 #prepararPedido{display:block;background:#113d61;color:white;border:0;border-radius:8px;padding:14px 18px;font:700 16px system-ui;cursor:pointer;margin:15px 0}
