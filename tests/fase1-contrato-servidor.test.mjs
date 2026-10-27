@@ -39,13 +39,13 @@ test('PDF A0 sin clasificacion verificable no obtiene precio inventado',()=>{
 });
 test('instrucciones de otro PDF no reemplazan medidas verificadas',()=>{
  const c={...config('plano.pdf','f1'),
-  paginas:[{numero:1,...metric(21,29.7,'poster')}]};
+  clasificacionCliente:[{numero:1,...metric(21,29.7,'poster')}]};
  const r=receipt('plano.pdf','f1',[metric(84.1,118.9,'sin-clasificar')]);
  assert.throws(()=>run([c],[r]),/no corresponde/);
 });
 test('instruccion CAD del navegador usa medidas comprobadas para cotizar A0',()=>{
  const c={...config('plano.pdf','f1'),
-  paginas:[{numero:1,...metric(84.1,118.9,'cad')}]};
+  clasificacionCliente:[{numero:1,...metric(84.1,118.9,'cad')}]};
  const r=receipt('plano.pdf','f1',[metric(84.1,118.9,'sin-clasificar')]);
  const x=run([c],[r]);
  assert.equal(x.cotizacion.plan[0].destino,'ploteos');
@@ -61,10 +61,10 @@ test('sin clasificación CAD/Póster no se presupuesta A0',()=>{
 test('el receptor rechaza cambios de orden y discrepancias de clasificación',()=>{
  const r=receipt('plano.pdf','f1',[metric(84.1,118.9,'sin-clasificar')]);
  assert.throws(()=>run([{...config('plano.pdf','f1'),
-  paginas:[{numero:2,...metric(84.1,118.9,'cad')}]}],[r]),/no corresponde/);
+  clasificacionCliente:[{numero:2,...metric(84.1,118.9,'cad')}]}],[r]),/no corresponde/);
  const typed=receipt('plano.pdf','f1',[metric(84.1,118.9,'cad')]);
  assert.throws(()=>run([{...config('plano.pdf','f1'),
-  paginas:[{numero:1,...metric(84.1,118.9,'poster')}]}],[typed]),/inconsistente/);
+  clasificacionCliente:[{numero:1,...metric(84.1,118.9,'poster')}]}],[typed]),/inconsistente/);
 });
 test('dos PDFs A4 verificados permiten recalcular anillado agrupado sin pagos',()=>{
  const a=config('parte1.pdf','f1',{seleccion:'a4',anillado:'grupo',grupoAnillado:'1'});
