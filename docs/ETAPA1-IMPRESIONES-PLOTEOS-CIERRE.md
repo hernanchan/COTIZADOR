@@ -66,3 +66,12 @@ Se confirmó una **incompatibilidad entre cotización y recepción**, no una fal
 - **Este mensaje no recibe ni almacena el PDF, no agrega trabajo a la cola y no registra D1.** La transferencia sigue cerrada hasta ampliar el contrato del receptor.
 - GitHub Actions `40582571318`: pruebas de frontera, puente preliminar, contrato servidor y regresiones del backend exitosas.
 - Próxima tarea no satisfecha: integrar esa información en la recepción comprobada de cada PDF, su recotización oficial, manifiesto y Central D1. Ninguna autorización de publicación implícita.
+
+## Integración privada de ploteos — 27-10-2026
+
+- El cotizador transfiere objetos `File` originales de ploteos junto con su clasificación por página y subtotales numéricos de cada trabajo. Las impresiones enviadas simultáneamente mantienen su subtotal independiente.
+- El portal agrega los PDF de ploteos a la cola local (no a la web comercial), calcula su huella SHA-256, y los envía por la recepción protegida existente al pulsar «Enviar todos los PDF del pedido».
+- Tras la verificación del recibo de Google, solicita `POST /api/ensayo-cotizar-ploteo-verificado`, que exige autorización privada y verifica origen, sesión, recibo, bytes/huella y dimensiones reales del PDF; el servidor utiliza la clasificación visual del navegador como instrucción y recalcula rollo, papel y tarifa.
+- Las cotizaciones verificadas se muestran en el resumen, pero **el registro en D1 y los pagos permanecen bloqueados para ploteos**. No se guarda el archivo original en localStorage ni sessionStorage.
+- GitHub Actions `40585879038`: pruebas de regresión, compilación unificada del Worker y sintaxis completadas con éxito.
+- Pendiente imprescindible: desplegar únicamente la versión de ensayo privado mediante proceso controlado, comprobar recepción real y reintentos en navegador/Drive, extender el manifiesto/registro D1 a ploteos y anillados, y ensayar el pedido completo antes de cualquier publicación comercial.
