@@ -17,7 +17,7 @@ test('el cliente generado es JavaScript sintacticamente valido',()=>{
 
 test('ambas validaciones aceptan MUEBLES.pdf de 2.35 MB y rechazan extensiones ajenas',()=>{
  const patterns=[...source.matchAll(/\/([^\n/]*pdf\$)\/i\.test\((file\.name|e\.name)\)/g)];
- assert.equal(patterns.length,2,'Deben existir las validaciones en carga y transferencia privada');
+ assert.equal(patterns.length,3,'Deben validarse PDF en carga, ploteos y transferencia privada');
  for(const [,pattern] of patterns){
   assert.equal(pattern,String.raw`\.pdf$`,'Expresión de extensión inesperada');
   const rx=new RegExp(pattern,'i');
@@ -69,7 +69,7 @@ test('el callback real agrega MUEBLES.pdf de ocho paginas a la cola privada, sin
   formato:o.formato,modo:o.modo,caras:o.caras,copias:o.copias,paginas:o.paginas,
   nombre:o.nombre
  })),[{formato:'a4',modo:'bn',caras:'simple',copias:1,paginas:8,nombre:'MUEBLES.pdf'}]);
- assert.match(info.textContent,/enviados a la cola/);
+ assert.match(info.textContent,/enviaron a la cola/);
 });
 
 test('el callback real rechaza nombres no PDF y archivos superiores a 20 MB',()=>{
