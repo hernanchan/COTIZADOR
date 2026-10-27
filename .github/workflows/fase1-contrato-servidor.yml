@@ -5,6 +5,8 @@ on:
       - fase1/impresiones-ploteos-20261027
     paths:
       - 'tests/fase1-contrato-servidor.test.mjs'
+      - 'tests/fase1-ploteo-recibo-verificado.test.mjs'
+      - 'integraciones/autocotizador/recepcion/cotizar-ploteo-recibo-verificado.mjs'
       - 'tests/fase1-puente-clasificacion.test.mjs'
       - 'integraciones/autocotizador/recepcion/carga-unica-cliente.mjs'
       - 'integraciones/autocotizador/recepcion/pantalla-cotizador-v2-prueba-privada.mjs'
