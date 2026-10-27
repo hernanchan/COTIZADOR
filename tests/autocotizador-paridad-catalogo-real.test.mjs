@@ -40,7 +40,9 @@ test('grupo A4 válido: una encuadernación para dos PDF, sin duplicarla',()=>{
   archivo('primero.pdf',{cantidad:7,anillado:'grupo',grupoAnillado:'1'}),
   archivo('segundo.pdf',{cantidad:5,anillado:'grupo',grupoAnillado:'1'})]});
  assert.equal(r.estado,'PRELIMINAR');
- assert.equal(r.subtotalImpresiones,1008);
+ assert.equal(r.detalleImpresiones.reduce((s,d)=>s+d.subtotal,0),1008);
+ // En este contrato subtotalImpresiones ya incluye el armado; no sumarlo dos veces.
+ assert.equal(r.subtotalImpresiones,3338);
  assert.equal(r.subtotalAnillados,2330);
  assert.equal(r.total,3338);
  assert.deepEqual(r.detalleArmados[0].archivos,['pdf1','pdf2']);
