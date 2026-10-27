@@ -229,7 +229,8 @@ $('archivos').addEventListener('change',async ev=>{
  const files=[...(ev.target.files||[])];ev.target.value='';
  if(entries.length+files.length>30){$('estado').textContent='Máximo 30 PDF.';return}
  leyendo=true;
- if(!entries.length)abierto=0;
+ // Mantener fichas compactas al cargar un lote; cada PDF se edita sólo si hace falta.
+ if(!entries.length)abierto=-1;
  for(const f of files)entries.push({name:f.name,archivoOriginal:f,paginas:null,seleccion:'sin-confirmar',error:null,copias:1,modo:'bn',caras:'simple',papelPoster:'obra80',anillado:'ninguno',grupoAnillado:'',materialColor:'',paginasSeleccionadas:'',servicio:'auto',productoFoto:'',productoGrafica:'',corteVariante:'gt3',corteMetros:1});
  render();
  const start=entries.length-files.length;
