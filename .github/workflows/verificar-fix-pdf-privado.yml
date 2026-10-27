@@ -1,0 +1,36 @@
+name: Verificar correccion PDF privada sin despliegue
+on:
+  push:
+    branches:
+      - fix/pdf-extension-private-20261027
+    paths:
+      - '.github/workflows/verificar-fix-pdf-privado.yml'
+      - 'integraciones/autocotizador/recepcion/carga-unica-cliente.mjs'
+      - 'integraciones/autocotizador/recepcion/carga-unica-pdf-regresion.test.mjs'
+      - 'integraciones/autocotizador/recepcion/package.json'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar dependencias
+        working-directory: integraciones/autocotizador/recepcion
+        run: npm install --no-audit --no-fund
+      - name: Probar codigo real del boton y cola privada
+        working-directory: integraciones/autocotizador/recepcion
+        run: npm run test:handoff
+      - name: Compilar version aislada y comprobar sintaxis
+        working-directory: integraciones/autocotizador/recepcion
+        run: |
+          npm run build:unificado
+          node --check dist/saber-documentos-cotizador-fase4.mjs
+          node --check carga-unica-cliente.txt
+      - name: Confirmar ausencia de despliegue
+        run: echo 'NO DEPLOY - NO PAYMENT - NO COMMERCIAL SITE MODIFICATION'
