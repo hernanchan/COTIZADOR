@@ -82,6 +82,17 @@ Objetivo: entregar el sistema original + V2 completamente integrado y verificabl
 - **Pendiente verificable para cerrar etapa:** desplegar exclusivamente en el entorno de ensayo autorizado, efectuar carga de un PDF original, comprobar recibo GAS, cotización y registro en D1, generar y revisar el PDF final privado y comparar visualmente composición de caras y orientación. Ninguna de estas pruebas remotas se declara realizada.
 - Producción `libreriasaber.com.ar`, pagos, recepción comercial y gastos siguen sin modificación.
 
+## Hito de integridad del pedido V2 — 27/10/2026
+
+**Prueba integral de código aprobada:** https://github.com/hernanchan/COTIZADOR/actions/runs/40497648507
+
+- Se corrigió la pérdida de metadatos en `prepararBorradorPedido(...)`: la carga real ahora aporta `caras`, `anillado`, `grupoAnillado` y `paginasPorHoja` en cada archivo.
+- El cliente de recepción privada transporta N-up 1/2/4/9, verifica que coincida con la cotización del servidor y rechaza modificaciones incongruentes.
+- Se añadieron pruebas de integración del cliente para 2, 4 y 9 páginas por cara y un caso adverso de respuesta de cotización alterada.
+- Se añadieron comprobaciones CI para confirmar que el **Worker compilado** incluye la ruta de carga inteligente y campos de composición, en vez de verificar únicamente los archivos fuente.
+- Sigue estrictamente pendiente: ensayo remoto con PDF real en ambiente privado (Cloudflare, GAS/Drive y D1), comprobación de la vista final y la orientación de impresión, sin activar pagos.
+- No hay despliegue automático desde este flujo de pruebas. No se alteró la web pública.
+
 ## Estado de corte al 27/10/2026
 **Etapa activa: 1, cierre funcional y paridad comercial.** Existen componentes de cotización rápida, CAD/Póster y carga única, pero aún no se confirmó una UX integrada aceptada con todas las opciones del cotizador vigente. Etapa 2 tiene piezas y pruebas locales, pero el recorrido remoto completo con D1 aún no fue aceptado. Cambios recientes sobre borrador de anillados y suite CI son parciales; comprobar ejecución y resultado antes de tratarlos como validados.
 
