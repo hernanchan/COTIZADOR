@@ -79,3 +79,45 @@ test('el callback real rechaza nombres no PDF y archivos superiores a 20 MB',()=
   assert.match(info.textContent,/20 MB/);
  }
 });
+
+
+test('el portal privado recibe el evento real y agrega PDF con hash y precio, sin Drive ni D1',async()=>{
+ const {paginaCotizadorV2PruebaPrivada}=await import('./pantalla-cotizador-v2-prueba-privada.mjs');
+ const {webcrypto}=await import('node:crypto');
+ const html=paginaCotizadorV2PruebaPrivada('sitekey-test');
+ const script=html.match(/<script type="module">([\s\S]*?)<\/script>/)?.[1];
+ assert.ok(script,'Falta el script del portal privado');
+ assert.doesNotThrow(()=>new Script(script.replace(/^import [^\n]+;\s*$/gm,''),{
+  filename:'portal-privado.js'}));
+ const marker="if(event.source===smart.contentWindow&&event.data?.type==='SABER_SMART_DOCUMENTS_TO_PRIVATE'){";
+ const begin=script.indexOf(marker);
+ const finish=script.indexOf('\n if(event.source!==frame.contentWindow)return;',begin);
+ assert.ok(begin>=0&&finish>begin,'No se encontró el receptor del pedido inteligente');
+ const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
+ const onMessage=new AsyncFunction('event','smart','batchSending','registering',
+  'registeredOrder','all','batchStatus','used','save','render','updateSummary',
+  'status','document','crypto','File',script.slice(begin,finish));
+ const bytes=Math.round(2.35*1024*1024);
+ const file=new File([new Uint8Array([37,80,68,70,45]),new Uint8Array(bytes-5)],
+  'MUEBLES.pdf',{type:'application/pdf'});
+ const contentWindow={};
+ const options=[{nombre:file.name,paginas:8,formato:'a4',modo:'bn',caras:'simple',
+  copias:1,paginasPorHoja:1,materialColor:''}];
+ const all=[],used=new Set(),batchStatus={textContent:''},status={textContent:''};
+ let updates=0;
+ await onMessage({
+  source:contentWindow,data:{type:'SABER_SMART_DOCUMENTS_TO_PRIVATE',
+   files:[file],options,total:800}
+ },{contentWindow},false,false,false,all,batchStatus,used,
+ ()=>updates++,()=>updates++,()=>updates++,
+ status,{getElementById:()=>({open:false})},webcrypto,File);
+ assert.equal(all.length,1,batchStatus.textContent);
+ assert.equal(all[0].price,800);
+ assert.equal(all[0].references.length,1);
+ assert.equal(all[0].references[0].archivoLocal,file);
+ assert.equal(all[0].references[0].reference.bytes,bytes);
+ assert.equal(all[0].references[0].reference.estado,'PENDIENTE_DE_ENVIO');
+ assert.match(all[0].references[0].reference.sha256,/^[0-9a-f]{64}$/);
+ assert.match(batchStatus.textContent,/1 PDF listos para enviar/);
+ assert.equal(updates,3);
+});
