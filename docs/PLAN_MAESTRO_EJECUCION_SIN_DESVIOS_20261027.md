@@ -93,6 +93,18 @@ Objetivo: entregar el sistema original + V2 completamente integrado y verificabl
 - Sigue estrictamente pendiente: ensayo remoto con PDF real en ambiente privado (Cloudflare, GAS/Drive y D1), comprobación de la vista final y la orientación de impresión, sin activar pagos.
 - No hay despliegue automático desde este flujo de pruebas. No se alteró la web pública.
 
+## Auditoría real de Cloudflare de los Workers privados — 27/10/2026
+
+**Evidencia:** https://github.com/hernanchan/COTIZADOR/actions/runs/40497879357 — lectura GET de metadatos de los dos Workers, sin modificar configuraciones.
+
+- `saber-pagos-pruebas`: acceso OK, `CENTRAL_BRIDGE_KEY` y binding D1 presentes. Service Binding no presente en este Worker, coherente con el enlace desde Documentos hacia Central.
+- `saber-documentos-pruebas`: acceso OK; `SABER_CENTRAL`, `DOCS_SCRIPT_URL`, `DOCS_RELAY_KEY`, `DOCS_ALLOWED_ORIGIN`, Turnstile, `DOCS_EXTENDED_RECEIVER_ENABLED`, `DOCS_V2_RECEIPT_LINK_ENABLED`, compuerta UI privada, `DOCS_CENTRAL_ADMIN_KEY`, `CENTRAL_TEST_URL`, `DOCS_CENTRAL_SYNC_ENABLED`, `DOCS_ORDER_PREPARE_ENABLED` están **presentes como nombres de binding**.
+- **Faltan** `DOCS_PRINT_DRAFT_ENABLED` y `DOCS_PRINT_DRAFT_CENTRAL_ENABLED` en el Worker documental. Son guardias necesarios para preparar/registrar el PDF compuesto del ensayo. Su ausencia actualmente es un bloqueo seguro, no un error que autorice encenderlas automáticamente.
+- La lectura de metadatos **no prueba los valores activos** de ninguna bandera, ni qué commit se encuentra desplegado, ni la recepción real en GAS/Drive o D1.
+- El control de solo lectura ahora informa la ausencia/indeterminación de ambas configuraciones de composición de PDF y nunca afirma que estén habilitadas. Corregir configuración sólo en el entorno de ensayo, bajo autorización, después de verificar artefacto a desplegar; no modificar la web pública, no activar pagos, no generar costos.
+
+**Siguiente condición de salida:** validar versión realmente desplegada del Worker documental privado y control de acceso; efectuar un pedido ficticio de PDF con 2/4/9 páginas por cara, recibo Drive, ficha D1 y PDF compuesto revisado, con pagos desactivados. No declarar Etapa 1 finalizada por CI o presencia de bindings.
+
 ## Estado de corte al 27/10/2026
 **Etapa activa: 1, cierre funcional y paridad comercial.** Existen componentes de cotización rápida, CAD/Póster y carga única, pero aún no se confirmó una UX integrada aceptada con todas las opciones del cotizador vigente. Etapa 2 tiene piezas y pruebas locales, pero el recorrido remoto completo con D1 aún no fue aceptado. Cambios recientes sobre borrador de anillados y suite CI son parciales; comprobar ejecución y resultado antes de tratarlos como validados.
 
