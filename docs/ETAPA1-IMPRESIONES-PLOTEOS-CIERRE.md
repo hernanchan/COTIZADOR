@@ -34,3 +34,27 @@ Estado: **en desarrollo y sin autorización de publicación**, 27-10-2026.
 - No promocionar una versión sólo porque Actions aparece en verde.
 - No modificar código minificado desde Cloudflare; corregir fuentes, compilar y promover artefacto identificable con SHA.
 - No desplegar a clientes sin las nueve condiciones verificadas con evidencia y autorización.
+
+## Auditoría de contrato de recepción (27-10-2026)
+
+Se confirmó una **incompatibilidad entre cotización y recepción**, no una falta del motor de cálculo:
+
+| Capa | Capacidad observada | Brecha real |
+|---|---|---|
+| `cotizar-carga-unica.mjs` | cotiza documentos, ploteos y anillados | su resultado es preliminar |
+| `carga-unica-cliente.mjs` | genera evento de cola `SABER_SMART_DOCUMENTS_TO_PRIVATE` | rechaza destino distinto de `documentos` y anillado |
+| `pantalla-cotizador-v2-prueba-privada.mjs` | recibe PDF y opciones; verifica cabecera y SHA antes de encolar | contrato de opciones limitado a A4/A3, sin clasificación CAD/Póster ni grupos de anillado |
+| `fase4-ficha-central-lote-privada.mjs` | consulta recibos privados de Google y revalida archivos | prepara `conectarRecepcionConCentral` con opciones documentales |
+| `preparar-manifiesto-v2-documental.mjs` | genera manifiesto sólo con recibos confirmados | formatos `a4/a3`, anillado `ninguno/juntos`; no representa rollo ni clasificación por página |
+| `cotizar-nup-recibo-verificado.mjs` | recalcula N-up desde un PDF verificado | N-up sólo en documentos, anillado ninguno |
+| `worker-fase4-cotizador-unificado.mjs` | rutas de recepción, verificación y composición | las rutas y compuertas no prueban que un ploteo sea producible |
+
+### Orden técnico de cierre (sin módulos ni pantallas nuevos)
+
+1. **Definir y probar el contrato de trabajo por archivo** con servicio, páginas seleccionadas, destino por página (CAD/Póster), rollo automático y papel Póster cuando corresponda. Los valores del navegador no autorizan precio.
+2. **Extender el receptor y la revalidación del servidor** para recomputar tamaño, clasificación, rollo, papel y precio de cada página desde los bytes almacenados.
+3. **Integrar anillado** por grupo de archivos en el pedido, validando que el grupo sea consistente; el PDF compuesto deberá conservar el orden e indicar los grupos.
+4. **Extender manifiesto y Central** de manera transaccional sin perder el formato documental ya existente; guardar opciones verificadas de producción y total calculado en servidor.
+5. **Conectar el único botón de envío** al contrato validado, seguido de pruebas reales Drive/D1/PDF compuesto. Mantener los rechazos actuales hasta que exista soporte verificable.
+
+**Criterio de bloqueo:** no quitar restricciones de UI para ploteos/anillados antes de que el backend pueda aceptar, revalidar y registrar esos casos. Nunca usar el precio del navegador como importe confirmado.
