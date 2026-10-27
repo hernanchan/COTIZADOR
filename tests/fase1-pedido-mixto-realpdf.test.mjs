@@ -19,6 +19,7 @@ async function fixture(){
  const bytes=[],receipts=[],configuraciones=[];
  for(let i=0;i<3;i++){
   const pdf=await PDFDocument.create();
+  pdf.setTitle(names[i]);
   pdf.addPage(i===2?[2383.94,3370.39]:[595.28,841.89]);
   const data=await pdf.save();
   bytes.push(data);
