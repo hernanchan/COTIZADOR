@@ -122,7 +122,7 @@ function render(){
    input.onchange=async()=>{
     const file=input.files?.[0];input.value='';
     if(!file||leyendo)return;
-    if(!/\\.pdf$/i.test(file.name)||file.size<5||file.size>250*1024*1024){
+    if(!/\.pdf$/i.test(file.name)||file.size<5||file.size>250*1024*1024){
      $('estado').textContent='Elegí un PDF válido, de hasta 250 MB.';return;
     }
     leyendo=true;version++;ultimoPresupuesto=null;
@@ -346,7 +346,7 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
      throw Error('Los ploteos y otros servicios se calculan automáticamente, pero su recepción privada todavía requiere la validación del servidor.');
     if(!e.archivoOriginal||!Number.isSafeInteger(e.archivoOriginal.size)||
        e.archivoOriginal.size<5||e.archivoOriginal.size>20*1024*1024||
-       e.name.length>120||!/\\.pdf$/i.test(e.name))
+       e.name.length>120||!/\.pdf$/i.test(e.name))
      throw Error('La recepción privada admite PDF de hasta 20 MB por archivo.');
     if(e.anillado!=='ninguno')
      throw Error('El anillado está disponible para cotizar, pero su registro privado todavía requiere validación.');
