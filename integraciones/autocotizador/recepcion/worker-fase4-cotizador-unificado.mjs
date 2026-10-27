@@ -7,6 +7,9 @@ import {paginaPloteosRapido} from './ploteos-rapido-pagina.mjs';
 import {paginaCotizadorConjunto} from './cotizador-conjunto-pagina.mjs';
 import {paginaCargaUnica} from './carga-unica-pagina.mjs';
 import {cotizarCargaUnica} from './cotizar-carga-unica.mjs';
+import {cotizarNupReciboVerificado} from './cotizar-nup-recibo-verificado.mjs';
+import {leerPdfFase4Privado} from './leer-pdf-fase4-privado.mjs';
+import {medidasPdfServidor} from './medidas-pdf-servidor.mjs';
 import {GRAFICA_COMERCIAL} from './cotizar-grafica.mjs';
 import {fase4FichaCentralPrivada} from './fase4-ficha-central-privada.mjs';
 import {fase4FichaCentralLotePrivada} from './fase4-ficha-central-lote-privada.mjs';
@@ -861,7 +864,10 @@ async function v2VincularPdf(request,env){
      !['bn','color'].includes(input.expectedMode)||
      (input.opciones!==undefined&&(
        !input.opciones||typeof input.opciones!=='object'||Array.isArray(input.opciones)||
-       Object.keys(input.opciones).sort().join(',')!=='anillado,caras,copias,formato,materialColor'||
+       !['anillado,caras,copias,formato,materialColor',
+         'anillado,caras,copias,formato,materialColor,paginasPorHoja']
+        .includes(Object.keys(input.opciones).sort().join(','))||
+       ![1,2,4,9].includes(input.opciones.paginasPorHoja??1)||
        !['a4','a3'].includes(input.opciones.formato)||
        !['simple','double'].includes(input.opciones.caras)||
        !['ninguno','juntos'].includes(input.opciones.anillado)||
@@ -885,6 +891,21 @@ async function v2VincularPdf(request,env){
   // El importe del navegador jamás es autoridad y no se prepara una orden comercial.
   if(input.opciones!==undefined){
    const o=input.opciones;
+   if((o.paginasPorHoja??1)!==1){
+    const consultarFirmado=p=>postToScript(env,p,fetch,420000);
+    const original=await leerPdfFase4Privado({
+     session:input.sesion,receiptId:recibo.receiptId,
+     bytes:recibo.bytes,sha256:recibo.sha256,
+     maxFileBytes:DOCS_MAX,consultarFirmado
+    });
+    const medidas=await medidasPdfServidor(original);
+    const presupuesto=cotizarNupReciboVerificado({
+     recibo,medidas,opciones:o,precios:preciosPiloto
+    });
+    return testResponse({...link,ok:true,cotizacionServidor:{
+     ...presupuesto,priceVersion:preciosPiloto.generatedAt||'catalogo-local'
+    },paymentAuthorized:false,checkoutEnabled:false},200);
+   }
    const budget=prepararPresupuestoDocumentos({
     solicitud:{orderId:recibo.orderId,archivos:[{
      id:recibo.fileId,nombre:recibo.name,modo:recibo.mode,orden:1
