@@ -48,7 +48,13 @@ export function consolidarPedidoVerificado({orderId,configuraciones,recibosServi
       x.anchoCm<=0||x.altoCm<=0||x.anchoCm>2000||x.altoCm>2000||
       !['cad','poster','sin-clasificar'].includes(x.modo))
     throw Error('El servidor no confirmó las medidas del PDF.');
-   const instruccion=Array.isArray(config.paginas)?config.paginas[i]:null;
+   // Campo optativo NUEVO: no reutilizar 'paginas', que ya pertenece
+   // al contrato histórico de cotización y puede contener datos preliminares.
+   if(config.clasificacionCliente!==undefined&&
+      (!Array.isArray(config.clasificacionCliente)||
+       config.clasificacionCliente.length!==verificado.pageCount))
+    throw Error('Instrucciones CAD/Póster incompletas para el PDF.');
+   const instruccion=config.clasificacionCliente?.[i]||null;
    if(instruccion&&(
       instruccion.numero!==i+1||
       !Number.isFinite(instruccion.anchoCm)||!Number.isFinite(instruccion.altoCm)||
@@ -62,7 +68,8 @@ export function consolidarPedidoVerificado({orderId,configuraciones,recibosServi
    const modo=x.modo!=='sin-clasificar'?x.modo:(instruccion?.modo||'sin-clasificar');
    return {numero:i+1,anchoCm:x.anchoCm,altoCm:x.altoCm,modo};
   });
-  const {fileId:descartado,paginas:declaradas,...opciones}=config;
+  const {fileId:descartado,paginas:declaradas,
+   clasificacionCliente:instruccionesValidadas,...opciones}=config;
   return {...opciones,paginas};
  });
  if([...refs.keys()].some(k=>!ids.has(k)))throw Error('Hay recibos ajenos al pedido.');
