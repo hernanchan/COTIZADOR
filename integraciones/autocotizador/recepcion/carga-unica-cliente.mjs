@@ -376,7 +376,11 @@ $('prepararPedido').addEventListener('click',()=>{
  try{
   const draft=prepararBorradorPedido({
    cotizacion:ultimoPresupuesto,
-   archivos:entries.map(e=>({file:e.archivoOriginal,name:e.name,paginas:e.paginas,copias:e.copias}))
+   archivos:entries.map(e=>({
+    file:e.archivoOriginal,name:e.name,paginas:e.paginas,copias:e.copias,
+    caras:e.caras,anillado:e.anillado,grupoAnillado:e.grupoAnillado,
+    paginasPorHoja:e.paginasPorHoja??1
+   }))
   });
   let articulos=[];
   try{articulos=JSON.parse(localStorage.getItem('saberCartV1')||'[]')}catch(_){articulos=[]}
