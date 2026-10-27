@@ -16,6 +16,11 @@ let productosGrafica=[];
 let abierto=-1;
 let ultimoPresupuesto=null;
 const pesos=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(n);
+function informarPrecioPrivado(estado,total=null){
+ if(window.parent===window)return;
+ window.parent.postMessage({type:'SABER_SMART_PRICE_STATE',estado,
+  total:Number.isSafeInteger(total)&&total>0?total:null},location.origin);
+}
 function importeArchivo(indice){
  if(!ultimoPresupuesto)return null;
  const plan=ultimoPresupuesto.plan?.find(p=>p.indice===indice);
@@ -243,10 +248,11 @@ $('archivos').addEventListener('change',async ev=>{
 });
 async function cotizar(){
  const n=++version,out=$('presupuesto');
+ informarPrecioPrivado('calculando');
  $('prepararPedido').disabled=true;
  $('resumenPedido').replaceChildren();
  ultimoPresupuesto=null;
- if(leyendo||!entries.length){out.textContent='Esperando archivos…';return}
+ if(leyendo||!entries.length){out.textContent='Esperando archivos…';informarPrecioPrivado('esperando');return}
  const lote=prepararLoteParcial(entries);
  if(!lote.archivos.length){
   out.replaceChildren(texto('strong','No hay PDF aptos para cotizar'));
@@ -255,6 +261,7 @@ async function cotizar(){
    note.className='advertencia';out.append(note);
   }
   out.append(texto('p','Podés quitar únicamente el archivo con error. Los demás no se pierden.'));
+  informarPrecioPrivado('incompleto');
   render();return;
  }
  out.textContent=lote.noLeidos.length?
@@ -275,6 +282,7 @@ async function cotizar(){
   throw Error(respuesta.error||'Sin cotización');
  const d=recomponerLoteParcial(respuesta,lote);
  ultimoPresupuesto=d;
+ informarPrecioPrivado(d.estado==='PRELIMINAR'?'listo':'incompleto',d.total);
  $('prepararPedido').disabled=!(d.estado==='PRELIMINAR'&&Number.isSafeInteger(d.total)&&d.total>0&&entries.every(e=>e.archivoOriginal));
  const ars=v=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(v);
  out.replaceChildren(
@@ -292,7 +300,7 @@ async function cotizar(){
  }
  if(d.plan.length)out.append(texto('p','Precio orientativo. Los archivos no se enviaron ni se autoriza el cobro.'));
  render();
- }catch(e){if(n===version){out.textContent='No fue posible cotizar: '+String(e.message||e);render()}}
+ }catch(e){if(n===version){informarPrecioPrivado('error');out.textContent='No fue posible cotizar: '+String(e.message||e);render()}}
 }
 async function iniciar(){
  try{const r=await fetch('/api/ensayo-materiales-rapido',{cache:'no-store'});const x=await r.json();if(!r.ok||!x.ok||!x.materials)throw Error('Catálogo inaccesible');catalogo=x.materials;productosFoto=x.photos||[];variantesCorte=x.cutVariants||[];productosGrafica=x.graphicProducts||[];}
