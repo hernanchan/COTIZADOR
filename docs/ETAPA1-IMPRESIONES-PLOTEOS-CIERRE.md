@@ -100,3 +100,11 @@ Se confirmó una **incompatibilidad entre cotización y recepción**, no una fal
 - Cloudflare confirmó versión no desplegada: `18779e7c-05f9-4f33-9fa0-dd2955942492` del commit `2c09e2324c45f481a9b14aae8b7a6f10dff684f3`.
 - **No se ejecutó `deployments`, ni modificación de rutas, dominio, Worker activo o pagos**.
 - El ensayo real Drive/D1 todavía necesita que esa versión se promueva de manera controlada sólo en el entorno de pruebas, previa comprobación del despliegue activo y estrategia de reversión. Se debe verificar PDF real 2×A4 + 1×A0 sin datos de clientes y borrar registros de ensayo cuando se complete.
+
+## Activación controlada y comprobación de acceso — 27-10-2026
+
+- Se confirmó por API la versión anterior `29d8ee1f-111d-4b3f-bec6-f7ae3a53c1b2` y la versión de pruebas `18779e7c-05f9-4f33-9fa0-dd2955942492`.
+- Dos verificaciones iniciales del despliegue fallaron por una expresión de control, activando reversión automática; una inspección independiente confirmó la recuperación de la versión anterior.
+- Tras ajustar la validación, GitHub Actions `40590896800` desplegó la versión de etapa 1 **únicamente** en `saber-documentos-pruebas`, comprobando mediante GET que recibe el 100% del tráfico de ese Worker.
+- Prueba independiente de acceso `40590988167`: desplegado correcto y `GET /prueba-v2/` sin credenciales devuelve **HTTP 401**, sin exponer pantalla privada.
+- No se ejecutaron envíos PDF ni escrituras en Drive/D1 durante esa comprobación. El siguiente criterio de aceptación sigue siendo probar realmente PDF de trabajo con Drive y pedido registrado en D1, con pagos bloqueados.
