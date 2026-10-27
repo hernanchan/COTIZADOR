@@ -41,4 +41,4 @@ jobs:
           done
           echo "FASE1_OLD_VERSION=$old"
           echo "FASE1_NEW_VERSION=$target"
-          echo "PREFLIGHT_OK_NO_DEPLOY"
+          echo "PREFLIGHT_OK_NO_DEPLOY_ROLLBACK_CONFIRMED"
