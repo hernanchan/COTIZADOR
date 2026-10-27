@@ -10,16 +10,17 @@ const manifest=readFileSync(new URL('preparar-manifiesto-v2-documental.mjs',dir)
 
 test('primera etapa: ploteos ingresan a ensayo sin registro comercial',()=>{
  assert.match(smart,/plan\.destino!=='documentos'/);
- assert.match(portal,/allRefs\.some\(d=>d\.ploteo\)/);
+ assert.match(portal,/d\.ploteoVerificado\?\.estado/);
  assert.match(portal,/Registro D1 del ploteo: PENDIENTE/);
 });
 test('primera etapa: no permitir anillado sin contrato backend',()=>{
  assert.match(smart,/e\.anillado!=='ninguno'/);
  assert.match(smart,/El anillado está disponible para cotizar, pero su registro privado todavía requiere validación/);
 });
-test('primera etapa: manifiesto legado limitado a A4 A3 y sin rollos',()=>{
+test('primera etapa: manifiesto incorpora ploteos sin ampliar los formatos documentales',()=>{
  assert.match(manifest,/new Set\(\['a4','a3'\]\)/);
- assert.doesNotMatch(manifest,/rolloEstandarAutomatico|papelPoster/);
+ assert.match(manifest,/ploteoVerificado/);
+ assert.match(manifest,/opciones:Object\.freeze\(\{servicio:'ploteos'/);
  assert.match(portal,/SABER_SMART_DOCUMENTS_TO_PRIVATE/);
 });
 // Estas pruebas son de frontera: NO certifican recepción, precio ni producción de ploteos.
