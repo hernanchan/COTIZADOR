@@ -37,6 +37,9 @@ jobs:
           if [ "$code" != 200 ]; then echo "PRIVATE_JS_FAILED_HTTP_$code"; exit 1; fi
           grep -Fq 'clasificarPaginasPloteo' /tmp/client || grep -Fq 'sin-clasificar' /tmp/client
           echo "CAD_POSTER_ANALYZER_CLIENT_PRESENT"
+          grep -Fq 'PDFJS_ALTERNATIVO' /tmp/client
+          grep -Fq 'Sin páginas para clasificar' /tmp/client
+          echo "PDF_RESCUE_AND_FAST_A4_A3_LIVE_PRESENT"
           code=$(curl -sS --max-time 20 -u "operador:$PASSWORD" -o /tmp/portal -w '%{http_code}' "$root/")
           if [ "$code" != 200 ]; then echo "INTEGRATED_PORTAL_FAILED_HTTP_$code"; exit 1; fi
           grep -Fq 'id="smart"' /tmp/portal
