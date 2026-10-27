@@ -1,0 +1,41 @@
+name: Fase 1 - verificar acceso privado tras activacion
+on:
+  push:
+    branches: [fase1/impresiones-ploteos-20261027]
+    paths: [.github/workflows/fase1-comprobar-acceso-privado.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Comprobar despliegue y acceso privado sin credenciales
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          base="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers"
+          trap 'rm -f /tmp/fase1-check.json /tmp/fase1-subdomain.json /tmp/fase1-private.html' EXIT
+          curl -fsS --max-time 20 -H "Authorization: Bearer $TOKEN" "$base/scripts/saber-documentos-pruebas/deployments" >/tmp/fase1-check.json
+          jq -e '.success==true and (.result.deployments[0].versions|length==1 and .[0].version_id=="18779e7c-05f9-4f33-9fa0-dd2955942492" and .[0].percentage==100)' /tmp/fase1-check.json >/dev/null
+          echo "ACTIVE_VERSION_CORRECT"
+          curl -fsS --max-time 20 -H "Authorization: Bearer $TOKEN" "$base/subdomain" >/tmp/fase1-subdomain.json
+          subdomain=$(jq -r 'if .success==true then .result.subdomain else empty end' /tmp/fase1-subdomain.json)
+          test -n "$subdomain"
+          url="https://saber-documentos-pruebas.$subdomain.workers.dev/prueba-v2/"
+          http=$(curl -sS --max-time 20 -L --max-redirs 0 -o /tmp/fase1-private.html -w '%{http_code}' "$url")
+          echo "PRIVATE_UI_NO_CREDENTIALS_HTTP=$http"
+          if [ "$http" != "401" ] && [ "$http" != "503" ]; then
+            echo "PRIVATE_ACCESS_GUARD_FAILED"
+            exit 1
+          fi
+          echo "PRIVATE_UI_NOT_PUBLICLY_ACCESSIBLE"
+          echo "NO_FILES_NO_D1_NO_PAYMENT"
