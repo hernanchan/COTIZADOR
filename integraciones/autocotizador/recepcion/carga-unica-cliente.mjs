@@ -350,8 +350,8 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
      throw Error('La recepción privada admite PDF de hasta 20 MB por archivo.');
     if(e.anillado!=='ninguno')
      throw Error('El anillado está disponible para cotizar, pero su registro privado todavía requiere validación.');
-    if((e.paginasPorHoja??1)!==1)
-     throw Error('La composición de 2, 4 o 9 páginas por cara ya se cotiza, pero la recepción privada aún no genera el PDF impuesto. No se enviará una orden con páginas sin componer.');
+    if(![1,2,4,9].includes(e.paginasPorHoja??1))
+     throw Error('Composición por cara no admitida.');
     if(!Array.isArray(e.paginas)||e.paginas.length<1||
        e.paginas.length>2000||plan.paginasElegidas.length!==e.paginas.length)
      throw Error('El envío directo admite PDF completos, sin selección parcial de páginas.');
@@ -362,6 +362,7 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
     files.push(e.archivoOriginal);
     options.push({formato:plan.formatoFinal,modo:e.modo,caras:e.caras,
      copias:e.copias,materialColor:e.materialColor,
+     paginasPorHoja:e.paginasPorHoja??1,
      paginas:e.paginas.length,nombre:e.name});
    }
    window.parent.postMessage({type:'SABER_SMART_DOCUMENTS_TO_PRIVATE',
