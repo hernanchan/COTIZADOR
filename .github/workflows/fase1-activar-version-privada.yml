@@ -51,7 +51,7 @@ jobs:
             exit 1
           fi
           deployed=1
-          jq -e --arg id "$target" '.success==true and .result.versions|length==1 and .[0].percentage==100 and .[0].version_id==$id' /tmp/f1-response.json >/dev/null
+          jq -e --arg id "$target" '.success==true and (.result.versions|length==1 and .[0].percentage==100 and .[0].version_id==$id)' /tmp/f1-response.json >/dev/null
           curl -fsS --max-time 20 -H "Authorization: Bearer $TOKEN" "$root/deployments" >/tmp/f1-after.json
           jq -e --arg id "$target" '.success==true and (.result.deployments[0].versions|length==1 and .[0].percentage==100 and .[0].version_id==$id)' /tmp/f1-after.json >/dev/null
           deployed=0
