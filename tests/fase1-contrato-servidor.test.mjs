@@ -69,7 +69,7 @@ test('la ficha privada registra cada pagina CAD y su rollo automatico sin habili
  assert.equal(t.planoPorPagina.length,1);
  assert.equal(t.planoPorPagina[0].numeroOriginal,1);
  assert.equal(t.planoPorPagina[0].modo,'cad');
- assert.match(t.planoPorPagina[0].rollo,/^rollo\\d+$/);
+ assert.match(t.planoPorPagina[0].rollo,/^rollo\d+$/);
  assert.equal(t.planoPorPagina[0].papel,'obra80');
  assert.equal(t.pdfImprimibleVerificado,false);
 });
