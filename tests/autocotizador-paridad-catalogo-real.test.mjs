@@ -60,3 +60,39 @@ test('separación comercial: A4 B/N y A3 color no comparten escala',()=>{
   assert.equal(r.detalleImpresiones.find(x=>x.id===linea.id)?.nombre,linea.nombre);
  }
 });
+
+test('frontera del descuento: 10 a 11 hojas A4 B/N en lote',()=>{
+ const diez=Array.from({length:10},(_,i)=>archivo('diez-'+i+'.pdf'));
+ const once=[...diez,archivo('once.pdf')];
+ const r10=cotizarCargaUnica({precios,archivos:diez});
+ const r11=cotizarCargaUnica({precios,archivos:once});
+ assert.equal(r10.total,10*100);
+ assert.equal(r11.total,11*84);
+ assert.equal(r10.plan.length,10);
+ assert.equal(r11.plan.length,11);
+});
+test('30 PDF de dos hojas: escala correcta y líneas inequívocas',()=>{
+ const files=Array.from({length:30},(_,i)=>archivo('lote-'+i+'.pdf',{cantidad:2}));
+ const r=cotizarCargaUnica({precios,archivos:files});
+ assert.equal(r.estado,'PRELIMINAR');
+ assert.equal(r.total,60*76);
+ assert.equal(r.plan.length,30);
+ assert.equal(r.detalleImpresiones.length,30);
+ assert.equal(new Set(r.plan.map(p=>p.id)).size,30);
+ for(const p of r.plan)
+  assert.equal(r.detalleImpresiones.find(x=>x.id===p.id)?.nombre,p.nombre);
+ assert.equal(r.paymentAuthorized,false);
+});
+test('A4 B/N a doble faz usa la tarifa doble en escala 11 a 30',()=>{
+ const files=[
+  archivo('doble.pdf',{cantidad:7,caras:'double'}),
+  archivo('simple.pdf',{cantidad:5})];
+ const r=cotizarCargaUnica({precios,archivos:files});
+ assert.equal(r.estado,'PRELIMINAR');
+ assert.equal(r.total,7*80+5*84);
+ assert.equal(r.subtotalAnillados,0);
+});
+test('31 PDF deben ser rechazados antes de cualquier precio',()=>{
+ const files=Array.from({length:31},(_,i)=>archivo('excede-'+i+'.pdf'));
+ assert.throws(()=>cotizarCargaUnica({precios,archivos:files}),/Cantidad de archivos inválida/);
+});
