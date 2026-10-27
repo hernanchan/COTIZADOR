@@ -14,6 +14,17 @@ function chequearDimensiones(anchoCm,altoCm){
   altoCm:Math.round(altoCm*1000)/1000};
 }
 
+/**
+ * No renderizar visualmente miles de páginas A4/A3: la cobertura CAD/Póster
+ * sólo define precio y rollo de trabajos mayores a A3.
+ */
+export function requiereClasificacionVisualPloteo(paginas){
+ if(!Array.isArray(paginas)||!paginas.length)
+  throw Error('Sin páginas para clasificar');
+ return paginas.some(p=>Math.max(p.anchoCm,p.altoCm)>42.03||
+  Math.min(p.anchoCm,p.altoCm)>29.73);
+}
+
 export async function recuperarMedidasConPdfJs(buffer,{maxPaginas=2000,
  pdfjs=globalThis.pdfjsLib}={}){
  if(!pdfjs?.getDocument)
@@ -48,7 +59,7 @@ export async function recuperarMedidasConPdfJs(buffer,{maxPaginas=2000,
  }
 }
 
-export async function leerMedidasPloteo(file,{maxBytes=250*1024*1024,maxPaginas=2000}={}){
+export async function leerMedidasPloteo(file,{maxBytes=250*1024*1024,maxPaginas=2000,pdfjs=globalThis.pdfjsLib}={}){
  if(!file||!/\\.pdf$/i.test(String(file.name))||
     !Number.isSafeInteger(file.size)||file.size<5||file.size>maxBytes)
    throw Error('PDF inválido o mayor de 250 MB.');
@@ -62,7 +73,7 @@ export async function leerMedidasPloteo(file,{maxBytes=250*1024*1024,maxPaginas=
  }catch(error){
   if(/encrypt|password|protected|contraseña/i.test(String(error?.message||'')))
    throw Error('PDF protegido por contraseña: requiere revisión.');
-  try{return await recuperarMedidasConPdfJs(buffer,{maxPaginas})}
+  try{return await recuperarMedidasConPdfJs(buffer,{maxPaginas,pdfjs})}
   catch(otro){
    throw Error('No fue posible leer las dimensiones del PDF con ninguno de los lectores. '+
     String(otro?.message||otro));
