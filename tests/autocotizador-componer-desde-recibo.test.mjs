@@ -158,3 +158,30 @@ test('ficha manipulada de imposición 4 a 9 queda bloqueada antes de leer Drive'
  }),/Trabajo no apto/);
  assert.equal(m.calls.length,0);
 });
+
+test('no aceptar ficha coherente pero diferente del precio recalculado',async()=>{
+ const m=await mock({count:5,paginasPorHoja:4});
+ const original=m.manifiesto.ficha.trabajos[0];
+ const changed={...original,paginasPorCaraPresupuestadas:9,
+  carasPorJuegoPresupuestadas:1,hojasPorJuegoPresupuestadas:1};
+ const falsificado={...m.manifiesto,ficha:{...m.manifiesto.ficha,
+  trabajos:[changed]}};
+ await assert.rejects(componerDesdeReciboVerificado({
+  manifiesto:falsificado,sesion:session,trabajoId:changed.idTrabajo,
+  consultarFirmado:m.consultarFirmado
+ }),/presupuesto recalculado/);
+ assert.equal(m.calls.length,0,'La divergencia debe detectarse antes de consultar Google');
+});
+test('imposición de dos y nueve por cara no cambia la protección privada',async()=>{
+ for(const paginasPorHoja of [2,9]){
+  const m=await mock({count:5,paginasPorHoja});
+  const compuesto=await compile(m);
+  const carasJuego=Math.ceil(5/paginasPorHoja);
+  const carasDoble=carasJuego+(carasJuego%2);
+  assert.equal(compuesto.ficha.paginasPorCara,paginasPorHoja);
+  assert.equal(compuesto.ficha.compuestoPaginas,carasDoble*2);
+  assert.equal(compuesto.ficha.guardadoEnDrive,false);
+  assert.equal(compuesto.ficha.paymentAuthorized,false);
+  assert.equal((await PDFDocument.load(compuesto.pdfBytes)).getPageCount(),carasDoble*2);
+ }
+});
