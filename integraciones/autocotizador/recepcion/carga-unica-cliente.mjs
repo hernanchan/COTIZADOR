@@ -1,4 +1,4 @@
-import {leerMedidasPloteo} from './medidas-local-pdf.mjs';
+import {leerMedidasPloteo,requiereClasificacionVisualPloteo} from './medidas-local-pdf.mjs';
 import {clasificarDestino} from './destino-impresion.mjs';
 import {prepararBorradorPedido} from './preparar-borrador-pedido.mjs';
 import {componerCarritoPreliminar} from './componer-carrito-preliminar.mjs';
@@ -203,13 +203,17 @@ async function analizarArchivoPDF(e,file){
  try{
   const x=await leerMedidasPloteo(file,{maxPaginas:2000});
   e.paginas=x.paginas.map(p=>({...p,modo:'sin-clasificar'}));
-  try{
-   const clases=await clasificarPaginasPloteo(file);
-   for(const item of clases){
-    if(['cad','poster'].includes(item.modo)&&e.paginas[item.numero-1])
-     e.paginas[item.numero-1].modo=item.modo;
-   }
-  }catch(_){/* El análisis visual pendiente no invalida dimensiones comprobadas. */}
+  // Para A4/A3 y documentos pequeños no hace falta renderizar cada página.
+  // Para ploteos sí se mantiene el clasificador CAD/Póster por página.
+  if(requiereClasificacionVisualPloteo(e.paginas)){
+   try{
+    const clases=await clasificarPaginasPloteo(file);
+    for(const item of clases){
+     if(['cad','poster'].includes(item.modo)&&e.paginas[item.numero-1])
+      e.paginas[item.numero-1].modo=item.modo;
+    }
+   }catch(_){/* Sin clase confirmada, el ploteo no obtiene precio final. */}
+  }
   const suggested=clasificarDestino(e.paginas);
   e.requiereConfirmacion=suggested.requiereConfirmacion;
   const estandar=tamañoEstandar(e.paginas);
