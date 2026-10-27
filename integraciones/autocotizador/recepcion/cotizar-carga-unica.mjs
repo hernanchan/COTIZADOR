@@ -48,6 +48,9 @@ export function cotizarCargaUnica({archivos,precios}){
  const documentos=[],ploteos=[],stickers=[],fotos=[],cortes=[],graficas=[],pendientes=[],plan=[];
  archivos.forEach((a,i)=>{
   validarArchivo(a,i);
+  if((a.paginasPorHoja??1)!==1&&a.servicio&&a.servicio!=='auto'){
+   pendientes.push({indice:i,nombre:a.nombre,motivo:'Composición por cara sólo disponible en impresiones documentales A4/A3'});return;
+  }
   const seleccionadas=seleccionarPaginas(a.paginas,a.paginasSeleccionadas);
   const d=clasificarDestino(seleccionadas,a.seleccion);
   if(a.servicio==='grafica'){procesarGraficaCarga(a,i,seleccionadas,graficas,plan,pendientes);return;}
