@@ -48,6 +48,11 @@ export function prepararBorradorPedido({cotizacion,archivos}){
   const detallesTrabajo=cotizacion[detalles[item.destino]];
   const calculo=detallesTrabajo?.find(x=>x.id===item.id);
   if(!calculo||calculo.nombre!==entrada.name)throw Error('Falta el detalle comercial vinculado al archivo original.');
+  const paginasPorHoja=entrada.paginasPorHoja??1;
+  if(![1,2,4,9].includes(paginasPorHoja)||
+     (item.paginasPorHoja??1)!==paginasPorHoja||
+     (calculo.paginasPorHoja??1)!==paginasPorHoja)
+   throw Error('La composición por cara no coincide con la cotización del archivo.');
   // Los anillados conjuntos se totalizan a nivel de presupuesto, no de archivo.
   if(entrada.anillado==='grupo'){
    const id=String(entrada.grupoAnillado||'');
@@ -62,6 +67,8 @@ export function prepararBorradorPedido({cotizacion,archivos}){
    referenciaLocal:'archivo-'+(item.indice+1),nombre:entrada.name,
    servicio:item.destino,paginasElegidas:[...refs],paginasOriginales:entrada.paginas.length,
    bytes:entrada.file.size,copias:entrada.copias,
+   paginasPorHoja,carasPorJuego:Math.ceil(refs.length/paginasPorHoja),
+   hojasPorJuego:Math.ceil(Math.ceil(refs.length/paginasPorHoja)/(entrada.caras==='double'?2:1)),
    anillado:entrada.anillado||'ninguno',grupoAnillado:entrada.grupoAnillado||'',
    ordenArmado:item.indice+1,descripcion:calculo.descripcion||calculo.familia||'',
    subtotalReferencia:entero(calculo.subtotal)?calculo.subtotal:null,
