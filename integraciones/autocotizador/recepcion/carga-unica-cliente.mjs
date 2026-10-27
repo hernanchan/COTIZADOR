@@ -4,6 +4,7 @@ import {prepararBorradorPedido} from './preparar-borrador-pedido.mjs';
 import {componerCarritoPreliminar} from './componer-carrito-preliminar.mjs';
 import {seleccionarPaginas} from './seleccionar-paginas.mjs';
 import {clasificarPaginasPloteo} from './clasificar-paginas-ploteo.mjs';
+import {prepararLoteParcial,recomponerLoteParcial} from './cotizar-lote-parcial.mjs';
 const $=id=>document.getElementById(id);
 const entries=[];
 let leyendo=false;
@@ -88,7 +89,19 @@ function render(){
   const boton=texto('button',abierto===i?'Cerrar':'Editar');
   boton.className='editar';boton.type='button';boton.setAttribute('aria-expanded',String(abierto===i));
   boton.onclick=()=>{abierto=abierto===i?-1:i;render()};
-  fila.append(boton);card.append(fila);
+  fila.append(boton);
+  const quitar=texto('button','Quitar');
+  quitar.type='button';quitar.className='editar';
+  quitar.style.color='#9d3434';
+  quitar.setAttribute('aria-label','Quitar archivo '+e.name);
+  quitar.onclick=()=>{
+   entries.splice(i,1);
+   if(abierto===i)abierto=-1;
+   else if(abierto>i)abierto--;
+   cambio();
+   $('estado').textContent=entries.length+' PDF en la lista. No hace falta volver a cargar los restantes.';
+  };
+  fila.append(quitar);card.append(fila);
   if(abierto!==i){lista.append(card);continue}
   const panel=document.createElement('div');panel.className='panel-edicion';
   if(e.error){panel.append(texto('p','Error: '+e.error));card.append(panel);lista.append(card);continue}
@@ -196,17 +209,19 @@ async function cotizar(){
  $('resumenPedido').replaceChildren();
  ultimoPresupuesto=null;
  if(leyendo||!entries.length){out.textContent='Esperando archivos…';return}
- if(entries.some(e=>e.error||!e.paginas)){
-  const problem=entries.filter(e=>e.error||!e.paginas);
-  out.replaceChildren(texto('strong','Revisar '+problem.length+' archivo(s) antes de calcular el total'));
-  for(const e of problem){
-   const note=texto('p',e.name+' · '+(e.error||'El análisis del PDF todavía no terminó.'));
+ const lote=prepararLoteParcial(entries);
+ if(!lote.archivos.length){
+  out.replaceChildren(texto('strong','No hay PDF aptos para cotizar'));
+  for(const e of lote.noLeidos){
+   const note=texto('p',e.nombre+' · '+e.motivo);
    note.className='advertencia';out.append(note);
   }
-  out.append(texto('p','Los otros PDF siguen cargados. No tenés que volver a seleccionarlos.'));
-  return;
+  out.append(texto('p','Podés quitar únicamente el archivo con error. Los demás no se pierden.'));
+  render();return;
  }
- out.textContent='Calculando importes preliminares…';
+ out.textContent=lote.noLeidos.length?
+  'Calculando los '+lote.archivos.length+' PDF legibles; los demás quedarán pendientes…':
+  'Calculando importes preliminares…';
  for(const e of entries){
   if(!e.paginas||e.modo!=='color')continue;
   const d=clasificarDestino(paginasElegidas(e)||e.paginas,e.seleccion);
@@ -215,15 +230,25 @@ async function cotizar(){
   const disponibles=catalogo[formato]||[];
   if(!e.materialColor&&disponibles.length)e.materialColor=disponibles[0].id;
  }
- const archivos=entries.map(e=>({nombre:e.name,paginas:e.paginas,paginasSeleccionadas:e.paginasSeleccionadas,seleccion:e.seleccion,servicio:e.servicio||'auto',productoFoto:e.productoFoto||'',productoGrafica:e.productoGrafica||'',corteVariante:e.corteVariante,corteMetros:e.corteMetros,copias:e.copias,modo:e.modo,caras:e.caras,papelPoster:e.papelPoster,anillado:e.anillado,grupoAnillado:e.grupoAnillado,materialColor:e.materialColor}));
- try{const r=await fetch('/api/ensayo-carga-unica',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({archivos})});const d=await r.json();if(n!==version)return;if(!r.ok||d.ok!==true||d.paymentAuthorized!==false)throw Error(d.error||'Sin cotización');
+ const archivos=lote.archivos;
+ try{const r=await fetch('/api/ensayo-carga-unica',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({archivos})});const respuesta=await r.json();if(n!==version)return;
+ if(!r.ok||respuesta.ok!==true||respuesta.paymentAuthorized!==false)
+  throw Error(respuesta.error||'Sin cotización');
+ const d=recomponerLoteParcial(respuesta,lote);
  ultimoPresupuesto=d;
  $('prepararPedido').disabled=!(d.estado==='PRELIMINAR'&&Number.isSafeInteger(d.total)&&d.total>0&&entries.every(e=>e.archivoOriginal));
  const ars=v=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(v);
- out.replaceChildren(texto('strong',d.total===null?'TOTAL INCOMPLETO':'TOTAL PRELIMINAR: '+ars(d.total)),texto('p','Impresiones (incluye anillados): '+ars(d.subtotalImpresiones)+' · Ploteos: '+ars(d.subtotalPloteos)+' · Stickers: '+ars(d.subtotalStickers||0)+' · Fotos: '+ars(d.subtotalFotos||0)+' · Corte: '+ars(d.subtotalCortes||0)+' · Gráfica: '+ars(d.subtotalGraficas||0)),texto('p','Anillados incluidos: '+ars(d.subtotalAnillados)));
+ out.replaceChildren(
+  texto('strong',d.total!==null?'TOTAL PRELIMINAR: '+ars(d.total):
+   d.subtotalCalculable!==null?'SUBTOTAL DE PDF COTIZABLES: '+ars(d.subtotalCalculable):
+   'TOTAL INCOMPLETO'),
+  texto('p',d.contieneArchivosSinAnalizar?
+   'Falta revisar '+lote.noLeidos.length+' PDF. Este subtotal NO es el total del pedido y no habilita su envío.':
+   'Impresiones (incluye anillados): '+ars(d.subtotalImpresiones)+' · Ploteos: '+ars(d.subtotalPloteos)+' · Stickers: '+ars(d.subtotalStickers||0)+' · Fotos: '+ars(d.subtotalFotos||0)+' · Corte: '+ars(d.subtotalCortes||0)+' · Gráfica: '+ars(d.subtotalGraficas||0)),
+  texto('p','Anillados incluidos en el cálculo: '+ars(d.subtotalAnillados)));
  for(const p of d.pendientes){
   const warning=texto('p',p.nombre+': '+p.motivo+
-   '. Tocá Editar en ese archivo; el resto mantiene sus configuraciones.');
+   '. Tocá Editar o Quitá únicamente ese archivo; los demás mantienen su cálculo.');
   warning.className='advertencia';out.append(warning);
  }
  if(d.plan.length)out.append(texto('p','Precio orientativo. Los archivos no se enviaron ni se autoriza el cobro.'));
