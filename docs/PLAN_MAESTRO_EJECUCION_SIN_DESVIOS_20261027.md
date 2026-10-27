@@ -60,6 +60,15 @@ Objetivo: entregar el sistema original + V2 completamente integrado y verificabl
 
 **Paridad de materiales y modalidades:** pruebas con tarifa real A4/A3, mezcla B/N-color, anillado y ploteos ya existen en CI; la cobertura de promociones y cupones, validación móvil con PDF reales y tiempos p50/p95 sigue pendiente. No marcar Etapa 1 como concluida con solo casos de unidad.
 
+## Avance del compositor vectorial privado — 27/10/2026
+
+- El compositor `componer-pdf-documentos-privado.mjs` ya existía con salida PDF vectorial 1/2/4/9 por cara, selección de páginas y hojas dúplex por juego. Se reutilizó, sin rehacer ni rasterizar.
+- Corregida la ficha central: `paginasPorCaraPresupuestadas`, `carasPorJuegoPresupuestadas` y `hojasPorJuegoPresupuestadas` proceden ahora del cálculo verificado, en vez de estar fijadas a 1 por cara.
+- Corregido `componer-desde-recibo-verificado.mjs`: acepta 1/2/4/9 solo con coherencia estricta entre páginas seleccionadas, caras presupuestadas y hojas presupuestadas. Conserva consultas HMAC, hash SHA-256, lectura de Drive y estado de pago/producción desactivados.
+- Ensayo unitario nuevo: generación N-up 4 desde recepción privada simulada, comprobar número de caras y hojas; alterar posteriormente N-up de 4 a 9 debe bloquearse antes de leer Drive.
+- CI aprobada: https://github.com/hernanchan/COTIZADOR/actions/runs/40496085795
+- **No significa recepción comercial habilitada**: el puente del portal privado sigue rechazando N-up distinto de 1, ya que resta conducir el contrato hasta el pedido real, ensayo PC/Android y revisión visual de orden, orientación y doble faz de archivos PDF originales. Mantener esa barrera hasta prueba extremo a extremo; no publicar web ni cobros.
+
 ## Estado de corte al 27/10/2026
 **Etapa activa: 1, cierre funcional y paridad comercial.** Existen componentes de cotización rápida, CAD/Póster y carga única, pero aún no se confirmó una UX integrada aceptada con todas las opciones del cotizador vigente. Etapa 2 tiene piezas y pruebas locales, pero el recorrido remoto completo con D1 aún no fue aceptado. Cambios recientes sobre borrador de anillados y suite CI son parciales; comprobar ejecución y resultado antes de tratarlos como validados.
 
