@@ -239,11 +239,17 @@ $('archivos').addEventListener('change',async ev=>{
  for(const f of files)entries.push({name:f.name,archivoOriginal:f,paginas:null,seleccion:'sin-confirmar',error:null,copias:1,modo:'bn',caras:'simple',papelPoster:'obra80',anillado:'ninguno',grupoAnillado:'',materialColor:'',paginasSeleccionadas:'',servicio:'auto',productoFoto:'',productoGrafica:'',corteVariante:'gt3',corteMetros:1});
  render();
  const start=entries.length-files.length;
- for(let i=0;i<files.length;i++){
-  const e=entries[start+i];
-  await analizarArchivoPDF(e,files[i]);
-  render();
- }
+ // Lotes pequeños: lectura de hasta tres PDF en paralelo, sin cargar Google.
+ // Archivos grandes se analizan de a uno para limitar presión de memoria.
+ const concurrencia=files.every(f=>f.size<=12*1024*1024)?Math.min(3,files.length):1;
+ let siguiente=0;
+ await Promise.all(Array.from({length:concurrencia},async()=>{
+  while(siguiente<files.length){
+   const i=siguiente++;
+   await analizarArchivoPDF(entries[start+i],files[i]);
+   render();
+  }
+ }));
  leyendo=false;render();cotizar();
 });
 async function cotizar(){
