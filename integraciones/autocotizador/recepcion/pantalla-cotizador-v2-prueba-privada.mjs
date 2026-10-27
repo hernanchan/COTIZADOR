@@ -177,8 +177,10 @@ function updateSummary(){
  const allRefs=all.flatMap(item=>item.references);
  const verified=allRefs.filter(d=>d.confirmacion?.reciboGoogleVerificado===true&&
   d.confirmacion?.paymentAuthorized===false&&
-  d.confirmacion?.cotizacionServidor?.estado==='PRELIMINAR_VERIFICADA_SIN_PEDIDO');
- const value=verified.reduce((n,d)=>n+d.confirmacion.cotizacionServidor.totalArs,0);
+  (d.confirmacion?.cotizacionServidor?.estado==='PRELIMINAR_VERIFICADA_SIN_PEDIDO'||
+   d.ploteoVerificado?.estado==='PRELIMINAR_VERIFICADA_SIN_PEDIDO'));
+ const value=verified.reduce((n,d)=>n+
+  (d.ploteoVerificado?.totalArs??d.confirmacion.cotizacionServidor.totalArs),0);
  const amount=Number.isSafeInteger(value)?new Intl.NumberFormat('es-AR',{
   style:'currency',currency:'ARS',maximumFractionDigits:0}).format(value):'Requiere revisión';
  const remaining=allRefs.length-verified.length;
@@ -195,7 +197,7 @@ function updateSummary(){
  sendAllButton.disabled=batchSending||registering||Boolean(registeredOrder)||
   allRefs.length===0||allRefs.every(d=>Boolean(d.confirmacion))||
   allRefs.some(d=>!d.confirmacion&&!d.archivoLocal);
- registerButton.disabled=registering||Boolean(registeredOrder)||verified.length===0||
+ registerButton.disabled=registering||Boolean(registeredOrder)||allRefs.some(d=>d.ploteo)||verified.length===0||
   remaining!==0||withoutPdf!==0||verified.some(d=>!d.sesionConfirmada||!d.modoConfirmado);
 }
 
@@ -213,6 +215,79 @@ function render(){
   for(const d of item.references){
    const r=d.reference,area=document.createElement('div'),name=document.createElement('p');
    name.textContent='Trabajo '+(d.itemIndex+1)+': '+r.nombre+' · '+r.paginas+' páginas (pendiente)';
+   if(d.ploteo){
+    const note=document.createElement('p');note.className='state';
+    const meta=d.ploteo;
+    note.textContent='Clasificación del navegador: '+meta.clasificacionCliente.filter(p=>p.modo==='cad').length+
+     ' CAD, '+meta.clasificacionCliente.filter(p=>p.modo==='poster').length+
+     ' Póster. PDF original listo para recepción protegida. Sin cobro.';
+    area.append(name,note);
+    const msg=document.createElement('p');msg.className='state';
+    if(d.confirmacion&&d.ploteoVerificado){
+     msg.textContent='PDF verificado en Google · '+d.confirmacion.pages+
+      ' páginas. Precio recalculado por servidor: '+
+      new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0})
+       .format(d.ploteoVerificado.totalArs)+
+      '. Registro D1 del ploteo: PENDIENTE. Pago desactivado.';
+     area.append(msg);div.append(area);continue;
+    }
+    const retry=document.createElement('button');retry.type='button';
+    retry.textContent='Reintentar este PDF';retry.hidden=true;
+    const sendPlot=async()=>{
+     if(!d.archivoLocal||!d.sesionTemporal&&!window.turnstile?.getResponse()){
+      msg.textContent='Completá la verificación de seguridad antes de enviar el PDF.';
+      return false;
+     }
+     retry.disabled=true;
+     try{
+      const result=await subirYVincularPdfCotizadorV2({
+       archivo:d.archivoLocal,referencia:r,orderId,modo:meta.modo,
+       turnstileToken:window.turnstile?.getResponse()||'',
+       origin:location.origin,sesionPrevia:d.sesionTemporal||null,
+       onSession:session=>{d.sesionTemporal=session;},
+       onProgress:p=>{msg.textContent='Recepción protegida: '+p.phase+
+        ' · '+p.completed+'/'+p.total;}
+      });
+      const session=d.sesionTemporal;
+      if(!session)throw Error('Sesión de recepción no disponible.');
+      const response=await fetch('/api/ensayo-cotizar-ploteo-verificado',{
+       method:'POST',credentials:'same-origin',redirect:'error',
+       headers:{'Content-Type':'application/json'},
+       body:JSON.stringify({
+        sesion:{uploadId:session.uploadId,token:session.token},
+        expectedOrderId:orderId,expectedMode:meta.modo,
+        copias:meta.copias,papelPoster:meta.papelPoster,
+        clasificacionCliente:meta.clasificacionCliente
+       })
+      });
+      const data=await response.json().catch(()=>null);
+      if(!response.ok||data?.ok!==true||data?.receiptId!==result.receiptId||
+         data?.sha256!==result.sha256||data?.orderId!==orderId||
+         data?.quote?.estado!=='PRELIMINAR_VERIFICADA_SIN_PEDIDO'||
+         !Number.isSafeInteger(data.quote.totalArs)||data.quote.totalArs<1||
+         data.quote.paginasOriginales!==result.pages||
+         data.paymentAuthorized!==false||data.checkoutEnabled!==false)
+       throw Error(data?.error||'El servidor no confirmó el ploteo.');
+      d.confirmacion=result;d.ploteoVerificado=data.quote;
+      d.sesionConfirmada=session;d.modoConfirmado=meta.modo;
+      delete d.sesionTemporal;
+      retry.hidden=true;updateSummary();
+      msg.textContent='PDF recibido y ploteo cotizado por servidor: '+
+       new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0})
+        .format(data.quote.totalArs)+
+       '. El pedido todavía no se registra en D1 ni habilita pago.';
+      return true;
+     }catch(error){
+      retry.hidden=false;retry.disabled=false;
+      msg.textContent='El ploteo no fue confirmado: '+String(error.message||error)+
+       '. Podés reintentar, sin reenviar las partes ya recibidas.';
+      return false;
+     }finally{window.turnstile?.reset()}
+    };
+    d.sendNow=sendPlot;
+    retry.addEventListener('click',()=>{void sendPlot()});
+    area.append(retry,msg);div.append(area);continue;
+   }
    if(d.confirmacion && d.sesionConfirmada){
     name.textContent='Trabajo '+(d.itemIndex+1)+': '+r.nombre+' · '+d.confirmacion.pages+' páginas (PDF verificado)';
     const confirmed=document.createElement('p');
