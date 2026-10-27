@@ -58,3 +58,11 @@ Se confirmó una **incompatibilidad entre cotización y recepción**, no una fal
 5. **Conectar el único botón de envío** al contrato validado, seguido de pruebas reales Drive/D1/PDF compuesto. Mantener los rechazos actuales hasta que exista soporte verificable.
 
 **Criterio de bloqueo:** no quitar restricciones de UI para ploteos/anillados antes de que el backend pueda aceptar, revalidar y registrar esos casos. Nunca usar el precio del navegador como importe confirmado.
+
+## Avance de enlace de clasificación — commit 3ecbfaeb
+
+- El cliente inteligente transmite un mensaje mismo-origen `SABER_FASE1_PLOTEO_PRELIMINAR` con las dimensiones, CAD/Póster, copias y papel por archivo.
+- El portal privado recibe las instrucciones, las valida estructuralmente y muestra cantidad de páginas CAD/Póster.
+- **Este mensaje no recibe ni almacena el PDF, no agrega trabajo a la cola y no registra D1.** La transferencia sigue cerrada hasta ampliar el contrato del receptor.
+- GitHub Actions `40582571318`: pruebas de frontera, puente preliminar, contrato servidor y regresiones del backend exitosas.
+- Próxima tarea no satisfecha: integrar esa información en la recepción comprobada de cada PDF, su recotización oficial, manifiesto y Central D1. Ninguna autorización de publicación implícita.
