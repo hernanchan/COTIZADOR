@@ -44,7 +44,11 @@ export async function componerDesdeReciboVerificado({
     !['a4','a3'].includes(trabajo.formatoFinal)||
     !Number.isSafeInteger(trabajo.copias)||trabajo.copias<1||trabajo.copias>200||
     !['simple','double'].includes(trabajo.carasPresupuestadas)||
-    trabajo.paginasPorCaraPresupuestadas!==1||
+    ![1,2,4,9].includes(trabajo.paginasPorCaraPresupuestadas)||
+    !Number.isSafeInteger(trabajo.carasPorJuegoPresupuestadas)||
+    trabajo.carasPorJuegoPresupuestadas!==Math.ceil(trabajo.paginasElegidas?.length/trabajo.paginasPorCaraPresupuestadas)||
+    !Number.isSafeInteger(trabajo.hojasPorJuegoPresupuestadas)||
+    trabajo.hojasPorJuegoPresupuestadas!==Math.ceil(trabajo.carasPorJuegoPresupuestadas/(trabajo.carasPresupuestadas==='double'?2:1))||
     !Array.isArray(trabajo.paginasElegidas)||!trabajo.paginasElegidas.length)
   throw Error('Trabajo no apto: composición o tarifa requieren revisión.');
  const r=manifiesto.recibos.find(x=>x.receiptId===trabajo.reciboPrivado);
@@ -114,7 +118,7 @@ export async function componerDesdeReciboVerificado({
    compuestoSha256:outputHash,compuestoBytes:armado.pdfBytes.length,
    compuestoPaginas:armado.ficha.carasTotales,
    formatoHoja:trabajo.formatoFinal,caras:trabajo.carasPresupuestadas,
-   copias:trabajo.copias,paginasPorCara:1,
+   copias:trabajo.copias,paginasPorCara:trabajo.paginasPorCaraPresupuestadas,
    hojasFisicas:armado.ficha.hojasFisicas,
    paginasElegidas:[...trabajo.paginasElegidas],
    estado:'COMPUESTO_EN_MEMORIA_PENDIENTE_DE_DRIVE',
