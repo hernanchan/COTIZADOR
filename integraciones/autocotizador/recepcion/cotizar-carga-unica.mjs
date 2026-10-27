@@ -129,7 +129,18 @@ export function cotizarCargaUnica({archivos,precios}){
    if(ix>=0)plan.splice(ix,1);
   }
  }
- cotizables.forEach((a,i)=>{a.id='pdf'+(i+1)});
+ // Reindexar documentos y sus líneas juntas: un grupo rechazado no debe
+ // dejar IDs huérfanos ni asociar el precio de otro archivo al resumen.
+ const idsReindexados=new Map();
+ cotizables.forEach((a,i)=>{
+  const nuevo='pdf'+(i+1);
+  idsReindexados.set(a.id,nuevo);
+  a.id=nuevo;
+ });
+ for(const linea of plan){
+  if(linea.destino==='documentos'&&idsReindexados.has(linea.id))
+   linea.id=idsReindexados.get(linea.id);
+ }
  // No ofrecer un importe aparentemente completo si algún archivo sigue sin precio.
  const c=cotizables.length?cotizarDocumentosIndividuales({archivos:cotizables,precios}):null;
  const p=ploteos.length?cotizarPloteosRapido({trabajos:ploteos,precios}):null;
