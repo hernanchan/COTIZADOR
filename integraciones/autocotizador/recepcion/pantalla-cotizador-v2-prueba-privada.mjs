@@ -219,6 +219,11 @@ function render(){
     kept.textContent='Archivo recuperado del cotizador en esta pestaña. No hace falta seleccionarlo otra vez.';
     area.append(kept);file.hidden=true;
    }
+   const advanced=document.createElement('details');
+   advanced.open=!d.opcionesInteligentes;
+   const advancedTitle=document.createElement('summary');
+   advancedTitle.textContent=d.opcionesInteligentes?'Revisar o corregir opciones de impresión':'Completar opciones de impresión';
+   advanced.append(advancedTitle);
    const mode=document.createElement('select');
    for(const [value,label] of [['bn','Blanco y negro'],['color','Color']]){
     const o=document.createElement('option');o.value=value;o.textContent=label;mode.append(o);
@@ -227,7 +232,7 @@ function render(){
     const wrapper=document.createElement('label');wrapper.textContent=title;
     const select=document.createElement('select');
     for(const [v,t] of entries){const option=document.createElement('option');option.value=v;option.textContent=t;select.append(option)}
-    wrapper.append(select);area.append(wrapper);return select;
+    wrapper.append(select);advanced.append(wrapper);return select;
    };
    const formato=field('Formato', [['a4','A4'],['a3','A3']]);
    const papel=field('Papel color', []);
@@ -303,7 +308,19 @@ function render(){
    };
    d.sendNow=sendThis;
    btn.addEventListener('click',()=>{void sendThis()});
-   area.prepend(name,file,mode);area.append(btn,msg);div.append(area);
+   const modeLabel=document.createElement('label');
+   modeLabel.textContent='Modalidad de impresión';modeLabel.append(mode);
+   advanced.prepend(modeLabel);
+   if(d.opcionesInteligentes){
+    const preview=document.createElement('p');preview.className='state';
+    preview.textContent='Opciones recibidas: '+
+     (d.opcionesInteligentes.modo==='color'?'Color':'B/N')+' · '+
+     String(d.opcionesInteligentes.formato).toUpperCase()+' · '+
+     (d.opcionesInteligentes.caras==='double'?'Doble faz':'Simple faz')+' · '+
+     d.opcionesInteligentes.copias+' copia(s).';
+    area.append(preview);
+   }
+   area.prepend(name,file);area.append(advanced,btn,msg);div.append(area);
   }
   list.append(div);
  }
