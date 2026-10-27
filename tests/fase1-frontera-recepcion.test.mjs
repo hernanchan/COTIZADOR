@@ -10,7 +10,7 @@ const manifest=readFileSync(new URL('preparar-manifiesto-v2-documental.mjs',dir)
 
 test('primera etapa: no presentar ploteos como recepcion privada ya integrada',()=>{
  assert.match(smart,/plan\.destino!=='documentos'/);
- assert.match(smart,/Los ploteos y otros servicios se calculan automáticamente, pero su recepción privada todavía requiere la validación del servidor/);
+ assert.match(smart,/La recepción continúa bloqueada hasta cerrar su validación en el servidor/);
 });
 test('primera etapa: no permitir anillado sin contrato backend',()=>{
  assert.match(smart,/e\.anillado!=='ninguno'/);
