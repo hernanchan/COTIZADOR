@@ -105,6 +105,15 @@ Objetivo: entregar el sistema original + V2 completamente integrado y verificabl
 
 **Siguiente condición de salida:** validar versión realmente desplegada del Worker documental privado y control de acceso; efectuar un pedido ficticio de PDF con 2/4/9 páginas por cara, recibo Drive, ficha D1 y PDF compuesto revisado, con pagos desactivados. No declarar Etapa 1 finalizada por CI o presencia de bindings.
 
+## Regresión integral de 30 PDF y corrección de páginas blancas — 27/10/2026
+
+- Ensayo aislado de 30 documentos distintos y cinco composiciones individuales: recibos HMAC simulados, lectura de PDF original, comprobación de SHA real, precios por lote con catálogo real, ficha privada completa y PDF vectorial N-up. La alteración de un original entre recibo y lectura interrumpe todo el pedido, sin ficha de Central.
+- El primer CI detectó un **defecto de producción real**: `pdf-lib` no incrusta páginas PDF válidas que carecen de `/Contents` (páginas completamente en blanco), incluso cuando son parte de apuntes reales.
+- Se corrigió `componer-pdf-documentos-privado.mjs`: mantiene la posición de las páginas en blanco sin rasterizar, desplazar hojas ni omitir el reverso. Se añadió regresión para blanco/texto/blanco en dos páginas por cara y doble faz.
+- **CI después de corregir: éxito** https://github.com/hernanchan/COTIZADOR/actions/runs/40500349981
+- El resultado asegura paridad del código frente al lote sintético; no equivale a recepción real de 30 PDF por móvil ni a confirmación en Google Drive y D1 remotos.
+- **Bloqueo de infraestructura pendiente, sin cambios:** las dos variables de prueba `DOCS_PRINT_DRAFT_ENABLED` y `DOCS_PRINT_DRAFT_CENTRAL_ENABLED` estaban ausentes en el Worker documental en auditoría GET, no se habilitaron. Para la prueba remota completa hace falta acceso autorizado a Cloudflare y despliegue privado controlado; jamás producción ni pagos.
+
 ## Estado de corte al 27/10/2026
 **Etapa activa: 1, cierre funcional y paridad comercial.** Existen componentes de cotización rápida, CAD/Póster y carga única, pero aún no se confirmó una UX integrada aceptada con todas las opciones del cotizador vigente. Etapa 2 tiene piezas y pruebas locales, pero el recorrido remoto completo con D1 aún no fue aceptado. Cambios recientes sobre borrador de anillados y suite CI son parciales; comprobar ejecución y resultado antes de tratarlos como validados.
 
