@@ -41,6 +41,9 @@ jobs:
           grep -Fq 'recepcion-avanzada' dist/saber-documentos-cotizador-fase4.mjs
           grep -Fq 'SABER_SMART_RESIZE' dist/saber-documentos-cotizador-fase4.mjs
           echo 'UNIFIED_LAYOUT_NO_NESTED_SCROLL_VERIFIED'
+          grep -Fq 'SUBTOTAL DE PDF COTIZABLES' dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq 'acciones-archivo' dist/saber-documentos-cotizador-fase4.mjs
+          echo 'PARTIAL_QUOTE_AND_RETRY_UI_VERIFIED'
       - name: Subir version aislada sin desplegar y heredando bindings
         env:
           ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
