@@ -60,7 +60,7 @@ export async function recuperarMedidasConPdfJs(buffer,{maxPaginas=2000,
 }
 
 export async function leerMedidasPloteo(file,{maxBytes=250*1024*1024,maxPaginas=2000,pdfjs=globalThis.pdfjsLib}={}){
- if(!file||!/\\.pdf$/i.test(String(file.name))||
+ if(!file||!/\.pdf$/i.test(String(file.name))||
     !Number.isSafeInteger(file.size)||file.size<5||file.size>maxBytes)
    throw Error('PDF inválido o mayor de 250 MB.');
  const buffer=await file.arrayBuffer();
