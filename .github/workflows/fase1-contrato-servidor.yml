@@ -1,0 +1,30 @@
+name: Fase 1 - validar contrato servidor sin desplegar
+on:
+  push:
+    branches:
+      - fase1/impresiones-ploteos-20261027
+    paths:
+      - 'tests/fase1-contrato-servidor.test.mjs'
+      - 'tests/fase1-frontera-recepcion.test.mjs'
+      - '.github/workflows/fase1-contrato-servidor.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar dependencias locales
+        working-directory: integraciones/autocotizador/recepcion
+        run: npm install --no-audit --no-fund
+      - name: Probar limite entre cotizacion y recepcion
+        run: node --test tests/fase1-frontera-recepcion.test.mjs tests/fase1-contrato-servidor.test.mjs
+      - name: Regresion previa del servidor
+        run: node --test tests/autocotizador-pedido-verificado.test.mjs tests/autocotizador-puente-central.test.mjs tests/autocotizador-regla-comercial-ploteos.test.mjs
+      - name: Confirmacion de aislamiento
+        run: echo 'NO DEPLOY; NO PAYMENTS; NO COMMERCIAL WEBSITE'
