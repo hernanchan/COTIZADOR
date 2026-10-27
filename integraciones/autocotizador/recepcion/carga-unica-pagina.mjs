@@ -29,7 +29,10 @@ input:focus,select:focus{outline:3px solid #bedcf4;border-color:#2878ad}
 .pie{font-size:14px;color:#5e6d78}
 @media(max-width:680px){main{width:100%;margin:0;padding:18px 14px 35px;border-radius:0}body{font-size:16px}.archivo{padding:17px}.archivo h3{font-size:18px}.controles{grid-template-columns:1fr;gap:13px}.nota{font-size:14px}#presupuesto{top:0;padding:14px 16px}#presupuesto strong{font-size:20px}}
 .archivo{padding:0;margin:8px 0;background:#fff;overflow:hidden}
-.fila{display:grid;grid-template-columns:minmax(0,1fr) minmax(105px,auto) 88px;align-items:center;gap:16px;padding:13px 17px;min-height:74px}
+.fila{display:grid;grid-template-columns:minmax(0,1fr) minmax(105px,auto) minmax(135px,auto);align-items:center;gap:16px;padding:13px 17px;min-height:74px}
+.acciones-archivo{display:flex;justify-content:flex-end;align-items:center;gap:6px;flex-wrap:wrap}
+.acciones-archivo button{min-height:37px}
+.acciones-archivo button:disabled{opacity:.45;cursor:not-allowed}
 .fila-principal{min-width:0}.nombre{display:block;overflow-wrap:anywhere;font-size:16px;color:#143f62}
 .resumen-archivo{font-size:14px;color:#53697b;margin-top:3px;line-height:1.35}
 .precio-archivo{text-align:right;font-weight:750;font-size:16px;white-space:nowrap;color:#154d73}
