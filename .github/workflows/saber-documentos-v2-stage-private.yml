@@ -23,6 +23,7 @@ jobs:
         working-directory: integraciones/autocotizador/recepcion
         run: |
           npm install --no-audit --no-fund
+          node --test medidas-local-pdf-rescate.test.mjs
           npm run build:unificado
           grep -q 'ensayo-preparar-documentos-v2-lote' dist/saber-documentos-cotizador-fase4.mjs
           grep -Fq 'batch-files' dist/saber-documentos-cotizador-fase4.mjs
@@ -46,6 +47,9 @@ jobs:
           echo 'PARTIAL_QUOTE_AND_RETRY_UI_VERIFIED'
           grep -Fq 'Reemplazar' dist/saber-documentos-cotizador-fase4.mjs
           echo 'SINGLE_PDF_REPLACEMENT_VERIFIED'
+          grep -Fq 'PDFJS_ALTERNATIVO' dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq 'requiereClasificacionVisualPloteo' ./medidas-local-pdf.mjs
+          echo 'PDF_FALLBACK_AND_FAST_A4_A3_READY'
       - name: Subir version aislada sin desplegar y heredando bindings
         env:
           ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
