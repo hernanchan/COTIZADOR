@@ -257,13 +257,17 @@ function render(){
    });
    const caras=field('Caras', [['simple','Simple faz'],['double','Doble faz']]);
    const copias=field('Copias', Array.from({length:200},(_,i)=>[String(i+1),String(i+1)]));
-   const anillado=field('Anillado', [['ninguno','Sin anillado'],['juntos','Anillado conjunto']]);
+   const anillado=field('Anillado (recepción privada)', [['ninguno','Sin anillado — integración pendiente']]);
    if(d.opcionesInteligentes){
     mode.value=d.opcionesInteligentes.modo;
     caras.value=d.opcionesInteligentes.caras;
     copias.value=String(d.opcionesInteligentes.copias);
     anillado.value='ninguno';
    }
+   const warningBinding=document.createElement('p');
+   warningBinding.className='state';
+   warningBinding.textContent='El anillado se cotiza en la pantalla inteligente, pero todavía no puede registrarse en la Central. Este ensayo admite solamente PDF sin anillar.';
+   advanced.append(warningBinding);
    const btn=document.createElement('button');btn.type='button';btn.textContent='Reintentar solamente este PDF';
    btn.hidden=true;
    const msg=document.createElement('p');msg.className='state';
