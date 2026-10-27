@@ -103,19 +103,51 @@ function docsPilotDispatch(p){
  }
  return answer;
 }
+/** Código de diagnóstico acotado: nunca devolver el mensaje interno ni tokens.
+ * Sólo se invoca después de la autenticación HMAC en doPost.
+ */
+function docsReceptionReasonCode(e){
+ var m=String(e&&e.message||'');
+ if(m==='Cupo global de ensayo agotado')return 'GLOBAL_CAP';
+ if(m==='Límite de 30 archivos o 60 MiB por pedido excedido')return 'ORDER_CAP';
+ if(m==='Índice de cupo inconsistente'||m==='Índice sin estado de sesión'||
+    m==='Índice con recibo dañado'||m==='Índice de recibo inválido')
+   return 'INDEX_INVALID';
+ if(m==='Identificador de ensayo en uso')return 'FILE_ID_CONFLICT';
+ if(m==='Metadatos de ensayo incorrectos')return 'BAD_META';
+ if(m==='Piloto ocupado')return 'BUSY';
+ return 'RECEPTOR_ERROR';
+}
+/** Ejecutable manualmente desde el editor privado de Apps Script.
+ * No altera la cuota ni borra recibos; no incluye nombres o credenciales.
+ */
+function docsMultiCapacityDiagnostico(){
+ var sessions=docsMultiIds();
+ var orders={};
+ for(var i=0;i<sessions.length;i++){
+  var s=docsRead(sessions[i]);
+  orders[s.orderId]=(orders[s.orderId]||0)+1;
+ }
+ return {used:sessions.length,globalLimit:DOCS_MULTI_GLOBAL_CAP,
+  activeOrders:Object.keys(orders).length,
+  maxFilesPerOrder:DOCS_MULTI_CAP,expiryDays:DOCS_TTL/86400000,
+  status:sessions.length>=DOCS_MULTI_GLOBAL_CAP?'GLOBAL_CAP':'AVAILABLE'};
+}
 function doPost(e){
- var lock=LockService.getScriptLock();
+ var lock=LockService.getScriptLock(),signed=false;
  try{
   if(!e||!e.postData||!e.postData.contents)throw Error('Solicitud vacía');
   var p=docsVerifyEnvelope(JSON.parse(e.postData.contents));
+  signed=true;
   // Sólo lecturas autenticadas: no bloquear las demás operaciones de carga.
   if(['multiInfo','multiReadPart','multiVerifiedStatus'].includes(p.op))
     return docsJson(Object.assign({ok:true},docsPilotDispatch(p)));
   if(!lock.tryLock(20000))throw Error('Piloto ocupado');
   try{return docsJson(Object.assign({ok:true},docsPilotDispatch(p)));}
   finally{lock.releaseLock();}
- }catch(_){return docsJson({ok:false,receptionEnabled:false,
-  error:'Solicitud no autorizada, cupo agotado o error de recepción de prueba.'});}
+ }catch(err){return docsJson({ok:false,receptionEnabled:false,
+  error:'La recepción privada no pudo aceptar la operación.',
+  errorCode:signed?docsReceptionReasonCode(err):'UNAUTHORIZED'});}
 }
 
 
