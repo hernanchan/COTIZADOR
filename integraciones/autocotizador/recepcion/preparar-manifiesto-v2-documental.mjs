@@ -14,6 +14,43 @@ export function prepararManifiestoDocumentalV2({orderId,trabajos}){
  const receipts=new Set(),shaRefs=new Set(),localRefs=new Set();
  const items=trabajos.map((entry,index)=>{
   const v=entry?.vinculo,quote=v?.cotizacionServidor;
+  // Contrato mixto de etapa 1. Los datos CAD/Póster son instrucciones
+  // preliminares; el servidor relee el PDF y vuelve a calcular el precio.
+  if(entry?.ploteoVerificado!==undefined){
+   const plot=entry.ploteoVerificado;
+   if(!v||v.schema!=='saber-v2-pdf-conciliado-privado-v1'||
+      v.orderId!==orderId||!UUID.test(v.localRef||'')||
+      !RECEIPT.test(v.receiptId||'')||!SHA.test(v.sha256||'')||
+      !Number.isSafeInteger(v.pages)||v.pages<1||v.pages>2000||
+      v.reciboGoogleVerificado!==true||v.paymentAuthorized!==false||
+      v.listoParaProducir!==false||v.precioRecalculado!==false||
+      v.estado!=='RECIBO_VERIFICADO_NO_CONCILIADO_CON_PRECIO'||
+      !plot||plot.estado!=='PRELIMINAR_VERIFICADA_SIN_PEDIDO'||
+      plot.paginasOriginales!==v.pages||
+      !Number.isSafeInteger(plot.totalArs)||plot.totalArs<1||
+      typeof plot.priceVersion!=='string'||!plot.priceVersion||
+      !Number.isSafeInteger(plot.copias)||plot.copias<1||plot.copias>200||
+      !['obra80','recubierto'].includes(plot.papelPoster)||
+      !Array.isArray(plot.paginas)||plot.paginas.length!==v.pages||
+      plot.paginas.some((p,i)=>!p||p.numero!==i+1||
+       !['cad','poster'].includes(p.modo)||
+       !Number.isFinite(p.anchoCm)||!Number.isFinite(p.altoCm)||
+       !/^(rollo|rec)\\d+$/.test(p.rollo||'')||
+       !['obra80','recubierto'].includes(p.papel)||
+       (p.modo==='cad'&&(p.papel!=='obra80'||!/^rollo\\d+$/.test(p.rollo)))||
+       (p.modo==='poster'&&p.papel!==plot.papelPoster))||
+      plot.paymentAuthorized!==false||plot.checkoutEnabled!==false||
+      receipts.has(v.receiptId)||localRefs.has(v.localRef)||
+      shaRefs.has(v.sha256))
+    throw Error('Ploteo V2 no confirmado o duplicado: '+(index+1));
+   receipts.add(v.receiptId);localRefs.add(v.localRef);shaRefs.add(v.sha256);
+   return Object.freeze({referenciaLocal:v.localRef,reciboPrivado:v.receiptId,
+    sha256:v.sha256,paginas:v.pages,
+    opciones:Object.freeze({servicio:'ploteos',copias:plot.copias,
+     papelPoster:plot.papelPoster}),
+    subtotalReferencia:plot.totalArs,versionPrecioReferencia:plot.priceVersion,
+    estado:'REQUIERE_REVALIDACION_DE_BACKEND'});
+  }
   if(!v||v.schema!=='saber-v2-pdf-conciliado-privado-v1'||
    v.orderId!==orderId||!UUID.test(v.localRef||'')||
    !RECEIPT.test(v.receiptId||'')||!SHA.test(v.sha256||'')||
