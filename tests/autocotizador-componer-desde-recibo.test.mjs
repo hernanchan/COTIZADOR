@@ -14,7 +14,7 @@ const opts={servicio:'auto',seleccion:'a4',paginasSeleccionadas:'',
  copias:2,modo:'bn',caras:'double',papelPoster:'obra80',anillado:'ninguno',
  grupoAnillado:'',materialColor:'',productoFoto:'',productoGrafica:'',
  corteVariante:'gt3',corteMetros:1};
-async function mock({count=3,bigPage=false,changePdf=false}={}){
+async function mock({count=3,bigPage=false,changePdf=false,paginasPorHoja=1}={}){
  const pdf=await PDFDocument.create();
  for(let i=0;i<count;i++){
   const p=pdf.addPage(bigPage&&i===0?[1683,1190]:[595.276,841.89]);
@@ -42,7 +42,7 @@ async function mock({count=3,bigPage=false,changePdf=false}={}){
   throw Error('Operación HMAC no reconocida');
  };
  const manifiesto=await fase4FichaCentralPrivada({
-  sesion:session,opciones:opts,consultarFirmado,preciosServidor:precios
+  sesion:session,opciones:{...opts,paginasPorHoja},consultarFirmado,preciosServidor:precios
  });
  calls.length=0;
  return {manifiesto,consultarFirmado,calls,originalBytes:bytes};
@@ -131,4 +131,30 @@ test('si la recepción no verifica páginas o bloquea el recibo, detener antes d
  };
  await assert.rejects(compile(m),/recepción privada/);
  assert.equal(m.calls.filter(x=>x==='multiReadPart').length,0);
+});
+
+test('recibo verificado N-up 4: precio, ficha y PDF final tienen las mismas caras',async()=>{
+ const m=await mock({count:5,paginasPorHoja:4});
+ const work=m.manifiesto.ficha.trabajos[0];
+ assert.equal(work.paginasPorCaraPresupuestadas,4);
+ assert.equal(work.carasPorJuegoPresupuestadas,2);
+ assert.equal(work.hojasPorJuegoPresupuestadas,1);
+ const res=await compile(m);
+ assert.equal(res.ficha.paginasPorCara,4);
+ assert.equal(res.ficha.compuestoPaginas,4);
+ assert.equal(res.ficha.hojasFisicas,2);
+ assert.equal((await PDFDocument.load(res.pdfBytes)).getPageCount(),4);
+ assert.equal(res.ficha.paymentAuthorized,false);
+ assert.equal(res.ficha.descargaPrivadaHabilitada,false);
+});
+test('ficha manipulada de imposición 4 a 9 queda bloqueada antes de leer Drive',async()=>{
+ const m=await mock({count:5,paginasPorHoja:4});
+ const original=m.manifiesto.ficha.trabajos[0];
+ const work={...original,paginasPorCaraPresupuestadas:9};
+ const fake={...m.manifiesto,ficha:{...m.manifiesto.ficha,trabajos:[work]}};
+ await assert.rejects(componerDesdeReciboVerificado({
+  manifiesto:fake,sesion:session,trabajoId:work.idTrabajo,
+  consultarFirmado:m.consultarFirmado
+ }),/Trabajo no apto/);
+ assert.equal(m.calls.length,0);
 });
