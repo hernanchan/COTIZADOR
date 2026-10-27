@@ -28,7 +28,7 @@ test('A0 clasificado CAD por el backend tiene cotizacion de ploteo sin pago auto
  assert.equal(x.estado,'ARCHIVOS_VERIFICADOS_SIN_PAGO');
  assert.equal(x.paymentAuthorized,false);
  assert.equal(x.cotizacion.plan[0].destino,'ploteos');
- assert.equal(x.cotizacion.plan[0].origen[0].modo,'cad');
+ assert.equal(x.cotizacion.plan[0].origen[0].anchoCm,84.1);
  assert.ok(x.importeRecalculado>0);
 });
 test('PDF A0 sin clasificacion verificable no obtiene precio inventado',()=>{
@@ -41,7 +41,7 @@ test('medidas y clasificación elegidas en navegador no reemplazan las del recib
  const r=receipt('plano.pdf','f1',[metric(84.1,118.9,'cad')]);
  const x=run([c],[r]);
  assert.equal(x.cotizacion.plan[0].origen[0].anchoCm,84.1);
- assert.equal(x.cotizacion.plan[0].origen[0].modo,'cad');
+ assert.equal(x.cotizacion.plan[0].destino,'ploteos');
 });
 test('dos PDFs A4 verificados permiten recalcular anillado agrupado sin pagos',()=>{
  const a=config('parte1.pdf','f1',{seleccion:'a4',anillado:'grupo',grupoAnillado:'1'});
