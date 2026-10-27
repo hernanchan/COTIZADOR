@@ -50,6 +50,8 @@ jobs:
           grep -Fq 'PDFJS_ALTERNATIVO' dist/saber-documentos-cotizador-fase4.mjs
           grep -Fq 'requiereClasificacionVisualPloteo' ./medidas-local-pdf.mjs
           echo 'PDF_FALLBACK_AND_FAST_A4_A3_READY'
+          grep -Fq 'requiereClasificacionVisualPloteo' ./carga-unica-cliente.mjs
+          echo 'SKIP_A4_A3_VISUAL_SCAN_ENABLED'
       - name: Subir version aislada sin desplegar y heredando bindings
         env:
           ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
