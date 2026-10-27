@@ -25,7 +25,7 @@ export function prepararBorradorPedido({cotizacion,archivos}){
  if(subtotales.some(k=>!entero(cotizacion[k]??0))||
     subtotales.reduce((n,k)=>n+(cotizacion[k]??0),0)!==cotizacion.total)
   throw Error('La suma de las líneas no coincide con el presupuesto.');
- const indices=new Set(),lineas=[],nombres=new Set();
+ const indices=new Set(),lineas=[],nombres=new Set(),grupos=new Map();
  for(const item of cotizacion.plan){
   if(!item||!Number.isSafeInteger(item.indice)||item.indice<0||
      item.indice>=archivos.length||indices.has(item.indice)||
@@ -49,6 +49,15 @@ export function prepararBorradorPedido({cotizacion,archivos}){
   const calculo=detallesTrabajo?.find(x=>x.id===item.id);
   if(!calculo||calculo.nombre!==entrada.name)throw Error('Falta el detalle comercial vinculado al archivo original.');
   // Los anillados conjuntos se totalizan a nivel de presupuesto, no de archivo.
+  if(entrada.anillado==='grupo'){
+   const id=String(entrada.grupoAnillado||'');
+   if(!/^[1-9][0-9]?$/.test(id)||item.destino!=='documentos')
+    throw Error('Grupo de anillado inválido.');
+   const integrantes=grupos.get(id)||[];
+   integrantes.push({referenciaLocal:'archivo-'+(item.indice+1),
+    orden:item.indice+1,formato:item.formatoFinal,copias:entrada.copias});
+   grupos.set(id,integrantes);
+  }
   lineas.push(Object.freeze({
    referenciaLocal:'archivo-'+(item.indice+1),nombre:entrada.name,
    servicio:item.destino,paginasElegidas:[...refs],paginasOriginales:entrada.paginas.length,
@@ -59,9 +68,18 @@ export function prepararBorradorPedido({cotizacion,archivos}){
    estadoArchivo:'SIN_ENVIAR',reciboServidor:null,verificacionServidor:false
   }));
  }
+ const instruccionesGrupos=[...grupos].map(([grupo,archivos])=>{
+  if(archivos.length<2||new Set(archivos.map(a=>a.formato)).size!==1||
+     new Set(archivos.map(a=>a.copias)).size!==1)
+   throw Error('Grupo '+grupo+' incompatible: revisar cantidad, tamaño y copias.');
+  return Object.freeze({grupo,ordenArchivos:Object.freeze(archivos.map(a=>a.referenciaLocal)),
+   formato:archivos[0].formato,copias:archivos[0].copias,
+   estado:'BORRADOR_NO_VERIFICADO'});
+ });
  return Object.freeze({
   schema:'saber-pedido-borrador-v1',estado:'PENDIENTE_DE_RECEPCION',
-  items:lineas,cantidadArchivos:lineas.length,totalOrientativo:cotizacion.total,
+  items:lineas,gruposAnillado:Object.freeze(instruccionesGrupos),
+  cantidadArchivos:lineas.length,totalOrientativo:cotizacion.total,
   // Contrato importante: estos valores NUNCA pueden autorizar un pago.
   filesReceived:false,serverQuoteVerified:false,paymentAuthorized:false,
   requiereValidacionPreciosYOriginales:true,
