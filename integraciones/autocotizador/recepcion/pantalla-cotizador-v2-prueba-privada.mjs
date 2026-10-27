@@ -36,7 +36,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <iframe id="smart" title="Análisis automático de PDF, tamaños, CAD y póster" src="/prueba-v2/carga-inteligente" loading="eager"></iframe>
 </section>
 <details id="recepcion-avanzada" class="panel" style="margin-top:14px"><summary style="font-size:16px;font-weight:700;cursor:pointer;padding:5px 0">Paso 2 · Enviar los PDF y registrar el pedido (ensayo privado)</summary><div style="padding-top:12px">
-<div class="warning">Los documentos A4/A3 compatibles se trasladan desde la cotización a esta etapa. Sólo confirmamos la recepción después de verificar el PDF original y su presupuesto en el servidor. Los ploteos no se envían todavía.</div>
+<div class="warning">Los documentos A4/A3 compatibles se trasladan desde la cotización a esta etapa. Sólo confirmamos la recepción después de verificar el PDF original y su presupuesto en el servidor. Los ploteos y los trabajos con anillado todavía no pueden registrarse en esta recepción. No se modificarán ni descartarán silenciosamente las opciones elegidas.</div>
 <div id="drop-pdf" style="display:none"><strong>Recuperación manual de PDF para trabajos antiguos</strong><input id="batch-files" type="file" accept=".pdf,application/pdf" multiple><p id="batch-status" class="state" role="status">Los PDF se asignan por nombre y tamaño al trabajo correspondiente. La recepción sigue protegida.</p></div>
 <div class="cf-turnstile" data-sitekey="${sitekey}" data-action="documentos"></div>
 <div id="all" role="list" aria-label="Trabajos del cotizador"></div>
