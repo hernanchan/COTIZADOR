@@ -332,7 +332,7 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
  const resumen=$('resumenPedido');
  resumen?.parentNode?.insertBefore(bridgeButton,resumen);
  bridgeButton.insertAdjacentElement('afterend',info);
- bridgeButton.addEventListener('click',()=>{
+ const prepararEnvioPrivado=()=>{
   try{
    if(leyendo||!ultimoPresupuesto||ultimoPresupuesto.estado!=='PRELIMINAR'||
       !Number.isSafeInteger(ultimoPresupuesto.total)||ultimoPresupuesto.total<1||
@@ -397,8 +397,17 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
    }
    for(const trabajo of ploteosPendientes)
     window.parent.postMessage(trabajo,location.origin);
-   info.textContent='Los documentos y ploteos se enviaron a la cola privada. El envío a Drive requiere pulsar «Enviar todos los PDF del pedido».';
-  }catch(error){info.textContent=String(error.message||error)}
+   info.textContent='Pedido preparado. Ahora se reciben y verifican los PDF.';
+   window.parent.postMessage({type:'SABER_SMART_HANDOFF_READY',cantidad:entries.length},location.origin);
+  }catch(error){info.textContent=String(error.message||error);
+   window.parent.postMessage({type:'SABER_SMART_HANDOFF_ERROR',message:String(error.message||error)},location.origin);
+  }
+ };
+ bridgeButton.hidden=true;
+ window.addEventListener('message',event=>{
+  if(event.origin!==location.origin||event.source!==window.parent||
+     event.data?.type!=='SABER_SMART_PREPARAR_ENVIO')return;
+  prepararEnvioPrivado();
  });
 }
 $('prepararPedido').addEventListener('click',()=>{
