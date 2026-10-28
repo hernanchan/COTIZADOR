@@ -108,3 +108,41 @@ Se confirmó una **incompatibilidad entre cotización y recepción**, no una fal
 - Tras ajustar la validación, GitHub Actions `40590896800` desplegó la versión de etapa 1 **únicamente** en `saber-documentos-pruebas`, comprobando mediante GET que recibe el 100% del tráfico de ese Worker.
 - Prueba independiente de acceso `40590988167`: desplegado correcto y `GET /prueba-v2/` sin credenciales devuelve **HTTP 401**, sin exponer pantalla privada.
 - No se ejecutaron envíos PDF ni escrituras en Drive/D1 durante esa comprobación. El siguiente criterio de aceptación sigue siendo probar realmente PDF de trabajo con Drive y pedido registrado en D1, con pagos bloqueados.
+
+
+## ESTADO VIGENTE PARA RETOMAR EN OTRO CHAT — 28-10-2026 (LEER PRIMERO)
+
+**Estado real: BLOQUEADO EN RECEPTOR APPS SCRIPT DE DOCUMENTOS. NO ES ETAPA CERRADA.** Este apartado prevalece sobre los párrafos históricos anteriores que decían que faltaba desplegar el Worker: el Worker privado sí se desplegó después. No repetir investigaciones resueltas.
+
+### Prueba real efectuada y fallo reproducido
+- En `https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/`, el usuario cargó 3 PDF sintéticos: `ENSAYO_SABER_A4_1.pdf`, `ENSAYO_SABER_A4_2.pdf` y `ENSAYO_SABER_PLANO_A0_CAD.pdf`.
+- El cotizador mostró **A0 CAD $7.200 + dos A4 B/N $200 = $7.400**; esto verifica sólo el cálculo preliminar, no entrega.
+- En el paso «Enviar todos los PDF», el receptor GAS rechazó **`multiStart` del A0**, por lo que quedaron **0/3 PDF verificados**, precio confirmado por servidor $0 y registro D1 PENDIENTE. No repetir la carga hasta corregir el GAS.
+- El Worker originalmente respondía «Google no pudo recibir el PDF o se agotó el cupo» indiscriminadamente. Se cambió la respuesta para exponer etapa/categoría acotada; el reintento mostró `start (código CUPO)`. **Esa categoría procedía de comparar texto de un error genérico GAS; NO significa que el cupo estuviera agotado.**
+- Cloudflare recibió corrección de mensajes en versión privada `217912ca-0610-4047-95d8-3e3b0be1d599` con GitHub Actions `40591911250` (éxito). No desplegar Worker nuevamente para solucionar la incompatibilidad GAS.
+
+### Diagnóstico de cupo y CAUSA DEMOSTRADA
+- En Apps Script «SABER — RECEPCIÓN DOCUMENTOS» se creó archivo independiente `DiagnosticoCupo.gs` y se ejecutó `diagnosticarCupoDocumentosSaber`. Resultado: **entradas=0, vigentes=0, vencidas=0, sinEstado=0, estadoInvalido=0, indiceLegible=true, posibleCausa=CUPO_DISPONIBLE_BUSCAR_OTRA_CAUSA** para el índice `DOCS_MULTI_INDEX_LOTE_20261024`. No atribuir el problema a 120 sesiones ocupadas.
+- Atención: ese diagnóstico consulta el **índice nuevo** `DOCS_MULTI_INDEX_LOTE_20261024`; el código viejo usa `DOCS_MULTI_INDEX_FASE4` y límite 5. Por tanto el 0/120 no confirma el estado del índice antiguo. Lo concluyente es el contrato del receptor antiguo.
+- En la captura del **Código.gs real** del Apps Script: `var DOCS_MULTI_CAP=5, DOCS_MULTI_INDEX='DOCS_MULTI_INDEX_FASE4';`; `function docsMultiStart(p)` exige `WEB-ENSAYO-[A-F0-9]{16}`, `fileId === 'documento'`, máximo **1 MiB**, modo B/N o color, sólo 5 archivos. El Worker nuevo envía `WEB-...`, `fileId='pdf-'+sha`, permite hasta 20 MiB/30 PDF y modo de ploteos. **Esta incompatibilidad de contrato causa el rechazo de la operación start**. No son errores de CAD/Póster ni el usuario.
+- Se identificó el Apps Script correcto: el Worker `saber-documentos-pruebas`, variable `DOCS_SCRIPT_URL`, apunta a la implementación **«FASE 4 – Carga y presupuesto PDF»**, versión **5 del 21-10-2026**, URL que comienza `https://script.google.com/macros/s/AKfycbwQUipB5Gafy7OwQSK8nfsrl2lvGAqg64n8F3StIiwbfQzELA_puIiCPUFBg11cUjRb5A/exec`.
+- **NO modificar** la otra implementación activa «RECEPCION DOCUMENTOS – PRUEBA 1», versión 1 del 19-10-2026, URL que comienza `AKfycbw6jdCy8C_5CyZHHFjL7S2pY0XsSqi-D-XqlFuT82wa0Rr4nsgZ04--Bxbogfji1a5q0A`.
+- La carpeta privada de Drive observada como «Librería Saber - Documentos WEB - PRUEBAS» no demuestra que el PDF A0 se haya almacenado. No hay aún entrega real ni pedido D1.
+
+### Corrección preparada pero NO instalada
+- En la rama `fase1/impresiones-ploteos-20261027` existe el archivo **`integraciones/autocotizador/recepcion/DocumentosReceiver_LOTE_AMPLIADO_PRUEBAS_20261024.gs`**: receptor separado ampliado, `DOCS_MULTI_CAP=30`, `DOCS_MULTI_GLOBAL_CAP=120`, `DOCS_MAX=20*1024*1024`, 60 MiB/pedido, índice `DOCS_MULTI_INDEX_LOTE_20261024`, HMAC y operaciones multi*.
+- Se añadieron diagnóstico acotado `docsReceptionReasonCode`, función `docsMultiCapacityDiagnostico`, test `tests/fase1-gas-cupo-diagnostico.test.mjs` y verificación CI exitosa `40594057398`. **Los cambios del archivo .gs están sólo en GitHub**, NO en el Apps Script publicado; ejecutar tests de GitHub no corrige el receptor activo.
+- El archivo auxiliar `DIAGNOSTICO_CUPO_SIN_BORRAR.gs` sólo lee el índice nuevo y fue pegado manualmente en Apps Script como `DiagnosticoCupo.gs` sin implementar; no es la reparación.
+
+### Paso exacto siguiente (no pedir volver a medir cuotas ni buscar las dos URLs)
+1. **Preservar copia de seguridad del contenido actual de Código.gs y los IDs de implementación**. Revisar que el archivo ampliado sea compatible con el proyecto GAS real (firmas, funciones, propiedades existentes, Drive, `appsscript.json`); no reemplazar por accidente el proyecto Polaroids ni otro receptor.
+2. Instalar el **receptor ampliado**, no únicamente el diagnóstico, en el proyecto «SABER — RECEPCIÓN DOCUMENTOS». **Actualizar SOLAMENTE la implementación existente «FASE 4 – Carga y presupuesto PDF»**, manteniendo su URL/ID (crear nueva versión dentro de esa implementación), sin crear otra URL por error. No publicar nada en `libreriasaber.com.ar`. Tomar precauciones de versión y reversión.
+3. Verificar que `DOCS_SCRIPT_URL` del Worker sigue apuntando a esa implementación; probar `multiStart` con los PDF ficticios reales y luego `multiPart`, `multiFinish`, verificación de bytes/páginas y relación de recibos. Consultar estado antes de reintentar si hubo timeout.
+4. Comprobar **3/3 PDF verificados**, precios revalidados del servidor y registro **único** de pedido en Central D1 con pagos y producción desactivados. Sin esas pruebas **NO declarar resuelto**. Limpiar sólo los registros de prueba identificados, no todo Drive.
+5. Si no se dispone de herramienta conectada que pueda editar/desplegar Apps Script, proporcionar al usuario pasos concretos y **un solo pedido de intervención por vez**. Nunca afirmar que un cambio guardado en GitHub ya está en Apps Script.
+
+### Restricciones estables
+- Repositorio `hernanchan/COTIZADOR`, rama de ensayos `fase1/impresiones-ploteos-20261027`; NO tocar `main`, `libreriasaber.com.ar` ni Polaroids, ni activar pagos ni realizar gastos.
+- No introducir otro rediseño de interfaz ni volver a empezar; cerrar recepción/cotización/central de documentos A4/A3 + CAD/Póster.
+- Usuario ha invertido muchas pruebas; evitar micro-pasos redundantes, falsas confirmaciones, vueltas a diagnósticos descartados y promesas de avance sin despliegue real.
+- Este archivo es el **registro persistente primario** para próximos chats; leer esta sección y el último commit antes de actuar. La memoria automática o un prompt resumido NO bastan para recuperar todo.
