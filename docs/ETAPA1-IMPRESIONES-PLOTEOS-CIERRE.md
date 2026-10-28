@@ -146,3 +146,12 @@ Se confirmó una **incompatibilidad entre cotización y recepción**, no una fal
 - No introducir otro rediseño de interfaz ni volver a empezar; cerrar recepción/cotización/central de documentos A4/A3 + CAD/Póster.
 - Usuario ha invertido muchas pruebas; evitar micro-pasos redundantes, falsas confirmaciones, vueltas a diagnósticos descartados y promesas de avance sin despliegue real.
 - Este archivo es el **registro persistente primario** para próximos chats; leer esta sección y el último commit antes de actuar. La memoria automática o un prompt resumido NO bastan para recuperar todo.
+
+
+## Actualización de continuidad — 28-10-2026, ensayo receptor ampliado
+
+- Se preparó una prueba nueva `tests/fase1-receptor-gas-integracion.test.mjs` que **ejecuta las funciones reales del archivo GAS ampliado** dentro de un entorno simulado sin escribir en Drive. Casos: 3 PDF del mismo pedido, dos páginas A4 y plano A0 como trabajos individuales, reintentos idempotentes, conflictos de mismo fileId con distinto SHA, bloqueo de metadatos mal formados, tope 30 archivos por pedido, tope global 120, prohibición de marcar páginas verificadas antes de verificar.
+- Workflow GitHub Actions `40673933315` **SUCCESS**: tests GAS, resto de pruebas de recepción y ficha, build completo del Worker y regresiones.
+- **No se actualizó el Apps Script real**: sigue siendo la versión 5 de «FASE 4 – Carga y presupuesto PDF», contrato antiguo (5 PDF de 1 MB/identificador `documento`). La corrección ampliada está en `integraciones/autocotizador/recepcion/DocumentosReceiver_LOTE_AMPLIADO_PRUEBAS_20261024.gs`.
+- El siguiente paso es **preservar copia de `Código.gs` y reemplazar su contenido únicamente en el proyecto receptor de documentos**, guardar y luego actualizar la implementación existente «FASE 4 – Carga y presupuesto PDF» creando una versión nueva dentro de ella (sin cambiar la URL que utiliza Worker). No modificar ninguna implementación de Polaroids o la web pública. La intervención en Apps Script debe hacerse con cuenta del propietario; no hay un conector disponible para efectuarla directamente.
+- Solo después del despliegue, la prueba real de 3 archivos / recepción Drive / D1 autoriza declarar arreglada esta falla. No confundir CI con despliegue ni prueba real.
