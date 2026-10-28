@@ -198,3 +198,27 @@ test('sesiones antiguas sin marca SHA pasan por una lectura de compatibilidad y 
  assert.equal(x.sandbox.docsMultiCommitPages(x.commit()).status,'verified');
  assert.equal(x.counters().legacyDownloads,1);
 });
+
+test('GAS indica newSession:true sólo si crea realmente un recibo nuevo',()=>{
+ const x=environment();
+ const original={orderId:x.s.orderId,fileId:x.s.fileId,name:'archivo.pdf',
+  mode:'bn',bytes:x.s.bytes,sha256:x.s.sha256,
+  parts:x.s.parts,partBytes:PART};
+ const reused=x.sandbox.docsMultiStart({meta:original});
+ assert.equal(reused.uploadId,x.s.uploadId);
+ assert.equal(reused.newSession,false,'idempotencia nunca saltea el status');
+ x.sandbox.docsStart=function({meta}){
+  const start={...x.state(),...meta,uploadId:'DOC-'+randomUUID(),
+   token:'SECOND_TEST_TOKEN_abcdefghijklmnopqrstuvwxyz',
+   name:meta.fileId+'__'+meta.name,offset:0,driveFileId:null,
+   receiptState:'receiving',createdAt:Date.now()};
+  x.sandbox.docsSave(start);
+  return {uploadId:start.uploadId,token:start.token};
+ };
+ const fresh=x.sandbox.docsMultiStart({meta:{
+  ...original,orderId:'WEB-ENSAYO-OTRO-PEDIDO',fileId:'pdf-new'
+ }});
+ assert.equal(fresh.newSession,true);
+ assert.notEqual(fresh.uploadId,reused.uploadId);
+ assert.ok(fresh.remainingSlots>0);
+});
