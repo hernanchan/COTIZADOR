@@ -790,8 +790,8 @@ async function fase4BatchStart(request,env){
   if(!reply.ok){
    const reason=String(reply.errorCode||'').toUpperCase();
    // El receptor sólo publica categorías autorizadas, nunca su mensaje interno.
-   const permitted=new Set(['UNAUTHORIZED','INVALID_REQUEST','QUOTA','LIMIT','DUPLICATE',
-     'SESSION','ARCHIVO','LOCKED','INTERNAL']);
+   const permitted=new Set(['UNAUTHORIZED','GLOBAL_CAP','ORDER_CAP','INDEX_INVALID',
+     'FILE_ID_CONFLICT','BAD_META','BUSY','RECEPTOR_ERROR']);
    const err=new Error('Receptor rechazó inicio del lote');
    err.safeReason=permitted.has(reason)?reason:'RECHAZO_RECEPTOR';
    throw err;
