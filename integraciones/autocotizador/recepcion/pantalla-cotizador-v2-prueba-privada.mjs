@@ -25,6 +25,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .warning{background:#fff2db;border-left:4px solid #f7931e;padding:10px;margin-bottom:12px}
 #acciones-pedido{position:sticky;top:0;z-index:30;background:#eaf3fa;border-bottom:2px solid #aecce5;padding:8px max(15px,calc((100vw - 1110px)/2));box-shadow:0 3px 9px #0a315812;display:flex;align-items:center;gap:12px;flex-wrap:wrap}#precio-smart{flex:1;font-size:16px;font-weight:750;color:#0a3158}#send-all-pdf{font-weight:750;background:#095985;white-space:nowrap;min-height:43px}#batch-progress{flex-basis:100%;margin:0;font-size:12px;line-height:1.2}#recepcion-avanzada>summary{font-size:13px!important;color:#536475}#seguridad-privada{max-width:1110px;margin:7px auto 0;padding:0 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}#seguridad-privada .cf-turnstile{margin:0} @media(max-width:600px){#acciones-pedido{padding:8px 12px}#send-all-pdf{width:100%}}
 .cf-turnstile{margin:15px 0}
+#vista-estado-pedido{background:#fff;border-radius:12px;padding:24px;margin:12px 0;border:1px solid #bad2e7}
+#vista-estado-pedido strong{display:block;font-size:21px;margin-bottom:8px}
+#vista-estado-pedido p{margin:5px 0}
+body.estado-envio #smart,body.estado-registro #smart{display:none}
+[hidden]{display:none!important}
 #drop-pdf{display:block;border:2px dashed #8faec5;background:#f4f9fd;border-radius:12px;padding:16px;margin:12px 0;cursor:pointer}
 #drop-pdf.dragging{background:#dfedfb;border-color:#095f8f}
 #drop-pdf input{display:block;margin-top:8px}
@@ -36,6 +41,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <div style="max-width:1140px;margin:18px auto 0;padding:0 14px">
 <section style="padding:8px 3px 4px"><h2 style="margin:0 0 5px;font-size:22px;color:#123852">Cargá tus archivos una sola vez</h2><p style="margin:0;color:#52677a">Arrastrá todos los PDF juntos. La web reconoce tamaños y ploteos automáticamente. Revisá el precio y pulsá «Enviar mi pedido» una sola vez.</p></section></div>
 <main><section class="panel" style="padding:0;border:0;background:transparent">
+<section id="vista-estado-pedido" hidden role="status" aria-live="polite"></section>
 <iframe id="smart" title="Análisis automático de PDF, tamaños, CAD y póster" src="/prueba-v2/carga-inteligente" loading="eager"></iframe>
 </section>
 <details id="recepcion-avanzada" class="panel" style="margin-top:14px"><summary style="font-size:16px;font-weight:700;cursor:pointer;padding:5px 0">Detalles de la recepción y verificación (ensayo privado)</summary><div style="padding-top:12px">
@@ -49,7 +55,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <p id="register-status" role="status" aria-live="polite" class="state">Disponible únicamente cuando todos los PDF estén verificados. Sin pagos.</p>
 
 </div></details></main>
-<details style="max-width:1110px;margin:10px auto 25px;padding:0 14px"><summary style="cursor:pointer">Cotizador original (comparación comercial)</summary>
+<details id="comparacion-original" style="max-width:1110px;margin:10px auto 25px;padding:0 14px"><summary style="cursor:pointer">Cotizador original (comparación comercial)</summary>
 <iframe id="base" title="Cotizador original de comparación" src="/prueba-v2/cotizador?integrado=1&ensayoArchivos=1" loading="lazy"></iframe>
 </details>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
@@ -61,6 +67,22 @@ const list=document.getElementById('all'),status=document.getElementById('state'
  summary=document.getElementById('order-summary');
 const registerButton=document.getElementById('register-private'),registerStatus=document.getElementById('register-status');
 const sendAllButton=document.getElementById('send-all-pdf'),batchProgress=document.getElementById('batch-progress');
+const modoDiagnostico=new URLSearchParams(location.search).get('diagnostico')==='1';
+if(!modoDiagnostico){
+ document.getElementById('recepcion-avanzada').hidden=true;
+ document.getElementById('comparacion-original').hidden=true;
+}
+const vistaEstadoPedido=document.getElementById('vista-estado-pedido');
+let ultimoTotalServidor=null;
+function mostrarEstadoCliente(estado,titulo,detalle){
+ document.body.classList.toggle('estado-envio',estado==='enviando');
+ document.body.classList.toggle('estado-registro',estado==='registrado');
+ vistaEstadoPedido.hidden=!estado;
+ if(!estado){vistaEstadoPedido.replaceChildren();return}
+ const h=document.createElement('strong');h.textContent=titulo;
+ const p=document.createElement('p');p.textContent=detalle;
+ vistaEstadoPedido.replaceChildren(h,p);
+}
 let batchSending=false,smartReady=false,smartBlockedReason='',handoffInProgress=false,handoffResolve=null;
 const dropPdf=document.getElementById('drop-pdf'),batchFiles=document.getElementById('batch-files'),batchStatus=document.getElementById('batch-status');
  // Mediciones locales: sin archivos, nombres, importes, credenciales ni hashes.
@@ -501,6 +523,7 @@ sendAllButton.addEventListener('click',async()=>{
   return;
  }
  batchSending=true;updateSummary();
+ mostrarEstadoCliente('enviando','Estamos recibiendo tus archivos','Se verificarán los PDF y registraremos el pedido automáticamente. No cierres esta pestaña.');
  let received=0,success=true;
  try{
   for(const d of pending){
@@ -523,9 +546,13 @@ sendAllButton.addEventListener('click',async()=>{
   batchSending=false;
   updateSummary();
  }
- if(!success){terminarMedicion('envio_incompleto');return;}
+ if(!success){
+  mostrarEstadoCliente(null);
+  terminarMedicion('envio_incompleto');return;
+ }
  if(allEntries.some(d=>!d.confirmacion)){
   batchProgress.textContent='Hay PDF pendientes de verificar. Se detuvo el registro.';
+  mostrarEstadoCliente(null);
   terminarMedicion('verificacion_incompleta');
   return;
  }
@@ -533,10 +560,18 @@ sendAllButton.addEventListener('click',async()=>{
  marcarTiempo('central_inicio');
  await registrarPedidoVerificado();
  marcarTiempo('central_fin');
- if(registeredOrder)
+ if(registeredOrder){
   batchProgress.textContent='Pedido enviado y registrado correctamente. Sin cobros.';
- else
+  if(Number.isSafeInteger(ultimoTotalServidor))
+   document.getElementById('precio-smart').textContent='Total verificado: '+
+    new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(ultimoTotalServidor)+
+    ' · Sin cobro autorizado';
+  mostrarEstadoCliente('registrado','Pedido recibido correctamente',
+   'Número de pedido: '+registeredOrder+'. '+allEntries.length+' PDF verificados. Pago desactivado en esta prueba.');
+ }else{
   batchProgress.textContent='PDF recibidos; el registro quedó pendiente. Pulsá «Enviar mi pedido» para reintentar sin subir los PDF.';
+  mostrarEstadoCliente(null);
+ }
  terminarMedicion(registeredOrder?'pedido_registrado':'registro_pendiente');
 });
 if(previous?.items.length){
@@ -590,6 +625,7 @@ async function registrarPedidoVerificado(){
      result.listoParaProducir!==false)
    throw Error(result?.error||'La Central no confirmó este pedido.');
   registeredOrder=result.orderId;
+  ultimoTotalServidor=result.totalArs;
   // El recibo de cliente no lleva sesiones ni tokens de Google.
   registerStatus.textContent='Pedido de ensayo registrado y comprobado: '+registeredOrder+
    '. '+entries.length+' PDF; total verificado por servidor: '+
