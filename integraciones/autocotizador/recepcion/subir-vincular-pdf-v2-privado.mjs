@@ -86,7 +86,11 @@ export async function subirYVincularPdfCotizadorV2({
   // Sólo reintentar dentro de esta pestaña. No conservar la credencial
   // bearer de GAS en localStorage ni sessionStorage.
   session={uploadId:sesionPrevia.uploadId,token:sesionPrevia.token};
-  onProgress({phase:'reanudacion',completed:0,total:parts});
+  // La sesión fue creada por el inicio HMAC de esta misma tanda, todavía
+  // sin envío. El marcador se elimina de onSession ANTES de subir un bloque:
+  // cualquier reintento debe consultar Drive, nunca confiar en él otra vez.
+  freshSession=sesionPrevia.batchFresh===true;
+  onProgress({phase:freshSession?'inicio':'reanudacion',completed:0,total:parts});
  }else{
   const start=await rpc('/api/ensayo-pdf-ampliado',{op:'start',turnstileToken,
    meta:{orderId,fileId:'pdf-'+r.sha256.slice(0,24),
@@ -201,4 +205,33 @@ export async function subirYVincularPdfCotizadorV2({
    paymentAuthorized:false
   })})
  });
+}
+
+/**
+ * Procesa hasta dos sesiones independientes en paralelo. Cada sesión
+ * conserva su orden interno de fragmentos, SHA, recuperación e idempotencia.
+ * Ante un error no inicia archivos adicionales, pero deja terminar los
+ * envíos que ya estaban en curso; nunca cancela ni borra sesiones válidas.
+ */
+export async function ejecutarRecepcionParalela(trabajos,procesar,onOk,limite=2){
+ if(!Array.isArray(trabajos)||trabajos.length<1||trabajos.length>30||
+    typeof procesar!=='function'||typeof onOk!=='function'||
+    !Number.isSafeInteger(limite)||limite<1||limite>2)
+  throw Error('Planificación privada de PDF inválida.');
+ let proximo=0,detener=false,confirmados=0,fallos=0;
+ async function carril(){
+  while(!detener){
+   const indice=proximo++;
+   if(indice>=trabajos.length)return;
+   let bien=false;
+   try{bien=(await procesar(trabajos[indice],indice))===true}
+   catch{bien=false}
+   if(!bien){fallos++;detener=true;return}
+   confirmados++;
+   onOk(trabajos[indice],indice,confirmados);
+  }
+ }
+ await Promise.all(Array.from({length:Math.min(limite,trabajos.length)},()=>carril()));
+ return Object.freeze({confirmados,fallos,total:trabajos.length,
+  completo:!detener&&confirmados===trabajos.length});
 }
