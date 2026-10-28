@@ -10,8 +10,8 @@
  *   DOCS_ROOT_FOLDER_ID: carpeta privada de Drive para pedidos web
  * Envíos firmados HMAC-SHA256 desde Worker, no acceso directo del cliente.
  * Los PDFs se envían mediante Drive API v3 resumable upload en bloques 512KiB.
- * Atención: NO hay validador fiable de páginas en backend todavía.
- * Por ello finish confirma bytes, pero NUNCA devuelve verified:true ni permite cobrar.
+ * El Worker privado confirma las páginas reales con pdf-lib tras el SHA.
+ * Ni este receptor ni esta mejora autorizan cobro o producción.
  */
 var DOCS_MAX=20*1024*1024,DOCS_PILOT_MAX=1024*1024,DOCS_PART=512*1024,DOCS_TTL=6*86400000;
 var DOCS_PILOT_ORDER='WEB-PILOTO-UN-PDF-20261020';
@@ -358,7 +358,19 @@ function docsMultiCommitPages(p){
     p.pages<1||p.pages>20000||
     s.receiptState!=='bytes_checked'&&s.receiptState!=='pages_verified')
    throw Error('Conteo de páginas no autorizado');
- docsPilotBlob(s);
+ // docsFinish ya comprobó SHA-256 de bytes REALES de Drive y lo guardó.
+ // El Worker HMAC volvió a leer íntegramente el PDF para contar sus páginas.
+ // No descargar otra vez todo el archivo en el commit de esas páginas.
+ // Sesiones antiguas sin marca SHA: una última verificación para compatibilidad.
+ if(!s.driveFileId||s.offset!==s.bytes)
+   throw Error('PDF sin finalización íntegra en Drive');
+ if(s.storageSha256Checked!==s.sha256||
+    !Number.isFinite(s.storageSha256CheckedAt)){
+   docsPilotBlob(s);
+   s.storageSha256Checked=s.sha256;
+   s.storageSha256CheckedAt=Date.now();
+   docsSave(s);
+ }
  if(s.pageVerification==='server'){
    if(s.pdfPages!==p.pages)throw Error('Conteos de páginas incompatibles');
  }else{
@@ -476,7 +488,12 @@ function docsPart(p){
  if(p.bytes!==end-start||p.dataBase64.length>Math.ceil(DOCS_PART/3)*4+8)throw Error('Longitud incorrecta');
  var bytes=Utilities.base64Decode(p.dataBase64);
  if(bytes.length!==end-start||docsSha(bytes)!==p.sha256)throw Error('Checksum incorrecto');
- var offset=docsProbe(s);
+ // Fast path: cada ACK de Drive actualiza y guarda el offset.
+ // Consultar al servidor sólo ante reintentos, saltos o estados dudosos.
+ var known=Number.isSafeInteger(s.offset)&&s.offset>=0&&s.offset<=s.bytes;
+ var directo=known&&s.offset===start&&s.receiptState==='receiving'&&
+   typeof s.sessionUrl==='string'&&s.sessionUrl.length>0&&!s.driveFileId;
+ var offset=directo?start:docsProbe(s);
  if(offset>=end)return {accepted:true,index:p.index};
  if(offset<start)throw Error('Parte fuera de orden');
  var remaining=bytes.slice(offset-start);
@@ -489,7 +506,13 @@ function docsPart(p){
   s.driveFileId=meta.id;s.offset=s.bytes;s.receiptState='uploaded';docsSave(s);
   return {accepted:true,index:p.index};
  }
- if(r.getResponseCode()!==308)throw Error('Drive no confirmó la parte');
+ if(r.getResponseCode()!==308){
+  // Si se perdió el ACK previo, Drive pudo avanzar mientras GAS no guardó
+  // ese avance. Consultar el estado REAL antes de rechazar o reintentar.
+  var real=docsProbe(s);
+  if(real>=end)return {accepted:true,index:p.index};
+  throw Error('Drive no confirmó la parte');
+ }
  var h=docsHeader(r,'Range'),m=h&&/^bytes=0-(\d+)$/.exec(String(h));
  var committed=m?Number(m[1])+1:0;
  s.offset=committed;docsSave(s);
@@ -507,6 +530,8 @@ function docsFinish(p){
  if(downloaded.getResponseCode()!==200)throw Error('Drive no permitió comprobar el PDF');
  var blob=downloaded.getBlob().getBytes();
  if(blob.length!==s.bytes||docsSha(blob)!==s.sha256)throw Error('El PDF de Drive no coincide');
+ // Checkpoint de integridad persistente; no lo inventa el navegador.
+ s.storageSha256Checked=s.sha256;s.storageSha256CheckedAt=Date.now();
  s.receiptState='bytes_checked';docsSave(s);
  return docsAwaitPages(s);
 }
