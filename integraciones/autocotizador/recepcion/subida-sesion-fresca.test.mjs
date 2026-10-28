@@ -5,7 +5,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash,randomUUID,webcrypto} from 'node:crypto';
-import {subirYVincularPdfCotizadorV2} from './subir-vincular-pdf-v2-privado.mjs';
+import {subirYVincularPdfCotizadorV2,fileIdParaReferencia} from './subir-vincular-pdf-v2-privado.mjs';
+import {verificarVinculoCotizadorV2} from './verificar-vinculo-cotizador-v2.mjs';
 
 const ORIGIN='https://saber-documentos-pruebas.libreriasaber.workers.dev';
 const bytes=Buffer.from('%PDF-1.7\nvalid test file\n%%EOF\n');
@@ -106,4 +107,36 @@ test('la sesión recién creada por una TANDA omite status UNA vez, nunca en un 
  await retry.run();
  assert.deepEqual(retry.calls,['status','finish','link'],
   'reanudación consulta siempre Drive y no repite partes aceptadas');
+});
+
+test('dos PDF con el MISMO SHA pero distintas referencias conservan recibos diferentes y no se cruzan',()=>{
+ const first={...referencia,localRef:randomUUID()};
+ const second={...referencia,localRef:randomUUID()};
+ const id1=fileIdParaReferencia(first);
+ const id2=fileIdParaReferencia(second);
+ assert.notEqual(id1,id2);
+ assert.match(id1,/^pdf-[a-f0-9]{16}-[a-f0-9]{32}$/);
+ assert.equal(fileIdParaReferencia(first),id1);
+ const mk=(ref,id)=>({ok:true,status:'verified',verified:true,
+  storageVerified:true,pageVerification:'server',paymentAuthorized:false,
+  receiptId:'DOC-'+randomUUID(),orderId,fileId:id,
+  name:id+'__'+name,mode:'bn',bytes:ref.bytes,sha256,pages:1});
+ const rec1=mk(first,id1),rec2=mk(second,id2);
+ assert.equal(verificarVinculoCotizadorV2({
+  referencia:first,recibo:rec1,sessionId:rec1.receiptId,
+  expectedOrderId:orderId,expectedMode:'bn'
+ }).fileId,id1);
+ assert.equal(verificarVinculoCotizadorV2({
+  referencia:second,recibo:rec2,sessionId:rec2.receiptId,
+  expectedOrderId:orderId,expectedMode:'bn'
+ }).fileId,id2);
+ assert.throws(()=>verificarVinculoCotizadorV2({
+  referencia:second,recibo:rec1,sessionId:rec1.receiptId,
+  expectedOrderId:orderId,expectedMode:'bn'
+ }),/PDF de Google no coincide/);
+ const legacyId='pdf-'+sha256.slice(0,24),old=mk(first,legacyId);
+ assert.equal(verificarVinculoCotizadorV2({
+  referencia:first,recibo:old,sessionId:old.receiptId,
+  expectedOrderId:orderId,expectedMode:'bn'
+ }).fileId,legacyId,'El recibo de antes de la migración sigue siendo aceptado');
 });
