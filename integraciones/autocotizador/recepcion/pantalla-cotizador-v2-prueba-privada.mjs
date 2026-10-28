@@ -60,7 +60,7 @@ body.estado-envio #smart,body.estado-registro #smart{display:none}
 </details>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 <script type="module">
-import {subirYVincularPdfCotizadorV2,ejecutarRecepcionParalela} from '/prueba-v2/subir-vincular-pdf.mjs';
+import {subirYVincularPdfCotizadorV2,ejecutarRecepcionParalela,fileIdParaReferencia} from '/prueba-v2/subir-vincular-pdf.mjs';
 import {prepararManifiestoDocumentalV2} from '/prueba-v2/preparar-manifiesto.mjs';
 const list=document.getElementById('all'),status=document.getElementById('state'),
  frame=document.getElementById('base'),smart=document.getElementById('smart'),
@@ -341,7 +341,7 @@ function render(){
     };
     // Preparación segura del lote: datos del mismo PDF que sendPlot enviaría.
     d.batchInicio=()=>({
-     meta:{orderId,fileId:'pdf-'+r.sha256.slice(0,24),
+     meta:{orderId,fileId:fileIdParaReferencia(r),
       name:r.nombre,mode:meta.modo,bytes:r.bytes,sha256:r.sha256,
       partBytes:512*1024,parts:Math.ceil(r.bytes/(512*1024))},
      localRef:r.localRef,modo:meta.modo,opcionesKey:'null'
@@ -467,7 +467,7 @@ function render(){
     const opciones={formato:formato.value,caras:caras.value,
      copias:Number(copias.value),anillado:anillado.value,
      materialColor:papel.value,paginasPorHoja:Number(paginasPorHoja.value)};
-    return {meta:{orderId,fileId:'pdf-'+r.sha256.slice(0,24),
+    return {meta:{orderId,fileId:fileIdParaReferencia(r),
       name:r.nombre,mode:mode.value,bytes:r.bytes,sha256:r.sha256,
       partBytes:512*1024,parts:Math.ceil(r.bytes/(512*1024))},
      localRef:r.localRef,modo:mode.value,opcionesKey:JSON.stringify(opciones)};
