@@ -832,21 +832,31 @@ async function fase4PrivateVerified(env,session,metrics=null,preferirInfo=false,
      return ready;
  }
  const bytes=new Uint8Array(info.bytes);
- for(let offset=0;offset<bytes.length;offset+=FASE4_CHUNK_BYTES){
-   const part=await postToScript(env,{op:'multiReadPart',...ctx,
-     receiptId:info.receiptId,offset},fetch,420000);
-   const expected=Math.min(FASE4_CHUNK_BYTES,bytes.length-offset);
-   if(!part.ok||part.receiptId!==info.receiptId||part.offset!==offset||
-     part.length!==expected||part.bytes!==info.bytes||part.sha256!==info.sha256||
-     typeof part.dataBase64!=='string'||part.dataBase64.length>380000||
-     !/^[a-f0-9]{64}$/.test(part.chunkSha256||''))
-     throw Error('Google no entregó el fragmento privado esperado');
-   const str=atob(part.dataBase64);
-   if(str.length!==expected)throw Error('Tamaño de fragmento inconsistente');
-   const chunk=Uint8Array.from(str,c=>c.charCodeAt(0));
-   if(await safeHash(chunk)!==part.chunkSha256)throw Error('Integridad de fragmento incorrecta');
-   bytes.set(chunk,offset);
+ // GAS ofrece multiReadPart autenticado sin lock de escritura: hasta tres
+ // lecturas independientes a la vez, con validación completa de cada bloque.
+ // Las operaciones de escritura y registro en D1 siguen siendo secuenciales.
+ const offsets=Array.from({length:Math.ceil(bytes.length/FASE4_CHUNK_BYTES)},
+  (_,i)=>i*FASE4_CHUNK_BYTES);
+ let siguienteOffset=0;
+ async function lectorPrivado(){
+   while(siguienteOffset<offsets.length){
+     const offset=offsets[siguienteOffset++];
+     const part=await postToScript(env,{op:'multiReadPart',...ctx,
+       receiptId:info.receiptId,offset},fetch,420000);
+     const expected=Math.min(FASE4_CHUNK_BYTES,bytes.length-offset);
+     if(!part.ok||part.receiptId!==info.receiptId||part.offset!==offset||
+        part.length!==expected||part.bytes!==info.bytes||part.sha256!==info.sha256||
+        typeof part.dataBase64!=='string'||part.dataBase64.length>380000||
+        !/^[a-f0-9]{64}$/.test(part.chunkSha256||''))
+       throw Error('Google no entregó el fragmento privado esperado');
+     const str=atob(part.dataBase64);
+     if(str.length!==expected)throw Error('Tamaño de fragmento inconsistente');
+     const chunk=Uint8Array.from(str,c=>c.charCodeAt(0));
+     if(await safeHash(chunk)!==part.chunkSha256)throw Error('Integridad de fragmento incorrecta');
+     bytes.set(chunk,offset);
+   }
  }
+ await Promise.all(Array.from({length:Math.min(3,offsets.length)},()=>lectorPrivado()));
  lap('lecturaPrivadaMs');
  const checked=await verificarPdfAlmacenado({driveBytes:bytes,reciboServidor:{
    receiptState:'bytes_checked',receiptId:info.receiptId,orderId:info.orderId,
