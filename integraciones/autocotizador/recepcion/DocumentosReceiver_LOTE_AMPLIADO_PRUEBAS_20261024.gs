@@ -321,7 +321,7 @@ function docsMultiStartBatch(p){
  var metas=p.metas;
  if(!Array.isArray(metas)||metas.length<1||metas.length>10)
    throw Error('Tanda privada fuera de límites');
- var orderId=null,used={},total=0;
+ var orderId=null,used=Object.create(null),total=0;
  for(var i=0;i<metas.length;i++){
    var m=metas[i];
    if(!m||typeof m!=='object'||Array.isArray(m)||
@@ -341,7 +341,7 @@ function docsMultiStartBatch(p){
  // Preflight DEL LOTE antes de abrir sesiones Drive: no consumir cupos de
  // una tanda que no entra en el pedido o excede la cuota global.
  var index=docsMultiIds(true),oldCount=0,oldBytes=0,newCount=0,newBytes=0;
- var existing={};
+ var existing=Object.create(null);
  for(var j=0;j<index.length;j++){
    var previous=docsRead(index[j]);
    if(previous.orderId!==orderId)continue;
