@@ -23,7 +23,7 @@ test('cookie firmada autoriza registro sin enviar Basic por JavaScript',async()=
 test('rechaza cookie alterada, vencida, secreta diferente y bandera desactivada',async()=>{
  const signed=(await ctx.v2SessionCookie(env)).split(';')[0];
  const make=value=>new Request('https://example.test/',{headers:{Cookie:value}});
- assert.equal(await ctx.v2SessionAuthorized(make(signed.replace(/.$/,'f')),env),false);
+ assert.equal(await ctx.v2SessionAuthorized(make(signed.slice(0,-1)+(signed.endsWith('f')?'e':'f')),env),false);
  assert.equal(await ctx.v2SessionAuthorized(make(signed),{...env,DOCS_V2_PRIVATE_UI_SECRET:'b'.repeat(45)}),false);
  assert.equal(await ctx.v2SessionAuthorized(make(signed),{...env,DOCS_V2_PRIVATE_UI_ENABLED:'OFF'}),false);
  const timestamp=String(Math.floor(Date.now()/1000)-3600);
