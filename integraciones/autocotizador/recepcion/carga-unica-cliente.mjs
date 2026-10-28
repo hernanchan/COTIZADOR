@@ -19,11 +19,11 @@ const pesos=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',ma
 function informarPrecioPrivado(estado,total=null){
  if(window.parent===window)return;
  const anillados=entries.filter(e=>e.anillado!=='ninguno');
- const sendable=estado==='listo'&&anillados.length===0;
+ const sendable=estado==='listo'&&anillados.every(e=>e.anillado==='individual');
  window.parent.postMessage({type:'SABER_SMART_PRICE_STATE',estado,
   total:Number.isSafeInteger(total)&&total>0?total:null,
   sendable,blockReason:anillados.length?
-   'Anillado cotizado, pero todavía no habilitado para recepción automática. Elegí Sin anillado o aguardá su integración.':null},location.origin);
+   'El anillado conjunto todavía no puede registrarse automáticamente. Elegí anillado individual o sin anillado.':null},location.origin);
 }
 function importeArchivo(indice){
  if(!ultimoPresupuesto)return null;
@@ -398,8 +398,8 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
        e.archivoOriginal.size<5||e.archivoOriginal.size>20*1024*1024||
        e.name.length>120||!/\.pdf$/i.test(e.name))
      throw Error('La recepción privada admite PDF de hasta 20 MB por archivo.');
-    if(e.anillado!=='ninguno')
-     throw Error('El anillado está disponible para cotizar, pero su registro privado todavía requiere validación.');
+    if(!['ninguno','individual'].includes(e.anillado))
+     throw Error('El anillado de varios PDF juntos sigue pendiente de integración.');
     if(![1,2,4,9].includes(e.paginasPorHoja??1))
      throw Error('Composición por cara no admitida.');
     if(!Array.isArray(e.paginas)||e.paginas.length<1||
@@ -412,7 +412,7 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
     files.push(e.archivoOriginal);
     options.push({formato:plan.formatoFinal,modo:e.modo,caras:e.caras,
      copias:e.copias,materialColor:e.materialColor,
-     paginasPorHoja:e.paginasPorHoja??1,
+     anillado:e.anillado,paginasPorHoja:e.paginasPorHoja??1,
      paginas:e.paginas.length,nombre:e.name});
    }
    if(files.length){
