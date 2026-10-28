@@ -29,6 +29,15 @@ input:focus,select:focus{outline:3px solid #bedcf4;border-color:#2878ad}
 .pie{font-size:14px;color:#5e6d78}
 @media(max-width:680px){main{width:100%;margin:0;padding:18px 14px 35px;border-radius:0}body{font-size:16px}.archivo{padding:17px}.archivo h3{font-size:18px}.controles{grid-template-columns:1fr;gap:13px}.nota{font-size:14px}#presupuesto{top:0;padding:14px 16px}#presupuesto strong{font-size:20px}}
 .archivo{padding:0;margin:8px 0;background:#fff;overflow:hidden}
+.grupo-pedido{border:1px solid #cedce8;border-radius:12px;background:#f8fbfe;margin:14px 0 16px;padding:12px}
+.titulo-grupo{font-size:17px;color:#0b4269;margin:0 0 9px;padding:2px 3px}
+.grupo-pedido .archivo{margin:7px 0;background:#fff}
+.opciones-comunes{display:flex;align-items:flex-end;flex-wrap:wrap;gap:9px;margin:4px 0 11px;padding:11px 12px;background:#eaf3fa;border-radius:9px}
+.opciones-comunes>strong{flex-basis:100%;font-size:13px;color:#34556e}
+.opciones-comunes label{font-size:13px;flex:1 1 140px;font-weight:600;min-width:130px}
+.opciones-comunes input,.opciones-comunes select{margin:0;padding:7px 9px;min-height:38px;font-size:14px}
+@media(max-width:650px){.grupo-pedido{padding:9px}.opciones-comunes{gap:8px}.opciones-comunes label{flex-basis:45%}}
+
 .fila{display:grid;grid-template-columns:minmax(0,1fr) minmax(105px,auto) minmax(135px,auto);align-items:center;gap:16px;padding:13px 17px;min-height:74px}
 .acciones-archivo{display:flex;justify-content:flex-end;align-items:center;gap:6px;flex-wrap:wrap}
 .acciones-archivo button{min-height:37px}
