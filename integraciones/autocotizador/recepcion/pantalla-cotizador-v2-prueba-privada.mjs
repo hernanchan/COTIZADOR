@@ -23,7 +23,7 @@ button{border:0;background:#0a5583;color:#fff;padding:10px 15px;border-radius:8p
 button:disabled{opacity:.45;cursor:not-allowed}
 .state{white-space:pre-wrap;overflow-wrap:anywhere;color:#0a3158;font-size:13px}
 .warning{background:#fff2db;border-left:4px solid #f7931e;padding:10px;margin-bottom:12px}
-#acciones-pedido{position:sticky;top:0;z-index:30;background:#eaf3fa;border-bottom:2px solid #aecce5;padding:8px max(15px,calc((100vw - 1110px)/2));box-shadow:0 3px 9px #0a315812;display:flex;align-items:center;gap:12px;flex-wrap:wrap}#precio-smart{flex:1;font-size:16px;font-weight:750;color:#0a3158}#send-all-pdf{font-weight:750;background:#095985;white-space:nowrap;min-height:43px}#batch-progress{flex-basis:100%;margin:0;font-size:12px;line-height:1.2}#recepcion-avanzada>summary{font-size:13px!important;color:#536475} @media(max-width:600px){#acciones-pedido{padding:8px 12px}#send-all-pdf{width:100%}}
+#acciones-pedido{position:sticky;top:0;z-index:30;background:#eaf3fa;border-bottom:2px solid #aecce5;padding:8px max(15px,calc((100vw - 1110px)/2));box-shadow:0 3px 9px #0a315812;display:flex;align-items:center;gap:12px;flex-wrap:wrap}#precio-smart{flex:1;font-size:16px;font-weight:750;color:#0a3158}#send-all-pdf{font-weight:750;background:#095985;white-space:nowrap;min-height:43px}#batch-progress{flex-basis:100%;margin:0;font-size:12px;line-height:1.2}#recepcion-avanzada>summary{font-size:13px!important;color:#536475}#seguridad-privada{max-width:1110px;margin:7px auto 0;padding:0 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}#seguridad-privada .cf-turnstile{margin:0} @media(max-width:600px){#acciones-pedido{padding:8px 12px}#send-all-pdf{width:100%}}
 .cf-turnstile{margin:15px 0}
 #drop-pdf{display:block;border:2px dashed #8faec5;background:#f4f9fd;border-radius:12px;padding:16px;margin:12px 0;cursor:pointer}
 #drop-pdf.dragging{background:#dfedfb;border-color:#095f8f}
@@ -32,15 +32,15 @@ button:disabled{opacity:.45;cursor:not-allowed}
 </style></head><body>
 <header><h1>LIBRERÍA SABER · Cotizador V2 en ensayo privado</h1><small style="color:#d5e3f0">Sin cobros, sin órdenes de producción y sin publicación comercial.</small></header>
 <div id="acciones-pedido"><div id="precio-smart" role="status" aria-live="polite">Presupuesto preliminar: todavía sin cotizar · No autoriza cobro</div><button id="send-all-pdf" type="button" disabled>Enviar mi pedido</button><p id="batch-progress" class="state" role="status" aria-live="polite">Cargá tus PDF y revisá las opciones.</p></div>
+<div id="seguridad-privada"><small>Verificación de seguridad para el envío:</small><div class="cf-turnstile" data-sitekey="${sitekey}" data-action="documentos"></div></div>
 <div style="max-width:1140px;margin:18px auto 0;padding:0 14px">
-<section style="padding:8px 3px 4px"><h2 style="margin:0 0 5px;font-size:22px;color:#123852">Cargá tus archivos una sola vez</h2><p style="margin:0;color:#52677a">Arrastrá todos los PDF juntos, revisá el presupuesto y después prepará el envío. Los ploteos se cotizan automáticamente; su recepción sigue en pruebas.</p></section></div>
+<section style="padding:8px 3px 4px"><h2 style="margin:0 0 5px;font-size:22px;color:#123852">Cargá tus archivos una sola vez</h2><p style="margin:0;color:#52677a">Arrastrá todos los PDF juntos. La web reconoce tamaños y ploteos automáticamente. Revisá el precio y pulsá «Enviar mi pedido» una sola vez.</p></section></div>
 <main><section class="panel" style="padding:0;border:0;background:transparent">
 <iframe id="smart" title="Análisis automático de PDF, tamaños, CAD y póster" src="/prueba-v2/carga-inteligente" loading="eager"></iframe>
 </section>
 <details id="recepcion-avanzada" class="panel" style="margin-top:14px"><summary style="font-size:16px;font-weight:700;cursor:pointer;padding:5px 0">Detalles de la recepción y verificación (ensayo privado)</summary><div style="padding-top:12px">
 <div class="warning">Los PDF se verifican en Drive y la Central registra automáticamente el pedido. Sin cobros.</div>
 <div id="drop-pdf" style="display:none"><strong>Recuperación manual de PDF para trabajos antiguos</strong><input id="batch-files" type="file" accept=".pdf,application/pdf" multiple><p id="batch-status" class="state" role="status">Los PDF se asignan por nombre y tamaño al trabajo correspondiente. La recepción sigue protegida.</p></div>
-<div class="cf-turnstile" data-sitekey="${sitekey}" data-action="documentos"></div>
 <div id="all" role="list" aria-label="Trabajos del cotizador"></div>
 <p id="state" role="status" aria-live="polite" class="state">Cotizá una impresión y agregala al pedido de prueba.</p>
 <section id="order-summary" class="warning" aria-label="Resumen privado del pedido" aria-live="polite"></section>
@@ -63,6 +63,40 @@ const registerButton=document.getElementById('register-private'),registerStatus=
 const sendAllButton=document.getElementById('send-all-pdf'),batchProgress=document.getElementById('batch-progress');
 let batchSending=false,smartReady=false,smartBlockedReason='',handoffInProgress=false,handoffResolve=null;
 const dropPdf=document.getElementById('drop-pdf'),batchFiles=document.getElementById('batch-files'),batchStatus=document.getElementById('batch-status');
+ // Mediciones locales: sin archivos, nombres, importes, credenciales ni hashes.
+ // Son invisibles para el cliente y no se transmiten a servicios externos.
+ let medicionActual=null,analisisIniciado=null,ultimoAnalisisMs=null;
+ function marcarTiempo(etapa,detalle={}){
+  if(!medicionActual)return;
+  medicionActual.eventos.push({etapa,ms:Math.round(performance.now()-medicionActual.inicio),...detalle});
+ }
+ function iniciarMedicion(){
+  medicionActual={inicio:performance.now(),eventos:[],fasesPorPdf:{}};
+  marcarTiempo('clic_enviar');
+ }
+ function marcarFasePdf(d,progreso){
+  if(!medicionActual)return;
+  const indice=all.flatMap(item=>item.references).indexOf(d)+1;
+  if(indice<1||medicionActual.fasesPorPdf[indice]===progreso.phase)return;
+  medicionActual.fasesPorPdf[indice]=progreso.phase;
+  marcarTiempo('pdf_'+progreso.phase,{pdf:indice,bloques:progreso.completed,totalBloques:progreso.total});
+ }
+ function terminarMedicion(estado){
+  if(!medicionActual)return;
+  marcarTiempo('fin',{estado});
+  const resultado=Object.freeze({
+   estado,tiempoTotalMs:Math.round(performance.now()-medicionActual.inicio),
+   ultimoAnalisisMs,cantidadPdf:all.flatMap(item=>item.references).length,
+   eventos:medicionActual.eventos
+  });
+  Object.defineProperty(window,'__saberRendimientoPrivado',{configurable:true,value:resultado});
+  if(new URLSearchParams(location.search).get('diagnostico')==='1'){
+   console.info('[Librería Saber] Mediciones locales del ensayo',resultado);
+   console.table(resultado.eventos);
+  }
+  medicionActual=null;
+ }
+
 function assignFiles(files){
  const chosen=Array.from(files||[]);
  if(!chosen.length)return;
@@ -244,7 +278,7 @@ function render(){
        turnstileToken:window.turnstile?.getResponse()||'',
        origin:location.origin,sesionPrevia:d.sesionTemporal||null,
        onSession:session=>{d.sesionTemporal=session;},
-       onProgress:p=>{msg.textContent='Recepción protegida: '+p.phase+
+       onProgress:p=>{marcarFasePdf(d,p);msg.textContent='Recepción protegida: '+p.phase+
         ' · '+p.completed+'/'+p.total;}
       });
       const session=d.sesionTemporal;
@@ -366,7 +400,7 @@ function render(){
       origin:location.origin,
       sesionPrevia:d.sesionTemporal||null,
       onSession:s=>{d.sesionTemporal=s;},
-      onProgress:p=>{msg.textContent=['transferencia','estado','reanudacion'].includes(p.phase)?'PDF: '+p.completed+' de '+p.total+' bloques confirmados':p.phase}
+      onProgress:p=>{marcarFasePdf(d,p);msg.textContent=['transferencia','estado','reanudacion'].includes(p.phase)?'PDF: '+p.completed+' de '+p.total+' bloques confirmados':p.phase}
      });
      const quote=result.cotizacionServidor;
      const moneda=value=>new Intl.NumberFormat('es-AR',{style:'currency',
@@ -450,9 +484,12 @@ async function prepararDesdeCotizador(){
 }
 sendAllButton.addEventListener('click',async()=>{
  if(batchSending||registering||handoffInProgress||registeredOrder)return;
+ iniciarMedicion();
  if(all.flatMap(item=>item.references).length===0){
-  if(!smartReady){batchProgress.textContent=smartBlockedReason||'El presupuesto no está listo para enviar.';return;}
-  if(!(await prepararDesdeCotizador()))return;
+  if(!smartReady){batchProgress.textContent=smartBlockedReason||'El presupuesto no está listo para enviar.';terminarMedicion('presupuesto_incompleto');return;}
+  marcarTiempo('preparacion_inicio');
+  if(!(await prepararDesdeCotizador())){terminarMedicion('preparacion_fallida');return;}
+  marcarTiempo('preparacion_terminada');
  }
  const allEntries=all.flatMap(item=>item.references);
  const pending=allEntries.filter(d=>!d.confirmacion);
@@ -460,12 +497,14 @@ sendAllButton.addEventListener('click',async()=>{
     all.some(item=>!item.references.length)||
     pending.some(d=>!d.archivoLocal||typeof d.sendNow!=='function')){
   batchProgress.textContent='Faltan archivos o trabajos por completar antes del envío.';
+  terminarMedicion('trabajos_incompletos');
   return;
  }
  batchSending=true;updateSummary();
  let received=0,success=true;
  try{
   for(const d of pending){
+   marcarTiempo('pdf_inicio',{pdf:received+1});
    batchProgress.textContent='Recibiendo y verificando PDF '+(received+1)+' de '+pending.length+
     ': '+d.reference.nombre;
    if(!d.sesionTemporal&&!(await waitForTurnstile())){
@@ -477,23 +516,28 @@ sendAllButton.addEventListener('click',async()=>{
      '. Corregí el inconveniente y volvé a pulsar «Enviar mi pedido»; no se duplicarán los PDF ya verificados.';
     success=false;break;
    }
+   marcarTiempo('pdf_confirmado',{pdf:received+1});
    received++;
   }
  }finally{
   batchSending=false;
   updateSummary();
  }
- if(!success)return;
+ if(!success){terminarMedicion('envio_incompleto');return;}
  if(allEntries.some(d=>!d.confirmacion)){
   batchProgress.textContent='Hay PDF pendientes de verificar. Se detuvo el registro.';
+  terminarMedicion('verificacion_incompleta');
   return;
  }
  batchProgress.textContent='Todos los PDF verificados. Registrando el pedido en la Central…';
+ marcarTiempo('central_inicio');
  await registrarPedidoVerificado();
+ marcarTiempo('central_fin');
  if(registeredOrder)
   batchProgress.textContent='Pedido enviado y registrado correctamente. Sin cobros.';
  else
   batchProgress.textContent='PDF recibidos; el registro quedó pendiente. Pulsá «Enviar mi pedido» para reintentar sin subir los PDF.';
+ terminarMedicion(registeredOrder?'pedido_registrado':'registro_pendiente');
 });
 if(previous?.items.length){
  status.textContent='Carrito recuperado: '+previous.seen.size+' referencia(s) de PDF pendiente(s) de nueva verificación. Volvé a seleccionar cada PDF: las fotos y archivos nunca se guardan en el navegador. Ningún pago ni pedido quedó confirmado. Pedido de prueba: '+orderId;
@@ -597,7 +641,7 @@ window.addEventListener('message',async event=>{
       nombre:p.nombre,bytes:p.file.size,paginas:paginas.length,sha256:sha,
       estado:'PENDIENTE_DE_ENVIO',recibido:false,verificadoServidor:false}}]});
    save();render();updateSummary();
-   document.getElementById('recepcion-avanzada').open=true;
+   // Los detalles técnicos quedan cerrados.
   }catch(error){
    batchStatus.textContent='Ploteo sin preparar: '+String(error.message||error);return;
   }
@@ -605,7 +649,7 @@ window.addEventListener('message',async event=>{
   const poster=paginas.length-cad;
   batchStatus.textContent='Ploteo analizado: '+p.nombre+' · '+cad+
    ' página(s) CAD y '+poster+' Póster. PDF preparado en memoria para la recepción privada. '+
-   'Falta pulsar «Enviar todos los PDF del pedido». La Central D1 continúa bloqueada para ploteos.';
+   'Cuando estés listo, pulsá «Enviar mi pedido»; el registro será automático.';
   return;
  }
  if(event.source===smart.contentWindow&&event.data?.type==='SABER_SMART_HANDOFF_READY'){
@@ -618,6 +662,8 @@ window.addEventListener('message',async event=>{
  }
  if(event.source===smart.contentWindow&&event.data?.type==='SABER_SMART_PRICE_STATE'){
   const status=event.data.estado;
+  if(status==='calculando'&&analisisIniciado===null)analisisIniciado=performance.now();
+  else if(status==='listo'&&analisisIniciado!==null){ultimoAnalisisMs=Math.round(performance.now()-analisisIniciado);analisisIniciado=null;}
   const price=event.data.total;
   smartReady=status==='listo'&&Number.isSafeInteger(price)&&price>0&&event.data.sendable===true;
   smartBlockedReason=typeof event.data.blockReason==='string'?event.data.blockReason:'';
@@ -685,8 +731,7 @@ window.addEventListener('message',async event=>{
    all.push({name:'Pedido inteligente · '+drafts.length+' PDF',
     price:payload.total,references:drafts});
    save();render();updateSummary();
-   document.getElementById('recepcion-avanzada').open=true;
-   status.textContent=drafts.length+' PDF listos. Pulsá «Enviar todos los PDF del pedido».';
+   status.textContent=drafts.length+' PDF preparados para el envío seguro.';
    batchStatus.textContent=drafts.length+' PDF listos para enviar, sin seleccionarlos otra vez.';
   }catch(error){batchStatus.textContent='No se preparó la carga: '+String(error.message||error)}
   return;
