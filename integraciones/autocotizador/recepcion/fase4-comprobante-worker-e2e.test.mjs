@@ -17,6 +17,7 @@ const adminKey='TEST_ADMIN_NOT_REAL_0123456789_abcdefghij';
 const hash=b=>createHash('sha256').update(b).digest('hex');
 const uploads=new Map();
 let expectedGoogle=null,googleCalls=[],stageCount=0,preparedCount=0;
+let expectedCentral={total:3290,receipts:1};
 const now=Math.floor(Date.now()/1000);
 const env={
  DOCS_RELAY_KEY:relayKey,
@@ -45,10 +46,11 @@ const env={
   if(path==='/internal/central/stage'){
    stageCount++;
    assert.equal(data.schema,'saber-central-recepcion-verificada-v1');
-   assert.equal(data.importeVerificado,3290);
-   assert.equal(data.recibos.length,1);
-   assert.equal(data.ficha.trabajos[0].tipoAnillado,'individual');
-   assert.equal(data.ficha.trabajos[0].paginasOriginales,12);
+   assert.equal(data.importeVerificado,expectedCentral.total);
+   assert.equal(data.recibos.length,expectedCentral.receipts);
+   assert.equal(data.ficha.trabajos.length,expectedCentral.receipts);
+   assert.ok(data.ficha.trabajos.every(t=>t.tipoAnillado==='individual'));
+   assert.ok(data.ficha.trabajos.every(t=>t.paginasOriginales===12));
    assert.equal(data.paymentAuthorized,false);
    assert.equal(data.listoParaProducir,false);
    return Response.json({saved:true,web_order_id:data.orderId,idempotent:false,
@@ -59,7 +61,7 @@ const env={
    assert.equal(data.items.length,0);
    assert.match(data.webOrderId,/^WEB-/);
    return Response.json({created:true,commercial_order_id:randomUUID(),
-    amount_ars:3290,state:'awaiting_payment',checkoutEnabled:false,
+    amount_ars:expectedCentral.total,state:'awaiting_payment',checkoutEnabled:false,
     paymentAuthorized:false},{status:201});
   }
   throw Error('Central mock: unexpected route '+path);
@@ -142,7 +144,7 @@ function dispatch(p){
 }
 const oldFetch=globalThis.fetch;
 let turnstileCount=0;
-globalThis.fetch=async (url,options={})=>{
+const simulatedFetch=async (url,options={})=>{
  const uri=new URL(url);
  if(uri.hostname==='challenges.cloudflare.com'){
   turnstileCount++;
@@ -163,6 +165,7 @@ globalThis.fetch=async (url,options={})=>{
  }
  throw Error('Unexpected external request '+url);
 };
+globalThis.fetch=simulatedFetch;
 const call=(path,data,additional={})=>worker.fetch(new Request(origin+path,{
  method:'POST',headers:{'Content-Type':'application/json',
   Origin:origin,'Sec-Fetch-Site':'same-origin',...additional},
@@ -299,6 +302,96 @@ test('Worker enlaza 12p y registra en Central sin segunda lectura de Drive; sell
   assert.equal(stageCount,1,'No se manda a Central un comprobante alterado');
   assert.equal(preparedCount,1);
  }finally{
+  globalThis.fetch=oldFetch;
+ }
+});
+
+test('dos PDF con sesiones de una sola tanda se verifican por SHA y registran UN pedido D1',async()=>{
+ globalThis.fetch=simulatedFetch;
+ stageCount=0;preparedCount=0;
+ try{
+  const orderId='WEB-ENSAYO-LOTE-PDF-DOBLE';
+  const docs=[];
+  for(let i=0;i<2;i++){
+   const pdf=await PDFDocument.create();
+   pdf.setTitle('Pedido múltiple PDF '+i);
+   for(let p=0;p<12;p++)pdf.addPage([595.28,841.89]);
+   const bytes=Buffer.from(await pdf.save());
+   const sha256=hash(bytes);
+   docs.push({bytes,sha256,meta:{
+    orderId,fileId:'pdf-'+sha256.slice(0,24),name:'prueba-'+i+'.pdf',
+    mode:'bn',bytes:bytes.length,sha256,
+    partBytes:524288,parts:Math.ceil(bytes.length/524288)
+   }});
+  }
+  assert.notEqual(docs[0].sha256,docs[1].sha256);
+  const response=await call('/api/ensayo-pdf-iniciar-lote',{
+   turnstileToken:'TURNTSTILE_DOBLE_01234567',metas:docs.map(d=>d.meta)
+  });
+  assert.equal(response.status,200,JSON.stringify(await response.clone().json()));
+  const batch=await response.json();
+  assert.equal(batch.sessions.length,2);
+  const links=[];
+  const options={formato:'a4',caras:'double',copias:1,
+   anillado:'individual',materialColor:'obra70',paginasPorHoja:1};
+  for(let i=0;i<2;i++){
+   const d=docs[i],ss=batch.sessions[i];
+   for(let p=0;p<d.meta.parts;p++){
+    const part=d.bytes.subarray(p*524288,Math.min(d.bytes.length,(p+1)*524288));
+    const r=await call('/api/ensayo-pdf-ampliado',{
+     op:'part',uploadId:ss.uploadId,token:ss.token,index:p,
+     bytes:part.length,sha256:hash(part),dataBase64:part.toString('base64')
+    });
+    assert.equal(r.status,200,JSON.stringify(await r.clone().json()));
+   }
+   const finished=await call('/api/ensayo-pdf-ampliado',{
+    op:'finish',uploadId:ss.uploadId,token:ss.token,
+    sha256:d.sha256,bytes:d.bytes.length,parts:d.meta.parts
+   });
+   assert.equal(finished.status,200,JSON.stringify(await finished.clone().json()));
+   const ref={schema:'saber-pdf-local-pendiente-v1',
+    localRef:randomUUID(),sha256:d.sha256,bytes:d.bytes.length,paginas:12,
+    nombre:d.meta.name,estado:'PENDIENTE_DE_ENVIO',
+    recibido:false,verificadoServidor:false};
+   const linked=await call('/api/ensayo-vincular-pdf-v2',{
+    referencia:ref,expectedOrderId:orderId,expectedMode:'bn',
+    sesion:{uploadId:ss.uploadId,token:ss.token},opciones:options
+   });
+   assert.equal(linked.status,200,JSON.stringify(await linked.clone().json()));
+   const data=await linked.json();
+   assert.equal(data.cotizacionServidor.totalArs,3290);
+   assert.equal(data.paymentAuthorized,false);
+   assert.equal(data.comprobanteServidor.payload.sha256,d.sha256);
+   links.push({linked:data,session:ss});
+  }
+  expectedCentral={total:6580,receipts:2};
+  const manifest=prepararManifiestoDocumentalV2({
+   orderId,trabajos:links.map(d=>({vinculo:d.linked}))
+  });
+  const cfg={servicio:'auto',seleccion:'a4',paginasSeleccionadas:'',
+   copias:1,modo:'bn',caras:'double',paginasPorHoja:1,
+   papelPoster:'obra80',anillado:'individual',grupoAnillado:'',
+   materialColor:'obra70',productoFoto:'',productoGrafica:'',
+   corteVariante:'gt3',corteMetros:1};
+  const payload={clientOrderId:randomUUID(),items:[],manifiesto:manifest,
+   sesiones:links.map(d=>({
+    sesion:{uploadId:d.session.uploadId,token:d.session.token},
+    comprobanteServidor:d.linked.comprobanteServidor,opciones:cfg
+   }))};
+  const beforeCentral=googleCalls.length;
+  const registered=await call('/api/ensayo-preparar-documentos-v2-lote',payload,
+   {Authorization:'Bearer '+adminKey});
+  assert.equal(registered.status,200,JSON.stringify(await registered.clone().json()));
+  const result=await registered.json();
+  assert.equal(result.totalArs,6580);
+  assert.equal(result.paymentAuthorized,false);
+  assert.equal(result.listoParaProducir,false);
+  assert.equal(result.checkoutEnabled,false);
+  assert.equal(stageCount,1,'No se registran dos pedidos D1 por dos PDFs');
+  assert.equal(preparedCount,1,'Se prepara un solo pedido comercial SIN cobro');
+  assert.equal(googleCalls.length,beforeCentral,'Ninguna descarga Google adicional al registrar');
+ }finally{
+  expectedCentral={total:3290,receipts:1};
   globalThis.fetch=oldFetch;
  }
 });
