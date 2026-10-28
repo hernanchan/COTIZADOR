@@ -13,7 +13,7 @@ export function cotizarNupReciboVerificado({recibo,medidas,opciones,precios}){
    !opciones||![2,4,9].includes(opciones.paginasPorHoja)||
    !['a4','a3'].includes(opciones.formato)||
    !['simple','double'].includes(opciones.caras)||
-   !['ninguno'].includes(opciones.anillado)||
+   !['ninguno','individual'].includes(opciones.anillado)||
    !Number.isSafeInteger(opciones.copias)||opciones.copias<1||opciones.copias>200||
    !['bn','color'].includes(recibo.mode)||
    typeof opciones.materialColor!=='string')
@@ -29,7 +29,7 @@ export function cotizarNupReciboVerificado({recibo,medidas,opciones,precios}){
  const r=cotizarCargaUnica({precios,archivos:[{
   nombre:recibo.name,servicio:'auto',paginas,seleccion:opciones.formato,
   paginasSeleccionadas:'',copias:opciones.copias,modo:recibo.mode,
-  caras:opciones.caras,papelPoster:'obra80',anillado:'ninguno',
+  caras:opciones.caras,papelPoster:'obra80',anillado:opciones.anillado,
   grupoAnillado:'',materialColor:opciones.materialColor,
   paginasPorHoja:opciones.paginasPorHoja
  }]});
@@ -39,6 +39,6 @@ export function cotizarNupReciboVerificado({recibo,medidas,opciones,precios}){
  return Object.freeze({estado:'PRELIMINAR_VERIFICADA_SIN_PEDIDO',
   totalArs:r.total,paginasOriginales:recibo.pages,
   formato:opciones.formato,caras:opciones.caras,copias:opciones.copias,
-  anillado:'ninguno',materialColor:opciones.materialColor,
+  anillado:opciones.anillado,grupoAnillado:'',materialColor:opciones.materialColor,
   paginasPorHoja:opciones.paginasPorHoja,paymentAuthorized:false});
 }
