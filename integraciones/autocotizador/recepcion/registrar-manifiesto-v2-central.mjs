@@ -91,6 +91,26 @@ export function conciliarManifiestoV2ConServidor({manifiesto,verificacion}){
   }else if(item.opciones?.grupoAnillado)
    throw Error('El pedido agregó un grupo de anillado ajeno.');
  }
+ // Ningún grupo se puede ensamblar con un solo documento ni con un
+ // miembro ausente del pedido. Evita que D1 guarde instrucciones parciales.
+ const anilladosPorGrupo=new Map();
+ for(const item of m.items){
+  if(item.opciones?.anillado!=='grupo')continue;
+  const id=String(item.opciones.grupoAnillado);
+  const ficha=trabajos.find(t=>t.reciboPrivado===item.reciboPrivado);
+  if(!anilladosPorGrupo.has(id))anilladosPorGrupo.set(id,[]);
+  anilladosPorGrupo.get(id).push(ficha.idTrabajo);
+ }
+ for(const [id,ids] of anilladosPorGrupo){
+  const grupo=v.ficha.gruposAnillado?.find(g=>String(g.grupo)===id);
+  if(ids.length<2||!grupo||!Array.isArray(grupo.archivos)||
+     grupo.archivos.length!==ids.length||
+     grupo.archivos.some(idTrabajo=>!ids.includes(idTrabajo))||
+     !Number.isSafeInteger(grupo.hojasPorJuego)||grupo.hojasPorJuego<1||
+     !Number.isSafeInteger(grupo.juegos)||grupo.juegos<1||
+     !Number.isSafeInteger(grupo.subtotal)||grupo.subtotal<0)
+   throw Error('El armado conjunto no coincide con los PDF del pedido.');
+ }
  // No aceptar total local como precio; ni rechazar una modificación legítima
  // de tarifa: la autoridad es la cotización comprobada por el servidor.
  return Object.freeze({
