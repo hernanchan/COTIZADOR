@@ -33,7 +33,7 @@ function environment({n=PART*2+37}={}){
   getContentText:()=>typeof body==='string'?body:JSON.stringify(body),
   getBlob:()=>({getBytes:()=>Array.from(blob||remote)})
  });
- const UrlFetchApp={fetch(url,params)=>{
+ const UrlFetchApp={fetch:(url,params)=>{
   const range=params.headers?.['Content-Range']||null;
   if(url===s.sessionUrl&&params.method==='put'){
    if(range===`bytes */${bytes.length}`){
