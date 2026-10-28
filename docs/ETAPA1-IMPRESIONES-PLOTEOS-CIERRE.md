@@ -346,3 +346,13 @@ Se confirmó una **incompatibilidad entre cotización y recepción**, no una fal
 **Estado confirmado al cerrar:** código seguro y pruebas aprobados en GitHub, **sin nueva versión Cloudflare cargada ni desplegada**. La última versión privada conocida en servicio es `2c1db455-4ac5-4f02-9ebd-c4e581f7283d`, que produjo el ensayo de 62.081 ms. `main` comercial, `libreriasaber.com.ar`, cobros y Polaroids intactos.
 
 **Próximo paso operativo:** desde el workflow manual de GitHub existente en `main` `.github/workflows/saber-preparar-version-privada.yml` (build FROM rama privada), ejecutar **Run workflow** y recuperar `VERSION_PRIVADA_PREPARADA_SIN_ACTIVAR`. Luego promocionar **solo** en Cloudflare `saber-documentos-pruebas`, guardando `2c1db455` como rollback. Repetir exactamente PDF de 12 páginas con `?diagnostico=1` (y un lote mixto después), comparar tiempos por fase contra 62.081 ms. Si hay errores de concurrencia/cuotas o empeora la latencia, revertir al despliegue anterior; no atribuir mejoría antes de medir. Si el cuello `finish` persiste, instrumentar GAS para separar Drive SHA, relecturas y llamadas Worker, sin omitir seguridad.
+
+
+## 28-10-2026: optimización de lectura concurrente preparada como versión privada, SIN activarla
+
+- El usuario ejecutó manualmente la tercera preparación en `main`, workflow `saber-preparar-version-privada.yml`, run GitHub **`40721612657`**.
+- Consultados job `122933746335` y logs: **completed/success** en todos sus pasos, con `PRUEBAS_PRIVADAS_OK` y `SIN_DESPLIEGUE_SIN_PAGOS_SIN_CAMBIOS_EN_WEB_COMERCIAL`.
+- Nueva versión cargada en Cloudflare pero **NO desplegada**: `VERSION_PRIVADA_PREPARADA_SIN_ACTIVAR=8ea21564-0d95-44ab-a344-0100f108ef30`.
+- Incluye lectura de 256KiB con concurrencia acotada a 3, SHA-256 íntegro y consulta de metadata+estado firmados solapadas; las pruebas del contrato y tests de seguridad/concurrencia pasaron previamente en run `40721208008`.
+- **Última versión de pruebas activa conocida:** `2c1db455-4ac5-4f02-9ebd-c4e581f7283d` (línea base de 62.081ms para 1 PDF A4 de 12 páginas). Mantenerla como rollback si se activa la optimizada.
+- **Próximo paso:** Cloudflare → Worker `saber-documentos-pruebas` → Implementaciones → menú de versión `8ea21564` → Promocionar al 100%, comprobar que la versión anterior indicada sea `2c1db455` y el destino sea exclusivamente Worker privado. Verificar con captura versión activa. Después una sola prueba del mismo PDF con `?diagnostico=1`, comparar total y fases contra 62.081ms; cualquier diferencia debe atribuirse con cautela a una muestra y no a planes de servicios. NO modificar `main` público, pagos ni Polaroids.
