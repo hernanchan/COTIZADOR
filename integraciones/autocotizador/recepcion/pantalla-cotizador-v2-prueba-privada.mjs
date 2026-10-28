@@ -567,6 +567,7 @@ async function registrarPedidoVerificado(){
    const q=d.ploteoVerificado||d.confirmacion.cotizacionServidor;
    const plot=d.ploteo;
    return {sesion:{uploadId:d.sesionConfirmada.uploadId,token:d.sesionConfirmada.token},
+    ...(d.confirmacion?.comprobanteServidor?{comprobanteServidor:d.confirmacion.comprobanteServidor}:{}),
     opciones:{servicio:'auto',seleccion:plot?'original':q.formato,paginasSeleccionadas:'',
      copias:q.copias,modo:d.modoConfirmado,caras:plot?'simple':q.caras,
      paginasPorHoja:plot?1:(q.paginasPorHoja??1),
