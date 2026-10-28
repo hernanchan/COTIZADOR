@@ -14,3 +14,12 @@ En DevTools Network, después de un solo reintento con los dos PDF cargados, sol
 - Commit `859a30ca`: prueba estática `tests/fase1-lote-diagnostico-502.test.mjs` añadida. **No consta ejecución CI de estos nuevos cambios**: no afirmar pruebas aprobadas.
 - No se cambió GAS, Central, pagos, Polaroids ni `main`. **Código modificado en rama ≠ Worker desplegado**. La versión privada promovida por confirmación de usuario sigue siendo `5fcfcf56` hasta verificar su estado con Cloudflare. El ensayo 502 de 2,60 s sigue sin causa definitiva.
 - **Próximo paso concreto:** ejecutar pruebas automáticas y compilar; preparar nueva versión privada sin activar mediante el workflow manual existente en `main`, recoger UUID real, promover sólo Worker `saber-documentos-pruebas` conservando `b7f58caf` como rollback. Después, reintentar la misma tanda de dos PDF sólo una vez, preservando la sesión si aún está abierta. El resultado `reasonCode` permitirá intervenir sobre la causa exacta. No repetir pruebas ni cambiar configuraciones a ciegas.
+
+
+## 28-10-2026 — versión de diagnóstico preparada, sin activar
+
+- El usuario lanzó el workflow manual `.github/workflows/saber-preparar-version-privada.yml` (#7) desde `main`, que toma código de la rama privada.
+- GitHub Actions run **40783328342**, job **123150222755**, **completed / success**. Logs de pruebas: `# fail 0`, `PRUEBAS_PRIVADAS_OK`; compilación y subida de versión aprobadas.
+- UUID real de Cloudflare **`625a9f5a-cb9f-43a7-bcb3-94d2c4c545ba`**, extraído del log `VERSION_PRIVADA_PREPARADA_SIN_ACTIVAR=...`.
+- Log final `SIN_DESPLIEGUE_SIN_PAGOS_SIN_CAMBIOS_EN_WEB_COMERCIAL`: **NO activada**, NO prueba real. La última versión concurrente promovida por confirmación del usuario es `5fcfcf56-52b8-471e-ac59-5ac9a50182ac` (sin readback independiente) y el rollback funcional documentado es `b7f58caf-7ca4-4abf-8e05-9694fa9593fd`.
+- **Próximo paso ejecutable**: en Cloudflare Worker `saber-documentos-pruebas`, promover exclusivamente `625a9f5a` al 100 %, verificar que `DOCS_SCRIPT_URL` sigue apuntando a GAS v8 `AKfycbyIQA...`. Conservar `b7f58caf` como recuperación. Repetir **un solo ensayo** de los dos PDF que fallaron (12 y 17 páginas; total preliminar $6.980) y leer el nuevo `reasonCode` de respuesta 502 si vuelve a fallar; no exponer tokens ni credenciales. Confirmar SHA/Drive, cotización oficial y un único pedido D1 antes de declarar éxito; pagos apagados. No tocar `main`, web comercial o Polaroids.
