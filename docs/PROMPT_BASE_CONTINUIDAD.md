@@ -31,6 +31,7 @@
 ## Ubicación de los registros
 
 - Registro de etapa vigente: `docs/ETAPA1-IMPRESIONES-PLOTEOS-CIERRE.md`.
+- Contrato UX acordado para el próximo desarrollo: `docs/UX-CIRCUITO-UNICO-CLIENTE-V1.md` (documentación, aún no implementada).
 - Índice de continuidad y criterio general: este documento.
 - Instrucciones de agentes/colaboradores: `AGENTS.md`.
 
