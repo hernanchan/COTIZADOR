@@ -18,6 +18,8 @@ on:
       - 'integraciones/autocotizador/recepcion/receptor-gas-recuperacion.test.mjs'
       - 'integraciones/autocotizador/recepcion/recepcion-paralela-lote.test.mjs'
       - 'integraciones/autocotizador/recepcion/subir-vincular-pdf-v2-privado.mjs'
+      - 'integraciones/autocotizador/recepcion/subida-sesion-fresca.test.mjs'
+      - 'integraciones/autocotizador/recepcion/verificar-vinculo-cotizador-v2.mjs'
       - 'integraciones/autocotizador/recepcion/fase4-comprobante-worker-e2e.test.mjs'
       - 'integraciones/autocotizador/recepcion/package.json'
       - 'integraciones/autocotizador/recepcion/preparar-manifiesto-v2-documental.mjs'
