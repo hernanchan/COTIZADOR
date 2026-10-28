@@ -1524,6 +1524,10 @@ async function v2PrivateBrowserResponse(request,env,path){
      #prepararPedido{display:none}
      #enviar-cotizacion-inteligente{border:0;border-radius:10px;padding:14px 20px;background:#0a5583;color:white;font-weight:700;font-size:16px;cursor:pointer}
      #lista{margin-bottom:20px}
+     .tamano-rapido{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:7px;font-size:13px}
+     .tamano-rapido .tamano-opcion{border:1px solid #b7c6d4;background:white;color:#173c61;border-radius:7px;padding:6px 11px;cursor:pointer}
+     .tamano-rapido .tamano-opcion.seleccionada{background:#0a5583;border-color:#0a5583;color:white;font-weight:700}
+     .tamano-rapido small{flex-basis:100%;color:#5a6371}
      @media(max-width:720px){main{padding:12px 4px 20px}#zonaArchivos{padding:15px}}
      </style></head><body>`
    ).replace(
