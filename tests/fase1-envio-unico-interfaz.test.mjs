@@ -35,10 +35,16 @@ test('el clic único pide al analizador preparar archivos y espera confirmación
 
 test('anillado no se ofrece falsamente como enviable y tamaño A4 puede elegirse sin abrir editor',()=>{
  const client=readFileSync(new URL('../integraciones/autocotizador/recepcion/carga-unica-cliente.mjs',import.meta.url),'utf8');
- assert.match(client,/const sendable=estado==='listo'&&anillados\.length===0/);
+ assert.match(client,/const sendable=estado==='listo'&&anillados\.every\(e=>e\.anillado==='individual'\)/);
  assert.match(client,/className='tamano-rapido'/);
  assert.match(client,/\['a4','A4'\]/);
  assert.match(client,/coincide\(p,21,29\.7,1\)/);
  assert.match(source,/smartBlockedReason/);
  assert.match(source,/event\.data\.sendable===true/);
+});
+
+test('el registro D1 conserva anillado individual y no admite grupo parcial',()=>{
+ assert.match(source,/anillado:plot\?'ninguno':q\.anillado/);
+ assert.match(source,/\['ninguno','individual'\]\.includes\(opt\.anillado\)/);
+ assert.match(source,/d\.opcionesInteligentes\.anillado\|\|'ninguno'/);
 });
