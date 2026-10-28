@@ -35,11 +35,22 @@ test('no se puede quitar un anillado ya contratado en el servidor',()=>{
  const {m,v}=fixture({binding:'ninguno',serverBinding:'individual'});
  assert.throws(()=>conciliarManifiestoV2ConServidor({manifiesto:m,verificacion:v}),/anillado u opciones/);
 });
-test('grupo requiere coincidencia de ID y listado de armado verificado',()=>{
+test('grupo requiere 2 PDFs, identidad y membresía completa comprobada',()=>{
  const {m,v}=fixture({binding:'grupo',group:'2'});
- assert.equal(conciliarManifiestoV2ConServidor({manifiesto:m,verificacion:v}).cantidadArchivos,1);
- v.ficha.gruposAnillado=[{grupo:'1',archivos:['pdf1']}];
- assert.throws(()=>conciliarManifiestoV2ConServidor({manifiesto:m,verificacion:v}),/grupo de anillado/);
+ assert.throws(()=>conciliarManifiestoV2ConServidor({manifiesto:m,verificacion:v}),/armado conjunto/);
+ const receipt2='DOC-00000000-0000-4000-8000-000000000002',hash2='b'.repeat(64);
+ m.items.push({reciboPrivado:receipt2,sha256:hash2,paginas:8,
+  estado:'REQUIERE_REVALIDACION_DE_BACKEND',
+  opciones:{formato:'a4',caras:'double',copias:1,anillado:'grupo',grupoAnillado:'2'}});
+ v.recibos.push({receiptId:receipt2,sha256:hash2,pages:8,bytes:6000,fileId:'pdf-two'});
+ v.ficha.trabajos.push({idTrabajo:'pdf2',servicio:'documentos',reciboPrivado:receipt2,
+  sha256:hash2,paginasOriginales:8,formatoFinal:'a4',carasPresupuestadas:'double',
+  copias:1,tipoAnillado:'grupo',pdfImprimibleVerificado:false});
+ v.ficha.gruposAnillado=[{grupo:'2',archivos:['pdf1','pdf2'],
+  hojasPorJuego:10,juegos:1,subtotal:2035}];
+ assert.equal(conciliarManifiestoV2ConServidor({manifiesto:m,verificacion:v}).cantidadArchivos,2);
+ v.ficha.gruposAnillado[0].archivos=['pdf1'];
+ assert.throws(()=>conciliarManifiestoV2ConServidor({manifiesto:m,verificacion:v}),/armado conjunto/);
 });
 test('rechaza inconsistencias de formato, copias y caras',()=>{
  for(const field of ['formato','caras','copias']){
