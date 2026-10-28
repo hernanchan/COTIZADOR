@@ -365,3 +365,12 @@ Se confirmó una **incompatibilidad entre cotización y recepción**, no una fal
 - Versión incorpora lectura HMAC Google Drive de fragmentos 256KiB con concurrencia máxima 3 y comprobación SHA; en Central las dos consultas de estado/metadata se solapan. No elimina verificación de integridad/páginas/cotización de servidor ni activa cobros.
 - **Estado real:** promoción de Worker privado comprobada en screenshot. **Todavía NO se ha medido ni demostrado reducción de latencia** con prueba de PDF. Sitio público y cobros sin cambios.
 - **Siguiente paso:** el mismo PDF `poliza_1145046.pdf` (12 páginas, A4, B/N, doble faz, una copia, anillado individual, total preliminar $3.290), desde pestaña nueva `/prueba-v2/?diagnostico=1` y un solo clic de envío; luego capturar `Array(...)` de consola abierto con etapa `fin`. Contrastar con 62.081ms anteriores, recepción hasta 42.605ms y Central desde 42.607 hasta 62.081. Si cuota/red/revalidación falla, volver al Worker `2c1db455`; no concluir que mejoras o fallos son por planes gratis con una sola muestra.
+
+
+## 28-10-2026: primera prueba real tras optimización 8ea21564 — usuario informa demora excesiva
+
+- Captura proporcionada por usuario de `/prueba-v2/?diagnostico=1`: 1 PDF `poliza_1145046.pdf`, A4, 12 páginas, B/N, doble faz, anillado individual, total preliminar $3.290, interfaz muestra `Pedido registrado` y `Pedido enviado y registrado correctamente. Sin cobros`.
+- El usuario informa explícitamente **«demoró un montón»** después de implementar lecturas concurrentes con máximo 3 en versión privada `8ea21564`.
+- La consola muestra `[Librería Saber] Mediciones locales del ensayo` y `Array(13)`, **CONTRAÍDO**. Por tanto NO es posible leer de esa captura el tiempo total ni fases y NO se puede afirmar una mejora o regresión cuantificada. Se le indicó desplegar `Array(13)` con un clic y enviar captura.
+- **Hallazgo práctico:** la optimización de fragmentos por sí sola no ha resuelto la percepción de lentitud del cliente. Evitar reiterar pruebas sin obtener primero duración real y luego atacar la arquitectura del intercambio GAS/Drive/Worker (múltiples POST firmados y relecturas) con salvaguardas de integridad, cotización de servidor, registro D1 y reintentos.
+- No tocar producción, pagos, Polaroids ni desplegar otra versión basada únicamente en la percepción sin medir tramos. Versión previa conocida para rollback `2c1db455`.
