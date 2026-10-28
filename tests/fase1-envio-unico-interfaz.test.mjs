@@ -91,7 +91,8 @@ test('una verificación firmada de PDF puede reutilizarse para D1 sin segunda de
  const worker=readFileSync(new URL('../integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs',import.meta.url),'utf8');
  const upload=readFileSync(new URL('../integraciones/autocotizador/recepcion/subir-vincular-pdf-v2-privado.mjs',import.meta.url),'utf8');
  const signer=readFileSync(new URL('../integraciones/autocotizador/recepcion/comprobante-pdf-servidor.mjs',import.meta.url),'utf8');
- assert.match(worker,/comprobanteServidor=await crearComprobantePdf/);
+ assert.match(worker,/comprobanteServidor=recibo\.serverPageMetrics/);
+ assert.match(worker,/await crearComprobantePdf/);
  assert.match(worker,/verificacion=await verificarPedidoPorComprobantes/);
  assert.match(worker,/verificacion=await rutaLegada\(\)/);
  assert.match(worker,/serverPageMetrics/);
