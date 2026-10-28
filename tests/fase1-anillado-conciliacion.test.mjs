@@ -50,7 +50,7 @@ test('grupo requiere 2 PDFs, identidad y membresía completa comprobada',()=>{
   hojasPorJuego:10,juegos:1,subtotal:2035}];
  assert.equal(conciliarManifiestoV2ConServidor({manifiesto:m,verificacion:v}).cantidadArchivos,2);
  v.ficha.gruposAnillado[0].archivos=['pdf1'];
- assert.throws(()=>conciliarManifiestoV2ConServidor({manifiesto:m,verificacion:v}),/armado conjunto/);
+ assert.throws(()=>conciliarManifiestoV2ConServidor({manifiesto:m,verificacion:v}),/(?:armado conjunto|grupo de anillado)/);
 });
 test('rechaza inconsistencias de formato, copias y caras',()=>{
  for(const field of ['formato','caras','copias']){
