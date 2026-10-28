@@ -503,3 +503,11 @@ Se inspeccionó en GitHub `integraciones/autocotizador/recepcion/DocumentosRecei
 - Nueva versión Cloudflare **`b7f58caf-7ca4-4abf-8e05-9694fa9593fd`**, log exacto `VERSION_PRIVADA_PREPARADA_SIN_ACTIVAR=b7f58caf-7ca4-4abf-8e05-9694fa9593fd`, **SIN activar**.
 - Log confirma `SIN_DESPLIEGUE_SIN_PAGOS_SIN_CAMBIOS_EN_WEB_COMERCIAL`. Última versión del Worker privado activa conocida `4218e07f-ce26-4c88-93c1-4d3ce6cc68de` para rollback. No tocar `main` público, cobros, Polaroids.
 - Próximo paso: Cloudflare → `saber-documentos-pruebas` → Implementaciones → menú fila `b7f58caf` → promover al 100% solamente sobre el Worker privado; comprobar nombre y versión previa, conservar rollback `4218e07f`. Luego prueba única mismo `poliza_1145046.pdf` con `?diagnostico=1`; comparar contra 32.296 ms previos y total verificado $3.290. No afirmar mejora antes de medir. Si falla la recepción, revertir Worker y/o versión GAS anterior, no borrar PDFs o sesiones.
+
+
+## 28-10-2026: usuario confirma promoción de Worker privado b7f58caf; medición final PENDIENTE
+
+- El usuario respondió «listo» inmediatamente después de que se le indicó promocionar `b7f58caf-7ca4-4abf-8e05-9694fa9593fd` al 100% en Cloudflare Worker `saber-documentos-pruebas`. Interpretación operativa: **promoción confirmada por usuario**, aún sin captura/readback independiente del estado de Cloudflare.
+- El proyecto Google Apps Script «SABER — RECEPCIÓN DOCUMENTOS» también fue actualizado previamente según confirmación del usuario. No tocar Polaroids, web comercial, producción ni pagos.
+- Se solicitó UNA sola nueva prueba `https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/?diagnostico=1` con `poliza_1145046.pdf`: 12p, A4, B/N, doble faz, 1 copia, anillado individual; expectativa de cotización $3.290. Captura de consola `Array(...)` expandido con `fin`. **No existen todavía tiempos de la versión b7f58caf, no afirmar mejoras.**
+- Comparar contra línea base `4218e07f` de **32.296 ms**; observar si `pdf_estado`, `pdf_transferencia`, `pdf_verificacion` y `pdf_confirmado` cambian, además de `central_fin`. Comprobar estado pedido registrado, recibo PDF y cobros apagados. Si hay fallo, conservar `4218e07f` como rollback del Worker y versión GAS anterior como recuperación.
