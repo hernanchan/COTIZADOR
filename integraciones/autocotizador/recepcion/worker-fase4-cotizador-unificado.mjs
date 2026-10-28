@@ -787,9 +787,21 @@ async function fase4BatchStart(request,env){
   return testResponse({ok:false,error:'No se confirmó la verificación de seguridad del lote',paymentAuthorized:false},403);
  try{
   const reply=await postToScript(env,{op:'multiStartBatch',metas:body.metas},fetch,12000);
-  if(!reply.ok||!Array.isArray(reply.sessions)||reply.sessions.length!==body.metas.length||
-     reply.paymentAuthorized!==false)
-   throw Error('Receptor no confirmó el lote');
+  if(!reply.ok){
+   const reason=String(reply.errorCode||'').toUpperCase();
+   // El receptor sólo publica categorías autorizadas, nunca su mensaje interno.
+   const permitted=new Set(['UNAUTHORIZED','INVALID_REQUEST','QUOTA','LIMIT','DUPLICATE',
+     'SESSION','ARCHIVO','LOCKED','INTERNAL']);
+   const err=new Error('Receptor rechazó inicio del lote');
+   err.safeReason=permitted.has(reason)?reason:'RECHAZO_RECEPTOR';
+   throw err;
+  }
+  if(!Array.isArray(reply.sessions)||reply.sessions.length!==body.metas.length||
+     reply.paymentAuthorized!==false){
+   const err=new Error('Respuesta de lote incompatible');
+   err.safeReason='RESPUESTA_INCOMPATIBLE';
+   throw err;
+  }
   const seenSessions=new Set();
   for(let i=0;i<reply.sessions.length;i++){
    const item=reply.sessions[i],meta=body.metas[i];
@@ -802,11 +814,22 @@ async function fase4BatchStart(request,env){
   return testResponse({ok:true,orderId:body.metas[0].orderId,
    sessions:reply.sessions,receiptOnly:true,paymentAuthorized:false,
    maxParallelUploads:2},200);
- }catch(_){
-  // Un inicio parcial en Google se recupera con el mismo fileId+SHA.
-  // No afirmar que falló la creación, ni enviar al cliente sesiones dudosas.
+ }catch(err){
+  // Diagnóstico privado sin tokens, contenido de PDF, URL de Google ni errores crudos.
+  // Un inicio parcial en Google puede recuperarse con idénticos fileId+SHA.
+  const safeReason=err?.safeReason||
+   (err?.stage==='script_post'?'GOOGLE_POST':
+    err?.stage==='googleusercontent_get'?'GOOGLE_REDIRECT_GET':
+    err?.name==='TimeoutError'?'TIMEOUT':
+    err?.message==='Redirección de Google no autorizada.'?'GOOGLE_REDIRECT':
+    err?.message==='Respuesta Google inesperada.'?'RESPUESTA_GRANDE':
+    err?.message==='Respuesta Google ilegible.'?'JSON_INVALIDO':
+    err?.message==='Respuesta Google inválida.'?'JSON_INCOMPATIBLE':
+    err?.message==='Conexión privada no configurada.'?'CONFIGURACION':
+    'VALIDACION_SESION');
+  console.warn('saber_batch_start_failure',safeReason);
   return testResponse({ok:false,error:'No se pudo confirmar el inicio completo de la tanda. Podés reintentar sin duplicar recibos.',
-   retrySafe:true,paymentAuthorized:false},502);
+   reasonCode:safeReason,retrySafe:true,paymentAuthorized:false},502);
  }
 }
 async function fase4Transfer(request,env,extended=false){
