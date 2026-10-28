@@ -9,7 +9,7 @@ const doc=(id,paginas,anillado,grupoAnillado='',copias=1,caras='double')=>({
  modo:'bn',caras,anillado,grupoAnillado,materialColor:'estandar',orden:Number(id.slice(3))
 });
 test('12 páginas doble faz producen 6 hojas y 1 anillado individual de catálogo',()=>{
- const q=cotizarDocumentosIndividuales({archivos:[doc('pdf1',12,'individual')],precios});
+ const q=cotizarDocumentosIndividuales({archivos:[doc('pdf1',12,'individual')],precios:prices});
  assert.equal(q.detalles[0].hojasPorJuego,6);
  assert.equal(q.subtotalAnillados,prices.bindings.a4[0].price);
  assert.equal(q.total,q.subtotalImpresiones+q.subtotalAnillados);
@@ -18,7 +18,7 @@ test('12 páginas doble faz producen 6 hojas y 1 anillado individual de catálog
 test('dos PDF se anillan juntos por la suma de hojas y no cobran dos anillados',()=>{
  const q=cotizarDocumentosIndividuales({archivos:[
   doc('pdf1',12,'grupo','2'),doc('pdf2',8,'grupo','2')
- ],precios});
+ ],precios:prices});
  assert.equal(q.detalleArmados.length,1);
  assert.equal(q.detalleArmados[0].hojasPorJuego,10);
  assert.deepEqual(q.detalleArmados[0].archivos,['pdf1','pdf2']);
@@ -31,6 +31,6 @@ test('no se cotiza grupo incompleto, copias inconsistentes ni exceso de capacida
   [doc('pdf1',12,'grupo','3'),doc('pdf2',12,'grupo','3',2)],
   [doc('pdf1',500,'grupo','3'),doc('pdf2',500,'grupo','3')]
  ]){
-  assert.throws(()=>cotizarDocumentosIndividuales({archivos:files,precios}));
+  assert.throws(()=>cotizarDocumentosIndividuales({archivos:files,precios:prices}));
  }
 });
