@@ -936,7 +936,7 @@ async function v2VincularPdf(request,env){
        ![1,2,4,9].includes(input.opciones.paginasPorHoja??1)||
        !['a4','a3'].includes(input.opciones.formato)||
        !['simple','double'].includes(input.opciones.caras)||
-       !['ninguno','juntos'].includes(input.opciones.anillado)||
+       !['ninguno','individual'].includes(input.opciones.anillado)||
        !Number.isSafeInteger(input.opciones.copias)||
        input.opciones.copias<1||input.opciones.copias>200||
        typeof input.opciones.materialColor!=='string'||
@@ -976,7 +976,7 @@ async function v2VincularPdf(request,env){
     solicitud:{orderId:recibo.orderId,archivos:[{
      id:recibo.fileId,nombre:recibo.name,modo:recibo.mode,orden:1
     }],formato:o.formato,caras:o.caras,copias:o.copias,
-    anillado:o.anillado,materialColor:o.materialColor},
+    anillado:o.anillado==='individual'?'juntos':'ninguno',materialColor:o.materialColor},
     recibosConfiables:[recibo],tarifasServidor:preciosPiloto
    });
    if(budget.paymentAuthorized!==false||
@@ -986,7 +986,8 @@ async function v2VincularPdf(request,env){
     cotizacionServidor:{estado:'PRELIMINAR_VERIFICADA_SIN_PEDIDO',
      totalArs:budget.quote.total,priceVersion:budget.priceVersion,
      paginasOriginales:recibo.pages,formato:o.formato,caras:o.caras,
-     copias:o.copias,anillado:o.anillado,materialColor:o.materialColor,paymentAuthorized:false},
+     copias:o.copias,anillado:o.anillado,grupoAnillado:'',
+     materialColor:o.materialColor,paymentAuthorized:false},
     paymentAuthorized:false,checkoutEnabled:false},200);
   }
   return testResponse({...link,ok:true},200);
