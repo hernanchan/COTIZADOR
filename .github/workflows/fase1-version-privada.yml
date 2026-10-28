@@ -1,4 +1,4 @@
-name: Fase 1 - preparar version privada Cloudflare sin desplegar (diagnostico recepcion)
+name: Fase 1 - preparar version privada Cloudflare sin desplegar (sesion segura D1)
 on:
   push:
     branches:
