@@ -62,7 +62,7 @@ const list=document.getElementById('all'),status=document.getElementById('state'
  summary=document.getElementById('order-summary');
 const registerButton=document.getElementById('register-private'),registerStatus=document.getElementById('register-status');
 const sendAllButton=document.getElementById('send-all-pdf'),batchProgress=document.getElementById('batch-progress');
-let batchSending=false,smartReady=false,handoffInProgress=false,handoffResolve=null;
+let batchSending=false,smartReady=false,smartBlockedReason='',handoffInProgress=false,handoffResolve=null;
 const dropPdf=document.getElementById('drop-pdf'),batchFiles=document.getElementById('batch-files'),batchStatus=document.getElementById('batch-status');
 function assignFiles(files){
  const chosen=Array.from(files||[]);
@@ -452,7 +452,8 @@ async function prepararDesdeCotizador(){
 sendAllButton.addEventListener('click',async()=>{
  if(batchSending||registering||handoffInProgress||registeredOrder)return;
  if(all.flatMap(item=>item.references).length===0){
-  if(!smartReady||!(await prepararDesdeCotizador()))return;
+  if(!smartReady){batchProgress.textContent=smartBlockedReason||'El presupuesto no está listo para enviar.';return;}
+  if(!(await prepararDesdeCotizador()))return;
  }
  const allEntries=all.flatMap(item=>item.references);
  const pending=allEntries.filter(d=>!d.confirmacion);
@@ -619,7 +620,10 @@ window.addEventListener('message',async event=>{
  if(event.source===smart.contentWindow&&event.data?.type==='SABER_SMART_PRICE_STATE'){
   const status=event.data.estado;
   const price=event.data.total;
-  smartReady=status==='listo'&&Number.isSafeInteger(price)&&price>0;
+  smartReady=status==='listo'&&Number.isSafeInteger(price)&&price>0&&event.data.sendable===true;
+  smartBlockedReason=typeof event.data.blockReason==='string'?event.data.blockReason:'';
+  if(smartBlockedReason)batchProgress.textContent=smartBlockedReason;
+  else if(all.length===0)batchProgress.textContent=smartReady?'Presupuesto listo. Pulsá «Enviar mi pedido».':'Revisá los archivos para continuar.';
   updateSummary();
   const headerPrice=document.getElementById('precio-smart');
   if(status==='listo'&&Number.isSafeInteger(price)&&price>0)
