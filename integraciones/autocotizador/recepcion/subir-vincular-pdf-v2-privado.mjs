@@ -66,7 +66,7 @@ export async function subirYVincularPdfCotizadorV2({
       .includes(Object.keys(opciones).sort().join(','))||
     ![1,2,4,9].includes(opciones.paginasPorHoja??1)||
     !['a4','a3'].includes(opciones.formato)||!['simple','double'].includes(opciones.caras)||
-    !['ninguno','juntos'].includes(opciones.anillado)||
+    !['ninguno','individual'].includes(opciones.anillado)||
     !Number.isSafeInteger(opciones.copias)||opciones.copias<1||opciones.copias>200||
     typeof opciones.materialColor!=='string'||
     !/^[A-Za-z0-9_-]{1,80}$/.test(opciones.materialColor)))
@@ -185,7 +185,8 @@ export async function subirYVincularPdfCotizadorV2({
   ...(opciones===undefined?{}:{cotizacionServidor:Object.freeze({
    estado:quote.estado,totalArs:quote.totalArs,priceVersion:quote.priceVersion,
    paginasOriginales:quote.paginasOriginales,formato:quote.formato,caras:quote.caras,
-   copias:quote.copias,anillado:quote.anillado,materialColor:quote.materialColor,
+   copias:quote.copias,anillado:quote.anillado,grupoAnillado:quote.grupoAnillado||'',
+   materialColor:quote.materialColor,
    paginasPorHoja:quote.paginasPorHoja??1,
    paymentAuthorized:false
   })})
