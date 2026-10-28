@@ -7,7 +7,7 @@ test('una sola llamada explícita envía PDF y registra D1',()=>{
  assert.match(source,/register-private"[^>]+hidden aria-hidden="true"/);
  assert.match(source,/async function registrarPedidoVerificado\(\)/);
  assert.match(source,/await registrarPedidoVerificado\(\)/);
- assert.match(source,/if\(!success\)\{terminarMedicion\('envio_incompleto'\);return;\}/);
+ assert.match(source,/if\(!success\)\{[\s\S]*?mostrarEstadoCliente\(null\);[\s\S]*?terminarMedicion\('envio_incompleto'\);return;[\s\S]*?\}/);
  assert.match(source,/if\(allEntries.some\(d=>!d.confirmacion\)\)/);
  assert.match(source,/const pending=allEntries.filter\(d=>!d.confirmacion\)/);
  assert.match(source,/if\(registeredOrder\)/);
@@ -101,4 +101,34 @@ test('una verificación firmada de PDF puede reutilizarse para D1 sin segunda de
  assert.match(signer,/subtle\.verify\('HMAC'/);
  assert.match(signer,/TTL_MS=15\*60\*1000/);
  assert.match(worker,/paymentAuthorized:false,listoParaProducir:false/);
+});
+
+test('UX compacta: pantalla de cliente no despliega diagnosticos y reemplaza editor por estado en mismo espacio',()=>{
+ assert.match(source,/const modoDiagnostico=new URLSearchParams/);
+ assert.match(source,/document.getElementById\('recepcion-avanzada'\).hidden=true/);
+ assert.match(source,/document.getElementById\('comparacion-original'\).hidden=true/);
+ assert.match(source,/#vista-estado-pedido/);
+ assert.match(source,/body\.estado-envio #smart,body\.estado-registro #smart\{display:none\}/);
+ assert.match(source,/mostrarEstadoCliente\('enviando'/);
+ assert.match(source,/mostrarEstadoCliente\('registrado'/);
+ assert.match(source,/ultimoTotalServidor=result\.totalArs/);
+ assert.match(source,/mostrarEstadoCliente\(null\)/);
+});
+
+test('UX de carga unica: grupos automaticos conservan indices de origen y opciones individuales',()=>{
+ const client=readFileSync(new URL('../integraciones/autocotizador/recepcion/carga-unica-cliente.mjs',import.meta.url),'utf8');
+ const worker=readFileSync(new URL('../integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs',import.meta.url),'utf8');
+ assert.match(client,/function grupoVisible\(e\)/);
+ for(const id of ['a4','a3','cad','poster','mixtos','pendientes'])
+  assert.match(client,new RegExp("id:'"+id+"'"));
+ assert.match(client,/entries\.forEach\(\(e,i\)=>\{/);
+ assert.match(client,/grupo\.indices\.push\(i\)/);
+ assert.match(client,/for\(const i of grupo\.indices\)/);
+ assert.match(client,/const e=entries\[i\]/);
+ assert.match(client,/function controlesComunes\(grupo\)/);
+ assert.match(client,/for\(const i of grupo\.indices\)\{/);
+ assert.match(client,/if\(campo==='anillado'\)/);
+ assert.match(client,/e\.grupoAnillado=''/);
+ assert.match(worker,/#presupuesto\{display:none\}/);
+ assert.match(client,/files,options,total:totalDocumentos/);
 });
