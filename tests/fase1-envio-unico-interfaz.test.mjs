@@ -157,3 +157,29 @@ test('receptor de Google confirma SHA una vez y conserva recuperación de bloque
  assert.match(part,/var real=docsProbe\(s\)/);
  assert.match(pkg.scripts['test:handoff'],/receptor-gas-recuperacion\.test\.mjs/);
 });
+
+test('tandas privadas: una sola acción inicia hasta 10 recibos por Turnstile, máximo dos archivos en curso y un solo pedido',()=>{
+ const gas=readFileSync(new URL('../integraciones/autocotizador/recepcion/DocumentosReceiver_LOTE_AMPLIADO_PRUEBAS_20261024.gs',import.meta.url),'utf8');
+ const worker=readFileSync(new URL('../integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs',import.meta.url),'utf8');
+ const upload=readFileSync(new URL('../integraciones/autocotizador/recepcion/subir-vincular-pdf-v2-privado.mjs',import.meta.url),'utf8');
+ const pkg=JSON.parse(readFileSync(new URL('../integraciones/autocotizador/recepcion/package.json',import.meta.url),'utf8'));
+ assert.match(source,/async function prepararSesionesDeLote\(pendientes\)/);
+ assert.match(source,/inicio\+=10/);
+ assert.match(source,/\/api\/ensayo-pdf-iniciar-lote/);
+ assert.match(source,/await prepararSesionesDeLote\(pending\)/);
+ assert.match(source,/await ejecutarRecepcionParalela\(pending,/);
+ assert.match(source,/\},2\);/);
+ assert.match(source,/await registrarPedidoVerificado\(\)/);
+ assert.match(source,/if\(!success\)\{[\s\S]{0,190}terminarMedicion\('envio_incompleto'\)/);
+ assert.match(worker,/async function fase4BatchStart\(request,env\)/);
+ assert.match(worker,/pilotVerifyTurnstile\(body.turnstileToken,env\)/);
+ assert.match(worker,/postToScript\(env,\{op:'multiStartBatch',metas:body.metas\}/);
+ assert.match(gas,/function docsMultiStartBatch\(p\)/);
+ assert.match(gas,/var index=docsMultiIds\(true\)/);
+ assert.match(gas,/newCount>DOCS_MULTI_CAP/);
+ assert.match(gas,/multiPart','multiStatus','multiFinish','multiCommitPages/);
+ assert.match(upload,/export async function ejecutarRecepcionParalela/);
+ assert.match(upload,/const indice=proximo\+\+/);
+ assert.match(pkg.scripts['test:handoff'],/recepcion-paralela-lote\.test\.mjs/);
+ assert.match(pkg.scripts['build:unificado'],/fase4-comprobante-worker-e2e\.test\.mjs/);
+});
