@@ -557,3 +557,10 @@ Se inspeccionó en GitHub `integraciones/autocotizador/recepcion/DocumentosRecei
 - Capturas de GAS «Receptor ampliado 30 PDF - pruebas privadas» versión **8, 28-10-2026 18:40**, muestran ID/URL comenzando por **`AKfycbyIQA...`**. **No son la misma implementación**. La versión 8 se instaló en el proyecto indicado, pero el Worker privado NO la invoca según la variable visible. La prueba de 2 PDF y el workflow de nueva versión quedan BLOQUEADOS hasta resolverlo.
 - Recomendación: verificar las URLs completas con el usuario, sin compartir credenciales; corregir únicamente el enlace `DOCS_SCRIPT_URL` en el entorno de ensayo si es la implementación de recepción correcta, entender el efecto sobre Worker activo y conservar referencia previa para rollback. No activar nueva versión concurrente ni afirmar que GAS v8 está conectado hasta verificar.
 - En la misma captura aparece una variable administrativa de Central con valor visible. Tratarla como potencial secreto expuesto; recomendar migrarla a secreto cifrado y rotar después de asegurar el funcionamiento, sin divulgar su valor en registros.
+
+
+## 28-10-2026 — DOCS_SCRIPT_URL corregida en Cloudflare (captura)
+
+- Nueva captura del Worker privado `saber-documentos-pruebas` → Configuración → Variables y secretos: `DOCS_SCRIPT_URL` ahora comienza `https://script.google.com/macros/s/AKfycbyIQA...`, coincidente con el prefijo de la implementación «Receptor ampliado 30 PDF - pruebas privadas» GAS v8 (28-10-2026 18:40). Antes estaba `AKfycbwQUipB...`.
+- **Confirmación por interfaz:** valor visible cambiado. No hay prueba de POST `multiStartBatch` en vivo ni readback de despliegue/versión efectiva del Worker. Conservar esa distinción.
+- **Siguiente paso:** workflow manual `.github/workflows/saber-preparar-version-privada.yml` desde `main` (checkout explícito de rama privada) → anotar UUID real `VERSION_PRIVADA_PREPARADA_SIN_ACTIVAR` → promoción únicamente en `saber-documentos-pruebas` manteniendo `b7f58caf-7ca4-4abf-8e05-9694fa9593fd` para rollback → ensayo real único con dos PDF, dos recibos, precio y una operación Central D1 sin pagos. No tocar `main`, web comercial o Polaroids.
