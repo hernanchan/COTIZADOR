@@ -1,4 +1,4 @@
-name: Fase 1 - preparar version privada Cloudflare sin desplegar (envio unico)
+name: Fase 1 - preparar version privada Cloudflare sin desplegar (un boton total)
 on:
   push:
     branches:
