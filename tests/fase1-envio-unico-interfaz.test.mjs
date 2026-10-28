@@ -132,3 +132,13 @@ test('UX de carga unica: grupos automaticos conservan indices de origen y opcion
  assert.match(worker,/#presupuesto\{display:none\}/);
  assert.match(client,/files,options,total:totalDocumentos/);
 });
+
+test('la compilación de staging exige ensayo completo de sello PDF y Central sin otra descarga',()=>{
+ const pkg=JSON.parse(readFileSync(new URL('../integraciones/autocotizador/recepcion/package.json',import.meta.url),'utf8'));
+ assert.match(pkg.scripts['build:unificado'],/node --test \.\/fase4-comprobante-worker-e2e\.test\.mjs/);
+ const e2e=readFileSync(new URL('../integraciones/autocotizador/recepcion/fase4-comprobante-worker-e2e.test.mjs',import.meta.url),'utf8');
+ assert.match(e2e,/googleCalls\.length,googleBeforeOrder/);
+ assert.match(e2e,/stageCount,1/);
+ assert.match(e2e,/comprobanteServidor\.payload\.pages=11/);
+ assert.match(e2e,/preparedCount,1/);
+});
