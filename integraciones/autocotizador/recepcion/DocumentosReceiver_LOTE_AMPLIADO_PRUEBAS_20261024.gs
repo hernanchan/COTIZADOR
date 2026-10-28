@@ -338,6 +338,29 @@ function docsMultiStartBatch(p){
  }
  if(total>DOCS_MULTI_ORDER_MAX_BYTES)
    throw Error('Tanda excede 60 MiB');
+ // Preflight DEL LOTE antes de abrir sesiones Drive: no consumir cupos de
+ // una tanda que no entra en el pedido o excede la cuota global.
+ var index=docsMultiIds(true),oldCount=0,oldBytes=0,newCount=0,newBytes=0;
+ var existing={};
+ for(var j=0;j<index.length;j++){
+   var previous=docsRead(index[j]);
+   if(previous.orderId!==orderId)continue;
+   oldCount++;oldBytes+=previous.bytes;
+   existing[previous.fileId]=previous;
+ }
+ for(var k=0;k<metas.length;k++){
+   var candidate=metas[k],found=existing[candidate.fileId];
+   if(found){
+     if(found.sha256!==candidate.sha256||found.bytes!==candidate.bytes||
+        found.mode!==candidate.mode||
+        found.name!==candidate.fileId+'__'+candidate.name.replace(/[^A-Za-z0-9_. -]/g,'_'))
+       throw Error('Identificador de ensayo en uso');
+   }else{newCount++;newBytes+=candidate.bytes;}
+ }
+ if(index.length+newCount>DOCS_MULTI_GLOBAL_CAP||
+    oldCount+newCount>DOCS_MULTI_CAP||
+    oldBytes+newBytes>DOCS_MULTI_ORDER_MAX_BYTES)
+   throw Error('La tanda supera los cupos privados del pedido');
  var sessions=[];
  for(var j=0;j<metas.length;j++){
    var response=docsMultiStart({meta:metas[j]});
