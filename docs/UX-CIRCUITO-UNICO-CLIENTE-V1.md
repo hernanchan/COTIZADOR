@@ -1,6 +1,6 @@
 # UX definitiva V1: circuito único del cliente — Librería Saber
 
-**Estado:** diseño funcional acordado para implementar en la **rama privada**, sin reescribir el motor probado; **NO IMPLEMENTADO** al 28-10-2026.
+**Estado:** diseño acordado y primera implementación en la rama privada (28-10-2026); **NO DESPLEGADA NI COMPROBADA EN NAVEGADOR**. No se reescribió el motor probado.
 **Referencia técnica:** `docs/ETAPA1-IMPRESIONES-PLOTEOS-CIERRE.md`. Este documento define **qué debe ver y hacer el cliente**. No es autorización para cambiar `main`, `libreriasaber.com.ar`, activar Mercado Pago ni publicar.
 
 ## Decisión de producto
@@ -79,3 +79,15 @@ Las operaciones independientes por PDF podrán ejecutarse en concurrencia **acot
 **Optimización en código, no desplegada ni medida en vivo:** lecturas independientes de PDF en GAS/Drive concurrentes con máximo 3, SHA-256 de bloque y archivo final intactos, validaciones firmadas en paralelo; GitHub CI aprobado `40721208008`. Esto puede reducir esperas, pero no constituye todavía una mejora comprobada. No es prueba de que los planes gratuitos sean el problema.
 
 **Siguiente tarea:** preparar/desplegar nueva versión solo en `saber-documentos-pruebas`, con rollback, repetir medición idéntica y contrastar contra 62.081 ms. Luego avanzar sobre la interfaz compacta y agrupada aprobada; no activar pagos ni tocar producción pública.
+
+
+## Avance de implementación UX (28-10-2026): agrupación y estados compactos
+
+- Archivo carga-unica-cliente.mjs: agrupación visual A4, A3, planos CAD, póster, mixtos CAD/póster, pendientes y servicios especiales. Se conserva el orden físico original del arreglo entries y los índices del manifiesto, no se cambió el cálculo.
+- Opciones compartidas para 2 o más archivos del mismo grupo: copias; en A4/A3, B/N-color, caras y anillado ninguno/individual; en póster/mixtos, papel. Cada archivo mantiene edición individual. El anillado conjunto todavía no está habilitado.
+- Archivo carga-unica-pagina.mjs: estilos compactos responsive.
+- Archivo worker-fase4-cotizador-unificado.mjs: exclusivamente en pantalla privada integrada, se oculta el presupuesto duplicado del iframe y permanece total fijo arriba. Se mantiene el cálculo y validaciones.
+- Archivo pantalla-cotizador-v2-prueba-privada.mjs: panel técnico y cotizador original ocultos al cliente normal, consultables con ?diagnostico=1. Al enviar, el espacio de edición se sustituye por estado de recepción; después por recibo compacto y total servidor. Si falla, regresa la vista para reintento sin duplicar PDFs.
+- Pruebas tests/fase1-envio-unico-interfaz.test.mjs: control de estados y que se conserven índices de entrada, tamaño y tipos. GitHub Actions 40728153179 SUCCESS, test suite y compilación Worker.
+- Estado estricto: código en rama fase1/impresiones-ploteos-20261027, **NO PREPARADO NI DESPLEGADO** en Cloudflare; sin prueba visual ni envío real. Línea base anterior de tiempo real 44.877 ms con 12 páginas; esta UX no promete mejorar el tiempo de red.
+- Siguiente paso: workflow manual de GitHub en main que prepara rama privada, promocionar SOLO Worker saber-documentos-pruebas y verificar visualmente y funcionalmente A4+A4+A0, PDF A4 de 12 páginas con anillado y reintento. Conserva rollback previo 8ea21564. Sin activar pagos, Polaroids ni modificar web comercial.
