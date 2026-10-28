@@ -28,7 +28,10 @@ export function verificarVinculoCotizadorV2({
   v.paymentAuthorized!==false||
   !RECEIPT.test(v.receiptId||'')||v.receiptId!==sessionId||
   !ORDER.test(v.orderId||'')||
-  v.fileId!=='pdf-'+r.sha256.slice(0,24)||
+  // ID nuevo: SHA parcial + UUID local, para dos PDF idénticos en el pedido.
+  // Se acepta también el ID legado (sólo SHA) para reanudar recibos anteriores.
+  !['pdf-'+r.sha256.slice(0,16)+r.localRef.replace(/-/g,'').toLowerCase().padStart(33,'-'),
+    'pdf-'+r.sha256.slice(0,24)].includes(v.fileId)||
   v.sha256!==r.sha256||v.bytes!==r.bytes||
   v.pages!==r.paginas||!['bn','color'].includes(v.mode))
   throw Error('El PDF de Google no coincide con la referencia del carrito.');
