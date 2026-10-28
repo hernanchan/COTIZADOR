@@ -93,3 +93,17 @@ test('si Google recibió el bloque pero se perdió ACK, cliente consulta status 
  assert.equal(v.pages,1);
  assert.ok(t.progress.some(p=>p.phase==='recuperado'));
 });
+
+test('la sesión recién creada por una TANDA omite status UNA vez, nunca en un reintento',async()=>{
+ const prior={uploadId,token,orderId,localRef,sha256,modo:'bn',
+  opcionesKey:'null',batchFresh:true};
+ const first=setup({prior});
+ await first.run();
+ assert.deepEqual(first.calls,['part','finish','link']);
+ assert.equal(first.sessions[0].batchFresh,undefined,
+  'onSession borra batchFresh antes de enviar un bloque');
+ const retry=setup({prior:first.sessions[0],alreadyAccepted:true});
+ await retry.run();
+ assert.deepEqual(retry.calls,['status','finish','link'],
+  'reanudación consulta siempre Drive y no repite partes aceptadas');
+});
