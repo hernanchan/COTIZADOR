@@ -62,7 +62,7 @@ const list=document.getElementById('all'),status=document.getElementById('state'
  summary=document.getElementById('order-summary');
 const registerButton=document.getElementById('register-private'),registerStatus=document.getElementById('register-status');
 const sendAllButton=document.getElementById('send-all-pdf'),batchProgress=document.getElementById('batch-progress');
-let batchSending=false;
+let batchSending=false,smartReady=false,handoffInProgress=false,handoffResolve=null;
 const dropPdf=document.getElementById('drop-pdf'),batchFiles=document.getElementById('batch-files'),batchStatus=document.getElementById('batch-status');
 function assignFiles(files){
  const chosen=Array.from(files||[]);
@@ -193,8 +193,8 @@ function updateSummary(){
    (withoutPdf?' · '+withoutPdf+' trabajos sin PDF':'')+
    ' · Central D1: '+(registeredOrder?'registrado':'pendiente')+' · Cobros desactivados.';
  summary.append(title,detail);
- sendAllButton.disabled=batchSending||registering||Boolean(registeredOrder)||
-  allRefs.length===0||withoutPdf!==0||
+ sendAllButton.disabled=batchSending||registering||handoffInProgress||Boolean(registeredOrder)||
+  (allRefs.length===0&&!smartReady)||withoutPdf!==0||
   allRefs.some(d=>!d.confirmacion&&!d.archivoLocal);
  sendAllButton.textContent=registeredOrder?'Pedido registrado':
   batchSending?'Enviando archivos…':registering?'Registrando pedido…':'Enviar mi pedido';
@@ -424,8 +424,36 @@ async function waitForTurnstile(){
  }
  return false;
 }
+async function prepararDesdeCotizador(){
+ if(handoffInProgress)return false;
+ handoffInProgress=true;updateSummary();
+ batchProgress.textContent='Preparando archivos para el envío seguro…';
+ let timeout;
+ try{
+  const result=await new Promise(resolve=>{
+   handoffResolve=resolve;
+   timeout=setTimeout(()=>resolve({ok:false,error:'El cotizador no confirmó los archivos.'}),20000);
+   smart.contentWindow.postMessage({type:'SABER_SMART_PREPARAR_ENVIO'},location.origin);
+  });
+  if(!result.ok){
+   batchProgress.textContent=result.error||'No se pudo preparar el envío.';
+   return false;
+  }
+  for(let n=0;n<100;n++){
+   const refs=all.flatMap(item=>item.references);
+   if(refs.length===result.cantidad&&refs.every(d=>d.archivoLocal&&
+      typeof d.sendNow==='function'))return true;
+   await new Promise(resolve=>setTimeout(resolve,100));
+  }
+  batchProgress.textContent='No se pudieron asociar todos los PDF. Revisá la carga.';
+  return false;
+ }finally{clearTimeout(timeout);handoffResolve=null;handoffInProgress=false;updateSummary()}
+}
 sendAllButton.addEventListener('click',async()=>{
- if(batchSending||registering||registeredOrder)return;
+ if(batchSending||registering||handoffInProgress||registeredOrder)return;
+ if(all.flatMap(item=>item.references).length===0){
+  if(!smartReady||!(await prepararDesdeCotizador()))return;
+ }
  const allEntries=all.flatMap(item=>item.references);
  const pending=allEntries.filter(d=>!d.confirmacion);
  if(!allEntries.length||allEntries.length>30||
@@ -580,9 +608,19 @@ window.addEventListener('message',async event=>{
    'Falta pulsar «Enviar todos los PDF del pedido». La Central D1 continúa bloqueada para ploteos.';
   return;
  }
+ if(event.source===smart.contentWindow&&event.data?.type==='SABER_SMART_HANDOFF_READY'){
+  if(handoffResolve){handoffResolve({ok:true,cantidad:event.data.cantidad});handoffResolve=null;}
+  return;
+ }
+ if(event.source===smart.contentWindow&&event.data?.type==='SABER_SMART_HANDOFF_ERROR'){
+  if(handoffResolve){handoffResolve({ok:false,error:event.data.message});handoffResolve=null;}
+  return;
+ }
  if(event.source===smart.contentWindow&&event.data?.type==='SABER_SMART_PRICE_STATE'){
   const status=event.data.estado;
   const price=event.data.total;
+  smartReady=status==='listo'&&Number.isSafeInteger(price)&&price>0;
+  updateSummary();
   const headerPrice=document.getElementById('precio-smart');
   if(status==='listo'&&Number.isSafeInteger(price)&&price>0)
    headerPrice.textContent='Total preliminar: '+new Intl.NumberFormat('es-AR',{
