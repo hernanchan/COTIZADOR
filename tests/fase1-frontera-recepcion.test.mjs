@@ -13,9 +13,10 @@ test('primera etapa: ploteos ingresan a ensayo sin registro comercial',()=>{
  assert.match(portal,/d\.ploteoVerificado\?\.estado/);
  assert.match(portal,/Registro D1 del ploteo: PENDIENTE/);
 });
-test('primera etapa: no permitir anillado sin contrato backend',()=>{
- assert.match(smart,/e\.anillado!=='ninguno'/);
- assert.match(smart,/El anillado está disponible para cotizar, pero su registro privado todavía requiere validación/);
+test('primera etapa: anillado individual con contrato; grupos siguen bloqueados',()=>{
+ assert.match(smart,/!\['ninguno','individual'\]\.includes\(e\.anillado\)/);
+ assert.match(smart,/El anillado de varios PDF juntos sigue pendiente de integración/);
+ assert.match(portal,/anillado:plot\?'ninguno':q\.anillado/);
 });
 test('primera etapa: manifiesto incorpora ploteos sin ampliar los formatos documentales',()=>{
  assert.match(manifest,/new Set\(\['a4','a3'\]\)/);
