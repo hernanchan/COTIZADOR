@@ -297,3 +297,32 @@ Se confirmó una **incompatibilidad entre cotización y recepción**, no una fal
 - Incluye los cambios GitHub previos de diagnóstico de tiempos y evitar apertura automática de panel técnico, con regresión CI exitosa (run `40712336636`, 48/48).
 - **Estado:** staged `2c1db455` NO desplegada. Activa anterior `070ba91d-4468-4953-a9d3-45d2659b6d0c`; conservar para posible reversión. Sin pagos, sin cambios en sitio público, sin modificar `main`.
 - **Siguiente paso exacto:** en Cloudflare → Worker `saber-documentos-pruebas` → Implementaciones, promocionar la fila `2c1db455` al 100% **únicamente en Worker de pruebas** y verificar pantalla de confirmación/versión activa. Luego prueba de `poliza_1145046.pdf` sin expandir detalles técnicos y medición local `?diagnostico=1` con fases desde `window.__saberRendimientoPrivado`; registrar tiempos observados sin especular mejoras.
+
+
+## 28-10-2026: medición REAL en navegador, PDF de 12 páginas — cuello de botella CONFIRMADO
+
+**Evidencia:** captura del usuario de DevTools Console en `https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/?diagnostico=1`. Pantalla «Pedido registrado», 1 PDF `poliza_1145046.pdf`, 12 páginas, A4, B/N, doble faz, anillado individual, total preliminar $3.290, pago desactivado; widget Turnstile `¡Operación exitosa!`. Se observa panel de recepción privado sin desplegar. Version privada `2c1db455-4ac5-4f02-9ebd-c4e581f7283d` preparada previamente y promovida por usuario para esa prueba; la captura no muestra directamente el ID de versión activo de Cloudflare y no es prueba D1 directa, solo estado de la UI.
+
+**Marcas temporales del objeto local `window.__saberRendimientoPrivado.eventos` (ms desde click):**
+- `clic_enviar` 0;
+- `preparacion_inicio` 0;
+- `preparacion_terminada` 104;
+- `pdf_inicio` 104;
+- `pdf_inicio` (fase upload) 109;
+- `pdf_estado` 6354 (start + consulta de estado GAS);
+- `pdf_transferencia` 10517 (3 bloques totales; callback visible al último bloque);
+- `pdf_verificacion` 22229 (recibo `finish` de GAS completo);
+- `pdf_confirmado` 42605 (consulta/verificación-vinculación adicional del Worker/Google);
+- `central_inicio` 42607;
+- `central_fin` 62081;
+- `fin` `pedido_registrado` 62081.
+
+**Totales y subtramos (aproximados):** preparación 0,104 s, upload+verificación+cotización del PDF ~42,5 s, registro/revalidación en Central ~19,47 s, total **62,081 s**. La validación posterior a `finish` entre 22,229 y 42,605 tarda ~20,376 s. El `finish` tras último callback de transferencia, entre 10,517 y 22,229, tarda ~11,712 s. Primera consulta `start`+`status` 6,245 s. **El análisis inicial en el navegador NO es el principal cuello de botella en esta prueba.** Falta medir tiempos backend internos para atribuir qué servicio consume cada tramo.
+
+**Inspección de código que explica las fases, sin inferir mediciones no disponibles:**
+- `subir-vincular-pdf-v2-privado.mjs`: 3 bloques de 512 KiB enviados a `/api/ensayo-pdf-ampliado` de manera secuencial; `start`, `status`, tres `part`, `finish`, seguido de `/api/ensayo-vincular-pdf-v2`. Cada RPC a GAS es POST HMAC firmado vía Worker.
+- `worker-fase4-cotizador-unificado.mjs` (`v2VincularPdf`): `fase4PrivateVerified` consulta `multiVerifiedStatus`, `multiInfo`, lee desde Drive por `multiReadPart` si es necesario, analiza PDF con pdf-lib y persiste `multiCommitPages` en GAS. Esto puede explicar el tramo post-`finish`, pero no se desglosó el tiempo real de cada suboperación.
+- `apiPrepararDocumentosV2Lote`: ejecuta `fase4FichaCentralLotePrivada`, `registrarManifiestoV2EnCentral`, `prepararDocumentosCentralFirmado`. En `fase4FichaCentralLotePrivada` se vuelve a leer metadata y estado desde GAS y se vuelven a reconstruir bytes en `conectarRecepcionConCentral`, además de registrar/crear orden en D1. Puede explicar el tramo `central_inicio→central_fin`, pero no hay aún métricas internas.
+- `DocumentosReceiver_LOTE_AMPLIADO_PRUEBAS_20261024.gs`: recepción resumable Drive y comprobación `docsFinish` descargando PDF completo, luego `docsMultiReadPart` por rango y `docsMultiCommitPages` vuelve a cargar/verificar blob del PDF. Toda reducción de relecturas debe conservar SHA-256, páginas verificadas, recibo, precios servidor e idempotencia.
+
+**Decisión de priorización:** no optimizar parser del navegador ni agregar pantallas/pagos antes de mejorar primero los tramos ~20 s de `vincular` y ~19,5 s de Central y validar el ~11,7 s de `finish`; una sola prueba no es suficiente para estimar p95 ni latencia de múltiples PDFs. Añadir métricas seguras internas / tests para descomponer las suboperaciones, especialmente tiempo de red GAS y Drive, sin revelar datos privados ni omitir comprobaciones. Luego evaluar batching, lecturas duplicadas y operaciones secuenciales, manteniendo prohibición de cobro. **No considerar esto una optimización ya implementada**.
