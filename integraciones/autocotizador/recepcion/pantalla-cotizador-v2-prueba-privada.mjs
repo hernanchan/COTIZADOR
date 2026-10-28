@@ -459,7 +459,11 @@ function render(){
    // Las opciones se leen al iniciar el lote, no antes; si cambian tras
    // una sesión recibida, subirYVincularPdf las rechaza por opcionesKey.
    d.batchInicio=()=>{
-    if(!papel.value||!d.archivoLocal)throw Error('Falta el PDF o el papel seleccionado.');
+    const elegido=d.archivoLocal||file.files?.[0];
+    if(!papel.value||!elegido||elegido.name!==r.nombre||
+       elegido.size!==r.bytes)
+     throw Error('Falta el PDF original o el papel seleccionado.');
+    d.archivoLocal=elegido;
     const opciones={formato:formato.value,caras:caras.value,
      copias:Number(copias.value),anillado:anillado.value,
      materialColor:papel.value,paginasPorHoja:Number(paginasPorHoja.value)};
