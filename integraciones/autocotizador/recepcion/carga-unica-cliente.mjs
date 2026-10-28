@@ -22,7 +22,7 @@ function informarPrecioPrivado(estado,total=null){
  const sendable=estado==='listo'&&anillados.every(e=>e.anillado==='individual');
  window.parent.postMessage({type:'SABER_SMART_PRICE_STATE',estado,
   total:Number.isSafeInteger(total)&&total>0?total:null,
-  sendable,blockReason:anillados.length?
+  sendable,blockReason:anillados.some(e=>e.anillado==='grupo')?
    'El anillado conjunto todavía no puede registrarse automáticamente. Elegí anillado individual o sin anillado.':null},location.origin);
 }
 function importeArchivo(indice){
