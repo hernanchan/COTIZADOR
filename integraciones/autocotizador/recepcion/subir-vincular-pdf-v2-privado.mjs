@@ -180,6 +180,8 @@ export async function subirYVincularPdfCotizadorV2({
   orderId:linked.orderId,receiptId:linked.receiptId,
   sha256:linked.sha256,pages:linked.pages,
   estado:linked.estado,reciboGoogleVerificado:true,
+  // Un comprobante firmado del servidor, sin credenciales de recepción.
+  ...(linked.comprobanteServidor?{comprobanteServidor:linked.comprobanteServidor}:{}),
   precioRecalculado:false,paymentAuthorized:false,
   listoParaProducir:false,
   ...(opciones===undefined?{}:{cotizacionServidor:Object.freeze({
