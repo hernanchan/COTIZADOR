@@ -81,7 +81,7 @@ export async function subirYVincularPdfCotizadorV2({
  const rpc=(path,payload)=>sameOriginRpc(path,payload,{fetcher,origin});
  const parts=Math.ceil(bytes.length/PART);
  onProgress({phase:'inicio',completed:0,total:parts});
- let session;
+ let session,freshSession=false;
  if(sesionPrevia){
   // Sólo reintentar dentro de esta pestaña. No conservar la credencial
   // bearer de GAS en localStorage ni sessionStorage.
@@ -99,20 +99,28 @@ export async function subirYVincularPdfCotizadorV2({
      start.orderId!==orderId)
    throw Error('El servidor no confirmó una sesión privada.');
   session={uploadId:start.uploadId,token:start.token};
+  // Sólo el receptor HMAC puede confirmar que esta sesión se acaba de crear.
+  // Con receptores antiguos o sesiones reutilizadas consultamos Drive como antes.
+  freshSession=start.newSession===true;
  }
  // Guardar exclusivamente en memoria de la página tras verificar SHA local.
  // Si falla una transferencia, la próxima llamada consulta partes existentes.
  onSession(Object.freeze({...session,orderId,localRef:r.localRef,
   sha256:r.sha256,modo,opcionesKey:JSON.stringify(opciones??null)}));
- const status=await rpc('/api/ensayo-pdf-ampliado',{op:'status',...session});
- if(status.uploadId!==session.uploadId||
-    !Array.isArray(status.acceptedParts))
-  throw Error('El estado de subida es incoherente.');
- const accepted=new Set(status.acceptedParts);
+ // Una sesión nueva NO puede tener fragmentos: evitar la ida extra a GAS.
+ // El reinicio, la falta de indicador y toda sesión existente consultan Drive.
+ let accepted=new Set();
+ if(!freshSession){
+  const status=await rpc('/api/ensayo-pdf-ampliado',{op:'status',...session});
+  if(status.uploadId!==session.uploadId||
+     !Array.isArray(status.acceptedParts))
+   throw Error('El estado de subida es incoherente.');
+  accepted=new Set(status.acceptedParts);
+  if(accepted.size!==status.acceptedParts.length||
+     [...accepted].some(i=>!Number.isSafeInteger(i)||i<0||i>=parts))
+   throw Error('El servidor informó fragmentos incompatibles.');
+ }
  onProgress({phase:'estado',completed:accepted.size,total:parts});
- if(accepted.size!==status.acceptedParts.length||
-    [...accepted].some(i=>!Number.isSafeInteger(i)||i<0||i>=parts))
-  throw Error('El servidor informó fragmentos incompatibles.');
  for(let index=0;index<parts;index++){
   if(accepted.has(index))continue;
   const part=bytes.subarray(index*PART,Math.min(bytes.length,(index+1)*PART));
