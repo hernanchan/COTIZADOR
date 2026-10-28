@@ -248,3 +248,12 @@ Se confirmó una **incompatibilidad entre cotización y recepción**, no una fal
 - El nuevo workflow usa **`workflow_dispatch` manual únicamente**, con ejecución restringida a `refs/heads/main`. Hace checkout **explícito** de `fase1/impresiones-ploteos-20261027`, corre pruebas y compilación, y prepara una versión **SIN activar** en `saber-documentos-pruebas` con herencia estricta de bindings. No hay actualización de rutas, dominio comercial o pagos.
 - URL directa: `https://github.com/hernanchan/COTIZADOR/actions/workflows/saber-preparar-version-privada.yml`. Al pulsar **Run workflow**, seleccionar rama **main** (porque el workflow vive allí; el código que toma es el de la rama de pruebas). No confundir este selector con la rama del código: esta última está fijada en el checkout.
 - **PENDIENTE**: ejecutar la automatización, confirmar ejecución verde y recoger `VERSION_PRIVADA_PREPARADA_SIN_ACTIVAR` en su log; después activar **sólo** esa versión privada con verificación de versión previa/rollback, operación independiente que aún no está realizada. No declarar publicada la barra sticky con `Enviar mi pedido` hasta verificarlo en navegador.
+
+
+## 28-10-2026: nueva preparación privada CONFIRMADA — NO activada
+
+- El usuario lanzó el workflow manual instalado en `main`: run `40702668153` («Saber - preparar versión privada desde rama de pruebas»).
+- Consultado el job `122866369983`: **SUCCESS**, incluido checkout de la rama `fase1/impresiones-ploteos-20261027`, validación, build y upload de versión sin activar.
+- Log de GitHub confirma **`VERSION_PRIVADA_PREPARADA_SIN_ACTIVAR=070ba91d-4468-4953-a9d3-45d2659b6d0c`** y `SIN_DESPLIEGUE_SIN_PAGOS_SIN_CAMBIOS_EN_WEB_COMERCIAL`.
+- **Estado real:** código con un único botón sticky junto al total, más aclaración de anillado individual, está en una versión staged de Cloudflare. El Worker privado activo sigue en la versión previa hasta una **activación independiente y verificada**. No pedir cargar archivos nuevos antes de activarla.
+- **Siguiente paso:** desde un canal autorizado, activar exclusivamente `070ba91d-4468-4953-a9d3-45d2659b6d0c` en `saber-documentos-pruebas`, con rollback a `32b71329-7495-4849-aa0f-56c61c112def`. Verificar deployment en Cloudflare y luego una nueva navegación privada que muestre `Enviar mi pedido` junto al total; comprobar el pedido real y que anillado individual no se elimine.
