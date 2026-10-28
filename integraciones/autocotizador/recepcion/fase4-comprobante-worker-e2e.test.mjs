@@ -25,6 +25,7 @@ const env={
  DOCS_TURNSTILE_SECRET:'TEST_TURNSTILE_SECRET',
  DOCS_TURNSTILE_SITE_KEY:'0x4AAAA-test-0123456789',
  DOCS_EXTENDED_RECEIVER_ENABLED:'PRIVATE_TEST_ONLY',
+ DOCS_V2_PRIVATE_UI_ENABLED:'PRIVATE_TEST_ONLY',
  DOCS_V2_RECEIPT_LINK_ENABLED:'PRIVATE_TEST_ONLY',
  DOCS_CENTRAL_SYNC_ENABLED:'PRIVATE_TEST_ONLY',
  DOCS_ORDER_PREPARE_ENABLED:'PRIVATE_TEST_ONLY',
@@ -72,6 +73,25 @@ function receipt(s){
 }
 function dispatch(p){
  googleCalls.push(p.op);
+ if(p.op==='multiStartBatch'){
+  const sessions=[];
+  for(const m of p.metas){
+   const key=m.orderId+':'+m.fileId;
+   let item=uploads.get(key),newSession=false;
+   if(!item){
+    newSession=true;
+    item={...m,uploadId:'DOC-'+randomUUID(),
+     token:'TOKEN_BATCH_TEST_0123456789_abcdefghijklmnop',partsStored:[]};
+    uploads.set(key,item);uploads.set(item.uploadId,item);
+   }else if(item.sha256!==m.sha256||item.bytes!==m.bytes){
+    return {ok:false,error:'Identificador de ensayo en uso'};
+   }
+   sessions.push({fileId:m.fileId,orderId:m.orderId,
+    uploadId:item.uploadId,token:item.token,newSession});
+  }
+  return {ok:true,orderId:p.metas[0].orderId,
+   sessions,paymentAuthorized:false};
+ }
  if(p.op==='multiStart'){
   const m=p.meta;
   const existing=uploads.get(m.orderId);
@@ -121,9 +141,11 @@ function dispatch(p){
  throw Error('Mock unexpected op '+p.op);
 }
 const oldFetch=globalThis.fetch;
+let turnstileCount=0;
 globalThis.fetch=async (url,options={})=>{
  const uri=new URL(url);
  if(uri.hostname==='challenges.cloudflare.com'){
+  turnstileCount++;
   return Response.json({success:true,action:'documentos',hostname:new URL(origin).hostname});
  }
  if(uri.hostname==='script.google.com'){
@@ -146,6 +168,59 @@ const call=(path,data,additional={})=>worker.fetch(new Request(origin+path,{
   Origin:origin,'Sec-Fetch-Site':'same-origin',...additional},
  body:JSON.stringify(data)
 }),env);
+
+
+test('Worker inicia 3 sesiones PDF con un solo Turnstile y un solo POST Google, rechaza mezclas',async()=>{
+ const orderId='WEB-ENSAYO-LOTE-ABCDEFGHIJ';
+ const metas=Array.from({length:3},(_,i)=>{
+  const sha256=hash(Buffer.from('archivo original '+i));
+  return {orderId,fileId:'pdf-'+sha256.slice(0,24),
+   name:'archivo'+i+'.pdf',mode:'bn',bytes:500+i,
+   sha256,partBytes:524288,parts:1};
+ });
+ const beforeVerify=turnstileCount;
+ const beforeGAS=googleCalls.length;
+ const start=await call('/api/ensayo-pdf-iniciar-lote',{
+  metas,turnstileToken:'TOKEN_TURNSTILE_TANDA_VERIFICADO'
+ });
+ assert.equal(start.status,200,JSON.stringify(await start.clone().json()));
+ const v=await start.json();
+ assert.equal(v.ok,true);
+ assert.equal(v.paymentAuthorized,false);
+ assert.equal(v.maxParallelUploads,2);
+ assert.equal(v.sessions.length,3);
+ assert.equal(turnstileCount-beforeVerify,1,'Un solo desafío para toda la tanda');
+ assert.deepEqual(googleCalls.slice(beforeGAS),['multiStartBatch'],
+  'Un solo POST a GAS en vez de uno por archivo');
+ assert.equal(new Set(v.sessions.map(s=>s.uploadId)).size,3);
+ assert.ok(v.sessions.every(s=>s.newSession===true));
+ const again=await call('/api/ensayo-pdf-iniciar-lote',{
+  metas,turnstileToken:'TOKEN_TURNSTILE_TANDA_SEGUNDO'
+ });
+ assert.equal(again.status,200);
+ const twice=await again.json();
+ assert.ok(twice.sessions.every(s=>s.newSession===false));
+ assert.deepEqual(twice.sessions.map(s=>s.uploadId),v.sessions.map(s=>s.uploadId));
+ const beforeBad=googleCalls.length;
+ const bad=await call('/api/ensayo-pdf-iniciar-lote',{
+  metas:[metas[0],{...metas[1],orderId:'WEB-OTRO-PEDIDO'}],
+  turnstileToken:'TOKEN_INVALID_BATCH'
+ });
+ assert.equal(bad.status,400);
+ assert.equal(googleCalls.length,beforeBad);
+ const duplicate=await call('/api/ensayo-pdf-iniciar-lote',{
+  metas:[metas[0],metas[0]],turnstileToken:'TOKEN_BATCH_DUPLICADO'
+ });
+ assert.equal(duplicate.status,400);
+ assert.equal(googleCalls.length,beforeBad);
+ const extra=await call('/api/ensayo-pdf-iniciar-lote',{
+  metas:[{...metas[0],bytes:21*1024*1024}],
+  turnstileToken:'TOKEN_BATCH_EXCESO_TAMANO'
+ });
+ assert.equal(extra.status,400);
+ assert.equal(stageCount,0,'Sólo crear sesiones nunca registra pedido en D1');
+ assert.equal(preparedCount,0);
+});
 
 test('Worker enlaza 12p y registra en Central sin segunda lectura de Drive; sello inválido se rechaza',async()=>{
  try{
