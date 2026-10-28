@@ -75,9 +75,89 @@ function cantidadCopias(e){
 }
 
 const texto=(tag,value)=>{const n=document.createElement(tag);n.textContent=value;return n};
+// La categoría es sólo presentación: no reordena `entries` ni los índices del
+// manifiesto, ni modifica la clasificación página a página o los importes.
+function grupoVisible(e){
+ if(e.error||!e.paginas)return {id:'pendientes',titulo:'Archivos por revisar'};
+ let paginas=paginasElegidas(e);
+ if(!paginas)return {id:'pendientes',titulo:'Archivos por revisar'};
+ const especiales={stickers:'Stickers',fotos:'Fotografías',corte:'Ploteos de corte',grafica:'Gráfica comercial'};
+ if(especiales[e.servicio])return {id:e.servicio,titulo:especiales[e.servicio]};
+ const d=clasificarDestino(paginas,e.seleccion);
+ if(!d.confirmado)return {id:'pendientes',titulo:'Archivos por revisar'};
+ if(d.destino==='documentos'){
+  const formato=d.tamanoFinal==='original'?formatoOriginal(paginas):d.tamanoFinal;
+  if(formato==='a4')return {id:'a4',titulo:'Documentos A4'};
+  if(formato==='a3')return {id:'a3',titulo:'Documentos A3'};
+  return {id:'pendientes',titulo:'Archivos por revisar'};
+ }
+ if(paginas.some(p=>!['cad','poster'].includes(p.modo)))
+  return {id:'pendientes',titulo:'Archivos por revisar'};
+ const cad=paginas.some(p=>p.modo==='cad'),poster=paginas.some(p=>p.modo==='poster');
+ if(cad&&poster)return {id:'mixtos',titulo:'Planos CAD y póster'};
+ if(poster)return {id:'poster',titulo:'Póster / pleno'};
+ return {id:'cad',titulo:'Planos CAD'};
+}
+function accionComun(titulo,opciones,aplicar){
+ const label=texto('label',titulo);
+ const select=document.createElement('select');
+ select.setAttribute('aria-label',titulo);
+ select.add(new Option('Elegir…',''));
+ for(const [valor,nombre] of opciones)select.add(new Option(nombre,valor));
+ select.value='';
+ select.onchange=()=>{if(select.value)aplicar(select.value)};
+ label.append(select);return label;
+}
+function controlesComunes(grupo){
+ const tipos=['a4','a3'].includes(grupo.id),ploteo=['cad','poster','mixtos'].includes(grupo.id);
+ if(grupo.indices.length<2||(!tipos&&!ploteo))return null;
+ const barra=document.createElement('div');barra.className='opciones-comunes';
+ barra.append(texto('strong','Opciones para estos '+grupo.indices.length+' archivos'));
+ const aplicar=(campo,valor)=>{
+  for(const i of grupo.indices){
+   const e=entries[i];
+   if(campo==='modo'){e.modo=valor;e.materialColor=''}
+   else if(campo==='caras')e.caras=valor;
+   else if(campo==='anillado'){e.anillado=valor;e.grupoAnillado=''}
+   else if(campo==='papelPoster')e.papelPoster=valor;
+   else if(campo==='copias')e.copias=valor;
+  }
+  cambio();
+ };
+ const lCopias=texto('label','Copias para todos');
+ const copias=document.createElement('input');copias.type='number';copias.min='1';copias.max='500';copias.step='1';
+ copias.placeholder='1 a 500';copias.setAttribute('aria-label','Aplicar copias a todo el grupo');
+ copias.onchange=()=>{
+  const v=Number(copias.value);
+  if(!Number.isSafeInteger(v)||v<1||v>500){copias.setCustomValidity('Elegí de 1 a 500 copias');copias.reportValidity();return}
+  aplicar('copias',v);
+ };
+ lCopias.append(copias);barra.append(lCopias);
+ if(tipos){
+  barra.append(accionComun('Impresión para todos',[['bn','Blanco y negro'],['color','Color']],v=>aplicar('modo',v)));
+  barra.append(accionComun('Caras para todos',[['simple','Simple faz'],['double','Doble faz']],v=>aplicar('caras',v)));
+  barra.append(accionComun('Anillado para todos',[['ninguno','Sin anillado'],['individual','Individual por archivo']],v=>aplicar('anillado',v)));
+ }
+ if(['poster','mixtos'].includes(grupo.id))
+  barra.append(accionComun('Papel de póster',[['obra80','Obra 80 g'],['recubierto','Recubierto 130 g']],v=>aplicar('papelPoster',v)));
+ return barra;
+}
 function render(){
  const lista=$('lista');lista.replaceChildren();
- for(const [i,e] of entries.entries()){
+ const grupos=new Map();
+ entries.forEach((e,i)=>{
+  const cat=grupoVisible(e);
+  if(!grupos.has(cat.id))grupos.set(cat.id,{...cat,indices:[]});
+  grupos.get(cat.id).indices.push(i);
+ });
+ const orden=['a4','a3','cad','poster','mixtos','stickers','fotos','corte','grafica','pendientes'];
+ for(const grupo of [...grupos.values()].sort((a,b)=>orden.indexOf(a.id)-orden.indexOf(b.id))){
+  const bloque=document.createElement('section');bloque.className='grupo-pedido';
+  const titulo=texto('h3',grupo.titulo+' · '+grupo.indices.length+' archivo(s)');
+  titulo.className='titulo-grupo';bloque.append(titulo);
+  const comunes=controlesComunes(grupo);if(comunes)bloque.append(comunes);
+  for(const i of grupo.indices){
+  const e=entries[i];
   const card=texto('section','');card.className='archivo';
   const fila=document.createElement('div');fila.className='fila';
   const principal=document.createElement('div');principal.className='fila-principal';
@@ -138,7 +218,7 @@ function render(){
    $('estado').textContent=entries.length+' PDF en la lista. No hace falta volver a cargar los restantes.';
   };
   acciones.append(quitar);fila.append(acciones);card.append(fila);
-  if(abierto!==i){lista.append(card);continue}
+  if(abierto!==i){bloque.append(card);continue}
   const panel=document.createElement('div');panel.className='panel-edicion';
   if(e.error){
    const error=texto('p','No pudimos analizar este PDF: '+e.error);
@@ -161,9 +241,9 @@ function render(){
     finally{leyendo=false;render();cotizar()}
    };
    reemplazar.append(input);panel.append(reemplazar);
-   card.append(panel);lista.append(card);continue;
+   card.append(panel);bloque.append(card);continue;
   }
-  if(!e.paginas){panel.append(texto('p','Analizando medidas…'));card.append(panel);lista.append(card);continue}
+  if(!e.paginas){panel.append(texto('p','Analizando medidas…'));card.append(panel);bloque.append(card);continue}
   const multiples=e.paginas.length>1;
   const medidas=e.paginas.map(p=>p.anchoCm.toFixed(2)+' × '+p.altoCm.toFixed(2)+' cm');
   const origin=texto('p','Tamaño original: '+(new Set(medidas).size===1?medidas[0]:(multiples?'Varios tamaños · '+[...new Set(medidas)].join(' / '):medidas[0]))+' · '+e.paginas.length+' página(s)');origin.className='origen';panel.append(origin);
@@ -173,7 +253,7 @@ function render(){
   paginasInput.setAttribute('aria-label','Páginas a imprimir de '+e.name);
   paginasInput.onchange=()=>{e.paginasSeleccionadas=paginasInput.value.trim();cambio()};
   paginasLabel.append(paginasInput);panel.append(paginasLabel);
-  if(!paginas){const err=texto('p','Selección inválida. Usá 1-3,5 y números que existan en el PDF.');err.className='advertencia';panel.append(err);card.append(panel);lista.append(card);continue}
+  if(!paginas){const err=texto('p','Selección inválida. Usá 1-3,5 y números que existan en el PDF.');err.className='advertencia';panel.append(err);card.append(panel);bloque.append(card);continue}
   const aviso=clasificarDestino(paginas);
   if(aviso.requiereConfirmacion){const n=texto('p','Confirmá el tamaño de impresión: el PDF puede tener medidas distintas a las que querés.');n.className='advertencia';panel.append(n)}
   const controles=document.createElement('div');controles.className='controles';
@@ -231,7 +311,9 @@ function render(){
   }else {const n=texto('p','Elegí el tamaño de impresión para continuar.');n.className='advertencia';panel.append(n)}
   panel.append(controles);
   card.append(panel);
-  lista.append(card);
+  bloque.append(card);
+  }
+  lista.append(bloque);
  }
  $('estado').textContent=leyendo?'Analizando archivos…':entries.length?'Identificados '+entries.length+' PDF. Cotización orientativa, sin subir originales.':'Seleccioná tus PDF para comenzar.';
 }
