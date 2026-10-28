@@ -17,7 +17,7 @@ main{max-width:1140px;margin:12px auto;padding:0 14px;display:block}
 .panel{background:#fff;padding:15px;border:1px solid #cbd5e1;border-radius:13px;min-width:0}
 h1{font-size:19px;margin:0 0 4px}h2{font-size:17px;margin:0 0 12px}p{line-height:1.5}
 small{color:#536475}iframe{border:0;width:100%;display:block}#smart{height:1050px;overflow:hidden}#base{min-height:750px}
-.entry{border-top:1px solid #dce4ec;padding:13px 0}
+.entry{border-top:1px solid #dce4ec;padding:7px 0}.entry>strong{display:block;margin-bottom:3px}.entry p{margin:5px 0;line-height:1.28}#recepcion-avanzada>.warning{margin-bottom:6px}#recepcion-avanzada .state{font-size:12px;line-height:1.3;margin:5px 0}#recepcion-avanzada .cf-turnstile{margin:7px 0}#recepcion-avanzada #order-summary{padding:7px;margin:7px 0}#order-summary p{margin:3px 0;font-size:12px}#recepcion-avanzada button{padding:8px 11px}#recepcion-avanzada input[type=file]{margin:4px 0;padding:5px}#recepcion-avanzada details>summary{cursor:pointer}
 input,select,button{font:inherit;max-width:100%}input[type=file],select{display:block;width:100%;padding:8px;margin:8px 0;border:1px solid #b9c8d8;border-radius:7px}
 button{border:0;background:#0a5583;color:#fff;padding:10px 15px;border-radius:8px;cursor:pointer}
 button:disabled{opacity:.45;cursor:not-allowed}
@@ -38,7 +38,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <iframe id="smart" title="Análisis automático de PDF, tamaños, CAD y póster" src="/prueba-v2/carga-inteligente" loading="eager"></iframe>
 </section>
 <details id="recepcion-avanzada" class="panel" style="margin-top:14px"><summary style="font-size:16px;font-weight:700;cursor:pointer;padding:5px 0">Paso 2 · Enviar los PDF y registrar el pedido (ensayo privado)</summary><div style="padding-top:12px">
-<div class="warning">Los documentos A4/A3 compatibles se trasladan desde la cotización a esta etapa. Sólo confirmamos la recepción después de verificar el PDF original y su presupuesto en el servidor. Los ploteos y los trabajos con anillado todavía no pueden registrarse en esta recepción. No se modificarán ni descartarán silenciosamente las opciones elegidas.</div>
+<div class="warning">Ensayo privado: cada PDF debe verificarse en Drive antes del registro. Trabajos con anillado: registro pendiente. Sin cobros.</div>
 <div id="drop-pdf" style="display:none"><strong>Recuperación manual de PDF para trabajos antiguos</strong><input id="batch-files" type="file" accept=".pdf,application/pdf" multiple><p id="batch-status" class="state" role="status">Los PDF se asignan por nombre y tamaño al trabajo correspondiente. La recepción sigue protegida.</p></div>
 <div class="cf-turnstile" data-sitekey="${sitekey}" data-action="documentos"></div>
 <div id="all" role="list" aria-label="Trabajos del cotizador"></div>
@@ -48,7 +48,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <p id="batch-progress" class="state" role="status" aria-live="polite">Agregá los archivos al carrito para habilitar el envío conjunto.</p>
 <button id="register-private" type="button" disabled>Registrar pedido de prueba en la Central</button>
 <p id="register-status" role="status" aria-live="polite" class="state">Disponible únicamente cuando todos los PDF estén verificados. Sin pagos.</p>
-<p><small>No se transmite ningún PDF a la tienda pública. La verificación de Drive y el presupuesto preliminar del servidor son ensayos; D1 y los cobros siguen separados.</small></p>
+
 </div></details></main>
 <details style="max-width:1110px;margin:10px auto 25px;padding:0 14px"><summary style="cursor:pointer">Cotizador original (comparación comercial)</summary>
 <iframe id="base" title="Cotizador original de comparación" src="/prueba-v2/cotizador?integrado=1&ensayoArchivos=1" loading="lazy"></iframe>
@@ -189,10 +189,9 @@ function updateSummary(){
  const title=document.createElement('strong');
  title.textContent='Resumen del pedido · '+verified.length+' de '+allRefs.length+' PDF verificados';
  const detail=document.createElement('p');
- detail.textContent='Cotización del servidor para archivos verificados: '+amount+
-  '. '+(remaining?'Faltan '+remaining+' PDF.':'Todos los PDF declarados fueron verificados preliminarmente.')+
-   (withoutPdf?' Trabajos sin PDF asociado: '+withoutPdf+'; requieren revisión manual.':'')+
-  ' Registro en Central D1: PENDIENTE. Pago y producción: DESACTIVADOS.';
+ detail.textContent='Servidor: '+amount+' · '+(remaining?remaining+' PDF pendientes':'PDF verificados')+
+   (withoutPdf?' · '+withoutPdf+' trabajos sin PDF':'')+
+   ' · Central D1: '+(registeredOrder?'registrado':'pendiente')+' · Cobros desactivados.';
  summary.append(title,detail);
  sendAllButton.disabled=batchSending||registering||Boolean(registeredOrder)||
   allRefs.length===0||allRefs.every(d=>Boolean(d.confirmacion))||
@@ -292,13 +291,13 @@ function render(){
     name.textContent='Trabajo '+(d.itemIndex+1)+': '+r.nombre+' · '+d.confirmacion.pages+' páginas (PDF verificado)';
     const confirmed=document.createElement('p');
     confirmed.className='state';
-    confirmed.textContent='PDF ya confirmado, recibo '+d.confirmacion.receiptId+'. No hace falta volver a subirlo.';
+    confirmed.textContent='✓ Verificado en Drive · recibo '+d.confirmacion.receiptId;
     area.append(name,confirmed);div.append(area);continue;
    }
    const file=document.createElement('input');file.type='file';file.accept='.pdf,application/pdf';
    if(d.archivoLocal instanceof File){
     const kept=document.createElement('p');kept.className='state';
-    kept.textContent='Archivo recuperado del cotizador en esta pestaña. No hace falta seleccionarlo otra vez.';
+    kept.textContent='Archivo asociado automáticamente.';
     area.append(kept);file.hidden=true;
    }
    const advanced=document.createElement('details');
@@ -629,8 +628,7 @@ window.addEventListener('message',async event=>{
     price:payload.total,references:drafts});
    save();render();updateSummary();
    document.getElementById('recepcion-avanzada').open=true;
-   status.textContent='Se asociaron '+drafts.length+
-    ' PDF con la cotización inteligente. Verificá las opciones y pulsá Enviar todos los PDF del pedido.';
+   status.textContent=drafts.length+' PDF listos. Pulsá «Enviar todos los PDF del pedido».';
    batchStatus.textContent=drafts.length+' PDF listos para enviar, sin seleccionarlos otra vez.';
   }catch(error){batchStatus.textContent='No se preparó la carga: '+String(error.message||error)}
   return;
