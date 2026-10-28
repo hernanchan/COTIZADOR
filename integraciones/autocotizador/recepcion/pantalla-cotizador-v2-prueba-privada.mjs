@@ -508,8 +508,8 @@ async function registrarPedidoVerificado(){
     entries.some(d=>!d.confirmacion||!d.sesionConfirmada||
       !['bn','color'].includes(d.modoConfirmado)||
       (d.ploteo?d.ploteoVerificado?.estado!=='PRELIMINAR_VERIFICADA_SIN_PEDIDO':
-       d.confirmacion.cotizacionServidor?.anillado!=='ninguno'))){
-  registerStatus.textContent='Este ensayo sólo permite PDF verificados sin anillado conjunto ni trabajos sin archivo.';
+       !['ninguno','individual'].includes(d.confirmacion.cotizacionServidor?.anillado)))){
+  registerStatus.textContent='Solo PDF verificados: anillado individual admitido; grupos pendientes de integración.';
   return;
  }
  registering=true;updateSummary();
