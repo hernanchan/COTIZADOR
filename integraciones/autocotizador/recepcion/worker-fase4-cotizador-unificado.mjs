@@ -1474,7 +1474,7 @@ async function v2SessionAuthorized(request,env){
     typeof env?.DOCS_V2_PRIVATE_UI_SECRET!=='string'||
     !/^[A-Za-z0-9_-]{32,128}$/.test(env.DOCS_V2_PRIVATE_UI_SECRET))return false;
  const raw=request.headers.get('Cookie')||'';
- const match=raw.match(/(?:^|;\\s*)saber_v2_session=(\\d{10})\\.([a-f0-9]{64})(?=;|$)/);
+ const match=raw.match(/(?:^|;\s*)saber_v2_session=(\d{10})\.([a-f0-9]{64})(?=;|$)/);
  if(!match)return false;
  const timestamp=Number(match[1]),now=Math.floor(Date.now()/1000);
  if(!Number.isSafeInteger(timestamp)||timestamp>now+30||
