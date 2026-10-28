@@ -26,8 +26,8 @@ jobs:
           set -euo pipefail
           test -n "$ACCOUNT" && test -n "$TOKEN"
           root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-documentos-pruebas"
-          old="18779e7c-05f9-4f33-9fa0-dd2955942492"
-          target="217912ca-0610-4047-95d8-3e3b0be1d599"
+          old="217912ca-0610-4047-95d8-3e3b0be1d599"
+          target="9597827e-bc43-4a13-a5c6-e34cabf9f9ec"
           deployed=0
           cleanup() { rm -f /tmp/f1-before.json /tmp/f1-after.json /tmp/f1-request.json /tmp/f1-response.json /tmp/f1-rollback.json; }
           rollback() {
