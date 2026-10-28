@@ -287,3 +287,46 @@ test('lecturas de índice de archivos existentes no pueden sobreescribir cupos d
  assert.match(SOURCE,/var used=docsMultiIds\(true\);/);
  assert.match(SOURCE,/function docsMultiAuth\(p\)\{[\s\S]*?docsMultiIds\(\)/);
 });
+
+test('lote con cupo insuficiente se rechaza ANTES de iniciar sesiones Drive',()=>{
+ const x=environment();
+ let opened=0;
+ x.sandbox.docsStart=()=>{opened++;throw Error('No debería abrir Drive');};
+ const metas=[0,1,2].map(i=>{
+  const id='pdf-huge-'+i;
+  return {orderId:x.s.orderId,fileId:id,name:'file'+i+'.pdf',
+   mode:'bn',bytes:20*1024*1024,sha256:sha(Buffer.from(id)),
+   partBytes:PART,parts:40};
+ });
+ assert.throws(()=>x.sandbox.docsMultiStartBatch({metas}),/cupos privados/);
+ assert.equal(opened,0,'No se consume Drive ante una tanda que excede cuota agregada');
+});
+
+test('fallo a mitad del inicio de una tanda permite reintentar sin duplicar los primeros recibos',()=>{
+ const x=environment();
+ let attempts=0,failOnce=true;
+ x.sandbox.docsStart=function({meta}){
+  attempts++;
+  if(failOnce&&attempts===2){failOnce=false;throw Error('Drive interrumpido');}
+  const item={...x.state(),...meta,uploadId:'DOC-'+randomUUID(),
+   token:'BATCH_TEST_TOKEN_0123456789_abcdefghijk',offset:0,
+   name:meta.fileId+'__'+meta.name,createdAt:Date.now(),
+   receiptState:'receiving',driveFileId:null};
+  x.sandbox.docsSave(item);
+  return {uploadId:item.uploadId,token:item.token};
+ };
+ const metas=[1,2,3].map(i=>({orderId:x.s.orderId,fileId:'pdf-mid-'+i,
+  name:'archivo'+i+'.pdf',mode:'bn',bytes:250+i,
+  sha256:sha(Buffer.from('x'+i)),partBytes:PART,parts:1}));
+ assert.throws(()=>x.sandbox.docsMultiStartBatch({metas}),/Drive interrumpido/);
+ const retry=x.sandbox.docsMultiStartBatch({metas});
+ assert.equal(retry.sessions.length,3);
+ assert.equal(retry.sessions[0].newSession,false,'Primer PDF ya existe');
+ assert.equal(retry.sessions[1].newSession,true);
+ assert.equal(retry.sessions[2].newSession,true);
+ assert.equal(attempts,4,'Sólo 3 sesiones creadas; un intento interrumpido');
+ const repeat=x.sandbox.docsMultiStartBatch({metas});
+ assert.ok(repeat.sessions.every(s=>s.newSession===false));
+ assert.deepEqual(Array.from(retry.sessions.map(s=>s.uploadId)),
+  Array.from(repeat.sessions.map(s=>s.uploadId)));
+});
