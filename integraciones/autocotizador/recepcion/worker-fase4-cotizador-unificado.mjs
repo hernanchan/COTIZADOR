@@ -1425,16 +1425,29 @@ async function apiPrepararDocumentosV2Lote(request,env){
  try{
   // Sólo con TODOS los comprobantes HMAC válidos se evita una
   // segunda descarga. Para pedidos antiguos/mixtos se usa la ruta completa.
-  const verificacion=input.sesiones.every(e=>e?.comprobanteServidor)
-   ?await verificarPedidoPorComprobantes({
+  const rutaLegada=()=>fase4FichaCentralLotePrivada({
+   sesiones:input.sesiones,
+   consultarFirmado:p=>postToScript(env,p,fetch,420000),
+   preciosServidor:preciosPiloto,maxFiles:30,maxFileBytes:20*1024*1024
+  });
+  let verificacion;
+  if(input.sesiones.every(e=>e?.comprobanteServidor)){
+   try{
+    verificacion=await verificarPedidoPorComprobantes({
      sesiones:input.sesiones,manifiesto:input.manifiesto,
      secret:env.DOCS_RELAY_KEY,preciosServidor:preciosPiloto
-    })
-   :await fase4FichaCentralLotePrivada({
-     sesiones:input.sesiones,
-     consultarFirmado:p=>postToScript(env,p,fetch,420000),
-     preciosServidor:preciosPiloto,maxFiles:30,maxFileBytes:20*1024*1024
     });
+   }catch(error){
+    // Una prueba genuina que envejeció no obliga al cliente a re-subir.
+    // Se vuelve a la verificación COMPLETA contra Drive. Firma alterada,
+    // discrepancias de PDF o precio no se dejan pasar.
+    if(error?.message!=='Comprobante vencido; se debe volver a comprobar el PDF en servidor.')
+     throw error;
+    verificacion=await rutaLegada();
+   }
+  }else{
+   verificacion=await rutaLegada();
+  }
   const registrado=await registrarManifiestoV2EnCentral({
    manifiesto:input.manifiesto,verificacion,env
   });
