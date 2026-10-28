@@ -155,3 +155,12 @@ Se confirmó una **incompatibilidad entre cotización y recepción**, no una fal
 - **No se actualizó el Apps Script real**: sigue siendo la versión 5 de «FASE 4 – Carga y presupuesto PDF», contrato antiguo (5 PDF de 1 MB/identificador `documento`). La corrección ampliada está en `integraciones/autocotizador/recepcion/DocumentosReceiver_LOTE_AMPLIADO_PRUEBAS_20261024.gs`.
 - El siguiente paso es **preservar copia de `Código.gs` y reemplazar su contenido únicamente en el proyecto receptor de documentos**, guardar y luego actualizar la implementación existente «FASE 4 – Carga y presupuesto PDF» creando una versión nueva dentro de ella (sin cambiar la URL que utiliza Worker). No modificar ninguna implementación de Polaroids o la web pública. La intervención en Apps Script debe hacerse con cuenta del propietario; no hay un conector disponible para efectuarla directamente.
 - Solo después del despliegue, la prueba real de 3 archivos / recepción Drive / D1 autoriza declarar arreglada esta falla. No confundir CI con despliegue ni prueba real.
+
+
+## HITO CONFIRMADO — 28-10-2026: Apps Script receptor ampliado actualizado a versión 6
+
+- El usuario reemplazó el contenido de `Código.gs` en el proyecto «SABER — RECEPCIÓN DOCUMENTOS» con el receptor ampliado preparado en GitHub y actualizó **la implementación existente** «FASE 4 – Carga y presupuesto PDF», sin crear otra implementación.
+- La captura del administrador de implementaciones muestra literalmente **«La implementación se ha actualizado correctamente»**, **«Versión 6 del 28 oct 2026, 7:48»** y el mismo ID de implementación que antes comienza con `AKfycbwQUipB5Gafy7OwQSK8nfsrl2lvGAqg64n8F3StIiwbfQzELA_puIiCPUFBg11cUjRb5A`. Eso confirma despliegue del proyecto GAS, pero **no demuestra todavía recepción PDF funcional**.
+- **Siguiente paso inmediato:** probar carga real desde pantalla privada del Worker `https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/`, inicialmente con un PDF sintético pequeño y luego lote A4/A4/A0; observar respuesta del GAS y confirmar recibo/páginas/Drive antes de intentar registrar D1.
+- Si el usuario conservó la pestaña antigua con los archivos cargados, puede necesitar volver a iniciar el ensayo porque sesión/Turnstile expiran. Evitar afirmar que los 3 PDF ya están en Drive o en Central.
+- No tocar `main`, producción pública, pagos ni Polaroids. Mantener los reportes diferenciados: GAS desplegado / subida real no verificada / D1 no verificado.
