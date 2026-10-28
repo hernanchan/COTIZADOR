@@ -280,7 +280,8 @@ function docsMultiStart(p){
         old.mode!==m.mode)
        throw Error('Identificador de ensayo en uso');
      return {uploadId:old.uploadId,token:old.token,orderId:old.orderId,
-       fileId:old.fileId,remainingSlots:DOCS_MULTI_CAP-used.filter(function(id){return docsRead(id).orderId===m.orderId;}).length};
+       fileId:old.fileId,newSession:false,
+       remainingSlots:DOCS_MULTI_CAP-used.filter(function(id){return docsRead(id).orderId===m.orderId;}).length};
    }
  }
  if(used.length>=DOCS_MULTI_GLOBAL_CAP)
@@ -295,8 +296,10 @@ function docsMultiStart(p){
  var started=docsStart({meta:m});
  used.push(started.uploadId);
  docsStore().setProperty(DOCS_MULTI_INDEX,JSON.stringify(used));
+ // Sólo una sesión recién creada no tiene partes recibidas.
+ // Sesiones reanudadas o idempotentes siguen consultando el estado real.
  return {uploadId:started.uploadId,token:started.token,
-   orderId:m.orderId,fileId:m.fileId,
+   orderId:m.orderId,fileId:m.fileId,newSession:true,
    remainingSlots:DOCS_MULTI_CAP-count-1};
 }
 function docsMultiAuth(p){
