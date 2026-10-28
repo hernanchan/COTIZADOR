@@ -65,6 +65,32 @@ export function conciliarManifiestoV2ConServidor({manifiesto,verificacion}){
      ficha.pdfImprimibleVerificado!==false)
    throw Error('El ploteo no coincide con la ficha verificada del servidor.');
  }
+ // Documentos: las opciones de encuadernación del manifiesto deben ser
+ // idénticas a la ficha recomputada desde PDF + tarifas del servidor.
+ // Nunca registrar silenciosamente "sin anillado" cuando se pidió uno.
+ for(const item of m.items){
+  if(item.opciones?.servicio==='ploteos')continue;
+  const ficha=trabajos.find(t=>t.reciboPrivado===item.reciboPrivado);
+  if(!ficha||ficha.servicio!=='documentos'||
+     ficha.sha256!==item.sha256||
+     ficha.paginasOriginales!==item.paginas||
+     ficha.formatoFinal!==item.opciones?.formato||
+     ficha.carasPresupuestadas!==item.opciones?.caras||
+     ficha.copias!==item.opciones?.copias||
+     ficha.tipoAnillado!==item.opciones?.anillado||
+     !['ninguno','individual','grupo'].includes(ficha.tipoAnillado)||
+     ficha.pdfImprimibleVerificado!==false)
+   throw Error('El anillado u opciones del documento difieren de la ficha verificada.');
+  if(ficha.tipoAnillado==='grupo'){
+   if(!/^[1-9][0-9]?$/.test(String(item.opciones.grupoAnillado||''))||
+      !Array.isArray(v.ficha.gruposAnillado)||
+      !v.ficha.gruposAnillado.some(g=>
+       String(g.grupo)===String(item.opciones.grupoAnillado)&&
+       Array.isArray(g.archivos)&&g.archivos.includes(ficha.idTrabajo)))
+    throw Error('El grupo de anillado no coincide con el armado presupuestado.');
+  }else if(item.opciones?.grupoAnillado)
+   throw Error('El pedido agregó un grupo de anillado ajeno.');
+ }
  // No aceptar total local como precio; ni rechazar una modificación legítima
  // de tarifa: la autoridad es la cotización comprobada por el servidor.
  return Object.freeze({
