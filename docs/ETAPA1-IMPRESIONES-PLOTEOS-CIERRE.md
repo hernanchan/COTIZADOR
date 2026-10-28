@@ -326,3 +326,23 @@ Se confirmó una **incompatibilidad entre cotización y recepción**, no una fal
 - `DocumentosReceiver_LOTE_AMPLIADO_PRUEBAS_20261024.gs`: recepción resumable Drive y comprobación `docsFinish` descargando PDF completo, luego `docsMultiReadPart` por rango y `docsMultiCommitPages` vuelve a cargar/verificar blob del PDF. Toda reducción de relecturas debe conservar SHA-256, páginas verificadas, recibo, precios servidor e idempotencia.
 
 **Decisión de priorización:** no optimizar parser del navegador ni agregar pantallas/pagos antes de mejorar primero los tramos ~20 s de `vincular` y ~19,5 s de Central y validar el ~11,7 s de `finish`; una sola prueba no es suficiente para estimar p95 ni latencia de múltiples PDFs. Añadir métricas seguras internas / tests para descomponer las suboperaciones, especialmente tiempo de red GAS y Drive, sin revelar datos privados ni omitir comprobaciones. Luego evaluar batching, lecturas duplicadas y operaciones secuenciales, manteniendo prohibición de cobro. **No considerar esto una optimización ya implementada**.
+
+
+## 28-10-2026: optimización de lecturas GAS/Drive en paralelo acotado — **CÓDIGO Y CI APROBADOS, NO DESPLEGADOS**
+
+**Motivo y línea base comprobada:** un solo PDF A4 de 12 páginas, blanco y negro doble faz con anillado individual, $3.290 preliminar, tardó **62.081 ms** (captura consola del usuario). El cuello identificado está en `finish` (~11,7s), `vincular` (~20,4s) y `central` (~19,5s). No atribuir todavía latencia exclusivamente a plan gratuito, Apps Script, Drive o Workers.
+
+**Cambios únicamente en rama privada `fase1/impresiones-ploteos-20261027`:**
+- `integraciones/autocotizador/recepcion/leer-pdf-fase4-privado.mjs` (`2174ee66`): lecturas autenticadas HMAC `multiReadPart` de 256 KiB hasta **3 en paralelo**, según offsets predeterminados, sin alterar bytes, reensamblado por offset y SHA-256 por bloque + documento completo.
+- `integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs` (`74d126f5`): mismo límite de **3 lecturas de sólo lectura en paralelo** en `fase4PrivateVerified`, con validación intacta de recibo, offset, tamaño, firma y SHA-256. El conteo de páginas y su persistencia en GAS no cambian.
+- `integraciones/autocotizador/recepcion/fase4-ficha-central-lote-privada.mjs` (`ce949efb`): las consultas de solo lectura `multiInfo` y `multiVerifiedStatus` del mismo PDF se solapan con `Promise.all`. Se mantienen las comprobaciones de consistencia estricta entre ambos recibos y la reconstrucción independiente que recalcula precio en servidor antes de D1.
+- Las **subidas `multiPart`**, escrituras, verificación de páginas, precios y registro D1 siguen **secuenciales**; no se cambian permisos, cuotas ni seguridad. La optimización evita esperas seriales en lecturas independientes, no elimina comprobaciones.
+- `tests/fase1-lectura-privada-concurrente.test.mjs` (`3639e04d`): pruebas reales de 6 fragmentos con respuestas desordenadas, concurrencia máxima 3, SHA de fragmento falso, recibo/offset falsos, SHA final inconsistente, patrón de Worker y verificación de dos estados.
+- `integraciones/autocotizador/recepcion/package.json` (`e602de11`): incorpora suite de pruebas de rendimiento/seguridad en `test:handoff`, ejecutada antes de compilar el Worker.
+- `tests/fase1-envio-unico-interfaz.test.mjs` (`4ecdd93f`): regresión de seguridad y paralelismo, activando workflow de validación.
+
+**Pruebas verificadas GitHub Actions:** run `40721208008`, job `122932283823`, **SUCCESS**; 49 pruebas del contrato sin fallos y nuevas pruebas de lectura concurrente `ok`, compilación y verificación del Worker correctas. **No** se ejecutó carga real contra Google para medir ahorro.
+
+**Estado confirmado al cerrar:** código seguro y pruebas aprobados en GitHub, **sin nueva versión Cloudflare cargada ni desplegada**. La última versión privada conocida en servicio es `2c1db455-4ac5-4f02-9ebd-c4e581f7283d`, que produjo el ensayo de 62.081 ms. `main` comercial, `libreriasaber.com.ar`, cobros y Polaroids intactos.
+
+**Próximo paso operativo:** desde el workflow manual de GitHub existente en `main` `.github/workflows/saber-preparar-version-privada.yml` (build FROM rama privada), ejecutar **Run workflow** y recuperar `VERSION_PRIVADA_PREPARADA_SIN_ACTIVAR`. Luego promocionar **solo** en Cloudflare `saber-documentos-pruebas`, guardando `2c1db455` como rollback. Repetir exactamente PDF de 12 páginas con `?diagnostico=1` (y un lote mixto después), comparar tiempos por fase contra 62.081 ms. Si hay errores de concurrencia/cuotas o empeora la latencia, revertir al despliegue anterior; no atribuir mejoría antes de medir. Si el cuello `finish` persiste, instrumentar GAS para separar Drive SHA, relecturas y llamadas Worker, sin omitir seguridad.
