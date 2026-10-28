@@ -73,3 +73,16 @@ test('los tiempos quedan solo en memoria local y distinguen etapas del circuito'
  assert.match(source,/diagnostico'\)==='1'/);
  assert.doesNotMatch(source,/localStorage\.setItem\([^\n]*Rendimiento/);
 });
+
+test('optimización privada: lecturas GAS independientes con concurrencia máxima 3, envío de bloques sigue en serie',()=>{
+ const worker=readFileSync(new URL('../integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs',import.meta.url),'utf8');
+ const reader=readFileSync(new URL('../integraciones/autocotizador/recepcion/leer-pdf-fase4-privado.mjs',import.meta.url),'utf8');
+ const upload=readFileSync(new URL('../integraciones/autocotizador/recepcion/subir-vincular-pdf-v2-privado.mjs',import.meta.url),'utf8');
+ assert.match(worker,/Math\.min\(3,offsets\.length\)/);
+ assert.match(reader,/Math\.min\(3,offsets\.length\)/);
+ assert.match(worker,/safeHash\(chunk\)!==part\.chunkSha256/);
+ assert.match(reader,/checksum!==part\.chunkSha256/);
+ assert.match(reader,/actual!==sha256/);
+ assert.match(upload,/for\(let index=0;index<parts;index\+\+\)/);
+ assert.match(worker,/checkoutEnabled:false,paymentAuthorized:false/);
+});
