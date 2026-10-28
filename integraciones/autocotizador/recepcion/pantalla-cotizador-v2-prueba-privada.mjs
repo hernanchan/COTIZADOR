@@ -60,7 +60,7 @@ body.estado-envio #smart,body.estado-registro #smart{display:none}
 </details>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 <script type="module">
-import {subirYVincularPdfCotizadorV2} from '/prueba-v2/subir-vincular-pdf.mjs';
+import {subirYVincularPdfCotizadorV2,ejecutarRecepcionParalela} from '/prueba-v2/subir-vincular-pdf.mjs';
 import {prepararManifiestoDocumentalV2} from '/prueba-v2/preparar-manifiesto.mjs';
 const list=document.getElementById('all'),status=document.getElementById('state'),
  frame=document.getElementById('base'),smart=document.getElementById('smart'),
@@ -339,6 +339,13 @@ function render(){
       return false;
      }finally{window.turnstile?.reset()}
     };
+    // Preparación segura del lote: datos del mismo PDF que sendPlot enviaría.
+    d.batchInicio=()=>({
+     meta:{orderId,fileId:'pdf-'+r.sha256.slice(0,24),
+      name:r.nombre,mode:meta.modo,bytes:r.bytes,sha256:r.sha256,
+      partBytes:512*1024,parts:Math.ceil(r.bytes/(512*1024))},
+     localRef:r.localRef,modo:meta.modo,opcionesKey:'null'
+    });
     d.sendNow=sendPlot;
     retry.addEventListener('click',()=>{void sendPlot()});
     area.append(retry,msg);div.append(area);continue;
@@ -449,6 +456,18 @@ function render(){
      return false;
     }finally{window.turnstile?.reset()}
    };
+   // Las opciones se leen al iniciar el lote, no antes; si cambian tras
+   // una sesión recibida, subirYVincularPdf las rechaza por opcionesKey.
+   d.batchInicio=()=>{
+    if(!papel.value||!d.archivoLocal)throw Error('Falta el PDF o el papel seleccionado.');
+    const opciones={formato:formato.value,caras:caras.value,
+     copias:Number(copias.value),anillado:anillado.value,
+     materialColor:papel.value,paginasPorHoja:Number(paginasPorHoja.value)};
+    return {meta:{orderId,fileId:'pdf-'+r.sha256.slice(0,24),
+      name:r.nombre,mode:mode.value,bytes:r.bytes,sha256:r.sha256,
+      partBytes:512*1024,parts:Math.ceil(r.bytes/(512*1024))},
+     localRef:r.localRef,modo:mode.value,opcionesKey:JSON.stringify(opciones)};
+   };
    d.sendNow=sendThis;
    btn.addEventListener('click',()=>{void sendThis()});
    const modeLabel=document.createElement('label');
@@ -478,6 +497,65 @@ async function waitForTurnstile(){
   await new Promise(resolve=>setTimeout(resolve,500));
  }
  return false;
+}
+/**
+ * Crea sesiones Drive de los PDF pendientes en tandas de hasta 10.
+ * Un Turnstile por tanda, un HMAC de Worker a GAS y un recibo por archivo.
+ * No se emiten partes ni se marca ningún documento como verificado aquí.
+ */
+async function prepararSesionesDeLote(pendientes){
+ const nuevos=pendientes.filter(d=>!d.sesionTemporal);
+ for(let inicio=0;inicio<nuevos.length;inicio+=10){
+  const grupo=nuevos.slice(inicio,inicio+10);
+  if(!(await waitForTurnstile()))
+   throw Error('Completá la verificación de seguridad para iniciar la tanda.');
+  const plans=grupo.map(d=>{
+   if(typeof d.batchInicio!=='function')throw Error('El PDF no está listo para la recepción por lotes.');
+   return d.batchInicio();
+  });
+  const token=window.turnstile?.getResponse?.();
+  if(typeof token!=='string'||token.length<10)throw Error('Verificación de seguridad vencida.');
+  let reply;
+  try{
+   const res=await fetch('/api/ensayo-pdf-iniciar-lote',{
+    method:'POST',credentials:'same-origin',redirect:'error',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({turnstileToken:token,metas:plans.map(p=>p.meta)})
+   });
+   reply=await res.json().catch(()=>null);
+   if(!res.ok||reply?.ok!==true||
+      reply.paymentAuthorized!==false||
+      !Array.isArray(reply.sessions)||reply.sessions.length!==grupo.length)
+    throw Error(reply?.error||'Google no confirmó el inicio de toda la tanda.');
+   const vistos=new Set();
+   for(let i=0;i<grupo.length;i++){
+    const ss=reply.sessions[i],plan=plans[i];
+    if(!ss||ss.fileId!==plan.meta.fileId||
+       ss.orderId!==orderId||
+       !/^DOC-[a-f0-9-]{36}$/i.test(ss.uploadId||'')||
+       typeof ss.token!=='string'||ss.token.length<16||
+       typeof ss.newSession!=='boolean'||vistos.has(ss.uploadId))
+      throw Error('La tanda devolvió sesiones incompatibles.');
+    vistos.add(ss.uploadId);
+   }
+   // Publicación atómica: recién ahora las sesiones quedan ligadas a sus PDF.
+   for(let i=0;i<grupo.length;i++){
+    const plan=plans[i],ss=reply.sessions[i];
+    grupo[i].sesionTemporal=Object.freeze({
+     uploadId:ss.uploadId,token:ss.token,orderId,
+     localRef:plan.localRef,sha256:plan.meta.sha256,
+     modo:plan.modo,opcionesKey:plan.opcionesKey,
+     batchFresh:ss.newSession===true
+    });
+   }
+   marcarTiempo('lote_sesiones',{archivos:inicio+grupo.length});
+   batchProgress.textContent='Sesiones protegidas listas: '+
+    (inicio+grupo.length)+' de '+nuevos.length+' archivos nuevos.';
+  }finally{
+   // Turnstile sólo verifica el INICIO, nunca las partes ni la Central.
+   window.turnstile?.reset?.();
+  }
+ }
 }
 async function prepararDesdeCotizador(){
  if(handoffInProgress)return false;
@@ -526,21 +604,50 @@ sendAllButton.addEventListener('click',async()=>{
  mostrarEstadoCliente('enviando','Estamos recibiendo tus archivos','Se verificarán los PDF y registraremos el pedido automáticamente. No cierres esta pestaña.');
  let received=0,success=true;
  try{
-  for(const d of pending){
-   marcarTiempo('pdf_inicio',{pdf:received+1});
-   batchProgress.textContent='Recibiendo y verificando PDF '+(received+1)+' de '+pending.length+
-    ': '+d.reference.nombre;
-   if(!d.sesionTemporal&&!(await waitForTurnstile())){
-    batchProgress.textContent='Completá la verificación de seguridad y pulsá «Enviar mi pedido» otra vez.';
-    success=false;break;
+  if(pending.length>1){
+   try{
+    marcarTiempo('lote_inicio',{archivos:pending.length});
+    await prepararSesionesDeLote(pending);
+    marcarTiempo('lote_transferencia_inicio',{archivos:pending.length});
+    const outcome=await ejecutarRecepcionParalela(pending,
+     async(d,index)=>{
+      marcarTiempo('pdf_inicio',{pdf:index+1});
+      batchProgress.textContent='Recibiendo y comprobando hasta 2 PDF simultáneos · '+
+       received+' de '+pending.length+' confirmados.';
+      return d.sendNow();
+     },(d,index)=>{
+      marcarTiempo('pdf_confirmado',{pdf:index+1});
+      received++;
+      batchProgress.textContent='PDF verificados: '+received+' de '+pending.length+
+       '. Preparando un solo pedido.';
+      updateSummary();
+     },2);
+    if(!outcome.completo){
+     success=false;
+     batchProgress.textContent='Se detuvo la tanda en '+received+' de '+pending.length+
+      ' archivos. Los ya verificados quedan conservados para reintentar sin duplicarlos.';
+    }
+   }catch(error){
+    success=false;
+    batchProgress.textContent='No se pudo completar el inicio de la tanda: '+
+     String(error.message||error)+'. Las sesiones ya creadas pueden recuperarse.';
    }
-   if(!(await d.sendNow())){
-    batchProgress.textContent='Se detuvo en '+d.reference.nombre+
-     '. Corregí el inconveniente y volvé a pulsar «Enviar mi pedido»; no se duplicarán los PDF ya verificados.';
-    success=false;break;
+  }else{
+   // Un solo PDF mantiene su circuito medido y ya probado.
+   for(const d of pending){
+    marcarTiempo('pdf_inicio',{pdf:received+1});
+    batchProgress.textContent='Recibiendo y verificando el PDF…';
+    if(!d.sesionTemporal&&!(await waitForTurnstile())){
+     batchProgress.textContent='Completá la verificación de seguridad y pulsá «Enviar mi pedido» otra vez.';
+     success=false;break;
+    }
+    if(!(await d.sendNow())){
+     batchProgress.textContent='Se detuvo la carga; podés reintentar sin duplicar el PDF.';
+     success=false;break;
+    }
+    marcarTiempo('pdf_confirmado',{pdf:1});
+    received++;
    }
-   marcarTiempo('pdf_confirmado',{pdf:received+1});
-   received++;
   }
  }finally{
   batchSending=false;
