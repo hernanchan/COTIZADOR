@@ -71,13 +71,14 @@ test('el callback real agrega MUEBLES.pdf de ocho paginas a la cola privada, sin
   formato:o.formato,modo:o.modo,caras:o.caras,copias:o.copias,paginas:o.paginas,
   nombre:o.nombre
  })),[{formato:'a4',modo:'bn',caras:'simple',copias:1,paginas:8,nombre:'MUEBLES.pdf'}]);
- assert.match(info.textContent,/enviaron a la cola/);
+ assert.match(info.textContent,/Pedido preparado/);
 });
 
 test('el callback real rechaza nombres no PDF y archivos superiores a 20 MB',()=>{
  for(const [name,size] of [['MUEBLES.txt',2464154],['MUEBLES.pdf',20*1024*1024+1]]){
   const {sent,info}=runPrivateHandoff(name,size);
-  assert.equal(sent.length,0);
+  assert.equal(sent.length,1);
+  assert.equal(sent[0].payload.type,'SABER_SMART_HANDOFF_ERROR');
   assert.match(info.textContent,/20 MB/);
  }
 });
