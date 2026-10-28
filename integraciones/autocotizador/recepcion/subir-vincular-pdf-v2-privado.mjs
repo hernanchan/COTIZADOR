@@ -12,6 +12,16 @@ const SHA=/^[a-f0-9]{64}$/;
 const WEB=/^WEB-[A-Za-z0-9_-]{5,80}$/;
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 const RECEIPT=/^DOC-[a-f0-9-]{36}$/i;
+/**
+ * Identificador estable de la REFERENCIA, no sólo del contenido.
+ * Dos archivos byte a byte idénticos pueden pertenecer a trabajos distintos
+ * del mismo pedido y deben conservar recibos independientes.
+ */
+export function fileIdParaReferencia(r){
+ if(!r||!SHA.test(r.sha256||'')||!UUID.test(r.localRef||''))
+  throw Error('Referencia documental inválida para iniciar recepción.');
+ return 'pdf-'+r.sha256.slice(0,16)+'-'+r.localRef.replace(/-/g,'').toLowerCase();
+}
 function asBase64(bytes){
  let value='';
  for(let p=0;p<bytes.length;p+=12288)
@@ -93,7 +103,7 @@ export async function subirYVincularPdfCotizadorV2({
   onProgress({phase:freshSession?'inicio':'reanudacion',completed:0,total:parts});
  }else{
   const start=await rpc('/api/ensayo-pdf-ampliado',{op:'start',turnstileToken,
-   meta:{orderId,fileId:'pdf-'+r.sha256.slice(0,24),
+   meta:{orderId,fileId:fileIdParaReferencia(r),
     name:r.nombre,mode:modo,bytes:r.bytes,sha256:r.sha256,
     partBytes:PART,parts}
   });
