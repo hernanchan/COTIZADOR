@@ -37,9 +37,9 @@ test('el archivo valido conserva la transferencia al portal privado',()=>{
 });
 
 
-const marker="bridgeButton.addEventListener('click',()=>{";
+const marker="const prepararEnvioPrivado=()=>{";
 const begin=source.indexOf(marker);
-const finish=source.indexOf("\n });\n}\n$('prepararPedido')",begin);
+const finish=source.indexOf("\n };\n bridgeButton.hidden=true",begin);
 assert.ok(begin>=0&&finish>begin,'No se encontró el callback real del botón');
 const clickHandler=new Function('leyendo','ultimoPresupuesto','entries','window','location','info',
  source.slice(begin+marker.length,finish));
@@ -61,7 +61,9 @@ function runPrivateHandoff(name='MUEBLES.pdf',size=2464154){
 
 test('el callback real agrega MUEBLES.pdf de ocho paginas a la cola privada, sin enviarlo a Drive',()=>{
  const {sent,info,file}=runPrivateHandoff();
- assert.equal(sent.length,1,info.textContent);
+ assert.equal(sent.length,2,info.textContent);
+ assert.equal(sent[1].payload.type,'SABER_SMART_HANDOFF_READY');
+ assert.equal(sent[1].payload.cantidad,1);
  assert.equal(sent[0].payload.type,'SABER_SMART_DOCUMENTS_TO_PRIVATE');
  assert.equal(sent[0].payload.files[0],file);
  assert.equal(sent[0].payload.total,800);
