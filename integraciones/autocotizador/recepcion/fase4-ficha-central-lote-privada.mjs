@@ -29,8 +29,13 @@ export async function fase4FichaCentralLotePrivada({
    throw Error('Sesión repetida, incompleta o sin opciones.');
   ids.add(session.uploadId);
   const safe={uploadId:session.uploadId,token:session.token};
-  const info=await consultarFirmado({op:'multiInfo',...safe});
-  const status=await consultarFirmado({op:'multiVerifiedStatus',...safe});
+  // Ambas consultas de sólo lectura usan HMAC y GAS no las bloquea.
+  // Solaparlas reduce una ida a Google, sin confiar en la información
+  // del navegador: la comparación estricta de los dos recibos se mantiene.
+  const [info,status]=await Promise.all([
+   consultarFirmado({op:'multiInfo',...safe}),
+   consultarFirmado({op:'multiVerifiedStatus',...safe})
+  ]);
   if(!info||info.ok!==true||info.receiptState!=='pages_verified'||
      info.receiptId!==session.uploadId||!status||status.ok!==true||
      status.receiptId!==session.uploadId||status.status!=='verified'||
