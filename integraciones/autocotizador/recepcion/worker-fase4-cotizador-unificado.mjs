@@ -14,6 +14,8 @@ import {medidasPdfServidor} from './medidas-pdf-servidor.mjs';
 import {GRAFICA_COMERCIAL} from './cotizar-grafica.mjs';
 import {fase4FichaCentralPrivada} from './fase4-ficha-central-privada.mjs';
 import {fase4FichaCentralLotePrivada} from './fase4-ficha-central-lote-privada.mjs';
+import {crearComprobantePdf} from './comprobante-pdf-servidor.mjs';
+import {verificarPedidoPorComprobantes} from './verificacion-central-comprobante.mjs';
 import {enviarCentralFirmada} from './enviar-central-firmada.mjs';
 import {prepararMixtoCentralFirmado} from './preparar-mixto-central.mjs';
 import {prepararDocumentosCentralFirmado} from './preparar-documentos-central.mjs';
@@ -798,11 +800,22 @@ async function fase4Transfer(request,env,extended=false){
      ' por un problema de conexión con el receptor. Consultá el estado antes de reintentar.',
     paymentAuthorized:false},502)}
 }
-async function fase4PrivateVerified(env,session,metrics=null,preferirInfo=false,maxFileBytes=FASE4_QUOTA_BYTES){
+async function fase4PrivateVerified(env,session,metrics=null,preferirInfo=false,maxFileBytes=FASE4_QUOTA_BYTES,conMedidas=false){
  if(![FASE4_QUOTA_BYTES,DOCS_MAX].includes(maxFileBytes))throw Error('Límite documental inválido');
  const mark=()=>Date.now();let last=mark();
  const lap=(name)=>{if(metrics){metrics[name]=mark()-last;}last=mark();};
  const ctx={uploadId:session.uploadId,token:session.token};
+ async function incluirMedidas(recibo,original=null){
+  if(!conMedidas)return recibo;
+  const bytes=original||await leerPdfFase4Privado({
+   session,receiptId:recibo.receiptId,bytes:recibo.bytes,sha256:recibo.sha256,
+   consultarFirmado:p=>postToScript(env,p,fetch,420000),maxFileBytes
+  });
+  const medidas=await medidasPdfServidor(bytes);
+  if(medidas.pageCount!==recibo.pages)
+   throw Error('Las medidas no coinciden con las páginas del PDF verificado.');
+  return {...recibo,serverPageMetrics:medidas.pageMetrics};
+ }
  // En una recotización, consultar primero el recibo ya validado ahorra
  // una llamada a Google. Si no está verificado, continuar con la lectura
  // y análisis completos. La respuesta sigue vinculada a sesión+token.
@@ -815,7 +828,7 @@ async function fase4PrivateVerified(env,session,metrics=null,preferirInfo=false,
      Number.isSafeInteger(previo.pages)&&previo.pages>=1&&
      Number.isSafeInteger(previo.bytes)&&previo.bytes>=5&&previo.bytes<=maxFileBytes&&
      /^[a-f0-9]{64}$/.test(previo.sha256||'')){
-    return previo;
+    return incluirMedidas(previo);
   }
  }
  const info=await postToScript(env,{op:'multiInfo',...ctx},fetch);
@@ -829,7 +842,7 @@ async function fase4PrivateVerified(env,session,metrics=null,preferirInfo=false,
    lap('estadoVerificadoMs');
    if(ready.ok&&ready.verified&&ready.pages===info.pages&&
       ready.receiptId===info.receiptId&&ready.paymentAuthorized===false)
-     return ready;
+     return incluirMedidas(ready);
  }
  const bytes=new Uint8Array(info.bytes);
  // GAS ofrece multiReadPart autenticado sin lock de escritura: hasta tres
@@ -869,7 +882,7 @@ async function fase4PrivateVerified(env,session,metrics=null,preferirInfo=false,
  if(!committed.ok||committed.verified!==true||committed.receiptId!==checked.receiptId||
    committed.pages!==checked.pages||committed.paymentAuthorized!==false)
    throw Error('Google no guardó el conteo de páginas');
- return committed;
+ return incluirMedidas(committed,bytes);
 }
 /** Sólo presupuesto privado de ploteo de PDF ya guardado y verificado.
  * No registra órdenes, no escribe en D1 y no emite autorización de pago.
@@ -957,10 +970,13 @@ async function v2VincularPdf(request,env){
   return testResponse({ok:false,error:'Referencia o sesión de PDF inválida',paymentAuthorized:false},400);
  }
  try{
-  const recibo=await fase4PrivateVerified(env,input.sesion,null,false,DOCS_MAX);
+  const recibo=await fase4PrivateVerified(env,input.sesion,null,false,DOCS_MAX,true);
   const link=verificarVinculoCotizadorV2({
    referencia:input.referencia,recibo,sessionId:input.sesion.uploadId,
    expectedOrderId:input.expectedOrderId,expectedMode:input.expectedMode
+  });
+  const comprobanteServidor=await crearComprobantePdf({
+   recibo,medidas:recibo.serverPageMetrics,secret:env.DOCS_RELAY_KEY
   });
   // La cotización es OPCIONAL para conservar el contrato del cliente V2 existente.
   // Es preliminar de servidor, limitada a A4/A3, BN/color y materiales del piloto.
@@ -968,17 +984,11 @@ async function v2VincularPdf(request,env){
   if(input.opciones!==undefined){
    const o=input.opciones;
    if((o.paginasPorHoja??1)!==1){
-    const consultarFirmado=p=>postToScript(env,p,fetch,420000);
-    const original=await leerPdfFase4Privado({
-     session:input.sesion,receiptId:recibo.receiptId,
-     bytes:recibo.bytes,sha256:recibo.sha256,
-     maxFileBytes:DOCS_MAX,consultarFirmado
-    });
-    const medidas=await medidasPdfServidor(original);
+    const medidas={pageCount:recibo.pages,pageMetrics:recibo.serverPageMetrics};
     const presupuesto=cotizarNupReciboVerificado({
      recibo,medidas,opciones:o,precios:preciosPiloto
     });
-    return testResponse({...link,ok:true,cotizacionServidor:{
+    return testResponse({...link,ok:true,comprobanteServidor,cotizacionServidor:{
      ...presupuesto,priceVersion:preciosPiloto.generatedAt||'catalogo-local'
     },paymentAuthorized:false,checkoutEnabled:false},200);
    }
@@ -992,7 +1002,7 @@ async function v2VincularPdf(request,env){
    if(budget.paymentAuthorized!==false||
       !Number.isSafeInteger(budget.quote?.total)||budget.quote.total<=0)
     throw Error('Cotización documental no comprobada');
-   return testResponse({...link,ok:true,
+   return testResponse({...link,ok:true,comprobanteServidor,
     cotizacionServidor:{estado:'PRELIMINAR_VERIFICADA_SIN_PEDIDO',
      totalArs:budget.quote.total,priceVersion:budget.priceVersion,
      paginasOriginales:recibo.pages,formato:o.formato,caras:o.caras,
@@ -1000,7 +1010,7 @@ async function v2VincularPdf(request,env){
      materialColor:o.materialColor,paymentAuthorized:false},
     paymentAuthorized:false,checkoutEnabled:false},200);
   }
-  return testResponse({...link,ok:true},200);
+  return testResponse({...link,ok:true,comprobanteServidor},200);
  }catch(_){
   return testResponse({ok:false,error:'No se pudo verificar y cotizar el PDF seleccionado. Revisá el archivo y las opciones.',paymentAuthorized:false},422);
  }
@@ -1413,11 +1423,18 @@ async function apiPrepararDocumentosV2Lote(request,env){
    throw Error('Pedido incorrecto');
  }catch{return testResponse({ok:false,error:'Pedido V2 inválido',paymentAuthorized:false},400);}
  try{
-  const verificacion=await fase4FichaCentralLotePrivada({
-   sesiones:input.sesiones,
-   consultarFirmado:p=>postToScript(env,p,fetch,420000),
-   preciosServidor:preciosPiloto,maxFiles:30,maxFileBytes:20*1024*1024
-  });
+  // Sólo con TODOS los comprobantes HMAC válidos se evita una
+  // segunda descarga. Para pedidos antiguos/mixtos se usa la ruta completa.
+  const verificacion=input.sesiones.every(e=>e?.comprobanteServidor)
+   ?await verificarPedidoPorComprobantes({
+     sesiones:input.sesiones,manifiesto:input.manifiesto,
+     secret:env.DOCS_RELAY_KEY,preciosServidor:preciosPiloto
+    })
+   :await fase4FichaCentralLotePrivada({
+     sesiones:input.sesiones,
+     consultarFirmado:p=>postToScript(env,p,fetch,420000),
+     preciosServidor:preciosPiloto,maxFiles:30,maxFileBytes:20*1024*1024
+    });
   const registrado=await registrarManifiestoV2EnCentral({
    manifiesto:input.manifiesto,verificacion,env
   });
