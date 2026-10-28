@@ -105,7 +105,7 @@ test('el portal privado recibe el evento real y agrega PDF con hash y precio, si
   'MUEBLES.pdf',{type:'application/pdf'});
  const contentWindow={};
  const options=[{nombre:file.name,paginas:8,formato:'a4',modo:'bn',caras:'simple',
-  copias:1,paginasPorHoja:1,materialColor:''}];
+  copias:1,paginasPorHoja:1,anillado:'ninguno',materialColor:''}];
  const all=[],used=new Set(),batchStatus={textContent:''},status={textContent:''};
  let updates=0;
  await onMessage({
