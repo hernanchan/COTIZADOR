@@ -1,0 +1,7 @@
+# Ensayo real de dos PDF — fallo en inicio de lote (28/10/2026)
+
+Tras promover por confirmación del usuario el Worker concurrente `5fcfcf56-52b8-471e-ac59-5ac9a50182ac`, la primera prueba real en `/prueba-v2/?diagnostico=1` devuelve «No se pudo confirmar el inicio completo de la tanda. Podés reintentar sin duplicar recibos». Turnstile muestra éxito. Dos PDF A4: 12 páginas $3.290 y 17 páginas $3.690, total preliminar $6.980. NO hay confirmación de subida, recibos ni D1.
+
+Inspección de código privado: `fase4BatchStart` invoca `postToScript` con timeout explícito **12000 ms** y devuelve HTTP **502** genérico tanto si el receptor rechaza, agota tiempo o devuelve respuesta inesperada. El GAS `docsMultiStartBatch` está implementado y devuelve `{sessions,orderId,receiptOnly:true,paymentAuthorized:false}`. No afirmar causa definitiva: hay que distinguir timeout contra rechazo GAS con la duración y código de la solicitud `/api/ensayo-pdf-iniciar-lote`. No recargar sesión ni re-subir PDFs ni registrar D1 si falta un recibo. No repetir varias veces a ciegas.
+
+Siguiente paso: inspeccionar una única respuesta de esa solicitud desde DevTools Network (status y duración, sin tokens ni payload), o telemetría equivalente. Si tarda cerca de 12 s y 502, investigar timeout/reanudación sin duplicar; si mucho menos, revisar errorCode del receptor y validación de respuesta. Corregir en rama privada, repetir CI y preparar nueva versión aislada sin tocar main ni pagos. Worker `b7f58caf` es rollback documentado. Última promoción aún sin lectura independiente del 100%.
