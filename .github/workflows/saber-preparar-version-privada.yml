@@ -1,0 +1,65 @@
+name: Saber - preparar version privada desde rama de pruebas
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: saber-preparacion-privada-controlada
+  cancel-in-progress: false
+jobs:
+  preparar-sin-activar:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Obtener UNICAMENTE codigo de rama de pruebas
+        uses: actions/checkout@v4
+        with:
+          ref: fase1/impresiones-ploteos-20261027
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validar y compilar sin publicar
+        working-directory: integraciones/autocotizador/recepcion
+        run: |
+          set -euo pipefail
+          npm install --no-audit --no-fund
+          node --test ../../../tests/fase1-pedido-mixto-realpdf.test.mjs ../../../tests/fase1-ploteo-central-manifiesto.test.mjs ../../../tests/fase1-ploteo-recibo-verificado.test.mjs ../../../tests/fase1-envio-unico-interfaz.test.mjs
+          npm run build:unificado
+          node --check dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq '/api/ensayo-cotizar-ploteo-verificado' dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq 'PRIVATE_TEST_ONLY' dist/saber-documentos-cotizador-fase4.mjs
+          echo 'PRUEBAS_PRIVADAS_OK'
+      - name: Preparar version SIN activarla en el Worker de ensayos
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          worker=saber-documentos-pruebas
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/$worker"
+          trap 'rm -f /tmp/saber-settings.json /tmp/saber-metadata.json /tmp/saber-upload.json' EXIT
+          curl -fsS --max-time 25 -H "Authorization: Bearer $TOKEN" "$root/settings" > /tmp/saber-settings.json
+          jq -e '.success == true and (.result.bindings | type == "array")' /tmp/saber-settings.json >/dev/null
+          for binding in SABER_CENTRAL DOCS_CENTRAL_ADMIN_KEY DOCS_SCRIPT_URL DOCS_RELAY_KEY CENTRAL_BRIDGE_KEY; do
+            jq -e --arg name "$binding" '.result.bindings | any(.name==$name)' /tmp/saber-settings.json >/dev/null
+          done
+          jq -n --slurpfile settings /tmp/saber-settings.json \
+            '{main_module:"index.mjs",annotations:{"workers/message":"Saber prueba privada: version SIN activar"},bindings:[$settings[0].result.bindings[]|{name,type:"inherit"}]}' > /tmp/saber-metadata.json
+          curl --silent --show-error --max-time 75 \
+            -H "Authorization: Bearer $TOKEN" \
+            -F "metadata=@/tmp/saber-metadata.json;type=application/json" \
+            -F "index.mjs=@integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs;filename=index.mjs;type=application/javascript+module" \
+            "$root/versions?bindings_inherit=strict" > /tmp/saber-upload.json
+          if ! jq -e '.success==true and (.result.id|type=="string")' /tmp/saber-upload.json >/dev/null; then
+            jq -c '{success,errors:[.errors[]?|{code,message}]}' /tmp/saber-upload.json
+            exit 1
+          fi
+          jq -r '.result.id | "VERSION_PRIVADA_PREPARADA_SIN_ACTIVAR=" + .' /tmp/saber-upload.json
+          echo 'SIN_DESPLIEGUE_SIN_PAGOS_SIN_CAMBIOS_EN_WEB_COMERCIAL'
