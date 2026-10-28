@@ -564,3 +564,11 @@ Se inspeccionó en GitHub `integraciones/autocotizador/recepcion/DocumentosRecei
 - Nueva captura del Worker privado `saber-documentos-pruebas` → Configuración → Variables y secretos: `DOCS_SCRIPT_URL` ahora comienza `https://script.google.com/macros/s/AKfycbyIQA...`, coincidente con el prefijo de la implementación «Receptor ampliado 30 PDF - pruebas privadas» GAS v8 (28-10-2026 18:40). Antes estaba `AKfycbwQUipB...`.
 - **Confirmación por interfaz:** valor visible cambiado. No hay prueba de POST `multiStartBatch` en vivo ni readback de despliegue/versión efectiva del Worker. Conservar esa distinción.
 - **Siguiente paso:** workflow manual `.github/workflows/saber-preparar-version-privada.yml` desde `main` (checkout explícito de rama privada) → anotar UUID real `VERSION_PRIVADA_PREPARADA_SIN_ACTIVAR` → promoción únicamente en `saber-documentos-pruebas` manteniendo `b7f58caf-7ca4-4abf-8e05-9694fa9593fd` para rollback → ensayo real único con dos PDF, dos recibos, precio y una operación Central D1 sin pagos. No tocar `main`, web comercial o Polaroids.
+
+
+## 28-10-2026 — nueva versión concurrente preparada exitosamente, sin activar
+
+- Ejecución manual GitHub Actions `40775466422`, job `123123516776` del workflow `.github/workflows/saber-preparar-version-privada.yml`: **completed/success**, pasos de validación/compilación y carga de versión aprobados; log `PRUEBAS_PRIVADAS_OK`.
+- UUID auténtico extraído del log de GitHub: **`VERSION_PRIVADA_PREPARADA_SIN_ACTIVAR=5fcfcf56-52b8-471e-ac59-5ac9a50182ac`**.
+- El log confirma `SIN_DESPLIEGUE_SIN_PAGOS_SIN_CAMBIOS_EN_WEB_COMERCIAL`. **No se ha activado** esta nueva versión; no hay prueba real de concurrencia todavía. Receptor GAS versión 8 y `DOCS_SCRIPT_URL` con prefijo coincidente `AKfycbyIQA...` según capturas; binding completo y ejecución real aún no verificados.
+- **Siguiente paso exacto:** Cloudflare → Worker `saber-documentos-pruebas` → Implementaciones; promover exclusivamente `5fcfcf56-52b8-471e-ac59-5ac9a50182ac` al 100%, verificar selección y mantener `b7f58caf-7ca4-4abf-8e05-9694fa9593fd` como rollback. Luego una sola prueba real controlada con dos PDF, dos recibos SHA y un pedido D1, total de servidor y cronología; revertir si falla. No tocar `main`, web comercial, pagos o Polaroids.
