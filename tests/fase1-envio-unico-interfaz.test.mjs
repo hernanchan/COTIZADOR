@@ -7,7 +7,7 @@ test('una sola llamada explícita envía PDF y registra D1',()=>{
  assert.match(source,/register-private"[^>]+hidden aria-hidden="true"/);
  assert.match(source,/async function registrarPedidoVerificado\(\)/);
  assert.match(source,/await registrarPedidoVerificado\(\)/);
- assert.match(source,/if\(!success\)return;/);
+ assert.match(source,/if\(!success\)\{terminarMedicion\('envio_incompleto'\);return;\}/);
  assert.match(source,/if\(allEntries.some\(d=>!d.confirmacion\)\)/);
  assert.match(source,/const pending=allEntries.filter\(d=>!d.confirmacion\)/);
  assert.match(source,/if\(registeredOrder\)/);
@@ -47,4 +47,29 @@ test('el registro D1 conserva anillado individual y no admite grupo parcial',()=
  assert.match(source,/anillado:plot\?'ninguno':q\.anillado/);
  assert.match(source,/\['ninguno','individual'\]\.includes\(opt\.anillado\)/);
  assert.match(source,/d\.opcionesInteligentes\.anillado\|\|'ninguno'/);
+});
+
+test('los detalles técnicos quedan cerrados, incluso durante el envío',()=>{
+ assert.doesNotMatch(source,/document\.getElementById\('recepcion-avanzada'\)\.open\s*=\s*true/);
+ assert.match(source,/<details id="recepcion-avanzada"/);
+ assert.match(source,/<div id="seguridad-privada"/);
+ assert.equal((source.match(/data-action="documentos"/g)||[]).length,1,
+  'Un único widget de seguridad, visible fuera del acordeón técnico');
+ assert.ok(source.indexOf('id="seguridad-privada"')<source.indexOf('<details id="recepcion-avanzada"'));
+ assert.doesNotMatch(source,/Falta pulsar «Enviar todos los PDF del pedido»/);
+});
+
+test('los tiempos quedan solo en memoria local y distinguen etapas del circuito',()=>{
+ assert.match(source,/function iniciarMedicion\(/);
+ assert.match(source,/function marcarFasePdf\(/);
+ assert.match(source,/function terminarMedicion\(/);
+ assert.match(source,/ultimoAnalisisMs/);
+ assert.match(source,/marcarTiempo\('preparacion_inicio'\)/);
+ assert.match(source,/marcarTiempo\('pdf_inicio'/);
+ assert.match(source,/marcarTiempo\('central_inicio'\)/);
+ assert.match(source,/marcarTiempo\('central_fin'\)/);
+ assert.match(source,/marcarFasePdf\(d,p\)/);
+ assert.match(source,/__saberRendimientoPrivado/);
+ assert.match(source,/diagnostico'\)==='1'/);
+ assert.doesNotMatch(source,/localStorage\.setItem\([^\n]*Rendimiento/);
 });
