@@ -70,8 +70,12 @@ Las operaciones independientes por PDF podrán ejecutarse en concurrencia **acot
 4. Probar un PDF y lotes reales; revisar precios, decisiones, facturas de tiempo y duplicados. Corregir solo fallas concretas con regresiones.
 5. Separadamente, terminar anillado conjunto y conectar el checkout total, solo tras las autorizaciones necesarias.
 
-## Estado y próximo paso
+## Estado y próximo paso (actualizado 28-10-2026)
 
-**Diseño propuesto, registrado y no implementado.** La última versión privada confirmada sigue siendo `070ba91d-4468-4953-a9d3-45d2659b6d0c`, con un botón sticky y registro privado. La última captura del usuario mostró `poliza_1145046.pdf`, 12 páginas, A4, B/N, doble faz y anillado individual, total preliminar $3.290 y estado `Pedido registrado`. El usuario señaló **tiempo excesivo**, **expansión inesperada de paneles** y que sumar **pagos** haría confusa la pantalla. No hay medición temporal por fases todavía. 
+**Diseño integral acordado, todavía NO implementado.** La versión del Worker privado ensayada en navegador es `2c1db455-4ac5-4f02-9ebd-c4e581f7283d`; tiene botón único sticky y el panel técnico ya no se abre automáticamente, pero la configuración de archivos continúa larga. El cliente final aún no tiene el diseño de agrupación compacta A4/A3/CAD/Póster.
 
-**Siguiente trabajo:** instrumentar tiempos del circuito **existente** y producir propuesta de pantalla compacta con estados (sin modificar producción); luego implementación aislada en rama de pruebas y ensayo real, manteniendo protección y rollback. No retomar comparaciones de receptores antiguos ni pruebas de cupo ya resueltas.
+**Línea base medible:** archivo `poliza_1145046.pdf`, 12 páginas, A4, B/N doble faz, anillado individual, $3.290 preliminar: total **62.081 ms** desde un único clic hasta «Pedido registrado». Fracciones principales: preparación 104ms, recepción+verificación 42.605ms, revalidación Central 19.474ms. Evidencia exacta y etapas en `docs/ETAPA1-IMPRESIONES-PLOTEOS-CIERRE.md`.
+
+**Optimización en código, no desplegada ni medida en vivo:** lecturas independientes de PDF en GAS/Drive concurrentes con máximo 3, SHA-256 de bloque y archivo final intactos, validaciones firmadas en paralelo; GitHub CI aprobado `40721208008`. Esto puede reducir esperas, pero no constituye todavía una mejora comprobada. No es prueba de que los planes gratuitos sean el problema.
+
+**Siguiente tarea:** preparar/desplegar nueva versión solo en `saber-documentos-pruebas`, con rollback, repetir medición idéntica y contrastar contra 62.081 ms. Luego avanzar sobre la interfaz compacta y agrupada aprobada; no activar pagos ni tocar producción pública.
