@@ -18,23 +18,33 @@ export async function leerPdfFase4Privado({
     typeof consultarFirmado!=='function')
   throw Error('Lectura privada no autorizada.');
  const full=new Uint8Array(bytes);
- for(let offset=0;offset<bytes;offset+=chunkBytes){
-  const part=await consultarFirmado({op:'multiReadPart',
-   uploadId:session.uploadId,token:session.token,receiptId,offset});
-  const length=Math.min(chunkBytes,bytes-offset);
-  if(!part||part.ok!==true||part.receiptId!==receiptId||
-     part.offset!==offset||part.length!==length||part.bytes!==bytes||
-     part.sha256!==sha256||!HEX.test(part.chunkSha256||'')||
-     typeof part.dataBase64!=='string'||part.dataBase64.length>380000)
-   throw Error('El receptor no confirmó el fragmento esperado.');
-  let raw;
-  try{raw=atob(part.dataBase64)}catch(_){throw Error('Fragmento de Google no legible.');}
-  if(raw.length!==length)throw Error('Tamaño de fragmento inconsistente.');
-  const fragment=Uint8Array.from(raw,ch=>ch.charCodeAt(0));
-  const checksum=bytesHex(new Uint8Array(await subtle.digest('SHA-256',fragment)));
-  if(checksum!==part.chunkSha256)throw Error('El fragmento tiene hash incorrecto.');
-  full.set(fragment,offset);
+ // Las lecturas de fragmentos son autenticadas e independientes y GAS las
+ // ejecuta sin el lock de escritura. Tres en paralelo como máximo evita
+ // una espera serial por cada ida a Google, sin saturar las cuotas.
+ // Cada fragmento valida offset, longitud, recibo y SHA antes de copiarse.
+ const offsets=Array.from({length:Math.ceil(bytes/chunkBytes)},(_,i)=>i*chunkBytes);
+ let siguiente=0;
+ async function lector(){
+  while(siguiente<offsets.length){
+   const offset=offsets[siguiente++];
+   const part=await consultarFirmado({op:'multiReadPart',
+    uploadId:session.uploadId,token:session.token,receiptId,offset});
+   const length=Math.min(chunkBytes,bytes-offset);
+   if(!part||part.ok!==true||part.receiptId!==receiptId||
+      part.offset!==offset||part.length!==length||part.bytes!==bytes||
+      part.sha256!==sha256||!HEX.test(part.chunkSha256||'')||
+      typeof part.dataBase64!=='string'||part.dataBase64.length>380000)
+    throw Error('El receptor no confirmó el fragmento esperado.');
+   let raw;
+   try{raw=atob(part.dataBase64)}catch(_){throw Error('Fragmento de Google no legible.');}
+   if(raw.length!==length)throw Error('Tamaño de fragmento inconsistente.');
+   const fragment=Uint8Array.from(raw,ch=>ch.charCodeAt(0));
+   const checksum=bytesHex(new Uint8Array(await subtle.digest('SHA-256',fragment)));
+   if(checksum!==part.chunkSha256)throw Error('El fragmento tiene hash incorrecto.');
+   full.set(fragment,offset);
+  }
  }
+ await Promise.all(Array.from({length:Math.min(3,offsets.length)},()=>lector()));
  const actual=bytesHex(new Uint8Array(await subtle.digest('SHA-256',full)));
  if(actual!==sha256)throw Error('El PDF reconstruido difiere del recibo.');
  return full;
