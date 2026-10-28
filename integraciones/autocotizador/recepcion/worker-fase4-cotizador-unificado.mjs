@@ -1375,7 +1375,8 @@ async function apiPrepararDocumentosV2Lote(request,env){
  // El operador también puede iniciar el ensayo desde el portal Basic
  // del MISMO Worker: nunca se entrega DOCS_CENTRAL_ADMIN_KEY al JavaScript.
  // Se exigen las mismas compuertas privadas y origen explícito.
- if(difference&&v2PrivateBrowserAuthorized(request,env)!=='allow')
+ if(difference&&v2PrivateBrowserAuthorized(request,env)!=='allow'&&
+    !(await v2SessionAuthorized(request,env)))
   return testResponse({ok:false,error:'Autorización requerida',paymentAuthorized:false},401);
  if(env?.DOCS_V2_RECEIPT_LINK_ENABLED!=='PRIVATE_TEST_ONLY'||
     env?.DOCS_EXTENDED_RECEIVER_ENABLED!=='PRIVATE_TEST_ONLY'||
@@ -1450,7 +1451,39 @@ function v2PrivateBrowserAuthorized(request,env){
  for(let i=0;i<expected.length;i++)diff|=provided.charCodeAt(i)^expected.charCodeAt(i);
  return diff===0?'allow':'deny';
 }
-function v2PrivateBrowserResponse(request,env,path){
+// La navegación HTML usa HTTP Basic; fetch() no siempre reenvía esa
+// cabecera en el POST. Una cookie firmada, HttpOnly, de 30 minutos conserva
+// la autorización sin exponer secretos ni habilitar pagos.
+const V2_SESSION_COOKIE='saber_v2_session',V2_SESSION_SECONDS=1800;
+async function v2SessionMac(secret,timestamp){
+ const key=await crypto.subtle.importKey('raw',
+  new TextEncoder().encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+ const bytes=new Uint8Array(await crypto.subtle.sign('HMAC',key,
+  new TextEncoder().encode('saber-v2-private-browser-v1\\n'+timestamp)));
+ return Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function v2SessionCookie(env){
+ const timestamp=Math.floor(Date.now()/1000);
+ return V2_SESSION_COOKIE+'='+timestamp+'.'+
+  await v2SessionMac(env.DOCS_V2_PRIVATE_UI_SECRET,String(timestamp))+
+  '; Path=/api/ensayo-preparar-documentos-v2-lote; Secure; HttpOnly; SameSite=Strict; Max-Age='+
+  V2_SESSION_SECONDS;
+}
+async function v2SessionAuthorized(request,env){
+ if(env?.DOCS_V2_PRIVATE_UI_ENABLED!=='PRIVATE_TEST_ONLY'||
+    typeof env?.DOCS_V2_PRIVATE_UI_SECRET!=='string'||
+    !/^[A-Za-z0-9_-]{32,128}$/.test(env.DOCS_V2_PRIVATE_UI_SECRET))return false;
+ const raw=request.headers.get('Cookie')||'';
+ const match=raw.match(/(?:^|;\\s*)saber_v2_session=(\\d{10})\\.([a-f0-9]{64})(?=;|$)/);
+ if(!match)return false;
+ const timestamp=Number(match[1]),now=Math.floor(Date.now()/1000);
+ if(!Number.isSafeInteger(timestamp)||timestamp>now+30||
+    now-timestamp>V2_SESSION_SECONDS)return false;
+ const mac=await v2SessionMac(env.DOCS_V2_PRIVATE_UI_SECRET,match[1]);
+ let diff=0;for(let i=0;i<64;i++)diff|=mac.charCodeAt(i)^match[2].charCodeAt(i);
+ return diff===0;
+}
+async function v2PrivateBrowserResponse(request,env,path){
  if(request.method!=='GET')return closed();
  const status=v2PrivateBrowserAuthorized(request,env);
  if(status==='off')return testResponse({ok:false,error:'Ensayo privado deshabilitado'},503);
@@ -1468,7 +1501,8 @@ function v2PrivateBrowserResponse(request,env,path){
   if(path==='/prueba-v2/'){
    const html=paginaCotizadorV2PruebaPrivada(env.DOCS_TURNSTILE_SITE_KEY);
    return new Response(html,{status:200,headers:{
-    ...headers,'Content-Type':'text/html; charset=utf-8'}});
+    ...headers,'Set-Cookie':await v2SessionCookie(env),
+    'Content-Type':'text/html; charset=utf-8'}});
   }
   if(path==='/prueba-v2/carga-inteligente'){
    // Reutiliza el analizador consolidado CAD/Póster/rollos sin derivar
