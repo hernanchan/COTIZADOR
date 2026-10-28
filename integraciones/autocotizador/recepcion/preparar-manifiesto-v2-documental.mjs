@@ -64,7 +64,9 @@ export function prepararManifiestoDocumentalV2({orderId,trabajos}){
    quote.paginasOriginales!==v.pages||!formats.has(quote.formato)||
    !sides.has(quote.caras)||!Number.isSafeInteger(quote.copias)||
    quote.copias<1||quote.copias>200||
-   !['ninguno','juntos'].includes(quote.anillado)||
+   !['ninguno','individual','grupo'].includes(quote.anillado)||
+   (quote.anillado==='grupo'&&!/^[1-9][0-9]?$/.test(String(quote.grupoAnillado||'')))||
+   (quote.anillado!=='grupo'&&quote.grupoAnillado)||
    !/^[A-Za-z0-9_-]{1,80}$/.test(quote.materialColor||'')||
    quote.paymentAuthorized!==false||
    receipts.has(v.receiptId)||localRefs.has(v.localRef)||
@@ -74,7 +76,8 @@ export function prepararManifiestoDocumentalV2({orderId,trabajos}){
   return Object.freeze({referenciaLocal:v.localRef,reciboPrivado:v.receiptId,
    sha256:v.sha256,paginas:v.pages,
    opciones:Object.freeze({formato:quote.formato,caras:quote.caras,
-    copias:quote.copias,anillado:quote.anillado,materialColor:quote.materialColor}),
+    copias:quote.copias,anillado:quote.anillado,
+    grupoAnillado:quote.grupoAnillado||'',materialColor:quote.materialColor}),
    subtotalReferencia:quote.totalArs,versionPrecioReferencia:quote.priceVersion,
    estado:'REQUIERE_REVALIDACION_DE_BACKEND'});
  });
