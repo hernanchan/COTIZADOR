@@ -748,6 +748,67 @@ function phase4Opts(o){
   ['ninguno','juntos'].includes(o.anillado)&&
   Number.isSafeInteger(o.copias)&&o.copias>=1&&o.copias<=200;
 }
+/**
+ * Inicio de TANDA privada: un Turnstile para hasta 10 sesiones de PDF,
+ * con una única comunicación HMAC hacia Google Apps Script.
+ * Sólo crea recibos independientes: no transporta archivos ni cobra.
+ */
+async function fase4BatchStart(request,env){
+ if(env?.DOCS_EXTENDED_RECEIVER_ENABLED!=='PRIVATE_TEST_ONLY'||
+    env?.DOCS_V2_PRIVATE_UI_ENABLED!=='PRIVATE_TEST_ONLY')
+  return testResponse({ok:false,error:'Inicio privado de lote deshabilitado',paymentAuthorized:false},503);
+ if(request.method!=='POST')return closed();
+ if(!allowed(request,env))
+  return testResponse({ok:false,error:'Origen no autorizado',paymentAuthorized:false},403);
+ let body;
+ try{
+  body=await readLimited(request);
+  if(!body||typeof body!=='object'||Array.isArray(body)||
+     Object.keys(body).sort().join(',')!=='metas,turnstileToken'||
+     typeof body.turnstileToken!=='string'||body.turnstileToken.length<10||
+     !Array.isArray(body.metas)||body.metas.length<1||body.metas.length>10)
+    throw Error('Tanda inválida');
+  let orderId=null,total=0;
+  const seen=new Set();
+  for(const meta of body.metas){
+   if(!meta||typeof meta!=='object'||Array.isArray(meta)||
+      Object.keys(meta).sort().join(',')!=='bytes,fileId,mode,name,orderId,partBytes,parts,sha256')
+    throw Error('Metadatos de lote inválidos');
+   validateBasic({op:'start',meta,turnstileToken:body.turnstileToken});
+   if(orderId!==null&&orderId!==meta.orderId)throw Error('Pedidos diferentes');
+   if(seen.has(meta.fileId))throw Error('Archivos repetidos');
+   seen.add(meta.fileId);orderId=meta.orderId;total+=meta.bytes;
+  }
+  if(total>60*1024*1024)throw Error('Lote demasiado grande');
+ }catch(_){
+  return testResponse({ok:false,error:'Tanda de PDF inválida',paymentAuthorized:false},400);
+ }
+ if(!(await pilotVerifyTurnstile(body.turnstileToken,env)))
+  return testResponse({ok:false,error:'No se confirmó la verificación de seguridad del lote',paymentAuthorized:false},403);
+ try{
+  const reply=await postToScript(env,{op:'multiStartBatch',metas:body.metas},fetch,12000);
+  if(!reply.ok||!Array.isArray(reply.sessions)||reply.sessions.length!==body.metas.length||
+     reply.paymentAuthorized!==false)
+   throw Error('Receptor no confirmó el lote');
+  const seenSessions=new Set();
+  for(let i=0;i<reply.sessions.length;i++){
+   const item=reply.sessions[i],meta=body.metas[i];
+   if(!item||item.fileId!==meta.fileId||item.orderId!==meta.orderId||
+      !phase4Session(item.uploadId)||!phase4Token(item.token)||
+      typeof item.newSession!=='boolean'||seenSessions.has(item.uploadId))
+    throw Error('Sesión de tanda no confiable');
+   seenSessions.add(item.uploadId);
+  }
+  return testResponse({ok:true,orderId:body.metas[0].orderId,
+   sessions:reply.sessions,receiptOnly:true,paymentAuthorized:false,
+   maxParallelUploads:2},200);
+ }catch(_){
+  // Un inicio parcial en Google se recupera con el mismo fileId+SHA.
+  // No afirmar que falló la creación, ni enviar al cliente sesiones dudosas.
+  return testResponse({ok:false,error:'No se pudo confirmar el inicio completo de la tanda. Podés reintentar sin duplicar recibos.',
+   retrySafe:true,paymentAuthorized:false},502);
+ }
+}
 async function fase4Transfer(request,env,extended=false){
  if(extended&&env?.DOCS_EXTENDED_RECEIVER_ENABLED!=='PRIVATE_TEST_ONLY')
   return testResponse({ok:false,error:'Recepción ampliada privada deshabilitada',paymentAuthorized:false},503);
@@ -1693,6 +1754,7 @@ export default {
     if(page==='/api/ensayo-cotizar-lote')return fase4QuoteLote(request,env);
     if(page==='/api/ensayo-cotizar-lote-ampliado')return fase4QuoteLote(request,env,true);
     if(page==='/api/ensayo-pdf')return fase4Transfer(request,env);
+    if(page==='/api/ensayo-pdf-iniciar-lote')return fase4BatchStart(request,env);
     if(page==='/api/ensayo-pdf-ampliado')return fase4Transfer(request,env,true);
     if(page==='/api/ensayo-vincular-pdf-v2')return v2VincularPdf(request,env);
     if(page==='/api/ensayo-cotizar-ploteo-verificado')return v2CotizarPloteoVerificado(request,env);
