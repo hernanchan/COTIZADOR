@@ -331,7 +331,7 @@ function docsMultiStartBatch(p){
       m.partBytes!==DOCS_PART||m.parts!==Math.ceil(m.bytes/DOCS_PART)||
       !/^[a-f0-9]{64}$/.test(m.sha256||'')||
       !['bn','color','cad','poster'].includes(m.mode)||
-      typeof m.name!=='string'||m.name.length>120||!/\\.pdf$/i.test(m.name)||
+      typeof m.name!=='string'||m.name.length>120||!/\.pdf$/i.test(m.name)||
       (orderId!==null&&m.orderId!==orderId)||used[m.fileId])
       throw Error('Tanda privada inválida');
    orderId=m.orderId;used[m.fileId]=true;total+=m.bytes;
