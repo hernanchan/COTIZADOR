@@ -44,9 +44,9 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <div id="all" role="list" aria-label="Trabajos del cotizador"></div>
 <p id="state" role="status" aria-live="polite" class="state">Cotizá una impresión y agregala al pedido de prueba.</p>
 <section id="order-summary" class="warning" aria-label="Resumen privado del pedido" aria-live="polite"></section>
-<button id="send-all-pdf" type="button" disabled>Enviar todos los PDF del pedido</button>
+<button id="send-all-pdf" type="button" disabled>Enviar mi pedido</button>
 <p id="batch-progress" class="state" role="status" aria-live="polite">Agregá los archivos al carrito para habilitar el envío conjunto.</p>
-<button id="register-private" type="button" disabled>Registrar pedido de prueba en la Central</button>
+<button id="register-private" type="button" disabled hidden aria-hidden="true">Registro interno</button>
 <p id="register-status" role="status" aria-live="polite" class="state">Disponible únicamente cuando todos los PDF estén verificados. Sin pagos.</p>
 
 </div></details></main>
@@ -194,10 +194,11 @@ function updateSummary(){
    ' · Central D1: '+(registeredOrder?'registrado':'pendiente')+' · Cobros desactivados.';
  summary.append(title,detail);
  sendAllButton.disabled=batchSending||registering||Boolean(registeredOrder)||
-  allRefs.length===0||allRefs.every(d=>Boolean(d.confirmacion))||
+  allRefs.length===0||withoutPdf!==0||
   allRefs.some(d=>!d.confirmacion&&!d.archivoLocal);
- registerButton.disabled=registering||Boolean(registeredOrder)||verified.length===0||
-  remaining!==0||withoutPdf!==0||verified.some(d=>!d.sesionConfirmada||!d.modoConfirmado);
+ sendAllButton.textContent=registeredOrder?'Pedido registrado':
+  batchSending?'Enviando archivos…':registering?'Registrando pedido…':'Enviar mi pedido';
+ registerButton.disabled=true;
 }
 
 const catalogPromise=fetch('/prueba-v2/precios-web.json',{credentials:'same-origin'})
@@ -424,39 +425,54 @@ async function waitForTurnstile(){
  return false;
 }
 sendAllButton.addEventListener('click',async()=>{
- if(batchSending||registeredOrder)return;
- const pending=all.flatMap(item=>item.references).filter(d=>!d.confirmacion);
- if(!pending.length||pending.length>30||pending.some(d=>!d.archivoLocal||typeof d.sendNow!=='function')){
-  batchProgress.textContent='Faltan PDF por asociar al pedido. Arrastralos al área superior.';
+ if(batchSending||registering||registeredOrder)return;
+ const allEntries=all.flatMap(item=>item.references);
+ const pending=allEntries.filter(d=>!d.confirmacion);
+ if(!allEntries.length||allEntries.length>30||
+    all.some(item=>!item.references.length)||
+    pending.some(d=>!d.archivoLocal||typeof d.sendNow!=='function')){
+  batchProgress.textContent='Faltan archivos o trabajos por completar antes del envío.';
   return;
  }
  batchSending=true;updateSummary();
+ let received=0,success=true;
  try{
-  let completed=0;
   for(const d of pending){
-   batchProgress.textContent='Enviando y verificando PDF '+(completed+1)+' de '+pending.length+
-    ' · '+d.reference.nombre;
+   batchProgress.textContent='Recibiendo y verificando PDF '+(received+1)+' de '+pending.length+
+    ': '+d.reference.nombre;
    if(!d.sesionTemporal&&!(await waitForTurnstile())){
-    batchProgress.textContent='La verificación de seguridad no está lista. Completala y pulsá nuevamente Enviar todos; los PDF confirmados no se repiten.';
-    return;
+    batchProgress.textContent='Completá la verificación de seguridad y pulsá «Enviar mi pedido» otra vez.';
+    success=false;break;
    }
-   const ok=await d.sendNow();
-   if(!ok){
-    batchProgress.textContent='Envío detenido en '+d.reference.nombre+
-     '. Revisá el mensaje del archivo; al reintentar no se vuelven a enviar los ya verificados.';
-    return;
+   if(!(await d.sendNow())){
+    batchProgress.textContent='Se detuvo en '+d.reference.nombre+
+     '. Corregí el inconveniente y volvé a pulsar «Enviar mi pedido»; no se duplicarán los PDF ya verificados.';
+    success=false;break;
    }
-   completed++;
+   received++;
   }
-  batchProgress.textContent=completed+' PDF recibidos y verificados. El pedido está listo para registrar en la Central.';
- }finally{batchSending=false;updateSummary()}
+ }finally{
+  batchSending=false;
+  updateSummary();
+ }
+ if(!success)return;
+ if(allEntries.some(d=>!d.confirmacion)){
+  batchProgress.textContent='Hay PDF pendientes de verificar. Se detuvo el registro.';
+  return;
+ }
+ batchProgress.textContent='Todos los PDF verificados. Registrando el pedido en la Central…';
+ await registrarPedidoVerificado();
+ if(registeredOrder)
+  batchProgress.textContent='Pedido enviado y registrado correctamente. Sin cobros.';
+ else
+  batchProgress.textContent='PDF recibidos; el registro quedó pendiente. Pulsá «Enviar mi pedido» para reintentar sin subir los PDF.';
 });
 if(previous?.items.length){
  status.textContent='Carrito recuperado: '+previous.seen.size+' referencia(s) de PDF pendiente(s) de nueva verificación. Volvé a seleccionar cada PDF: las fotos y archivos nunca se guardan en el navegador. Ningún pago ni pedido quedó confirmado. Pedido de prueba: '+orderId;
  render();
 }
 updateSummary();
-registerButton.addEventListener('click',async()=>{
+async function registrarPedidoVerificado(){
  if(registering||registeredOrder)return;
  const entries=all.flatMap(item=>item.references);
  if(!entries.length||entries.length>30||all.some(item=>!item.references.length)||
@@ -511,7 +527,7 @@ registerButton.addEventListener('click',async()=>{
   registerStatus.textContent='Pedido NO confirmado: '+String(error.message||error)+
    '. No se autorizó ningún cobro.';
  }finally{registering=false;updateSummary();}
-});
+}
 window.addEventListener('message',async event=>{
  if(event.origin!==location.origin)return;
  if(event.source===smart.contentWindow&&event.data?.type==='SABER_FASE1_PLOTEO_PRELIMINAR'){
