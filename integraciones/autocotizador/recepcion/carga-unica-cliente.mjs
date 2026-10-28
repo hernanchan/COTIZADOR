@@ -18,8 +18,12 @@ let ultimoPresupuesto=null;
 const pesos=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(n);
 function informarPrecioPrivado(estado,total=null){
  if(window.parent===window)return;
+ const anillados=entries.filter(e=>e.anillado!=='ninguno');
+ const sendable=estado==='listo'&&anillados.length===0;
  window.parent.postMessage({type:'SABER_SMART_PRICE_STATE',estado,
-  total:Number.isSafeInteger(total)&&total>0?total:null},location.origin);
+  total:Number.isSafeInteger(total)&&total>0?total:null,
+  sendable,blockReason:anillados.length?
+   'Anillado cotizado, pero todavía no habilitado para recepción automática. Elegí Sin anillado o aguardá su integración.':null},location.origin);
 }
 function importeArchivo(indice){
  if(!ultimoPresupuesto)return null;
@@ -44,7 +48,9 @@ function tamañoEstandar(paginas){
   const x=Math.min(p.anchoCm,p.altoCm),y=Math.max(p.anchoCm,p.altoCm);
   return Math.abs(x-a)<=margen&&Math.abs(y-b)<=margen;
  };
- if(paginas.every(p=>coincide(p,21,29.7,0.35)))return 'a4';
+ // Algunos PDF exportados desde escáner/Word agregan bordes (ej. 21,75 × 30,43).
+ // Proponer A4 si ambas dimensiones están a <= 1 cm, pero nunca confundir A3/A0.
+ if(paginas.every(p=>coincide(p,21,29.7,1)))return 'a4';
  if(paginas.every(p=>coincide(p,29.7,42,0.35)))return 'a3';
  return null;
 }
@@ -89,10 +95,32 @@ function render(){
    const nup=d.destino==='documentos'&&(e.paginasPorHoja??1)>1?' · '+e.paginasPorHoja+' por cara':'';
    resumen.textContent=(e.paginasSeleccionadas?(e.paginasSeleccionadas+' de '+e.paginas.length):(e.paginas.length+' pág.'))+' · '+tipo+(d.confirmado?' '+(d.tamanoFinal==='original'?'original':d.tamanoFinal.toUpperCase()):'')+' · '+e.copias+(e.servicio==='grafica'?' lote(s)':' copia(s)')+((d.confirmado||independiente)?extra+nup:'');
   }else resumen.textContent=e.error?'Error de lectura':'Analizando PDF…';
-  principal.append(resumen);fila.append(principal);
+  principal.append(resumen);
+  if(e.paginas&&e.servicio==='auto'){
+   const paginasFinal=paginasElegidas(e)||e.paginas;
+   const clasif=clasificarDestino(paginasFinal,e.seleccion);
+   const recomendada=tamañoEstandar(paginasFinal);
+   const filaTam=document.createElement('div');filaTam.className='tamano-rapido';
+   const tag=texto('span','Imprimir en: ');filaTam.append(tag);
+   for(const [tam,label] of [['a4','A4'],['a3','A3'],['original','Tamaño original']]){
+    const btn=texto('button',label);btn.type='button';
+    btn.className='tamano-opcion'+(e.seleccion===tam?' seleccionada':'');
+    btn.setAttribute('aria-pressed',String(e.seleccion===tam));
+    btn.onclick=()=>{e.seleccion=tam;cambio()};
+    filaTam.append(btn);
+   }
+   if(recomendada==='a4'&&clasif.cambioEscala){
+    const note=texto('small','Sugerido A4: se ajusta proporcionalmente, sin recortar.');
+    filaTam.append(note);
+   }else if(e.seleccion==='sin-confirmar'){
+    const note=texto('small','Elegí el tamaño para continuar.');filaTam.append(note);
+   }
+   principal.append(filaTam);
+  }
+  fila.append(principal);
   const importe=texto('span',importeArchivo(i)||(e.error?'Revisar':(e.seleccion==='sin-confirmar'&&!['fotos','corte','grafica'].includes(e.servicio))?'Pendiente':'Por calcular'));
   importe.className='precio-archivo';fila.append(importe);
-  const boton=texto('button',abierto===i?'Cerrar':'Editar');
+  const boton=texto('button',abierto===i?'Cerrar detalles':'Más opciones');
   boton.className='editar';boton.type='button';boton.setAttribute('aria-expanded',String(abierto===i));
   boton.onclick=()=>{abierto=abierto===i?-1:i;render()};
   const acciones=document.createElement('div');acciones.className='acciones-archivo';
