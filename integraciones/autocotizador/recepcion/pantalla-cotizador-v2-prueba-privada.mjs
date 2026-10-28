@@ -23,7 +23,7 @@ button{border:0;background:#0a5583;color:#fff;padding:10px 15px;border-radius:8p
 button:disabled{opacity:.45;cursor:not-allowed}
 .state{white-space:pre-wrap;overflow-wrap:anywhere;color:#0a3158;font-size:13px}
 .warning{background:#fff2db;border-left:4px solid #f7931e;padding:10px;margin-bottom:12px}
-#precio-smart{position:sticky;top:0;z-index:10;background:#eaf3fa;border-bottom:2px solid #aecce5;padding:9px max(15px,calc((100vw - 1110px)/2));font-size:16px;font-weight:750;color:#0a3158;box-shadow:0 3px 9px #0a315812}
+#acciones-pedido{position:sticky;top:0;z-index:30;background:#eaf3fa;border-bottom:2px solid #aecce5;padding:8px max(15px,calc((100vw - 1110px)/2));box-shadow:0 3px 9px #0a315812;display:flex;align-items:center;gap:12px;flex-wrap:wrap}#precio-smart{flex:1;font-size:16px;font-weight:750;color:#0a3158}#send-all-pdf{font-weight:750;background:#095985;white-space:nowrap;min-height:43px}#batch-progress{flex-basis:100%;margin:0;font-size:12px;line-height:1.2}#recepcion-avanzada>summary{font-size:13px!important;color:#536475} @media(max-width:600px){#acciones-pedido{padding:8px 12px}#send-all-pdf{width:100%}}
 .cf-turnstile{margin:15px 0}
 #drop-pdf{display:block;border:2px dashed #8faec5;background:#f4f9fd;border-radius:12px;padding:16px;margin:12px 0;cursor:pointer}
 #drop-pdf.dragging{background:#dfedfb;border-color:#095f8f}
@@ -31,21 +31,20 @@ button:disabled{opacity:.45;cursor:not-allowed}
 @media(max-width:840px){main{display:block}.panel{margin-bottom:14px}iframe{min-height:740px}}
 </style></head><body>
 <header><h1>LIBRERÍA SABER · Cotizador V2 en ensayo privado</h1><small style="color:#d5e3f0">Sin cobros, sin órdenes de producción y sin publicación comercial.</small></header>
-<div id="precio-smart" role="status" aria-live="polite">Presupuesto preliminar: todavía sin cotizar · No autoriza cobro</div>
+<div id="acciones-pedido"><div id="precio-smart" role="status" aria-live="polite">Presupuesto preliminar: todavía sin cotizar · No autoriza cobro</div><button id="send-all-pdf" type="button" disabled>Enviar mi pedido</button><p id="batch-progress" class="state" role="status" aria-live="polite">Cargá tus PDF y revisá las opciones.</p></div>
 <div style="max-width:1140px;margin:18px auto 0;padding:0 14px">
 <section style="padding:8px 3px 4px"><h2 style="margin:0 0 5px;font-size:22px;color:#123852">Cargá tus archivos una sola vez</h2><p style="margin:0;color:#52677a">Arrastrá todos los PDF juntos, revisá el presupuesto y después prepará el envío. Los ploteos se cotizan automáticamente; su recepción sigue en pruebas.</p></section></div>
 <main><section class="panel" style="padding:0;border:0;background:transparent">
 <iframe id="smart" title="Análisis automático de PDF, tamaños, CAD y póster" src="/prueba-v2/carga-inteligente" loading="eager"></iframe>
 </section>
-<details id="recepcion-avanzada" class="panel" style="margin-top:14px"><summary style="font-size:16px;font-weight:700;cursor:pointer;padding:5px 0">Paso 2 · Enviar los PDF y registrar el pedido (ensayo privado)</summary><div style="padding-top:12px">
-<div class="warning">Ensayo privado: cada PDF debe verificarse en Drive antes del registro. Trabajos con anillado: registro pendiente. Sin cobros.</div>
+<details id="recepcion-avanzada" class="panel" style="margin-top:14px"><summary style="font-size:16px;font-weight:700;cursor:pointer;padding:5px 0">Detalles de la recepción y verificación (ensayo privado)</summary><div style="padding-top:12px">
+<div class="warning">Los PDF se verifican en Drive y la Central registra automáticamente el pedido. Sin cobros.</div>
 <div id="drop-pdf" style="display:none"><strong>Recuperación manual de PDF para trabajos antiguos</strong><input id="batch-files" type="file" accept=".pdf,application/pdf" multiple><p id="batch-status" class="state" role="status">Los PDF se asignan por nombre y tamaño al trabajo correspondiente. La recepción sigue protegida.</p></div>
 <div class="cf-turnstile" data-sitekey="${sitekey}" data-action="documentos"></div>
 <div id="all" role="list" aria-label="Trabajos del cotizador"></div>
 <p id="state" role="status" aria-live="polite" class="state">Cotizá una impresión y agregala al pedido de prueba.</p>
 <section id="order-summary" class="warning" aria-label="Resumen privado del pedido" aria-live="polite"></section>
-<button id="send-all-pdf" type="button" disabled>Enviar mi pedido</button>
-<p id="batch-progress" class="state" role="status" aria-live="polite">Agregá los archivos al carrito para habilitar el envío conjunto.</p>
+
 <button id="register-private" type="button" disabled hidden aria-hidden="true">Registro interno</button>
 <p id="register-status" role="status" aria-live="polite" class="state">Disponible únicamente cuando todos los PDF estén verificados. Sin pagos.</p>
 
