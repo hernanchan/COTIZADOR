@@ -86,3 +86,18 @@ test('optimización privada: lecturas GAS independientes con concurrencia máxim
  assert.match(upload,/for\(let index=0;index<parts;index\+\+\)/);
  assert.match(worker,/checkoutEnabled:false,paymentAuthorized:false/);
 });
+
+test('una verificación firmada de PDF puede reutilizarse para D1 sin segunda descarga',()=>{
+ const worker=readFileSync(new URL('../integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs',import.meta.url),'utf8');
+ const upload=readFileSync(new URL('../integraciones/autocotizador/recepcion/subir-vincular-pdf-v2-privado.mjs',import.meta.url),'utf8');
+ const signer=readFileSync(new URL('../integraciones/autocotizador/recepcion/comprobante-pdf-servidor.mjs',import.meta.url),'utf8');
+ assert.match(worker,/comprobanteServidor=await crearComprobantePdf/);
+ assert.match(worker,/verificacion=await verificarPedidoPorComprobantes/);
+ assert.match(worker,/verificacion=await rutaLegada\(\)/);
+ assert.match(worker,/serverPageMetrics/);
+ assert.match(upload,/comprobanteServidor:linked\.comprobanteServidor/);
+ assert.match(source,/comprobanteServidor:d\.confirmacion\.comprobanteServidor/);
+ assert.match(signer,/subtle\.verify\('HMAC'/);
+ assert.match(signer,/TTL_MS=15\*60\*1000/);
+ assert.match(worker,/paymentAuthorized:false,listoParaProducir:false/);
+});
