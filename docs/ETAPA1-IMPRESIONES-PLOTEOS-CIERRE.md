@@ -287,3 +287,13 @@ Se confirmó una **incompatibilidad entre cotización y recepción**, no una fal
 - **Evidencia GitHub Actions**: ejecución `40712336636`, workflow «Fase 1 - validar contrato servidor sin desplegar», **SUCCESS**; job `122900639162`; **48 tests passed / 0 failed**, nuevo test «los detalles técnicos quedan cerrados…» `ok 26`, «los tiempos quedan solo en memoria local…» `ok 27`; compilación Worker exitosa.
 - **ESTADO REAL**: correcciones en Github únicamente, **NO desplegadas**. El Worker de pruebas activo permanece `070ba91d-4468-4953-a9d3-45d2659b6d0c`. No tocar `main` ni sitio comercial, cobros o Polaroids.
 - **SIGUIENTE PASO**: preparar una nueva versión SIN activar con workflow manual `.github/workflows/saber-preparar-version-privada.yml` en `main` (se compila automáticamente desde rama privada), obtener UUID de versión, activarla **únicamente en `saber-documentos-pruebas`**, confirmar ausencia de expansión de paneles con un PDF A4 y obtener fases mediante `?diagnostico=1` / `window.__saberRendimientoPrivado`. No afirmar reducción de latencia sin ensayo cronómetro. Después optimizar el cuello de botella real y pasar a compactar agrupación A4/A3/CAD/Póster, sin reescribir cotizador probado.
+
+
+## 28-10-2026: versión instrumentada preparada y aún NO activada
+
+- El usuario lanzó manualmente desde `main` el workflow `.github/workflows/saber-preparar-version-privada.yml`, GitHub run **`40713306146`**.
+- Verificado desde GitHub: job `122904122017` **completed/success**, incluidos tests, compilación y preparación aislada en Cloudflare.
+- Log exacto: `VERSION_PRIVADA_PREPARADA_SIN_ACTIVAR=2c1db455-4ac5-4f02-9ebd-c4e581f7283d`; confirma `SIN_DESPLIEGUE_SIN_PAGOS_SIN_CAMBIOS_EN_WEB_COMERCIAL`.
+- Incluye los cambios GitHub previos de diagnóstico de tiempos y evitar apertura automática de panel técnico, con regresión CI exitosa (run `40712336636`, 48/48).
+- **Estado:** staged `2c1db455` NO desplegada. Activa anterior `070ba91d-4468-4953-a9d3-45d2659b6d0c`; conservar para posible reversión. Sin pagos, sin cambios en sitio público, sin modificar `main`.
+- **Siguiente paso exacto:** en Cloudflare → Worker `saber-documentos-pruebas` → Implementaciones, promocionar la fila `2c1db455` al 100% **únicamente en Worker de pruebas** y verificar pantalla de confirmación/versión activa. Luego prueba de `poliza_1145046.pdf` sin expandir detalles técnicos y medición local `?diagnostico=1` con fases desde `window.__saberRendimientoPrivado`; registrar tiempos observados sin especular mejoras.
