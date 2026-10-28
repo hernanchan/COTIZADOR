@@ -1567,6 +1567,12 @@ async function v2PrivateBrowserResponse(request,env,path){
      #zonaArchivos{padding:26px;border:2px dashed #5689af;background:#f1f8ff;border-radius:14px}
      #zonaArchivos p{font-size:18px}#zonaArchivos input{max-width:650px}
      main>h1{display:none}main>.nota{display:none}
+     /* Un solo total: el importe vive en la barra fija del portal padre.
+        Los errores se informan junto a cada archivo; el resumen sigue en DOM. */
+     main>h2{display:none}#presupuesto{display:none}
+     #estado{margin:7px 0 10px;font-size:13px}
+     .grupo-pedido{margin:9px 0 12px}
+
      main>p:has(a[href="/prueba-cotizador-conjunto"]){display:none}
      #prepararPedido{display:none}
      #enviar-cotizacion-inteligente{border:0;border-radius:10px;padding:14px 20px;background:#0a5583;color:white;font-weight:700;font-size:16px;cursor:pointer}
