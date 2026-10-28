@@ -34,7 +34,7 @@ function docsVerifyEnvelope(env){
  var calculated=docsHex(Utilities.computeHmacSha256Signature(env.timestamp+'\n'+env.payloadJson,docsProp('DOCS_RELAY_KEY')));
  if(!docsEq(calculated,env.signature))throw Error('Firma inválida');
  var p=JSON.parse(env.payloadJson);
- if(!p||typeof p!=='object'||Array.isArray(p)||!['ping','start','status','part','finish','privatePilotInfo','privateReadPart','privateCommitPages','privateVerifiedStatus','multiStart','multiPart','multiStatus','multiFinish','multiInfo','multiReadPart','multiCommitPages','multiVerifiedStatus','printDraftStart','printDraftPart','printDraftStatus','printDraftFinish','printDraftCommitPages','printDraftInfo'].includes(p.op))throw Error('Operación inválida');
+ if(!p||typeof p!=='object'||Array.isArray(p)||!['ping','start','status','part','finish','privatePilotInfo','privateReadPart','privateCommitPages','privateVerifiedStatus','multiStart','multiStartBatch','multiPart','multiStatus','multiFinish','multiInfo','multiReadPart','multiCommitPages','multiVerifiedStatus','printDraftStart','printDraftPart','printDraftStatus','printDraftFinish','printDraftCommitPages','printDraftInfo'].includes(p.op))throw Error('Operación inválida');
  return p;
 }
 function doGet(){return docsJson({ok:false,error:'Servicio privado de documentos'});}
@@ -50,6 +50,7 @@ function docsPilotDispatch(p){
           receptionEnabled:false,apiVersion:'ping-v1'};
  }
  if(p.op==='multiStart')return docsMultiStart(p);
+ if(p.op==='multiStartBatch')return docsMultiStartBatch(p);
  if(p.op==='multiPart')return docsMultiRun(p,'part');
  if(p.op==='multiStatus')return docsMultiRun(p,'status');
  if(p.op==='multiFinish')return docsMultiRun(p,'finish');
@@ -139,8 +140,13 @@ function doPost(e){
   if(!e||!e.postData||!e.postData.contents)throw Error('Solicitud vacía');
   var p=docsVerifyEnvelope(JSON.parse(e.postData.contents));
   signed=true;
-  // Sólo lecturas autenticadas: no bloquear las demás operaciones de carga.
-  if(['multiInfo','multiReadPart','multiVerifiedStatus'].includes(p.op))
+  // Límite de cupo e índice global: sólo multiStart / multiStartBatch
+  // necesitan el lock para impedir sobreasignación de sesiones.
+  // Cada archivo tiene una única secuencia de carga por el cliente,
+  // clave FILE_<uploadId> independiente y sesión Drive independiente.
+  // Las operaciones de archivos ya creados pueden progresar a la vez.
+  if(['multiInfo','multiReadPart','multiVerifiedStatus',
+      'multiPart','multiStatus','multiFinish','multiCommitPages'].includes(p.op))
     return docsJson(Object.assign({ok:true},docsPilotDispatch(p)));
   if(!lock.tryLock(20000))throw Error('Piloto ocupado');
   try{return docsJson(Object.assign({ok:true},docsPilotDispatch(p)));}
@@ -231,7 +237,7 @@ function docsPrivateVerifiedStatus(p){
 var DOCS_MULTI_CAP=30,DOCS_MULTI_GLOBAL_CAP=120,
  DOCS_MULTI_ORDER_MAX_BYTES=60*1024*1024,
  DOCS_MULTI_INDEX='DOCS_MULTI_INDEX_LOTE_20261024';
-function docsMultiIds(){
+function docsMultiIds(cleanup){
  // Una lectura de propiedades para todo el índice. Sin esta instantánea,
  // cada bloque de 256 KiB producía hasta 120 lecturas individuales de GAS.
  var store=docsStore(),snapshot=store.getProperties();
@@ -253,7 +259,9 @@ function docsMultiIds(){
      throw Error('Índice con recibo dañado');
    if(now-state.createdAt<=DOCS_TTL)valid.push(id);
  }
- if(valid.length!==list.length)
+ // Sólo el creador de sesiones, con el lock global tomado, puede
+ // sanear el índice. No sobrescribirlo desde transferencias paralelas.
+ if(cleanup===true&&valid.length!==list.length)
    store.setProperty(DOCS_MULTI_INDEX,JSON.stringify(valid));
  return valid;
 }
@@ -270,7 +278,7 @@ function docsMultiStart(p){
     !/^[a-f0-9]{64}$/.test(m.sha256||'')||
     m.partBytes!==DOCS_PART||m.parts!==Math.ceil(m.bytes/DOCS_PART))
    throw Error('Metadatos de ensayo incorrectos');
- var used=docsMultiIds();
+ var used=docsMultiIds(true);
  // Idempotencia: mismo pedido y mismo PDF vuelven a la sesión existente.
  for(var i=0;i<used.length;i++){
    var old=docsRead(used[i]);
@@ -301,6 +309,44 @@ function docsMultiStart(p){
  return {uploadId:started.uploadId,token:started.token,
    orderId:m.orderId,fileId:m.fileId,newSession:true,
    remainingSlots:DOCS_MULTI_CAP-count-1};
+}
+/**
+ * Una sola solicitud HMAC por tanda de hasta 10 archivos.
+ * La misma firma Turnstile se comprueba una sola vez en el Worker.
+ * Se invoca con lock de cupo GLOBAL; si falla a mitad, reintentar con
+ * los mismos fileId es idempotente y recupera los recibos ya creados.
+ * No recibe blobs ni cobra: sólo prepara sesiones privadas de Drive.
+ */
+function docsMultiStartBatch(p){
+ var metas=p.metas;
+ if(!Array.isArray(metas)||metas.length<1||metas.length>10)
+   throw Error('Tanda privada fuera de límites');
+ var orderId=null,used={},total=0;
+ for(var i=0;i<metas.length;i++){
+   var m=metas[i];
+   if(!m||typeof m!=='object'||Array.isArray(m)||
+      !/^WEB-[A-Za-z0-9_-]{5,80}$/.test(m.orderId||'')||
+      !/^[A-Za-z0-9_-]{1,80}$/.test(m.fileId||'')||
+      !Number.isSafeInteger(m.bytes)||m.bytes<5||m.bytes>DOCS_MAX||
+      m.partBytes!==DOCS_PART||m.parts!==Math.ceil(m.bytes/DOCS_PART)||
+      !/^[a-f0-9]{64}$/.test(m.sha256||'')||
+      !['bn','color','cad','poster'].includes(m.mode)||
+      typeof m.name!=='string'||m.name.length>120||!/\\.pdf$/i.test(m.name)||
+      (orderId!==null&&m.orderId!==orderId)||used[m.fileId])
+      throw Error('Tanda privada inválida');
+   orderId=m.orderId;used[m.fileId]=true;total+=m.bytes;
+ }
+ if(total>DOCS_MULTI_ORDER_MAX_BYTES)
+   throw Error('Tanda excede 60 MiB');
+ var sessions=[];
+ for(var j=0;j<metas.length;j++){
+   var response=docsMultiStart({meta:metas[j]});
+   sessions.push({fileId:response.fileId,orderId:response.orderId,
+     uploadId:response.uploadId,token:response.token,
+     newSession:response.newSession===true});
+ }
+ return {sessions:sessions,orderId:orderId,receiptOnly:true,
+   paymentAuthorized:false};
 }
 function docsMultiAuth(p){
  var s=docsAuth(p);
