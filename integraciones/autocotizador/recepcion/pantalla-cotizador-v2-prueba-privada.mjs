@@ -339,18 +339,18 @@ function render(){
    });
    const caras=field('Caras', [['simple','Simple faz'],['double','Doble faz']]);
    const copias=field('Copias', Array.from({length:200},(_,i)=>[String(i+1),String(i+1)]));
-   const anillado=field('Anillado (recepción privada)', [['ninguno','Sin anillado — integración pendiente']]);
+   const anillado=field('Anillado', [['ninguno','Sin anillado'],['individual','Anillado individual']]);
    const paginasPorHoja=field('Páginas por cara', [['1','1'],['2','2'],['4','4'],['9','9']]);
    if(d.opcionesInteligentes){
     mode.value=d.opcionesInteligentes.modo;
     caras.value=d.opcionesInteligentes.caras;
     copias.value=String(d.opcionesInteligentes.copias);
-    anillado.value='ninguno';
+    anillado.value=d.opcionesInteligentes.anillado||'ninguno';
     paginasPorHoja.value=String(d.opcionesInteligentes.paginasPorHoja??1);
    }
    const warningBinding=document.createElement('p');
    warningBinding.className='state';
-   warningBinding.textContent='El anillado se cotiza en la pantalla inteligente, pero todavía no puede registrarse en la Central. Este ensayo admite solamente PDF sin anillar.';
+   warningBinding.textContent='Anillado individual disponible en este ensayo; para anillar varios PDF juntos falta integrar el grupo completo.';
    advanced.append(warningBinding);
    const btn=document.createElement('button');btn.type='button';btn.textContent='Reintentar solamente este PDF';
    btn.hidden=true;
@@ -527,7 +527,7 @@ async function registrarPedidoVerificado(){
     opciones:{servicio:'auto',seleccion:plot?'original':q.formato,paginasSeleccionadas:'',
      copias:q.copias,modo:d.modoConfirmado,caras:plot?'simple':q.caras,
      paginasPorHoja:plot?1:(q.paginasPorHoja??1),
-     papelPoster:plot?q.papelPoster:'obra80',anillado:'ninguno',grupoAnillado:'',
+     papelPoster:plot?q.papelPoster:'obra80',anillado:plot?'ninguno':q.anillado,grupoAnillado:'',
      materialColor:plot?'':q.materialColor,productoFoto:'',productoGrafica:'',
      corteVariante:'gt3',corteMetros:1,
      ...(plot?{clasificacionCliente:plot.clasificacionCliente}:{})}};
@@ -666,6 +666,7 @@ window.addEventListener('message',async event=>{
        !['simple','double'].includes(opt.caras)||
        !Number.isSafeInteger(opt.copias)||opt.copias<1||opt.copias>200||
        ![1,2,4,9].includes(opt.paginasPorHoja??1)||
+       !['ninguno','individual'].includes(opt.anillado)||
        typeof opt.materialColor!=='string'||opt.materialColor.length>120)
      throw Error('Un PDF o sus opciones no cumplen los límites del receptor privado.');
     const header=new Uint8Array(await file.slice(0,5).arrayBuffer());
