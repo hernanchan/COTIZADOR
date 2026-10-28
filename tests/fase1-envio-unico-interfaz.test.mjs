@@ -25,3 +25,10 @@ test('plantilla JavaScript del portal compila de forma aislada',()=>{
  assert.ok(js?.length>2000);
  new Function(js.replace(/^import .*;$/gm,''));
 });
+
+test('el clic único pide al analizador preparar archivos y espera confirmación',()=>{
+ assert.match(source,/SABER_SMART_PREPARAR_ENVIO/);
+ assert.match(source,/SABER_SMART_HANDOFF_READY/);
+ assert.match(source,/await prepararDesdeCotizador\(\)/);
+ assert.match(source,/smartReady=status==='listo'/);
+});
