@@ -122,7 +122,7 @@ test('UX de carga unica: grupos automaticos conservan indices de origen y opcion
  for(const id of ['a4','a3','cad','poster','mixtos','pendientes'])
   assert.match(client,new RegExp("id:'"+id+"'"));
  assert.match(client,/entries\.forEach\(\(e,i\)=>\{/);
- assert.match(client,/grupo\.indices\.push\(i\)/);
+ assert.match(client,/grupos\.get\(cat\.id\)\.indices\.push\(i\)/);
  assert.match(client,/for\(const i of grupo\.indices\)/);
  assert.match(client,/const e=entries\[i\]/);
  assert.match(client,/function controlesComunes\(grupo\)/);
