@@ -222,3 +222,68 @@ test('GAS indica newSession:true sólo si crea realmente un recibo nuevo',()=>{
  assert.notEqual(fresh.uploadId,reused.uploadId);
  assert.ok(fresh.remainingSlots>0);
 });
+
+test('multiStartBatch crea tres recibos separados y permite reintento idempotente después de un inicio parcial',()=>{
+ const x=environment();
+ let created=0;
+ x.sandbox.docsStart=function({meta}){
+  created++;
+  const item={...x.state(),...meta,
+   uploadId:'DOC-'+randomUUID(),token:'BATCH_TEST_TOKEN_0123456789_abcdefghijk',
+   name:meta.fileId+'__'+meta.name,offset:0,
+   createdAt:Date.now(),sessionUrl:'https://upload-drive.test/session/'+created,
+   receiptState:'receiving',driveFileId:null};
+  x.sandbox.docsSave(item);
+  return {uploadId:item.uploadId,token:item.token};
+ };
+ const meta=i=>({orderId:x.s.orderId,fileId:'pdf-test-'+i,
+  name:'documento'+i+'.pdf',mode:'bn',bytes:100+i,
+  sha256:sha(Buffer.from('documento'+i)),parts:1,partBytes:PART});
+ const metas=[meta(1),meta(2),meta(3)];
+ const a=x.sandbox.docsMultiStartBatch({metas});
+ assert.equal(a.sessions.length,3);
+ assert.equal(new Set(a.sessions.map(v=>v.uploadId)).size,3);
+ assert.equal(a.paymentAuthorized,false);
+ assert.ok(a.sessions.every(v=>v.newSession===true));
+ const b=x.sandbox.docsMultiStartBatch({metas});
+ assert.equal(created,3,'Repetir el lote no duplica sesiones Drive');
+ assert.ok(b.sessions.every(v=>v.newSession===false));
+ assert.deepEqual(Array.from(b.sessions.map(v=>v.uploadId)),
+  Array.from(a.sessions.map(v=>v.uploadId)));
+ assert.throws(()=>x.sandbox.docsMultiStartBatch({metas:[meta(1),meta(1)]}),/Tanda privada inválida/);
+ assert.throws(()=>x.sandbox.docsMultiStartBatch({metas:[meta(1),
+  {...meta(2),orderId:'WEB-OTRO-PEDIDO'}]}),/Tanda privada inválida/);
+ assert.throws(()=>x.sandbox.docsMultiStartBatch({metas:Array.from({length:11},(_,i)=>meta(i+10))}),/fuera de límites/);
+});
+
+test('bloqueo GAS sólo para crear cupos; partes, finish y commit no mantienen lock global',()=>{
+ const x=environment();
+ let locked=0;
+ x.sandbox.LockService={getScriptLock:()=>({
+  tryLock:()=>{locked++;return true},
+  releaseLock:()=>{}
+ })};
+ x.sandbox.docsVerifyEnvelope=o=>o;
+ x.sandbox.docsPilotDispatch=o=>({op:o.op});
+ x.sandbox.docsJson=o=>o;
+ const send=op=>x.sandbox.doPost({postData:{contents:JSON.stringify({op})}});
+ for(const op of ['multiPart','multiStatus','multiFinish','multiCommitPages',
+   'multiReadPart','multiInfo','multiVerifiedStatus']){
+  const r=send(op);
+  assert.equal(r.ok,true);
+  assert.equal(locked,0,'La operación '+op+' no debe bloquear otros PDF');
+ }
+ assert.equal(send('multiStartBatch').ok,true);
+ assert.equal(locked,1,'El lote sí debe proteger cupos e índice');
+ assert.equal(send('multiStart').ok,true);
+ assert.equal(locked,2);
+});
+
+test('lecturas de índice de archivos existentes no pueden sobreescribir cupos durante cargas concurrentes',()=>{
+ const x=environment();
+ const src=SOURCE.slice(SOURCE.indexOf('function docsMultiIds('),
+  SOURCE.indexOf('function docsMultiKnown('));
+ assert.match(src,/if\(cleanup===true&&valid\.length!==list\.length\)/);
+ assert.match(SOURCE,/var used=docsMultiIds\(true\);/);
+ assert.match(SOURCE,/function docsMultiAuth\(p\)\{[\s\S]*?docsMultiIds\(\)/);
+});
