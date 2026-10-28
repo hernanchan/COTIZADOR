@@ -811,7 +811,11 @@ async function fase4PrivateVerified(env,session,metrics=null,preferirInfo=false,
    session,receiptId:recibo.receiptId,bytes:recibo.bytes,sha256:recibo.sha256,
    consultarFirmado:p=>postToScript(env,p,fetch,420000),maxFileBytes
   });
-  const medidas=await medidasPdfServidor(bytes);
+  // Si un PDF común no ofrece medidas avanzadas, conservar la ruta
+  // histórica de cotización sin habilitar atajos inseguros.
+  let medidas;
+  try{medidas=await medidasPdfServidor(bytes)}
+  catch{return {...recibo,serverPageMetrics:null};}
   if(medidas.pageCount!==recibo.pages)
    throw Error('Las medidas no coinciden con las páginas del PDF verificado.');
   return {...recibo,serverPageMetrics:medidas.pageMetrics};
@@ -975,9 +979,11 @@ async function v2VincularPdf(request,env){
    referencia:input.referencia,recibo,sessionId:input.sesion.uploadId,
    expectedOrderId:input.expectedOrderId,expectedMode:input.expectedMode
   });
-  const comprobanteServidor=await crearComprobantePdf({
-   recibo,medidas:recibo.serverPageMetrics,secret:env.DOCS_RELAY_KEY
-  });
+  const comprobanteServidor=recibo.serverPageMetrics
+   ?await crearComprobantePdf({
+     recibo,medidas:recibo.serverPageMetrics,secret:env.DOCS_RELAY_KEY
+    })
+   :null;
   // La cotización es OPCIONAL para conservar el contrato del cliente V2 existente.
   // Es preliminar de servidor, limitada a A4/A3, BN/color y materiales del piloto.
   // El importe del navegador jamás es autoridad y no se prepara una orden comercial.
