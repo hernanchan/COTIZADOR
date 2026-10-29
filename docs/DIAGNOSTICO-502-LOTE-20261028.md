@@ -75,3 +75,13 @@ Revisada la ruta `apiPrepararDocumentosV2Lote` del Worker y los módulos `verifi
 
 - Commit `27a47a19`: `integraciones/autocotizador/recepcion/package.json` actualiza `test:handoff` para ejecutar `tests/fase1-comprobantes-ids-lote-regresion.test.mjs`. El workflow existente en `main` ejecuta `npm run build:unificado`, que invoca `test:handoff` **antes** de compilar o crear una versión privada; por tanto una regresión fallida debe detener la preparación.
 - El workflow `.github/workflows/saber-preparar-version-privada.yml` se lanza manualmente desde `main` y hace checkout de la rama privada. **Ningún workflow ha sido iniciado por esta intervención**; no hay pruebas ejecutadas todavía y no se creó versión de Cloudflare. No alterar el workflow de `main` ni activar Worker sin ensayo/verificación de CI.
+
+
+## 29-10-2026 — CI y compilación privados CONFIRMADOS, versión lista SIN activar
+
+- Usuario inició GitHub Actions workflow `.github/workflows/saber-preparar-version-privada.yml` (run **40870680395**, job **123436621534**, run #8) desde `main` con checkout de `fase1/impresiones-ploteos-20261027`.
+- Estado real consultado en GitHub: **completed/success**, todos los pasos aprobados. Log: grupos de pruebas `# pass 23, # fail 0`, `# pass 46, # fail 0`, `# pass 3, # fail 0` (72 pruebas, cero fallos), `PRUEBAS_PRIVADAS_OK`, compilación exitosa.
+- **UUID genuino preparado SIN activar:** `2db48bcb-7bd8-4eca-bedf-1c5b98c41fcd`. Log: `SIN_DESPLIEGUE_SIN_PAGOS_SIN_CAMBIOS_EN_WEB_COMERCIAL`.
+- El arreglo de IDs SHA/UUID en `verificacion-central-comprobante.mjs` (commit `e1e1d94b`) y nueva regresión (commit `3e50ba3c`) quedaron incluidos por `test:handoff`, modificado en `27a47a19`.
+- **Estado vigente:** CI correcta, versión Cloudflare creada, NO promovida y NO probada con PDFs reales. No asegurar que 422 esté resuelto.
+- **Próximo paso:** promover exclusivamente la versión `2db48bcb-7bd8-4eca-bedf-1c5b98c41fcd` al 100 % del Worker **`saber-documentos-pruebas`**; no otro Worker ni main. Mantener `625a9f5a-cb9f-43a7-bcb3-94d2c4c545ba` como reversión inmediata del ensayo y `b7f58caf-7ca4-4abf-8e05-9694fa9593fd` como recuperación histórica. Luego un ensayo end-to-end controlado sin pagos para ver si Central registra pedido único y precio oficial. Si el usuario conserva sesiones, intentar registro solo una vez sin recargar PDFs; si caducaron, no asumir recuperación. No cambiar GAS, Polaroids ni web comercial.
