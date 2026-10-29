@@ -16,7 +16,7 @@
     "build:v2-reader": "esbuild ../../../cotizador-v2-ensayo-archivos.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --outfile=./cotizador-v2-ensayo-archivos.txt",
     "build:v2-upload": "esbuild ./subir-vincular-pdf-v2-privado.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --outfile=./subir-vincular-pdf-v2-privado.txt",
     "build:v2-manifest": "esbuild ./preparar-manifiesto-v2-documental.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --outfile=./preparar-manifiesto-v2-documental.txt",
-    "test:handoff": "node --test ./carga-unica-pdf-regresion.test.mjs ../../../tests/fase1-lectura-privada-concurrente.test.mjs ../../../tests/fase1-comprobante-pdf-unico.test.mjs ./receptor-gas-recuperacion.test.mjs ./subida-sesion-fresca.test.mjs ./recepcion-paralela-lote.test.mjs"
+    "test:handoff": "node --test ./carga-unica-pdf-regresion.test.mjs ../../../tests/fase1-lectura-privada-concurrente.test.mjs ../../../tests/fase1-comprobante-pdf-unico.test.mjs ../../../tests/fase1-comprobantes-ids-lote-regresion.test.mjs ./receptor-gas-recuperacion.test.mjs ./subida-sesion-fresca.test.mjs ./recepcion-paralela-lote.test.mjs"
   },
   "dependencies": {
     "pdf-lib": "1.17.1"
