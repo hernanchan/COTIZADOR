@@ -23,3 +23,12 @@ En DevTools Network, después de un solo reintento con los dos PDF cargados, sol
 - UUID real de Cloudflare **`625a9f5a-cb9f-43a7-bcb3-94d2c4c545ba`**, extraído del log `VERSION_PRIVADA_PREPARADA_SIN_ACTIVAR=...`.
 - Log final `SIN_DESPLIEGUE_SIN_PAGOS_SIN_CAMBIOS_EN_WEB_COMERCIAL`: **NO activada**, NO prueba real. La última versión concurrente promovida por confirmación del usuario es `5fcfcf56-52b8-471e-ac59-5ac9a50182ac` (sin readback independiente) y el rollback funcional documentado es `b7f58caf-7ca4-4abf-8e05-9694fa9593fd`.
 - **Próximo paso ejecutable**: en Cloudflare Worker `saber-documentos-pruebas`, promover exclusivamente `625a9f5a` al 100 %, verificar que `DOCS_SCRIPT_URL` sigue apuntando a GAS v8 `AKfycbyIQA...`. Conservar `b7f58caf` como recuperación. Repetir **un solo ensayo** de los dos PDF que fallaron (12 y 17 páginas; total preliminar $6.980) y leer el nuevo `reasonCode` de respuesta 502 si vuelve a fallar; no exponer tokens ni credenciales. Confirmar SHA/Drive, cotización oficial y un único pedido D1 antes de declarar éxito; pagos apagados. No tocar `main`, web comercial o Polaroids.
+
+
+## 29-10-2026 — Promoción de diagnóstico confirmada por usuario
+
+- El usuario respondió **«implementado»** tras recibir instrucciones para promover al 100 % la versión `625a9f5a-cb9f-43a7-bcb3-94d2c4c545ba` exclusivamente en Cloudflare Worker `saber-documentos-pruebas`.
+- **Estado:** promoción confirmada por usuario, aún sin lectura independiente de Cloudflare ni ensayo real con el código diagnóstico. No dar por resuelto el HTTP 502 ni por confirmado D1.
+- La versión incorpora `reasonCode` seguro para distinguir causas en `/api/ensayo-pdf-iniciar-lote` (rechazo GAS, sesión, respuesta inválida, comunicación, etc.). Se conserva `b7f58caf-7ca4-4abf-8e05-9694fa9593fd` como recuperación anterior funcional.
+- **Siguiente paso:** una sola prueba privada de dos PDF. Si la pestaña anterior todavía conserva los archivos en memoria, reintentar una vez con DevTools Network abierto y consultar Response de `ensayo-pdf-iniciar-lote`, mostrando únicamente `reasonCode`, HTTP y duración (sin tokens ni payload). Si la pestaña se cerró o expiró por la noche, iniciar nueva sesión y cargar dos archivos de prueba, sin asumir recuperación. Si se confirma recepción, verificar recibos individuales, precio servidor y registro único en D1; pagos apagados.
+- No modificar `main`, web comercial, Polaroids ni generar nuevos despliegues hasta identificar resultado de este ensayo.
