@@ -25,3 +25,10 @@ Librería Saber ya cuenta con procesos físicos de impresión consolidados. La n
 ## Estado técnico separado del método
 
 Incidencia actual: recepción de dos PDF informada por interfaz, pero POST `/api/ensayo-preparar-documentos-v2-lote` devuelve HTTP 422 con mensaje genérico. La instrumentación de fase 422 está en código privado pero **no está desplegada**, según `docs/DIAGNOSTICO-502-LOTE-20261028.md`. No confundir acuerdo metodológico con resolución de este incidente.
+
+
+## 29-10-2026 — Confirmación de venta y seguimiento futuro
+
+- **Definición de venta cerrada, aprobada por usuario:** Mercado Pago confirma el pago, el sistema tiene los archivos efectivamente recibidos y un pedido consistente registrado en Central, listo para producción. Evitar cobrar sin archivos o permitir duplicaciones al recuperarse de fallos. La confirmación visible al cliente debe corresponder a ese estado real.
+- **Funcionalidad futura solicitada para conservar, NO implementar ahora:** pantalla de seguimiento de pedido, inspirada en experiencia de compra de comida. Estados propuestos para evaluar: recibido/pagado, en preparación/producción, listo para retirar, entregado. No prometer plazos breves ficticios; fecha prometida sólo si confirmada. Se podría aprovechar el Centro de Pedidos como fuente única de estados, sin duplicar operaciones. Priorizar primero cierre de compra y recepción estable.
+- Se confirma prioridad permanente de UX minimalista, velocidad y conversión. No introducir tracking en esta etapa ni usarlo como excusa para ampliar alcance actual. Pendiente de futura especificación: mecanismo seguro de consulta por cliente y actualización de estados.
