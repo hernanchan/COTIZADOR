@@ -70,3 +70,12 @@ El usuario investigó Printly, MG CopyArte y Printcopy. **Printly** ofrece una p
 **Hipótesis UX recomendada para evaluar, todavía no aprobada como diseño definitivo:** iniciar en carga de archivos sin modal ni selector obligatorio «simple/personalizada». Aplicar valores habituales inicialmente; permitir una acción «Aplicar a todos» y modificar opciones individuales por archivo dentro de la misma lista. La simplicidad es progresiva, sin perder soporte de casos complejos de PDF e imágenes mezcladas. Mantener detección y precio en la misma pantalla y cierre de compra completo, sin derivación obligatoria a WhatsApp.
 
 **Disciplina:** la investigación de interfaces públicas no demuestra arquitectura backend, costos, escalabilidad, seguridad o performance de competidores. No copiar código ni cambiar arquitectura por similitud visual. Antes de implementar: prototipo UX compacto, validación comercial por usuario y ensayo por cliente no técnico. Ninguna modificación técnica autorizada por esta nota.
+
+
+## 29-10-2026 — Aprendizaje de prueba real de Tío Toto: fluidez versus cantidad de pasos
+
+El usuario exploró personalmente la configuración y avance hasta la pasarela de pagos de `impresionestiototo.com.ar`. Reporta que, aunque configurar el pedido lleva varios pasos, la interacción es clara y la **demora percibida hasta llegar al pago es mínima**. No se hizo una medición cronometrada, ensayo de carga masiva ni análisis de backend: es observación cualitativa de experiencia.
+
+**Implicación para el diseño:** distinguir **tiempo útil** (el cliente entiende y configura) de **tiempo muerto** (esperas, bloqueos, preguntas repetidas, formularios innecesarios). Evitar la rigidez de «una sola pantalla» como obligación física: el acuerdo real es **un único flujo de compra continuo, claro y compacto**, que puede usar etapas cortas/contextuales si esto mejora la experiencia, sin que el cliente cambie de sistema ni pierda configuración. Detección automática y valores sugeridos; confirmar solo decisiones necesarias, actualizar precio y progreso sin latencias evitables. No trasladar automáticamente la arquitectura técnica de sitios comparados ni alterar el método vertical acordado.
+
+**Validación futura:** cronometraje de tiempo hasta primer precio, tiempo hasta pasarela, y sesión real con compradores ajenos al desarrollo; diferenciar latencia técnica de minutos que el comprador voluntariamente dedica a elegir.
