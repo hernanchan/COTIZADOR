@@ -39,3 +39,10 @@ Incidencia actual: recepción de dos PDF informada por interfaz, pero POST `/api
 El usuario prioriza que los clientes **no abandonen por confusión, exceso de botones o demora**. La experiencia prevalece sobre la exposición de funciones. Acuerdo propuesto: tres acciones claras (cargar, revisar precio/opciones, pagar), una pantalla compacta de trabajo, configuración automática editable, avanzadas ocultas, precio y progreso siempre visibles, ninguna advertencia pequeña como bloqueo, no exigir reingreso de información ni repetir cargas. PDF grandes universitarios y pedidos escolares de PDF/imágenes mixtas deben usar el mismo carrito. 
 
 **Criterio de validación UX:** ensayo con alguien ajeno al desarrollo que complete el pedido sin explicaciones, más medición de tiempo de carga, tiempo hasta precio, confirmación y abandonos. No dar por terminada una fase sólo con CI verde. Esta regla se incorpora al método en discusión; no autoriza rediseño/despliegue ahora ni sustituye integridad de pedido/pago.
+
+
+## 29-10-2026 — Interfaz de decisiones contextuales, confirmada
+
+El usuario ratifica que el producto debe ser **minimalista, interactivo y fácil de comprender**, con preguntas claras como el ejemplo «¿Cómo querés imprimir este archivo?» mostrado para el caso de dimensiones 20×20 cm. Principio aprobado: mostrar por defecto únicamente opciones comunes; proponer automáticamente una configuración razonable y permitir corregirla con preguntas visuales simples **solo cuando haga falta**. Mostrar configuraciones avanzadas bajo demanda, sin ocultar advertencias que impidan enviar. Si existen formatos mixtos, solicitar una decisión evidente en la misma fila/tarjeta, sin popups repetitivos, y conservarla para el pedido. Precio total, archivos y progreso accesibles en todo momento. Objetivo: bajar abandono por confusión, no multiplicar confirmaciones.
+
+**Importante:** este acuerdo de producto no autoriza implementaciones ni modifica el error técnico 422 aún abierto. Pendiente: completar protocolo definitivo y acordar pruebas observables de facilidad de uso con clientes nuevos.
