@@ -1512,6 +1512,7 @@ async function apiPrepararDocumentosV2Lote(request,env){
    new Set(input.manifiesto.items.map(m=>m.reciboPrivado)).size!==input.sesiones.length)
    throw Error('Pedido incorrecto');
  }catch{return testResponse({ok:false,error:'Pedido V2 inválido',paymentAuthorized:false},400);}
+ let etapaRegistro='VERIFICACION_RECIBOS';
  try{
   // Sólo con TODOS los comprobantes HMAC válidos se evita una
   // segunda descarga. Para pedidos antiguos/mixtos se usa la ruta completa.
@@ -1533,16 +1534,20 @@ async function apiPrepararDocumentosV2Lote(request,env){
     // discrepancias de PDF o precio no se dejan pasar.
     if(error?.message!=='Comprobante vencido; se debe volver a comprobar el PDF en servidor.')
      throw error;
+    etapaRegistro='RELECTURA_DRIVE';
     verificacion=await rutaLegada();
    }
   }else{
+   etapaRegistro='RELECTURA_DRIVE';
    verificacion=await rutaLegada();
   }
+  etapaRegistro='CONCILIACION_MANIFIESTO';
   const registrado=await registrarManifiestoV2EnCentral({
    manifiesto:input.manifiesto,verificacion,env
   });
   if(registrado.orderId!==verificacion.orderId||registrado.archivos!==input.sesiones.length)
    throw Error('Pedido V2 no concordante.');
+  etapaRegistro='PREPARACION_CENTRAL';
   const pedido=await prepararDocumentosCentralFirmado({
    env,webOrderId:registrado.orderId,
    clientOrderId:input.clientOrderId,items:input.items
@@ -1553,8 +1558,11 @@ async function apiPrepararDocumentosV2Lote(request,env){
    totalArs:pedido.amountArs,idempotent:pedido.idempotent,
    checkoutEnabled:false,paymentAuthorized:false,listoParaProducir:false
   },200);
- }catch{
-  return testResponse({ok:false,error:'Pedido privado pendiente de revisión; no se autorizó pago.',
+ }catch(_error){
+  // No registrar mensajes internos, identificadores, recibos ni credenciales.
+  console.warn('saber_v2_registro_pendiente',etapaRegistro);
+  return testResponse({ok:false,reasonCode:etapaRegistro,
+   error:'Pedido privado pendiente de revisión; no se autorizó pago.',
    checkoutEnabled:false,paymentAuthorized:false,listoParaProducir:false},422);
  }
 }
