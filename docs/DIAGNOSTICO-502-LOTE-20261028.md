@@ -32,3 +32,12 @@ En DevTools Network, después de un solo reintento con los dos PDF cargados, sol
 - La versión incorpora `reasonCode` seguro para distinguir causas en `/api/ensayo-pdf-iniciar-lote` (rechazo GAS, sesión, respuesta inválida, comunicación, etc.). Se conserva `b7f58caf-7ca4-4abf-8e05-9694fa9593fd` como recuperación anterior funcional.
 - **Siguiente paso:** una sola prueba privada de dos PDF. Si la pestaña anterior todavía conserva los archivos en memoria, reintentar una vez con DevTools Network abierto y consultar Response de `ensayo-pdf-iniciar-lote`, mostrando únicamente `reasonCode`, HTTP y duración (sin tokens ni payload). Si la pestaña se cerró o expiró por la noche, iniciar nueva sesión y cargar dos archivos de prueba, sin asumir recuperación. Si se confirma recepción, verificar recibos individuales, precio servidor y registro único en D1; pagos apagados.
 - No modificar `main`, web comercial, Polaroids ni generar nuevos despliegues hasta identificar resultado de este ensayo.
+
+
+## 29-10-2026 — nuevo ensayo tras promoción 625a9f5a: recepción informada, D1 pendiente
+
+- Captura de `/prueba-v2/?diagnostico=1` tras despliegue informado de la versión diagnóstica. Pantalla: **«PDF recibidos; el registro quedó pendiente. Pulsá «Enviar mi pedido» para reintentar sin subir los PDF.»**; Turnstile con indicador verde, dos entradas de documentos A4, total preliminar $6.980 (12 páginas $3.290 + 17 páginas $3.690).
+- **No aparece el error anterior «No se pudo confirmar el inicio completo de la tanda»**, pero no se aportó trazado Network ni confirmación independiente de SHA/Drive. No afirmar que la concurrencia completa quedó medida o aprobada.
+- El segundo PDF es diferente al anterior y muestra advertencia por **tamaños originales mixtos** (20×20 cm / 40×20 cm); se seleccionó A4. Revisar que esa opción refleje el ensayo buscado; no tratar el precio preliminar como oficial.
+- **Estado vigente:** UI indica recepción completada y **registro único D1 PENDIENTE**. No consta pedido confirmado, ni medición `fin`, ni cobro. No duplicar subida, no recargar pestaña que conserva referencias.
+- **Siguiente paso exacto:** en misma pantalla, pulsar **una sola vez «Enviar mi pedido»** para reintentar el registro sin subir PDFs, confirmar resultado Central D1 y total oficial; si falla, conservar texto de error y consultar el POST del registro, sin emitir otro pedido ni borrar recibos. Mantener privados Worker/GAS y pagos apagados.
