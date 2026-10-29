@@ -8,7 +8,7 @@
 >
 > Repositorio oficial: `hernanchan/COTIZADOR`. Trabajá en la rama de pruebas activa, actualmente `fase1/impresiones-ploteos-20261027`, sin tocar `main` ni la web pública.
 >
-> **Antes de intervenir:** consultá `AGENTS.md`, este archivo `docs/PROMPT_BASE_CONTINUIDAD.md` y el registro de estado vigente `docs/ETAPA1-IMPRESIONES-PLOTEOS-CIERRE.md`, especialmente el último apartado «ESTADO VIGENTE PARA RETOMAR EN OTRO CHAT». Si el proyecto avanza a otra etapa, seguí el enlace a su registro vigente en el índice de continuidad.
+> **Antes de intervenir:** consultá `AGENTS.md`, este archivo, `docs/METODO-PERMANENTE-DESARROLLO-EN-DEFINICION-20261029.md` (acuerdos vigentes de producto y método), `docs/ETAPA1-IMPRESIONES-PLOTEOS-CIERRE.md` (historial) y `docs/DIAGNOSTICO-502-LOTE-20261028.md` (incidencia técnica vigente). Para concurrencia PDF, consultar `docs/PLAN-LOTE-CONCURRENTE-PDF-20261028.md`. Si avanza la etapa, seguí el índice actualizado. No reiniciar diagnósticos cerrados.
 >
 > **Durante el trabajo:** conservá el rumbo acordado; no repitas investigaciones ni pruebas ya concluidas. Distinguí siempre entre «identificado», «corregido en GitHub», «desplegado en entorno privado» y «comprobado con prueba real». Nunca declares solucionado un problema que no superó el ensayo correspondiente.
 >
@@ -18,7 +18,7 @@
 >
 > **Restricciones:** jamás modificar `libreriasaber.com.ar`, publicar `main`, activar cobros, generar gastos o tocar Polaroids sin autorización explícita. Mantené la recepción y Central privadas. Pedí intervención humana solo cuando sea indispensable; una instrucción a la vez, con enlaces concretos.
 >
-> **Prioridad vigente:** resolver incompatibilidad entre receptor Google Apps Script Fase 4 y Worker de prueba; instalar receptor ampliado en implementación correcta, verificar 3 PDF reales recibidos en Drive y el registro de un pedido en D1. No comenzar de nuevo.
+> **Prioridad vigente al 29-10-2026:** evitar nuevas iteraciones a ciegas. Dos PDF informados recibidos por la UI; la preparación del pedido retorna HTTP 422 y Central D1 sigue sin confirmación. Hay instrumentación segura por etapa del 422 en la rama privada, no desplegada. Revisar integralmente verificación, manifiesto y Central; después compilar/probar y preparar una sola versión privada controlada. No repetir cargas, confirmación A4 ni configuraciones de GAS ya realizadas. Experiencia mínima y rápida orientada a cerrar ventas.
 
 ## Protocolo de documentación por conversación
 
@@ -30,7 +30,10 @@
 
 ## Ubicación de los registros
 
-- Registro de etapa vigente: `docs/ETAPA1-IMPRESIONES-PLOTEOS-CIERRE.md`.
+- Método de desarrollo y producto (acuerdos vigentes): `docs/METODO-PERMANENTE-DESARROLLO-EN-DEFINICION-20261029.md`.
+- Registro histórico de etapa: `docs/ETAPA1-IMPRESIONES-PLOTEOS-CIERRE.md`.
+- Incidencia técnica vigente y próximo paso: `docs/DIAGNOSTICO-502-LOTE-20261028.md`.
+- Plan multiarchivo y límites de arquitectura: `docs/PLAN-LOTE-CONCURRENTE-PDF-20261028.md`.
 - Contrato UX acordado para el próximo desarrollo: `docs/UX-CIRCUITO-UNICO-CLIENTE-V1.md` (documentación, aún no implementada).
 - Índice de continuidad y criterio general: este documento.
 - Instrucciones de agentes/colaboradores: `AGENTS.md`.
