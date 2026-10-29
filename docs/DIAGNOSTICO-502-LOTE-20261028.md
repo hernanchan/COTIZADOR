@@ -69,3 +69,9 @@ Revisada la ruta `apiPrepararDocumentosV2Lote` del Worker y los módulos `verifi
 **Regresión añadida:** commit `3e50ba3c`, `tests/fase1-comprobantes-ids-lote-regresion.test.mjs`, con cuatro escenarios: dos PDF mismo SHA y distintos ID actuales, ID legado, ID nuevo incongruente con SHA, y archivo ID duplicado. **No se han ejecutado las pruebas ni hay CI asociada todavía.** Compilación, despliegue privado y ensayo real siguen pendientes; no declarar solucionado el 422.
 
 **Próximo paso preciso:** ejecutar `npm test` / compilación en el workflow de la rama antes de preparar otro Worker; validar nuevo test y suite existente. Si fallan, corregir en rama y repetir pruebas, sin intervención del usuario. Tras CI exitoso preparar **una única** versión privada identificada, sin activar, luego promover a `saber-documentos-pruebas` con autorización; un solo ensayo end-to-end con dos PDF y verificación de recibos y un pedido Central D1. Conservar `625a9f5a` como versión anterior del ensayo y `b7f58caf` como recuperación funcional; no asumir que las sesiones antiguas sobreviven indefinidamente. Mantener pagos, Polaroids y web comercial apagados/intactos.
+
+
+### Regresión conectada al workflow de preparación privada
+
+- Commit `27a47a19`: `integraciones/autocotizador/recepcion/package.json` actualiza `test:handoff` para ejecutar `tests/fase1-comprobantes-ids-lote-regresion.test.mjs`. El workflow existente en `main` ejecuta `npm run build:unificado`, que invoca `test:handoff` **antes** de compilar o crear una versión privada; por tanto una regresión fallida debe detener la preparación.
+- El workflow `.github/workflows/saber-preparar-version-privada.yml` se lanza manualmente desde `main` y hace checkout de la rama privada. **Ningún workflow ha sido iniciado por esta intervención**; no hay pruebas ejecutadas todavía y no se creó versión de Cloudflare. No alterar el workflow de `main` ni activar Worker sin ensayo/verificación de CI.
