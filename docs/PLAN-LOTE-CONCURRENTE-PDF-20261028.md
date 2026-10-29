@@ -42,3 +42,10 @@ Cobertura: 10 archivos escalonados en máximo dos carriles; error de un archivo 
 5. Si la prueba falla, retroceder Worker a `b7f58caf` inmediatamente. Si el receptor de Google presenta errores, retroceder en la implementación GAS al código anterior. No borrar sesiones ni pedidos de prueba prematuramente.
 
 **Estado final al redactar:** código y tests listos EN RAMA PRIVADA; NO se activaron cambios del receptor GAS ni Cloudflare Worker correspondientes a esta fase. Web comercial y pagos intactos.
+
+
+## Corrección de continuidad — 29/10/2026
+
+**ATENCIÓN: el orden de activación histórico arriba es obsoleto y NO debe ejecutarse tal como está escrito.** Capturas reales de Apps Script confirmaron que «Receptor ampliado 30 PDF - pruebas privadas» v6 está **ARCHIVADO**, mientras que la aplicación web ACTIVA es «Recepción concurrente de PDF - multiStartBatch - pruebas privadas» v8 (28/10 18:40), URL prefijo AKfycbyIQA. Se guardó código en el editor pero NO se desplegó nueva versión. El Worker privado se informó promovido y el fallo observado en ensayo de dos PDF es `saber_batch_start_failure UNAUTHORIZED` durante inicio, anterior a registro D1. Consultar `docs/DIAGNOSTICO-502-LOTE-20261028.md` y `docs/PROMPT_BASE_CONTINUIDAD.md` para detalle vigente.
+
+**Plan de recuperación:** congelar nuevas funciones; conservar cotizador, precios, clasificación, UX y Central; auditar dependencia Worker→GAS y validar comunicación firmada sin PDFs ni cambios de configuración a ciegas; corregir sólo causa probada; una prueba E2E con dos PDF, registro en Drive/D1, cobros deshabilitados. Después validar minimalismo y circuito comercial. No sustituir toda la arquitectura sin evaluación comparativa ni autorización expresa. Ninguna modificación de `main`, dominio comercial, pagos ni Polaroids.
