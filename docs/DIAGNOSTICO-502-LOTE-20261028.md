@@ -85,3 +85,10 @@ Revisada la ruta `apiPrepararDocumentosV2Lote` del Worker y los módulos `verifi
 - El arreglo de IDs SHA/UUID en `verificacion-central-comprobante.mjs` (commit `e1e1d94b`) y nueva regresión (commit `3e50ba3c`) quedaron incluidos por `test:handoff`, modificado en `27a47a19`.
 - **Estado vigente:** CI correcta, versión Cloudflare creada, NO promovida y NO probada con PDFs reales. No asegurar que 422 esté resuelto.
 - **Próximo paso:** promover exclusivamente la versión `2db48bcb-7bd8-4eca-bedf-1c5b98c41fcd` al 100 % del Worker **`saber-documentos-pruebas`**; no otro Worker ni main. Mantener `625a9f5a-cb9f-43a7-bcb3-94d2c4c545ba` como reversión inmediata del ensayo y `b7f58caf-7ca4-4abf-8e05-9694fa9593fd` como recuperación histórica. Luego un ensayo end-to-end controlado sin pagos para ver si Central registra pedido único y precio oficial. Si el usuario conserva sesiones, intentar registro solo una vez sin recargar PDFs; si caducaron, no asumir recuperación. No cambiar GAS, Polaroids ni web comercial.
+
+
+## 29-10-2026 — Promoción de versión con corrección de IDs confirmada por usuario
+
+- Tras instrucciones de promover UUID `2db48bcb-7bd8-4eca-bedf-1c5b98c41fcd` al 100 % en Cloudflare Worker `saber-documentos-pruebas`, el usuario confirmó **«LISTO»**. Estado: **promoción informada por usuario**, sin lectura independiente de Cloudflare; NO representa validación E2E ni prueba de pedido D1.
+- Continúan apagados los cobros; no se modificó `main`, web comercial, Google Apps Script ni Polaroids.
+- **Siguiente paso único:** si la sesión existente aún está abierta, utilizar el botón de envío para reintentar **registro sin re-subir**, una sola vez. Si caducó, iniciar ensayo privado controlado con dos PDF distintos y un único clic «Enviar mi pedido», sin nuevas configuraciones ni promociones. Comprobar respuesta de `/api/ensayo-preparar-documentos-v2-lote`: 200 con `ok:true` y precio servidor, o 422 con `reasonCode` seguro. Después confirmar 2 recibos reales y un único pedido D1; sin pago. No repetir intentos sin nueva evidencia.
