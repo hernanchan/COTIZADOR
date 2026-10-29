@@ -1,6 +1,6 @@
-# Método de desarrollo — acuerdos en definición (29-10-2026)
+# Método de desarrollo y experiencia del cliente — acuerdos vigentes (29-10-2026)
 
-**Estado: borrador de decisiones consensuadas, NO implica modificar la hoja de ruta técnica ni activar deploy.** Se completará luego de discutir los criterios restantes con el usuario y se vinculará desde el índice de continuidad.
+**Estado:** los acuerdos explícitamente confirmados por el usuario son criterios vigentes del proyecto. Los límites numéricos, los umbrales de tiempo y los detalles todavía pendientes siguen sujetos a validación. Este documento no autoriza despliegues ni publicación comercial.
 
 ## Objetivo comercial
 
@@ -18,9 +18,9 @@ Librería Saber ya cuenta con procesos físicos de impresión consolidados. La n
 
 ## Decisiones pendientes
 
-- Orden concreto de pago, recepción definitiva de archivos y confirmación del pedido; definir cuándo una venta se considera cerrada y cómo recuperar fallos sin cobrar dos veces.
+- Está definida la **venta cerrada** (pago confirmado + archivos recibidos y verificados + Central consistente). Pendiente: implementar y ensayar el orden transaccional de estas operaciones y recuperación sin doble cobro.
 - Límites operativos medidos para pedidos mixtos y umbrales de aceptación de rendimiento y experiencia.
-- Formalización final del protocolo de releases, pruebas y cierre y enlace desde `docs/PROMPT_BASE_CONTINUIDAD.md` una vez aprobado.
+- Formalización de criterios numéricos de rendimiento, protocolo operativo de releases y pruebas de aceptación para cada servicio.
 
 ## Estado técnico separado del método
 
@@ -51,3 +51,13 @@ El usuario ratifica que el producto debe ser **minimalista, interactivo y fácil
 ## 29-10-2026 — Tamaño real no implica A3: papel mínimo compatible
 
 Nueva regla comercial/UX aportada por el usuario: ante un PDF que no es A4, formular una única pregunta visible: «Detectamos que tu archivo no es A4. ¿Querés que lo ajustemos o preferís imprimirlo en tamaño real?». **La elección de tamaño real conserva la dimensión física del contenido, no fuerza automáticamente el cobro A3.** El motor determina orientación y hoja mínima compatible: A4, Legal (misma tarifa que A4) o A3, considerando el área realmente imprimible y sin recortar contenido. Ejemplo: 20×20 cm se puede ubicar en una hoja A4 si la impresora/márgenes permiten esa anchura; no corresponde A3 por el mero hecho de no ser A4. Una hoja A3 solo se propone cuando el contenido no entra en A4 ni Legal sin escala no autorizada. Para PDF mixtos, examinar dimensiones por página, sin subir todo a A3 por una excepción; informar claramente al cliente la distribución y precio, y mantener la elección en el pedido para no volver a preguntar. Validar físicamente los márgenes de los equipos antes de codificar el umbral. Este acuerdo es **diseño**, aún no implementado ni ensayado. No altera precio de ploteos ni condiciones de pago.
+
+
+## Acuerdo final de continuidad entre chats — 29-10-2026
+
+- **Fuente de verdad:** este método de producto y trabajo, `AGENTS.md`, `docs/PROMPT_BASE_CONTINUIDAD.md`, el registro de etapa `docs/ETAPA1-IMPRESIONES-PLOTEOS-CIERRE.md`, el plan de concurrencia `docs/PLAN-LOTE-CONCURRENTE-PDF-20261028.md` y la incidencia vigente `docs/DIAGNOSTICO-502-LOTE-20261028.md`. Consultar primero la documentación, no reiniciar investigación desde memoria.
+- **Prioridad comercial invariable:** cerrar ventas con la menor fricción posible. No sumar botones, pantallas, popups, verificaciones o pasos salvo justificación concreta. La interfaz muestra una lista compacta de archivos configurable por fila, con opciones avanzadas a demanda; se aprueba el principio UX, mientras sus detalles operativos deberán probarse.
+- **Disciplina de ingeniería:** no alterar el método ante observaciones puntuales ni complacer automáticamente; evaluar su efecto. Diagnosticar antes de editar, probar sin desplegar, agrupar correcciones, separar preparación/despliegue/ensayo real y usar pocas intervenciones humanas. Una mejora solo se da por validada cuando supera un ensayo completo, funcional y de UX.
+- **Estado técnico verdadero al registrar:** Worker privado `625a9f5a-cb9f-43a7-bcb3-94d2c4c545ba` promovido según confirmación del usuario, GAS receptor versión 8 informada por capturas; dos PDF aparecen recibidos en la interfaz, total preliminar $6.980, pero `POST /api/ensayo-preparar-documentos-v2-lote` devolvió **HTTP 422**. Pedido D1 **NO confirmado**, cobros apagados. Instrumentación de `reasonCode` por fase del 422: código `9210cb76`, test añadido `f229abaf`, **no compilado en CI ni desplegado aún**. Referencia de reversión conocida `b7f58caf-7ca4-4abf-8e05-9694fa9593fd`.
+- **Próxima tarea técnica:** revisar integralmente la ruta de preparación/validación/manifiesto/Central antes de otro despliegue; corregir causas sustentadas en código y tests, ejecutar pruebas automatizadas y compilar. Preparar versión privada identificada sin activar; promocionar solo tras verificación y ensayar una única vez los dos PDF, buscando un único pedido D1 y precio confirmado. No pedir al usuario que vuelva a seleccionar A4, reenvíe repetidamente o haga capturas sin necesidad concreta. No tocar `main`, `libreriasaber.com.ar`, Polaroids ni cobros.
+- **Mejora diferida:** seguimiento de estado de pedido accesible al cliente, basado en Central, sin promesas artificiales de entrega. No implementar ahora.
