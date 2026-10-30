@@ -224,14 +224,17 @@ function testResponse(data,status=200){
   }});
 }
 function testPage(env,mode='turnstile'){
-  const googleMode=mode==='google';
-  const pageTitle=googleMode?'Prueba de conexión · Cloudflare y Google':'Prueba de seguridad · Documentos';
-  const pageDescription=googleMode
-    ?'Se comprobará un ping firmado a Google Apps Script. NO se envían PDF ni se habilitan compras.'
+  const batchMode=mode==='google-lote';
+  const googleMode=mode==='google'||batchMode;
+  const pageTitle=batchMode?'Diagnóstico de autorización · Sin PDF':googleMode?'Prueba de conexión · Cloudflare y Google':'Prueba de seguridad · Documentos';
+  const pageDescription=batchMode
+    ?'Tres comprobaciones firmadas, sin archivos: ping normal, ping con acentos e inicio de lote vacío (rechazado antes de crear sesiones). Sin pedidos ni cobros.'
+    :googleMode?'Se comprobará un ping firmado a Google Apps Script. NO se envían PDF ni se habilitan compras.'
     :'La recepción de PDF permanece desactivada. Esta página sólo verifica Turnstile; no accede a Drive.';
-  const endpoint=googleMode?'/prueba-google':'/prueba-turnstile';
-  const successMessage=googleMode
-    ?'PING CONFIRMADO: Cloudflare y Google se comunicaron mediante una firma correcta. La recepción continúa desactivada.'
+  const endpoint=batchMode?'/prueba-google-lote':googleMode?'/prueba-google':'/prueba-turnstile';
+  const successMessage=batchMode
+    ?'DIAGNÓSTICO CONFIRMADO: Google verificó las firmas y autorizó la operación de lote. Ninguna sesión fue creada.'
+    :googleMode?'PING CONFIRMADO: Cloudflare y Google se comunicaron mediante una firma correcta. La recepción continúa desactivada.'
     :'PRUEBA EXITOSA: Turnstile validado por Cloudflare. La recepción continúa desactivada.';
   const sitekey=env?.DOCS_TURNSTILE_SITE_KEY;
   if(typeof sitekey!=='string'||!/^[a-zA-Z0-9._-]{10,200}$/.test(sitekey))
@@ -268,7 +271,7 @@ function testPage(env,mode='turnstile'){
       const msNavegador=Math.round(performance.now()-inicioNavegador);
       const timing=${googleMode?"value.ok ? ' Tiempo total desde el navegador: '+msNavegador+' ms. Conexión firmada con Google: '+value.googleMs+' ms.' : ''":"''"};
       out.textContent=value.ok
-        ? '${successMessage}'+timing
+        ? '${successMessage}'+timing+(value.diagnostic ? ' Resultado: '+String(value.diagnostic) : '')
         : 'NO VALIDADO — diagnóstico: '+String(value.reason || 'sin_diagnostico')+
           (Array.isArray(value.codes)&&value.codes.length ? ' ('+value.codes.join(', ')+')' : '')+
           (value.kind ? ' ['+value.kind+']' : '')+
@@ -396,6 +399,46 @@ async function testGooglePing(request,env){
     receptionEnabled:false},502);
 }
 
+
+/**
+ * Diagnóstico sin efectos secundarios: dos pings firmados y lote vacío.
+ * Un lote sin metas es rechazado ANTES de consultar cupos o Drive.
+ */
+async function diagnosticoAutorizacionLoteSinArchivos(request,env){
+  if(env?.DOCS_PING_ENABLED!=='true')return testResponse({
+    ok:false,reason:'google_ping_disabled',receptionEnabled:false},503);
+  const guard=await testTurnstilePost(request,env);
+  if(!guard.ok)return guard;
+  const inicioGoogle=Date.now();
+  try{
+    const ascii=await postToScript(env,{op:'ping',purpose:'saber-docs-hmac-v1'},fetch);
+    const validaPing=r=>r?.ok===true&&r?.service==='saber-docs-handshake'&&
+      r?.signed===true&&r?.apiVersion==='ping-v1'&&r?.receptionEnabled===false;
+    if(!validaPing(ascii))return testResponse({
+      ok:false,reason:'ascii_ping_failed',receptionEnabled:false},502);
+    const unicode=await postToScript(env,{
+      op:'ping',purpose:'saber-docs-hmac-v1',probe:'prueba-áéíñ.pdf'
+    },fetch);
+    if(!validaPing(unicode))return testResponse({
+      ok:false,reason:unicode?.errorCode==='UNAUTHORIZED'?'unicode_hmac_rejected':'unicode_ping_failed',
+      receptionEnabled:false},502);
+    // El receptor rechaza metas vacías antes de abrir sesiones Drive.
+    const batch=await postToScript(env,{op:'multiStartBatch',metas:[]},fetch);
+    if(batch?.ok===false&&batch?.errorCode==='RECEPTOR_ERROR')
+      return testResponse({ok:true,diagnostic:'UTF8_OK_LOTE_AUTORIZADO',
+        receptionEnabled:false,googleMs:Date.now()-inicioGoogle},200);
+    return testResponse({ok:false,
+      reason:batch?.errorCode==='UNAUTHORIZED'?'lote_no_autorizado':
+        batch?.ok===false?'lote_rechazo_inesperado':'lote_respuesta_inesperada',
+      receptionEnabled:false},502);
+  }catch(err){
+    return testResponse({ok:false,
+      reason:err?.stage==='script_post'?'google_post_failure':
+        err?.stage==='googleusercontent_get'?'google_redirect_failure':
+        err?.name==='TimeoutError'?'google_timeout':'google_probe_transport_failure',
+      receptionEnabled:false},502);
+  }
+}
 
 /* PILOTO PDF único: endpoint distinto, un solo PDF <= 1MiB y sin checkout.
    El receptor de Google aplica su propio cupo y verifica HMAC en cada operación.
@@ -1804,6 +1847,11 @@ export default {
     if(page==='/prueba-google'){
       if(request.method==='GET')return testPage(env,'google');
       if(request.method==='POST')return testGooglePing(request,env);
+      return closed();
+    }
+    if(page==='/prueba-google-lote'){
+      if(request.method==='GET')return testPage(env,'google-lote');
+      if(request.method==='POST')return diagnosticoAutorizacionLoteSinArchivos(request,env);
       return closed();
     }
     // Este guardia permanece desactivado hasta revisión técnica formal.
