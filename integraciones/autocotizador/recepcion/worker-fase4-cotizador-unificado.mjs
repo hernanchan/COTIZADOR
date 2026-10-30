@@ -158,10 +158,21 @@ function googleScriptUrl(str){
  return typeof str==='string'&&
   /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(str);
 }
+/**
+ * JSON firmado compatible entre Cloudflare/WebCrypto y Google Apps Script.
+ * Escapar los caracteres no ASCII ANTES de firmar y enviar el mismo string:
+ * JSON.parse() recupera los nombres originales (acentos y emoji), pero el
+ * cálculo HMAC no depende del charset implícito de GAS. No cambia la clave,
+ * algoritmo ni el contrato de respuesta, tampoco elimina verificaciones.
+ */
+function docsJsonAsciiFirmado(payload){
+ return JSON.stringify(payload).replace(/[\u007f-\uffff]/g,
+  chr=>'\\u'+chr.charCodeAt(0).toString(16).padStart(4,'0'));
+}
 async function postToScript(env,payload,fetcher,maxResponseChars=5000){
  if(!googleScriptUrl(env.DOCS_SCRIPT_URL)||typeof env.DOCS_RELAY_KEY!=='string'||
   env.DOCS_RELAY_KEY.length<32)throw Error('Conexión privada no configurada.');
- const payloadJson=JSON.stringify(payload),timestamp=Date.now();
+ const payloadJson=docsJsonAsciiFirmado(payload),timestamp=Date.now();
  const envelope=JSON.stringify({
    payloadJson,timestamp,signature:await signature(payloadJson,timestamp,env.DOCS_RELAY_KEY)
  });
