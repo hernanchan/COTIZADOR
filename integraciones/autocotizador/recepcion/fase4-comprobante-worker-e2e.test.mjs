@@ -70,7 +70,7 @@ const env={
 function receipt(s){
  return {ok:true,status:'verified',verified:true,storageVerified:true,
   pageVerification:'server',paymentAuthorized:false,receiptId:s.uploadId,
-  orderId:s.orderId,fileId:s.fileId,name:s.fileId+'__'+s.name,
+  orderId:s.orderId,fileId:s.fileId,name:s.fileId+'__'+s.name.replace(/[^A-Za-z0-9_. -]/g,'_'),
   mode:s.mode,bytes:s.bytes,sha256:s.sha256,pages:s.pages};
 }
 function dispatch(p){
@@ -105,6 +105,7 @@ function dispatch(p){
  }
  const s=uploads.get(p.uploadId);
  if(!s||p.token!==s.token)throw Error('Mock unauthorized');
+ if(s.failAt===p.op)return {ok:false,error:'Inyección privada de fallo de prueba'};
  if(p.op==='multiStatus')
   return {ok:true,acceptedParts:s.partsStored.map((v,i)=>v?i:null).filter(x=>x!==null)};
  if(p.op==='multiPart'){
@@ -125,7 +126,7 @@ function dispatch(p){
  if(p.op==='multiInfo'){
   if(!s.data)throw Error('Mock not uploaded');
   return {ok:true,receiptId:s.uploadId,orderId:s.orderId,fileId:s.fileId,
-   name:s.fileId+'__'+s.name,mode:s.mode,bytes:s.bytes,sha256:s.sha256,
+   name:s.fileId+'__'+s.name.replace(/[^A-Za-z0-9_. -]/g,'_'),mode:s.mode,bytes:s.bytes,sha256:s.sha256,
    privateChunkBytes:256*1024,pageVerification:s.pagesVerified?'server':null,
    pages:s.pagesVerified||null,receiptState:s.pagesVerified?'pages_verified':'bytes_checked'};
  }
@@ -392,6 +393,78 @@ test('dos PDF con sesiones de una sola tanda se verifican por SHA y registran UN
   assert.equal(googleCalls.length,beforeCentral,'Ninguna descarga Google adicional al registrar');
  }finally{
   expectedCentral={total:3290,receipts:1};
+  globalThis.fetch=oldFetch;
+ }
+});
+
+test('PDF A4 B/N de 16 páginas con tilde: falla por fases seguras y se confirma sin re-subir',async()=>{
+ globalThis.fetch=simulatedFetch;
+ try{
+  const pdf=await PDFDocument.create();
+  for(let p=0;p<16;p++)pdf.addPage([595.28,841.89]);
+  const bytes=Buffer.from(await pdf.save());
+  const sha256=hash(bytes),localRef=randomUUID();
+  const name='preview_acau_bajaresolución.pdf';
+  const fileId='pdf-'+sha256.slice(0,16)+'-'+localRef.replace(/-/g,'');
+  const orderId='WEB-TEST-DIAGNOSTICO-A4-16P';
+  const meta={orderId,fileId,name,mode:'bn',bytes:bytes.length,
+   sha256,partBytes:524288,parts:Math.ceil(bytes.length/524288)};
+  const initial=await call('/api/ensayo-pdf-ampliado',{
+   op:'start',meta,turnstileToken:'TURNTSTILE_DIAGNOSTICO_1234567'
+  });
+  assert.equal(initial.status,200);
+  const session=await initial.json();
+  for(let index=0;index<meta.parts;index++){
+   const chunk=bytes.subarray(index*524288,Math.min(bytes.length,(index+1)*524288));
+   const r=await call('/api/ensayo-pdf-ampliado',{
+    op:'part',uploadId:session.uploadId,token:session.token,index,
+    bytes:chunk.length,sha256:hash(chunk),dataBase64:chunk.toString('base64')
+   });
+   assert.equal(r.status,200);
+  }
+  const finished=await call('/api/ensayo-pdf-ampliado',{
+   op:'finish',uploadId:session.uploadId,token:session.token,
+   sha256,bytes:bytes.length,parts:meta.parts
+  });
+  assert.equal(finished.status,200);
+  const referencia={schema:'saber-pdf-local-pendiente-v1',
+   localRef,sha256,bytes:bytes.length,paginas:16,
+   nombre:name,estado:'PENDIENTE_DE_ENVIO',
+   recibido:false,verificadoServidor:false};
+  const opciones={formato:'a4',caras:'simple',copias:1,
+   anillado:'ninguno',materialColor:'obra70',paginasPorHoja:1};
+  const pedirLink=()=>call('/api/ensayo-vincular-pdf-v2',{
+   referencia,expectedOrderId:orderId,expectedMode:'bn',
+   sesion:{uploadId:session.uploadId,token:session.token},opciones
+  });
+  const saved=uploads.get(session.uploadId);
+  assert.ok(saved);
+  saved.failAt='multiInfo';
+  let failed=await pedirLink();
+  assert.equal(failed.status,422);
+  let detail=await failed.json();
+  assert.equal(detail.phase,'vinculo');
+  assert.equal(detail.reasonCode,'INFO_GOOGLE');
+  assert.doesNotMatch(JSON.stringify(detail),/TOKEN_TEST_ONLY|bajaresolución|sha256/i);
+  saved.failAt='multiReadPart';
+  failed=await pedirLink();
+  assert.equal(failed.status,422);
+  detail=await failed.json();
+  assert.equal(detail.reasonCode,'LECTURA_DRIVE');
+  delete saved.failAt;
+  const before=googleCalls.length;
+  const linkedResponse=await pedirLink();
+  assert.equal(linkedResponse.status,200,JSON.stringify(await linkedResponse.clone().json()));
+  const linked=await linkedResponse.json();
+  assert.equal(linked.cotizacionServidor.totalArs,1344);
+  assert.equal(linked.comprobanteServidor.payload.pages,16);
+  assert.equal(linked.comprobanteServidor.payload.sha256,sha256);
+  assert.equal(linked.paymentAuthorized,false);
+  assert.equal(linked.checkoutEnabled,false);
+  assert.ok(googleCalls.slice(before).includes('multiInfo'));
+  assert.ok(!googleCalls.slice(before).includes('multiVerifiedStatus'),
+   'No se requiere consulta de estado redundante después de finish');
+ }finally{
   globalThis.fetch=oldFetch;
  }
 });
