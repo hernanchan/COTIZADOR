@@ -23,7 +23,7 @@ const archivo={
 const referencia={schema:'saber-pdf-local-pendiente-v1',localRef,sha256,
  bytes:bytes.length,paginas:1,nombre:name,estado:'PENDIENTE_DE_ENVIO',
  recibido:false,verificadoServidor:false};
-function setup({newSession,prior=null,ackLost=false,alreadyAccepted=false,onTiming=null}={}){
+function setup({newSession,prior=null,ackLost=false,alreadyAccepted=false,onTiming=null,linkError=null}={}){
  const calls=[],progress=[],sessions=[],timings=[];
  let lost=ackLost;
  const fetcher=async (url,{body})=>{
@@ -43,12 +43,15 @@ function setup({newSession,prior=null,ackLost=false,alreadyAccepted=false,onTimi
   }
   if(q.op==='finish')return Response.json({ok:true,received:true,sha256,
    bytes:bytes.length,receiptId:uploadId});
-  if(new URL(url).pathname==='/api/ensayo-vincular-pdf-v2')
+  if(new URL(url).pathname==='/api/ensayo-vincular-pdf-v2'){
+   if(linkError)return Response.json({ok:false,error:'Error en la validación privada',
+    reasonCode:linkError}, {status:422});
    return Response.json({ok:true,schema:'saber-v2-pdf-conciliado-privado-v1',
     localRef,orderId,receiptId:uploadId,sha256,pages:1,
     estado:'RECIBO_VERIFICADO_NO_CONCILIADO_CON_PRECIO',
     reciboGoogleVerificado:true,precioRecalculado:false,
     paymentAuthorized:false,listoParaProducir:false});
+  }
   throw Error('Operación desconocida');
  };
  const run=()=>subirYVincularPdfCotizadorV2({
@@ -164,4 +167,20 @@ test('un ACK perdido se recupera, y también se mide el status extraordinario',a
  const t=setup({newSession:true,ackLost:true});
  await t.run();
  assert.deepEqual(t.timings.map(e=>e.fase),['start','part','status','finish','vinculo']);
+});
+
+test('error de vinculación informa la etapa segura y mantiene estado de recuperación',async()=>{
+ const t=setup({newSession:true,linkError:'LECTURA_DRIVE'});
+ await assert.rejects(t.run(),/Error en la validación privada \[etapa LECTURA_DRIVE\]/);
+ assert.deepEqual(t.calls,['start','part','finish','link']);
+ assert.equal(t.sessions.length,1);
+ assert.ok(t.timings.some(x=>x.fase==='vinculo'));
+});
+test('el navegador no muestra códigos arbitrarios ni secretos devueltos como etapa',async()=>{
+ const t=setup({newSession:true,linkError:'TOKEN_PRIVADO_O_ARCHIVO'});
+ await assert.rejects(t.run(),error=>{
+  assert.match(error.message,/Error en la validación privada/);
+  assert.doesNotMatch(error.message,/TOKEN_PRIVADO_O_ARCHIVO|\[etapa /);
+  return true;
+ });
 });
