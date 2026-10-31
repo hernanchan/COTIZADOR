@@ -26,6 +26,7 @@ function environment({n=PART*2+37}={}){
  props.set('FILE_'+s.uploadId,JSON.stringify(s));
  props.set('DOCS_MULTI_INDEX_LOTE_20261024',JSON.stringify([s.uploadId]));
  let remote=Buffer.alloc(0),probeCount=0,putCount=0,shaDownloads=0,legacyDownloads=0;
+ let indexSnapshots=0;
  let readCorrupted=false;
  const response=(status,{headers={},body='',blob=null}={})=>({
   getResponseCode:()=>status,
@@ -66,7 +67,7 @@ function environment({n=PART*2+37}={}){
  const PropertiesService={getScriptProperties:()=>({
   getProperty:k=>props.get(k)||null,
   setProperty:(k,v)=>props.set(k,v),
-  getProperties:()=>Object.fromEntries(props)
+  getProperties:()=>{indexSnapshots++;return Object.fromEntries(props)}
  })};
  const DriveApp={getFileById:id=>{
   assert.equal(id,'stored-pdf-123');
@@ -95,9 +96,10 @@ function environment({n=PART*2+37}={}){
  const commit=(pages=12)=>({uploadId:s.uploadId,token:s.token,
   receiptId:s.uploadId,sha256:s.sha256,bytes:s.bytes,
   parserVersion:'pdf-lib-1.17.1',pages});
- const counters=()=>({probeCount,putCount,shaDownloads,legacyDownloads});
+ const counters=()=>({probeCount,putCount,shaDownloads,legacyDownloads,indexSnapshots});
  const api={sandbox,s,state,setState,part,finish,commit,counters,
   corrupt:()=>{readCorrupted=true},
+  setGlobalIndex:ids=>props.set('DOCS_MULTI_INDEX_LOTE_20261024',JSON.stringify(ids)),
   addRemote:()=>{throw Error('Not supported')}
  };
  return api;
@@ -111,6 +113,10 @@ test('3 fragmentos consecutivos no hacen consultas de estado antes de escribir; 
   assert.equal(result.index,i);
  }
  assert.equal(x.counters().probeCount,0,'sin consultas redundantes por bloque');
+ assert.equal(x.counters().indexSnapshots,1,
+  'recibo legado valida el índice una vez, no por cada fragmento');
+ assert.equal(x.state().indexedForMulti,true,
+  'el recibo heredado guarda marca tras el cotejo real');
  assert.equal(x.counters().putCount,x.s.parts);
  assert.equal(x.state().offset,x.s.bytes);
  assert.equal(x.state().receiptState,'uploaded');
@@ -127,6 +133,8 @@ test('3 fragmentos consecutivos no hacen consultas de estado antes de escribir; 
  assert.equal(pageResponse.paymentAuthorized,false);
  assert.equal(x.counters().shaDownloads,1,'commit de páginas NO descarga otro PDF');
  assert.equal(x.counters().legacyDownloads,0,'no se usa DriveApp.getBlob en el nuevo flujo');
+ assert.equal(x.counters().indexSnapshots,1,
+  'ni finish ni commit de páginas escanean el índice completo');
  assert.equal(g.docsMultiCommitPages(x.commit()).status,'verified','confirmar páginas es idempotente');
  assert.equal(x.counters().legacyDownloads,0);
 });
@@ -221,6 +229,8 @@ test('GAS indica newSession:true sólo si crea realmente un recibo nuevo',()=>{
  assert.equal(fresh.newSession,true);
  assert.notEqual(fresh.uploadId,reused.uploadId);
  assert.ok(fresh.remainingSlots>0);
+ assert.equal(x.sandbox.docsRead(fresh.uploadId).indexedForMulti,true,
+  'los recibos nuevos guardan el marcador solamente después de publicar el índice');
 });
 
 test('multiStartBatch crea tres recibos separados y permite reintento idempotente después de un inicio parcial',()=>{
@@ -245,6 +255,8 @@ test('multiStartBatch crea tres recibos separados y permite reintento idempotent
  assert.equal(new Set(a.sessions.map(v=>v.uploadId)).size,3);
  assert.equal(a.paymentAuthorized,false);
  assert.ok(a.sessions.every(v=>v.newSession===true));
+ assert.ok(a.sessions.every(v=>x.sandbox.docsRead(v.uploadId).indexedForMulti===true),
+  'un lote marca todas sus sesiones después de incorporar al índice');
  const b=x.sandbox.docsMultiStartBatch({metas});
  assert.equal(created,3,'Repetir el lote no duplica sesiones Drive');
  assert.ok(b.sessions.every(v=>v.newSession===false));
@@ -286,6 +298,45 @@ test('lecturas de índice de archivos existentes no pueden sobreescribir cupos d
  assert.match(src,/if\(cleanup===true&&valid\.length!==list\.length\)/);
  assert.match(SOURCE,/var used=docsMultiIds\(true\);/);
  assert.match(SOURCE,/function docsMultiAuth\(p\)\{[\s\S]*?docsMultiIds\(\)/);
+});
+
+test('recibo nuevo marcado no requiere ninguna lectura del índice global en transferencias ni finish',()=>{
+ const x=environment();const {sandbox:g}=x;
+ x.setState({indexedForMulti:true});
+ for(let i=0;i<x.s.parts;i++)
+  assert.equal(g.docsMultiRun(x.part(i),'part').accepted,true);
+ assert.equal(g.docsMultiRun(x.finish(),'finish').received,true);
+ assert.equal(g.docsMultiCommitPages(x.commit()).verified,true);
+ assert.equal(x.counters().indexSnapshots,0,'ninguna instantánea global en el camino rápido');
+ assert.equal(x.counters().shaDownloads,1,'SHA completo permanece obligatorio');
+});
+
+test('recibo legado pasa por índice una sola vez, incluso al reanudar',()=>{
+ const x=environment();
+ x.sandbox.docsMultiRun(x.part(0),'part');
+ assert.equal(x.counters().indexSnapshots,1);
+ assert.equal(x.state().indexedForMulti,true);
+ const st=x.sandbox.docsMultiRun({uploadId:x.s.uploadId,token:x.s.token},'status');
+ assert.deepEqual(Array.from(st.acceptedParts),[0]);
+ for(let i=1;i<x.s.parts;i++)x.sandbox.docsMultiRun(x.part(i),'part');
+ assert.equal(x.counters().indexSnapshots,1);
+});
+
+test('recibo legado FUERA del índice sigue rechazado, aun con token correcto',()=>{
+ const x=environment();
+ x.setGlobalIndex([]);
+ assert.throws(()=>x.sandbox.docsMultiRun(x.part(0),'part'),/Recibo ajeno a fase 4/);
+ assert.equal(x.state().indexedForMulti,undefined);
+ assert.equal(x.counters().putCount,0);
+});
+
+test('una sesión marcada sigue validando token y vencimiento en cada fragmento',()=>{
+ const x=environment();
+ x.setState({indexedForMulti:true});
+ assert.throws(()=>x.sandbox.docsMultiRun({...x.part(0),token:'TOKEN_ERRONEO'},'part'),/Acceso denegado/);
+ x.setState({createdAt:Date.now()-7*86400000});
+ assert.throws(()=>x.sandbox.docsMultiRun(x.part(0),'part'),/Sesión vencida/);
+ assert.equal(x.counters().putCount,0);
 });
 
 test('lote con cupo insuficiente se rechaza ANTES de iniciar sesiones Drive',()=>{
