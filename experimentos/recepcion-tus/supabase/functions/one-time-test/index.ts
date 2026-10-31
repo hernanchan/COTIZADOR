@@ -11,7 +11,12 @@ import {pageHtml} from './page.ts';
 const PROJECT='qkbbqzbannyhuanngjpw';
 const BUCKET='saber-tus-lab';
 const MAX_AGE_MINUTES=90;
+const FRONTEND_ORIGIN='https://hernanchan.github.io';
 const RESPONSE_HEADERS={
+ 'Access-Control-Allow-Origin':FRONTEND_ORIGIN,
+ 'Access-Control-Allow-Headers':'x-lab-token,content-type',
+ 'Access-Control-Allow-Methods':'POST,OPTIONS',
+ 'Vary':'Origin',
  'Content-Type':'application/json; charset=utf-8',
  'Cache-Control':'no-store',
  'Referrer-Policy':'no-referrer',
@@ -42,28 +47,15 @@ async function invitation(admin:ReturnType<typeof createClient>,token:string){
 Deno.serve(async req=>{
  const url=new URL(req.url);
  const path=url.pathname;
- if(req.method==='OPTIONS')return respond({error:'No CORS'},403);
- if(req.method==='GET'&&!path.endsWith('/start')&&!path.endsWith('/verify')){
-  const token=url.searchParams.get('k')||'';
-  const admin=adminClient();
-  const item=await invitation(admin,token);
-  if(!item)return respond({error:'Enlace de ensayo ausente o vencido'},403);
-  return new Response(pageHtml,{
-    status:200,
-    headers:{
-     'Content-Type':'text/html; charset=utf-8',
-     'Referrer-Policy':'no-referrer','Cache-Control':'no-store',
-     'X-Frame-Options':'DENY','X-Content-Type-Options':'nosniff',
-     'Content-Security-Policy':[
-      "default-src 'none'",
-      "script-src 'self' 'unsafe-inline' https://releases.transloadit.com https://esm.sh",
-      "style-src 'self' 'unsafe-inline' https://releases.transloadit.com",
-      "connect-src 'self' https://"+PROJECT+".storage.supabase.co https://esm.sh https://releases.transloadit.com",
-      "img-src 'self' data: blob:","font-src 'self' data:",
-     ].join('; '),
-    },
-  });
+ if(req.method==='OPTIONS'){
+  if(req.headers.get('origin')!==FRONTEND_ORIGIN)
+   return respond({error:'Origen no permitido'},403);
+  return new Response(null,{status:204,headers:RESPONSE_HEADERS});
  }
+ if(req.method==='GET')
+  return respond({error:'Esta URL es una API. La pantalla del ensayo está en el alojamiento estático de GitHub Pages.'},410);
+ if(req.headers.get('origin')!==FRONTEND_ORIGIN)
+  return respond({error:'Origen de prueba no permitido'},403);
  if(req.method!=='POST')return respond({error:'Método no permitido'},405);
  const token=req.headers.get('x-lab-token')||'';
  try{
