@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://releases.transloadit.com https://esm.sh; style-src 'self' 'unsafe-inline' https://releases.transloadit.com; connect-src 'self' https://qkbbqzbannyhuanngjpw.supabase.co https://qkbbqzbannyhuanngjpw.storage.supabase.co https://esm.sh https://releases.transloadit.com; img-src 'self' data: blob:; font-src 'self' data:">
+<title>Librería Saber — prueba privada de PDF</title>
+<link rel="stylesheet" href="https://releases.transloadit.com/uppy/v3.6.1/uppy.min.css">
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#183451;background:#eaf1f8}
+*{box-sizing:border-box}body{margin:0}main{max-width:850px;margin:0 auto;padding:22px}
+header{background:#0e355a;border-radius:10px;color:white;padding:18px 20px;display:flex;align-items:center;gap:12px}
+.logo{background:#f47e24;color:white;padding:8px 13px;border-radius:50%;font-size:23px;font-weight:800}
+header span{font-size:13px}article{background:white;border:1px solid #d3dfe9;border-radius:12px;margin-top:16px;padding:20px}
+h1{font-size:22px;margin:0 0 12px}p{font-size:15px;line-height:1.5}
+button{font-size:16px;background:#0b679a;border:0;border-radius:7px;color:white;padding:14px 18px;cursor:pointer;font-weight:700}
+button:disabled{background:#96acbc;cursor:not-allowed}#status{padding:14px 0;font-weight:600}
+#progress{padding:8px;border:1px solid #d7e0e7;border-radius:8px;min-height:48px}
+#result{white-space:pre-wrap;overflow-wrap:anywhere;background:#f1f6fc;padding:12px;border-radius:8px}
+aside{color:#516274;font-size:13px;margin-top:15px}
+</style>
+</head><body>
+<main>
+<header><b class="logo">S</b><div><b>LIBRERÍA SABER</b><div><span>Laboratorio privado • Supabase Storage TUS</span></div></div></header>
+<article>
+<h1>Prueba automática con dos PDF</h1>
+<p>Genera archivos sintéticos de 16 y 94 páginas, los sube por una conexión directa segura y verifica páginas y SHA-256 desde el servidor. No son documentos de clientes.</p>
+<p><b>Esta invitación funciona una sola vez.</b> El ensayo no genera pedidos ni cobra.</p>
+<button id="go">Probar recepción de 2 PDF</button>
+<div id="status" role="status">Listo para iniciar.</div>
+<div id="progress"></div>
+<pre id="result" hidden></pre>
+<aside>El ensayo usa PDF pequeños para validar la recepción. No representa todavía una prueba de velocidad con archivos grandes.</aside>
+</article></main>
+<script type="module">
+const $=id=>document.getElementById(id);
+const startUrl='https://qkbbqzbannyhuanngjpw.supabase.co/functions/v1/lab-tus-one-use/start';
+const verifyUrl='https://qkbbqzbannyhuanngjpw.supabase.co/functions/v1/lab-tus-one-use/verify';
+const access=new URLSearchParams(location.hash.slice(1)).get('k')||'';
+history.replaceState(null,'',location.pathname);
+$('go').onclick=async()=>{
+ $('go').disabled=true;
+ $('result').hidden=true;
+ let stage='inicio';
+ const t0=performance.now();
+ try{
+  if(!/^[a-f0-9]{64}$/.test(access))throw Error('Enlace inválido.');
+  const {Uppy,Dashboard,Tus}=await import('https://releases.transloadit.com/uppy/v3.6.1/uppy.min.mjs');
+  const {PDFDocument}=await import('https://esm.sh/pdf-lib@1.17.1');
+  stage='iniciando permiso';
+  $('status').textContent='Solicitando autorización privada para 2 archivos…';
+  const res=await fetch(startUrl,{method:'POST',headers:{'x-lab-token':access,'content-type':'application/json'},body:'{}'});
+  const accessData=await res.json();
+  if(!res.ok||!accessData.ok||accessData.uploads?.length!==2)throw Error('No se pudo iniciar la prueba privada (HTTP '+res.status+').');
+  const prep=performance.now();
+  const uu=new Uppy({autoProceed:false,restrictions:{maxNumberOfFiles:2,minNumberOfFiles:2,allowedFileTypes:['.pdf','application/pdf']}});
+  uu.use(Dashboard,{inline:true,target:'#progress',height:190,hideUploadButton:true,showProgressDetails:true,proudlyDisplayPoweredByUppy:false});
+  uu.use(Tus,{
+    endpoint:'https://'+accessData.projectRef+'.storage.supabase.co/storage/v1/upload/resumable/sign',
+    headers:{apikey:accessData.apikey},uploadDataDuringCreation:true,
+    retryDelays:[0,1200,3000],chunkSize:6*1024*1024,limit:2,
+    allowedMetaFields:['bucketName','objectName','contentType','cacheControl'],
+  });
+  const fileDescriptors=[];
+  stage='generando PDF';
+  for(let i=0;i<2;i++){
+   const pages=i===0?16:94;
+   const doc=await PDFDocument.create();
+   for(let j=0;j<pages;j++)doc.addPage([595.28,841.89]);
+   const bytes=await doc.save();
+   const digest=await crypto.subtle.digest('SHA-256',bytes);
+   const hex=Array.from(new Uint8Array(digest)).map(v=>v.toString(16).padStart(2,'0')).join('');
+   const name='ensayo_'+pages+'_paginas.pdf';
+   const file=new File([bytes],name,{type:'application/pdf'});
+   const id=uu.addFile({name,type:'application/pdf',data:file,source:'laboratorio'});
+   uu.setFileMeta(id,{bucketName:accessData.bucket,objectName:accessData.uploads[i].objectName,contentType:'application/pdf',cacheControl:'0'});
+   uu.setFileState(id,{tus:{headers:{'x-signature':accessData.uploads[i].signature}}});
+   fileDescriptors.push({objectName:accessData.uploads[i].objectName,expectedSha256:hex,pages,bytes:bytes.byteLength});
+  }
+  const uploadStarted=performance.now();
+  stage='subiendo PDF';
+  $('status').textContent='Subiendo ambos PDF directamente a Supabase…';
+  const result=await uu.upload();
+  const uploadFinished=performance.now();
+  if(result.failed?.length || result.successful?.length!==2)throw Error('La transferencia TUS quedó incompleta.');
+  stage='verificando SHA y páginas';
+  $('status').textContent='Ambos PDF subidos. Comprobando integridad y páginas en servidor…';
+  const verify=await fetch(verifyUrl,{method:'POST',headers:{'x-lab-token':access,'content-type':'application/json'},body:JSON.stringify({files:fileDescriptors.map(({objectName,expectedSha256})=>({objectName,expectedSha256}))})});
+  const confirmation=await verify.json();
+  if(!verify.ok || !confirmation.ok||confirmation.verified!==2)throw Error('La verificación independiente no pudo confirmar los dos PDF.');
+  for(let i=0;i<2;i++)
+   if(confirmation.files[i].pages!==fileDescriptors[i].pages||!confirmation.files[i].sha256Match||confirmation.files[i].bytes!==fileDescriptors[i].bytes)
+    throw Error('Las páginas, bytes o SHA no coinciden.');
+  const done=performance.now();
+  $('status').textContent='ÉXITO: 2 de 2 PDF recibidos y verificados, sin cobros.';
+  $('result').hidden=false;
+  $('result').textContent=JSON.stringify({
+   verificados:'2 de 2',paginas:[16,94],integridadSha256:'correcta',
+   tiempoTotalSegundos:((done-t0)/1000).toFixed(2),
+   tiempoPreparacionSegundos:((uploadStarted-prep)/1000).toFixed(2),
+   tiempoSubidaSegundos:((uploadFinished-uploadStarted)/1000).toFixed(2),
+   tiempoVerificacionSegundos:((done-uploadFinished)/1000).toFixed(2),
+   pedidosRegistrados:0,cobros:false,
+  },null,2);
+ }catch(error){
+  $('status').textContent='ERROR EN '+stage.toUpperCase()+': no se confirmó la recepción. No reintentar.';
+  $('result').hidden=false;
+  $('result').textContent=String(error?.message||'Error no identificado.');
+ }
+};
+</script></body></html>
