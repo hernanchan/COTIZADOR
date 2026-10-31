@@ -339,3 +339,37 @@ El usuario conservó la pestaña y expandió «Detalles de la recepción y verif
   2) `verificarVinculoCotizadorV2` con referencia 16 páginas y recibo coherente, nombre `preview_acau_bajaresolución.pdf` → normalización `preview_acau_bajaresoluci_n.pdf`: **PASA**, con UUID/SHA coherentes. Ni el acento aislado ni el cotejo nominal básico explican el fallo.
 - **Causas aún abiertas**: PDF real no legible con parser estricto de `pdf-lib`, error de Google en lectura privada o conteo, discrepancia real de páginas, error de sello/metadatos, timeout/concurrencia, o alguna diferencia en recibo real. No inventar causa. Falta el **archivo exacto que falla** o un código de etapa seguro del servidor (hoy no se registra ni retorna).
 - **Siguiente paso mínimo y no repetitivo**: pedir que adjunte **en este chat** el archivo original `preview_acau_bajaresolución.pdf` desde su computadora (no volver a enviarlo al cotizador ni pulsar reintentar). Analizar estructura y páginas sin pasar por Cloudflare/GAS; confirmar/rule out parser/problema PDF. Si el archivo resulta válido, la siguiente modificación responsable es instrumentación de fases seguras en `v2VincularPdf` sin filtrar secretos, luego CI y un solo deploy privado cuando corresponda. Mantener esa pestaña hasta resolver si posible. No tocar pagos, main, GAS ni web comercial.
+
+
+## 31-10-2026 — Investigación autónoma del 422, reducción de ida a Google, error por fase, CI 90/90
+
+El usuario confirmó que los intervalos entre órdenes de su negocio son valiosos y solicitó seguir trabajando autónomamente, sin nuevas cargas manuales.
+
+### Evidencia y límites
+- Receptor vivo anterior: PDF `Registro de trabajos.pdf` 94 páginas A3 verificado, $40.420; PDF `preview_acau_bajaresolución.pdf` 16 páginas A4 falló en `v2VincularPdf` con HTTP 422 y mensaje genérico; ambos llegaron a `finish`. 1/2 verificado, D1 sin registro, 93,5 segundos total.
+- Búsquedas por nombre en **Google Drive conectado** (`preview_acau`, `bajaresoluci`, `preview` y filtros de creación reciente) **no encontraron el original**. Probablemente el Drive de destino no sea accesible desde esta conexión; no afirmar identidad de cuentas sin prueba. El PDF exacto **sigue sin estar disponible** para análisis de estructura. No suplantarlo con PDFs arbitrarios.
+- Las funciones puras reales de vínculo y cálculo fueron comprobadas previamente en V8 con datos acordes: acento normalizado correctamente; 16p A4 B/N simple faz => **$1.344**. No descartan discrepancia del PDF verdadero ni fallos de lectura/validación de Drive.
+
+### Cambios privados y conservadores, SOLO rama
+1. `worker-fase4-cotizador-unificado.mjs` commit `866d78ad`:
+   - Para `v2VincularPdf` se llama `fase4PrivateVerified` con `preferirInfo=true`: tras `finish` confirmado, se inicia con `multiInfo` y **no** con un `multiVerifiedStatus` redundante, que normalmente devuelve `verified:false` antes de primera lectura. No se omiten SHA, descarga por rangos, análisis del PDF, guardado de páginas, cotejo de ID ni presupuesto. En un **reintento ya verificado** consulta `multiInfo` y `multiVerifiedStatus` antes de aceptar; se conserva verificación autorizada, puede añadir una llamada en ese caso minoritario.
+   - `fase4PrivateVerified` acepta callback interno `onFase` por defecto vacío, con fases **enumeradas** `ESTADO_GOOGLE`, `INFO_GOOGLE`, `ESTADO_VERIFICADO`, `LECTURA_DRIVE`, `ANALISIS_PDF`, `GUARDADO_PAGINAS`, `LECTURA_MEDIDAS`, `MEDIDAS_PDF`. `v2VincularPdf` además distingue `CRUCE_RECIBO`, `SELLO_RECEPCION`, `COTIZACION`.
+   - En error interno 422 retorna **`phase:'vinculo',reasonCode:<fase>`** y registra `console.warn('saber_v2_link_failure',etapaVinculo)` en Observabilidad, sin detalles sensibles (nunca nombre, SHA, recibo, token, bytes ni excepción textual). Errores 400 de validación previa no se modificaron.
+2. `subir-vincular-pdf-v2-privado.mjs` commit `d7a2fea4`: cliente sólo anexa código de etapa si `reasonCode` pertenece a la **lista blanca** y el endpoint es el de vínculo; protege de texto arbitrario en código.
+3. `pantalla-cotizador-v2-prueba-privada.mjs` commit `353cefcb`: error seguro del PDF faltante se refleja junto a «Enviar mi pedido» (además del detalle expandible), conserva 1/2 verificado y **no reintenta automáticamente**.
+4. Test E2E simulado `fase4-comprobante-worker-e2e.test.mjs` commit `03c6a228`: PDF nuevo de 16p A4 B/N nombre `preview_acau_bajaresolución.pdf` (creado con pdf-lib, NO mismo PDF de cliente). Se inyecta fallo `multiInfo` → HTTP 422 `INFO_GOOGLE`, después fallo `multiReadPart` → 422 `LECTURA_DRIVE`; tras eliminarlos, **vínculo HTTP200, presupuesto $1.344 y sello 16p**, todo sobre la **misma sesión sin re-subir**; se comprueba que la ruta inicial evita `multiVerifiedStatus`.
+5. Test cliente `subida-sesion-fresca.test.mjs` commit `536914b7`: propagación solo de código permitido, manejo de código arbitrario y conservación de sesión.
+6. Test UI `tests/fase1-envio-unico-interfaz.test.mjs` commit `1553752b`: error de PDF se muestra cerca del botón, sin reiniciar recepción.
+
+### Validación REAL de CI y nueva versión SIN activar
+
+- Se relanzó **únicamente el mismo job de GitHub Actions**, run `41051946623`, **intento 3**, job `124558285762`; workflow en main hace checkout explícito de la rama privada. Estado `completed/success`.
+- Logs verificados: **25 + 61 + 4 = 90 pruebas exitosas, 0 fallas**, construcción del bundle y `PRUEBAS_PRIVADAS_OK`.
+- Cloudflare respondió `VERSION_PRIVADA_PREPARADA_SIN_ACTIVAR=9e8dd46e-a0f5-42b5-be1a-4d1b21df8684` y `SIN_DESPLIEGUE_SIN_PAGOS_SIN_CAMBIOS_EN_WEB_COMERCIAL`.
+- El Worker privado ACTIVO según ensayo previo sigue siendo **`67bcda58-7ed3-45ec-bb56-b43caa7a3437`**; la versión anterior `344e6d43` queda como posible rollback. No se desplegó GAS ni se habilitaron cobros.
+
+### Próximos pasos (sin repetir esfuerzos)
+1. No declarar causa original resuelta: sin bytes del PDF real ni código por fase capturado en el despliegue antiguo, **422 original sigue sin diagnóstico definitivo**.
+2. Cuando el usuario pueda intervenir, promoción **sólo** `9e8dd46e` en `saber-documentos-pruebas`, no en otros Workers. No forzar ensayo repetitivo: si se prueba, una vez con los archivos ya utilizados, y capturar `reasonCode` en pantalla o Observabilidad.
+3. Para causa exacta actual, obtener archivo de origen `preview_acau_bajaresolución.pdf` como adjunto en conversación, si está disponible; ejecutar parser estricto con original (no con copia Drive inaccesible). Si falla por estructura, diseñar manejo conservador sin desactivar validaciones.
+4. Latencia: se eliminó una ida GAS redundante por primer vínculo pero NO alcanza para resolver 93,5 s. Próxima optimización de mayor impacto requiere estudiar viajes `part` secuenciales de 512KiB y `multiReadPart` 256KiB, con control de límites Worker 950KB por request, integridad y eventual despliegue coordinado GAS. No subir tamaños unilateralmente ni prometer aceleración sin medir.
