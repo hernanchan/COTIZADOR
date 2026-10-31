@@ -251,6 +251,8 @@ test('multiStartBatch crea tres recibos separados y permite reintento idempotent
   sha256:sha(Buffer.from('documento'+i)),parts:1,partBytes:PART});
  const metas=[meta(1),meta(2),meta(3)];
  const a=x.sandbox.docsMultiStartBatch({metas});
+ assert.equal(x.counters().indexSnapshots,1,
+  'lote toma una sola instantánea de índice para todos los archivos');
  assert.equal(a.sessions.length,3);
  assert.equal(new Set(a.sessions.map(v=>v.uploadId)).size,3);
  assert.equal(a.paymentAuthorized,false);
@@ -258,6 +260,8 @@ test('multiStartBatch crea tres recibos separados y permite reintento idempotent
  assert.ok(a.sessions.every(v=>x.sandbox.docsRead(v.uploadId).indexedForMulti===true),
   'un lote marca todas sus sesiones después de incorporar al índice');
  const b=x.sandbox.docsMultiStartBatch({metas});
+ assert.equal(x.counters().indexSnapshots,2,
+  'la segunda ejecución también toma una sola instantánea');
  assert.equal(created,3,'Repetir el lote no duplica sesiones Drive');
  assert.ok(b.sessions.every(v=>v.newSession===false));
  assert.deepEqual(Array.from(b.sessions.map(v=>v.uploadId)),
