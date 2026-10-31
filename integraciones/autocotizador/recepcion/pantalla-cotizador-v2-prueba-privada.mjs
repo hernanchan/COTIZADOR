@@ -42,6 +42,7 @@ body.estado-envio #smart,body.estado-registro #smart{display:none}
 <section style="padding:8px 3px 4px"><h2 style="margin:0 0 5px;font-size:22px;color:#123852">Cargá tus archivos una sola vez</h2><p style="margin:0;color:#52677a">Arrastrá todos los PDF juntos. La web reconoce tamaños y ploteos automáticamente. Revisá el precio y pulsá «Enviar mi pedido» una sola vez.</p></section></div>
 <main><section class="panel" style="padding:0;border:0;background:transparent">
 <section id="vista-estado-pedido" hidden role="status" aria-live="polite"></section>
+<output id="rendimiento-privado" hidden style="display:block;margin:8px 0;padding:11px 14px;background:#f9fcff;border:1px solid #cbd5e1;border-radius:10px;font-size:13px;white-space:pre-wrap" aria-label="Tiempos del ensayo"></output>
 <iframe id="smart" title="Análisis automático de PDF, tamaños, CAD y póster" src="/prueba-v2/carga-inteligente" loading="eager"></iframe>
 </section>
 <details id="recepcion-avanzada" class="panel" style="margin-top:14px"><summary style="font-size:16px;font-weight:700;cursor:pointer;padding:5px 0">Detalles de la recepción y verificación (ensayo privado)</summary><div style="padding-top:12px">
@@ -73,6 +74,7 @@ if(!modoDiagnostico){
  document.getElementById('comparacion-original').hidden=true;
 }
 const vistaEstadoPedido=document.getElementById('vista-estado-pedido');
+const rendimientoPrivado=document.getElementById('rendimiento-privado');
 let ultimoTotalServidor=null;
 function mostrarEstadoCliente(estado,titulo,detalle){
  document.body.classList.toggle('estado-envio',estado==='enviando');
@@ -112,7 +114,27 @@ const dropPdf=document.getElementById('drop-pdf'),batchFiles=document.getElement
    eventos:medicionActual.eventos
   });
   Object.defineProperty(window,'__saberRendimientoPrivado',{configurable:true,value:resultado});
-  if(new URLSearchParams(location.search).get('diagnostico')==='1'){
+  if(modoDiagnostico){
+   const eventos=resultado.eventos;
+   function faseMs(primera,ultima){
+    const inicio=eventos.find(e=>e.etapa===primera);
+    const finales=eventos.filter(e=>e.etapa===ultima);
+    const fin=finales[finales.length-1];
+    return inicio&&fin&&fin.ms>=inicio.ms?fin.ms-inicio.ms:null;
+   }
+   const segundos=ms=>ms===null?'no registrado':(ms/1000).toFixed(1)+' s';
+   const fases=[
+    ['Preparación',faseMs('preparacion_inicio','preparacion_terminada')],
+    ['Inicio de tandas',faseMs('lote_inicio','lote_sesiones')],
+    ['Recepción y verificación',faseMs('lote_transferencia_inicio','central_inicio')],
+    ['Registro en Central',faseMs('central_inicio','central_fin')]
+   ];
+   rendimientoPrivado.hidden=false;
+   rendimientoPrivado.textContent='Tiempos del ensayo · '+resultado.cantidadPdf+' PDF · Estado: '+resultado.estado+
+    '\\nDesde pulsar Enviar: '+segundos(resultado.tiempoTotalMs)+
+    (Number.isFinite(resultado.ultimoAnalisisMs)?' · Análisis previo: '+segundos(resultado.ultimoAnalisisMs):'')+
+    '\\n'+fases.filter(p=>p[1]!==null).map(p=>p[0]+': '+segundos(p[1])).join(' · ')+
+    '\\nSolo diagnóstico local: sin archivos, nombres ni credenciales.';
    console.info('[Librería Saber] Mediciones locales del ensayo',resultado);
    console.table(resultado.eventos);
   }
