@@ -86,7 +86,7 @@ Deno.serve(async req=>{
     .eq('id',row.id).is('consumed_at',null)
     .gt('expires_at',new Date().toISOString()).select('id').maybeSingle();
    if(claimError||!claimed)return respond({error:'Invitación ya utilizada'},409);
-   return respond({ok:true,uploads:signatures,projectRef:PROJECT,bucket:BUCKET});
+   return respond({ok:true,uploads:signatures,projectRef:PROJECT,bucket:BUCKET,apikey:Deno.env.get('SUPABASE_ANON_KEY')});
   }
   if(path.endsWith('/verify')){
    if(!row.consumed_at||!row.session_id||!row.object_a||!row.object_b)
