@@ -395,13 +395,13 @@ function docsMultiAuth(p){
 }
 function docsMultiRun(p,action){
  var s=docsMultiAuth(p),body={uploadId:s.uploadId,token:p.token};
- if(action==='part')return docsPart(p);
- if(action==='status')return docsStatus(body);
+ if(action==='part')return docsPart(p,s);
+ if(action==='status')return docsStatus(body,s);
  if(action==='finish'){
    if(s.receiptState==='pages_verified')return {received:true,verified:true,
      bytes:s.bytes,sha256:s.sha256,receiptId:s.uploadId,pdfPages:s.pdfPages,
      paymentAuthorized:false};
-   return docsFinish(p);
+   return docsFinish(p,s);
  }
  throw Error('Operación no prevista');
 }
@@ -559,14 +559,16 @@ function docsProbe(s){
  if(!Number.isSafeInteger(offset)||offset<0||offset>s.bytes)throw Error('Estado Drive inválido');
  s.offset=offset;docsSave(s);return offset;
 }
-function docsStatus(p){
- var s=docsAuth(p),offset=docsProbe(s);
+function docsStatus(p,validatedSession){
+ // Las llamadas multi ya fueron autenticadas en docsMultiAuth.
+ // El piloto legado sigue verificando mediante docsAuth.
+ var s=validatedSession||docsAuth(p),offset=docsProbe(s);
  var received=offset===s.bytes?s.parts:Math.floor(offset/DOCS_PART);
  return {uploadId:s.uploadId,acceptedParts:Array.from({length:received},function(_,i){return i;}),
   receivedBytes:offset,receiptState:s.receiptState,verified:false};
 }
-function docsPart(p){
- var s=docsAuth(p);
+function docsPart(p,validatedSession){
+ var s=validatedSession||docsAuth(p);
  if(!Number.isSafeInteger(p.index)||p.index<0||p.index>=s.parts||
   typeof p.dataBase64!=='string'||!/^[a-f0-9]{64}$/.test(p.sha256||''))
   throw Error('Parte inválida');
@@ -605,8 +607,8 @@ function docsPart(p){
  if(committed<end)throw Error('Drive recibió sólo parte del bloque');
  return {accepted:true,index:p.index};
 }
-function docsFinish(p){
- var s=docsAuth(p);
+function docsFinish(p,validatedSession){
+ var s=validatedSession||docsAuth(p);
  if(s.sha256!==p.sha256||s.bytes!==p.bytes||s.parts!==p.parts)
    throw Error('Resumen no coincide');
  if(s.receiptState==='bytes_checked')return docsAwaitPages(s);
