@@ -1,46 +1,44 @@
-# Librería Saber — LABORATORIO Uppy + Supabase TUS (NO PRODUCCIÓN)
+# Librería Saber — laboratorio privado de recepción TUS
 
-Prueba independiente para **dos PDF**, que conserva el cotizador actual sin modificaciones. Subida directa del navegador a **Supabase Storage privado** mediante protocolo TUS, con progreso y recuperación. Validación del objeto guardado en una función separada: SHA-256 y conteo de páginas con pdf-lib, descargando el PDF **una sola vez** desde Supabase. **No se registra D1 ni se hacen pagos**. Ningún Worker comercial ni Google Apps Script participan del experimento.
+**Entorno totalmente separado de la web comercial.** Rama `experimento/uppy-tus-supabase-20261031`. Proyecto Supabase Free `saber-tus-lab` (`qkbbqzbannyhuanngjpw`, São Paulo).
 
-## Estado real
+## Estado vigente — 31/10/2026
 
-- [x] Rama experimental separada, cliente Uppy, política RLS, función de verificación y pruebas locales.
-- [x] \`node --test\`: comprueba pertenencia de ruta, SHA, cabecera, tamaño, páginas y manipulación de metadatos con objetos simulados.
-- [ ] Proyecto Supabase **Free** separado conectado en ChatGPT o creado con autorización del dueño.
-- [ ] Crear bucket privado y ejecutar SQL **solo en el proyecto nuevo**.
-- [ ] Habilitar Auth Anonymous Sign-ins solo en el proyecto de laboratorio. El modo anónimo no protege de abuso por sí mismo.
-- [ ] Desplegar función \`verify-upload\` y comprobar lectura real de Storage.
-- [ ] Medir TUS con dos PDF sintéticos (16 y 94 páginas), persistencia, SHA, páginas y tiempos.
-- [ ] Revisar cuotas/abuso/retención antes de cualquier enlace público.
+- [x] Supabase Free creado y confirmado a **USD 0/mes**.
+- [x] Bucket `saber-tus-lab` privado, 20 MiB, solo PDF.
+- [x] Eliminada política abierta de INSERT para usuarios anónimos. **Nadie puede cargar un archivo solo por crear un usuario anónimo.**
+- [x] `public.lab_tus_invites` con RLS sin políticas de acceso público; invitaciones aleatorias de 32 bytes, solo SHA-256 almacenado y vigencia limitada.
+- [x] Función `lab-tus-one-use` desplegada, versión 1, protegida por enlace secreto y consumo único. **No habilita pagos ni registra pedidos.**
+- [x] GET sin invitación probado en vivo: **HTTP 403**; verificada ausencia de objetos y de permisos públicos de subida.
+- [x] Interfaz en navegador móvil que **genera automáticamente 2 PDF sintéticos de 16 y 94 páginas**, usa Uppy/TUS con dos tokens firmados de Supabase Storage y solicita verificación independiente de SHA-256, cantidad de páginas y bytes.
+- [x] Sintaxis del JavaScript de la página comprobada localmente. Tests anteriores de funciones puras con `Blob` sintético: **11/11 aprobados**.
+- [ ] **Recepción real de 2/2 PDF: PENDIENTE.** La primera ejecución deberá hacerse desde un navegador usando la invitación privada; no hay resultados de tiempos todavía.
+- [ ] Si 2/2 y SHA funcionan, repetir una prueba de rendimiento con tamaños comparables a los 24 fragmentos del cotizador viejo; no extrapolar los tiempos de dos PDFs pequeños.
 
-**Pasar tests de Node NO demuestra que se haya subido ningún archivo.** No usar PDF de clientes.
+### Flujo nuevo
 
-## Ejecución cuando esté conectado el proyecto Free
+1. Usuario abre enlace único privado **sin copiar claves**, desde celular o PC; el token no se guarda en GitHub.
+2. Un clic en «Probar recepción de 2 PDF»; servidor marca la invitación usada y crea **dos rutas aleatorias** en el bucket privado, y emite dos tokens de subida con `service_role` **exclusivamente en Edge Function**, nunca en navegador.
+3. Browser genera PDF válidos con pdf-lib, los carga con Uppy/TUS por conexión directa a `<project>.storage.supabase.co` (sin Google Apps Script).
+4. Servidor descarga desde Storage una sola vez cada PDF, verifica bytes/SHA y páginas con pdf-lib y devuelve tiempos/resultado.
+5. Si falla cualquier etapa, no genera pedido ni intenta cobrar. **No reintentar** usando la misma invitación.
 
-1. Confirmar que el proyecto Supabase sea **exclusivo del laboratorio**, sin claves del cotizador comercial y plan **Free**. Nunca habilitar pagos.
-2. Habilitar Auth → Anonymous Sign-ins. Ejecutar \`supabase/001_lab.sql\` en su SQL Editor. Comprobar bucket \`saber-tus-lab\` con \`public=false\` y límite 20 MiB.
-3. Desplegar \`verify-upload\` desde \`supabase/functions/verify-upload/index.ts\`, con \`SUPABASE_URL\`, \`SUPABASE_ANON_KEY\`, \`SUPABASE_SERVICE_ROLE_KEY\` en el entorno **servidor**, además de \`LAB_ALLOWED_ORIGIN=http://localhost:4173\`. JWT se verifica en el código con \`auth.getUser()\`. Mantener service_role fuera de frontend.
-4. Copiar \`config.local.example.js\` a \`config.local.js\` y completar solamente project URL, project ID y **publishable** key. Este archivo se excluye de Git.
-5. Ejecutar \`npm test\` y \`npm run serve\`, abrir \`http://localhost:4173\`, «Iniciar laboratorio» y elegir exactamente dos PDF **de prueba**, no de clientes. Pulsar «Subir y verificar».
-6. Medir subida y verificación con dos archivos del tamaño indicado; comparar con 93,5s y 97,7s del circuito anterior **bajo las mismas condiciones de equipo y red**. Fallo 1/2 = rechazo del candidato hasta diagnosticar.
+### Archivos
 
-## Privacidad y límites
+- `supabase/functions/one-time-test/index.ts`: emisión privada de dos firmas, control de invitación y verificación.
+- `supabase/functions/one-time-test/page.ts`: pantalla de un clic, sin archivos del usuario.
+- `supabase/functions/_shared/verification.mjs`: validación estricta, reutilizada por la función.
+- `supabase/001_lab.sql`: SQL actualizado para invitaciones, RLS y bucket privado.
+- `tests/verify.test.mjs`: pruebas de SHA/propiedad/páginas, con datos simulados.
+- `client.js` e `index.html`: **prototipo inicial basado en Auth anónimo, solo referencia histórica; no corresponde a la configuración segura vigente**. No ejecutarlo ni abrirlo públicamente con la política actual.
 
-- Proyecto, bucket y credenciales **NUEVOS**; no tocar \`saber-documentos-pruebas\`, GAS Documentos v10, Central D1, Mercado Pago ni Polaroids.
-- Bucket privado, rutas aleatorias \`uid/uuid.pdf\`, sin \`getPublicUrl\`. RLS exige carpeta de cada usuario, y la función verifica identidad antes de descargar usando service_role servidor.
-- El cliente usa Supabase Auth Anonymous Sign-ins (rol autenticado) y \`createSignedUploadUrl\` sobre la ruta propia. Uppy envía \`x-signature\` con TUS directo a \`<project>.storage.supabase.co/storage/v1/upload/resumable/sign\`.
-- Solo archivos PDF máximo 20 MiB; 6 MiB por fragmento TUS; dos carriles.
-- No hay limpieza de objetos automática ni mitigación suficiente de spam: **no publicar públicamente**. Una prueba con Auth anónima requiere controles de abuso antes de usarla en producción.
-- CDN oficial Uppy 3.6.1 y supabase-js 2 por ESM; deben comprobarse en navegador conectado, no se probaron aquí con internet.
-- No hay tarifas, ploteos, anillados, D1, cobro ni web comercial en este experimento: evalúa **solo recepción**.
+### Seguridad y restricciones
 
-## Recursos originales
+- La función requiere un código no adivinable de 64 caracteres hexadecimales; el hash se almacena en base. El enlace vence y solo puede iniciar una tanda.
+- El bucket `public=false`, sin políticas de lectura pública ni de INSERT para usuarios anónimos. El servicio firma objetos con acceso limitado. No se expone `service_role`.
+- La cuenta tiene **Anonymous Sign-ins activado**, pero el ensayo privado de un clic **no depende de ese acceso** y no abre permisos de Storage.
+- Security Advisor: aviso informativo de RLS sin políticas de `lab_tus_invites` (es **denegación total deliberada**) y advertencia de protección de contraseñas filtradas desactivada (configuración de Auth general; ensayo no usa contraseñas). No se habilitan usuarios comerciales.
+- No conectar a D1, Mercado Pago, dominio comercial, Cloudflare Workers existentes, Google Apps Script ni Polaroids.
+- **No es una solución comercial probada.** Faltan ensayo real, manejo de errores, limpieza programada/retención, cuotas, seguridad externa, carga concurrente y evaluación de gastos antes de integrar.
 
-- https://github.com/supabase/supabase/tree/master/examples/storage/resumable-upload-signed-uppy
-- https://supabase.com/docs/guides/storage/uploads/resumable-uploads
-- https://supabase.com/docs/guides/auth/auth-anonymous
-- https://github.com/transloadit/uppy
-
-## Condición para migrar
-
-**Dos PDF reales de prueba 2/2, SHA verificado y páginas reales, latencia medida, bucket privado, costos aceptables.** Recién entonces evaluar cómo integrar exclusivamente el transporte con nuestro cotizador existente, nunca reemplazar todo a ciegas.
+Fuentes originales: <https://supabase.com/docs/guides/storage/uploads/resumable-uploads> · <https://github.com/transloadit/uppy> · <https://supabase.com/docs/guides/storage/buckets/fundamentals>.
