@@ -205,3 +205,12 @@ test('modo diagnóstico muestra mediciones de las cuatro etapas sin consola ni o
  assert.match(source,/\['part','Subida de fragmentos'\]/);
  assert.doesNotMatch(source,/localStorage\.setItem\([^\n]*Rendimiento/);
 });
+
+test('en error de recepción muestra código de etapa al lado de Enviar sin reintentar automáticamente',()=>{
+ assert.match(source,/d\.ultimoErrorDeRecepcion=String\(e\.message\|\|e\)/);
+ assert.match(source,/d\.ultimoErrorDeRecepcion=String\(error\.message\|\|error\)/);
+ assert.match(source,/const errorPdf=pending\.find\(d=>d\.ultimoErrorDeRecepcion\)/);
+ assert.match(source,/\(errorPdf\?' Causa: '\+errorPdf\.ultimoErrorDeRecepcion:'\'\)/);
+ assert.match(source,/if\(!outcome\.completo\)\{/);
+ assert.match(source,/if\(!success\)\{\s*mostrarEstadoCliente\(null\);\s*terminarMedicion\('envio_incompleto'\);return;/);
+});
