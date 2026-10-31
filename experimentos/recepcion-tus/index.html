@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Librería Saber | Laboratorio de recepción PDF</title>
+  <link rel="stylesheet" href="https://releases.transloadit.com/uppy/v3.6.1/uppy.min.css">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main>
+    <header><span class="mark">S</span><div><strong>LIBRERÍA SABER</strong><span>Laboratorio aislado · Subida directa TUS</span></div></header>
+    <section>
+      <h1>Probar recepción de dos PDF</h1>
+      <p>Solo archivos de prueba. Subida directa al bucket privado de Supabase, sin pasar por Google Apps Script ni la web comercial. No procesa pedidos ni pagos.</p>
+      <p class="warning">NO usar PDF de clientes: todavía es un experimento, no un servicio comercial.</p>
+      <button id="connect" type="button">Iniciar laboratorio</button>
+      <p id="state" role="status" aria-live="polite">Sin conexión. Configurá <code>config.local.js</code> para habilitar la prueba.</p>
+      <div id="uploader" aria-label="Seleccionar dos PDF para ensayo"></div>
+      <button id="send" type="button" disabled>Subir y verificar dos PDF</button>
+      <div id="results" aria-live="polite"></div>
+      <pre id="measurements" hidden></pre>
+    </section>
+    <footer>Entorno local, sin publicación · Sin cobros · Bucket privado obligatorio</footer>
+  </main>
+  <script type="module" src="./client.js"></script>
+</body>
+</html>
