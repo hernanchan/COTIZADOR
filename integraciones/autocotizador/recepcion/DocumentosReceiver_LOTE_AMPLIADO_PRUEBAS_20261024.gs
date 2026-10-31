@@ -304,6 +304,11 @@ function docsMultiStart(p){
  var started=docsStart({meta:m});
  used.push(started.uploadId);
  docsStore().setProperty(DOCS_MULTI_INDEX,JSON.stringify(used));
+ // Confirmación del índice GLOBAL en la creación, no en cada fragmento.
+ // Guardar DESPUÉS de la publicación; las sesiones heredadas mantienen
+ // validación por índice antes de autorizar la primera operación.
+ var indexedSession=docsRead(started.uploadId);
+ indexedSession.indexedForMulti=true;docsSave(indexedSession);
  // Sólo una sesión recién creada no tiene partes recibidas.
  // Sesiones reanudadas o idempotentes siguen consultando el estado real.
  return {uploadId:started.uploadId,token:started.token,
@@ -373,8 +378,15 @@ function docsMultiStartBatch(p){
 }
 function docsMultiAuth(p){
  var s=docsAuth(p);
- if(!docsMultiIds().includes(s.uploadId)||
-    !/^[A-Za-z0-9_-]{1,80}$/.test(s.fileId)||
+ // docsAuth valida el token y la caducidad EN CADA llamada.
+ // Un recibo nuevo ya está vinculado al índice en docsMultiStart; no
+ // recorrer todas las sesiones globales por cada parte o lectura privada.
+ if(s.indexedForMulti!==true){
+   if(!docsMultiIds().includes(s.uploadId))
+     throw Error('Recibo ajeno a fase 4');
+   s.indexedForMulti=true;docsSave(s);
+ }
+ if(!/^[A-Za-z0-9_-]{1,80}$/.test(s.fileId)||
     !/^WEB-[A-Za-z0-9_-]{5,80}$/.test(s.orderId)||
     s.bytes>DOCS_MAX)throw Error('Sesión fuera del ensayo');
  return s;
