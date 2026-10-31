@@ -26,7 +26,7 @@ function environment({n=PART*2+37}={}){
  props.set('FILE_'+s.uploadId,JSON.stringify(s));
  props.set('DOCS_MULTI_INDEX_LOTE_20261024',JSON.stringify([s.uploadId]));
  let remote=Buffer.alloc(0),probeCount=0,putCount=0,shaDownloads=0,legacyDownloads=0;
- let indexSnapshots=0;
+ let indexSnapshots=0,fileReads=0;
  let readCorrupted=false;
  const response=(status,{headers={},body='',blob=null}={})=>({
   getResponseCode:()=>status,
@@ -65,7 +65,7 @@ function environment({n=PART*2+37}={}){
   throw Error('Solicitud inesperada a Google simulada: '+url);
  }};
  const PropertiesService={getScriptProperties:()=>({
-  getProperty:k=>props.get(k)||null,
+  getProperty:k=>{fileReads++;return props.get(k)||null},
   setProperty:(k,v)=>props.set(k,v),
   getProperties:()=>{indexSnapshots++;return Object.fromEntries(props)}
  })};
@@ -96,7 +96,7 @@ function environment({n=PART*2+37}={}){
  const commit=(pages=12)=>({uploadId:s.uploadId,token:s.token,
   receiptId:s.uploadId,sha256:s.sha256,bytes:s.bytes,
   parserVersion:'pdf-lib-1.17.1',pages});
- const counters=()=>({probeCount,putCount,shaDownloads,legacyDownloads,indexSnapshots});
+ const counters=()=>({probeCount,putCount,shaDownloads,legacyDownloads,indexSnapshots,fileReads});
  const api={sandbox,s,state,setState,part,finish,commit,counters,
   corrupt:()=>{readCorrupted=true},
   setGlobalIndex:ids=>props.set('DOCS_MULTI_INDEX_LOTE_20261024',JSON.stringify(ids)),
@@ -305,6 +305,26 @@ test('lecturas de índice de archivos existentes no pueden sobreescribir cupos d
  assert.match(SOURCE,/function docsMultiAuth\(p\)\{[\s\S]*?docsMultiIds\(\)/);
 });
 
+test('una sola comprobación de token/estado por parte; no releer sesión al entrar en docsPart',()=>{
+ const x=environment();x.setState({indexedForMulti:true});
+ const before=x.counters().fileReads;
+ for(let i=0;i<x.s.parts;i++)assert.equal(x.sandbox.docsMultiRun(x.part(i),'part').accepted,true);
+ const after=x.counters().fileReads;
+ assert.equal(after-before,x.s.parts,'un getProperty por parte, no dos');
+ assert.equal(x.sandbox.docsMultiRun(x.finish(),'finish').received,true);
+ assert.equal(x.counters().fileReads-after,1,'un getProperty en finish');
+ assert.equal(x.state().storageSha256Checked,x.s.sha256,
+  'la validación SHA completa de Drive se conserva');
+});
+test('reanudación multiStatus conserva token obligatorio y reconoce progreso',()=>{
+ const x=environment();x.setState({indexedForMulti:true});
+ x.sandbox.docsMultiRun(x.part(0),'part');
+ const before=x.counters().fileReads;
+ const status=x.sandbox.docsMultiRun({uploadId:x.s.uploadId,token:x.s.token},'status');
+ assert.deepEqual(Array.from(status.acceptedParts),[0]);
+ assert.equal(x.counters().fileReads-before,1,'no doble getProperty al consultar estado');
+ assert.throws(()=>x.sandbox.docsMultiRun({uploadId:x.s.uploadId,token:'INVALID'},'status'),/Acceso denegado/);
+});
 test('recibo nuevo marcado no requiere ninguna lectura del índice global en transferencias ni finish',()=>{
  const x=environment();const {sandbox:g}=x;
  x.setState({indexedForMulti:true});
