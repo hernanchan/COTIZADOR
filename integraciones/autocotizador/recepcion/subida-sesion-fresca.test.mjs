@@ -151,7 +151,7 @@ test('medición privada informa sólo tipo y duración de RPC sin interferir con
   assert.deepEqual(Object.keys(e).sort(),['duracionMs','fase']);
   assert.ok(Number.isSafeInteger(e.duracionMs)&&e.duracionMs>=0);
   assert.doesNotMatch(JSON.stringify(e),new RegExp(token));
-  assert.doesNotMatch(JSON.stringify(e),/archivo\\.pdf|dataBase64|uploadId/);
+  assert.doesNotMatch(JSON.stringify(e),/archivo\.pdf|dataBase64|uploadId/);
  }
 });
 test('si la instrumentación arroja error, no interrumpe el envío y se mantiene el recibo',async()=>{
