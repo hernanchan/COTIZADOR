@@ -430,3 +430,43 @@ Tras las dos mejoras del índice global registradas arriba, se encontró otra du
 El usuario contestó **«LISTO»** inmediatamente después de la instrucción de Cloudflare → `saber-documentos-pruebas` → Implementaciones → promocionar **`4d194510-964d-4c70-b08b-663fe3cc11b6`** al 100 %. Se interpreta como **confirmación verbal de promoción**, **no verificación independiente del panel**. La versión Worker anterior `67bcda58` permanece como recuperación posible en el historial. El receptor GAS documentos **v10** había superado ya la sonda sin PDF `UTF8_OK_LOTE_AUTORIZADO` (4273 ms total/4221 ms enlace Google).
 
 **Acción siguiente indicada:** abrir `https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/?diagnostico=1`, cargar los mismos dos PDF del ensayo previo si están disponibles (A3 94 páginas `Registro de trabajos.pdf`, A4 B/N 16 páginas `preview_acau_bajaresolución.pdf`), revisar cotización y pulsar **«Enviar mi pedido» UNA sola vez**. Capturar resultado, **Tiempos del ensayo** y, si hay fallo, el nuevo `reasonCode` seguro; **no reintentar** tras error. Comparar contra muestra anterior: **93,5 s** desde clic, 24 `part` 62,9s acumulados, 2 `finish` 16,2s, 2 `vinculo` 33s, 1/2 verificado, Central D1 sin pedido y total preliminar $41.764. Observar 2/2 recibos y 1 único registro D1, pago desactivado. La versión que estaba activa previamente pasó un ensayo exitoso diferente de 2 PDF pero lento; no confundir pruebas. No tocar `main`, web comercial, pagos ni Polaroids.
+
+
+## 31-10-2026 — INCIDENTE CRÍTICO: segunda prueba GAS v10 + Worker 4d194510 FALLÓ y fue MÁS LENTA. Suspender ensayos y despliegues.
+
+**Prioridad máxima: no ocultar este resultado detrás de CI exitoso.** El usuario compartió dos capturas reales de la pantalla privada \`/prueba-v2/?diagnostico=1\`, luego de publicar GAS receptor v10 y promover Worker \`4d194510\` según su confirmación. **Resultado: FAIL**, \`envio_incompleto\`, **1 de 2 PDF verificados**, D1 pendiente y sin cobro; error de segunda vinculación **\`[etapa LECTURA_DRIVE]\`**, mismo tipo de bloqueo que la prueba anterior. Importe preliminar $41.764; servidor parcial $40.420 correspondiente al PDF de 94 páginas A3, mientras el PDF de 16 páginas A4 \`preview_acau_bajaresolución.pdf\` no se verifica. No reintentar ni refrescar por el solo hecho de investigar.
+
+### Comparación exacta de las capturas
+
+| Indicador | E2E anterior | E2E actual |
+| --- | ---: | ---: |
+| Desde clic «Enviar» | **93,5 s** | **97,7 s** |
+| Análisis previo UI | **14,8 s** | **444,2 s** |
+| Inicio de tandas | **5,8 s** | **7,2 s** |
+| Envío de fragmentos | **24 RPC, 62,9 s acumulados (máximo 3,8)** | **24 RPC, 69,9 s acumulados (máximo 4,0)** |
+| \`finish\` / «Verificación en Google» | **2 RPC, 16,2 s acumulados (máximo 12,6)** | **2 RPC, 15,1 s acumulados (máximo 12,1)** |
+| \`vinculo\` / «Verificación y cotización en Worker» | **2 RPC, 33,0 s acumulados (máximo 22,6)** | **2 RPC, 29,3 s acumulados (máximo 21,1)** |
+| Resultado | 1/2, D1 pendiente | 1/2, D1 pendiente, \`LECTURA_DRIVE\` |
+
+**Cuidado interpretativo:** duraciones HTTP **acumuladas y solapadas**, no se pueden sumar como tiempo de reloj. \`ultimoAnalisisMs\` en la UI se calcula desde evento \`SABER_SMART_PRICE_STATE:'calculando'\` hasta \`'listo'\`, no es necesariamente CPU efectivo ni tiempo de carga; el valor 444,2 s corresponde a ese estado en el navegador y **no** debe atribuirse sin más al backend ni sumarse a 97,7 s.
+
+### Auditoría precisa del error y hueco de pruebas
+
+Se cotejó el código real de la rama:
+- \`worker-fase4-cotizador-unificado.mjs\`, función \`fase4PrivateVerified\`: tras confirmar \`multiInfo\`, fase \`LECTURA_DRIVE\` ejecuta numerosas llamadas HMAC \`multiReadPart\` (hasta 3 lectores concurrentes **por PDF**), ensambla y comprueba SHA. Esta fase se detiene **antes** de \`ANALISIS_PDF\`, \`GUARDADO_PAGINAS\`, \`CRUCE_RECIBO\` o \`COTIZACION\`. Por tanto, **el fallo presente no es de precio ni de recuento de páginas demostrado**, es de lectura/transporte y/o reconstrucción desde Drive.
+- En \`DocumentosReceiver_LOTE_AMPLIADO_PRUEBAS_20261024.gs\`, \`docsMultiReadPart\` usa \`UrlFetchApp.fetch\` con \`Range: bytes=<inicio>-<fin>\` y \`followRedirects:false\`, y **rechaza toda respuesta distinta de HTTP 206**. También exige coincidencia textual exacta del encabezado \`Content-Range\` y del tamaño, sin un diagnóstico diferenciador. En HTTP es válido que un servidor ignore el \`Range\` y conteste \`200\` con el recurso íntegro; el código actual no contempla ese escenario. Esto es **una incompatibilidad potencial comprobable en el código**, pero **NO está demostrado** que el PDF concreto recibiera 200, 302, 429, 403, 5xx, 206 con otro formato ni problema de firma/integridad. Referencias públicas para futura evaluación: documentación oficial Google Drive «Partial download» (Range), RFC 9110/MDN Range.
+- \`docsReceptionReasonCode\` en GAS devuelve \`RECEPTOR_ERROR\` para todas las variantes de fallos de rango, por lo que la excepción real queda oculta. El Worker convierte toda esa familia en \`LECTURA_DRIVE\`, insuficiente para decidir arreglo.
+- El E2E \`fase4-comprobante-worker-e2e.test.mjs\` **simula** \`multiReadPart\` devolviendo siempre un bloque válido de Buffer en \`dispatch\` (líneas ~133-138), **SIN ejecutar el \`docsMultiReadPart\` real con \`UrlFetchApp\`, estado HTTP ni cabeceras Drive**. \`receptor-gas-recuperacion.test.mjs\` cubre SHA, upload/reintento e índice, pero no un GET por rango real con respuestas 206/200/302/429 ni transición end-to-end. Por eso **96 tests aprobados no demostraban compatibilidad con Drive**: hueco real de cobertura.
+- El flujo completo realiza 24 intercambios navegador→Worker→GAS→Drive para subir fragmentos (512KiB), luego GAS descarga PDF completo y revisa SHA en \`finish\`, y el Worker lo vuelve a recuperar desde GAS/Drive en fragmentos 256KiB para calcular páginas. Esto introduce latencia estructural en serie, incluso si se arregla la incidencia de lectura. Las optimizaciones de índice y una lectura menos por bloque **NO mostraron mejora real** en la comparación disponible; los tiempos variaron en dirección peor y el resultado sigue fallando. No inventar ahorro.
+- Se intentó localizar el PDF original en archivos del proyecto/Library y en Google Drive conectado sin un resultado que permita recuperar los bytes: **no hay un ejemplar auténtico en el contexto actual para reproducir la falla**.
+
+### Decisión operativa
+
+**SUSPENDER** nuevas promociones, nuevas versiones GAS y reenvíos de PDF de clientes. El sistema privado sigue siendo experimental y no apto para captar órdenes comerciales. No modificar web comercial, cobros, Polaroids, rama \`main\` ni secretos. **No hacer otra corrección a ciegas.**
+
+Siguiente investigación justificable, idealmente mediante revisión humana independiente:
+1. Reproducir en una prueba aislada de \`docsMultiReadPart\` el comportamiento con respuestas simuladas 206, 200 recurso completo, 302, 403, 429 y 5xx; verificar cabeceras, respuesta y SHA. No confundir la simulación con conocer el fallo real.
+2. Capturar de manera **segura y efímera**, en recepción privada, solamente **estado HTTP y clase de fallo** de los GET de rangos Drive (sin URL, OAuth, SHA, nombre, bytes, recibo ni tokens) para distinguir la causa. Preferir trazas de una incidencia ya existente si accesibles en el proyecto, sin más envíos.
+3. Tras demostrar causa, corregir con control de integridad/rollback y ensayo privado **único**; en paralelo evaluar rediseñar el circuito para evitar doble transferencia y decenas de POST HMAC de 512/256 KiB. No prometer «pocos segundos» sin benchmark de arquitectura.
+4. Mantener esta sección como parte del handoff: no volver a describir el proyecto como listo ni pedirle al comerciante probar sucesivas versiones para encontrar fallos básicos.
+
