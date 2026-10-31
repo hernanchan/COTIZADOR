@@ -269,7 +269,7 @@ function docsMultiKnown(id){
  if(!docsMultiIds().includes(id))throw Error('Recibo ajeno a fase 4');
  return docsRead(id);
 }
-function docsMultiStart(p){
+function docsMultiStart(p,usedInBatch){
  var m=p.meta;
  if(!m||!/^WEB-[A-Za-z0-9_-]{5,80}$/.test(m.orderId||'')||
     !/^[A-Za-z0-9_-]{1,80}$/.test(m.fileId||'')||typeof m.name!=='string'||m.name.length>120||
@@ -278,7 +278,9 @@ function docsMultiStart(p){
     !/^[a-f0-9]{64}$/.test(m.sha256||'')||
     m.partBytes!==DOCS_PART||m.parts!==Math.ceil(m.bytes/DOCS_PART))
    throw Error('Metadatos de ensayo incorrectos');
- var used=docsMultiIds(true);
+ // Con lock global ya tomado, la tanda reutiliza su índice validado.
+ // Sólo la ruta de un PDF individual necesita otra instantánea.
+ var used=Array.isArray(usedInBatch)?usedInBatch:docsMultiIds(true);
  // Idempotencia: mismo pedido y mismo PDF vuelven a la sesión existente.
  for(var i=0;i<used.length;i++){
    var old=docsRead(used[i]);
@@ -368,7 +370,7 @@ function docsMultiStartBatch(p){
    throw Error('La tanda supera los cupos privados del pedido');
  var sessions=[];
  for(var j=0;j<metas.length;j++){
-   var response=docsMultiStart({meta:metas[j]});
+   var response=docsMultiStart({meta:metas[j]},index);
    sessions.push({fileId:response.fileId,orderId:response.orderId,
      uploadId:response.uploadId,token:response.token,
      newSession:response.newSession===true});
