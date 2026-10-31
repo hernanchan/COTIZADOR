@@ -300,7 +300,8 @@ test('lecturas de índice de archivos existentes no pueden sobreescribir cupos d
  const src=SOURCE.slice(SOURCE.indexOf('function docsMultiIds('),
   SOURCE.indexOf('function docsMultiKnown('));
  assert.match(src,/if\(cleanup===true&&valid\.length!==list\.length\)/);
- assert.match(SOURCE,/var used=docsMultiIds\(true\);/);
+ assert.match(SOURCE,/var used=Array\.isArray\(usedInBatch\)\?usedInBatch:docsMultiIds\(true\);/);
+ assert.match(SOURCE,/docsMultiStart\(\{meta:metas\[j\]\},index\)/);
  assert.match(SOURCE,/function docsMultiAuth\(p\)\{[\s\S]*?docsMultiIds\(\)/);
 });
 
