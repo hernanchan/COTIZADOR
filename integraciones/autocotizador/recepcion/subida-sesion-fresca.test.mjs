@@ -23,8 +23,8 @@ const archivo={
 const referencia={schema:'saber-pdf-local-pendiente-v1',localRef,sha256,
  bytes:bytes.length,paginas:1,nombre:name,estado:'PENDIENTE_DE_ENVIO',
  recibido:false,verificadoServidor:false};
-function setup({newSession,prior=null,ackLost=false,alreadyAccepted=false}={}){
- const calls=[],progress=[],sessions=[];
+function setup({newSession,prior=null,ackLost=false,alreadyAccepted=false,onTiming=null}={}){
+ const calls=[],progress=[],sessions=[],timings=[];
  let lost=ackLost;
  const fetcher=async (url,{body})=>{
   assert.equal(new URL(url).origin,ORIGIN);
@@ -55,9 +55,10 @@ function setup({newSession,prior=null,ackLost=false,alreadyAccepted=false}={}){
   archivo,referencia,orderId,modo:'bn',turnstileToken:'TOKEN_TURNSTILE_SIMULADO',
   origin:ORIGIN,fetcher,subtle:webcrypto.subtle,
   onProgress:p=>progress.push(p),onSession:s=>sessions.push(s),
+  onRequestTiming:t=>{timings.push(t);if(onTiming)onTiming(t);},
   sesionPrevia:prior
  });
- return {run,calls,progress,sessions};
+ return {run,calls,progress,sessions,timings};
 }
 test('sesión HMAC realmente nueva: no se pide multiStatus, sí se transfiere y verifica completo',async()=>{
  const t=setup({newSession:true});
@@ -139,4 +140,28 @@ test('dos PDF con el MISMO SHA pero distintas referencias conservan recibos dife
   referencia:first,recibo:old,sessionId:old.receiptId,
   expectedOrderId:orderId,expectedMode:'bn'
  }).fileId,legacyId,'El recibo de antes de la migración sigue siendo aceptado');
+});
+
+test('medición privada informa sólo tipo y duración de RPC sin interferir con el flujo',async()=>{
+ const t=setup({newSession:true});
+ const result=await t.run();
+ assert.equal(result.receiptId,uploadId);
+ assert.deepEqual(t.timings.map(e=>e.fase),['start','part','finish','vinculo']);
+ for(const e of t.timings){
+  assert.deepEqual(Object.keys(e).sort(),['duracionMs','fase']);
+  assert.ok(Number.isSafeInteger(e.duracionMs)&&e.duracionMs>=0);
+  assert.doesNotMatch(JSON.stringify(e),new RegExp(token));
+  assert.doesNotMatch(JSON.stringify(e),/archivo\\.pdf|dataBase64|uploadId/);
+ }
+});
+test('si la instrumentación arroja error, no interrumpe el envío y se mantiene el recibo',async()=>{
+ const t=setup({newSession:true,onTiming:()=>{throw Error('Diagnóstico fallido');}});
+ const result=await t.run();
+ assert.equal(result.receiptId,uploadId);
+ assert.deepEqual(t.calls,['start','part','finish','link']);
+});
+test('un ACK perdido se recupera, y también se mide el status extraordinario',async()=>{
+ const t=setup({newSession:true,ackLost:true});
+ await t.run();
+ assert.deepEqual(t.timings.map(e=>e.fase),['start','part','status','finish','vinculo']);
 });
