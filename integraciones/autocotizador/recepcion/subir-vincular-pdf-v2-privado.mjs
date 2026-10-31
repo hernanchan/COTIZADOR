@@ -32,22 +32,32 @@ async function digest(bytes,subtle){
  const result=await subtle.digest('SHA-256',bytes);
  return Array.from(new Uint8Array(result),b=>b.toString(16).padStart(2,'0')).join('');
 }
-async function sameOriginRpc(path,body,{fetcher,origin}){
+async function sameOriginRpc(path,body,{fetcher,origin,onRequestTiming}){
  if(typeof origin!=='string'||!/^https:\/\/[^/?#]+$/.test(origin)||
     !/^\/api\/ensayo-(?:pdf-ampliado|vincular-pdf-v2)$/.test(path))
   throw Error('Recepción privada fuera del origen autorizado.');
  const reqUrl=new URL(path,origin);
- const res=await fetcher(reqUrl.href,{method:'POST',
-  headers:{'Content-Type':'application/json'},body:JSON.stringify(body),
-  credentials:'same-origin',redirect:'error'});
- const data=await res.json().catch(()=>null);
- if(!res.ok||data?.ok!==true)throw Error(data?.error||'El servidor no confirmó la recepción.');
- return data;
+ const fase=path==='/api/ensayo-vincular-pdf-v2'?'vinculo':
+  ['start','status','part','finish'].includes(body?.op)?body.op:'otro';
+ const inicio=performance.now();
+ try{
+  const res=await fetcher(reqUrl.href,{method:'POST',
+   headers:{'Content-Type':'application/json'},body:JSON.stringify(body),
+   credentials:'same-origin',redirect:'error'});
+  const data=await res.json().catch(()=>null);
+  if(!res.ok||data?.ok!==true)throw Error(data?.error||'El servidor no confirmó la recepción.');
+  return data;
+ }finally{
+  // Sólo categoría y milisegundos: jamás incluir tokens, nombre o datos PDF.
+  // La telemetría no debe poder romper una recepción real.
+  try{onRequestTiming({fase,duracionMs:Math.max(0,Math.round(performance.now()-inicio))})}
+  catch(_){}
+ }
 }
 export async function subirYVincularPdfCotizadorV2({
  archivo,referencia,orderId,modo,turnstileToken,opciones,
  origin,fetcher=fetch,subtle=crypto.subtle,onProgress=()=>{},
- sesionPrevia=null,onSession=()=>{}
+ sesionPrevia=null,onSession=()=>{},onRequestTiming=()=>{}
 }){
  const r=referencia;
  if(!r||r.schema!=='saber-pdf-local-pendiente-v1'||
@@ -63,6 +73,7 @@ export async function subirYVincularPdfCotizadorV2({
     !WEB.test(orderId||'')||!['bn','color'].includes(modo)||
     (sesionPrevia===null&&(typeof turnstileToken!=='string'||turnstileToken.length<10))||
     typeof onProgress!=='function'||typeof onSession!=='function'||
+     typeof onRequestTiming!=='function'||
    (sesionPrevia!==null&&(!RECEIPT.test(sesionPrevia?.uploadId||'')||
     typeof sesionPrevia.token!=='string'||sesionPrevia.token.length<16||
     sesionPrevia.token.length>256||
@@ -88,7 +99,7 @@ export async function subirYVincularPdfCotizadorV2({
     String.fromCharCode(...bytes.subarray(0,5))!=='%PDF-'||
     await digest(bytes,subtle)!==r.sha256)
   throw Error('El PDF seleccionado es distinto del PDF cotizado.');
- const rpc=(path,payload)=>sameOriginRpc(path,payload,{fetcher,origin});
+ const rpc=(path,payload)=>sameOriginRpc(path,payload,{fetcher,origin,onRequestTiming});
  const parts=Math.ceil(bytes.length/PART);
  onProgress({phase:'inicio',completed:0,total:parts});
  let session,freshSession=false;
