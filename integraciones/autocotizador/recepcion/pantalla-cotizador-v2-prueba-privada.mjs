@@ -368,7 +368,7 @@ function render(){
          data.quote.paginasOriginales!==result.pages||
          data.paymentAuthorized!==false||data.checkoutEnabled!==false)
        throw Error(data?.error||'El servidor no confirmó el ploteo.');
-      d.confirmacion=result;d.ploteoVerificado=data.quote;
+      d.confirmacion=result;d.ploteoVerificado=data.quote;d.ultimoErrorDeRecepcion='';
       d.sesionConfirmada=session;d.modoConfirmado=meta.modo;
       delete d.sesionTemporal;
       retry.hidden=true;updateSummary();
@@ -378,6 +378,7 @@ function render(){
        '. El pedido todavía no se registra en D1 ni habilita pago.';
       return true;
      }catch(error){
+      d.ultimoErrorDeRecepcion=String(error.message||error);
       retry.hidden=false;retry.disabled=false;
       msg.textContent='El ploteo no fue confirmado: '+String(error.message||error)+
        '. Podés reintentar, sin reenviar las partes ya recibidas.';
@@ -489,12 +490,13 @@ function render(){
      msg.textContent='PDF recibido y verificado · '+result.pages+' páginas · recibo '+result.receiptId+
       '. Presupuesto del servidor: '+(quote?moneda(quote.totalArs):'SIN CONFIRMAR')+
       '. '+aviso+' Pedido D1 y autorización de pago: PENDIENTES.';
-     btn.textContent='PDF verificado';d.confirmacion=result;
+     btn.textContent='PDF verificado';d.confirmacion=result;d.ultimoErrorDeRecepcion='';
      d.sesionConfirmada=d.sesionTemporal;
      d.modoConfirmado=mode.value;
      delete d.sesionTemporal;updateSummary();
      return true;
     }catch(e){
+     d.ultimoErrorDeRecepcion=String(e.message||e);
      msg.textContent='No se confirmó la recepción: '+String(e.message||e)+
       (d.sesionTemporal?' Podés reintentar este PDF sin volver a enviar los bloques aceptados mientras permanezcas en esta página.':'');
      btn.disabled=false;file.disabled=false;mode.disabled=false;
@@ -643,6 +645,7 @@ sendAllButton.addEventListener('click',async()=>{
  }
  const allEntries=all.flatMap(item=>item.references);
  const pending=allEntries.filter(d=>!d.confirmacion);
+ for(const d of pending)d.ultimoErrorDeRecepcion='';
  if(!allEntries.length||allEntries.length>30||
     all.some(item=>!item.references.length)||
     pending.some(d=>!d.archivoLocal||typeof d.sendNow!=='function')){
@@ -674,8 +677,10 @@ sendAllButton.addEventListener('click',async()=>{
      },2);
     if(!outcome.completo){
      success=false;
+     const errorPdf=pending.find(d=>d.ultimoErrorDeRecepcion);
      batchProgress.textContent='Se detuvo la tanda en '+received+' de '+pending.length+
-      ' archivos. Los ya verificados quedan conservados para reintentar sin duplicarlos.';
+      ' archivos. Los ya verificados quedan conservados para reintentar sin duplicarlos.'+
+      (errorPdf?' Causa: '+errorPdf.ultimoErrorDeRecepcion:'');
     }
    }catch(error){
     success=false;
@@ -692,7 +697,8 @@ sendAllButton.addEventListener('click',async()=>{
      success=false;break;
     }
     if(!(await d.sendNow())){
-     batchProgress.textContent='Se detuvo la carga; podés reintentar sin duplicar el PDF.';
+     batchProgress.textContent='Se detuvo la carga; podés reintentar sin duplicar el PDF.'+
+      (d.ultimoErrorDeRecepcion?' Causa: '+d.ultimoErrorDeRecepcion:'');
      success=false;break;
     }
     marcarTiempo('pdf_confirmado',{pdf:1});
