@@ -196,5 +196,12 @@ test('modo diagnóstico muestra mediciones de las cuatro etapas sin consola ni o
  assert.match(source,/faseMs\('central_inicio','central_fin'\)/);
  assert.match(source,/resultado\.tiempoTotalMs/);
  assert.match(source,/Solo diagnóstico local: sin archivos, nombres ni credenciales/);
+ assert.match(source,/function medirSolicitudPdf\(d,t\)/);
+ assert.match(source,/marcarTiempo\('rpc_'\+t\.fase/);
+ assert.equal((source.match(/onRequestTiming:t=>medirSolicitudPdf\(d,t\)/g)||[]).length,2,
+  'Tanto impresión como ploteo deben medir las solicitudes sin registrar metadatos');
+ assert.match(source,/Detalle HTTP \(suma, puede superar el total por paralelismo\)/);
+ assert.match(source,/e\.duracionMs/);
+ assert.match(source,/\['part','Subida de fragmentos'\]/);
  assert.doesNotMatch(source,/localStorage\.setItem\([^\n]*Rendimiento/);
 });
