@@ -183,3 +183,18 @@ test('tandas privadas: una sola acción inicia hasta 10 recibos por Turnstile, m
  assert.match(pkg.scripts['test:handoff'],/recepcion-paralela-lote\.test\.mjs/);
  assert.match(pkg.scripts['build:unificado'],/fase4-comprobante-worker-e2e\.test\.mjs/);
 });
+
+
+test('modo diagnóstico muestra mediciones de las cuatro etapas sin consola ni otra carga',()=>{
+ assert.match(source,/<output id="rendimiento-privado" hidden/);
+ assert.match(source,/const rendimientoPrivado=document\.getElementById\('rendimiento-privado'\)/);
+ assert.match(source,/if\(modoDiagnostico\)\{/);
+ assert.match(source,/rendimientoPrivado\.hidden=false/);
+ assert.match(source,/rendimientoPrivado\.textContent=/);
+ assert.match(source,/faseMs\('lote_inicio','lote_sesiones'\)/);
+ assert.match(source,/faseMs\('lote_transferencia_inicio','central_inicio'\)/);
+ assert.match(source,/faseMs\('central_inicio','central_fin'\)/);
+ assert.match(source,/resultado\.tiempoTotalMs/);
+ assert.match(source,/Solo diagnóstico local: sin archivos, nombres ni credenciales/);
+ assert.doesNotMatch(source,/localStorage\.setItem\([^\n]*Rendimiento/);
+});
