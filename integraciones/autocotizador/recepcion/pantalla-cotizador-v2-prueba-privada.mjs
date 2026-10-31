@@ -98,6 +98,14 @@ const dropPdf=document.getElementById('drop-pdf'),batchFiles=document.getElement
   medicionActual={inicio:performance.now(),eventos:[],fasesPorPdf:{}};
   marcarTiempo('clic_enviar');
  }
+ function medirSolicitudPdf(d,t){
+  if(!medicionActual||!modoDiagnostico||!t||
+     !['start','status','part','finish','vinculo'].includes(t.fase)||
+     !Number.isFinite(t.duracionMs)||t.duracionMs<0)return;
+  const indice=all.flatMap(item=>item.references).indexOf(d)+1;
+  if(indice<1)return;
+  marcarTiempo('rpc_'+t.fase,{pdf:indice,duracionMs:t.duracionMs});
+ }
  function marcarFasePdf(d,progreso){
   if(!medicionActual)return;
   const indice=all.flatMap(item=>item.references).indexOf(d)+1;
@@ -129,11 +137,25 @@ const dropPdf=document.getElementById('drop-pdf'),batchFiles=document.getElement
     ['Recepción y verificación',faseMs('lote_transferencia_inicio','central_inicio')],
     ['Registro en Central',faseMs('central_inicio','central_fin')]
    ];
+   // La suma de esperas HTTP puede superar el total por paralelismo de dos PDF.
+   const desgloses=[
+    ['part','Subida de fragmentos'],['finish','Verificación en Google'],
+    ['vinculo','Verificación y cotización en Worker'],
+    ['status','Consultas de recuperación'],['start','Inicio individual']
+   ].map(([fase,titulo])=>{
+     const rr=eventos.filter(e=>e.etapa==='rpc_'+fase);
+     if(!rr.length)return null;
+     const suma=rr.reduce((ac,e)=>ac+e.duracionMs,0);
+     const max=Math.max(...rr.map(e=>e.duracionMs));
+     return titulo+': '+rr.length+' llamadas, '+segundos(suma)+
+      ' acumulados (máx. '+segundos(max)+')';
+   }).filter(Boolean);
    rendimientoPrivado.hidden=false;
    rendimientoPrivado.textContent='Tiempos del ensayo · '+resultado.cantidadPdf+' PDF · Estado: '+resultado.estado+
     '\\nDesde pulsar Enviar: '+segundos(resultado.tiempoTotalMs)+
     (Number.isFinite(resultado.ultimoAnalisisMs)?' · Análisis previo: '+segundos(resultado.ultimoAnalisisMs):'')+
     '\\n'+fases.filter(p=>p[1]!==null).map(p=>p[0]+': '+segundos(p[1])).join(' · ')+
+    (desgloses.length?'\\nDetalle HTTP (suma, puede superar el total por paralelismo):\\n'+desgloses.join('\\n'):'')+
     '\\nSolo diagnóstico local: sin archivos, nombres ni credenciales.';
    console.info('[Librería Saber] Mediciones locales del ensayo',resultado);
    console.table(resultado.eventos);
@@ -322,6 +344,7 @@ function render(){
        turnstileToken:window.turnstile?.getResponse()||'',
        origin:location.origin,sesionPrevia:d.sesionTemporal||null,
        onSession:session=>{d.sesionTemporal=session;},
+       onRequestTiming:t=>medirSolicitudPdf(d,t),
        onProgress:p=>{marcarFasePdf(d,p);msg.textContent='Recepción protegida: '+p.phase+
         ' · '+p.completed+'/'+p.total;}
       });
@@ -451,6 +474,7 @@ function render(){
       origin:location.origin,
       sesionPrevia:d.sesionTemporal||null,
       onSession:s=>{d.sesionTemporal=s;},
+      onRequestTiming:t=>medirSolicitudPdf(d,t),
       onProgress:p=>{marcarFasePdf(d,p);msg.textContent=['transferencia','estado','reanudacion'].includes(p.phase)?'PDF: '+p.completed+' de '+p.total+' bloques confirmados':p.phase}
      });
      const quote=result.cotizacionServidor;
