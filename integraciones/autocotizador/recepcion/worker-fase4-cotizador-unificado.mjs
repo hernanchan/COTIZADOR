@@ -938,13 +938,14 @@ async function fase4Transfer(request,env,extended=false){
      ' por un problema de conexión con el receptor. Consultá el estado antes de reintentar.',
     paymentAuthorized:false},502)}
 }
-async function fase4PrivateVerified(env,session,metrics=null,preferirInfo=false,maxFileBytes=FASE4_QUOTA_BYTES,conMedidas=false){
+async function fase4PrivateVerified(env,session,metrics=null,preferirInfo=false,maxFileBytes=FASE4_QUOTA_BYTES,conMedidas=false,onFase=()=>{}){
  if(![FASE4_QUOTA_BYTES,DOCS_MAX].includes(maxFileBytes))throw Error('Límite documental inválido');
  const mark=()=>Date.now();let last=mark();
  const lap=(name)=>{if(metrics){metrics[name]=mark()-last;}last=mark();};
  const ctx={uploadId:session.uploadId,token:session.token};
  async function incluirMedidas(recibo,original=null){
   if(!conMedidas)return recibo;
+  onFase('LECTURA_MEDIDAS');
   const bytes=original||await leerPdfFase4Privado({
    session,receiptId:recibo.receiptId,bytes:recibo.bytes,sha256:recibo.sha256,
    consultarFirmado:p=>postToScript(env,p,fetch,420000),maxFileBytes
@@ -952,6 +953,7 @@ async function fase4PrivateVerified(env,session,metrics=null,preferirInfo=false,
   // Si un PDF común no ofrece medidas avanzadas, conservar la ruta
   // histórica de cotización sin habilitar atajos inseguros.
   let medidas;
+  onFase('MEDIDAS_PDF');
   try{medidas=await medidasPdfServidor(bytes)}
   catch{return {...recibo,serverPageMetrics:null};}
   if(medidas.pageCount!==recibo.pages)
@@ -962,6 +964,7 @@ async function fase4PrivateVerified(env,session,metrics=null,preferirInfo=false,
  // una llamada a Google. Si no está verificado, continuar con la lectura
  // y análisis completos. La respuesta sigue vinculada a sesión+token.
  if(!preferirInfo){
+  onFase('ESTADO_GOOGLE');
   const previo=await postToScript(env,{op:'multiVerifiedStatus',...ctx},fetch);
   lap('estadoPrevioMs');
   if(previo.ok&&previo.status==='verified'&&previo.verified===true&&
@@ -973,6 +976,7 @@ async function fase4PrivateVerified(env,session,metrics=null,preferirInfo=false,
     return incluirMedidas(previo);
   }
  }
+ onFase('INFO_GOOGLE');
  const info=await postToScript(env,{op:'multiInfo',...ctx},fetch);
  lap('consultaGoogleMs');
  if(!info.ok||!phase4Session(info.receiptId)||info.receiptId!==ctx.uploadId||
@@ -980,12 +984,14 @@ async function fase4PrivateVerified(env,session,metrics=null,preferirInfo=false,
     !/^[a-f0-9]{64}$/.test(info.sha256||'')||
     info.privateChunkBytes!==FASE4_CHUNK_BYTES)throw Error('Información privada inválida');
  if(info.pageVerification==='server'&&Number.isSafeInteger(info.pages)&&info.pages>=1){
-   const ready=await postToScript(env,{op:'multiVerifiedStatus',...ctx},fetch);
+   onFase('ESTADO_VERIFICADO');
+  const ready=await postToScript(env,{op:'multiVerifiedStatus',...ctx},fetch);
    lap('estadoVerificadoMs');
    if(ready.ok&&ready.verified&&ready.pages===info.pages&&
       ready.receiptId===info.receiptId&&ready.paymentAuthorized===false)
      return incluirMedidas(ready);
  }
+ onFase('LECTURA_DRIVE');
  const bytes=new Uint8Array(info.bytes);
  // GAS ofrece multiReadPart autenticado sin lock de escritura: hasta tres
  // lecturas independientes a la vez, con validación completa de cada bloque.
@@ -1013,11 +1019,13 @@ async function fase4PrivateVerified(env,session,metrics=null,preferirInfo=false,
  }
  await Promise.all(Array.from({length:Math.min(3,offsets.length)},()=>lectorPrivado()));
  lap('lecturaPrivadaMs');
+ onFase('ANALISIS_PDF');
  const checked=await verificarPdfAlmacenado({driveBytes:bytes,reciboServidor:{
    receiptState:'bytes_checked',receiptId:info.receiptId,orderId:info.orderId,
    fileId:info.fileId,name:info.name,mode:info.mode,bytes:info.bytes,sha256:info.sha256
  }});
  lap('analisisPdfMs');
+ onFase('GUARDADO_PAGINAS');
  const committed=await postToScript(env,{op:'multiCommitPages',...ctx,receiptId:info.receiptId,
    sha256:checked.sha256,bytes:checked.bytes,pages:checked.pages,parserVersion:'pdf-lib-1.17.1'},fetch);
  lap('confirmacionGoogleMs');
@@ -1111,17 +1119,24 @@ async function v2VincularPdf(request,env){
  }catch(_){
   return testResponse({ok:false,error:'Referencia o sesión de PDF inválida',paymentAuthorized:false},400);
  }
+ let etapaVinculo='RECIBO_GOOGLE';
  try{
-  const recibo=await fase4PrivateVerified(env,input.sesion,null,false,DOCS_MAX,true);
+  // Se valida todo el PDF; sólo omitimos la consulta de estado previa que
+  // siempre queda pendiente inmediatamente después de finish.
+  const recibo=await fase4PrivateVerified(env,input.sesion,null,true,DOCS_MAX,true,
+   fase=>{etapaVinculo=fase});
+  etapaVinculo='CRUCE_RECIBO';
   const link=verificarVinculoCotizadorV2({
    referencia:input.referencia,recibo,sessionId:input.sesion.uploadId,
    expectedOrderId:input.expectedOrderId,expectedMode:input.expectedMode
   });
+  etapaVinculo='SELLO_RECEPCION';
   const comprobanteServidor=recibo.serverPageMetrics
    ?await crearComprobantePdf({
      recibo,medidas:recibo.serverPageMetrics,secret:env.DOCS_RELAY_KEY
     })
    :null;
+  etapaVinculo='COTIZACION';
   // La cotización es OPCIONAL para conservar el contrato del cliente V2 existente.
   // Es preliminar de servidor, limitada a A4/A3, BN/color y materiales del piloto.
   // El importe del navegador jamás es autoridad y no se prepara una orden comercial.
@@ -1156,7 +1171,11 @@ async function v2VincularPdf(request,env){
   }
   return testResponse({...link,ok:true,comprobanteServidor},200);
  }catch(_){
-  return testResponse({ok:false,error:'No se pudo verificar y cotizar el PDF seleccionado. Revisá el archivo y las opciones.',paymentAuthorized:false},422);
+  // Observabilidad segura: etapa enumerada, sin nombres, tokens ni SHA.
+  console.warn('saber_v2_link_failure',etapaVinculo);
+  return testResponse({ok:false,phase:'vinculo',reasonCode:etapaVinculo,
+   error:'No se pudo verificar y cotizar el PDF seleccionado. Revisá el archivo y las opciones.',
+   paymentAuthorized:false},422);
  }
 }
 
