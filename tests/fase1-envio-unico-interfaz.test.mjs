@@ -147,12 +147,14 @@ test('receptor de Google confirma SHA una vez y conserva recuperación de bloque
  const gas=readFileSync(new URL('../integraciones/autocotizador/recepcion/DocumentosReceiver_LOTE_AMPLIADO_PRUEBAS_20261024.gs',import.meta.url),'utf8');
  const pkg=JSON.parse(readFileSync(new URL('../integraciones/autocotizador/recepcion/package.json',import.meta.url),'utf8'));
  const commit=gas.slice(gas.indexOf('function docsMultiCommitPages(p)'),gas.indexOf('function docsMultiVerifiedStatus(p)'));
- const part=gas.slice(gas.indexOf('function docsPart(p)'),gas.indexOf('function docsFinish(p)'));
- const finish=gas.slice(gas.indexOf('function docsFinish(p)'),gas.indexOf('function docsAwaitPages(s)'));
+ const part=gas.slice(gas.indexOf('function docsPart('),gas.indexOf('function docsFinish('));
+ const finish=gas.slice(gas.indexOf('function docsFinish('),gas.indexOf('function docsAwaitPages(s)'));
  assert.match(finish,/docsSha\(blob\)!==s\.sha256/);
  assert.match(finish,/s\.storageSha256Checked=s\.sha256/);
  assert.match(commit,/s\.storageSha256Checked!==s\.sha256/);
  assert.match(commit,/docsPilotBlob\(s\)/,'sólo se verifica Drive de nuevo para sesiones antiguas');
+ assert.match(part,/var s=validatedSession\|\|docsAuth\(p\)/);
+ assert.match(finish,/var s=validatedSession\|\|docsAuth\(p\)/);
  assert.match(part,/var offset=directo\?start:docsProbe\(s\)/);
  assert.match(part,/var real=docsProbe\(s\)/);
  assert.match(pkg.scripts['test:handoff'],/receptor-gas-recuperacion\.test\.mjs/);
