@@ -45,7 +45,16 @@ async function sameOriginRpc(path,body,{fetcher,origin,onRequestTiming}){
    headers:{'Content-Type':'application/json'},body:JSON.stringify(body),
    credentials:'same-origin',redirect:'error'});
   const data=await res.json().catch(()=>null);
-  if(!res.ok||data?.ok!==true)throw Error(data?.error||'El servidor no confirmó la recepción.');
+  if(!res.ok||data?.ok!==true){
+   // Los únicos códigos expuestos son subetapas enumeradas del Worker privado.
+   // Evita aceptar errores arbitrarios o metadatos de PDF en el mensaje.
+   const permitidos=new Set(['ESTADO_GOOGLE','INFO_GOOGLE','ESTADO_VERIFICADO',
+    'LECTURA_DRIVE','ANALISIS_PDF','GUARDADO_PAGINAS','LECTURA_MEDIDAS',
+    'MEDIDAS_PDF','CRUCE_RECIBO','SELLO_RECEPCION','COTIZACION']);
+   const etapa=path==='/api/ensayo-vincular-pdf-v2'&&
+    permitidos.has(data?.reasonCode)?' [etapa '+data.reasonCode+']':'';
+   throw Error((data?.error||'El servidor no confirmó la recepción.')+etapa);
+  }
   return data;
  }finally{
   // Sólo categoría y milisegundos: jamás incluir tokens, nombre o datos PDF.
