@@ -1023,7 +1023,7 @@ function node(tag,txt){const x=document.createElement(tag);x.textContent=String(
 async function showOrder(id){try{status.textContent="Consultando detalle...";const x=await api("/admin/api/order?id="+encodeURIComponent(id));details.replaceChildren();details.append(node("h3","Pedido "+x.order.id));details.append(node("p","Total: "+money(x.order.amount_ars)+" · Aprobado: "+(x.order.paid_at||"sin fecha")));if(x.produccion){const pr=x.produccion;details.append(node("h4","Estado operativo: "+pr.estado.replaceAll("_"," ")));details.append(node("p",pr.mensaje));for(const t of pr.trabajos){const area=node("section","");area.append(node("h4",t.linea+". "+t.cantidad+" × "+t.descripcion+" — "+money(t.subtotal)));area.append(node("p","Estado: "+t.etapa.replaceAll("_"," ")+" · "+t.instruccion));const valores=Object.entries(t.especificaciones||{}).map(a=>a[0]+": "+a[1]).join(" · ");if(valores)area.append(node("p","Ficha técnica: "+valores));if(t.referencias?.length)area.append(node("p","Referencias privadas: "+t.referencias.join(", ")));details.append(area)}}else details.append(node("p","La ficha de producción no está disponible."));if(x.produccion?.documentosVerificados){
  const d=x.produccion.documentosVerificados;
  details.append(node("h4","PDF originales verificados · "+d.archivos+" archivo(s)"));
- details.append(node("p","Recepción "+d.webOrderId+" · "+money(d.totalDocumentos)+" · PDF final listo para imprimir: pendiente"));
+ details.append(node("p","Recepción "+d.webOrderId+" · "+money(d.totalDocumentos)+" · PDF originales verificados. Preparación e impresión manual en Adobe Acrobat."));
  for(const t of d.trabajos){
   const line=node("section","");
   line.append(node("h4",t.orden+". "+t.nombreOriginal+" · "+t.servicio));
