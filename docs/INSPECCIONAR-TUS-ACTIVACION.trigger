@@ -39,3 +39,5 @@ Inspeccionar versión privada y resultado de test selector 1/2 páginas por cara
 Inspeccionar CI de corrección de selector invisible por estar oculto en panel: commit trigger 1c3010fb; tests de montaje antes de if(abierto!==i), estilos visibles y HTTP401. Sin cambios de cobro ni web pública.
 
 Verificar CI segundo fallo 2-up con tamaño sin confirmar para PDF 14×20; activar solo Worker documental privado, tests 14x20 pending, A3 pending, excluir A0, Basic 401 y pagos apagados. Commit d5de137e.
+
+Consultar CI activación ZIP Adobe tras commit 7d11936b: etiquetas PDF_01/original, doble faz, 2 por cara, tamaño original 14x20 y HTML seguro. Informar versión activa y HTTP401 sin mostrar secretos.
