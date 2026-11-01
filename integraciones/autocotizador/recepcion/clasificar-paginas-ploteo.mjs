@@ -1,7 +1,7 @@
 import {clasificarCoberturaPloteo} from './clasificar-cobertura-ploteo.mjs';
 import {contieneRotuloTecnico} from './refinar-tipo-plano.mjs';
 import {ajustarPlanoTecnicoPorPagina} from './regla-comercial-ploteos.mjs';
-import {evidenciaPlanoTecnico,esCadVectorialDenso} from './discriminar-plano-denso.mjs';
+import {evidenciaPlanoTecnico,esCadVectorialDenso,esCadPorEstructuraPDF,ameritaVerificarEstructura} from './discriminar-plano-denso.mjs';
 // PDF.js fijado en una versión conocida; procesa las páginas localmente.
 // No enviar bytes ni capturas del PDF a servicios externos.
 const PDFJS_WORKER='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -32,18 +32,34 @@ export async function clasificarPaginasPloteo(file,{onProgreso=()=>{},maxPaginas
    await page.render({canvasContext:context,viewport,background:'rgb(255,255,255)'}).promise;
    const pixels=context.getImageData(0,0,canvas.width,canvas.height).data;
    const clasificacion=clasificarCoberturaPloteo(pixels,{ancho:canvas.width,alto:canvas.height});
-   let rotuloTecnico=false,texto=''; 
+   let rotuloTecnico=false,texto='',textos=0;
    try{
     const contenido=await page.getTextContent();
+    textos=(contenido.items||[]).length;
     texto=(contenido.items||[]).map(item=>item.str||'').join(' ');
     rotuloTecnico=contieneRotuloTecnico(texto);
-   }catch(_){/* Si no se puede leer el texto, no cambiar la clasificación visual. */}
+   }catch(_){/* Mantener clasificación visual ante textos ilegibles. */}
    let clasificada=ajustarPlanoTecnicoPorPagina(clasificacion,{rotuloTecnico});
+   // Un PDF técnico puede contener decenas de miles de trazados rojos:
+   // el color superficial NO significa Póster. Consultar los operadores
+   // renderizados por PDF.js y excluir cualquier imagen o sombreado;
+   // en caso de fallo, se mantiene la clasificación visual conservadora.
+   if(ameritaVerificarEstructura({miniatura:clasificacion,texto,textos})){
+    try{
+     const operadores=await page.getOperatorList();
+     if(esCadPorEstructuraPDF({miniatura:clasificacion,
+       fnArray:operadores.fnArray,OPS:pdfjs.OPS,texto})){
+      clasificada={...clasificada,modo:'cad',
+       regla:'cad_vectorial_sin_imagenes',
+       modoVisual:clasificacion.modo};
+     }
+    }catch(_){/* Nunca descartar un PDF si falla esta comprobación opcional. */}
+   }
    // Sólo ante poster positivo CON rótulo de plano, un segundo muestreo
    // diferencia trama de líneas (cae fuerte al subir resolución) de tinta
    // plena (se mantiene). No rasterizar dos veces los demás documentos.
-   if(clasificacion.modo==='poster'&&clasificacion.cobertura>=0.30&&
-      evidenciaPlanoTecnico(texto)){
+   if(clasificada.modo==='poster'&&clasificacion.modo==='poster'&&
+      clasificacion.cobertura>=0.30&&evidenciaPlanoTecnico(texto)){
     const vAlta=page.getViewport({scale:720/Math.max(v.width,v.height)});
     const cAlta=document.createElement('canvas');
     cAlta.width=Math.max(1,Math.ceil(vAlta.width));
