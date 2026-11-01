@@ -80,7 +80,7 @@ export async function enviarPedidoTUSV2({
   throw Error('Cargador TUS no disponible.');
  const {Uppy,Tus}=mod;
  onProgress({phase:'autorizacion',count:trabajos.length,total:trabajos.length});
- const started=await call('/api/ensayo-tus-iniciar',{
+ const started=await call('/prueba-v2/api/ensayo-tus-iniciar',{
   orderId,metas:trabajos.map(t=>t.meta)
  },fetcher);
  if(started.orderId!==orderId||started.sessions?.length!==trabajos.length||
@@ -135,7 +135,7 @@ export async function enviarPedidoTUSV2({
   onProgress({phase:'servidor',count:trabajos.length,total:trabajos.length});
   // La respuesta definitiva viene del MOTOR ACTUAL, que vuelve a leer
   // TODOS los archivos, verifica SHA+páginas+medidas y recalcula precios.
-  const finalized=await call('/api/ensayo-tus-registrar',{
+  const finalized=await call('/prueba-v2/api/ensayo-tus-registrar',{
    orderId,clientOrderId,
    entries:trabajos.map((t,i)=>({
     proof:started.sessions[i].proof,opciones:t.opciones
