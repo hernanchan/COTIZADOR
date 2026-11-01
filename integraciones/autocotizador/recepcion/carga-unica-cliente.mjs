@@ -280,6 +280,8 @@ function render(){
     filaTam.append(texto('small','Tamaño original: '+[...new Set(regla.medidas)].join(' / ')+'. Se calcula con la tarifa A4 vigente, sin agrandar ni recortar.'));
    }else if(e.seleccion==='original'&&formatoOriginal(paginasFinal)==='a5'){
     filaTam.append(texto('small','A5 real (14,8 × 21 cm), sin ampliar. Se aplica la tarifa A4 vigente; no incluye corte ni terminaciones especiales.'));
+   }else if(e.seleccion==='original'&&regla.superaA3){
+    filaTam.append(texto('small','Ploteo a tamaño real seleccionado automáticamente. El sistema elige rollo y CAD/Póster según el PDF. Para reducirlo, podés elegir A4 o A3.'));
    }else if(e.seleccion==='original'&&!regla.a3Exacto&&!regla.a4Exacto){
     filaTam.append(texto('small','El tamaño real puede no tener una tarifa disponible. En ese caso elegí A4 o A3.'));
    }else if(recomendada==='a4'&&e.seleccion==='a4'&&!regla.a4Exacto&&!regla.forzarA4){
@@ -429,8 +431,8 @@ async function analizarArchivoPDF(e,file){
    }catch(_){/* Sin clase confirmada, el ploteo no obtiene precio final. */}
   }
   const decision=decidirTamanoCliente(e.paginas);
-  // A4 real y 20x20 cm quedan preseleccionados; todos los demás,
-  // incluidos A3 y mayores de A3, exigen elección explícita del cliente.
+  // A4/20x20 van a A4, tamaños mayores a A3 pasan a ploteo original
+  // sin preguntas redundantes. A5, A3 y formatos intermedios aún preguntan.
   e.requiereConfirmacion=decision.requierePregunta;
   e.seleccion=decision.seleccionInicial;
   e.error=null;
