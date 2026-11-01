@@ -49,7 +49,7 @@ test('tolerancia de A3 no deriva a ploteo sin motivo',()=>{
 test('la preselección automática de un plano CAD municipal da presupuesto completo en rollo90',()=>{
  const paginaPlano={numero:1,anchoCm:97.01,altoCm:61.49,modo:'cad'};
  const seleccion=decidirTamanoCliente([paginaPlano]).seleccionInicial;
- const precios=JSON.parse(readFileSync(new URL('../precios-web.json',import.meta.url),'utf8'));
+ const precios=JSON.parse(readFileSync(new URL('../../../precios-web.json',import.meta.url),'utf8'));
  const cotizacion=cotizarCargaUnica({precios,archivos:[{
   nombre:'Municipal_SUM_COCHERAS_Presentacion.pdf',
   paginas:[paginaPlano],servicio:'auto',seleccion,paginasSeleccionadas:'',
