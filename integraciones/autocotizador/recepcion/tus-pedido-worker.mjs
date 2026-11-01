@@ -18,7 +18,6 @@ import {verificarTandaTUSYRecalcular} from './tus-pedido-puente.mjs';
 import {registrarManifiestoV2EnCentral} from './registrar-manifiesto-v2-central.mjs';
 import {prepararDocumentosCentralFirmado} from './preparar-documentos-central.mjs';
 const PROJECT='qkbbqzbannyhuanngjpw';
-const API='https://'+PROJECT+'.supabase.co';
 const STORAGE='https://'+PROJECT+'.storage.supabase.co';
 const BUCKET='saber-tus-lab';
 const FLAG='PRIVATE_TEST_ONLY';
@@ -91,7 +90,7 @@ function storageError(code){
  return error;
 }
 export async function firmarSubidaSupabase(env,objectName,{fetcher=fetch}={}){
- const url=API+'/storage/v1/object/upload/sign/'+BUCKET+'/'+pathUrl(objectName);
+ const url=STORAGE+'/storage/v1/object/upload/sign/'+BUCKET+'/'+pathUrl(objectName);
  let r;
  try{
   r=await fetcher(url,{method:'POST',headers:{
@@ -112,7 +111,7 @@ export async function firmarSubidaSupabase(env,objectName,{fetcher=fetch}={}){
  return answer.token;
 }
 export async function leerObjetoTUSPrivado(env,objectName,{fetcher=fetch}={}){
- const url=API+'/storage/v1/object/'+BUCKET+'/'+pathUrl(objectName);
+ const url=STORAGE+'/storage/v1/object/'+BUCKET+'/'+pathUrl(objectName);
  const r=await fetcher(url,{headers:privateHeaders(env),redirect:'error'});
  if(!r.ok||Number(r.headers.get('Content-Length')||0)>20*1024*1024)
   throw Error('No se pudo leer el PDF privado.');
