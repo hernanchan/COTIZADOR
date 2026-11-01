@@ -353,6 +353,24 @@ function render(){
      ' CAD, '+meta.clasificacionCliente.filter(p=>p.modo==='poster').length+
      ' Póster. PDF original listo para recepción protegida. Sin cobro.';
     area.append(name,note);
+    const fmtMedida=p=>Number(p.anchoCm).toLocaleString('es-AR',{maximumFractionDigits:2})+
+     ' × '+Number(p.altoCm).toLocaleString('es-AR',{maximumFractionDigits:2})+' cm';
+    const paginasMedidas=Array.isArray(d.ploteoVerificado?.paginas)
+     ?d.ploteoVerificado.paginas:meta.clasificacionCliente;
+    if(Array.isArray(paginasMedidas)&&paginasMedidas.length){
+     const detalle=document.createElement('div');detalle.className='state';
+     const encabezado=document.createElement('p');
+     encabezado.textContent=(d.ploteoVerificado?'Medidas verificadas':'Medidas detectadas (preliminares)')+
+      ' · Clasificación por página:';
+     detalle.append(encabezado);
+     for(const p of paginasMedidas){
+      const linea=document.createElement('p');
+      linea.textContent='Página '+p.numero+': '+fmtMedida(p)+' · '+
+       (p.modo==='cad'?'CAD':p.modo==='poster'?'Póster':'Revisión');
+      detalle.append(linea);
+     }
+     area.append(detalle);
+    }
     const msg=document.createElement('p');msg.className='state';
     if(d.confirmacion&&d.ploteoVerificado){
      msg.textContent='PDF verificado en Google · '+d.confirmacion.pages+
