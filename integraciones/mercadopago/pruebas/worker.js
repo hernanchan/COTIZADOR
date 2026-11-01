@@ -1037,7 +1037,7 @@ function agregarFichaDeImpresion(area,t){
  // ni del PDF original. Los datos ausentes se señalan: no inventar instrucciones.
  const modo=(t.modo==="bn"||t.modo==="b/n")?"Blanco y negro":
   t.modo==="color"?"Color":null;
- const formato=(t.formatoFinal==="a4"||t.formatoFinal==="a3")?
+ const formato=(["a5","a4","a3"].includes(t.formatoFinal))?
   t.formatoFinal.toUpperCase():null;
  const caras=t.carasPresupuestadas==="simple"?"Simple faz":
   t.carasPresupuestadas==="double"?"Doble faz":null;
@@ -1061,6 +1061,7 @@ function agregarFichaDeImpresion(area,t){
   ["Páginas del archivo",Number.isSafeInteger(t.paginasOriginales)?String(t.paginasOriginales):null],
   ["Páginas a imprimir",seleccion],
   ["Tamaño final",formato],
+  ["Tarifa aplicada",t.formatoFinal==="a5"?"Tarifa A4 vigente (A5 sin ampliar)":formato?"Tarifa "+formato:null],
   ["Impresión",modo],
   ["Caras",caras],
   ["Páginas por cara",[1,2,4,9].includes(t.paginasPorCaraPresupuestadas)?
