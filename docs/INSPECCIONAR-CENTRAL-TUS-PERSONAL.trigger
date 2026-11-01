@@ -7,3 +7,5 @@ Inspeccionar run 306afcad para mostrar instrucciones impresión por PDF en Centr
 Registrar resultado CI 5cf72bcd para numeración secuencial D1 y paquete ZIP. No exponer archivos ni claves. No tocar web comercial.
 
 Consultar de nuevo estado CI 4156ea2d tras instalar dependencia pdf-lib, sin secretos.
+
+Consulta última ejecución 815da702 de Central corto 001 sin exponer secretos.
