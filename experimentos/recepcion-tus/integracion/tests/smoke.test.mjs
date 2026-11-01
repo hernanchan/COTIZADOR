@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {validateManifest,reconcileVerifiedObjects,SCHEMA} from '../contract.mjs';
+const files=[1,2].map(i=>({localRef:randomUUID(),objectName:randomUUID()+'/'+randomUUID()+'.pdf',sha256:'a'.repeat(64),bytes:1000+i,pages:16,options:{servicio:'impresion'}}));
+const m={schema:'saber-tus-private-manifest-v1',orderId:'WEB-TEST12345',clientOrderId:randomUUID(),registeredInD1:false,checkoutEnabled:false,paymentAuthorized:false,files};
+const receipt=f=>({schema:SCHEMA,objectName:f.objectName,sha256:f.sha256,bytes:f.bytes,pages:f.pages,verified:true,bucketPrivate:true,provenance:'server-storage'});
+test('reconcilia dos archivos independientes',()=>assert.equal(reconcileVerifiedObjects(m,files.map(receipt)).files.length,2));
+test('no acepta hash diferente',()=>{const bad=files.map(receipt);bad[1].sha256='f'.repeat(64);assert.throws(()=>reconcileVerifiedObjects(m,bad))});
+test('no acepta archivo faltante',()=>assert.throws(()=>reconcileVerifiedObjects(m,[receipt(files[0])])));
+test('no acepta manifiesto listo para cobrar',()=>assert.throws(()=>validateManifest({...m,paymentAuthorized:true})));
+test('no acepta objetos duplicados',()=>assert.throws(()=>validateManifest({...m,files:[files[0],{...files[1],objectName:files[0].objectName}]})));
