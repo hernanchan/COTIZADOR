@@ -310,3 +310,23 @@ El usuario confirmó «see ok» tras comprobar la última corrección de la pant
 ## 01/11/2026 — Confirmación del usuario: prueba de ZIP desde Chrome
 
 Después de recibir la instrucción de abrir una orden existente en la Central y pulsar «Descargar orden + ZIP de PDF», el usuario respondió «listo». Registrar **ejecución de la prueba de navegador confirmada por el usuario**; no se aportó captura, lista de archivos o resultado explícito de descompresión. Evitar afirmar evidencia independiente del contenido del ZIP o de impresión en Adobe. CI previa 41356085872 SUCCESS (136 pruebas), versión documental privada 040ad664. No solicitar subir nuevamente PDF. Próximo foco: cierre operativo de Etapa 1, pendientes reales de la Central/impresiones/ploteos, sin añadir PDF compuesto, modificar web comercial ni cobros.
+
+
+## 01/11/2026 — Ploteos CAD/Póster: detalle por página preservado en D1, Central y ZIP
+
+**Hallazgo verificado:** la recepción TUS de ploteos y su cotización en servidor ya existían; `ficha-produccion-central.mjs` emitía `planoPorPagina` con página original, ancho, alto, clasificación CAD/Póster, rollo y papel. Pero `centralSafeManifest()` lo descartaba al normalizar antes de guardar el `manifest_json` inmutable en D1. En consecuencia la Central y el ZIP no tenían los datos para producir desde Adobe y advertían instrucciones incompletas. No se modificaron la clasificación, los rollos automáticos ni los precios.
+
+**Correcciones implementadas en rama privada `integracion/tus-pedido-privado-20261101`:**
+- `integraciones/mercadopago/pruebas/worker.js`: valida en el manifiesto firmado que cada página de ploteo tenga número original coincidente con las páginas seleccionadas, dimensiones positivas razonables, CAD/Póster, rollo compatible y papel obra/recubierto. Rechaza ficha de ploteo ausente o adulterada. Conserva `planoPorPagina` en D1 y en la respuesta firmada `/internal/central/tus-package`. La vista del operador muestra el detalle por página y lo incluye al copiar instrucciones. El texto de pedidos verificados deja de exigir generar un PDF compuesto: el usuario imprime desde Adobe.
+- `integraciones/autocotizador/recepcion/paquete-tus-cliente.txt`: en el ZIP, las instrucciones HTML A4 y TXT de cada ploteo muestran por página CAD/Póster, ancho×alto, rollo, papel, copias, tamaño original y prohibición de imprimir sin autorización. Se descargan PDF originales intactos. Para fichas históricas sin detalles se declara ausencia, no se inventa la información.
+- `integraciones/autocotizador/recepcion/carga-unica-cliente.mjs`: elimina aviso obsoleto «ploteos pendientes de integración»; informa límites reales de recepción privada TUS (máximo 10 PDF, 20 MB/archivo, 60 MB/orden) y deja claros los casos no integrados (páginas parciales/anillado conjunto).
+
+**Regresión automatizada:**
+- `tests/tus-instrucciones-reales.test.mjs`: PDF real sintetizado de 2 páginas de 60×85 cm, una CAD en obra y otra Póster en recubierto, creación de sesiones TUS firmadas, comprobación de bytes/SHA/páginas/medidas y recálculo del importe en servidor, ficha y normalización D1; rechaza página original adulterada o detalle omitido. No hubo pedido de usuario nuevo ni un envío real externo.
+- `tests/tus-paquete-manifiesto.test.mjs`: manifiesto firmado de la Central conserva detalles de ambas páginas y el flag de pagos desactivados.
+- `tests/tus-zip-orden-privada.test.mjs`: TXT/HTML muestran rollos y papel de ambas páginas con asociación al PDF original, y fallback de legado.
+- `carga-unica-pdf-regresion.test.mjs`: no reintroducir mensaje falso de ploteo no integrado.
+
+**CI y despliegue CONFIRMADOS:** Centro `saber-pagos-pruebas` run **41358813011** (18 PASS, 0 FAIL), versión `03a93a23-f4bf-4c8c-a4ac-92b3135bc597`, panel HTTP 401 sin credenciales y health con paymentsEnabled=false. Documental `saber-documentos-pruebas` run **41358847946** (58+78+4=**140 PASS**, 0 FAIL), versión `6580ecd3-f79b-4d1d-a731-297d1a59174e`, portal HTTP 401 anónimo y cobros apagados. `main`, precios y web comercial intactos. Código Central `af5838ac` y `fe13d5f0`, ZIP `4b565c0e`, tests `54244c85`, `e6cbef69`, `4d7585cc`.
+
+**Estado exacto:** cotización/validación TUS → ficha D1 → respuesta Central → ZIP **probadas automáticamente** para CAD/Póster; el último despliegue está activo en dos Workers privados. Falta una sola validación de operador **con ploteo nuevo real y su ZIP**, no confundirla con prueba sintética. Antes de publicación comercial, además resolver selección parcial de páginas y anillado conjunto o decidir formalmente su exclusión; seguir sin cobros reales ni PDF compuesto.
