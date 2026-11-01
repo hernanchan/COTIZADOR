@@ -209,6 +209,45 @@ async function centralBridgeProbe(req,env){
   challenge:body.challenge,verifiedSignature:true,dbTouched:false,
   orderCreated:false,paymentAuthorized:false,checkoutEnabled:false},200);
 }
+/** Consulta exclusiva entre Workers: recibo TUS perteneciente a un pedido D1.
+ * Prohíbe descargar un archivo no registrado o con metadatos incompatibles.
+ */
+async function centralTUSReceiptLookup(req,env){
+ const signed=await centralReadSigned(req,env);
+ if(signed.error)return json({ok:false,error:"Consulta privada no autorizada",paymentAuthorized:false},signed.status);
+ const p=signed.payload;
+ if(!p||typeof p!=="object"||Array.isArray(p)||
+    Object.keys(p).sort().join(",")!=="receiptId,schema,webOrderId"||
+    p.schema!=="saber-central-tus-recibo-lookup-v1"||
+    !CENTRAL_WEB.test(p.webOrderId||"")||
+    !CENTRAL_RECEIPT.test(p.receiptId||""))
+  return json({ok:false,found:false,paymentAuthorized:false},422);
+ await centralTables(env);
+ const row=await env.DB.prepare(
+  "SELECT r.file_id,r.sha256,m.manifest_json FROM central_document_receipts r "+
+  "INNER JOIN central_document_manifests m ON m.web_order_id=r.web_order_id "+
+  "WHERE r.web_order_id=? AND r.receipt_id=? LIMIT 1"
+ ).bind(p.webOrderId,p.receiptId).first();
+ if(!row)return json({ok:false,found:false,paymentAuthorized:false},404);
+ let parsed;
+ try{parsed=JSON.parse(row.manifest_json)}catch(_){return json({ok:false,found:false,paymentAuthorized:false},409)}
+ const matches=Array.isArray(parsed?.trabajos)?
+  parsed.trabajos.filter(t=>t.reciboPrivado===p.receiptId&&t.fileId===row.file_id&&
+   t.sha256===row.sha256):[];
+ if(matches.length!==1)return json({ok:false,found:false,paymentAuthorized:false},409);
+ const t=matches[0];
+ if(!Number.isSafeInteger(t.bytes)||t.bytes<5||t.bytes>20*1024*1024||
+    !Number.isSafeInteger(t.paginasOriginales)||t.paginasOriginales<1||t.paginasOriginales>2000||
+    !CENTRAL_HEX.test(row.sha256)||typeof t.nombreOriginal!=="string"||
+    t.nombreOriginal.length<1||t.nombreOriginal.length>180)
+  return json({ok:false,found:false,paymentAuthorized:false},409);
+ return json({ok:true,found:true,schema:"saber-central-tus-recibo-lookup-v1",
+   webOrderId:p.webOrderId,receiptId:p.receiptId,fileId:row.file_id,
+   sha256:row.sha256,bytes:t.bytes,pages:t.paginasOriginales,
+   name:t.nombreOriginal,paymentAuthorized:false,listoParaProducir:false
+ },200);
+}
+
 async function centralStage(req,env){
  const signed=await centralReadSigned(req,env);
  if(signed.error)return json({error:signed.error},signed.status);
@@ -1273,6 +1312,7 @@ export default {
    if(url.pathname==="/internal/central/stage-print-draft")return await centralStagePrintDraft(req,env);
    if(url.pathname==="/internal/central/bridge-probe")return await centralBridgeProbe(req,env);
    if(url.pathname==="/internal/central/stage")return await centralStage(req,env);
+   if(url.pathname==="/internal/central/receipt-check")return await centralTUSReceiptLookup(req,env);
    if(url.pathname==="/internal/central/link")return await centralLink(req,env);
    if(url.pathname==="/internal/central/prepare-order")return await centralPrepareDraft(req,env);
    if(url.pathname.startsWith("/checkout/"))return await customerCheckout(req,env,this);
