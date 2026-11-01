@@ -1,0 +1,10 @@
+{
+  "estado": "ACTIVA_PRIVADA",
+  "worker": "saber-documentos-pruebas",
+  "version_activa": "6e6ff6aa-b85c-4d67-a922-ebb31c74b37d",
+  "deployment_id": "5dc27553-0f5f-4d8e-8093-07a2cd789574",
+  "origen": "Cloudflare deployments GET",
+  "rama": "integracion/tus-pedido-privado-20261101",
+  "consultado_utc": "2026-11-01T13:42:26Z",
+  "nota": "No demuestra TUS E2E; no se enviaron archivos ni se activaron cobros."
+}
