@@ -46,6 +46,8 @@ test('la pantalla exige respuesta visible antes de presupuestar PDF no A4',()=>{
  assert.match(client,/Mantener tamaño real/);
  assert.match(client,/Medida detectada/);
  assert.match(client,/const orden=\['pendientes'/);
+ assert.match(client,/if\(regla\.forzarA4&&tam!=='a4'\)continue/);
+ assert.match(client,/decidirTamanoCliente\(paginas\)\.forzarA4\?'a4':sel\.value/);
  assert.match(client,/ATENCIÓN: /);
  assert.match(client,/clasificarDestino\(elegidas,e\.seleccion\)/);
  assert.match(page,/pregunta-tamano/);
