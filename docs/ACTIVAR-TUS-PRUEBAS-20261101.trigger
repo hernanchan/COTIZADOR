@@ -14,3 +14,5 @@ trigger=2026-11-01-tus-private-only
 2026-11-01 12:22 ART — Diagnóstico exacto de STORAGE_FIRMA_ERROR para Worker privado: comprobar firma Supabase sin subir PDF, clasificar FETCH_FAILURE / HTTP_NNN / RESPONSE_JSON / TOKEN_MISSING. Nunca registrar tokens ni valores secretos. Código ddd5f523 test 221cd7c0. Compilar, probar y activar solo Worker pruebas con rollback y 401 anónimo.
 
 2026-11-01 12:26 ART — pruebas y activación de firma privada con host directo https://<project>.storage.supabase.co para endpoints de firma y lectura, sin pasar por redireccionamientos del host API. Commits d66122a4 y 6bf2e97d; no se transfieren PDF, pagos ni sitio comercial. Revertir ante prueba HTTP 401 fallida.
+
+2026-11-01 — CAUSA IDENTIFICADA en documentación oficial Cloudflare Workers Request API: redirect:'error' NO es soportado y lanza TypeError ANTES de fetch HTTP, provocando STORAGE_FETCH_FAILURE. Corregidas firma y lectura privada a redirect:'manual', rechazo explícito de 3xx. Código 29339936, tests 49a304a3. Activar SOLO Worker de pruebas, con CI y comprobación HTTP401 anónimo; sin pagos ni sitio público.
