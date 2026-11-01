@@ -33,3 +33,5 @@ Inspeccionar ensayo A5 original + tarifa A4 commit 7e4e9b6b, CI TUS PDF real, pr
 Confirmar CI cda372ac prueba A5 contra total realmente verificado, 44+72+4, y protección HTTP 401.
 
 Consultar pruebas del ensayo privado 14x20, versión del sitio de pruebas y acceso protegido.
+
+Inspeccionar versión privada y resultado de test selector 1/2 páginas por cara, con 4/9 avanzadas, CI por trigger 967b70bb y HTTP401. No publicación ni cobro.
