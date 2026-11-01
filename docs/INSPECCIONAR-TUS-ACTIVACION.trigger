@@ -21,3 +21,5 @@ Consultar ejecución 5f914a55 con A4/A3 y nuevos datos completos de papel/anilla
 Verificar resultado de despliegue 527f2972 para mostrar éxito y número de orden corto; exigir test vm nuevo y autenticación privada intacta.
 
 Confirmar ejecucion c425245a tras reparacion regex UI para banner de exito y N.º D1. Estado CI privado, rollback y protección 401.
+
+Obtener resultado final de CI bbe71928 confirmación del cliente y número corto. Verificar 42 tests, compilación, HTTP401.
