@@ -97,7 +97,7 @@ const vistaEstadoPedido=document.getElementById('vista-estado-pedido');
 const rendimientoPrivado=document.getElementById('rendimiento-privado');
 let ultimoTotalServidor=null;
 function mostrarEstadoCliente(estado,titulo,detalle,numeroOrden=null){
- const confirmado=estado==='registrado'&&/^\d{3,}$/.test(numeroOrden||'');
+ const confirmado=estado==='registrado'&&/^\\d{3,}$/.test(numeroOrden||'');
  document.body.classList.toggle('estado-envio',estado==='enviando');
  document.body.classList.toggle('estado-registro',confirmado);
  vistaEstadoPedido.hidden=!estado;
