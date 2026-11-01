@@ -151,3 +151,81 @@ test('nunca llega a cotizar o guardar D1 si el segundo PDF falta o su SHA difier
  }),/Segundo PDF/);
  assert.equal(readCount,2);
 });
+
+
+test('dos PDFs A4/A3 atraviesan PDF real, recotización servidor y manifiesto coherente',async()=>{
+ const bytes=[];
+ for(const dims of [[595.28,841.89],[841.89,1190.55]]){
+  const pdf=await PDFDocument.create();
+  pdf.addPage(dims);pdf.addPage(dims);
+  bytes.push(new Uint8Array(await pdf.save()));
+ }
+ const hashes=await Promise.all(bytes.map(async b=>Buffer.from(await subtle.digest('SHA-256',b)).toString('hex')));
+ const specs=bytes.map((b,i)=>({...meta(i+1),name:'Documento_'+(i+1)+'.pdf',bytes:b.length,sha256:hashes[i],pages:2}));
+ const signed=await mint(specs);
+ const cfg=entries(signed);
+ cfg[1].opciones.seleccion='a3';
+ const byPath=new Map(signed.sessions.map((s,i)=>[s.objectName,bytes[i]]));
+ const prices=JSON.parse(readFileSync(new URL('../precios-web.json',import.meta.url),'utf8'));
+ const v=await verificarTandaTUSYRecalcular({
+  orderId:ORDER,entries:cfg,secret:SECRET,subtle,ahora:()=>1800000001,
+  preciosServidor:prices,leerObjetoPrivado:async p=>byPath.get(p)
+ });
+ assert.equal(v.claims.length,2);
+ assert.equal(v.verificacion.recibos.length,2);
+ assert.equal(v.verificacion.ficha.trabajos.length,2);
+ assert.ok(v.verificacion.importeVerificado>0);
+ const m=manifiestoServidorTUS(v);
+ const result=conciliarManifiestoV2ConServidor({manifiesto:m,verificacion:v.verificacion});
+ assert.equal(result.cantidadArchivos,2);
+ assert.equal(result.importeServidor,v.verificacion.importeVerificado);
+ assert.equal(result.paymentAuthorized,false);
+});
+
+test('endpoint privado registra D1 SOLO luego de verificar ambos PDF; monto calculado en servidor',async()=>{
+ const buffers=[];
+ for(const dimensions of [[595.28,841.89],[595.28,841.89]]){
+  const file=await PDFDocument.create();
+  file.addPage(dimensions);
+  buffers.push(new Uint8Array(await file.save()));
+ }
+ const hashes=await Promise.all(buffers.map(async b=>Buffer.from(await subtle.digest('SHA-256',b)).toString('hex')));
+ const metas=buffers.map((b,i)=>({...meta(i+1),name:'Doc_'+(i+1)+'.pdf',bytes:b.length,sha256:hashes[i],pages:1}));
+ const signed=await mint(metas),entriesList=entries(signed);
+ const data=new Map(signed.sessions.map((s,i)=>[s.objectName,buffers[i]]));
+ const prices=JSON.parse(readFileSync(new URL('../precios-web.json',import.meta.url),'utf8'));
+ let writes=0,prepared=0,serverPrice=null;
+ const origin='https://saber-documentos-pruebas.libreriasaber.workers.dev';
+ const req=()=>new Request(origin+'/api/ensayo-tus-registrar',{
+  method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},
+  body:JSON.stringify({orderId:ORDER,clientOrderId:randomUUID(),entries:entriesList})
+ });
+ const downloader=async url=>{
+  const found=[...data.entries()].find(([name])=>url.endsWith('/'+name));
+  if(!found)return new Response('NOT_FOUND',{status:404});
+  return new Response(found[1],{status:200,headers:{'Content-Type':'application/pdf'}});
+ };
+ const register=async ({manifiesto,verificacion})=>{
+  const result=conciliarManifiestoV2ConServidor({manifiesto,verificacion});
+  assert.equal(result.cantidadArchivos,2);
+  writes++;serverPrice=result.importeServidor;
+  return {orderId:ORDER,archivos:2,registeredInD1:true};
+ };
+ const prepare=async()=>{prepared++;return {
+  commercialOrderId:randomUUID(),amountArs:serverPrice,
+  idempotent:false,paymentAuthorized:false
+ }};
+ const answer=await finalizarPedidoTUSPrivado(req(),env,{authorized:true,fetcher:downloader,
+  preciosServidor:prices,ahora:()=>1800000001,registrar:register,preparar:prepare});
+ assert.equal(answer.status,200);
+ const body=await answer.json();
+ assert.equal(body.ok,true);assert.equal(body.archivosVerificados,2);
+ assert.equal(body.totalArs,serverPrice);
+ assert.equal(body.paymentAuthorized,false);assert.equal(body.checkoutEnabled,false);
+ assert.equal(writes,1);assert.equal(prepared,1);
+ data.delete(signed.sessions[1].objectName);
+ const bad=await finalizarPedidoTUSPrivado(req(),env,{authorized:true,fetcher:downloader,
+  preciosServidor:prices,ahora:()=>1800000001,registrar:register,preparar:prepare});
+ assert.equal(bad.status,422);
+ assert.equal(writes,1);assert.equal(prepared,1);
+});
