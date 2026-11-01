@@ -1,0 +1,19 @@
+{
+  "runs": [
+    {
+      "id": 41323518240,
+      "head_sha": "0ed91803dadb1ed5b0ac186946b495598a5dc8a1",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/hernanchan/COTIZADOR/actions/runs/41323518240"
+    }
+  ],
+  "jobs": [
+    {
+      "id": 124898549015,
+      "name": "activar-central-pruebas",
+      "conclusion": "success",
+      "failed_steps": []
+    }
+  ]
+}
