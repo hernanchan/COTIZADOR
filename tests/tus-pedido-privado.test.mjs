@@ -212,7 +212,7 @@ test('endpoint privado registra D1 SOLO luego de verificar ambos PDF; monto calc
   return {orderId:ORDER,archivos:2,registeredInD1:true};
  };
  const prepare=async()=>{prepared++;return {
-  commercialOrderId:randomUUID(),amountArs:serverPrice,
+  commercialOrderId:randomUUID(),numeroOrden:'001',amountArs:serverPrice,
   idempotent:false,paymentAuthorized:false
  }};
  const answer=await finalizarPedidoTUSPrivado(req(),env,{authorized:true,fetcher:downloader,
