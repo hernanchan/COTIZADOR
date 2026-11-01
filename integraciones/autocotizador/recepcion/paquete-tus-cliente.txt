@@ -152,32 +152,55 @@ async function pdfOriginal(d,t){
   throw Error('Contenido PDF inválido: '+t.orden);
  return blob;
 }
-button.addEventListener('click',async()=>{
- if(!ficha)return;
- button.disabled=true;
+// Se inicia desde el clic «Descargar orden + ZIP» de la Central. Si el navegador
+// bloquea descargas automáticas, queda el botón para repetirla manualmente.
+let descargando=false;
+async function descargarZip(){
+ if(!ficha||descargando)return;
+ descargando=true;button.disabled=true;
  try{
-  const entries=[];
-  for(let i=0;i<ficha.trabajos.length;i++){
-   const t=ficha.trabajos[i];
-   state.textContent='Descargando y verificando original '+(i+1)+'/'+ficha.trabajos.length+'…';
-   const pdf=await pdfOriginal(ficha,t);
-   entries.push({name:nombreZip(i),blob:pdf});
+  const trabajos=ficha.trabajos;
+  if(!Array.isArray(trabajos)||trabajos.length<1||trabajos.length>30)
+   throw Error('La orden no tiene una cantidad válida de PDF.');
+  const bytes=trabajos.reduce((n,t)=>n+(Number.isSafeInteger(t.bytes)?t.bytes:0),0);
+  if(bytes<5||bytes>160*1024*1024)
+   throw Error('La orden supera 160 MiB. Descargá los PDF por separado desde la Central.');
+  // Tres descargas privadas simultáneas, máximo. El array por índice
+  // mantiene el orden original aunque los PDF terminen en distinto orden.
+  const pdfs=new Array(trabajos.length);
+  let proximo=0,completados=0,primerError=null;
+  async function trabajador(){
+   while(!primerError&&proximo<trabajos.length){
+    const i=proximo++;
+    try{
+     const pdf=await pdfOriginal(ficha,trabajos[i]);
+     pdfs[i]={name:nombreZip(i),blob:pdf};
+     completados++;
+     state.textContent='PDF originales verificados: '+completados+'/'+trabajos.length+'…';
+    }catch(error){primerError??=error}
+   }
   }
+  state.textContent='Descargando y verificando PDF originales…';
+  await Promise.all(Array.from({length:Math.min(3,trabajos.length)},()=>trabajador()));
+  if(primerError)throw primerError;
+  if(pdfs.some(x=>!x))throw Error('Faltan PDF originales para completar la orden.');
   const order='ORDEN_'+ficha.numeroOrden+'_INSTRUCCIONES';
-  entries.push({name:order+'.html',blob:new Blob([htmlOrden(ficha)],{type:'text/html'})});
-  entries.push({name:order+'.txt',blob:new Blob([textoOrden(ficha)],{type:'text/plain;charset=utf-8'})});
-  state.textContent='Armando ZIP y calculando integridad…';
-  const zip=await crearZipSinCompresion(entries,{
+  pdfs.push({name:order+'.html',blob:new Blob([htmlOrden(ficha)],{type:'text/html'})});
+  pdfs.push({name:order+'.txt',blob:new Blob([textoOrden(ficha)],{type:'text/plain;charset=utf-8'})});
+  state.textContent='Armando ZIP y comprobando integridad…';
+  const zip=await crearZipSinCompresion(pdfs,{
    progress:(i,n)=>{state.textContent='Armando ZIP '+i+'/'+n+'…'}
   });
   const link=document.createElement('a'),url=URL.createObjectURL(zip);
   link.href=url;link.download='ORDEN_'+ficha.numeroOrden+'.zip';
   document.body.append(link);link.click();link.remove();
   setTimeout(()=>URL.revokeObjectURL(url),60000);
-  state.textContent='ZIP de la orden '+ficha.numeroOrden+' preparado. Archivos originales sin alterar.';
- }catch(error){state.textContent='No se pudo armar el ZIP: '+String(error.message||error)}
- finally{button.disabled=false}
-});
+  state.textContent='ZIP de la orden '+ficha.numeroOrden+' generado. Si tu navegador bloqueó la descarga, usá el botón «Descargar ZIP nuevamente».';
+  button.textContent='Descargar ZIP nuevamente';
+ }catch(error){state.textContent='No se pudo descargar el ZIP: '+String(error.message||error)+'. Podés reintentar con el botón.'}
+ finally{descargando=false;button.disabled=false}
+}
+button.addEventListener('click',descargarZip);
 (async()=>{
  try{
   ficha=await fetchFicha();
@@ -185,6 +208,7 @@ button.addEventListener('click',async()=>{
   document.getElementById('detalle').textContent=ficha.trabajos.length+
    ' PDF · '+ficha.estadoPago+' · ARS '+ficha.importe;
   button.disabled=false;
-  state.textContent='Listo para generar el ZIP. Se volverá a verificar cada PDF.';
+  state.textContent='Orden verificada. Descarga automática del ZIP…';
+  await descargarZip();
  }catch(error){state.textContent='Acceso bloqueado: '+String(error.message||error)}
 })();
