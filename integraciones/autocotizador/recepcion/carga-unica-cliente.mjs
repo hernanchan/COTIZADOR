@@ -67,6 +67,38 @@ const formatoOriginal=paginas=>{
 const valor=(label,options,selected,change)=>{const l=texto('label',label+' '),sel=document.createElement('select');for(const [k,v] of options)sel.add(new Option(v,k));sel.value=selected;sel.onchange=()=>change(sel.value);l.append(sel);return l};
 function paginasElegidas(e){try{return seleccionarPaginas(e.paginas,e.paginasSeleccionadas)}catch(_){return null}}
 function cambio(){version++;render();cotizar()}
+// Sólo impresiones documentales: dos decisiones visibles y las demás
+// en un desplegable. Conserva el mismo "paginasPorHoja" del presupuesto,
+// la verificación del servidor y la ficha de producción.
+function selectorPaginasPorCara(e,indice){
+ const n=e.paginasPorHoja??1;
+ const fieldset=document.createElement('fieldset');
+ fieldset.className='composicion-por-cara';
+ const legend=texto('legend','Páginas por cara');fieldset.append(legend);
+ const opciones=document.createElement('div');opciones.className='composicion-opciones';
+ const radio=(value,label)=>{
+  const wrapper=document.createElement('label');wrapper.className='composicion-opcion';
+  const input=document.createElement('input');
+  input.type='radio';input.name='paginas-por-cara-'+indice;input.value=String(value);
+  input.checked=n===value;
+  input.onchange=()=>{if(input.checked){e.paginasPorHoja=value;cambio()}};
+  wrapper.append(input,texto('span',label));
+  return wrapper;
+ };
+ opciones.append(radio(1,'1 página'),radio(2,'2 páginas'));
+ fieldset.append(opciones);
+ const avanzadas=document.createElement('details');
+ avanzadas.className='composicion-avanzada';
+ avanzadas.open=n===4||n===9;
+ const summary=texto('summary',n===4||n===9
+  ?n+' páginas por cara · Más opciones'
+  :'Más opciones (4 o 9 páginas por cara)');
+ avanzadas.append(summary);
+ const extra=document.createElement('div');extra.className='composicion-opciones';
+ extra.append(radio(4,'4 páginas'),radio(9,'9 páginas'));
+ avanzadas.append(extra);fieldset.append(avanzadas);
+ return fieldset;
+}
 function cantidadCopias(e){
  const l=texto('label',e.servicio==='grafica'?'Lotes (1 a 500) ':'Copias (1 a 500) ');
  const input=document.createElement('input');
@@ -328,8 +360,8 @@ function render(){
    }else if(decision.destino==='documentos'){
     controles.append(valor('Impresión', [['bn','Blanco y negro'],['color','Color']],e.modo,v=>{e.modo=v;cambio()}));
     controles.append(valor('Caras', [['simple','Simple faz'],['double','Doble faz']],e.caras,v=>{e.caras=v;cambio()}));
-    controles.append(valor('Páginas por cara',[['1','1 página'],['2','2 páginas'],['4','4 páginas'],['9','9 páginas']],String(e.paginasPorHoja??1),v=>{e.paginasPorHoja=Number(v);cambio()}));
-    panel.append(texto('p','Las páginas se reducen proporcionalmente dentro de cada cara impresa. La doble faz utiliza dos caras por hoja física.'));
+    controles.append(selectorPaginasPorCara(e,i));
+    panel.append(texto('p','Con 2 páginas por cara, se ubican dos páginas del PDF en una cara impresa y se ajusta la escala si hace falta. Con doble faz, hasta cuatro páginas del PDF por hoja física.'));
     const formato=decision.tamanoFinal==='original'?formatoOriginal(paginas):decision.tamanoFinal;
     if(e.modo==='color'&&['personalizado_a4','a5','a4','a3'].includes(formato)){
      const disponibles=catalogo[['a5','personalizado_a4'].includes(formato)?'a4':formato]||[];
