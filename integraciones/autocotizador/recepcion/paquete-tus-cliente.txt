@@ -6,6 +6,15 @@ const encoder=new TextEncoder();
 let ficha=null;
 function clean(v){return String(v==null?'NO CONSTA — verificar':v)}
 function format(t){
+ const medidas=t.formatoFinal==='personalizado_a4'&&Array.isArray(t.medidasOriginalesCm)
+  ?t.medidasOriginalesCm.map(p=>({
+    pagina:p.pagina,valor:Number(p.anchoCm.toFixed(2))+' × '+
+      Number(p.altoCm.toFixed(2))+' cm'
+   })):null;
+ const unicas=medidas?[...new Set(medidas.map(x=>x.valor))]:[];
+ const formato=t.formatoFinal==='personalizado_a4'
+  ?unicas.length===1?unicas[0]:'Original personalizado (varias medidas)'
+  :t.formatoFinal?.toUpperCase();
  const mode=t.modo==='bn'?'B/N':t.modo==='color'?'Color':null;
  const sides=t.carasPresupuestadas==='simple'?'Simple faz':
   t.carasPresupuestadas==='double'?'Doble faz':null;
@@ -29,8 +38,11 @@ function format(t){
   ['Servicio',t.servicio],
   ['Archivo original',t.nombreOriginal],
   ['Páginas a imprimir',pages],
-  ['Tamaño',t.formatoFinal?.toUpperCase()],
-  ...(t.formatoFinal==='a5'?[['Tarifa aplicada','A4 vigente; A5 a escala original sin ampliación. No incluye corte.']]:[]),
+  ['Tamaño final',formato],
+  ...(t.formatoFinal==='personalizado_a4'?
+   [['Tarifa aplicada','A4 vigente; medida original sin ampliar ni recortar.'],
+    ...(medidas&&unicas.length>1?[['Tamaño por página',medidas.map(p=>'pág. '+p.pagina+': '+p.valor).join('; ')]]:[])]:
+   t.formatoFinal==='a5'?[['Tarifa aplicada','A4 vigente; A5 a escala original sin ampliación. No incluye corte.']]:[]),
   ['Color',mode],['Caras',sides],
   ['Páginas por cara',t.paginasPorCaraPresupuestadas],
   ['Copias',t.copias],['Papel',papelLegible],['Anillado',ring],
