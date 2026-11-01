@@ -22,3 +22,5 @@ trigger=2026-11-01-tus-private-only
 01-11-2026: activar descarga solo staff con pruebas focalizadas Central en tests/tus-central-staff-download.test.mjs, no cambiar anillados. La suite central-bridge-d1 antigua tiene fixture de anillado que falla previo a esta integración y se auditará aparte; no degradar seguridad. Release Worker DOCUMENTOS privado exclusivamente, con rollback HTTP 401. Commit 5a131500.
 
 2026-11-01 ~13:39 ART — ZIP privado numerado con instrucciones TXT+HTML, PDF originales en orden de ficha, CRC32 ZIP32 y límites de sesión. Worker documental: /prueba-v2/orden-paquete (Basic), POST /prueba-v2/api/ensayo-tus-paquete-manifiesto (Basic, HMAC D1), cada PDF sigue por descarga original D1+SHA. Central ya CI verde 41327349314, número D1 y reporte firmados. CI documental exige tests/tus-zip-orden-privada.test.mjs + tests/tus-paquete-manifiesto.test.mjs. Desplegar SOLO saber-documentos-pruebas con rollback HTTP401. No cobros, no web pública.
+
+Activar Worker documental para exigir numeroOrden D1 al completar pedido TUS y mostrar N.º 001 en confirmación del cliente. PDF/ZIP existentes sin cambios. CI completo con rollback.
