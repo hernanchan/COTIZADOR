@@ -91,7 +91,11 @@ export async function firmarSubidaSupabase(env,objectName,{fetcher=fetch}={}){
    ...privateHeaders(env),'Content-Type':'application/json',
  },body:'{}',redirect:'error'});
  const raw=await r.text();
- if(!r.ok||raw.length>2000)throw Error('Supabase no autorizó la subida privada.');
+ if(!r.ok||raw.length>2000){
+  const err=Error('Supabase no autorizó la subida privada.');
+  err.code=r.ok?'STORAGE_RESPONSE_SIZE':'STORAGE_HTTP_'+r.status;
+  throw err;
+ }
  let answer;
  try{answer=JSON.parse(raw)}catch{throw Error('Firma de Storage ilegible.')}
  if(typeof answer?.token!=='string'||answer.token.length<12)
@@ -136,6 +140,35 @@ export function manifiestoServidorTUS({verificacion,claims}){
   registeredInD1:false,checkoutEnabled:false,paymentAuthorized:false,
   listoParaProducir:false,
  };
+}
+/**
+ * Preflight del ensayo privado: firma una ruta ALEATORIA y NO sube archivos.
+ * No revela token, URL firmada, credenciales ni detalles de Storage.
+ * Permite conocer la etapa de fallo ANTES de aceptar los PDF del cliente.
+ */
+export async function comprobarTUSAntesDeEnviar(request,env,{
+ authorized=false,fetcher=fetch,uuid=()=>crypto.randomUUID()
+}={}){
+ try{
+  ensureRequest(request,env,authorized);
+ }catch{
+  return json({ok:false,etapa:'AUTORIZACION_PORTAL',paymentAuthorized:false},403);
+ }
+ try{
+  const id=uuid();
+  if(!UUID.test(id))throw Error('Id diagnóstico incorrecto.');
+  const objectName='v2/WEB-DIAGNOSTICO-'+id+'/'+id+'.pdf';
+  const signature=await firmarSubidaSupabase(env,objectName,{fetcher});
+  if(typeof signature!=='string'||signature.length<12)
+   throw Error('Firma de diagnóstico incorrecta.');
+  return json({ok:true,etapa:'STORAGE_FIRMA_OK',paymentAuthorized:false,
+   archivosSubidos:0});
+ }catch(error){
+  const code=typeof error?.code==='string'&&/^STORAGE_(HTTP_[0-9]{3}|RESPONSE_SIZE)$/.test(error.code)
+   ?error.code:'STORAGE_FIRMA_ERROR';
+  console.warn('saber_tus_private_preflight',code);
+  return json({ok:false,etapa:code,paymentAuthorized:false,archivosSubidos:0},503);
+ }
 }
 export async function iniciarTandaTUSPrivada(request,env,{
  authorized=false,fetcher=fetch,uuid=()=>crypto.randomUUID(),ahora,
