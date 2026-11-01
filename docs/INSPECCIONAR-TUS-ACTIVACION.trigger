@@ -9,3 +9,5 @@ Inspect workflow run triggered by 2a906583 after replacing general Supabase host
 Verificar resultado CI y despliegue activación e3b642ec en rama TUS tras corregir redirect:error no soportado por Cloudflare Workers. No imprimir secretos.
 
 2026-11-01: consultar GitHub Actions lanzamiento posterior a c2f8438b de staff TUS PDF download y central D1 smoke. No secretos ni cambio de tráfico.
+
+Inspeccionar run privada descarga personal posterior a 686a3e7b, test focalizado D1, regresión y versión. No cambio de tráfico desde este informe.
