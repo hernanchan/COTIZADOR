@@ -151,8 +151,14 @@ export async function comprobarTUSAntesDeEnviar(request,env,{
 }={}){
  try{
   ensureRequest(request,env,authorized);
- }catch{
-  return json({ok:false,etapa:'AUTORIZACION_PORTAL',paymentAuthorized:false},403);
+ }catch(error){
+  // Código fijo sin valores de secretos, cookies, tokens o encabezados.
+  const safeCode={
+   'private-tus-off':'CONFIGURACION_PRIVADA',
+   'private-tus-denied':'SESION_PRIVADA',
+   'private-tus-origin':'ORIGEN_SOLICITUD'
+  }[error?.message]||'AUTORIZACION_PORTAL';
+  return json({ok:false,etapa:safeCode,paymentAuthorized:false},403);
  }
  try{
   const id=uuid();
