@@ -15,3 +15,5 @@ Consultar resultado ejecución 23bc9ebe con PDF A4/A3 de prueba e instrucciones 
 Verificar Central A5 2afcb0c5: tests privados y estado de seguridad paymentsEnabled:false, formato A5 tarifa A4.
 
 Inspeccionar CI de tamaños originales 14x20 Central por commit 3e46f666: conservar medidas verificadas en D1 y ZIP, 0 errores, 401 sin contraseña.
+
+Confirmar CI rerun 70167930 con ficha original 14x20 sin confundir formato con tarifa, seguridad y 401.
