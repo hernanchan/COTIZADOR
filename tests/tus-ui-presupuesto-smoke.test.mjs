@@ -57,3 +57,20 @@ test('sólo PDF del mismo hash y referencia, se bloquean los intercambios de arc
  const d={...base,archivoLocal:{name:base.reference.nombre,size:1024,arrayBuffer:async()=>new ArrayBuffer(1024)}};
  assert.throws(()=>normalizarTrabajoTUS(d,{meta,opcionesKey:'null'}),/no corresponde/);
 });
+
+
+test('TUS solicitado pero mal configurado bloquea Google Drive e informa solamente requisitos',async()=>{
+ const html=paginaCotizadorV2PruebaPrivada(sitekey,false,{
+  solicitado:true,listo:false,invalidos:['DOCS_TUS_SUPABASE_SERVICE_KEY']
+ });
+ assert.match(html,/Supabase\/TUS no está operativo/);
+ assert.match(html,/DOCS_TUS_SUPABASE_SERVICE_KEY/);
+ assert.match(html,/const TUS_BLOCKED=true/);
+ assert.match(html,/sendAllButton\.disabled=TUS_BLOCKED\|\|/);
+ const script=html.match(/<script type="module">([\s\S]+?)<\/script>/)?.[1];
+ assert.ok(script);
+ await transform(script,{loader:'js',format:'esm',target:'es2022'});
+ const ready=paginaCotizadorV2PruebaPrivada(sitekey,true,{solicitado:true,listo:true,invalidos:[]});
+ assert.match(ready,/const TUS_BLOCKED=false/);
+ assert.match(ready,/const TUS_ENABLED=true/);
+});
