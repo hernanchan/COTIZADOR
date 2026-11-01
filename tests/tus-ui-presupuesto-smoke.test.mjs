@@ -1,3 +1,4 @@
+import vm from 'node:vm';
 import {paginaDescargaTUSPersonal} from '../integraciones/autocotizador/recepcion/pantalla-descarga-tus-personal.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -115,4 +116,42 @@ test('descarga del personal exige Basic y consulta protegida D1+SHA; no publica 
  const central=readFileSync(new URL('../integraciones/mercadopago/pruebas/worker.js',import.meta.url),'utf8');
  assert.ok(central.includes('"/admin/api/central/unpaid-detail"'));
  assert.ok(central.includes('if(!tokenOK(req,env))return json({error:"No autorizado"},401);'));
+});
+
+
+test('el cliente ve confirmación grande y número corto solo luego de registro D1',()=>{
+ const html=paginaCotizadorV2PruebaPrivada(sitekey,true);
+ const script=html.match(/<script type="module">([\\s\\S]+?)<\\/script>/)?.[1];
+ assert.ok(script);
+ const begin=script.indexOf('function mostrarEstadoCliente(');
+ const end=script.indexOf('let batchSending=',begin);
+ assert.ok(begin>=0&&end>begin);
+ const created=[],scroll=[],classes={},view={hidden:true,replaceChildren(...items){
+  this.children=items;
+ },scrollIntoView(settings){scroll.push(settings)}};
+ const progress={textContent:''},send={textContent:''};
+ const context=vm.createContext({
+  document:{body:{classList:{toggle(k,v){classes[k]=v}}},createElement(tag){
+   const node={tagName:tag,textContent:'',className:''};created.push(node);return node;
+  }},
+  vistaEstadoPedido:view,batchProgress:progress,sendAllButton:send
+ });
+ vm.runInContext(script.slice(begin,end),context);
+ const show=vm.runInContext('mostrarEstadoCliente',context);
+ show('enviando','Enviando PDF','Recepción en curso');
+ assert.equal(view.hidden,false);
+ assert.equal(scroll.length,0);
+ assert.equal(classes['estado-registro'],false);
+ show('registrado','Pedido recibido correctamente','PDF registrados',null);
+ assert.equal(scroll.length,0);
+ assert.equal(classes['estado-registro'],false);
+ show('registrado','Pedido recibido correctamente','2 PDF verificados','007');
+ assert.equal(classes['estado-registro'],true);
+ assert.equal(scroll.length,1);
+ assert.equal(view.children[1].textContent,'Orden N.º 007');
+ assert.equal(progress.textContent.includes('Orden N.º 007'),true);
+ assert.equal(send.textContent,'Orden N.º 007 recibida');
+ assert.ok(html.includes('body.estado-registro #vista-estado-pedido'));
+ assert.ok(script.includes('resultado.numeroOrden'));
+ assert.ok(script.includes('registeredShortOrder=resultado.numeroOrden'));
 });
