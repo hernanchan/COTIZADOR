@@ -2,6 +2,14 @@
   "workflow": "tus-activar-ensayo-privado.yml",
   "runs": [
     {
+      "id": 41360866608,
+      "head_sha": "b864f8cdf747bee4105581d99d06e0a1535bf78e",
+      "status": "completed",
+      "conclusion": "failure",
+      "created_at": "2026-11-01T23:11:18Z",
+      "html_url": "https://github.com/hernanchan/COTIZADOR/actions/runs/41360866608"
+    },
+    {
       "id": 41359738676,
       "head_sha": "a213d1122aea5df6aeeae1055f4fc3b9ea64abfa",
       "status": "completed",
@@ -56,21 +64,18 @@
       "conclusion": "success",
       "created_at": "2026-11-01T21:28:01Z",
       "html_url": "https://github.com/hernanchan/COTIZADOR/actions/runs/41352145962"
-    },
-    {
-      "id": 41351302346,
-      "head_sha": "967b70bb3bc7e591b7322051234bd22dacdf1f2c",
-      "status": "completed",
-      "conclusion": "success",
-      "created_at": "2026-11-01T21:18:08Z",
-      "html_url": "https://github.com/hernanchan/COTIZADOR/actions/runs/41351302346"
     }
   ],
   "jobs_latest": [
     {
       "name": "activar-ensayo",
-      "conclusion": "success",
-      "failed_steps": []
+      "conclusion": "failure",
+      "failed_steps": [
+        {
+          "name": "Compilar el mismo Worker privado verificado",
+          "conclusion": "failure"
+        }
+      ]
     }
   ],
   "secret_values_exposed": false
