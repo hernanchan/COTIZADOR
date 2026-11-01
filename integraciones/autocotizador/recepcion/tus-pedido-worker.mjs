@@ -243,8 +243,11 @@ export async function finalizarPedidoTUSPrivado(request,env,{
   if(pedido.amountArs!==checked.verificacion.importeVerificado||
      pedido.paymentAuthorized!==false)
    throw Error('Importe privado no coincide con el servidor.');
+  if(!/^\d{3,}$/.test(pedido.numeroOrden||""))
+   throw Error('La Central no confirmó el número de orden.');
   return json({
    ok:true,webOrderId:registrado.orderId,orderId:pedido.commercialOrderId,
+   numeroOrden:pedido.numeroOrden,
    archivosVerificados:checked.claims.length,totalArs:pedido.amountArs,
    idempotent:pedido.idempotent,carritoDocumentalV2:true,
    checkoutEnabled:false,paymentAuthorized:false,listoParaProducir:false,
