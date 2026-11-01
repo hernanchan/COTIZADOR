@@ -1,0 +1,52 @@
+name: Diagnosticar activacion privada TUS sin capturas
+on:
+  push:
+    branches:
+      - integracion/tus-pedido-privado-20261101
+    paths:
+      - docs/INSPECCIONAR-TUS-ACTIVACION.trigger
+permissions:
+  actions: read
+  contents: write
+jobs:
+  inspeccionar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Leer ultimo resultado de activacion y guardar nombres de fallos
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          folder=$(mktemp -d)
+          trap 'rm -rf "$folder"' EXIT
+          api="https://api.github.com/repos/$REPO"
+          auth="Authorization: Bearer $GH_TOKEN"
+          curl --fail --silent --show-error -H "$auth" -H "Accept: application/vnd.github+json" --get \
+            --data-urlencode "branch=$BRANCH" --data-urlencode "per_page=20" \
+            "$api/actions/workflows/tus-activar-ensayo-privado.yml/runs" > "$folder/runs.json"
+          jq -e '.workflow_runs | type=="array"' "$folder/runs.json" >/dev/null
+          jq '[.workflow_runs[]|{id,head_sha,status,conclusion,created_at,html_url}]|.[0:8]' "$folder/runs.json" > "$folder/list.json"
+          run=$(jq -r '.[0].id // empty' "$folder/list.json")
+          if [ -n "$run" ]; then
+            curl --fail --silent --show-error -H "$auth" -H "Accept: application/vnd.github+json" \
+              "$api/actions/runs/$run/jobs?per_page=30" > "$folder/jobs.json"
+            jq '[.jobs[]|{name,conclusion,failed_steps:[.steps[]?|select(.conclusion=="failure" or .conclusion=="cancelled")|{name,conclusion}]}]' "$folder/jobs.json" > "$folder/failures.json"
+          else
+            echo '[]' > "$folder/failures.json"
+          fi
+          jq -n --slurpfile runs "$folder/list.json" --slurpfile jobs "$folder/failures.json" \
+            '{workflow:"tus-activar-ensayo-privado.yml",runs:$runs[0],jobs_latest:$jobs[0],secret_values_exposed:false}' > "$folder/report.json"
+          dest="docs/DIAGNOSTICO-ACTIVACION-TUS-20261101.json"
+          content=$(base64 -w0 "$folder/report.json")
+          existing=$(curl --silent --show-error --get -H "$auth" -H "Accept: application/vnd.github+json" \
+            --data-urlencode "ref=$BRANCH" "$api/contents/$dest" | jq -r '.sha // empty')
+          jq -n --arg msg "docs(tus): registrar etapa real del fallo GitHub Actions sin secretos" \
+            --arg content "$content" --arg branch "$BRANCH" --arg sha "$existing" \
+            'if $sha=="" then {message:$msg,content:$content,branch:$branch} else {message:$msg,content:$content,branch:$branch,sha:$sha} end' > "$folder/write.json"
+          curl --fail --silent --show-error -X PUT -H "$auth" -H "Accept: application/vnd.github+json" -H "Content-Type: application/json" \
+            --data-binary "@$folder/write.json" "$api/contents/$dest" > "$folder/written.json"
+          jq -r '"RUN="+(.workflow_runs[0].id|tostring)' "$folder/runs.json" || true
+          echo "DIAGNOSTICO_GUARDADO=$dest"
