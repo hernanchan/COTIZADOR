@@ -99,8 +99,19 @@ test('selector VISIBLE fuera de Más opciones: se monta antes del retorno de pan
  assert.equal(card.children.length,2,'Debe seguir disponible tras elegir dos páginas');
  mount(card,{...docJob,servicio:'fotos'},1);
  mount(card,{...docJob,seleccion:'original'},2);
- mount(card,{...docJob,seleccion:'sin-confirmar'},3);
- assert.equal(card.children.length,2,'No exponer el selector en fotos, ploteos ni formatos sin confirmar');
+ assert.equal(card.children.length,2,'Excluir fotos y ploteos');
+ // Caso REAL reportado: 14 páginas de 14×20 cm pendientes del tamaño final,
+ // sin abrir detalles: el cliente debe ver 1 o 2 inmediatamente.
+ const pendiente={...docJob,seleccion:'sin-confirmar',
+  paginas:Array.from({length:14},(_,i)=>({numero:i+1,anchoCm:14,altoCm:20}))};
+ mount(card,pendiente,3);
+ assert.equal(card.children.length,3,'NO ocultar 2 páginas mientras se pregunta por tamaño (14 × 20 cm)');
+ assert.ok(card.children[2].type==='selector');
+ mount(card,{...pendiente,paginas:[{anchoCm:29.7,altoCm:42}]},4);
+ assert.equal(card.children.length,4,'A3 pendiente también permite 1 o 2 páginas');
+ mount(card,{...pendiente,paginas:[{anchoCm:84.1,altoCm:118.9}]},5);
+ assert.equal(card.children.length,4,'No anticipar opción de 2 páginas en ploteo A0');
+ assert.ok(src.includes("e.seleccion==='sin-confirmar'&&enA3"),'La regla no debe requerir tamaño final para mostrar 1/2');
  assert.ok(page.includes('.composicion-visible{'));
  assert.ok(page.includes('.archivo .composicion-opcion{'));
  assert.ok(!page.includes('.panel-edicion .composicion-opcion{'));
