@@ -9,7 +9,7 @@ import {
 import {verificarTandaTUSYRecalcular} from '../integraciones/autocotizador/recepcion/tus-pedido-puente.mjs';
 import {
  tusPrivadoConfigurado,iniciarTandaTUSPrivada,finalizarPedidoTUSPrivado,
- manifiestoServidorTUS,descargarPdfTUSPersonal
+ manifiestoServidorTUS,descargarPdfTUSPersonal,consultarReciboTUSFirmadoD1
 } from '../integraciones/autocotizador/recepcion/tus-pedido-worker.mjs';
 import {conciliarManifiestoV2ConServidor} from '../integraciones/autocotizador/recepcion/registrar-manifiesto-v2-central.mjs';
 const subtle=webcrypto.subtle;
@@ -297,4 +297,27 @@ test('descarga operador: D1 verifica pertenencia y SHA del original antes de rev
  const mismatched=await descargarPdfTUSPersonal(req(),env,{authorized:true,fetcher:read,
   revisarD1:async()=>({found:true,webOrderId:ORDER,receiptId,sha256:'0'.repeat(64),bytes:data.length}),subtle});
  assert.equal(mismatched.status,403);assert.equal(storageReads,2);
+});
+
+
+test('regresión: consulta firmada D1 acepta SHA-256 válido y rechaza SHA inválido',async()=>{
+ const receiptId='DOC-'+randomUUID();
+ const central='https://saber-pagos-pruebas.example.workers.dev';
+ const sha256='a'.repeat(64);
+ const signedEnv={...env,CENTRAL_BRIDGE_KEY:'test-secret-bridge-key-with-40-characters-123456789',
+  CENTRAL_TEST_URL:central+'/internal/central/stage',
+  SABER_CENTRAL:{fetch:async request=>{
+   assert.equal(new URL(request.url).pathname,'/internal/central/receipt-check');
+   assert.ok(request.headers.get('x-saber-signature'));
+   return Response.json({ok:true,found:true,schema:'saber-central-tus-recibo-lookup-v1',
+    webOrderId:ORDER,receiptId,paymentAuthorized:false,listoParaProducir:false,
+    sha256,bytes:2048,pages:2});
+  }}};
+ const valid=await consultarReciboTUSFirmadoD1(signedEnv,ORDER,receiptId);
+ assert.equal(valid.sha256,sha256);
+ const invalid={...signedEnv,SABER_CENTRAL:{fetch:async()=>Response.json({
+  ok:true,found:true,schema:'saber-central-tus-recibo-lookup-v1',
+  webOrderId:ORDER,receiptId,paymentAuthorized:false,listoParaProducir:false,
+  sha256:'NOT_SHA',bytes:2048,pages:2})}};
+ await assert.rejects(consultarReciboTUSFirmadoD1(invalid,ORDER,receiptId),/recibo fuera del pedido/);
 });
