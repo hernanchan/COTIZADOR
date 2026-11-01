@@ -71,3 +71,37 @@ test('N-up figura en resumen de cada PDF, presupuesto y ficha sin afectar ploteo
  assert.match(page,/composicion-avanzada/);
  assert.ok(page.includes('Con doble faz')===false,'La frase debe quedar en el cliente, no en la plantilla');
 });
+
+
+test('selector VISIBLE fuera de Más opciones: se monta antes del retorno de panel cerrado',()=>{
+ const placement=src.indexOf('mostrarSelectorRapido(card,e,i);');
+ const hidden=src.indexOf('if(abierto!==i){bloque.append(card);continue}');
+ assert.ok(placement>0&&hidden>placement,'El selector debe estar montado fuera y ANTES del panel cerrado');
+ const start=src.indexOf('function mostrarSelectorRapido(');
+ const end=src.indexOf('\nfunction cantidadCopias(',start);
+ assert.ok(start>0&&end>start);
+ const creates=[];
+ const card={children:[],append(child){this.children.push(child)}};
+ const docJob={servicio:'auto',paginas:[{anchoCm:21,altoCm:29.7}],seleccion:'a4',paginasPorHoja:1};
+ const selectorPaginasPorCara=()=>({classList:{add(s){creates.push(s)}},type:'selector'});
+ const paginasElegidas=e=>e.paginas;
+ const clasificarDestino=(_pages,selected)=>selected==='a4'
+  ?{confirmado:true,destino:'documentos'}
+  :selected==='original'?{confirmado:true,destino:'ploteo'}
+  :{confirmado:false,destino:null};
+ const mount=new Function('paginasElegidas','clasificarDestino','selectorPaginasPorCara',
+  src.slice(start,end)+';return mostrarSelectorRapido;')(paginasElegidas,clasificarDestino,selectorPaginasPorCara);
+ mount(card,docJob,0);
+ assert.equal(card.children.length,1,'El selector debe existir aun cuando el detalle no se abra');
+ assert.deepEqual(creates,['composicion-visible']);
+ docJob.paginasPorHoja=2;
+ mount(card,docJob,0);
+ assert.equal(card.children.length,2,'Debe seguir disponible tras elegir dos páginas');
+ mount(card,{...docJob,servicio:'fotos'},1);
+ mount(card,{...docJob,seleccion:'original'},2);
+ mount(card,{...docJob,seleccion:'sin-confirmar'},3);
+ assert.equal(card.children.length,2,'No exponer el selector en fotos, ploteos ni formatos sin confirmar');
+ assert.ok(page.includes('.composicion-visible{'));
+ assert.ok(page.includes('.archivo .composicion-opcion{'));
+ assert.ok(!page.includes('.panel-edicion .composicion-opcion{'));
+});
