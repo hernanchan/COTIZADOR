@@ -5,6 +5,8 @@
   "deployment_id": "b68dcb3a-dde1-4285-a2b0-d3fab823e513",
   "origen": "Cloudflare deployments GET",
   "rama": "integracion/tus-pedido-privado-20261101",
-  "consultado_utc": "2026-11-01T15:19:39Z",
+  "consultado_utc": "2026-11-01T15:20:58Z",
+  "portal_http_anonimo": "401",
+  "portal_protegido": true,
   "nota": "No demuestra TUS E2E; no se enviaron archivos ni se activaron cobros."
 }
