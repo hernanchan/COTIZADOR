@@ -1,0 +1,104 @@
+name: Consultar D1 - pedido TUS real sin PII
+on:
+  push:
+    branches:
+      - integracion/tus-pedido-privado-20261101
+    paths:
+      - docs/COMPROBAR-D1-TUS-20261101.trigger
+permissions:
+  contents: write
+jobs:
+  verificar-registro-d1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    env:
+      CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      CF_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      BRANCH: ${{ github.ref_name }}
+    steps:
+      - name: Comprobar existencia por SQL exclusivamente SELECT/PRAGMA - no copiar datos personales
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,os,urllib.request,urllib.error,base64,datetime,re
+          a=os.environ.get('CF_ACCOUNT','')
+          token=os.environ.get('CF_TOKEN','')
+          gh=os.environ['GH_TOKEN']
+          repo=os.environ['REPO']
+          branch=os.environ['BRANCH']
+          webid='WEB-ENSAYO-01937C3514FB89DC23D78AE7BCBCDDDD'
+          commercial='e2d76c8b-ce1c-4daf-9030-4bd402295a68'
+          cfroot='https://api.cloudflare.com/client/v4/accounts/'+a
+          ghroot='https://api.github.com/repos/'+repo+'/contents/docs/RESULTADO-D1-TUS-20261101.json'
+          report={'metodo':'Cloudflare D1 API consultas SELECT/PRAGMA',
+            'verificado_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            'resultados':[], 'confirmado':False,'errores':[],
+            'nota':'Solo conteos del pedido de ensayo; sin secretos, datos personales ni escritura D1.'}
+          def call(url,method='GET',payload=None,auth=None):
+            body=json.dumps(payload).encode() if payload is not None else None
+            req=urllib.request.Request(url,data=body,method=method,headers={
+              'Authorization':'Bearer '+(auth or token),
+              'Content-Type':'application/json','Accept':'application/json',
+              'User-Agent':'LibreriaSaber-ReadOnly-D1-Diagnostic'})
+            try:
+              with urllib.request.urlopen(req,timeout=25) as resp:
+                return json.loads(resp.read(180000).decode())
+            except urllib.error.HTTPError as e:
+              raise RuntimeError('HTTP_'+str(e.code))
+          def query(db,sql,params=None):
+            v=call(cfroot+'/d1/database/'+db+'/query','POST',
+                {'sql':sql,'params':params or []})
+            if not v.get('success'): raise RuntimeError('QUERY_REJECTED')
+            rows=[]
+            for x in v.get('result',[]):rows.extend(x.get('results') or [])
+            return rows
+          try:
+            if not a or not token:raise RuntimeError('CLOUDFLARE_ACCOUNT_OR_TOKEN_UNAVAILABLE')
+            dbs=call(cfroot+'/d1/database?per_page=100')
+            if not dbs.get('success'):raise RuntimeError('D1_LIST_DENIED')
+            candidates=[db for db in dbs.get('result',[]) if
+              re.search(r'saber|central|pagos|pedido',db.get('name',''),re.I)][:12]
+            if not candidates:raise RuntimeError('NO_MATCHING_D1_DATABASE')
+            for db in candidates:
+              try:
+                tables=query(db['uuid'],"SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+                for t in tables:
+                  table=t.get('name','')
+                  if not re.search(r'pedido|orden|order|receipt|recibo|archivo|document|web',table,re.I):continue
+                  if not re.fullmatch(r'[A-Za-z0-9_]+',table):continue
+                  columns=query(db['uuid'],"PRAGMA table_info("+table+")")
+                  # No consultar contenido personal; solo columnas id relevantes y COUNT(*)
+                  ids=[col['name'] for col in columns if
+                      re.fullmatch(r'[A-Za-z0-9_]+',str(col.get('name',''))) and
+                      re.search(r'(^id$|order|pedido|web|commercial|receipt|recibo)',str(col.get('name','')),re.I)]
+                  for field in ids[:8]:
+                    sql='SELECT COUNT(*) AS n FROM "'+table+'" WHERE "'+field+'"=? OR "'+field+'"=?'
+                    try:
+                      rows=query(db['uuid'],sql,[webid,commercial])
+                      count=int(rows[0].get('n',0)) if rows else 0
+                      if count>0:
+                        report['resultados'].append({'base':db.get('name',''), 'tabla':table,
+                          'campo':field,'coincidencias':count})
+                        report['confirmado']=True
+                    except Exception:pass
+              except Exception as e:report['errores'].append('D1_QUERY_'+str(e)[:50])
+          except Exception as e:report['errores'].append(str(e)[:70])
+          data=base64.b64encode(json.dumps(report,ensure_ascii=False,indent=2).encode()).decode()
+          existing=None
+          try:existing=call(ghroot+'?ref='+branch,auth=gh).get('sha')
+          except Exception:pass
+          payload={'message':'docs(tus): comprobar existencia real pedido en D1 sin acceder a PII',
+                   'content':data,'branch':branch}
+          if existing:payload['sha']=existing
+          out=call(ghroot,'PUT',payload,auth=gh)
+          print('VERIFICACION_D1_GUARDADA')
+          print('D1_CONFIRMA_PEDIDO='+str(report['confirmado']))
+          print('D1_COINCIDENCIAS='+str(len(report['resultados'])))
+          print('D1_DIAGNOSTICOS='+','.join(report['errores'][:3]))
+          PY
