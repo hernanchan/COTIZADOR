@@ -121,7 +121,7 @@ test('descarga del personal exige Basic y consulta protegida D1+SHA; no publica 
 
 test('el cliente ve confirmación grande y número corto solo luego de registro D1',()=>{
  const html=paginaCotizadorV2PruebaPrivada(sitekey,true);
- const script=html.match(/<script type="module">([\\s\\S]+?)<\\/script>/)?.[1];
+ const script=html.match(/<script type="module">([\s\S]+?)<\/script>/)?.[1];
  assert.ok(script);
  const begin=script.indexOf('function mostrarEstadoCliente(');
  const end=script.indexOf('let batchSending=',begin);
