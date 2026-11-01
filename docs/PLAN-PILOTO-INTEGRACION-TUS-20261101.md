@@ -42,3 +42,13 @@ En la rama experimental, comparar interfaces reales del Worker privado y `lab-tu
 - `docs/AUDITORIA-BASES-OPEN-SOURCE-20261031.md`
 - `docs/DIAGNOSTICO-502-LOTE-20261028.md`
 - `docs/UX-CIRCUITO-UNICO-CLIENTE-V1.md`
+
+
+## 01/11/2026 — Primer ensayo integrado bloqueado: se usó DRIVE, no TUS
+
+- Captura del usuario del portal `/prueba-v2/`: error `[etapa LECTURA_DRIVE]`, 0 de 2 PDF verificados y control Turnstile visible. Es evidencia DIRECTA de que `TUS_ENABLED` se evaluó falso al generar la pantalla; el envío cayó en el transporte viejo Google Drive. No afirmar que Supabase falló: no recibió esa tanda.
+- Comprobación independiente Supabase Storage: 0 objetos nuevos en los 20 minutos anteriores a las 13:18 UTC; cuatro objetos anteriores, sin nuevas transferencias confirmadas.
+- El código condicionaba `TUS_ENABLED` a `tusPrivadoConfigurado(env)`; el pipeline legada seguía disponible silenciosamente si faltaba cualquier requisito. Faltan identificar las condiciones EXACTAS que no se cumplieron en el Worker desplegado. NO concluir que una clave particular es incorrecta sin comprobarlo.
+- Corrección en rama `integracion/tus-pedido-privado-20261101`: `diagnosticarTUSPrivado(env)` ofrece exclusivamente los nombres de requisitos fallidos bajo portal Basic privado, sin valores de secretos; la nueva pantalla V2 impide el envío si TUS no está listo, en vez de caer en Drive. Incluye prueba de regresión sintáctica. Commits `46288b2d`, `f77336d8`, `852d7cef`, `2f161b09`, `312df392`, `3829f524`.
+- Se solicitó preparar una nueva versión PRIVADA INACTIVA por GitHub Actions, trigger commit `61fe82cb`. No está validada como compilada/desplegada/promovida en el instante de este registro.
+- PRÓXIMO PASO: comprobar que `Verificar integración TUS privada` y `Preparar TUS privado INACTIVO` de `61fe82cb` están verdes; localizar la versión nueva creada; promoverla únicamente al Worker `saber-documentos-pruebas`. Abrir `/prueba-v2/` SIN subir PDFs. Si muestra mensaje bloqueado, copiar SOLAMENTE nombres de requisitos fallidos y corregirlos en Cloudflare, sin revelar secretos ni más pruebas de archivos. Si la página confirma TUS habilitado y oculta Turnstile, entonces hacer una prueba E2E controlada. Nunca repetir un envío por Drive.
