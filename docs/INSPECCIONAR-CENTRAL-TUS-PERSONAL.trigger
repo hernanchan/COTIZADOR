@@ -13,3 +13,5 @@ Consulta última ejecución 815da702 de Central corto 001 sin exponer secretos.
 Consultar resultado ejecución 23bc9ebe con PDF A4/A3 de prueba e instrucciones verificadas. Sin secretos ni archivos privados.
 
 Verificar Central A5 2afcb0c5: tests privados y estado de seguridad paymentsEnabled:false, formato A5 tarifa A4.
+
+Inspeccionar CI de tamaños originales 14x20 Central por commit 3e46f666: conservar medidas verificadas en D1 y ZIP, 0 errores, 401 sin contraseña.
