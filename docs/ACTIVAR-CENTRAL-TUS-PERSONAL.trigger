@@ -16,3 +16,5 @@ CI reintento: la suite del manifiesto importa pdf-lib; ahora instalado explícit
 Activar Central versión de pedido corto visible también en respuesta de prepare-order, incluyendo reintentos históricos. Sin cobros, JWT privados intactos. Revalidación CI.
 
 2026-11-01 — Corregir NO CONSTA en órdenes nuevas: ficha servidor usa materialColor verificado, B/N estandar sin atribuir gramaje, grupoAnillado persistido en D1 y ZIP, validación de campos obligatorios. Pruebas con PDF A4/A3 reales generados y distintas opciones, sin subir archivos de clientes; desplegar sólo Central privada después de suites verdes, rollback y pagos desactivados.
+
+2026-11-01 ~17:31 ART — A5 original: mostrar tamaño real A5 + tarifa A4 en ficha de impresión Centro, formatoFinal a5 inmutable, instructivo ZIP 'A5 sin ampliar', sin permitir imposición no verificada. Suite central requiere nuevo test A5; solo saber-pagos-pruebas, no web comercial ni pagos.
