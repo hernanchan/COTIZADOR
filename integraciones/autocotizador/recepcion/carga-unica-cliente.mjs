@@ -532,7 +532,7 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
  bridgeButton.textContent='Agregar PDF al envío privado';
  const info=document.createElement('p');
  info.className='pie';info.setAttribute('role','status');
- info.textContent='Para este ensayo el envío integrado admite sólo PDF completos A4/A3 sin anillado. Los ploteos se cotizan, pero quedan pendientes de integración con el servidor.';
+ info.textContent='Recepción privada de hasta 10 PDF por pedido (máximo 20 MB por archivo y 60 MB en total). Impresiones y ploteos se verifican y registran en la Central. La selección parcial de páginas y el anillado conjunto todavía requieren integración.';
  const resumen=$('resumenPedido');
  resumen?.parentNode?.insertBefore(bridgeButton,resumen);
  bridgeButton.insertAdjacentElement('afterend',info);
