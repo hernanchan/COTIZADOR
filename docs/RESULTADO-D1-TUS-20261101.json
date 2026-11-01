@@ -1,0 +1,10 @@
+{
+  "metodo": "Cloudflare D1 API consultas SELECT/PRAGMA",
+  "verificado_utc": "2026-11-01T15:39:44.817358+00:00",
+  "resultados": [],
+  "confirmado": false,
+  "errores": [
+    "HTTP_401"
+  ],
+  "nota": "Solo conteos del pedido de ensayo; sin secretos, datos personales ni escritura D1."
+}
