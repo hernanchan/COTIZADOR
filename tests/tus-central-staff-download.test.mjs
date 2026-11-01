@@ -185,3 +185,10 @@ test('asignación nueva se guarda atómicamente en el lote de pedido junto al D1
  assert.match(source,/INSERT OR IGNORE INTO central_work_order_numbers/);
  assert.ok(!source.includes('ROW_NUMBER() OVER'));
 });
+
+
+test('A5 original se presenta como A5, con tarifa A4 explícita, sin mutar la ficha',()=>{
+ assert.match(source,/\["a5","a4","a3"\]\.includes\(t\.formatoFinal\)/);
+ assert.match(source,/t\.formatoFinal==="a5"\?"Tarifa A4 vigente \(A5 sin ampliar\)"/);
+ assert.match(source,/formatoFinal:texto\(w\.formatoFinal\)/);
+});
