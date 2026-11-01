@@ -17,3 +17,5 @@ Verificar Central A5 2afcb0c5: tests privados y estado de seguridad paymentsEnab
 Inspeccionar CI de tamaños originales 14x20 Central por commit 3e46f666: conservar medidas verificadas en D1 y ZIP, 0 errores, 401 sin contraseña.
 
 Confirmar CI rerun 70167930 con ficha original 14x20 sin confundir formato con tarifa, seguridad y 401.
+
+2026-11-01 inspeccionar CI `60cabd95`: preservar fichas D1 planos CAD+Póster por página y enviar al ZIP, número original, rollos obra y recubierto, sin cobros. Verificar HEALTH + HTTP401.
