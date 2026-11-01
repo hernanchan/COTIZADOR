@@ -43,3 +43,5 @@ Verificar CI segundo fallo 2-up con tamaño sin confirmar para PDF 14×20; activ
 Consultar CI activación ZIP Adobe tras commit 7d11936b: etiquetas PDF_01/original, doble faz, 2 por cara, tamaño original 14x20 y HTML seguro. Informar versión activa y HTTP401 sin mostrar secretos.
 
 2026-11-01 inspeccionar trigger 37fb03eb: CI tests de ZIP autoiniciado desde Central, descarga de 3 PDF concurrentes, reintento, límites y bytes originales. Comprobar RUN, versión activa y anónimo HTTP401; no exponer secretos.
+
+2026-11-01 inspeccionar CI ZIP ploteo tras trigger a0f0629b y Central 41358467843; pruebas de CAD/póster, 2 PDF firmados y render ZIP, versión activa HTTPS 401 sin cobros.
