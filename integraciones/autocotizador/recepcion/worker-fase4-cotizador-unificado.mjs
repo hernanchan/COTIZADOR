@@ -30,6 +30,7 @@ import cotizadorV2OriginalHtml from '../../../cotizador-web-v2.html';
 import v2ReaderClientJs from './cotizador-v2-ensayo-archivos.txt';
 import v2UploadClientJs from './subir-vincular-pdf-v2-privado.txt';
 import v2ManifestClientJs from './preparar-manifiesto-v2-documental.txt';
+import v2TUSClientJs from './tus-directo-cliente.txt';
 import cargaClienteJs from './carga-unica-cliente.txt';
 import {cotizarPloteosRapido} from '../pruebas/cotizar-ploteos-rapido.mjs';
 import plotClienteJs from './ploteos-rapido-cliente.txt';
@@ -38,7 +39,7 @@ import {cotizarDocumentos} from '../pruebas/cotizar-documentos.mjs';
 import {cotizarDocumentosIndividuales} from '../pruebas/cotizar-documentos-individuales.mjs';
 import preciosPiloto from '../../../precios-web.json';
 import {verificarPdfAlmacenado} from './verificacion-pdf-drive-servidor.mjs';
-import {iniciarTandaTUSPrivada,finalizarPedidoTUSPrivado,descargarPdfTUSPersonal} from './tus-pedido-worker.mjs';
+import {tusPrivadoConfigurado,iniciarTandaTUSPrivada,finalizarPedidoTUSPrivado,descargarPdfTUSPersonal} from './tus-pedido-worker.mjs';
 /**
  * SABER — DOCUMENTOS — ARCHIVO ÚNICO LISTO PARA PEGAR EN CLOUDFLARE
  *
@@ -1712,7 +1713,7 @@ async function v2PrivateBrowserResponse(request,env,path){
     'Referrer-Policy':'no-referrer',
     'X-Frame-Options':'SAMEORIGIN'};
   if(path==='/prueba-v2/'){
-   const html=paginaCotizadorV2PruebaPrivada(env.DOCS_TURNSTILE_SITE_KEY);
+   const html=paginaCotizadorV2PruebaPrivada(env.DOCS_TURNSTILE_SITE_KEY,tusPrivadoConfigurado(env));
    return new Response(html,{status:200,headers:{
     ...headers,'Set-Cookie':await v2SessionCookie(env),
     'Content-Type':'text/html; charset=utf-8'}});
@@ -1792,6 +1793,8 @@ async function v2PrivateBrowserResponse(request,env,path){
   if(path==='/prueba-v2/subir-vincular-pdf.mjs')
    return new Response(v2UploadClientJs,{status:200,headers:{
     ...headers,'Content-Type':'text/javascript; charset=utf-8'}});
+  if(path==='/prueba-v2/tus-directo.mjs'&&tusPrivadoConfigurado(env))
+   return new Response(v2TUSClientJs,{status:200,headers:{...headers,'Content-Type':'text/javascript; charset=utf-8'}});
   return closed();
  }catch{
   return testResponse({ok:false,error:'La pantalla privada no está lista'},503);
@@ -1807,6 +1810,7 @@ export default {
        page==='/prueba-v2/precios-web.json'||
        page==='/prueba-v2/cotizador-v2-ensayo-archivos.mjs'||
        page==='/prueba-v2/subir-vincular-pdf.mjs'||
+       page==='/prueba-v2/tus-directo.mjs'||
        page==='/prueba-v2/preparar-manifiesto.mjs')
       return v2PrivateBrowserResponse(request,env,page);
     if(page==='/prueba-cotizador-pdf'&&request.method==='GET')return fase4Html(env);
