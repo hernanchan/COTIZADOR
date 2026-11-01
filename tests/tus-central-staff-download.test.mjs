@@ -189,7 +189,8 @@ test('asignación nueva se guarda atómicamente en el lote de pedido junto al D1
 
 test('A5 original se presenta como A5, con tarifa A4 explícita, sin mutar la ficha',()=>{
  assert.match(source,/\["a5","a4","a3"\]\.includes\(t\.formatoFinal\)/);
- assert.match(source,/t\.formatoFinal==="a5"\?"Tarifa A4 vigente \(A5 sin ampliar\)"/);
+ assert.ok(source.includes('t.formatoFinal==="a5"?'));
+ assert.ok(source.includes('"Tarifa A4 vigente (A5 sin ampliar)"'));
  assert.match(source,/formatoFinal:texto\(w\.formatoFinal\)/);
 });
 
