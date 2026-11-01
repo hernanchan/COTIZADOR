@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {decidirTamanoCliente} from './decision-tamano-impresion.mjs';
+import {cotizarCargaUnica} from './cotizar-carga-unica.mjs';
 
 const pagina=(x,y)=>({anchoCm:x,altoCm:y});
 const decide=(x,y)=>decidirTamanoCliente([pagina(x,y)]);
@@ -44,6 +45,24 @@ test('tolerancia de A3 no deriva a ploteo sin motivo',()=>{
   assert.equal(d.superaA3,false);
   assert.equal(d.seleccionInicial,'sin-confirmar');
  }
+});
+test('la preselección automática de un plano CAD municipal da presupuesto completo en rollo90',()=>{
+ const paginaPlano={numero:1,anchoCm:97.01,altoCm:61.49,modo:'cad'};
+ const seleccion=decidirTamanoCliente([paginaPlano]).seleccionInicial;
+ const precios=JSON.parse(readFileSync(new URL('../precios-web.json',import.meta.url),'utf8'));
+ const cotizacion=cotizarCargaUnica({precios,archivos:[{
+  nombre:'Municipal_SUM_COCHERAS_Presentacion.pdf',
+  paginas:[paginaPlano],servicio:'auto',seleccion,paginasSeleccionadas:'',
+  modo:'bn',caras:'simple',copias:1,papelPoster:'obra80',anillado:'ninguno',
+  grupoAnillado:'',materialColor:''
+ }]});
+ assert.equal(cotizacion.estado,'PRELIMINAR');
+ assert.equal(cotizacion.plan[0].destino,'ploteos');
+ assert.equal(cotizacion.plan[0].formatoFinal,'original');
+ assert.equal(cotizacion.detallePloteos[0].paginas[0].material,'rollo90');
+ assert.equal(cotizacion.detallePloteos[0].paginas[0].modo,'cad');
+ assert.equal(cotizacion.total,5900);
+ assert.equal(cotizacion.paymentAuthorized,false);
 });
 test('regla especial 20×20 siempre usa A4, sin pregunta',()=>{
  const d=decide(20,20);
