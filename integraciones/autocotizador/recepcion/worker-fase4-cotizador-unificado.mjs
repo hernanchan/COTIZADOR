@@ -27,6 +27,8 @@ import {registrarPdfCompuestoCentralFirmado} from './registrar-pdf-compuesto-cen
 import {verificarVinculoCotizadorV2} from './verificar-vinculo-cotizador-v2.mjs';
 import {paginaCotizadorV2PruebaPrivada} from './pantalla-cotizador-v2-prueba-privada.mjs';
 import {paginaDescargaTUSPersonal} from './pantalla-descarga-tus-personal.mjs';
+import {paginaPaqueteTUSPersonal} from './pantalla-paquete-tus-personal.mjs';
+import {consultarPaqueteTUSPersonal} from './tus-paquete-personal.mjs';
 import cotizadorV2OriginalHtml from '../../../cotizador-web-v2.html';
 import v2ReaderClientJs from './cotizador-v2-ensayo-archivos.txt';
 import v2UploadClientJs from './subir-vincular-pdf-v2-privado.txt';
@@ -1714,6 +1716,14 @@ async function v2PrivateBrowserResponse(request,env,path){
     'X-Content-Type-Options':'nosniff',
     'Referrer-Policy':'no-referrer',
     'X-Frame-Options':'SAMEORIGIN'};
+  if(path==='/prueba-v2/orden-paquete'){
+   if(!tusPrivadoConfigurado(env))
+    return testResponse({ok:false,error:'ZIP privado deshabilitado',paymentAuthorized:false},503);
+   return new Response(paginaPaqueteTUSPersonal(),{status:200,headers:{
+    ...headers,'Content-Type':'text/html; charset=utf-8',
+    'Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+   }});
+  }
   if(path==='/prueba-v2/personal-descargar'){
    if(!tusPrivadoConfigurado(env))
     return testResponse({ok:false,error:'Descarga TUS privada deshabilitada',paymentAuthorized:false},503);
@@ -1821,7 +1831,7 @@ async function v2PrivateBrowserResponse(request,env,path){
 export default {
   async fetch(request, env, ctx) {
     const page=new URL(request.url).pathname;
-    if(page==='/prueba-v2/'||page==='/prueba-v2/personal-descargar'||page==='/prueba-v2/cotizador'||
+    if(page==='/prueba-v2/'||page==='/prueba-v2/orden-paquete'||page==='/prueba-v2/personal-descargar'||page==='/prueba-v2/cotizador'||
        page==='/prueba-v2/carga-inteligente'||
        page==='/prueba-v2/carga-inteligente.js'||
        page==='/prueba-v2/precios-web.json'||
@@ -1857,6 +1867,11 @@ export default {
     if(page==='/api/ensayo-preparar-documentos-v2')return apiFichaCentralPrivada(request,env,false,false,false,true,false,true);
     if(page==='/api/ensayo-preparar-documentos-v2-lote')return apiPrepararDocumentosV2Lote(request,env);
     // V1 TUS: solo entorno privado y autorizado, nunca comercial ni pagos.
+    // Ficha D1 para el ZIP, estrictamente Basic del operador.
+    if(page==='/prueba-v2/api/ensayo-tus-paquete-manifiesto')
+      return consultarPaqueteTUSPersonal(request,env,{
+       authorized:v2PrivateBrowserAuthorized(request,env)==='allow'
+      });
     // Descarga del operador: estrictamente Basic, nunca cookie de comprador.
     if(page==='/prueba-v2/api/ensayo-tus-descargar-personal')
       return descargarPdfTUSPersonal(request,env,{
