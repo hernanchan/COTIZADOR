@@ -14,3 +14,5 @@
 CI reintento: la suite del manifiesto importa pdf-lib; ahora instalado explícitamente en workflow privado central (commit 4ae4c6c5). No publicar si fallan pruebas.
 
 Activar Central versión de pedido corto visible también en respuesta de prepare-order, incluyendo reintentos históricos. Sin cobros, JWT privados intactos. Revalidación CI.
+
+2026-11-01 — Corregir NO CONSTA en órdenes nuevas: ficha servidor usa materialColor verificado, B/N estandar sin atribuir gramaje, grupoAnillado persistido en D1 y ZIP, validación de campos obligatorios. Pruebas con PDF A4/A3 reales generados y distintas opciones, sin subir archivos de clientes; desplegar sólo Central privada después de suites verdes, rollback y pagos desactivados.
