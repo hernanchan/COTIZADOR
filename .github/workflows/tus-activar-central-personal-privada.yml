@@ -1,0 +1,89 @@
+name: Activar Centro TUS personal SOLO en Worker de pagos PRUEBAS
+on:
+  push:
+    branches:
+      - integracion/tus-pedido-privado-20261101
+    paths:
+      - docs/ACTIVAR-CENTRAL-TUS-PERSONAL.trigger
+permissions:
+  contents: read
+concurrency:
+  group: saber-tus-central-personal-privado
+  cancel-in-progress: false
+jobs:
+  activar-central-pruebas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Pruebas D1 del Centro aisladas de cobros
+        run: |
+          set -euo pipefail
+          node --test tests/tus-central-staff-download.test.mjs
+          node --check integraciones/mercadopago/pruebas/worker.js
+          grep -Fq '/admin/api/central/unpaid-detail' integraciones/mercadopago/pruebas/worker.js
+          grep -Fq 'Descargar PDF original' integraciones/mercadopago/pruebas/worker.js
+          grep -Fq 'paymentAuthorized:false,listoParaProducir:false' integraciones/mercadopago/pruebas/worker.js
+      - name: Desplegar UNICAMENTE Worker de central de PRUEBAS con rollback
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-pagos-pruebas"
+          auth="Authorization: Bearer $TOKEN"
+          workdir=$(mktemp -d)
+          trap 'rm -rf "$workdir"' EXIT
+          curl --fail --silent --show-error --max-time 25 -H "$auth" "$root/settings" > "$workdir/settings.json"
+          jq -e '.success == true and (.result.bindings | type == "array")' "$workdir/settings.json" >/dev/null
+          for binding in DB CENTRAL_BRIDGE_KEY DEMO_ADMIN_KEY MP_TEST_ACCESS_TOKEN; do
+            jq -e --arg name "$binding" '.result.bindings | any(.name==$name)' "$workdir/settings.json" >/dev/null
+          done
+          jq -e '.result.bindings | any(.name=="DB" and (.type=="d1" or .type=="d1_database"))' "$workdir/settings.json" >/dev/null
+          curl --fail --silent --show-error --max-time 25 -H "$auth" "$root/deployments" > "$workdir/before.json"
+          jq -e '.success==true' "$workdir/before.json" >/dev/null
+          previous=$(jq -r '.result.deployments[0].versions[]? | select(.percentage==100) | .version_id' "$workdir/before.json" | head -n 1)
+          test -n "$previous"
+          echo "VERSION_CENTRAL_ANTERIOR=$previous"
+          jq -n --slurpfile settings "$workdir/settings.json"             '{main_module:"worker.js",annotations:{"workers/message":"Centro TUS personal SOLO en Worker privado de pruebas. Sin pagos nuevos ni sitio comercial."},bindings:[$settings[0].result.bindings[] | {name,type:"inherit"}]}' > "$workdir/metadata.json"
+          curl --fail --silent --show-error --max-time 75             -H "$auth"             -F "metadata=@$workdir/metadata.json;type=application/json"             -F "worker.js=@integraciones/mercadopago/pruebas/worker.js;filename=worker.js;type=application/javascript+module"             "$root/versions?bindings_inherit=strict" > "$workdir/version.json"
+          if ! jq -e '.success==true and (.result.id | type=="string")' "$workdir/version.json" >/dev/null; then
+            jq -c '{success,errors:[.errors[]?|{code,message}]}' "$workdir/version.json"; exit 1
+          fi
+          target=$(jq -r '.result.id' "$workdir/version.json")
+          jq -n --arg v "$target" '{strategy:"percentage",versions:[{percentage:100,version_id:$v}],annotations:{"workers/message":"Centro TUS personal SOLO en Worker privado de pruebas. Sin pagos nuevos ni sitio comercial."}}' > "$workdir/deploy.json"
+          curl --silent --show-error --max-time 60             -H "$auth" -H "Content-Type: application/json"             --data-binary "@$workdir/deploy.json" "$root/deployments" > "$workdir/response.json"
+          jq -e '.success==true' "$workdir/response.json" >/dev/null || {
+            jq -c '{success,errors:[.errors[]?|{code,message}]}' "$workdir/response.json";exit 1
+          }
+          active=""
+          for i in 1 2 3 4 5 6; do
+            curl --fail --silent --show-error --max-time 20 -H "$auth" "$root/deployments" > "$workdir/after.json"
+            active=$(jq -r '.result.deployments[0].versions[]? | select(.percentage==100) | .version_id' "$workdir/after.json" | head -n 1)
+            if [ "$active" = "$target" ]; then break; fi
+            sleep 2
+          done
+          if [ "$active" != "$target" ]; then
+            echo 'ERROR_CENTRAL_TRAFFIC_VERSION_UNVERIFIED';exit 1
+          fi
+          echo "CENTRAL_TUS_PRIVATE_VERSION=$target"
+          http=$(curl --silent --show-error --max-time 30 -o "$workdir/admin-response.txt" -w '%{http_code}'             "https://saber-pagos-pruebas.libreriasaber.workers.dev/admin/api/central/unpaid-detail?id=e2d76c8b-ce1c-4daf-9030-4bd402295a68" || true)
+          health=$(curl --silent --show-error --max-time 30             "https://saber-pagos-pruebas.libreriasaber.workers.dev/health" || true)
+          safe=false
+          if [ "$http" = "401" ] && echo "$health" | jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' >/dev/null; then safe=true; fi
+          if [ "$safe" != true ]; then
+            echo "CENTRAL_PRIVATE_SAFETY_CHECK_FAILED:HTTP_$http - ROLLBACK"
+            jq -n --arg v "$previous" '{strategy:"percentage",versions:[{percentage:100,version_id:$v}],annotations:{"workers/message":"Rollback automatico: centro privado seguridad o health falló"}}' > "$workdir/rollback.json"
+            curl --fail --silent --show-error --max-time 60 -H "$auth" -H "Content-Type: application/json"               --data-binary "@$workdir/rollback.json" "$root/deployments" > "$workdir/rollback-result.json"
+            jq -e '.success == true' "$workdir/rollback-result.json" >/dev/null
+            exit 1
+          fi
+          echo "CENTRAL_PROTECTED_HTTP401_AND_HEALTH_OK; PAGOS_DESACTIVADOS"
