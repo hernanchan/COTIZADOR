@@ -21,7 +21,7 @@ test('portal actual conserva un CTA y scripts HTML válidos con TUS OFF y ON',as
   assert.ok(match[1].includes('TUS_ENABLED&&!tusPreflightOK'));
   assert.ok(match[1].includes('STORAGE_FIRMA_OK'));
   assert.ok(match[1].includes("registeredShortOrder"));
-  assert.ok(match[1].includes("Orden de trabajo N.º "));
+  assert.ok(match[1].includes("Orden N.º "));
   assert.ok(html.includes('id="send-all-pdf"'));
   assert.ok(html.includes('id="precio-smart"'));
   assert.ok(match[1].includes('await enviarTUSDesdeCarrito(pending)'));
