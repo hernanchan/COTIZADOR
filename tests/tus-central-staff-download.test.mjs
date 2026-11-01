@@ -74,3 +74,24 @@ test('la vista central enlaza solo recibos de TUS a portal Basic, no ofrece URLs
  assert.ok(source.includes('/prueba-v2/personal-descargar'));
  assert.ok(!source.includes('getPublicUrl('));
 });
+
+
+test('botón Ver PDF privados abre detalle JUNTO al pedido y muestra fallas en el mismo lugar',()=>{
+ const pos=source.indexOf('const adminHtml = `');
+ const start=source.indexOf('<script>',pos);
+ const end=source.indexOf('</script>',start);
+ assert.ok(pos>=0&&start>pos&&end>start);
+ const client=source.slice(start+8,end);
+ new vm.Script(client);
+ assert.match(client,/showUnpaidDetails\(o\.commercial_order_id,panel,btn\)/);
+ assert.match(client,/li\.append\(btn\);\s*li\.append\(panel\)/);
+ const show=client.slice(client.indexOf('async function showUnpaidDetails('),
+  client.indexOf('async function refreshCronState(){'));
+ assert.ok(show.includes('target.replaceChildren('));
+ assert.ok(show.includes('target.append(area)'));
+ assert.ok(show.includes('target.scrollIntoView('));
+ assert.ok(show.includes('No se pudo abrir este pedido'));
+ assert.ok(show.includes('trigger.disabled=true'));
+ assert.ok(!show.includes('details.replaceChildren('),
+  'No usar la columna de detalle al final de una lista larga');
+});
