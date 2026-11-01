@@ -38,6 +38,7 @@ import {cotizarDocumentos} from '../pruebas/cotizar-documentos.mjs';
 import {cotizarDocumentosIndividuales} from '../pruebas/cotizar-documentos-individuales.mjs';
 import preciosPiloto from '../../../precios-web.json';
 import {verificarPdfAlmacenado} from './verificacion-pdf-drive-servidor.mjs';
+import {iniciarTandaTUSPrivada,finalizarPedidoTUSPrivado,descargarPdfTUSPersonal} from './tus-pedido-worker.mjs';
 /**
  * SABER — DOCUMENTOS — ARCHIVO ÚNICO LISTO PARA PEGAR EN CLOUDFLARE
  *
@@ -1834,6 +1835,18 @@ export default {
     if(page==='/api/ensayo-probar-puente-central')return diagnosticoPuenteCentral(request,env);
     if(page==='/api/ensayo-preparar-documentos-v2')return apiFichaCentralPrivada(request,env,false,false,false,true,false,true);
     if(page==='/api/ensayo-preparar-documentos-v2-lote')return apiPrepararDocumentosV2Lote(request,env);
+    // V1 TUS: solo entorno privado y autorizado, nunca comercial ni pagos.
+    if(page==='/api/ensayo-tus-iniciar'||page==='/api/ensayo-tus-registrar'||
+       page==='/api/ensayo-tus-descargar'){
+      const basic=v2PrivateBrowserAuthorized(request,env)==='allow';
+      const authorized=page==='/api/ensayo-tus-descargar'?basic
+        :(basic||(await v2SessionAuthorized(request,env)));
+      if(page==='/api/ensayo-tus-iniciar')
+        return iniciarTandaTUSPrivada(request,env,{authorized});
+      if(page==='/api/ensayo-tus-registrar')
+        return finalizarPedidoTUSPrivado(request,env,{authorized,preciosServidor:preciosPiloto});
+      return descargarPdfTUSPersonal(request,env,{authorized});
+    }
     if(page==='/api/ensayo-preparar-documentos-lote')return apiFichaCentralPrivada(request,env,false,false,true,true);
     if(page==='/api/ensayo-guardar-pdf-compuesto')return apiFichaCentralPrivada(request,env,false,false,false,false,true);
     if(page==='/api/ensayo-carga-unica'){
