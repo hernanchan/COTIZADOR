@@ -24,3 +24,5 @@ Activar Central versión de pedido corto visible también en respuesta de prepar
 2026-11-01 — Revalidar original menor que A4, 14 × 20 cm, tras actualizar test heredado de presentación A5; debe preservar medidas por página en D1 y ZIP, sin pagos ni producción, solo Central privada. Commit test de2ef457.
 
 2026-11-01 — CIERRE PLOTEOS CAD/POSTER EN D1: conservar `planoPorPagina` verificado por servidor a partir del PDF TUS en `centralSafeManifest`, validar correspondencia número original, dimensiones, rollo y papel, bloquear si la ficha de ploteo está incompleta. Exponer detalle de cada plano en la Central y en paquete firmado ZIP. Tests: `tus-instrucciones-reales` prueba 2 páginas CAD + Poster recubierto con PDF real/firmas, `tus-paquete-manifiesto` conserva plan en respuesta firmada, `tus-zip-orden-privada` verifica instrucciones impresas. Desplegar SOLO saber-pagos-pruebas con rollback 401+health sin pagos; no main ni web comercial.
+
+2026-11-01: Actualizar texto de Centro: el operador imprime desde Adobe los PDF originales privados; no se genera PDF compuesto. CI obligatoria, despliegue solo Central de pruebas. Codigo dd1bbb40.
