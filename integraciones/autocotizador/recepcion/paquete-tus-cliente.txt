@@ -30,6 +30,7 @@ function format(t){
   ['Archivo original',t.nombreOriginal],
   ['Páginas a imprimir',pages],
   ['Tamaño',t.formatoFinal?.toUpperCase()],
+  ...(t.formatoFinal==='a5'?[['Tarifa aplicada','A4 vigente; A5 a escala original sin ampliación. No incluye corte.']]:[]),
   ['Color',mode],['Caras',sides],
   ['Páginas por cara',t.paginasPorCaraPresupuestadas],
   ['Copias',t.copias],['Papel',papelLegible],['Anillado',ring],
