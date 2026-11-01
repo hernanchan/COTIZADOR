@@ -13,6 +13,7 @@ test('portal actual conserva un CTA y scripts HTML válidos con TUS OFF y ON',as
   const transformed=await transform(match[1],{loader:'js',format:'esm',target:'es2022'});
   assert.ok(transformed.code.length>2500);
   assert.ok(match[1].includes('const TUS_ENABLED='+enabled));
+  assert.ok(match[1].includes('const TUS_BLOCKED='+(!enabled)));
   assert.ok(html.includes('id="send-all-pdf"'));
   assert.ok(html.includes('id="precio-smart"'));
   assert.ok(match[1].includes('await enviarTUSDesdeCarrito(pending)'));
