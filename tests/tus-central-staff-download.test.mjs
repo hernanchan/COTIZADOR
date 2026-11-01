@@ -95,3 +95,54 @@ test('botón Ver PDF privados abre detalle JUNTO al pedido y muestra fallas en e
  assert.ok(!show.includes('details.replaceChildren('),
   'No usar la columna de detalle al final de una lista larga');
 });
+
+
+test('instrucciones de impresión visibles, sin asumir opciones ausentes',()=>{
+ const begin=source.indexOf('const adminHtml = `');
+ const start=source.indexOf('<script>',begin),end=source.indexOf('</script>',start);
+ assert.ok(start>=0&&end>start);
+ const client=source.slice(start+8,end);
+ // La interpolación de template literals deja escapes JS correctos en el HTML.
+ const generated=vm.runInContext('adminHtml',ctx);
+ const parsed=generated.slice(generated.indexOf('<script>')+8,generated.indexOf('</script>'));
+ new vm.Script(parsed);
+ assert.ok(client.includes('function agregarFichaDeImpresion('));
+ assert.ok(client.includes('agregarFichaDeImpresion(area,t);'));
+ assert.ok(client.includes('NO CONSTA — verificar'));
+ assert.ok(client.includes('tipoAnillado'));
+ assert.ok(client.includes('Páginas por cara'));
+ assert.ok(client.includes('Copiar instrucciones'));
+ assert.ok(client.includes('NO IMPRIMIR SIN PAGO CONFIRMADO'));
+});
+
+test('la normalización firmada conserva anillado y no lo inventa para pedidos históricos',()=>{
+ const receipt='DOC-12345678-1234-4234-8234-1234567890ab';
+ const bytes=10131027,sha='b'.repeat(64);
+ const data={
+  schema:'saber-central-recepcion-verificada-v1',orderId:webId,
+  filesReceived:true,paymentAuthorized:false,listoParaProducir:false,
+  importeVerificado:2432,
+  recibos:[{fileId:'file1',receiptId:receipt,sha256:sha,bytes,pages:16}],
+  ficha:{schema:'saber-central-ficha-produccion-v1',orderId:webId,
+   pagoConfirmado:false,listoParaProducir:false,totalVerificadoSinPago:2432,
+   trabajos:[{
+    orden:1,idTrabajo:'work1',servicio:'documentos',
+    fileId:'file1',nombreOriginal:'prueba.pdf',reciboPrivado:receipt,
+    sha256:sha,paginasOriginales:16,paginasElegidas:Array.from({length:16},(_,i)=>i+1),
+    copias:1,formatoFinal:'a4',carasPresupuestadas:'simple',
+    paginasPorCaraPresupuestadas:1,tipoAnillado:'individual',
+    material:'obra80',modo:'bn',
+    pdfImprimibleVerificado:false,descargaPrivadaHabilitada:false
+   }]}
+ };
+ const normalize=vm.runInContext('centralSafeManifest',ctx);
+ const normalized=normalize(data);
+ assert.equal(normalized.trabajos[0].tipoAnillado,'individual');
+ assert.equal(normalized.trabajos[0].carasPresupuestadas,'simple');
+ assert.equal(normalized.trabajos[0].modo,'bn');
+ assert.equal(normalized.trabajos[0].material,'obra80');
+ const historical=structuredClone(data);
+ delete historical.ficha.trabajos[0].tipoAnillado;
+ assert.equal(normalize(historical).trabajos[0].tipoAnillado,null);
+ assert.equal(normalize(historical).pagoConfirmado,false);
+});
