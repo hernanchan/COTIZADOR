@@ -144,6 +144,23 @@ function centralSafeManifest(data){
      ?w.medidasOriginalesCm.map(p=>({pagina:p.pagina,anchoCm:p.anchoCm,altoCm:p.altoCm})):null;
   if(w.formatoFinal==="personalizado_a4"&&!medidasOriginalesCm)
    throw Error("Faltan medidas originales verificadas en la orden.");
+  // El motor de precios YA verificó medidas, modo CAD/Póster y rollo de
+  // CADA página. No descartarlos al escribir el manifiesto inmutable D1.
+  const planoPorPagina=w.servicio==="ploteos"&&
+   Array.isArray(w.planoPorPagina)&&
+   w.planoPorPagina.length===w.paginasElegidas.length&&
+   w.planoPorPagina.every((p,i)=>p&&
+    p.numeroOriginal===w.paginasElegidas[i]&&
+    ["cad","poster"].includes(p.modo)&&
+    Number.isFinite(p.anchoCm)&&Number.isFinite(p.altoCm)&&
+    p.anchoCm>0&&p.altoCm>0&&p.anchoCm<=2000&&p.altoCm<=2000&&
+    typeof p.rollo==="string"&&/^(rollo|rec)\d+$/.test(p.rollo)&&
+    ["obra80","recubierto"].includes(p.papel)&&
+    (p.modo!=="cad"||(p.papel==="obra80"&&/^rollo\d+$/.test(p.rollo))))
+   ?w.planoPorPagina.map(p=>({numeroOriginal:p.numeroOriginal,modo:p.modo,
+     anchoCm:p.anchoCm,altoCm:p.altoCm,rollo:p.rollo,papel:p.papel})):null;
+  if(w.servicio==="ploteos"&&!planoPorPagina)
+   throw Error("Faltan las instrucciones verificadas de CAD/Póster por página.");
   return {
    orden:w.orden,idTrabajo:w.idTrabajo,servicio:w.servicio,
    nombreOriginal:w.nombreOriginal,fileId:w.fileId,
@@ -151,7 +168,7 @@ function centralSafeManifest(data){
    bytes:r.bytes,paginasElegidas:[...w.paginasElegidas],
    copias:copies??null,formatoFinal:texto(w.formatoFinal),
    tarifaAplicada:w.formatoFinal==='personalizado_a4'?'a4':texto(w.tarifaAplicada),
-   medidasOriginalesCm,
+   medidasOriginalesCm,planoPorPagina,
    carasPresupuestadas:w.servicio==="documentos"?(w.carasPresupuestadas??null):null,
    paginasPorCaraPresupuestadas:w.servicio==="documentos"?(w.paginasPorCaraPresupuestadas??null):null,
    // Conservar sólo el anillado de la ficha VERIFICADA por el servidor.
@@ -302,6 +319,7 @@ async function centralTUSPackageManifest(req,env){
   servicio:t.servicio,paginasOriginales:t.paginasOriginales,
   paginasElegidas:t.paginasElegidas,copias:t.copias,formatoFinal:t.formatoFinal,
   tarifaAplicada:t.tarifaAplicada,medidasOriginalesCm:t.medidasOriginalesCm,
+  planoPorPagina:t.planoPorPagina,
   carasPresupuestadas:t.carasPresupuestadas,
   paginasPorCaraPresupuestadas:t.paginasPorCaraPresupuestadas,
   modo:t.modo,material:t.material,tipoAnillado:t.tipoAnillado,
