@@ -1122,8 +1122,20 @@ function agregarFichaDeImpresion(area,t){
   area.append(node("p","Medidas por página: "+
    medidas.map(x=>"pág. "+x.pagina+": "+x.valor).join("; ")));
  if(descripcion)area.append(node("p","Descripción técnica: "+descripcion));
- if(t.servicio==="ploteos")
-  area.append(node("p","Ploteo: dimensiones, rollo y modo por página no constan en este resumen de la Central. No imprimir sin revisar el plano."));
+ if(t.servicio==="ploteos"){
+  const planos=Array.isArray(t.planoPorPagina)?t.planoPorPagina:null;
+  if(planos?.length){
+   area.append(node("h4","Detalle de ploteo por página · verificado por servidor"));
+   for(const p of planos){
+    const material=p.papel==="recubierto"?"Recubierto":"Obra 80 g";
+    const label="Pág. "+p.numeroOriginal+" · "+
+     (p.modo==="cad"?"Plano CAD":"Póster / pleno")+" · "+
+     p.anchoCm.toFixed(2)+" × "+p.altoCm.toFixed(2)+" cm · "+
+     p.rollo+" · "+material;
+    area.append(node("p",label));
+   }
+  }else area.append(node("p","Ploteo: instrucciones históricas sin medidas verificadas. Revisar original antes de imprimir."));
+ }
  if(t.tipoAnillado==="grupo")
   area.append(node("p","Grupo de anillado: "+(t.grupoAnillado||"NO CONSTA — verificar")+
    ". Confirmar qué archivos integran el grupo antes del armado."));
@@ -1131,6 +1143,9 @@ function agregarFichaDeImpresion(area,t){
   area.append(node("p","AVISO: la ficha histórica no conserva todas las instrucciones. Confirmar los campos marcados antes de imprimir."));
  const lines=["Pedido de impresión (sin pago confirmado)",t.nombreOriginal||"PDF",
   ...opciones.map(([k,v])=>k+": "+(v??"NO CONSTA — verificar")),
+  ...(t.servicio==="ploteos"&&Array.isArray(t.planoPorPagina)?
+   t.planoPorPagina.map(p=>"Pág. "+p.numeroOriginal+" · "+p.modo+" · "+
+    p.anchoCm+" × "+p.altoCm+" cm · rollo "+p.rollo+" · "+p.papel):[]),
   ...(descripcion?["Descripción técnica: "+descripcion]:[]),
   "NO IMPRIMIR SIN PAGO CONFIRMADO Y VALIDACIÓN DE PRODUCCIÓN"];
  const copy=node("button","Copiar instrucciones");copy.type="button";
