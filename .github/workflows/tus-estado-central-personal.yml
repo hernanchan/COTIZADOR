@@ -1,0 +1,39 @@
+name: Registrar estado CI Centro TUS personal
+on:
+  push:
+    branches:
+      - integracion/tus-pedido-privado-20261101
+    paths:
+      - docs/INSPECCIONAR-CENTRAL-TUS-PERSONAL.trigger
+permissions:
+  contents: write
+  actions: read
+jobs:
+  reporte:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Informe seguro de ejecución Centro TUS
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          base="https://api.github.com/repos/$REPO"
+          auth="Authorization: Bearer $GH_TOKEN"
+          tmp=$(mktemp -d);trap 'rm -rf "$tmp"' EXIT
+          curl --fail --silent --show-error -H "$auth" --get \
+            --data-urlencode "branch=$BRANCH" --data-urlencode "per_page=5" \
+            "$base/actions/workflows/tus-activar-central-personal-privada.yml/runs" > "$tmp/runs"
+          id=$(jq -r '.workflow_runs[0].id // empty' "$tmp/runs")
+          test -n "$id"
+          curl --fail --silent --show-error -H "$auth" "$base/actions/runs/$id/jobs?per_page=20" > "$tmp/jobs"
+          jq -n --slurpfile r "$tmp/runs" --slurpfile j "$tmp/jobs" \
+            '{runs:[$r[0].workflow_runs[]|{id,head_sha,status,conclusion,html_url}][0:5],jobs:[$j[0].jobs[]|{id,name,conclusion,failed_steps:[.steps[]?|select(.conclusion=="failure")|.name]}]}' > "$tmp/report"
+          dest='docs/ESTADO-CENTRAL-TUS-PERSONAL-20261101.json'
+          content=$(base64 -w0 "$tmp/report")
+          sha=$(curl --silent --show-error --get -H "$auth" --data-urlencode "ref=$BRANCH" "$base/contents/$dest" | jq -r '.sha // empty')
+          jq -n --arg msg 'docs(tus): registrar estado CI Central privada sin datos de clientes' --arg content "$content" --arg branch "$BRANCH" --arg sha "$sha" \
+            'if $sha=="" then {message:$msg,content:$content,branch:$branch} else {message:$msg,content:$content,branch:$branch,sha:$sha} end' > "$tmp/input"
+          curl --fail --silent --show-error -X PUT -H "$auth" -H 'Content-Type: application/json' --data-binary "@$tmp/input" "$base/contents/$dest" > /dev/null
+          jq -r '.runs[0].status+" "+(.runs[0].conclusion//"pending")' "$tmp/report"
