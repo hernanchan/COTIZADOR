@@ -2,6 +2,14 @@
   "workflow": "tus-activar-ensayo-privado.yml",
   "runs": [
     {
+      "id": 41323377931,
+      "head_sha": "686a3e7baf0ac389bc73ce22442ebeb7e29cf0be",
+      "status": "in_progress",
+      "conclusion": null,
+      "created_at": "2026-11-01T15:52:05Z",
+      "html_url": "https://github.com/hernanchan/COTIZADOR/actions/runs/41323377931"
+    },
+    {
       "id": 41323231152,
       "head_sha": "c2f8438b6cf57fdd76ac5d91960a771449c45929",
       "status": "completed",
@@ -56,26 +64,13 @@
       "conclusion": "failure",
       "created_at": "2026-11-01T13:52:11Z",
       "html_url": "https://github.com/hernanchan/COTIZADOR/actions/runs/41313335169"
-    },
-    {
-      "id": 41312385100,
-      "head_sha": "a53f32edd5588ab47578307bd2c96075717b2f9d",
-      "status": "completed",
-      "conclusion": "failure",
-      "created_at": "2026-11-01T13:40:21Z",
-      "html_url": "https://github.com/hernanchan/COTIZADOR/actions/runs/41312385100"
     }
   ],
   "jobs_latest": [
     {
       "name": "activar-ensayo",
-      "conclusion": "failure",
-      "failed_steps": [
-        {
-          "name": "Pruebas obligatorias sin conexiones comerciales",
-          "conclusion": "failure"
-        }
-      ]
+      "conclusion": null,
+      "failed_steps": []
     }
   ],
   "secret_values_exposed": false
