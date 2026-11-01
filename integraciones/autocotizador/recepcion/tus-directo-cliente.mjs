@@ -18,7 +18,8 @@ const call=async(path,body,fetcher)=>{
  });
  const data=await response.json().catch(()=>null);
  if(!response.ok||data?.ok!==true)
-  throw Error(data?.error||'No se pudo completar el ensayo TUS.');
+  throw Error((data?.error||'No se pudo completar el ensayo TUS.')+
+   (typeof data?.etapa==='string'&&/^[A-Z0-9_]{3,40}$/.test(data.etapa)?' ['+data.etapa+']':''));
  return data;
 };
 export function normalizarTrabajoTUS(d,plan){
