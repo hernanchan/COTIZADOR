@@ -1054,7 +1054,7 @@ if(TUS_ENABLED){
  batchProgress.textContent='Comprobando conexión privada con Supabase antes del envío…';
  void (async()=>{
   try{
-   const reply=await fetch('/api/ensayo-tus-comprobar',{
+   const reply=await fetch('/prueba-v2/api/ensayo-tus-comprobar',{
     method:'POST',credentials:'same-origin',redirect:'error',
     headers:{'Content-Type':'application/json'},body:'{}'
    });
