@@ -78,8 +78,22 @@ jobs:
           target=$(jq -r '.result.id' "$workdir/version.json")
           jq -n --arg v "$target" '{strategy:"percentage",versions:[{percentage:100,version_id:$v}],annotations:{"workers/message":"Ensayo privado TUS 100%, sin cobros ni cambios a web comercial"}}' > "$workdir/deploy.json"
           curl --silent --show-error --max-time 75             -H "$auth" -H "Content-Type: application/json"             --data-binary "@$workdir/deploy.json" "$root/deployments" > "$workdir/result.json"
-          if ! jq -e --arg v "$target" '.success == true and (.result.versions | any(.version_id==$v and .percentage==100))' "$workdir/result.json" >/dev/null; then
+          # Cloudflare POST /deployments devuelve success=true con una estructura
+          # distinta a GET /deployments (puede NO incluir result.versions).
+          jq -e '.success == true' "$workdir/result.json" >/dev/null || {
             jq -c '{success,errors:[.errors[]?|{code,message}]}' "$workdir/result.json"
+            exit 1
+          }
+          active=""
+          for attempt in 1 8; do
+            if curl --fail --silent --show-error --max-time 20 -H "$auth" "$root/deployments" > "$workdir/after.json"; then
+              active=$(jq -r '.result.deployments[0].versions[]? | select(.percentage == 100) | .version_id' "$workdir/after.json" | head -n 1)
+              if [ "$active" = "$target" ]; then break; fi
+            fi
+            sleep 2
+          done
+          if [ "$active" != "$target" ]; then
+            echo "DESPLIEGUE_NO_VERIFICADO_POR_GET - no se presume éxito"
             exit 1
           fi
           echo "VERSION_TUS_PRIVADA_ACTIVADA=$target"
