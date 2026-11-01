@@ -44,6 +44,17 @@ export function prepararFichaCentral({pedidoVerificado}){
      (detalles.carasPorJuego??Math.ceil(fila.paginasElegidas.length/(detalles.paginasPorHoja??1)))!==
        Math.ceil(fila.paginasElegidas.length/(detalles.paginasPorHoja??1))))
    throw Error('Composición documental distinta del presupuesto verificado.');
+  if(fila.destino==='documentos'&&(
+     !['a4','a3'].includes(fila.formatoFinal)||
+     !['bn','color'].includes(detalles.modo)||
+     !['simple','double'].includes(detalles.caras)||
+     !['ninguno','individual','grupo'].includes(detalles.anillado)||
+     !Number.isSafeInteger(detalles.copias)||detalles.copias<1||
+     (detalles.anillado==='grupo'&&
+      !/^[1-9][0-9]?$/.test(String(detalles.grupoAnillado||'')))||
+     (detalles.modo==='color'&&
+      (typeof detalles.materialColor!=='string'||!detalles.materialColor))))
+   throw Error('Faltan instrucciones de impresión verificadas en el presupuesto.');
   // La ficha de ploteo sólo admite las páginas, rollos y papeles derivados
   // del presupuesto recalculado por el servidor, nunca valores adicionales del cliente.
   let planoPorPagina=null;
@@ -77,7 +88,11 @@ export function prepararFichaCentral({pedidoVerificado}){
    paginasElegidas:[...fila.paginasElegidas],
    copias:detalles.copias??detalles.lotes??null,
    formatoFinal:fila.formatoFinal||null,
-   material:detalles.material||detalles.papel||fila.papelPoster||null,
+   // El desglose validado por el cotizador utiliza "materialColor".
+   // En B/N la tarifa es "estandar" sin gramaje especificado.
+   material:fila.destino==='documentos'
+      ?(detalles.modo==='color'?detalles.materialColor:'estandar')
+      :(detalles.material||detalles.papel||fila.papelPoster||null),
    modo:detalles.modo||null,
    planoPorPagina,
    // Procede del presupuesto recomputado; no aceptar opciones de impresión
@@ -87,6 +102,8 @@ export function prepararFichaCentral({pedidoVerificado}){
    carasPorJuegoPresupuestadas:fila.destino==='documentos'?(detalles.carasPorJuego??detalles.paginas):null,
    hojasPorJuegoPresupuestadas:fila.destino==='documentos'?(detalles.hojasPorJuego??Math.ceil(detalles.paginas/(detalles.caras==='double'?2:1))):null,
    tipoAnillado:fila.destino==='documentos'?detalles.anillado:null,
+   grupoAnillado:fila.destino==='documentos'&&detalles.anillado==='grupo'
+    ?String(detalles.grupoAnillado):null,
    productoId:detalles.productoId||null,
    variante:detalles.variante||null,
    metros:detalles.metros??null,
