@@ -1,16 +1,14 @@
 /**
- * LABORATORIO PRIVADO: dos PDF sintéticos, una invitación de un solo uso.
+ * LABORATORIO PRIVADO: dos PDF reales o de prueba, una invitación de un solo uso.
  * No hay autorización por usuario anónimo ni acceso directo a service_role.
  * NO importar a la web comercial. No integrar a D1, GAS ni pagos.
  */
 import {createClient} from 'npm:@supabase/supabase-js@2.49.4';
 import {PDFDocument} from 'npm:pdf-lib@1.17.1';
 import {verifyPrivatePdf} from './verification.mjs';
-import {pageHtml} from './page.ts';
 
 const PROJECT='qkbbqzbannyhuanngjpw';
 const BUCKET='saber-tus-lab';
-const MAX_AGE_MINUTES=90;
 const FRONTEND_ORIGIN='https://hernanchan.github.io';
 const RESPONSE_HEADERS={
  'Access-Control-Allow-Origin':FRONTEND_ORIGIN,
@@ -24,7 +22,6 @@ const RESPONSE_HEADERS={
 };
 const respond=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:RESPONSE_HEADERS});
 const code=/^[0-9a-f]{64}$/;
-const pagesExpected=[16,94];
 async function shaHex(s:string) {
  const v=new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)));
  return Array.from(v).map(x=>x.toString(16).padStart(2,'0')).join('');
@@ -105,10 +102,14 @@ Deno.serve(async req=>{
       return pdf.getPageCount();
      },
     });
-    if(verified.pages!==pagesExpected[i])throw Error('LAB_PAGE_COUNT_MISMATCH');
     result.push({pages:verified.pages,bytes:verified.bytes,sha256Match:true});
    }
-   return respond({ok:true,files:result,verified:2,ordersCreated:0,paymentsEnabled:false});
+   // En laboratorio no hay razón para retener documentos reales una vez comprobados.
+   // Los dos objetos se borran solamente DESPUÉS de verificar SHA, tamaño y páginas.
+   const {data:removed,error:removeError}=await admin.storage.from(BUCKET).remove(acceptedPaths);
+   const deletedAfterVerification=!removeError&&Array.isArray(removed)&&removed.length===2;
+   return respond({ok:true,files:result,verified:2,
+     deletedAfterVerification,ordersCreated:0,paymentsEnabled:false});
   }
   return respond({error:'Operación no encontrada'},404);
  }catch(_){
