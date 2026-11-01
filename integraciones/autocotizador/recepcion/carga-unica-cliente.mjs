@@ -197,7 +197,7 @@ function render(){
    for(const [tam,label] of [['a4',pregunta?'Ajustar a A4':'A4'],
      ['a3',pregunta?'Imprimir en A3':'A3'],
      ['original',pregunta?'Mantener tamaño real':'Tamaño original']]){
-    if(regla.forzarA4&&tam==='original')continue;
+    if(regla.forzarA4&&tam!=='a4')continue;
     const btn=texto('button',label);btn.type='button';
     btn.className='tamano-opcion'+(e.seleccion===tam?' seleccionada':'');
     btn.setAttribute('aria-pressed',String(e.seleccion===tam));
@@ -279,7 +279,7 @@ function render(){
   for(const [v,l] of [['sin-confirmar','Elegir tamaño final'],['original','Mantener tamaño original'],['a3','A3 (29,7 × 42 cm)'],['a4','A4 (21 × 29,7 cm)'],['a5','A5 (14,8 × 21 cm)']]){
    const o=new Option(l,v);sel.add(o);
   }
-  sel.value=e.seleccion;sel.onchange=()=>{e.seleccion=decidirTamanoCliente(paginas).forzarA4&&sel.value==='original'?'a4':sel.value;cambio()};label.append(sel);if(!['fotos','corte','grafica'].includes(e.servicio))controles.append(label);
+  sel.value=e.seleccion;sel.onchange=()=>{e.seleccion=decidirTamanoCliente(paginas).forzarA4?'a4':sel.value;cambio()};label.append(sel);if(!['fotos','corte','grafica'].includes(e.servicio))controles.append(label);
   const decision=clasificarDestino(paginas,e.seleccion);
   if(decision.confirmado||['corte','fotos','grafica'].includes(e.servicio)){
    const destino=texto('p',(e.servicio==='grafica'?'Gráfica comercial · Precio por lote, sin diseño':e.servicio==='corte'?'Trabajo: ploteo de corte · Metros declarados':e.servicio==='fotos'?'Trabajo fotográfico · Tamaño elegido por producto':'Trabajo: '+(decision.destino==='ploteo'?'Ploteo grande':'Impresión de documentos')+' · Salida: '+(decision.tamanoFinal==='original'?'tamaño original':decision.tamanoFinal.toUpperCase())));destino.className='destino';panel.append(destino);
