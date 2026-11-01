@@ -456,13 +456,14 @@ function render(){
     for(const [v,t] of entries){const option=document.createElement('option');option.value=v;option.textContent=t;select.append(option)}
     wrapper.append(select);advanced.append(wrapper);return select;
    };
-   const formato=field('Formato', [['a4','A4'],['a3','A3']]);
+   const formato=field('Formato', [['a4','A4'],['a3','A3'],['a5','A5 original (tarifa A4)'],
+     ['personalizado_a4','Tamaño original menor que A4 (tarifa A4)']]);
    const papel=field('Papel color', []);
    const updatePaper=async()=>{
     papel.replaceChildren();papel.disabled=true;
     try{
      const catalog=await catalogPromise;
-     const materiales=catalog[formato.value==='a4'?'colorA4':'colorA3']?.materials||[];
+     const materiales=catalog[formato.value==='a3'?'colorA3':'colorA4']?.materials||[];
      if(!materiales.length)throw Error('Materiales no disponibles');
      for(const m of materiales){
       const option=document.createElement('option');option.value=m.id;option.textContent=m.name;papel.append(option);
@@ -561,7 +562,8 @@ function render(){
     const preview=document.createElement('p');preview.className='state';
     preview.textContent='Opciones recibidas: '+
      (d.opcionesInteligentes.modo==='color'?'Color':'B/N')+' · '+
-     String(d.opcionesInteligentes.formato).toUpperCase()+' · '+
+     (d.opcionesInteligentes.formato==='personalizado_a4'?'Original menor que A4 (tarifa A4)':
+       String(d.opcionesInteligentes.formato).toUpperCase())+' · '+
      (d.opcionesInteligentes.caras==='double'?'Doble faz':'Simple faz')+' · '+
      d.opcionesInteligentes.copias+' copia(s) · '+
      String(d.opcionesInteligentes.paginasPorHoja??1)+' por cara.';
@@ -994,7 +996,7 @@ window.addEventListener('message',async event=>{
     if(!(file instanceof File)||!opt||file.size<5||file.size>20*1024*1024||
        file.name!==opt.nombre||file.name.length>120||!/\\.pdf$/i.test(file.name)||
        !Number.isSafeInteger(opt.paginas)||opt.paginas<1||opt.paginas>2000||
-       !['a4','a3'].includes(opt.formato)||
+       !['personalizado_a4','a5','a4','a3'].includes(opt.formato)||
        !['bn','color'].includes(opt.modo)||
        !['simple','double'].includes(opt.caras)||
        !Number.isSafeInteger(opt.copias)||opt.copias<1||opt.copias>200||
