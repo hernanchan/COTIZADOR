@@ -122,3 +122,16 @@ En la rama experimental, comparar interfaces reales del Worker privado y `lab-tu
 - Captura de la pantalla privada, ya con versión `8cf6c9cb-f52d-4508-bf2e-61b2dc483df6`, muestra literalmente: «Supabase/TUS verificado. Los PDF se enviarán directamente a almacenamiento privado.» La solicitud de firma sin subir PDF superó autenticación Worker y Storage.
 - Supabase SQL `storage.objects` (bucket `saber-tus-lab`) ANTES del primer nuevo ensayo: **4 objetos**, `max(created_at)=2026-11-01 03:05:05.775481+00`. Permite comparar llegada de 2 PDF nuevos sin identificar usuarios ni abrir documentos.
 - Siguiente paso exacto: UNA prueba de pedido con 2 PDF A4 de ensayo, B/N SF, una copia, sin anillado, un solo clic; luego consultar Storage nuevos, registro D1 y acceso privado. No declarar E2E hasta validar los tres. No activar cobros ni Google Drive.
+
+
+## 01/11/2026 ~12:36 ART — primer pedido integrado REAL exitoso, falta descarga desde la Central
+
+- Captura del usuario, `/prueba-v2/`: **«Pedido recibido correctamente», «Pedido verificado y registrado correctamente», «2 PDF verificados y registrados», «Total verificado $2.432», «Pago desactivado»**. Número comercial de ensayo `e2d76c8b-ce1c-4daf-9030-4bd402295a68`.
+- Comprobación DIRECTA en Postgres `storage.objects` del proyecto `qkbbqzbannyhuanngjpw`, bucket privado `saber-tus-lab`: dos objetos recién creados con prefijo `v2/WEB-ENSAYO-01937C3514FB89DC23D78AE7BCBCDDDD/`:
+  - 15:36:09.9342 UTC, 10.131.027 bytes
+  - 15:36:10.801454 UTC, 17.849.230 bytes
+  - La cantidad total de objetos pasó de 4 a 6, sin otra recepción registrada para el pedido de ensayo. PDF reales enviados y almacenados.
+- Se revisó el backend `tus-pedido-worker.mjs`: antes de responder OK, exige `registrado.registeredInD1===true` con recuento de recibos y `prepararDocumentosCentralFirmado` devuelve el número de pedido comercial/importe sin autorización de cobro. Por tanto, la UI atestigua confirmación recibida del backend del registro D1; **no constituye consulta SQL directa**.
+- Se intentó verificación independiente mediante Github Actions con consultas de solo lectura a Cloudflare D1 API `GET /d1/database` + `SELECT/PRAGMA`, sin exponer PII ni modificar registros. Resultado en `docs/RESULTADO-D1-TUS-20261101.json`: `HTTP_401` por falta de acceso API con el token de despliegue; **NO** significa que el pedido no exista. No solicitar credenciales al usuario ni ampliar permisos sin autorización.
+- **Pendiente para cierre verdadero:** desde el Centro de Pedidos privado confirmar que el pedido aparezca con sus DOS archivos, que el importe coincida y que un operador pueda descargar ambos PDF mediante endpoint protegido (incluida integridad SHA). La pantalla de éxito no demuestra todavía que la UX del Centro esté integrada ni la descarga verificada. No activar cobros ni web pública, no repetir subida de PDFs.
+- Los detalles y continuidad están guardados en la rama privada `integracion/tus-pedido-privado-20261101`. No volver a Google Drive.
