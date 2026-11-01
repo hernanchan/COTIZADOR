@@ -34,6 +34,7 @@ function validarArchivo(a,i){
 function tipoOriginal(paginas){
  const opciones=paginas.map(p=>{
   const ancho=Math.min(p.anchoCm,p.altoCm),largo=Math.max(p.anchoCm,p.altoCm);
+  if(Math.abs(ancho-14.8)<=0.2&&Math.abs(largo-21)<=0.2)return 'a5';
   if(Math.abs(ancho-21)<=0.2&&Math.abs(largo-29.7)<=0.2)return 'a4';
   if(Math.abs(ancho-29.7)<=0.2&&Math.abs(largo-42)<=0.2)return 'a3';
   return null;
@@ -79,11 +80,12 @@ export function cotizarCargaUnica({archivos,precios}){
   if(!d.confirmado){pendientes.push({indice:i,nombre:a.nombre,motivo:'Confirmar tamaño final'});return}
   if(d.destino==='documentos'){
    const formato=d.tamanoFinal==='original'?tipoOriginal(seleccionadas):d.tamanoFinal;
-   if(!['a4','a3'].includes(formato)){
-    pendientes.push({indice:i,nombre:a.nombre,motivo:formato==='a5'?'A5 sin tarifa autónoma vigente':'Tamaño original no homogéneo A4/A3'});return;
+   if(!['a5','a4','a3'].includes(formato)){
+    pendientes.push({indice:i,nombre:a.nombre,motivo:'Tamaño original sin tarifa disponible. Elegí A4 o A3.'});return;
    }
    const id='pdf'+(documentos.length+1);
-   const catalogo=precios[formato==='a4'?'colorA4':'colorA3']?.materials||[];
+   // A5 utiliza temporalmente la tarifa y catálogo A4, sin redimensionar el PDF.
+   const catalogo=precios[formato==='a3'?'colorA3':'colorA4']?.materials||[];
    if(a.modo==='color'&&!catalogo.some(m=>m.id===a.materialColor)){
     pendientes.push({indice:i,nombre:a.nombre,motivo:'Material incompatible con formato final'});return;
    }
