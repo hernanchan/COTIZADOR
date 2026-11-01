@@ -7,3 +7,5 @@
 2026-11-01: validar version activada POSTERIOR a baed6a9f por corrección alcance Basic y cookie en /prueba-v2/api/; solo lectura Cloudflare, guardado GitHub. Si aún no está activa, NO declarar éxito.
 
 2026-11-01: verificar despliegue con respuesta Cloudflare success=true y formato de respuesta distinto al esperado en CI; registrar ID activo y no ejecutar despliegue adicional en este control.
+
+2026-11-01: confirmar nueva versión c172461f activa y que el portal sin contraseña conteste HTTP 401; no subir archivos. Verificación técnica independiente tras el despliegue automatizado.
