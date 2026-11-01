@@ -229,3 +229,45 @@ test('endpoint privado registra D1 SOLO luego de verificar ambos PDF; monto calc
  assert.equal(bad.status,422);
  assert.equal(writes,1);assert.equal(prepared,1);
 });
+
+
+test('ploteo CAD A0 real usa medidas del servidor y rollo automático, no valores inventados',async()=>{
+ const pdf=await PDFDocument.create();
+ pdf.addPage([2383.94,3370.39]);
+ const bytes=new Uint8Array(await pdf.save());
+ const sha256=Buffer.from(await subtle.digest('SHA-256',bytes)).toString('hex');
+ const signed=await mint([{...meta(1),name:'Plano_A0_CAD.pdf',bytes:bytes.length,sha256,pages:1}]);
+ const inputs=entries(signed);
+ inputs[0].opciones.seleccion='original';
+ inputs[0].opciones.clasificacionCliente=[{numero:1,anchoCm:84.1,altoCm:118.9,modo:'cad'}];
+ inputs[0].opciones.anillado='ninguno';
+ inputs[0].opciones.papelPoster='obra80';
+ const precios=JSON.parse(readFileSync(new URL('../precios-web.json',import.meta.url),'utf8'));
+ const checked=await verificarTandaTUSYRecalcular({
+  orderId:ORDER,entries:inputs,secret:SECRET,subtle,ahora:()=>1800000001,
+  preciosServidor:precios,leerObjetoPrivado:async()=>bytes
+ });
+ const t=checked.verificacion.ficha.trabajos;
+ assert.equal(t.length,1);
+ assert.equal(t[0].servicio,'ploteos');
+ assert.equal(t[0].planoPorPagina?.[0]?.modo,'cad');
+ assert.ok(/^rollo\d+$/.test(t[0].planoPorPagina?.[0]?.rollo));
+ assert.ok(checked.verificacion.importeVerificado>0);
+ const m=manifiestoServidorTUS(checked);
+ const conciliated=conciliarManifiestoV2ConServidor({manifiesto:m,verificacion:checked.verificacion});
+ assert.equal(conciliated.cantidadArchivos,1);
+});
+test('modos de falla en la firma no crean pedido y nunca exponen secretos',async()=>{
+ const u='https://saber-documentos-pruebas.libreriasaber.workers.dev';
+ let tries=0;
+ const malformed=new Request(u+'/api/ensayo-tus-iniciar',{method:'POST',
+ headers:{Origin:u,'Content-Type':'application/json'},
+ body:JSON.stringify({orderId:ORDER,metas:[{...meta(1),priceArs:1}]})});
+ const response=await iniciarTandaTUSPrivada(malformed,env,{authorized:true,
+  fetcher:async()=>{tries++;return Response.json({token:'fake'})}});
+ assert.equal(response.status,403);
+ assert.equal(tries,0);
+ const json=await response.json();
+ assert.equal(JSON.stringify(json).includes('key'),false);
+ assert.equal(json.paymentAuthorized,false);
+});
