@@ -221,7 +221,7 @@ dropPdf.addEventListener('drop',event=>{
 });
 
 const newClientOrderId=()=>crypto.randomUUID();
-let registering=false,registeredOrder=null;
+let registering=false,registeredOrder=null,registeredShortOrder=null;
 // Recuperación de metadatos no sensibles tras recarga o suspensión móvil.
  // Nunca conservar objetos File, base64, sesiones, credenciales ni confirmaciones.
 const RECOVERY_KEY='saber-v2-ensayo-metadatos-v1';
@@ -679,13 +679,16 @@ async function enviarTUSDesdeCarrito(pendientes){
     resultado.webOrderId!==orderId||resultado.paymentAuthorized!==false)
   throw Error('La Central no confirmó el pedido completo.');
  ultimoTotalServidor=resultado.totalArs;
+ if(!/^\d{3,}$/.test(resultado.numeroOrden||''))
+  throw Error('La Central no confirmó el número de orden.');
  registeredOrder=resultado.orderId;
+ registeredShortOrder=resultado.numeroOrden;
  const valor=new Intl.NumberFormat('es-AR',{
   style:'currency',currency:'ARS',maximumFractionDigits:0
  }).format(ultimoTotalServidor);
  document.getElementById('precio-smart').textContent='Total verificado: '+valor+' · Sin cobro autorizado';
  mostrarEstadoCliente('registrado','Pedido recibido correctamente',
-  'Número de pedido: '+registeredOrder+'. '+trabajos.length+' PDF verificados y registrados. Pago desactivado.');
+  'Orden de trabajo N.º '+registeredShortOrder+'. '+trabajos.length+' PDF verificados y registrados. Pago desactivado.');
  return resultado;
 }
 sendAllButton.addEventListener('click',async()=>{
@@ -800,7 +803,7 @@ sendAllButton.addEventListener('click',async()=>{
     new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(ultimoTotalServidor)+
     ' · Sin cobro autorizado';
   mostrarEstadoCliente('registrado','Pedido recibido correctamente',
-   'Número de pedido: '+registeredOrder+'. '+allEntries.length+' PDF verificados. Pago desactivado en esta prueba.');
+   'Orden de trabajo N.º '+registeredShortOrder+'. '+allEntries.length+' PDF verificados. Pago desactivado en esta prueba.');
  }else{
   batchProgress.textContent='PDF recibidos; el registro quedó pendiente. Pulsá «Enviar mi pedido» para reintentar sin subir los PDF.';
   mostrarEstadoCliente(null);
