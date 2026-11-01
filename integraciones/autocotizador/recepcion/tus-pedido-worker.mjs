@@ -31,18 +31,31 @@ const json=(value,status=200)=>new Response(JSON.stringify(value),{status,
  headers:{'Content-Type':'application/json; charset=utf-8',
  'Cache-Control':'no-store, private','X-Content-Type-Options':'nosniff',
  'X-Robots-Tag':'noindex, nofollow'}});
-export function tusPrivadoConfigurado(env){
- return env?.DOCS_TUS_PRIVATE_ENABLED===FLAG&&
-   env?.DOCS_V2_PRIVATE_UI_ENABLED===FLAG&&
-   env?.DOCS_CENTRAL_SYNC_ENABLED===FLAG&&
-   env?.DOCS_ORDER_PREPARE_ENABLED===FLAG&&
-   typeof env.DOCS_TUS_RECEIPT_KEY==='string'&&env.DOCS_TUS_RECEIPT_KEY.length>=32&&
-   typeof env.DOCS_TUS_SUPABASE_SERVICE_KEY==='string'&&env.DOCS_TUS_SUPABASE_SERVICE_KEY.length>40&&
-   typeof env.DOCS_TUS_PUBLISHABLE_KEY==='string'&&env.DOCS_TUS_PUBLISHABLE_KEY.length>30&&
-   env.DOCS_TUS_RECEIPT_KEY!==env.CENTRAL_BRIDGE_KEY&&
-   env.DOCS_TUS_RECEIPT_KEY!==env.DOCS_RELAY_KEY&&
-   env.DOCS_TUS_RECEIPT_KEY!==env.DOCS_CENTRAL_ADMIN_KEY;
+/** Diagnóstico protegido: SOLO nombres de requisitos, jamás valores secretos. */
+export function diagnosticarTUSPrivado(env){
+ const has=(key,min)=>typeof env?.[key]==='string'&&env[key].length>=min;
+ const checks=[
+  ['DOCS_TUS_PRIVATE_ENABLED',env?.DOCS_TUS_PRIVATE_ENABLED===FLAG],
+  ['DOCS_V2_PRIVATE_UI_ENABLED',env?.DOCS_V2_PRIVATE_UI_ENABLED===FLAG],
+  ['DOCS_CENTRAL_SYNC_ENABLED',env?.DOCS_CENTRAL_SYNC_ENABLED===FLAG],
+  ['DOCS_ORDER_PREPARE_ENABLED',env?.DOCS_ORDER_PREPARE_ENABLED===FLAG],
+  ['DOCS_TUS_RECEIPT_KEY',has('DOCS_TUS_RECEIPT_KEY',32)&&
+   ![env?.CENTRAL_BRIDGE_KEY,env?.DOCS_RELAY_KEY,env?.DOCS_CENTRAL_ADMIN_KEY]
+    .includes(env?.DOCS_TUS_RECEIPT_KEY)],
+  ['DOCS_TUS_SUPABASE_SERVICE_KEY',has('DOCS_TUS_SUPABASE_SERVICE_KEY',41)],
+  ['DOCS_TUS_PUBLISHABLE_KEY',has('DOCS_TUS_PUBLISHABLE_KEY',31)]
+ ];
+ const invalidos=checks.filter(([,ok])=>!ok).map(([name])=>name);
+ return Object.freeze({
+  solicitado:env?.DOCS_TUS_PRIVATE_ENABLED===FLAG,
+  listo:invalidos.length===0,
+  invalidos:Object.freeze(invalidos)
+ });
 }
+export function tusPrivadoConfigurado(env){
+ return diagnosticarTUSPrivado(env).listo;
+}
+
 function ensureRequest(request,env,authorized){
  if(!tusPrivadoConfigurado(env))throw Error('private-tus-off');
  if(request.method!=='POST'||authorized!==true)
