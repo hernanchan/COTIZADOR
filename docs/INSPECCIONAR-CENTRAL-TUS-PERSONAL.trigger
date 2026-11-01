@@ -11,3 +11,5 @@ Consultar de nuevo estado CI 4156ea2d tras instalar dependencia pdf-lib, sin sec
 Consulta última ejecución 815da702 de Central corto 001 sin exponer secretos.
 
 Consultar resultado ejecución 23bc9ebe con PDF A4/A3 de prueba e instrucciones verificadas. Sin secretos ni archivos privados.
+
+Verificar Central A5 2afcb0c5: tests privados y estado de seguridad paymentsEnabled:false, formato A5 tarifa A4.
