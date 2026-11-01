@@ -55,7 +55,15 @@ function tamañoEstandar(paginas){
  if(paginas.every(p=>coincide(p,29.7,42,0.35)))return 'a3';
  return null;
 }
-const formatoOriginal=paginas=>{const v=paginas.map(p=>{const a=Math.min(p.anchoCm,p.altoCm),b=Math.max(p.anchoCm,p.altoCm);return Math.abs(a-14.8)<0.2&&Math.abs(b-21)<0.2?'a5':Math.abs(a-21)<0.2&&Math.abs(b-29.7)<0.2?'a4':Math.abs(a-29.7)<0.2&&Math.abs(b-42)<0.2?'a3':null});return v.every(x=>x===v[0])?v[0]:null};
+const formatoOriginal=paginas=>{
+ const v=paginas.map(p=>{const a=Math.min(p.anchoCm,p.altoCm),b=Math.max(p.anchoCm,p.altoCm);
+  return Math.abs(a-14.8)<0.2&&Math.abs(b-21)<0.2?'a5':
+   Math.abs(a-21)<0.2&&Math.abs(b-29.7)<0.2?'a4':
+   Math.abs(a-29.7)<0.2&&Math.abs(b-42)<0.2?'a3':null});
+ const exacto=v.every(x=>x===v[0])?v[0]:null;
+ return exacto||(paginas.every(p=>Math.min(p.anchoCm,p.altoCm)<=21.1&&
+  Math.max(p.anchoCm,p.altoCm)<=29.8)?'personalizado_a4':null);
+};
 const valor=(label,options,selected,change)=>{const l=texto('label',label+' '),sel=document.createElement('select');for(const [k,v] of options)sel.add(new Option(v,k));sel.value=selected;sel.onchange=()=>change(sel.value);l.append(sel);return l};
 function paginasElegidas(e){try{return seleccionarPaginas(e.paginas,e.paginasSeleccionadas)}catch(_){return null}}
 function cambio(){version++;render();cotizar()}
@@ -88,6 +96,7 @@ function grupoVisible(e){
  if(!d.confirmado)return {id:'pendientes',titulo:'Archivos por revisar'};
  if(d.destino==='documentos'){
   const formato=d.tamanoFinal==='original'?formatoOriginal(paginas):d.tamanoFinal;
+  if(formato==='personalizado_a4')return {id:'personalizado_a4',titulo:'Tamaño original menor que A4 · tarifa A4'};
   if(formato==='a5')return {id:'a5',titulo:'Documentos A5 (tarifa A4)'};
   if(formato==='a4')return {id:'a4',titulo:'Documentos A4'};
   if(formato==='a3')return {id:'a3',titulo:'Documentos A3'};
@@ -111,7 +120,7 @@ function accionComun(titulo,opciones,aplicar){
  label.append(select);return label;
 }
 function controlesComunes(grupo){
- const tipos=['a5','a4','a3'].includes(grupo.id),ploteo=['cad','poster','mixtos'].includes(grupo.id);
+ const tipos=['personalizado_a4','a5','a4','a3'].includes(grupo.id),ploteo=['cad','poster','mixtos'].includes(grupo.id);
  if(grupo.indices.length<2||(!tipos&&!ploteo))return null;
  const barra=document.createElement('div');barra.className='opciones-comunes';
  barra.append(texto('strong','Opciones para estos '+grupo.indices.length+' archivos'));
@@ -152,7 +161,7 @@ function render(){
   if(!grupos.has(cat.id))grupos.set(cat.id,{...cat,indices:[]});
   grupos.get(cat.id).indices.push(i);
  });
- const orden=['pendientes','a5','a4','a3','cad','poster','mixtos','stickers','fotos','corte','grafica'];
+ const orden=['pendientes','personalizado_a4','a5','a4','a3','cad','poster','mixtos','stickers','fotos','corte','grafica'];
  for(const grupo of [...grupos.values()].sort((a,b)=>orden.indexOf(a.id)-orden.indexOf(b.id))){
   const bloque=document.createElement('section');bloque.className='grupo-pedido';
   const titulo=texto('h3',grupo.titulo+' · '+grupo.indices.length+' archivo(s)');
@@ -166,6 +175,9 @@ function render(){
   const nombre=texto('strong',(i+1)+'. '+e.name);nombre.className='nombre';
   principal.append(nombre);
   const resumen=document.createElement('div');resumen.className='resumen-archivo';
+  if(e.seleccion==='original'&&e.paginas&&formatoOriginal(paginasElegidas(e)||e.paginas)==='personalizado_a4'){
+   principal.append(texto('small','Tamaño original personalizado · tarifa A4'));
+  }
   if(e.seleccion==='original'&&e.paginas&&formatoOriginal(paginasElegidas(e)||e.paginas)==='a5'){
    const note=texto('small','A5 original · tarifa de impresión A4');principal.append(note);
   }
@@ -210,7 +222,9 @@ function render(){
    }
    if(pregunta){
     filaTam.append(texto('small','Al ajustar a A4 o A3 se conserva la proporción, sin recortar. El tamaño real puede requerir ploteo.'));
-    }else if(e.seleccion==='original'&&formatoOriginal(paginasFinal)==='a5'){
+    }else if(e.seleccion==='original'&&formatoOriginal(paginasFinal)==='personalizado_a4'){
+    filaTam.append(texto('small','Tamaño original: '+[...new Set(regla.medidas)].join(' / ')+'. Se calcula con la tarifa A4 vigente, sin agrandar ni recortar.'));
+   }else if(e.seleccion==='original'&&formatoOriginal(paginasFinal)==='a5'){
     filaTam.append(texto('small','A5 real (14,8 × 21 cm), sin ampliar. Se aplica la tarifa A4 vigente; no incluye corte ni terminaciones especiales.'));
    }else if(e.seleccion==='original'&&!regla.a3Exacto&&!regla.a4Exacto){
     filaTam.append(texto('small','El tamaño real puede no tener una tarifa disponible. En ese caso elegí A4 o A3.'));
@@ -317,8 +331,8 @@ function render(){
     controles.append(valor('Páginas por cara',[['1','1 página'],['2','2 páginas'],['4','4 páginas'],['9','9 páginas']],String(e.paginasPorHoja??1),v=>{e.paginasPorHoja=Number(v);cambio()}));
     panel.append(texto('p','Las páginas se reducen proporcionalmente dentro de cada cara impresa. La doble faz utiliza dos caras por hoja física.'));
     const formato=decision.tamanoFinal==='original'?formatoOriginal(paginas):decision.tamanoFinal;
-    if(e.modo==='color'&&['a5','a4','a3'].includes(formato)){
-     const disponibles=catalogo[formato==='a5'?'a4':formato]||[];
+    if(e.modo==='color'&&['personalizado_a4','a5','a4','a3'].includes(formato)){
+     const disponibles=catalogo[['a5','personalizado_a4'].includes(formato)?'a4':formato]||[];
      if(!disponibles.some(m=>m.id===e.materialColor))e.materialColor=disponibles[0]?.id||'';
      if(disponibles.length)controles.append(valor('Material',disponibles.map(m=>[m.id,m.name]),e.materialColor,v=>{e.materialColor=v;cambio()}));
      else panel.append(texto('p','Materiales no disponibles: no cotizar hasta recuperar el catálogo.'));
@@ -512,7 +526,7 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
     if(!Array.isArray(e.paginas)||e.paginas.length<1||
        e.paginas.length>2000||plan.paginasElegidas.length!==e.paginas.length)
      throw Error('El envío directo admite PDF completos, sin selección parcial de páginas.');
-    if(!['a5','a4','a3'].includes(plan.formatoFinal)||
+    if(!['personalizado_a4','a5','a4','a3'].includes(plan.formatoFinal)||
        !['bn','color'].includes(e.modo)||!['simple','double'].includes(e.caras)||
        !Number.isSafeInteger(e.copias)||e.copias<1||e.copias>200)
      throw Error('Formato, copias o impresión no admitidos por la recepción privada.');
