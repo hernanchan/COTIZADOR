@@ -26,3 +26,43 @@ export function esCadVectorialDenso({miniatura,detalle,texto}={}){
   return false;
  return true;
 }
+
+/**
+ * Segunda evidencia independiente de la cobertura visual: miles de trazados
+ * PDF vectoriales sin ninguna imagen. Sirve cuando PDF.js no recupera los
+ * rótulos del documento o el antialiasing altera la comparación de dos escalas.
+ * Nunca alcanza con el nombre del archivo, el precio o el modo declarado.
+ * Se llama SOLO para Póster ambiguos de ploteo, no para PDF de documentos.
+ */
+export function esCadPorEstructuraPDF({miniatura,fnArray,OPS,texto=''}={}){
+ if(!miniatura||miniatura.modo!=='poster'||!Array.isArray(fnArray)||
+    !OPS||!Number.isInteger(OPS.constructPath)||fnArray.length<1500)
+  return false;
+ const codigosImagen=[
+  'paintImageXObject','paintImageXObjectRepeat','paintInlineImageXObject',
+  'paintInlineImageXObjectGroup','paintImageMaskXObject',
+  'paintImageMaskXObjectGroup','paintImageMaskXObjectRepeat',
+  'paintSolidColorImageMask','shadingFill'
+ ].map(k=>OPS[k]).filter(Number.isInteger);
+ const imagenes=new Set(codigosImagen);
+ let trazados=0;
+ for(const op of fnArray){
+  // Cualquier imagen raster o sombreado desactiva este atajo.
+  if(imagenes.has(op))return false;
+  if(op===OPS.constructPath)trazados++;
+ }
+ const continuo=miniatura.plenoContinuo;
+ if(!Number.isFinite(continuo)||continuo>0.3)return false;
+ // Láminas técnicas con rótulo: 1.000 trazados aislados son evidencia CAD.
+ if(evidenciaPlanoTecnico(texto)&&trazados>=1000)return true;
+ // Sin rótulos recuperables, exigir MUCHÍSIMOS trazados y bajo pleno.
+ return trazados>=12000&&continuo<=0.28;
+}
+/** No analizar todos los pósters: sólo los que parecen tramas de líneas. */
+export function ameritaVerificarEstructura({miniatura,texto='',textos=0}={}){
+ return !!miniatura&&miniatura.modo==='poster'&&
+  Number.isFinite(miniatura.cobertura)&&miniatura.cobertura>=0.30&&
+  Number.isFinite(miniatura.plenoContinuo)&&miniatura.plenoContinuo<=0.35&&
+  (evidenciaPlanoTecnico(texto)||textos>=30||
+   (miniatura.coberturaColor>=0.25&&miniatura.cobertura<=0.7));
+}
