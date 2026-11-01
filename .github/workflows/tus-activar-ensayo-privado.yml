@@ -29,7 +29,7 @@ jobs:
         run: |
           set -euo pipefail
           npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.25.12
-          node --test tests/tus-pedido-privado.test.mjs tests/tus-ui-presupuesto-smoke.test.mjs tests/tus-central-d1-lookup.test.mjs
+          node --test tests/tus-pedido-privado.test.mjs tests/tus-ui-presupuesto-smoke.test.mjs tests/tus-central-d1-lookup.test.mjs tests/central-bridge-d1.test.mjs
       - name: Compilar el mismo Worker privado verificado
         working-directory: integraciones/autocotizador/recepcion
         run: |
@@ -39,6 +39,7 @@ jobs:
           node --check dist/saber-documentos-cotizador-fase4.mjs
           grep -Fq '/api/ensayo-tus-iniciar' dist/saber-documentos-cotizador-fase4.mjs
           grep -Fq 'TUS_BLOCKED' dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq '/prueba-v2/api/ensayo-tus-descargar-personal' dist/saber-documentos-cotizador-fase4.mjs
       - name: Crear y activar exclusivamente la versión de ensayo, con rollback
         shell: bash
         env:
