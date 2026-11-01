@@ -1108,6 +1108,19 @@ async function showUnpaidDetails(id,target,trigger){
   target.append(node("p","Recepción "+x.documentos.webOrderId+" · "+money(x.documentos.totalDocumentos)+
    " · "+x.documentos.archivos+" archivo(s)"));
   target.append(node("p","PDF originales recibidos. El pago no está confirmado; no imprimir ni entregar."));
+  if(x.documentos.esTUS){
+   const pack=node("button","Descargar orden "+x.documentos.numeroOrden+" + ZIP de PDF");
+   pack.type="button";
+   pack.addEventListener("click",()=>{
+    const url=new URL("https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/orden-paquete");
+    url.searchParams.set("webOrderId",x.documentos.webOrderId);
+    const link=document.createElement("a");
+    link.href=url.href;link.target="_blank";link.rel="noopener noreferrer";
+    document.body.append(link);link.click();link.remove();
+   });
+   target.append(pack);
+   target.append(node("p","ZIP: PDF originales + instrucciones numeradas listas para imprimir, sin autorizar producción."));
+  }
   for(const t of x.documentos.trabajos){
    const area=node("section","");
    area.append(node("h4",t.orden+". "+t.nombreOriginal));
