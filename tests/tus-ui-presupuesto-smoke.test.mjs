@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {transform} from 'esbuild';
+import {readFileSync} from 'node:fs';
 import {paginaCotizadorV2PruebaPrivada} from '../integraciones/autocotizador/recepcion/pantalla-cotizador-v2-prueba-privada.mjs';
 import {normalizarTrabajoTUS} from '../integraciones/autocotizador/recepcion/tus-directo-cliente.mjs';
 const sitekey='1234567890abcdefghijklmnopqrstuvwxyz0123';
@@ -77,4 +78,19 @@ test('TUS solicitado pero mal configurado bloquea Google Drive e informa solamen
  const ready=paginaCotizadorV2PruebaPrivada(sitekey,true,{solicitado:true,listo:true,invalidos:[]});
  assert.match(ready,/const TUS_BLOCKED=false/);
  assert.match(ready,/const TUS_ENABLED=true/);
+});
+
+
+test('las solicitudes TUS comparten el alcance Basic /prueba-v2/ y cookie HttpOnly',()=>{
+ const page=paginaCotizadorV2PruebaPrivada(sitekey,true,{solicitado:true,listo:true,invalidos:[]});
+ assert.ok(page.includes("fetch('/prueba-v2/api/ensayo-tus-comprobar'"));
+ const root=new URL('../integraciones/autocotizador/recepcion/',import.meta.url);
+ const uploader=readFileSync(new URL('tus-directo-cliente.mjs',root),'utf8');
+ assert.ok(uploader.includes("call('/prueba-v2/api/ensayo-tus-iniciar'"));
+ assert.ok(uploader.includes("call('/prueba-v2/api/ensayo-tus-registrar'"));
+ const worker=readFileSync(new URL('worker-fase4-cotizador-unificado.mjs',root),'utf8');
+ assert.ok(worker.includes("v2SessionCookie(env,'/prueba-v2/api/')"));
+ assert.ok(worker.includes("page==='/prueba-v2/api/ensayo-tus-comprobar'"));
+ assert.ok(worker.includes("page==='/prueba-v2/api/ensayo-tus-iniciar'"));
+ assert.ok(worker.includes("page==='/prueba-v2/api/ensayo-tus-registrar'"));
 });
