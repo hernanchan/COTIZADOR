@@ -173,12 +173,15 @@ export async function comprobarTUSAntesDeEnviar(request,env,{
 export async function iniciarTandaTUSPrivada(request,env,{
  authorized=false,fetcher=fetch,uuid=()=>crypto.randomUUID(),ahora,
 }={}){
+ let etapa='AUTORIZACION_PORTAL';
  try{
   ensureRequest(request,env,authorized);
+  etapa='METADATOS';
   const input=await bodyJSON(request);
   if(!input||Object.keys(input).sort().join(',')!=='metas,orderId')
    throw Error('Solicitud TUS incorrecta.');
   validarMetasTUS(input);
+  etapa='STORAGE_FIRMA';
   const result=await crearTandaTUS({
    ...input,secret:env.DOCS_TUS_RECEIPT_KEY,uuid,ahora,
    firmarSubida:objectName=>firmarSubidaSupabase(env,objectName,{fetcher})
@@ -187,8 +190,11 @@ export async function iniciarTandaTUSPrivada(request,env,{
    publishableKey:env.DOCS_TUS_PUBLISHABLE_KEY,
    paymentAuthorized:false,checkoutEnabled:false});
  }catch(e){
-  console.warn('saber_tus_private_start',typeof e?.message==='string'&&e.message.startsWith('private-')?'GATE':'REJECT');
-  return json({ok:false,error:'No se pudo autorizar la tanda de PDF.',paymentAuthorized:false},403);
+  const code=typeof e?.code==='string'&&/^STORAGE_(HTTP_[0-9]{3}|RESPONSE_SIZE)$/.test(e.code)
+   ?e.code:etapa;
+  console.warn('saber_tus_private_start',code);
+  return json({ok:false,error:'No se pudo autorizar la tanda de PDF.',etapa:code,
+   paymentAuthorized:false},403);
  }
 }
 export async function finalizarPedidoTUSPrivado(request,env,{
