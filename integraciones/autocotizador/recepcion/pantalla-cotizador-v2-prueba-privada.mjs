@@ -3,7 +3,10 @@
  * Sólo puede abrirse con la compuerta BASIC privada del Worker, apagada
  * por defecto, y no interactúa con la tienda pública.
  */
-export function paginaCotizadorV2PruebaPrivada(sitekey,tusEnabled=false){
+export function paginaCotizadorV2PruebaPrivada(sitekey,tusEnabled=false,tusDiagnostico=null){
+ const tusSolicitado=tusDiagnostico?.solicitado===true;
+ const tusBloqueado=tusSolicitado&&!tusEnabled;
+ const fallas=Array.isArray(tusDiagnostico?.invalidos)?tusDiagnostico.invalidos:[];
  if(typeof sitekey!=='string'||!/^[a-zA-Z0-9._-]{10,200}$/.test(sitekey))
   throw Error('Turnstile privado sin configurar');
  return `<!doctype html><html lang="es"><head>
@@ -37,6 +40,7 @@ body.estado-envio #smart,body.estado-registro #smart{display:none}
 </style></head><body>
 <header><h1>LIBRERÍA SABER · Cotizador V2 en ensayo privado</h1><small style="color:#d5e3f0">Sin cobros, sin órdenes de producción y sin publicación comercial.</small></header>
 <div id="acciones-pedido"><div id="precio-smart" role="status" aria-live="polite">Presupuesto preliminar: todavía sin cotizar · No autoriza cobro</div><button id="send-all-pdf" type="button" disabled>Enviar mi pedido</button><p id="batch-progress" class="state" role="status" aria-live="polite">Cargá tus PDF y revisá las opciones.</p></div>
+<section role="alert" class="warning" style="margin:12px auto;max-width:1110px" ${tusBloqueado?'':'hidden'}>Supabase/TUS no está operativo. El envío está BLOQUEADO para evitar volver a Google Drive. Revisar: ${fallas.join(', ')||'configuración privada'}. No vuelvas a subir PDF todavía.</section>
 <div id="seguridad-privada"><small>Verificación de seguridad para el envío:</small><div class="cf-turnstile" data-sitekey="${sitekey}" data-action="documentos"></div></div>
 <div style="max-width:1140px;margin:18px auto 0;padding:0 14px">
 <section style="padding:8px 3px 4px"><h2 style="margin:0 0 5px;font-size:22px;color:#123852">Cargá tus archivos una sola vez</h2><p style="margin:0;color:#52677a">Arrastrá todos los PDF juntos. La web reconoce tamaños y ploteos automáticamente. Revisá el precio y pulsá «Enviar mi pedido» una sola vez.</p></section></div>
@@ -70,6 +74,11 @@ const registerButton=document.getElementById('register-private'),registerStatus=
 const sendAllButton=document.getElementById('send-all-pdf'),batchProgress=document.getElementById('batch-progress');
 const modoDiagnostico=new URLSearchParams(location.search).get('diagnostico')==='1';
 const TUS_ENABLED=${tusEnabled===true};
+const TUS_BLOCKED=${tusBloqueado};
+if(TUS_BLOCKED){
+ document.getElementById('seguridad-privada').hidden=true;
+ batchProgress.textContent='Supabase/TUS no disponible. Envío desactivado para evitar Google Drive.';
+}
 if(TUS_ENABLED){
  document.getElementById('seguridad-privada').hidden=true;
  document.querySelector('#recepcion-avanzada .warning').textContent='PDF enviados directamente a almacenamiento privado; precio y páginas revalidados por servidor. Sin cobros.';
@@ -299,7 +308,7 @@ function updateSummary(){
    (withoutPdf?' · '+withoutPdf+' trabajos sin PDF':'')+
    ' · Central D1: '+(registeredOrder?'registrado':'pendiente')+' · Cobros desactivados.';
  summary.append(title,detail);
- sendAllButton.disabled=batchSending||registering||handoffInProgress||Boolean(registeredOrder)||
+ sendAllButton.disabled=TUS_BLOCKED||batchSending||registering||handoffInProgress||Boolean(registeredOrder)||
   (allRefs.length===0&&!smartReady)||withoutPdf!==0||
   allRefs.some(d=>!d.confirmacion&&!d.archivoLocal);
  sendAllButton.textContent=registeredOrder?'Pedido registrado':
@@ -679,7 +688,7 @@ async function enviarTUSDesdeCarrito(pendientes){
  return resultado;
 }
 sendAllButton.addEventListener('click',async()=>{
- if(batchSending||registering||handoffInProgress||registeredOrder)return;
+ if(batchSending||registering||handoffInProgress||registeredOrder||TUS_BLOCKED)return;
  iniciarMedicion();
  if(all.flatMap(item=>item.references).length===0){
   if(!smartReady){batchProgress.textContent=smartBlockedReason||'El presupuesto no está listo para enviar.';terminarMedicion('presupuesto_incompleto');return;}
