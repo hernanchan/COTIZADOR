@@ -67,7 +67,7 @@ export function validarClaimTUS(c){
     !Number.isSafeInteger(c.issuedAt)||!Number.isSafeInteger(c.expiresAt)||
     c.expiresAt-c.issuedAt<1||c.expiresAt-c.issuedAt>3600||
     typeof c.objectName!=='string'||
-    !new RegExp('^'+UUID.source.slice(1,-1)+'/'+UUID.source.slice(1,-1)+'\\.pdf$','i').test(c.objectName))
+    c.objectName!==('v2/'+c.orderId+'/'+c.receiptId.slice(4)+'.pdf'))
   throw Error('Comprobante de un PDF TUS inválido.');
  return c;
 }
@@ -99,16 +99,17 @@ export async function crearTandaTUS({
  const valid=validarMetasTUS({orderId,metas});
  if(typeof firmarSubida!=='function'||typeof uuid!=='function')
   throw Error('Almacenamiento TUS privado ausente.');
- const issuedAt=ahora(),batchUUID=uuid();
- if(!Number.isSafeInteger(issuedAt)||!UUID.test(batchUUID))
+ const issuedAt=ahora();
+ if(!Number.isSafeInteger(issuedAt))
   throw Error('Sesión de pedido inválida.');
  const sessions=[];
  for(const m of valid.metas){
-  const fileUUID=uuid(),receiptUUID=uuid();
-  if(!UUID.test(fileUUID)||!UUID.test(receiptUUID))
+  const receiptUUID=uuid();
+  if(!UUID.test(receiptUUID))
    throw Error('Identificador de archivo incorrecto.');
-  const objectName=batchUUID+'/'+fileUUID+'.pdf';
   const receiptId='DOC-'+receiptUUID;
+  // Ruta determinista a partir de un recibo guardado en D1. El bucket es privado.
+  const objectName='v2/'+orderId+'/'+receiptUUID+'.pdf';
   const claim={v:1,orderId,fileId:m.fileId,receiptId,name:m.name,mode:m.mode,
    bytes:m.bytes,sha256:m.sha256,pages:m.pages,objectName,
    issuedAt,expiresAt:issuedAt+1800};
