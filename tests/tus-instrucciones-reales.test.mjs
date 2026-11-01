@@ -30,9 +30,10 @@ async function verificarCasos(casos){
    data:pdf.bytes,opciones:{
     servicio:'auto',seleccion:spec.formato,paginasSeleccionadas:'',
     copias:spec.copias,modo:spec.modo,caras:spec.caras,
-    paginasPorHoja:spec.nup,papelPoster:'obra80',
+    paginasPorHoja:spec.nup,papelPoster:spec.papelPoster||'obra80',
     anillado:spec.anillado,grupoAnillado:'',materialColor:spec.papel,
-    productoFoto:'',productoGrafica:'',corteVariante:'gt3',corteMetros:1
+    productoFoto:'',productoGrafica:'',corteVariante:'gt3',corteMetros:1,
+    ...(spec.clasificacionCliente?{clasificacionCliente:spec.clasificacionCliente}:{})
    }};
  }));
  const signed=await crearTandaTUS({
@@ -95,4 +96,43 @@ test('historico sin instrucciones conserva NO CONSTA en vez de falsear anillado'
  delete copy.ficha.trabajos[0].tipoAnillado;
  const legacy=normalize(copy);
  assert.equal(legacy.trabajos[0].tipoAnillado,null);
+});
+
+
+test('ploteo CAD y póster recubierto: PDF TUS real, cotización servidor y medidas/rollos en D1',async()=>{
+ const anchoCm=60,altoCm=85;
+ const opciones={paginas:2,ancho:anchoCm*72/2.54,alto:altoCm*72/2.54,
+  formato:'original',modo:'bn',caras:'simple',copias:2,nup:1,
+  anillado:'ninguno',papel:'obra70',papelPoster:'recubierto',
+  clasificacionCliente:[
+   {numero:1,anchoCm,altoCm,modo:'cad'},
+   {numero:2,anchoCm,altoCm,modo:'poster'}
+  ]};
+ const result=await verificarCasos([opciones]);
+ assert.equal(result.checked.verificacion.cotizacion.detallePloteos.length,1);
+ const fromBackend=result.checked.verificacion.ficha.trabajos[0];
+ assert.equal(fromBackend.servicio,'ploteos');
+ assert.equal(fromBackend.planoPorPagina.length,2);
+ assert.deepEqual(fromBackend.planoPorPagina.map(x=>x.modo),['cad','poster']);
+ const d1=result.normalized.trabajos[0];
+ assert.equal(d1.servicio,'ploteos');
+ assert.equal(d1.paginasOriginales,2);
+ assert.equal(d1.copias,2);
+ assert.equal(d1.planoPorPagina.length,2,'Cada rollo verificado debe persistir en D1');
+ assert.deepEqual(Array.from(d1.planoPorPagina,x=>x.numeroOriginal),[1,2]);
+ assert.deepEqual(Array.from(d1.planoPorPagina,x=>x.modo),['cad','poster']);
+ assert.equal(d1.planoPorPagina[0].rollo.startsWith('rollo'),true);
+ assert.equal(d1.planoPorPagina[0].papel,'obra80');
+ assert.equal(d1.planoPorPagina[1].rollo.startsWith('rec'),true);
+ assert.equal(d1.planoPorPagina[1].papel,'recubierto');
+ assert.ok(Math.abs(d1.planoPorPagina[0].anchoCm-anchoCm)<0.15);
+ assert.ok(Math.abs(d1.planoPorPagina[1].altoCm-altoCm)<0.15);
+ assert.equal(result.normalized.importe,result.checked.verificacion.importeVerificado);
+ assert.equal(result.normalized.pagoConfirmado,false);
+ const alterado=structuredClone(result.checked.verificacion);
+ delete alterado.ficha.trabajos[0].planoPorPagina;
+ assert.throws(()=>normalize(alterado),/instrucciones verificadas de CAD/i);
+ const adulterado=structuredClone(result.checked.verificacion);
+ adulterado.ficha.trabajos[0].planoPorPagina[0].numeroOriginal=5;
+ assert.throws(()=>normalize(adulterado),/instrucciones verificadas de CAD/i);
 });
