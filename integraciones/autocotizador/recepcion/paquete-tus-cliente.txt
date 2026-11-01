@@ -5,24 +5,28 @@ const isOrder=/^WEB-ENSAYO-[A-F0-9]{32}$/.test(webOrderId);
 const encoder=new TextEncoder();
 let ficha=null;
 function clean(v){return String(v==null?'NO CONSTA — verificar':v)}
-function format(t){
+function nombreSeguro(v){
+ return clean(v).replace(/[\x00-\x1f\x7f]+/g,' ').replace(/\s+/g,' ').trim();
+}
+function nombreZip(i){return 'PDF_'+String(i+1).padStart(2,'0')+'.pdf'}
+function formatoOrden(t,i){
  const medidas=t.formatoFinal==='personalizado_a4'&&Array.isArray(t.medidasOriginalesCm)
   ?t.medidasOriginalesCm.map(p=>({
-    pagina:p.pagina,valor:Number(p.anchoCm.toFixed(2))+' × '+
-      Number(p.altoCm.toFixed(2))+' cm'
-   })):null;
- const unicas=medidas?[...new Set(medidas.map(x=>x.valor))]:[];
- const formato=t.formatoFinal==='personalizado_a4'
-  ?unicas.length===1?unicas[0]:'Original personalizado (varias medidas)'
-  :t.formatoFinal?.toUpperCase();
- const mode=t.modo==='bn'?'B/N':t.modo==='color'?'Color':null;
- const sides=t.carasPresupuestadas==='simple'?'Simple faz':
-  t.carasPresupuestadas==='double'?'Doble faz':null;
- const ring=t.tipoAnillado==='ninguno'?'Sin anillado':
+   pagina:p.pagina,valor:Number(p.anchoCm.toFixed(2))+' × '+
+    Number(p.altoCm.toFixed(2))+' cm'
+  })):null;
+ const unicas=medidas?[...new Set(medidas.map(p=>p.valor))]:[];
+ const tamaño=t.formatoFinal==='personalizado_a4'
+  ?unicas.length===1?unicas[0]:'Original personalizado (ver medidas por página)'
+  :(['a4','a3','a5'].includes(t.formatoFinal)?t.formatoFinal.toUpperCase():null);
+ const color=t.modo==='bn'?'Blanco y negro':t.modo==='color'?'Color':null;
+ const caras=t.carasPresupuestadas==='simple'?'Simple faz (una cara por hoja)':
+  t.carasPresupuestadas==='double'?'Doble faz (ambas caras de la hoja)':null;
+ const anillado=t.tipoAnillado==='ninguno'?'Sin anillado':
   t.tipoAnillado==='individual'?'Anillado individual':
   t.tipoAnillado==='grupo'
-   ?('Anillado en grupo '+clean(t.grupoAnillado)+' (confirmar integrantes)'):null;
- const papelLegible={
+   ?'Anillado en grupo '+clean(t.grupoAnillado)+' (confirmar integrantes)':null;
+ const papeles={
   estandar:'Papel estándar B/N (gramaje sin especificar)',
   obra70:'Papel obra 70 g',obra80:'Papel obra 80 g',
   obra140:'Papel obra 140 g',obra180:'Papel obra 180 g',
@@ -30,37 +34,68 @@ function format(t){
   a3_color_obra140:'Papel obra 140 g A3',
   a3_color_obra180:'Papel obra 180 g A3',
   recubierto:'Papel recubierto',fotografico:'Papel fotográfico'
- }[t.material]||t.material||null;
- const pages=Array.isArray(t.paginasElegidas)&&t.paginasElegidas.length?
-  (t.paginasElegidas.length===t.paginasOriginales&&
-  t.paginasElegidas.every((v,i)=>v===i+1)?'Todas':t.paginasElegidas.join(', ')):null;
- return [
-  ['Servicio',t.servicio],
-  ['Archivo original',t.nombreOriginal],
-  ['Páginas a imprimir',pages],
-  ['Tamaño final',formato],
+ };
+ const papel=papeles[t.material]||t.material||null;
+ const elegidas=Array.isArray(t.paginasElegidas)?t.paginasElegidas:[];
+ const todas=elegidas.length===t.paginasOriginales&&elegidas.every((v,i)=>v===i+1);
+ const paginas=elegidas.length?(todas?'Todas ('+elegidas.length+')':elegidas.join(', ')):null;
+ const n=t.paginasPorCaraPresupuestadas;
+ const distribucion=[1,2,4,9].includes(n)
+  ?n===1?'Normal: 1 página del PDF por cara':
+   'Múltiples en Adobe Acrobat: '+n+' páginas del PDF por cara; revisar reducción en vista previa':null;
+ const ajuste=n>1?
+  'Elegir «Múltiples» en Adobe Acrobat: la escala se adapta a la distribución':
+  ['a5','personalizado_a4'].includes(t.formatoFinal)?
+  'Tamaño real / 100 %, SIN ampliar el contenido':
+  t.formatoFinal==='a4'?'Ajustar proporcionalmente al A4, sin recortar':
+  t.formatoFinal==='a3'?'Ajustar proporcionalmente al A3, sin recortar':null;
+ const filas=[
+  ['Archivo que se abre en Adobe',nombreZip(i)],
+  ['Nombre original del cliente',nombreSeguro(t.nombreOriginal)],
+  ['Páginas del PDF',Number.isSafeInteger(t.paginasOriginales)?t.paginasOriginales:null],
+  ['Páginas a imprimir',paginas],
+  ['Tamaño final solicitado',tamaño],
   ...(t.formatoFinal==='personalizado_a4'?
-   [['Tarifa aplicada','A4 vigente; medida original sin ampliar ni recortar.'],
-    ...(medidas&&unicas.length>1?[['Tamaño por página',medidas.map(p=>'pág. '+p.pagina+': '+p.valor).join('; ')]]:[])]:
-   t.formatoFinal==='a5'?[['Tarifa aplicada','A4 vigente; A5 a escala original sin ampliación. No incluye corte.']]:[]),
-  ['Color',mode],['Caras',sides],
-  ['Páginas por cara',t.paginasPorCaraPresupuestadas],
-  ['Copias',t.copias],['Papel',papelLegible],['Anillado',ring],
-  ...(t.descripcion?[['Observaciones',t.descripcion]]:[])
+   [['Tarifa aplicada','A4; tamaño original sin ampliar'],
+    ...(medidas&&unicas.length>1?
+     [['Medidas por página',medidas.map(p=>'pág. '+p.pagina+': '+p.valor).join('; ')]]:[])]:
+   t.formatoFinal==='a5'?[['Tarifa aplicada','A4; A5 sin ampliar']]:[]),
+  ['Color de impresión',color],
+  ['Impresión de caras',caras],
+  ['Distribución / páginas por cara',distribucion],
+  ['Escala en Adobe Acrobat',ajuste],
+  ['Cantidad de copias',t.copias],
+  ['Material / papel',papel],
+  ['Anillado después de imprimir',anillado],
+  ...(t.descripcion?[['Observaciones del pedido',nombreSeguro(t.descripcion)]]:[])
  ];
+ if(t.servicio!=='documentos'){
+  return [
+   ['Archivo que se abre en Adobe',nombreZip(i)],
+   ['Nombre original del cliente',nombreSeguro(t.nombreOriginal)],
+   ['Servicio',t.servicio],
+   ['Páginas seleccionadas',paginas],
+   ['Copias',t.copias],
+   ['Advertencia','Este ZIP no contiene las instrucciones completas para ploteos u otros servicios. Verificar antes de producir.']
+  ];
+ }
+ return filas;
 }
 function textoOrden(d){
  const lines=['LIBRERÍA SABER — ORDEN DE TRABAJO N.º '+d.numeroOrden,
-  'Referencia técnica: '+d.webOrderId,
-  'Estado: '+d.estadoPago+' — NO AUTORIZA IMPRIMIR NI ENTREGAR',
-  'Importe de referencia: ARS '+d.importe,
-  'Documentos: '+d.trabajos.length,''];
+  'ESTADO: '+d.estadoPago+' — NO IMPRIMIR NI ENTREGAR SIN AUTORIZACIÓN',
+  'Importe del pedido: ARS '+d.importe,
+  'Documentos: '+d.trabajos.length,
+  'Los PDF originales NO están modificados ni impuestos. Abrir cada PDF en Adobe Acrobat.',
+  ''];
  for(const [i,t] of d.trabajos.entries()){
-  lines.push('PDF '+String(i+1).padStart(2,'0')+' — '+t.nombreOriginal);
-  for(const [k,v] of format(t))lines.push('  '+k+': '+clean(v));
+  lines.push('PDF '+String(i+1).padStart(2,'0')+' — '+nombreZip(i)+
+   ' — '+nombreSeguro(t.nombreOriginal));
+  for(const [k,v] of formatoOrden(t,i))lines.push('  '+k+': '+clean(v));
   lines.push('');
  }
- lines.push('ATENCIÓN: confirmar cualquier dato que figure NO CONSTA.');
+ lines.push('IMPORTANTE: comprobar la vista previa de Adobe, papel y escala antes de imprimir.');
+ lines.push('Cualquier «NO CONSTA» requiere verificar la instrucción con el cliente.');
  return lines.join('\n');
 }
 function escapeHtml(s){return clean(s).replace(/[&<>"']/g,c=>({
@@ -68,21 +103,23 @@ function escapeHtml(s){return clean(s).replace(/[&<>"']/g,c=>({
 })[c])}
 function htmlOrden(d){
  const sections=d.trabajos.map((t,i)=>
-  '<section><h2>PDF '+String(i+1).padStart(2,'0')+' · '+escapeHtml(t.nombreOriginal)+
-  '</h2><table>'+format(t).map(([k,v])=>'<tr><th>'+escapeHtml(k)+
+  '<section><h2>'+escapeHtml(nombreZip(i))+' · '+escapeHtml(nombreSeguro(t.nombreOriginal))+
+  '</h2><table>'+formatoOrden(t,i).map(([k,v])=>'<tr><th>'+escapeHtml(k)+
   '</th><td>'+escapeHtml(v)+'</td></tr>').join('')+'</table></section>').join('');
  return '<!doctype html><html lang="es"><head><meta charset="utf-8">'+
   '<title>Orden '+escapeHtml(d.numeroOrden)+'</title><style>'+
-  'body{font:14px Arial,sans-serif;margin:24px;color:#163552}h1{font-size:24px}'+
-  'section{break-inside:avoid;margin-top:20px}table{border-collapse:collapse;width:100%}'+
-  'th,td{border:1px solid #d5dce5;padding:7px;text-align:left}th{width:35%}'+
-  '.alert{border:2px solid #be6000;padding:10px;font-weight:bold}'+
-  '@media print{body{margin:13mm}}'+
-  '</style></head><body><h1>LIBRERÍA SABER · ORDEN N.º '+
-  escapeHtml(d.numeroOrden)+'</h1><p>Referencia interna: '+
-  escapeHtml(d.webOrderId)+'</p><p>Importe: ARS '+escapeHtml(d.importe)+
-  '</p><p class="alert">PAGO NO CONFIRMADO. NO IMPRIMIR NI ENTREGAR SIN AUTORIZACIÓN.</p>'+
-  sections+'<p>Si un campo indica NO CONSTA, verificar antes de imprimir.</p></body></html>';
+  '@page{size:A4;margin:12mm}body{font:12px Arial,sans-serif;margin:0;color:#17324c}'+
+  'h1{font-size:23px;margin:0 0 8px}h2{font-size:15px;margin:0 0 7px}'+
+  '.datos{font-size:13px;margin:5px 0 12px}section{break-inside:avoid;page-break-inside:avoid;margin-top:16px}'+
+  'table{border-collapse:collapse;width:100%}th,td{border:1px solid #cbd7e2;padding:5px 7px;text-align:left;vertical-align:top}'+
+  'th{width:39%;font-weight:bold;background:#f1f5f9}.alert{border:2px solid #ad5500;padding:9px;font-weight:bold}'+
+  '.nota{font-weight:bold;font-size:12px;margin:15px 0 0}'+
+  '</style></head><body><h1>LIBRERÍA SABER · ORDEN DE TRABAJO N.º '+
+  escapeHtml(d.numeroOrden)+'</h1><p class="datos">Documentos: '+
+  escapeHtml(d.trabajos.length)+' · Total: ARS '+escapeHtml(d.importe)+
+  '</p><p class="alert">PEDIDO SIN PAGO CONFIRMADO. NO IMPRIMIR NI ENTREGAR SIN AUTORIZACIÓN.</p>'+
+  '<p>Abrir en Adobe Acrobat los PDF indicados. Son originales sin modificar ni imponer.</p>'+
+  sections+'<p class="nota">Control: verificar vista previa, escala, páginas por cara, doble faz y papel. Si dice NO CONSTA, confirmar antes de imprimir.</p></body></html>';
 }
 async function fetchFicha(){
  if(!isOrder)throw Error('Referencia del pedido incorrecta');
@@ -124,7 +161,7 @@ button.addEventListener('click',async()=>{
    const t=ficha.trabajos[i];
    state.textContent='Descargando y verificando original '+(i+1)+'/'+ficha.trabajos.length+'…';
    const pdf=await pdfOriginal(ficha,t);
-   entries.push({name:'PDF_'+String(i+1).padStart(2,'0')+'.pdf',blob:pdf});
+   entries.push({name:nombreZip(i),blob:pdf});
   }
   const order='ORDEN_'+ficha.numeroOrden+'_INSTRUCCIONES';
   entries.push({name:order+'.html',blob:new Blob([htmlOrden(ficha)],{type:'text/html'})});
