@@ -271,3 +271,30 @@ test('modos de falla en la firma no crean pedido y nunca exponen secretos',async
  assert.equal(JSON.stringify(json).includes('key'),false);
  assert.equal(json.paymentAuthorized,false);
 });
+
+
+test('descarga operador: D1 verifica pertenencia y SHA del original antes de revelar bytes',async()=>{
+ const pdf=await PDFDocument.create();
+ pdf.addPage([595.28,841.89]);
+ const data=new Uint8Array(await pdf.save());
+ const sha256=Buffer.from(await subtle.digest('SHA-256',data)).toString('hex');
+ const receiptId='DOC-'+randomUUID();
+ const base='https://saber-documentos-pruebas.libreriasaber.workers.dev';
+ const req=()=>new Request(base+'/api/ensayo-tus-descargar',{method:'POST',headers:{
+  Origin:base,'Content-Type':'application/json'
+ },body:JSON.stringify({orderId:ORDER,receiptId})});
+ let storageReads=0,lookups=0;
+ const read=async()=>{storageReads++;return new Response(data,{status:200})};
+ const d1=async()=>{lookups++;return {found:true,webOrderId:ORDER,receiptId,sha256,bytes:data.length,pages:1}};
+ const good=await descargarPdfTUSPersonal(req(),env,{authorized:true,fetcher:read,revisarD1:d1,subtle});
+ assert.equal(good.status,200);
+ assert.match(good.headers.get('Content-Type'),/application\/pdf/);
+ assert.equal(Buffer.from(await good.arrayBuffer()).equals(Buffer.from(data)),true);
+ assert.equal(storageReads,1);assert.equal(lookups,1);
+ const wrong=await descargarPdfTUSPersonal(req(),env,{authorized:true,fetcher:read,
+  revisarD1:async()=>({found:false,webOrderId:ORDER,receiptId,sha256,bytes:data.length}),subtle});
+ assert.equal(wrong.status,403);assert.equal(storageReads,1);
+ const mismatched=await descargarPdfTUSPersonal(req(),env,{authorized:true,fetcher:read,
+  revisarD1:async()=>({found:true,webOrderId:ORDER,receiptId,sha256:'0'.repeat(64),bytes:data.length}),subtle});
+ assert.equal(mismatched.status,403);assert.equal(storageReads,2);
+});
