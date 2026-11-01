@@ -72,3 +72,14 @@
 - Instrucciones de agentes/colaboradores: `AGENTS.md`.
 
 Al concluir Etapa 1, crear `docs/ETAPA2-...-ESTADO.md`, actualizar aquí cuál es la etapa activa y mantener los archivos anteriores como historial. **No borrar evidencia ni reemplazar el historial con resúmenes ambiguos.**
+
+
+## REGLA PERMANENTE — AVISO PREVENTIVO DE CAMBIO DE CHAT (01-11-2026)
+
+- En TODOS los chats, anticipar el traspaso cuando la conversación se extienda, sin esperar al límite de contexto (no existe contador fiable del espacio restante).
+- Antes de recomendar cambiar de chat, guardar en GitHub: rama, SHA de último commit, pruebas realmente ejecutadas, resultados, errores pendientes y siguiente acción exacta. No declarar guardado sin verificar commit.
+- Avisar expresamente al propietario: «Conviene cambiar de chat. Ya guardé la continuidad en GitHub y preparé el mensaje para seguir», únicamente si el guardado efectivamente tuvo éxito.
+- Entregar automáticamente en ese momento un prompt breve listo para copiar, apuntando al registro y commit más recientes.
+- Si el guardado falla, decirlo claramente y proporcionar el resumen para copiar; nunca simular continuidad persistida.
+- En el siguiente chat, consultar el registro actualizado y reanudar sin repetir decisiones, pruebas cerradas ni retroceder al 28 de octubre.
+- Esta medida es preventiva: no prometer detectar con precisión el momento de agotamiento del chat.
