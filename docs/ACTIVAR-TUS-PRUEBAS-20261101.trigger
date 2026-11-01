@@ -40,3 +40,5 @@ Revalidar mensaje definitivo número corto: test heredado esperaba «Orden de tr
 2026-11-01 ~17:25 ART — Reponer tamaño original A5: motor reconoce 14.8 x 21 cm, cotiza A5 al precio A4 oficial (sin nueva escala), mantiene formatoFinal=a5 en ficha y sin_escalado; admite B/N/color y opciones habituales. Mostrar explícitamente 'A5 original, tarifa A4'. Tests A5 con PDF bytes reales y SHA TUS obligatorios. Desplegar solo saber-documentos-pruebas tras CI y health, sin producción, cobros ni cambiar precios.
 
 Revalidación precio A5: comparar IMPORTE VERIFICADO real del servidor entre PDF A5 original y PDF A4 equivalente (en lugar de campo interno inexistente), mismo precio A4, formato final A5 sin ampliar. Test corregido bfe9a203; activar solo worker documental privado con rollback.
+
+2026-11-01: ensayo privado de originales de 14 por 20 cm, cotización A4, tamaño sin cambios; pruebas de interfaz y recepción del pedido. No modificar sitio público ni pagos.
