@@ -350,5 +350,5 @@ test('preflight privado de Supabase firma sin subir bytes ni exponer token',asyn
  assert.ok(!JSON.stringify(failure).includes('secret-error'));
  const forbidden=await comprobarTUSAntesDeEnviar(request(),env,{authorized:false,fetcher:async()=>{throw Error('must never call');}});
  assert.equal(forbidden.status,403);
- assert.equal((await forbidden.json()).etapa,'AUTORIZACION_PORTAL');
+ assert.equal((await forbidden.json()).etapa,'SESION_PRIVADA');
 });
