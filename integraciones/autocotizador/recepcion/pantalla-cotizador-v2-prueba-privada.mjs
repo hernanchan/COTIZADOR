@@ -4,8 +4,8 @@
  * por defecto, y no interactúa con la tienda pública.
  */
 export function paginaCotizadorV2PruebaPrivada(sitekey,tusEnabled=false,tusDiagnostico=null){
- const tusSolicitado=tusDiagnostico?.solicitado===true;
- const tusBloqueado=tusSolicitado&&!tusEnabled;
+ // En esta rama de integración el portal NUNCA vuelve silenciosamente a Drive.
+ const tusBloqueado=!tusEnabled;
  const fallas=Array.isArray(tusDiagnostico?.invalidos)?tusDiagnostico.invalidos:[];
  if(typeof sitekey!=='string'||!/^[a-zA-Z0-9._-]{10,200}$/.test(sitekey))
   throw Error('Turnstile privado sin configurar');
