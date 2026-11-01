@@ -135,12 +135,23 @@ function centralSafeManifest(data){
   const copies=w.copias;
   if(copies!==null&&copies!==undefined&&(!Number.isSafeInteger(copies)||copies<1||copies>500))
    throw Error("Cantidad de trabajo inválida");
+  const medidasOriginalesCm=w.formatoFinal==="personalizado_a4"&&
+    Array.isArray(w.medidasOriginalesCm)&&
+    w.medidasOriginalesCm.length===w.paginasElegidas.length&&
+    w.medidasOriginalesCm.every((p,i)=>p&&p.pagina===w.paginasElegidas[i]&&
+     Number.isFinite(p.anchoCm)&&Number.isFinite(p.altoCm)&&p.anchoCm>0&&p.altoCm>0&&
+     Math.min(p.anchoCm,p.altoCm)<=21.1&&Math.max(p.anchoCm,p.altoCm)<=29.8)
+     ?w.medidasOriginalesCm.map(p=>({pagina:p.pagina,anchoCm:p.anchoCm,altoCm:p.altoCm})):null;
+  if(w.formatoFinal==="personalizado_a4"&&!medidasOriginalesCm)
+   throw Error("Faltan medidas originales verificadas en la orden.");
   return {
    orden:w.orden,idTrabajo:w.idTrabajo,servicio:w.servicio,
    nombreOriginal:w.nombreOriginal,fileId:w.fileId,
    reciboPrivado:r.receiptId,sha256:r.sha256,paginasOriginales:r.pages,
    bytes:r.bytes,paginasElegidas:[...w.paginasElegidas],
    copias:copies??null,formatoFinal:texto(w.formatoFinal),
+   tarifaAplicada:w.formatoFinal==='personalizado_a4'?'a4':texto(w.tarifaAplicada),
+   medidasOriginalesCm,
    carasPresupuestadas:w.servicio==="documentos"?(w.carasPresupuestadas??null):null,
    paginasPorCaraPresupuestadas:w.servicio==="documentos"?(w.paginasPorCaraPresupuestadas??null):null,
    // Conservar sólo el anillado de la ficha VERIFICADA por el servidor.
@@ -290,6 +301,7 @@ async function centralTUSPackageManifest(req,env){
   orden:t.orden,nombreOriginal:t.nombreOriginal,reciboPrivado:t.reciboPrivado,
   servicio:t.servicio,paginasOriginales:t.paginasOriginales,
   paginasElegidas:t.paginasElegidas,copias:t.copias,formatoFinal:t.formatoFinal,
+  tarifaAplicada:t.tarifaAplicada,medidasOriginalesCm:t.medidasOriginalesCm,
   carasPresupuestadas:t.carasPresupuestadas,
   paginasPorCaraPresupuestadas:t.paginasPorCaraPresupuestadas,
   modo:t.modo,material:t.material,tipoAnillado:t.tipoAnillado,
@@ -1037,8 +1049,15 @@ function agregarFichaDeImpresion(area,t){
  // ni del PDF original. Los datos ausentes se señalan: no inventar instrucciones.
  const modo=(t.modo==="bn"||t.modo==="b/n")?"Blanco y negro":
   t.modo==="color"?"Color":null;
- const formato=(["a5","a4","a3"].includes(t.formatoFinal))?
-  t.formatoFinal.toUpperCase():null;
+ const medidas=t.formatoFinal==="personalizado_a4"&&Array.isArray(t.medidasOriginalesCm)
+  ?t.medidasOriginalesCm.map(x=>({
+   pagina:x.pagina,valor:Number(x.anchoCm.toFixed(2))+" × "+Number(x.altoCm.toFixed(2))+" cm"
+  })):null;
+ const medidasUnicas=medidas?[...new Set(medidas.map(x=>x.valor))]:[];
+ const formato=t.formatoFinal==="personalizado_a4"&&medidasUnicas.length
+  ?"Original: "+(medidasUnicas.length===1?medidasUnicas[0]:
+   medidasUnicas.length+" tamaños distintos (ver detalle por página)")
+  :(["a5","a4","a3"].includes(t.formatoFinal)?t.formatoFinal.toUpperCase():null);
  const caras=t.carasPresupuestadas==="simple"?"Simple faz":
   t.carasPresupuestadas==="double"?"Doble faz":null;
  const anillado=t.tipoAnillado==="ninguno"?"Sin anillado":
@@ -1061,7 +1080,9 @@ function agregarFichaDeImpresion(area,t){
   ["Páginas del archivo",Number.isSafeInteger(t.paginasOriginales)?String(t.paginasOriginales):null],
   ["Páginas a imprimir",seleccion],
   ["Tamaño final",formato],
-  ["Tarifa aplicada",t.formatoFinal==="a5"?"Tarifa A4 vigente (A5 sin ampliar)":formato?"Tarifa "+formato:null],
+  ["Tarifa aplicada",t.formatoFinal==="personalizado_a4"?
+   "Tarifa A4 vigente (original sin ampliar)":t.formatoFinal==="a5"?
+   "Tarifa A4 vigente (A5 sin ampliar)":formato?"Tarifa "+formato:null],
   ["Impresión",modo],
   ["Caras",caras],
   ["Páginas por cara",[1,2,4,9].includes(t.paginasPorCaraPresupuestadas)?
@@ -1079,6 +1100,9 @@ function agregarFichaDeImpresion(area,t){
   grid.append(line);
  }
  area.append(grid);
+ if(medidas&&medidasUnicas.length>1)
+  area.append(node("p","Medidas por página: "+
+   medidas.map(x=>"pág. "+x.pagina+": "+x.valor).join("; ")));
  if(descripcion)area.append(node("p","Descripción técnica: "+descripcion));
  if(t.servicio==="ploteos")
   area.append(node("p","Ploteo: dimensiones, rollo y modo por página no constan en este resumen de la Central. No imprimir sin revisar el plano."));
