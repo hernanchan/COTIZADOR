@@ -42,3 +42,17 @@ En la rama experimental, comparar interfaces reales del Worker privado y `lab-tu
 - `docs/AUDITORIA-BASES-OPEN-SOURCE-20261031.md`
 - `docs/DIAGNOSTICO-502-LOTE-20261028.md`
 - `docs/UX-CIRCUITO-UNICO-CLIENTE-V1.md`
+
+
+## 01/11/2026 — Avance de código autónomo tras autorización del usuario («todo hasta que quede operativo»)
+
+El usuario autorizó continuar mientras descansaba. Se auditó el Worker privado real y se constató un **bloqueo estructural**: `apiPrepararDocumentosV2Lote` (`integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs`, líneas ~1547–1640) valida recibos `DOC-` de GAS/Drive y usa `verificarPedidoPorComprobantes` o `fase4FichaCentralLotePrivada` para alimentar `registrarManifiestoV2EnCentral`. Por tanto **NO se pueden conectar directamente** los comprobantes `Supabase Storage TUS` sin rediseñar esa interfaz. Fabricar identificadores `DOC-` sería incorrecto e inseguro.
+
+En rama experimental `experimento/uppy-tus-supabase-20261031`, **sin despliegues ni cambios de configuración**, se creó:
+- `experimentos/recepcion-tus/integracion/contract.mjs` commit `f8cec306`: contrato puro de manifiesto (1–30 archivos, 20MiB individual, 60MiB por pedido), comprobante independiente por objeto privado y flujo estrictamente **todos verificados → cotización por servidor → alta D1 idempotente**, checkout/producción siempre apagados.
+- `experimentos/recepcion-tus/integracion/tests/smoke.test.mjs` commit `dfa6acf6`: pruebas de integridad de manifiesto y duplicados.
+- `experimentos/recepcion-tus/integracion/README.md` commit `76e1d73c`: límites y siguientes integraciones reales. La prueba **del código efectivamente recuperado de GitHub** mediante V8 dio 8/8 condiciones positivas; diseño previo local Node 9/9, sin prueba real de D1. **Nunca llamar a esto «pedido operativo».**
+
+**Pendiente imprescindible:** mantener los archivos privados (el lab los borra), establecer autorización de origen/cliente, elegir método de registro D1 con pago 0 y entregar descarga privada para la Central. Conectar además cotización A4/A3/CAD/Póster usando tarifas reales del backend. Añadir tests de integración reales y desplegar **únicamente un Worker de pruebas nuevo/versión inactiva** cuando las dependencias estén completas. El viejo Worker/GAS no debe tocarse a ciegas; tampoco web comercial ni `main`.
+
+**Estado final de esta tanda:** evidencia de transporte E2E 2/2 **real** sigue vigente, contrato de integración **codificado y testeado localmente**, registro real de pedido/descarga **NO IMPLEMENTADOS**. No se puede afirmar operativo. 
