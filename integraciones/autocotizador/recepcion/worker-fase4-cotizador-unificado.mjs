@@ -1677,7 +1677,7 @@ async function v2SessionMac(secret,timestamp){
  return Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
 }
 async function v2SessionCookie(env,path='/api/ensayo-preparar-documentos-v2-lote'){
- if(path!=='/api/ensayo-preparar-documentos-v2-lote'&&path!=='/api/ensayo-tus-')
+ if(path!=='/api/ensayo-preparar-documentos-v2-lote'&&path!=='/api/ensayo-tus-'&&path!=='/prueba-v2/api/')
   throw Error('Ruta de cookie privada no autorizada.');
  const timestamp=Math.floor(Date.now()/1000);
  return V2_SESSION_COOKIE+'='+timestamp+'.'+
@@ -1720,8 +1720,10 @@ async function v2PrivateBrowserResponse(request,env,path){
    responseHeaders.append('Set-Cookie',await v2SessionCookie(env));
    // El fetch TUS necesita cookie privada propia; el navegador no siempre
    // reenvía credenciales Basic tras la carga inicial del portal.
-   if(tusPrivadoConfigurado(env))
+   if(tusPrivadoConfigurado(env)){
     responseHeaders.append('Set-Cookie',await v2SessionCookie(env,'/api/ensayo-tus-'));
+    responseHeaders.append('Set-Cookie',await v2SessionCookie(env,'/prueba-v2/api/'));
+   }
    return new Response(html,{status:200,headers:responseHeaders});
   }
   if(path==='/prueba-v2/carga-inteligente'){
@@ -1847,15 +1849,17 @@ export default {
     if(page==='/api/ensayo-preparar-documentos-v2-lote')return apiPrepararDocumentosV2Lote(request,env);
     // V1 TUS: solo entorno privado y autorizado, nunca comercial ni pagos.
     if(page==='/api/ensayo-tus-iniciar'||page==='/api/ensayo-tus-registrar'||
-       page==='/api/ensayo-tus-comprobar'||page==='/api/ensayo-tus-descargar'){
+       page==='/api/ensayo-tus-comprobar'||
+       page==='/prueba-v2/api/ensayo-tus-iniciar'||page==='/prueba-v2/api/ensayo-tus-registrar'||
+       page==='/prueba-v2/api/ensayo-tus-comprobar'||page==='/api/ensayo-tus-descargar'){
       const basic=v2PrivateBrowserAuthorized(request,env)==='allow';
       const authorized=page==='/api/ensayo-tus-descargar'?basic
         :(basic||(await v2SessionAuthorized(request,env)));
-      if(page==='/api/ensayo-tus-comprobar')
+      if(page.endsWith('/ensayo-tus-comprobar'))
         return comprobarTUSAntesDeEnviar(request,env,{authorized});
-      if(page==='/api/ensayo-tus-iniciar')
+      if(page.endsWith('/ensayo-tus-iniciar'))
         return iniciarTandaTUSPrivada(request,env,{authorized});
-      if(page==='/api/ensayo-tus-registrar')
+      if(page.endsWith('/ensayo-tus-registrar'))
         return finalizarPedidoTUSPrivado(request,env,{authorized,preciosServidor:preciosPiloto});
       return descargarPdfTUSPersonal(request,env,{authorized});
     }
