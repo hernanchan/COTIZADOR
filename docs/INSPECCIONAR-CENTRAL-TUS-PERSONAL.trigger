@@ -9,3 +9,5 @@ Registrar resultado CI 5cf72bcd para numeración secuencial D1 y paquete ZIP. No
 Consultar de nuevo estado CI 4156ea2d tras instalar dependencia pdf-lib, sin secretos.
 
 Consulta última ejecución 815da702 de Central corto 001 sin exponer secretos.
+
+Consultar resultado ejecución 23bc9ebe con PDF A4/A3 de prueba e instrucciones verificadas. Sin secretos ni archivos privados.
