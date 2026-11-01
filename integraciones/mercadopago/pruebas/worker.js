@@ -158,6 +158,8 @@ function centralSafeManifest(data){
   pagoConfirmado:false,listoParaProducir:false};
 }
 async function centralTables(env){
+ // D1 asigna secuencia única transaccional: jamás derivar el N.º de una lista.
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_work_order_numbers (number INTEGER PRIMARY KEY AUTOINCREMENT,commercial_order_id TEXT NOT NULL UNIQUE REFERENCES orders(id) ON DELETE RESTRICT,assigned_at TEXT NOT NULL DEFAULT (datetime('now')) )").run();
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_document_manifests (web_order_id TEXT PRIMARY KEY,commercial_order_id TEXT UNIQUE REFERENCES orders(id) ON DELETE RESTRICT,amount_ars INTEGER NOT NULL CHECK(amount_ars>0 AND amount_ars<=50000000),file_count INTEGER NOT NULL CHECK(file_count BETWEEN 1 AND 30),manifest_hash TEXT NOT NULL,manifest_json TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'verified_waiting_order' CHECK(status IN ('verified_waiting_order','linked_waiting_payment','linked_paid_pending_preparation')),created_at TEXT NOT NULL DEFAULT (datetime('now')),linked_at TEXT)").run();
  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_central_manifests_commercial_order ON central_document_manifests(commercial_order_id)").run();
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_bridge_requests (request_id TEXT PRIMARY KEY,request_hash TEXT NOT NULL,action TEXT NOT NULL CHECK(action IN ('stage','link')),created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
@@ -472,6 +474,7 @@ async function centralPrepareDraft(req,env){
  ];
  products.forEach((it,i)=>requests.push(env.DB.prepare("INSERT INTO order_items(order_id,line_number,item_type,sku,title,quantity,unit_price_ars,line_total_ars,detail_json,file_references_json) VALUES(?,?,?,?,?,?,?,?,?,?)")
   .bind(orderId,i+2,"product",it.code,it.name,it.qty,it.price,it.total,"{}","[]")));
+ requests.push(env.DB.prepare("INSERT INTO central_work_order_numbers(commercial_order_id) VALUES(?)").bind(orderId));
  requests.push(env.DB.prepare("INSERT INTO cart_requests(client_order_id,request_hash,order_id) VALUES(?,?,?)").bind(data.clientOrderId,hash,orderId));
  requests.push(env.DB.prepare("UPDATE central_document_manifests SET commercial_order_id=?,status='linked_waiting_payment',linked_at=datetime('now') WHERE web_order_id=? AND commercial_order_id IS NULL").bind(orderId,data.webOrderId));
  let response;
@@ -867,13 +870,17 @@ async function centralPolaroidDetail(env,id){
  }:null;
 }
 
+function shortWorkNumber(n){
+ return Number.isSafeInteger(n)&&n>0?String(n).padStart(3,"0"):null;
+}
 async function centralAdminDetail(env,id){
  await centralTables(env);
  const row=await env.DB.prepare("SELECT web_order_id,manifest_json,created_at,amount_ars,file_count FROM central_document_manifests WHERE commercial_order_id=?").bind(id).first();
  if(!row)return null;
  let document;
  try{document=JSON.parse(row.manifest_json)}catch(_){return null}
- return {webOrderId:row.web_order_id,totalDocumentos:row.amount_ars,
+ const number=await env.DB.prepare("SELECT number FROM central_work_order_numbers WHERE commercial_order_id=?").bind(id).first();
+ return {numeroOrden:shortWorkNumber(number?.number),webOrderId:row.web_order_id,totalDocumentos:row.amount_ars,
   fechaRecepcion:row.created_at,archivos:row.file_count,
   estado:"DOCUMENTOS_VERIFICADOS_PDF_FINAL_PENDIENTE",
   esTUS:/^WEB-ENSAYO-[A-F0-9]{32}$/.test(row.web_order_id),
@@ -910,6 +917,13 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px ui-monospace,monospace
 <script>
 const secret=document.querySelector("#secret"),status=document.querySelector("#status"),orders=document.querySelector("#orders"),details=document.querySelector("#details");
 function money(n){return new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0}).format(Number(n)||0)}
+async function apiPost(path,data){
+ const r=await fetch(path,{method:"POST",headers:{"Authorization":"Bearer "+secret.value,
+  "Content-Type":"application/json"},body:JSON.stringify(data),cache:"no-store"});
+ const x=await r.json().catch(()=>({}));
+ if(!r.ok)throw Error(r.status===401?"Clave incorrecta":x.error||"Error "+r.status);
+ return x;
+}
 async function api(path,method="GET"){const r=await fetch(path,{method,headers:{"Authorization":"Bearer "+secret.value},cache:"no-store"});const x=await r.json().catch(()=>({}));if(!r.ok)throw Error(r.status===401?"Clave incorrecta":x.error||"Error "+r.status);return x}
 function node(tag,txt){const x=document.createElement(tag);x.textContent=String(txt);return x}
 async function showOrder(id){try{status.textContent="Consultando detalle...";const x=await api("/admin/api/order?id="+encodeURIComponent(id));details.replaceChildren();details.append(node("h3","Pedido "+x.order.id));details.append(node("p","Total: "+money(x.order.amount_ars)+" · Aprobado: "+(x.order.paid_at||"sin fecha")));if(x.produccion){const pr=x.produccion;details.append(node("h4","Estado operativo: "+pr.estado.replaceAll("_"," ")));details.append(node("p",pr.mensaje));for(const t of pr.trabajos){const area=node("section","");area.append(node("h4",t.linea+". "+t.cantidad+" × "+t.descripcion+" — "+money(t.subtotal)));area.append(node("p","Estado: "+t.etapa.replaceAll("_"," ")+" · "+t.instruccion));const valores=Object.entries(t.especificaciones||{}).map(a=>a[0]+": "+a[1]).join(" · ");if(valores)area.append(node("p","Ficha técnica: "+valores));if(t.referencias?.length)area.append(node("p","Referencias privadas: "+t.referencias.join(", ")));details.append(area)}}else details.append(node("p","La ficha de producción no está disponible."));if(x.produccion?.documentosVerificados){
@@ -1030,11 +1044,15 @@ async function showUnpaidDetails(id,target,trigger){
  trigger.disabled=true;
  trigger.textContent="Consultando…";
  try{
+  // POST administrativo idempotente: asigna 001, 002, 003... de forma atómica.
+  const numbered=await apiPost("/admin/api/central/asignar-numero",{orderId:id});
   const x=await api("/admin/api/central/unpaid-detail?id="+encodeURIComponent(id));
+  if(x.documentos.numeroOrden!==numbered.numeroOrden)
+   throw Error("El número de orden no coincide con D1.");
   if(!x?.documentos||!Array.isArray(x.documentos.trabajos))
    throw Error("La Central no devolvió los datos de los archivos.");
   target.replaceChildren();
-  target.append(node("h4","Pedido "+id+" · SIN PAGO"));
+  target.append(node("h3","ORDEN DE TRABAJO N.º "+x.documentos.numeroOrden+" · SIN PAGO"));
   target.append(node("p","Recepción "+x.documentos.webOrderId+" · "+money(x.documentos.totalDocumentos)+
    " · "+x.documentos.archivos+" archivo(s)"));
   target.append(node("p","PDF originales recibidos. El pago no está confirmado; no imprimir ni entregar."));
@@ -1117,7 +1135,8 @@ document.querySelector("#refreshUnpaid").addEventListener("click",async()=>{
   list.replaceChildren();
   if(!x.orders.length)list.append(node("li","No hay pedidos documentales esperando pago."));
   for(const o of x.orders){
-   const li=node("li",o.web_order_id+" · "+o.file_count+" PDF · Total pedido "+money(o.order_ars));
+   const li=node("li",(o.numero_orden?"Orden N.º "+String(o.numero_orden).padStart(3,"0"):"Pedido sin numerar")+
+    " · "+o.file_count+" PDF · Total "+money(o.order_ars));
    li.append(node("p","Referencia de compra: "+o.commercial_order_id+" · Estado: pago sin confirmar"));
    const btn=node("button","Ver PDF privados");btn.className="outline";btn.type="button";
    const panel=node("div","");panel.className="unpaid-result";panel.hidden=true;
@@ -1453,6 +1472,24 @@ export default {
     const rows=await env.DB.prepare("SELECT id,description,amount_ars,status,paid_at,created_at FROM orders WHERE status='paid' AND deposit_ars=amount_ars AND NOT EXISTS (SELECT 1 FROM payment_reviews WHERE order_id=orders.id AND state='revoked') ORDER BY paid_at DESC LIMIT 100").all();
     return json({orders:rows.results});
    }
+   // Un pedido histórico se numera SOLO al solicitar su ficha desde un
+   // POST administrativo. No mutar D1 en GET ni renumerar pedidos ya asignados.
+   if(url.pathname==="/admin/api/central/asignar-numero"&&req.method==="POST"){
+    if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+    if(!/^application\/json(?:;|$)/i.test(req.headers.get("Content-Type")||""))
+     return json({error:"Formato no válido"},415);
+    let p;
+    try{p=await req.json()}catch{return json({error:"Cuerpo inválido"},400)}
+    if(!p||Object.keys(p).join(",")!=="orderId"||!CENTRAL_UUID.test(p.orderId||""))
+     return json({error:"Pedido inválido"},400);
+    await centralTables(env);
+    const row=await env.DB.prepare("SELECT m.commercial_order_id FROM central_document_manifests m JOIN orders o ON o.id=m.commercial_order_id WHERE m.commercial_order_id=? AND o.status='awaiting_payment' LIMIT 1").bind(p.orderId).first();
+    if(!row)return json({error:"No es un pedido documental pendiente"},404);
+    await env.DB.prepare("INSERT OR IGNORE INTO central_work_order_numbers(commercial_order_id) VALUES(?)").bind(p.orderId).run();
+    const saved=await env.DB.prepare("SELECT number FROM central_work_order_numbers WHERE commercial_order_id=?").bind(p.orderId).first();
+    if(!saved||!Number.isSafeInteger(saved.number))return json({error:"Número no confirmado"},503);
+    return json({numeroOrden:shortWorkNumber(saved.number),paymentAuthorized:false,listoParaProducir:false});
+   }
    if(url.pathname==="/admin/api/central/unpaid-detail"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
     const id=url.searchParams.get("id")||"";
@@ -1472,7 +1509,7 @@ export default {
    if(url.pathname==="/admin/api/central/unpaid"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
     await centralTables(env);await ensurePaymentReviews(env);
-    const rows=await env.DB.prepare("SELECT m.web_order_id,m.commercial_order_id,m.amount_ars AS documents_ars,m.file_count,o.amount_ars AS order_ars,o.status,o.created_at FROM central_document_manifests m JOIN orders o ON o.id=m.commercial_order_id WHERE m.commercial_order_id IS NOT NULL AND (o.status!='paid' OR EXISTS(SELECT 1 FROM payment_reviews p WHERE p.order_id=o.id AND p.state='revoked')) ORDER BY o.created_at DESC LIMIT 50").all();
+    const rows=await env.DB.prepare("SELECT m.web_order_id,m.commercial_order_id,m.amount_ars AS documents_ars,m.file_count,o.amount_ars AS order_ars,o.status,o.created_at,n.number AS numero_orden FROM central_document_manifests m JOIN orders o ON o.id=m.commercial_order_id LEFT JOIN central_work_order_numbers n ON n.commercial_order_id=o.id WHERE m.commercial_order_id IS NOT NULL AND (o.status!='paid' OR EXISTS(SELECT 1 FROM payment_reviews p WHERE p.order_id=o.id AND p.state='revoked')) ORDER BY o.created_at DESC LIMIT 50").all();
     return json({estado:"PEDIDOS_DOCUMENTALES_SIN_PAGO_CONFIRMADO",orders:rows.results||[],productionAuthorized:false});
    }
    if(url.pathname==="/admin/api/central/polaroid-pdf"&&req.method==="GET"){
