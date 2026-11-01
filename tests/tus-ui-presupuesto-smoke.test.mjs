@@ -155,3 +155,21 @@ test('el cliente ve confirmación grande y número corto solo luego de registro 
  assert.ok(script.includes('resultado.numeroOrden'));
  assert.ok(script.includes('registeredShortOrder=resultado.numeroOrden'));
 });
+
+
+test('cotizador inteligente acepta 14x20 y preserva elección original en TUS',()=>{
+ const html=paginaCotizadorV2PruebaPrivada(sitekey,true);
+ assert.ok(html.includes('personalizado_a4'));
+ assert.ok(html.includes('Tamaño original menor que A4'));
+ assert.ok(html.includes("opt.formato"));
+ const sha='f'.repeat(64),name='CARATULAS DIARIA.pdf';
+ const d={reference:{sha256:sha,nombre:name,bytes:12345,paginas:14},
+  archivoLocal:{name,size:12345}};
+ const plan={meta:{fileId:'file-123',mode:'bn',name,sha256:sha,bytes:12345},
+  opcionesKey:JSON.stringify({formato:'personalizado_a4',copias:1,
+   caras:'simple',anillado:'ninguno',paginasPorHoja:1,materialColor:''})};
+ const normalized=normalizarTrabajoTUS(d,plan);
+ assert.equal(normalized.opciones.seleccion,'original');
+ assert.equal(normalized.opciones.copias,1);
+ assert.equal(normalized.opciones.anillado,'ninguno');
+});
