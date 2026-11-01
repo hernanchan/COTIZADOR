@@ -29,3 +29,5 @@ Verificar workflow size mandatory choice c02b157d, tests A3 A0 A5 scan 21,75 30,
 Inspeccionar ejecución 1c654e0f: A4-only 20x20, non A4 requiere pregunta, 0 fallos, solo Worker de prueba, HTTP401.
 
 Inspeccionar ensayo A5 original + tarifa A4 commit 7e4e9b6b, CI TUS PDF real, protección 401 y rollout a solo Worker privado.
+
+Confirmar CI cda372ac prueba A5 contra total realmente verificado, 44+72+4, y protección HTTP 401.
