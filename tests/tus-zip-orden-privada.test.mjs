@@ -89,7 +89,7 @@ test('orden numerada: relaciona PDF_01/PDF_02 con nombres originales y parámetr
  }
  for(const expected of ['14 × 20 cm','Múltiples en Adobe Acrobat: 2 páginas','Doble faz',
   'Cantidad de copias: 2','Anillado individual','Páginas a imprimir: 1, 3, 5',
-  'Sin anillado','NO IMPRIMIR NI ENTREGAR','Papel obra 70 g','Tamaño real']){
+  'Sin anillado','NO IMPRIMIR NI ENTREGAR','Papel obra 70 g','A4; tamaño original sin ampliar']){
   assert.ok(txt.includes(expected),expected);
  }
  assert.ok(html.includes('size:A4'));
