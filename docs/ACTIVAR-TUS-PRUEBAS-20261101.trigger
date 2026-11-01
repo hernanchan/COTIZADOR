@@ -10,3 +10,5 @@ trigger=2026-11-01-tus-private-only
 2026-11-01: corregir alcance Basic para llamadas TUS en /prueba-v2/api/ con cookie HttpOnly dedicada al nuevo prefijo; distinguir SESION_PRIVADA vs ORIGEN_SOLICITUD. Ejecución privada, rollback y CI obligatorios. Commits 8106e38b, 22479550, 4d7bf9b4, 9c205071, 80023ef6. No realizar cambios en web pública ni activar cobros.
 
 2026-11-01 — Reintento CI tras identificar en logs run 41314740662 el único fallo: test esperaba AUTORIZACION_PORTAL pero la respuesta correcta ya es SESION_PRIVADA. Prueba ajustada commit d362dfdc. Activación solamente Worker privado con rollback y sitio comercial intacto.
+
+2026-11-01 12:22 ART — Diagnóstico exacto de STORAGE_FIRMA_ERROR para Worker privado: comprobar firma Supabase sin subir PDF, clasificar FETCH_FAILURE / HTTP_NNN / RESPONSE_JSON / TOKEN_MISSING. Nunca registrar tokens ni valores secretos. Código ddd5f523 test 221cd7c0. Compilar, probar y activar solo Worker pruebas con rollback y 401 anónimo.
