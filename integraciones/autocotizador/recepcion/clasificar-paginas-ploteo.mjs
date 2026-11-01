@@ -1,6 +1,7 @@
 import {clasificarCoberturaPloteo} from './clasificar-cobertura-ploteo.mjs';
 import {contieneRotuloTecnico} from './refinar-tipo-plano.mjs';
 import {ajustarPlanoTecnicoPorPagina} from './regla-comercial-ploteos.mjs';
+import {evidenciaPlanoTecnico,esCadVectorialDenso} from './discriminar-plano-denso.mjs';
 // PDF.js fijado en una versión conocida; procesa las páginas localmente.
 // No enviar bytes ni capturas del PDF a servicios externos.
 const PDFJS_WORKER='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -31,9 +32,41 @@ export async function clasificarPaginasPloteo(file,{onProgreso=()=>{},maxPaginas
    await page.render({canvasContext:context,viewport,background:'rgb(255,255,255)'}).promise;
    const pixels=context.getImageData(0,0,canvas.width,canvas.height).data;
    const clasificacion=clasificarCoberturaPloteo(pixels,{ancho:canvas.width,alto:canvas.height});
-   let rotuloTecnico=false;
-   try{const texto=await page.getTextContent();rotuloTecnico=contieneRotuloTecnico((texto.items||[]).map(item=>item.str||'').join(' '));}catch(_){/* Sin rótulo comprobado, sin ajuste automático. */}
-   modos.push({numero:i,...ajustarPlanoTecnicoPorPagina(clasificacion,{rotuloTecnico})});
+   let rotuloTecnico=false,texto=''; 
+   try{
+    const contenido=await page.getTextContent();
+    texto=(contenido.items||[]).map(item=>item.str||'').join(' ');
+    rotuloTecnico=contieneRotuloTecnico(texto);
+   }catch(_){/* Si no se puede leer el texto, no cambiar la clasificación visual. */}
+   let clasificada=ajustarPlanoTecnicoPorPagina(clasificacion,{rotuloTecnico});
+   // Sólo ante poster positivo CON rótulo de plano, un segundo muestreo
+   // diferencia trama de líneas (cae fuerte al subir resolución) de tinta
+   // plena (se mantiene). No rasterizar dos veces los demás documentos.
+   if(clasificacion.modo==='poster'&&clasificacion.cobertura>=0.30&&
+      evidenciaPlanoTecnico(texto)){
+    const vAlta=page.getViewport({scale:720/Math.max(v.width,v.height)});
+    const cAlta=document.createElement('canvas');
+    cAlta.width=Math.max(1,Math.ceil(vAlta.width));
+    cAlta.height=Math.max(1,Math.ceil(vAlta.height));
+    try{
+     const ctxAlta=cAlta.getContext('2d',{willReadFrequently:true});
+     if(ctxAlta){
+      ctxAlta.fillStyle='#fff';ctxAlta.fillRect(0,0,cAlta.width,cAlta.height);
+      await page.render({canvasContext:ctxAlta,viewport:vAlta,
+       background:'rgb(255,255,255)'}).promise;
+      const pixelsAlta=ctxAlta.getImageData(0,0,cAlta.width,cAlta.height).data;
+      const detalle=clasificarCoberturaPloteo(pixelsAlta,{
+       ancho:cAlta.width,alto:cAlta.height
+      });
+      if(esCadVectorialDenso({miniatura:clasificacion,detalle,texto})){
+       clasificada={...clasificada,modo:'cad',
+        regla:'trama_vectorial_tecnica_dos_resoluciones',
+        modoVisual:clasificacion.modo};
+      }
+     }
+    }finally{cAlta.width=0;cAlta.height=0;}
+   }
+   modos.push({numero:i,...clasificada});
    canvas.width=0;canvas.height=0;
    page.cleanup();
    onProgreso({terminadas:i,total:pdf.numPages,clasificacion});
