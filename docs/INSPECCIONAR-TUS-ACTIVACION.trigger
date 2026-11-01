@@ -1,0 +1,1 @@
+Revisar vía GitHub API los resultados de las últimas ejecuciones del workflow de activación privada TUS; guardar etapas y conclusiones en GitHub. Solo lectura de Actions; no modificar Cloudflare ni subir PDFs.
