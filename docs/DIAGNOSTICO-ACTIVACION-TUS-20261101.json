@@ -2,10 +2,18 @@
   "workflow": "tus-activar-ensayo-privado.yml",
   "runs": [
     {
+      "id": 41348860127,
+      "head_sha": "6b5b0331a1bbbda9819954ea6b0c91ba3ea1aa6d",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-01T20:49:56Z",
+      "html_url": "https://github.com/hernanchan/COTIZADOR/actions/runs/41348860127"
+    },
+    {
       "id": 41347346485,
       "head_sha": "cda372ac9e22189331c5600779b247a3ec552129",
-      "status": "in_progress",
-      "conclusion": null,
+      "status": "completed",
+      "conclusion": "success",
       "created_at": "2026-11-01T20:32:11Z",
       "html_url": "https://github.com/hernanchan/COTIZADOR/actions/runs/41347346485"
     },
@@ -56,20 +64,12 @@
       "conclusion": "failure",
       "created_at": "2026-11-01T17:17:21Z",
       "html_url": "https://github.com/hernanchan/COTIZADOR/actions/runs/41330704072"
-    },
-    {
-      "id": 41329932565,
-      "head_sha": "5f914a55afd56bcf3031ad7a3b75624e5bc86975",
-      "status": "completed",
-      "conclusion": "success",
-      "created_at": "2026-11-01T17:08:36Z",
-      "html_url": "https://github.com/hernanchan/COTIZADOR/actions/runs/41329932565"
     }
   ],
   "jobs_latest": [
     {
       "name": "activar-ensayo",
-      "conclusion": null,
+      "conclusion": "success",
       "failed_steps": []
     }
   ],
