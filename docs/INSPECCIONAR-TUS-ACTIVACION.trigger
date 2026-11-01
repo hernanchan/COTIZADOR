@@ -41,3 +41,5 @@ Inspeccionar CI de corrección de selector invisible por estar oculto en panel: 
 Verificar CI segundo fallo 2-up con tamaño sin confirmar para PDF 14×20; activar solo Worker documental privado, tests 14x20 pending, A3 pending, excluir A0, Basic 401 y pagos apagados. Commit d5de137e.
 
 Consultar CI activación ZIP Adobe tras commit 7d11936b: etiquetas PDF_01/original, doble faz, 2 por cara, tamaño original 14x20 y HTML seguro. Informar versión activa y HTTP401 sin mostrar secretos.
+
+2026-11-01 inspeccionar trigger 37fb03eb: CI tests de ZIP autoiniciado desde Central, descarga de 3 PDF concurrentes, reintento, límites y bytes originales. Comprobar RUN, versión activa y anónimo HTTP401; no exponer secretos.
