@@ -12,6 +12,8 @@ jobs:
       deployment: false
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: integracion/tus-pedido-privado-20261101
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
