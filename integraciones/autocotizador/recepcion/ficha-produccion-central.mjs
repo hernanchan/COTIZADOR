@@ -45,7 +45,7 @@ export function prepararFichaCentral({pedidoVerificado}){
        Math.ceil(fila.paginasElegidas.length/(detalles.paginasPorHoja??1))))
    throw Error('Composición documental distinta del presupuesto verificado.');
   if(fila.destino==='documentos'&&(
-     !['a5','a4','a3'].includes(fila.formatoFinal)||
+     !['personalizado_a4','a5','a4','a3'].includes(fila.formatoFinal)||
      !['bn','color'].includes(detalles.modo)||
      !['simple','double'].includes(detalles.caras)||
      !['ninguno','individual','grupo'].includes(detalles.anillado)||
@@ -55,6 +55,16 @@ export function prepararFichaCentral({pedidoVerificado}){
      (detalles.modo==='color'&&
       (typeof detalles.materialColor!=='string'||!detalles.materialColor))))
    throw Error('Faltan instrucciones de impresión verificadas en el presupuesto.');
+  // Sólo aceptar un original pequeño si el PDF VERIFICADO cabe íntegro en A4.
+  // Conservar cada tamaño original asociado a su página para la orden de trabajo.
+  const medidasOriginalesCm=fila.destino==='documentos'&&fila.formatoFinal==='personalizado_a4'
+   ?fila.paginasElegidas.map(numero=>{
+     const p=fila.origen?.find(x=>x.numero===numero);
+     if(!p||!Number.isFinite(p.anchoCm)||!Number.isFinite(p.altoCm)||
+      Math.min(p.anchoCm,p.altoCm)>21.1||Math.max(p.anchoCm,p.altoCm)>29.8)
+      throw Error('Tamaño original fuera del papel A4 o no verificado.');
+     return {pagina:numero,anchoCm:p.anchoCm,altoCm:p.altoCm};
+    }):null;
   // La ficha de ploteo sólo admite las páginas, rollos y papeles derivados
   // del presupuesto recalculado por el servidor, nunca valores adicionales del cliente.
   let planoPorPagina=null;
@@ -88,6 +98,8 @@ export function prepararFichaCentral({pedidoVerificado}){
    paginasElegidas:[...fila.paginasElegidas],
    copias:detalles.copias??detalles.lotes??null,
    formatoFinal:fila.formatoFinal||null,
+   tarifaAplicada:fila.destino==='documentos'?(['a5','personalizado_a4'].includes(fila.formatoFinal)?'a4':fila.formatoFinal):null,
+   medidasOriginalesCm,
    // El desglose validado por el cotizador utiliza "materialColor".
    // En B/N la tarifa es "estandar" sin gramaje especificado.
    material:fila.destino==='documentos'
