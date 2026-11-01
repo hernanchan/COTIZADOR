@@ -116,3 +116,27 @@ test('anexo en Adobe advierte cuando faltan datos y escapa nombres hostiles de a
  assert.ok(!html.includes('<archivo>'));
  assert.ok(html.includes('NO CONSTA'));
 });
+
+
+test('ZIP de ploteos muestra CAD/Póster, rollo y papel por página verificada; nunca inventa valores',()=>{
+ const client=readFileSync(new URL('../integraciones/autocotizador/recepcion/paquete-tus-cliente.txt',import.meta.url),'utf8');
+ const start=client.indexOf('function clean(v)'),end=client.indexOf('async function fetchFicha()',start);
+ const render=vm.runInNewContext(client.slice(start,end)+'\n({textoOrden,htmlOrden})');
+ const data={numeroOrden:'041',estadoPago:'SIN_PAGO_CONFIRMADO',importe:12150,
+  trabajos:[{nombreOriginal:'PLANOS MUNICIPALES.pdf',servicio:'ploteos',
+   paginasOriginales:2,paginasElegidas:[1,2],copias:2,formatoFinal:'original',
+   planoPorPagina:[
+    {numeroOriginal:1,modo:'cad',anchoCm:60,altoCm:85,rollo:'rollo60',papel:'obra80'},
+    {numeroOriginal:2,modo:'poster',anchoCm:60,altoCm:85,rollo:'rec60',papel:'recubierto'}
+   ]}]};
+ const txt=render.textoOrden(data),html=render.htmlOrden(data);
+ for(const value of ['PDF_01.pdf','PLANOS MUNICIPALES.pdf','Ploteo de planos CAD / Póster',
+  'Tamaño real · sin ajustar escala','Página 1: CAD / plano · 60.00 × 85.00 cm · rollo60 · Obra 80 g',
+  'Página 2: Póster / pleno · 60.00 × 85.00 cm · rec60 · Recubierto','NO IMPRIMIR NI ENTREGAR']){
+  assert.ok(txt.includes(value),value);
+ }
+ assert.ok(html.includes('rec60'));
+ assert.ok(!txt.includes('no contiene las instrucciones completas'));
+ const anterior={...data,trabajos:[{...data.trabajos[0],planoPorPagina:null}]};
+ assert.match(render.textoOrden(anterior),/Faltan medidas, rollo o tipo CAD\/Póster/);
+});
