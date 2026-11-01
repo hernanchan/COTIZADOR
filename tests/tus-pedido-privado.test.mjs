@@ -333,7 +333,7 @@ test('preflight privado de Supabase firma sin subir bytes ni exponer token',asyn
   calls++;
   assert.match(url,/\/storage\/v1\/object\/upload\/sign\/saber-tus-lab\/v2\/WEB-DIAGNOSTICO-/);
   assert.equal(new URL(url).hostname,'qkbbqzbannyhuanngjpw.storage.supabase.co');
-  assert.equal(options.redirect,'error');
+  assert.equal(options.redirect,'manual');
   assert.equal(options.method,'POST');
   assert.equal(options.body,'{}');
   assert.ok(options.headers.Authorization.startsWith('Bearer '));
@@ -349,6 +349,12 @@ test('preflight privado de Supabase firma sin subir bytes ni exponer token',asyn
  assert.equal(rejected.status,503);
  const failure=await rejected.json();
  assert.equal(failure.etapa,'STORAGE_HTTP_401');
+ const redirect=await comprobarTUSAntesDeEnviar(request(),env,{authorized:true,fetcher:async(_url,options)=>{
+  assert.equal(options.redirect,'manual');
+  return Response.redirect('https://redirected.example.invalid/never-follow',302);
+ }});
+ assert.equal(redirect.status,503);
+ assert.equal((await redirect.json()).etapa,'STORAGE_REDIRECT_BLOCKED');
  for(const [response,code] of [
   [Response.json({url:'/storage/v1/object/upload/sign/obj?token=private-token'}),'STORAGE_TOKEN_MISSING'],
   [new Response('garbled-json',{status:200}),'STORAGE_RESPONSE_JSON']
