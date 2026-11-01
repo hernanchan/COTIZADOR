@@ -69,6 +69,29 @@ function formatoOrden(t,i){
   ['Anillado después de imprimir',anillado],
   ...(t.descripcion?[['Observaciones del pedido',nombreSeguro(t.descripcion)]]:[])
  ];
+ if(t.servicio==='ploteos'){
+  const planos=Array.isArray(t.planoPorPagina)?t.planoPorPagina:null;
+  const filasPloteo=[
+   ['Archivo que se abre en Adobe',nombreZip(i)],
+   ['Nombre original del cliente',nombreSeguro(t.nombreOriginal)],
+   ['Servicio','Ploteo de planos CAD / Póster'],
+   ['Páginas originales',t.paginasOriginales],
+   ['Páginas a imprimir',paginas],
+   ['Copias por página',t.copias],
+   ['Tamaño de impresión','Tamaño real · sin ajustar escala ni recortar'],
+   ['Control','Verificar escala y orientación en Adobe antes de imprimir']
+  ];
+  if(planos?.length){
+   for(const p of planos){
+    filasPloteo.push(['Página '+p.numeroOriginal,
+     (p.modo==='cad'?'CAD / plano':'Póster / pleno')+' · '+
+     Number(p.anchoCm).toFixed(2)+' × '+Number(p.altoCm).toFixed(2)+' cm'+
+     ' · '+p.rollo+' · '+(p.papel==='recubierto'?'Recubierto':'Obra 80 g')]);
+   }
+  }else filasPloteo.push(['Advertencia',
+   'Faltan medidas, rollo o tipo CAD/Póster verificados en esta orden. Revisar antes de imprimir.']);
+  return filasPloteo;
+ }
  if(t.servicio!=='documentos'){
   return [
    ['Archivo que se abre en Adobe',nombreZip(i)],
@@ -76,7 +99,7 @@ function formatoOrden(t,i){
    ['Servicio',t.servicio],
    ['Páginas seleccionadas',paginas],
    ['Copias',t.copias],
-   ['Advertencia','Este ZIP no contiene las instrucciones completas para ploteos u otros servicios. Verificar antes de producir.']
+   ['Advertencia','Este ZIP no contiene las instrucciones completas para este servicio. Verificar antes de producir.']
   ];
  }
  return filas;
