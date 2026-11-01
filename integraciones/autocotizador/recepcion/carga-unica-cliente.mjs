@@ -279,7 +279,7 @@ function render(){
   for(const [v,l] of [['sin-confirmar','Elegir tamaño final'],['original','Mantener tamaño original'],['a3','A3 (29,7 × 42 cm)'],['a4','A4 (21 × 29,7 cm)'],['a5','A5 (14,8 × 21 cm)']]){
    const o=new Option(l,v);sel.add(o);
   }
-  sel.value=e.seleccion;sel.onchange=()=>{e.seleccion=sel.value;cambio()};label.append(sel);if(!['fotos','corte','grafica'].includes(e.servicio))controles.append(label);
+  sel.value=e.seleccion;sel.onchange=()=>{e.seleccion=decidirTamanoCliente(paginas).forzarA4&&sel.value==='original'?'a4':sel.value;cambio()};label.append(sel);if(!['fotos','corte','grafica'].includes(e.servicio))controles.append(label);
   const decision=clasificarDestino(paginas,e.seleccion);
   if(decision.confirmado||['corte','fotos','grafica'].includes(e.servicio)){
    const destino=texto('p',(e.servicio==='grafica'?'Gráfica comercial · Precio por lote, sin diseño':e.servicio==='corte'?'Trabajo: ploteo de corte · Metros declarados':e.servicio==='fotos'?'Trabajo fotográfico · Tamaño elegido por producto':'Trabajo: '+(decision.destino==='ploteo'?'Ploteo grande':'Impresión de documentos')+' · Salida: '+(decision.tamanoFinal==='original'?'tamaño original':decision.tamanoFinal.toUpperCase())));destino.className='destino';panel.append(destino);
@@ -331,7 +331,12 @@ function render(){
   }
   lista.append(bloque);
  }
- $('estado').textContent=leyendo?'Analizando archivos…':entries.length?'Identificados '+entries.length+' PDF. Cotización orientativa, sin subir originales.':'Seleccioná tus PDF para comenzar.';
+ const porConfirmar=entries.filter(x=>x.servicio==='auto'&&x.paginas&&x.seleccion==='sin-confirmar'&&
+  decidirTamanoCliente(paginasElegidas(x)||x.paginas).requierePregunta).length;
+ $('estado').textContent=leyendo?'Analizando archivos…':
+  porConfirmar?'ATENCIÓN: '+porConfirmar+' PDF con tamaño diferente de A4. Respondé la pregunta de tamaño antes de enviar.':
+  entries.length?'Identificados '+entries.length+' PDF. Cotización orientativa, sin subir originales.':
+  'Seleccioná tus PDF para comenzar.';
 }
 async function analizarArchivoPDF(e,file){
  try{
