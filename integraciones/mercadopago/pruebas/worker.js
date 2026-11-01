@@ -254,6 +254,58 @@ async function centralTUSReceiptLookup(req,env){
  },200);
 }
 
+/**
+ * Consulta firmada entre Workers de la ficha completa del paquete.
+ * Protegida por el mismo HMAC que D1 receipt-check; nunca incluye bytes,
+ * enlaces de Storage, claves de Supabase, autorización de pago o producción.
+ */
+async function centralTUSPackageManifest(req,env){
+ const signed=await centralReadSigned(req,env);
+ if(signed.error)return json({ok:false,error:"Acceso privado no autorizado"},signed.status);
+ const p=signed.payload;
+ if(!p||typeof p!=="object"||Array.isArray(p)||
+    Object.keys(p).sort().join(",")!=="schema,webOrderId"||
+    p.schema!=="saber-central-tus-package-v1"||
+    !/^WEB-ENSAYO-[A-F0-9]{32}$/.test(p.webOrderId||""))
+  return json({ok:false,error:"Pedido TUS inválido"},422);
+ await centralTables(env);
+ const row=await env.DB.prepare(
+  "SELECT m.web_order_id,m.commercial_order_id,m.manifest_json,m.amount_ars,m.file_count,o.status,n.number "+
+  "FROM central_document_manifests m JOIN orders o ON o.id=m.commercial_order_id "+
+  "JOIN central_work_order_numbers n ON n.commercial_order_id=o.id "+
+  "WHERE m.web_order_id=? LIMIT 1"
+ ).bind(p.webOrderId).first();
+ if(!row||!Number.isSafeInteger(row.number)||row.number<=0)
+  return json({ok:false,error:"Orden no numerada o inexistente"},404);
+ let data;
+ try{data=JSON.parse(row.manifest_json)}catch{return json({ok:false,error:"Ficha D1 ilegible"},409)}
+ if(data?.schema!=="saber-central-documentos-d1-v1"||
+    data.webOrderId!==p.webOrderId||
+    !Array.isArray(data.trabajos)||data.trabajos.length!==row.file_count||
+    data.trabajos.length<1||data.trabajos.length>30)
+  return json({ok:false,error:"Ficha de orden incongruente"},409);
+ const trabajos=data.trabajos.map(t=>({
+  orden:t.orden,nombreOriginal:t.nombreOriginal,reciboPrivado:t.reciboPrivado,
+  servicio:t.servicio,paginasOriginales:t.paginasOriginales,
+  paginasElegidas:t.paginasElegidas,copias:t.copias,formatoFinal:t.formatoFinal,
+  carasPresupuestadas:t.carasPresupuestadas,
+  paginasPorCaraPresupuestadas:t.paginasPorCaraPresupuestadas,
+  modo:t.modo,material:t.material,tipoAnillado:t.tipoAnillado,
+  descripcion:t.descripcion,bytes:t.bytes
+ }));
+ if(trabajos.some(t=>!CENTRAL_RECEIPT.test(t.reciboPrivado||"")||
+    typeof t.nombreOriginal!=="string"||t.nombreOriginal.length>180||
+    !Number.isSafeInteger(t.orden)||t.orden<1||
+    !Number.isSafeInteger(t.bytes)||t.bytes<5||t.bytes>20*1024*1024)||
+    new Set(trabajos.map(t=>t.reciboPrivado)).size!==trabajos.length)
+  return json({ok:false,error:"Ficha incompleta"},409);
+ return json({ok:true,schema:p.schema,numeroOrden:shortWorkNumber(row.number),
+  webOrderId:p.webOrderId,importe:row.amount_ars,trabajos,
+  estadoPago:row.status==="paid"?"REVISAR_PAGO":"SIN_PAGO_CONFIRMADO",
+  pdfImprimibleVerificado:false,listoParaProducir:false,
+  paymentAuthorized:false},200);
+}
+
 async function centralStage(req,env){
  const signed=await centralReadSigned(req,env);
  if(signed.error)return json({error:signed.error},signed.status);
@@ -1456,6 +1508,7 @@ export default {
    if(url.pathname==="/internal/central/bridge-probe")return await centralBridgeProbe(req,env);
    if(url.pathname==="/internal/central/stage")return await centralStage(req,env);
    if(url.pathname==="/internal/central/receipt-check")return await centralTUSReceiptLookup(req,env);
+   if(url.pathname==="/internal/central/tus-package")return await centralTUSPackageManifest(req,env);
    if(url.pathname==="/internal/central/link")return await centralLink(req,env);
    if(url.pathname==="/internal/central/prepare-order")return await centralPrepareDraft(req,env);
    if(url.pathname.startsWith("/checkout/"))return await customerCheckout(req,env,this);
