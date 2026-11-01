@@ -1676,12 +1676,13 @@ async function v2SessionMac(secret,timestamp){
   new TextEncoder().encode('saber-v2-private-browser-v1\\n'+timestamp)));
  return Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
 }
-async function v2SessionCookie(env){
+async function v2SessionCookie(env,path='/api/ensayo-preparar-documentos-v2-lote'){
+ if(path!=='/api/ensayo-preparar-documentos-v2-lote'&&path!=='/api/ensayo-tus-')
+  throw Error('Ruta de cookie privada no autorizada.');
  const timestamp=Math.floor(Date.now()/1000);
  return V2_SESSION_COOKIE+'='+timestamp+'.'+
   await v2SessionMac(env.DOCS_V2_PRIVATE_UI_SECRET,String(timestamp))+
-  '; Path=/api/ensayo-preparar-documentos-v2-lote; Secure; HttpOnly; SameSite=Strict; Max-Age='+
-  V2_SESSION_SECONDS;
+  '; Path='+path+'; Secure; HttpOnly; SameSite=Strict; Max-Age='+V2_SESSION_SECONDS;
 }
 async function v2SessionAuthorized(request,env){
  if(env?.DOCS_V2_PRIVATE_UI_ENABLED!=='PRIVATE_TEST_ONLY'||
@@ -1714,9 +1715,14 @@ async function v2PrivateBrowserResponse(request,env,path){
     'X-Frame-Options':'SAMEORIGIN'};
   if(path==='/prueba-v2/'){
    const html=paginaCotizadorV2PruebaPrivada(env.DOCS_TURNSTILE_SITE_KEY,tusPrivadoConfigurado(env));
-   return new Response(html,{status:200,headers:{
-    ...headers,'Set-Cookie':await v2SessionCookie(env),
-    'Content-Type':'text/html; charset=utf-8'}});
+   const responseHeaders=new Headers({...headers,
+    'Content-Type':'text/html; charset=utf-8'});
+   responseHeaders.append('Set-Cookie',await v2SessionCookie(env));
+   // El fetch TUS necesita cookie privada propia; el navegador no siempre
+   // reenvía credenciales Basic tras la carga inicial del portal.
+   if(tusPrivadoConfigurado(env))
+    responseHeaders.append('Set-Cookie',await v2SessionCookie(env,'/api/ensayo-tus-'));
+   return new Response(html,{status:200,headers:responseHeaders});
   }
   if(path==='/prueba-v2/carga-inteligente'){
    // Reutiliza el analizador consolidado CAD/Póster/rollos sin derivar
