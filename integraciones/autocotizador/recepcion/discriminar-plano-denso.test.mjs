@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {
  evidenciaPlanoTecnico,esCadVectorialDenso
 } from './discriminar-plano-denso.mjs';
@@ -51,7 +52,7 @@ test('clasificador no interviene ante diferencia marginal o falta de color',()=>
  }),false);
 });
 test('se ejecuta el segundo raster SOLO para Póster con evidencia textual técnica',()=>{
- const code=(await import('node:fs')).readFileSync(
+ const code=readFileSync(
   new URL('./clasificar-paginas-ploteo.mjs',import.meta.url),'utf8');
  assert.match(code,/clasificacion\.modo==='poster'&&clasificacion\.cobertura>=0\.30&&\s*evidenciaPlanoTecnico\(texto\)/);
  assert.match(code,/scale:720\/Math\.max\(v\.width,v\.height\)/);
