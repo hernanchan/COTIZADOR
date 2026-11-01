@@ -6,3 +6,5 @@ Autorización: trabajo en ambiente privado sin cobros
 Compuerta TUS: deshabilitada hasta tener variables seguras y ensayo
 Operación Github Actions: POST /versions?bindings_inherit=strict
 PROHIBIDO: /deployments, www.libreriasaber.com.ar, main, Mercado Pago
+
+Segunda ejecución: dependencias unitarias instaladas en raíz (corrección fallo inicial sólo de CI); ninguna versión activada previamente.
