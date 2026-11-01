@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {
- evidenciaPlanoTecnico,esCadVectorialDenso
+ evidenciaPlanoTecnico,esCadVectorialDenso,esCadPorEstructuraPDF,ameritaVerificarEstructura
 } from './discriminar-plano-denso.mjs';
 
 // Mediciones de preflight local del plano real ya facilitado por el
@@ -54,8 +54,86 @@ test('clasificador no interviene ante diferencia marginal o falta de color',()=>
 test('se ejecuta el segundo raster SOLO para Póster con evidencia textual técnica',()=>{
  const code=readFileSync(
   new URL('./clasificar-paginas-ploteo.mjs',import.meta.url),'utf8');
- assert.match(code,/clasificacion\.modo==='poster'&&clasificacion\.cobertura>=0\.30&&\s*evidenciaPlanoTecnico\(texto\)/);
+ assert.match(code,/ameritaVerificarEstructura\(\{miniatura:clasificacion,texto,textos\}\)/);
+ assert.match(code,/esCadPorEstructuraPDF\(\{miniatura:clasificacion/);
  assert.match(code,/scale:720\/Math\.max\(v\.width,v\.height\)/);
  assert.match(code,/esCadVectorialDenso\(/);
  assert.match(code,/cAlta\.width=0;cAlta\.height=0/);
+});
+
+
+test('estructura PDF: 15.000 trazados sin imágenes certifican trama CAD incluso sin texto extraíble',()=>{
+ const OPS={constructPath:4,paintImageXObject:8,paintInlineImageXObject:9,shadingFill:10};
+ const miniatura={modo:'poster',cobertura:0.53,coberturaColor:0.48,plenoContinuo:0.23};
+ assert.equal(ameritaVerificarEstructura({miniatura,texto:'',textos:0}),true);
+ const paths=Array(15000).fill(OPS.constructPath);
+ assert.equal(esCadPorEstructuraPDF({miniatura,fnArray:paths,OPS,texto:''}),true);
+ assert.equal(esCadPorEstructuraPDF({miniatura,fnArray:[...paths,OPS.paintImageXObject],OPS,texto:plano}),false,
+  'Una sola imagen impide convertir arbitrariamente un póster en CAD');
+ assert.equal(esCadPorEstructuraPDF({miniatura,fnArray:[...paths,OPS.shadingFill],OPS,texto:plano}),false);
+ assert.equal(esCadPorEstructuraPDF({miniatura,fnArray:Array(999).fill(OPS.constructPath),OPS,texto:plano}),false);
+ assert.equal(esCadPorEstructuraPDF({
+  miniatura:{...miniatura,plenoContinuo:0.95},fnArray:paths,OPS,texto:plano
+ }),false);
+});
+test('función real del navegador: línea roja muy densa → CAD; póster raster → Póster',async()=>{
+ const {clasificarPaginasPloteo}=await import('./clasificar-paginas-ploteo.mjs');
+ const previousPdf=globalThis.pdfjsLib,previousDoc=globalThis.document;
+ const OPS={constructPath:4,paintImageXObject:8,paintInlineImageXObject:9,shadingFill:10};
+ async function ejecutar({imagen=false,texto=''}={}){
+  let renders=0,operadores=0;
+  const page={
+   getViewport({scale}){return {width:1000*scale,height:640*scale}},
+   async getTextContent(){return {items:texto?[{str:texto}]:[]}},
+   async getOperatorList(){operadores++;return {fnArray:imagen?
+    [...Array(15000).fill(OPS.constructPath),OPS.paintImageXObject]:
+    Array(15000).fill(OPS.constructPath)}},
+   render(){renders++;return {promise:Promise.resolve()}},
+   cleanup(){}
+  };
+  globalThis.pdfjsLib={OPS,GlobalWorkerOptions:{},getDocument(){
+   return {promise:Promise.resolve({numPages:1,getPage:async()=>page,destroy:async()=>{}}),
+    destroy:async()=>{}};
+  }};
+  globalThis.document={createElement(type){
+   assert.equal(type,'canvas');
+   const canvas={width:0,height:0};
+   canvas.getContext=()=>({
+    fillRect(){},fillStyle:'#fff',
+    getImageData(){
+     const data=new Uint8ClampedArray(canvas.width*canvas.height*4);
+     for(let y=0;y<canvas.height;y++)for(let x=0;x<canvas.width;x++){
+      const k=(y*canvas.width+x)*4;
+      const red=(x%4)<2;
+      data[k]=red?170:255;data[k+1]=red?15:255;data[k+2]=red?15:255;data[k+3]=255;
+     }
+     return {data};
+    }
+   });
+   return canvas;
+  }};
+  const resultado=await clasificarPaginasPloteo({arrayBuffer:async()=>new Uint8Array([37,80,68,70,45]).buffer});
+  return {resultado,renders,operadores};
+ }
+ try{
+  const cad=await ejecutar();
+  assert.equal(cad.resultado[0].modo,'cad');
+  assert.equal(cad.resultado[0].regla,'cad_vectorial_sin_imagenes');
+  assert.equal(cad.renders,1,'No renderizar a 720 px si la estructura ya confirma CAD');
+  assert.equal(cad.operadores,1);
+  const poster=await ejecutar({imagen:true});
+  assert.equal(poster.resultado[0].modo,'poster');
+  assert.equal(poster.operadores,1);
+ }finally{
+  globalThis.pdfjsLib=previousPdf;
+  globalThis.document=previousDoc;
+ }
+});
+test('UI del pedido hace explícito CAD/Póster sin abrir opciones',()=>{
+ const code=readFileSync(new URL('./carga-unica-cliente.mjs',import.meta.url),'utf8');
+ const css=readFileSync(new URL('./carga-unica-pagina.mjs',import.meta.url),'utf8');
+ assert.match(code,/TIPO DETECTADO: /);
+ assert.match(code,/CAD · Plano técnico/);
+ assert.match(code,/PÓSTER \/ PLENO/);
+ assert.match(css,/\.clasificacion-ploteo-visible/);
 });
