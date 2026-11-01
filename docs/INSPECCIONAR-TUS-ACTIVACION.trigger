@@ -15,3 +15,5 @@ Inspeccionar run privada descarga personal posterior a 686a3e7b, test focalizado
 Consultar CI Worker documental ZIP numerado trigger 8cf46635, verificando tests y protección 401, sin PII ni claves.
 
 Consulta última ejecución 321b1257 de documentos, cliente muestra orden N.º 001, sin PDF enviado.
+
+Consultar ejecución 5f914a55 con A4/A3 y nuevos datos completos de papel/anillado al ZIP; solo diagnóstico de CI privado.
