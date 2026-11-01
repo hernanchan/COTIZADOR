@@ -25,7 +25,7 @@ jobs:
       - name: Pruebas D1 del Centro aisladas de cobros
         run: |
           set -euo pipefail
-          node --test tests/tus-central-staff-download.test.mjs
+          node --test tests/tus-central-staff-download.test.mjs tests/tus-paquete-manifiesto.test.mjs
           node --check integraciones/mercadopago/pruebas/worker.js
           grep -Fq '/admin/api/central/unpaid-detail' integraciones/mercadopago/pruebas/worker.js
           grep -Fq 'Descargar PDF original' integraciones/mercadopago/pruebas/worker.js
