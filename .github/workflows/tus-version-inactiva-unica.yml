@@ -55,6 +55,13 @@ jobs:
           for binding in SABER_CENTRAL DOCS_CENTRAL_ADMIN_KEY DOCS_SCRIPT_URL DOCS_RELAY_KEY CENTRAL_BRIDGE_KEY; do
             jq -e --arg name "$binding" '.result.bindings | any(.name==$name)' /tmp/saber-tus-settings.json >/dev/null
           done
+          # Comprobar las cuatro configuraciones TUS sin imprimir claves ni secretos.
+          jq -e '.result.bindings | any(.name=="DOCS_TUS_PRIVATE_ENABLED" and .type=="plain_text" and .text=="PRIVATE_TEST_ONLY")' /tmp/saber-tus-settings.json >/dev/null
+          jq -e '.result.bindings | any(.name=="DOCS_TUS_PUBLISHABLE_KEY" and (.type=="plain_text" or .type=="secret_text"))' /tmp/saber-tus-settings.json >/dev/null
+          for binding in DOCS_TUS_SUPABASE_SERVICE_KEY DOCS_TUS_RECEIPT_KEY; do
+            jq -e --arg name "$binding" '.result.bindings | any(.name==$name and .type=="secret_text")' /tmp/saber-tus-settings.json >/dev/null
+          done
+          echo 'TUS_4_BINDINGS_PRESENT - NO_SECRET_VALUES_PRINTED'
           jq -n --slurpfile settings /tmp/saber-tus-settings.json \
             '{main_module:"index.mjs",annotations:{"workers/message":"Saber TUS experimental privada SIN activar SIN pagos"},bindings:[$settings[0].result.bindings[]|{name,type:"inherit"}]}' > /tmp/saber-tus-metadata.json
           curl --silent --show-error --max-time 75 \
