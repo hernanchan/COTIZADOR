@@ -66,6 +66,8 @@ export async function prepararDocumentosCentralFirmado({
     data.paymentAuthorized!==false)
   throw Error('Central devolvió un pedido no confirmado o un cobro.');
  return Object.freeze({created:true,idempotent:Boolean(data.idempotent),
-  commercialOrderId:data.commercial_order_id,amountArs:data.amount_ars,
+  commercialOrderId:data.commercial_order_id,
+  numeroOrden:/^\d{3,}$/.test(data.numeroOrden||"")?data.numeroOrden:null,
+  amountArs:data.amount_ars,
   checkoutEnabled:false,paymentAuthorized:false});
 }
