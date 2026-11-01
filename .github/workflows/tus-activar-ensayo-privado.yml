@@ -1,0 +1,100 @@
+name: Activar TUS SOLO en Worker de pruebas (NO sitio publico)
+on:
+  push:
+    branches:
+      - integracion/tus-pedido-privado-20261101
+    paths:
+      - docs/ACTIVAR-TUS-PRUEBAS-20261101.trigger
+
+permissions:
+  contents: read
+
+concurrency:
+  group: saber-tus-activar-ensayo-20261101
+  cancel-in-progress: false
+
+jobs:
+  activar-ensayo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Pruebas obligatorias sin conexiones comerciales
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.25.12
+          node --test tests/tus-pedido-privado.test.mjs tests/tus-ui-presupuesto-smoke.test.mjs tests/tus-central-d1-lookup.test.mjs
+      - name: Compilar el mismo Worker privado verificado
+        working-directory: integraciones/autocotizador/recepcion
+        run: |
+          set -euo pipefail
+          npm install --no-audit --no-fund
+          npm run build:unificado
+          node --check dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq '/api/ensayo-tus-iniciar' dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq 'TUS_BLOCKED' dist/saber-documentos-cotizador-fase4.mjs
+      - name: Crear y activar exclusivamente la versión de ensayo, con rollback
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-documentos-pruebas"
+          auth="Authorization: Bearer $TOKEN"
+          workdir=$(mktemp -d)
+          trap 'rm -rf "$workdir"' EXIT
+          curl --fail --silent --show-error --max-time 30 -H "$auth" "$root/settings" > "$workdir/settings.json"
+          jq -e '.success == true and (.result.bindings | type == "array")' "$workdir/settings.json" >/dev/null
+          for name in SABER_CENTRAL CENTRAL_BRIDGE_KEY DOCS_V2_PRIVATE_UI_SECRET; do
+            jq -e --arg name "$name" '.result.bindings | any(.name==$name)' "$workdir/settings.json" >/dev/null
+          done
+          for name in DOCS_TUS_PRIVATE_ENABLED DOCS_V2_PRIVATE_UI_ENABLED DOCS_CENTRAL_SYNC_ENABLED DOCS_ORDER_PREPARE_ENABLED; do
+            jq -e --arg name "$name" '.result.bindings | any(.name==$name and .type=="plain_text" and .text=="PRIVATE_TEST_ONLY")' "$workdir/settings.json" >/dev/null
+          done
+          for name in DOCS_TUS_SUPABASE_SERVICE_KEY DOCS_TUS_RECEIPT_KEY; do
+            jq -e --arg name "$name" '.result.bindings | any(.name==$name and .type=="secret_text")' "$workdir/settings.json" >/dev/null
+          done
+          jq -e '.result.bindings | any(.name=="DOCS_TUS_PUBLISHABLE_KEY" and (.type=="plain_text" or .type=="secret_text"))' "$workdir/settings.json" >/dev/null
+          echo 'COMPuERTAS_TUS_PRESENTES_SIN_REVELAR_VALORES'
+          curl --fail --silent --show-error --max-time 30 -H "$auth" "$root/deployments" > "$workdir/before.json"
+          jq -e '.success == true' "$workdir/before.json" >/dev/null
+          previous=$(jq -r '.result.deployments[0].versions[]? | select(.percentage == 100) | .version_id' "$workdir/before.json" | head -n 1)
+          test -n "$previous"
+          echo "VERSION_ANTERIOR=$previous"
+          jq -n --slurpfile settings "$workdir/settings.json"             '{main_module:"index.mjs",annotations:{"workers/message":"Saber TUS SOLO ensayo privado. No web comercial. Sin pagos."},bindings:[$settings[0].result.bindings[] | {name,type:"inherit"}]}' > "$workdir/metadata.json"
+          curl --fail --silent --show-error --max-time 90             -H "$auth"             -F "metadata=@$workdir/metadata.json;type=application/json"             -F "index.mjs=@integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs;filename=index.mjs;type=application/javascript+module"             "$root/versions?bindings_inherit=strict" > "$workdir/version.json"
+          if ! jq -e '.success == true and (.result.id | type == "string")' "$workdir/version.json" >/dev/null; then
+            jq -c '{success,errors:[.errors[]?|{code,message}]}' "$workdir/version.json"
+            exit 1
+          fi
+          target=$(jq -r '.result.id' "$workdir/version.json")
+          jq -n --arg v "$target" '{strategy:"percentage",versions:[{percentage:100,version_id:$v}],annotations:{"workers/message":"Ensayo privado TUS 100%, sin cobros ni cambios a web comercial"}}' > "$workdir/deploy.json"
+          curl --silent --show-error --max-time 75             -H "$auth" -H "Content-Type: application/json"             --data-binary "@$workdir/deploy.json" "$root/deployments" > "$workdir/result.json"
+          if ! jq -e --arg v "$target" '.success == true and (.result.versions | any(.version_id==$v and .percentage==100))' "$workdir/result.json" >/dev/null; then
+            jq -c '{success,errors:[.errors[]?|{code,message}]}' "$workdir/result.json"
+            exit 1
+          fi
+          echo "VERSION_TUS_PRIVADA_ACTIVADA=$target"
+          # Comprobar que el portal continúa cerrado al público sin credenciales.
+          code=0
+          for attempt in 1 2 3; do
+            code=$(curl --silent --show-error --max-time 20 --output /dev/null --write-out '%{http_code}' "https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/" || true)
+            if [ "$code" = "401" ]; then break; fi
+            sleep 2
+          done
+          if [ "$code" != "401" ]; then
+            echo "PORTAL_PRIVADO_CHECK_FAILED_HTTP_$code - ROLLBACK"
+            jq -n --arg v "$previous" '{strategy:"percentage",versions:[{percentage:100,version_id:$v}],annotations:{"workers/message":"Rollback automático: portal privado no devolvió HTTP 401"}}' > "$workdir/rollback.json"
+            curl --silent --show-error --max-time 60 -H "$auth" -H "Content-Type: application/json" --data-binary "@$workdir/rollback.json" "$root/deployments" > "$workdir/rollback-result.json"
+            jq -e '.success == true' "$workdir/rollback-result.json" >/dev/null
+            exit 1
+          fi
+          echo "ENSAYO_PRIVADO_HTTP_401_OK - PRODUCCION_COMERCIAL_INTACTA - PAGOS_DESACTIVADOS"
