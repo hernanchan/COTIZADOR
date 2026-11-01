@@ -9,3 +9,5 @@
 2026-11-01: verificar despliegue con respuesta Cloudflare success=true y formato de respuesta distinto al esperado en CI; registrar ID activo y no ejecutar despliegue adicional en este control.
 
 2026-11-01: confirmar nueva versión c172461f activa y que el portal sin contraseña conteste HTTP 401; no subir archivos. Verificación técnica independiente tras el despliegue automatizado.
+
+2026-11-01: verificar versión posterior a c172461f; CI activación bb144f3a completado SUCCESS, se requiere confirmar por GET Cloudflare y protección HTTP401, no probar PDF.
