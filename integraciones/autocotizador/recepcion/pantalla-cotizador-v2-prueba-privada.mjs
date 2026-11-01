@@ -75,6 +75,7 @@ const sendAllButton=document.getElementById('send-all-pdf'),batchProgress=docume
 const modoDiagnostico=new URLSearchParams(location.search).get('diagnostico')==='1';
 const TUS_ENABLED=${tusEnabled===true};
 const TUS_BLOCKED=${tusBloqueado};
+let tusPreflightOK=false;
 if(TUS_BLOCKED){
  document.getElementById('seguridad-privada').hidden=true;
  batchProgress.textContent='Supabase/TUS no disponible. Envío desactivado para evitar Google Drive.';
@@ -308,7 +309,7 @@ function updateSummary(){
    (withoutPdf?' · '+withoutPdf+' trabajos sin PDF':'')+
    ' · Central D1: '+(registeredOrder?'registrado':'pendiente')+' · Cobros desactivados.';
  summary.append(title,detail);
- sendAllButton.disabled=TUS_BLOCKED||batchSending||registering||handoffInProgress||Boolean(registeredOrder)||
+ sendAllButton.disabled=TUS_BLOCKED||(TUS_ENABLED&&!tusPreflightOK)||batchSending||registering||handoffInProgress||Boolean(registeredOrder)||
   (allRefs.length===0&&!smartReady)||withoutPdf!==0||
   allRefs.some(d=>!d.confirmacion&&!d.archivoLocal);
  sendAllButton.textContent=registeredOrder?'Pedido registrado':
@@ -1047,5 +1048,28 @@ window.addEventListener('message',async event=>{
  status.textContent='Se agregó un trabajo. Los PDF están pendientes hasta que Google confirme su recepción. Pedido de prueba: '+orderId;
  render();
 });
+// La recepción se habilita solo cuando el Worker logra firmar una carga
+// de prueba SIN enviar bytes a Storage y SIN devolver el token al navegador.
+if(TUS_ENABLED){
+ batchProgress.textContent='Comprobando conexión privada con Supabase antes del envío…';
+ void (async()=>{
+  try{
+   const reply=await fetch('/api/ensayo-tus-comprobar',{
+    method:'POST',credentials:'same-origin',redirect:'error',
+    headers:{'Content-Type':'application/json'},body:'{}'
+   });
+   const result=await reply.json().catch(()=>null);
+   if(!reply.ok||result?.ok!==true||result.etapa!=='STORAGE_FIRMA_OK')
+    throw Error(result?.etapa||'SIN_RESPUESTA');
+   tusPreflightOK=true;
+   batchProgress.textContent='Supabase/TUS verificado. Los PDF se enviarán directamente a almacenamiento privado.';
+  }catch(error){
+   tusPreflightOK=false;
+   batchProgress.textContent='Envío bloqueado: Supabase no autorizó la comprobación previa ('+
+    String(error?.message||error).slice(0,80)+'). No vuelvas a subir los PDF.';
+  }
+  updateSummary();
+ })();
+}
 </script></body></html>`;
 }
