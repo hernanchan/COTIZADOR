@@ -8,7 +8,7 @@ import {
 } from '../integraciones/autocotizador/recepcion/tus-pedido-contrato.mjs';
 import {verificarTandaTUSYRecalcular} from '../integraciones/autocotizador/recepcion/tus-pedido-puente.mjs';
 import {
- tusPrivadoConfigurado,iniciarTandaTUSPrivada,finalizarPedidoTUSPrivado,
+ tusPrivadoConfigurado,comprobarTUSAntesDeEnviar,iniciarTandaTUSPrivada,finalizarPedidoTUSPrivado,
  manifiestoServidorTUS,descargarPdfTUSPersonal,consultarReciboTUSFirmadoD1
 } from '../integraciones/autocotizador/recepcion/tus-pedido-worker.mjs';
 import {conciliarManifiestoV2ConServidor} from '../integraciones/autocotizador/recepcion/registrar-manifiesto-v2-central.mjs';
@@ -320,4 +320,35 @@ test('regresión: consulta firmada D1 acepta SHA-256 válido y rechaza SHA invá
   webOrderId:ORDER,receiptId,paymentAuthorized:false,listoParaProducir:false,
   sha256:'NOT_SHA',bytes:2048,pages:2})}};
  await assert.rejects(consultarReciboTUSFirmadoD1(invalid,ORDER,receiptId),/recibo fuera del pedido/);
+});
+
+
+test('preflight privado de Supabase firma sin subir bytes ni exponer token',async()=>{
+ const origin='https://saber-documentos-pruebas.libreriasaber.workers.dev';
+ const request=()=>new Request(origin+'/api/ensayo-tus-comprobar',{
+  method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:'{}'
+ });
+ let calls=0;
+ const signed=await comprobarTUSAntesDeEnviar(request(),env,{authorized:true,fetcher:async(url,options)=>{
+  calls++;
+  assert.match(url,/\/storage\/v1\/object\/upload\/sign\/saber-tus-lab\/v2\/WEB-DIAGNOSTICO-/);
+  assert.equal(options.method,'POST');
+  assert.equal(options.body,'{}');
+  assert.ok(options.headers.Authorization.startsWith('Bearer '));
+  return Response.json({token:'test-only-valid-signed-token-not-exposed'});
+ }});
+ assert.equal(signed.status,200);
+ const success=await signed.json();
+ assert.equal(success.ok,true);assert.equal(success.etapa,'STORAGE_FIRMA_OK');
+ assert.equal(success.archivosSubidos,0);
+ assert.ok(!JSON.stringify(success).includes('valid-signed-token'));
+ assert.equal(calls,1);
+ const rejected=await comprobarTUSAntesDeEnviar(request(),env,{authorized:true,fetcher:async()=>Response.json({message:'secret-error'},{status:401})});
+ assert.equal(rejected.status,503);
+ const failure=await rejected.json();
+ assert.equal(failure.etapa,'STORAGE_HTTP_401');
+ assert.ok(!JSON.stringify(failure).includes('secret-error'));
+ const forbidden=await comprobarTUSAntesDeEnviar(request(),env,{authorized:false,fetcher:async()=>{throw Error('must never call');}});
+ assert.equal(forbidden.status,403);
+ assert.equal((await forbidden.json()).etapa,'AUTORIZACION_PORTAL');
 });
