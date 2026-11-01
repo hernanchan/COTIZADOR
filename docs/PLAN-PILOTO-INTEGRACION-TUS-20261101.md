@@ -91,3 +91,11 @@ En la rama experimental, comparar interfaces reales del Worker privado y `lab-tu
 - **Seguridad verificada**: solicitud ANÓNIMA a `/prueba-v2/` respondió HTTP 401, `portal_protegido:true`, sin exponer contraseñas ni modificar la web comercial.
 - **Única prueba pendiente**: abrir el portal privado ya autenticado y SIN archivos, hacer Ctrl+F5 y leer el mensaje de preflight: debe mostrar `Supabase/TUS verificado`; solo después ensayar el envío de dos PDF, cotejar Storage/D1/precio/descarga. Si surge `SESION_PRIVADA`, `ORIGEN_SOLICITUD`, o `STORAGE_HTTP_NNN`, resolver sin volver a cargar archivos.
 - No confundir despliegue seguro con E2E de archivos. No activar cobros ni publicar.
+
+
+## 01/11/2026 12:25 ART — autorización privada superada, diagnóstico Storage granular activo
+
+- Captura cliente en /prueba-v2/: preflight devuelve `STORAGE_FIRMA_ERROR` (no es fallo de cookie: la petición llega al paso de solicitar firma Storage). No subir más PDFs ni cambiar claves sin código preciso.
+- Firma Storage en `tus-pedido-worker.mjs` tenía un error genérico que mezclaba errores de red/lectura, JSON ilegible y ausencia de token; ahora retorna códigos seguros `STORAGE_FETCH_FAILURE`, `STORAGE_BODY_FAILURE`, `STORAGE_HTTP_NNN`, `STORAGE_RESPONSE_JSON`, `STORAGE_TOKEN_MISSING`, `STORAGE_RESPONSE_SIZE`, sin registrar respuesta/token/credenciales. Tests cubren casos. Commits `ddd5f523` y `221cd7c0`.
+- CI y despliegue privado `bb144f3a` run `41321078333` SUCCESS, 23/23 pruebas iniciales, 67/67 en compilación, compilación satisfactoria. Versión `76b3bd4f-4bc6-425b-b231-6866ce8249a8` confirmada por Cloudflare GET a 2026-11-01 15:25:32Z. Protección sin autenticación HTTP 401 confirmada. Sin cobros ni cambios al sitio comercial.
+- **Próximo paso:** únicamente refrescar portal con Ctrl+F5, SIN PDF, y leer nuevo código específico de preflight. Según código, investigar el fallo exacto del Worker->Supabase antes de otra prueba E2E. No afirmar que el envío funciona todavía.
