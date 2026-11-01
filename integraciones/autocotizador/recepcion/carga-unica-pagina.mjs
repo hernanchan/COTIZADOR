@@ -60,6 +60,16 @@ h2{font-size:19px;margin:20px 0 7px}
 #resumenPedido{margin:12px 0}#resumenPedido li{padding:5px 0;overflow-wrap:anywhere}#resumenPedido .advertencia{background:#fff1da;border-left:4px solid #d99428;padding:12px}
 @media(max-width:720px){.fila{grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;padding:12px}.fila-principal{grid-column:1/-1}.precio-archivo{text-align:left}.editar{justify-self:end}.panel-edicion .controles{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:440px){.panel-edicion .controles{grid-template-columns:1fr}}
+.tamano-rapido{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:10px 0 3px}
+.tamano-rapido button{background:#fff;color:#174c70;border:1px solid #aac4d9;border-radius:7px;padding:8px 12px;font-weight:700;font-size:14px;cursor:pointer}
+.tamano-rapido button.seleccionada{background:#0d527d;color:#fff;border-color:#0d527d}
+.tamano-rapido button:focus-visible{outline:3px solid #e08d16;outline-offset:2px}
+.tamano-rapido small{display:block;flex-basis:100%;font-size:12px;color:#38546a}
+.pregunta-tamano{background:#fff4df;border:2px solid #dc8c19;border-radius:10px;padding:13px;margin:10px 0}
+.pregunta-tamano strong{display:block;flex-basis:100%;font-size:17px;color:#603d0b}
+.pregunta-tamano p{flex-basis:100%;margin:0;color:#634823;font-size:13px}
+.pregunta-tamano button{border:1px solid #986521;background:#fff;font-size:14px;min-height:40px}
+@media(max-width:520px){.pregunta-tamano button{flex:1 1 100%}}
 </style></head><body><main><h1>Una sola carga · Tamaño final</h1><p class="nota"><strong>Prueba privada de clasificación.</strong> Seleccioná varios PDF sin elegir de antemano entre impresiones y ploteos. Confirmá en qué tamaño querés imprimir cada archivo: el original puede ser A2, aunque quieras A4. Sin envío de originales, pedidos ni pagos. Presupuestos orientativos sin validez comercial hasta verificar los archivos. La clasificación CAD/Póster y las tarifas existentes no se modifican.</p><div id="zonaArchivos"><p><strong>Arrastrá aquí tus PDF</strong> o elegilos desde tu equipo. Podés seleccionar varios a la vez (hasta 30).</p><label for="archivos">Agregar varios PDF</label><input id="archivos" type="file" accept=".pdf,application/pdf" multiple></div><p id="estado" role="status">Cargando…</p><h2>Resumen del presupuesto</h2><section class="archivo" id="presupuesto" aria-live="polite">Esperando archivos…</section><button id="prepararPedido" type="button" disabled>Revisar pedido (sin enviar)</button><section id="resumenPedido" aria-live="polite"></section><h2>Configuración de tus archivos</h2><div id="lista"></div><p><a href="/prueba-cotizador-conjunto">Volver a los presupuestos de prueba</a></p></main><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script><script src="/prueba-carga-unica.js" defer></script><script>
 document.addEventListener('DOMContentLoaded',()=>{
  const zona=document.getElementById('zonaArchivos');
