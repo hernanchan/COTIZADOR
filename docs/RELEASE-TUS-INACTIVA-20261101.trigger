@@ -8,3 +8,5 @@ Operación Github Actions: POST /versions?bindings_inherit=strict
 PROHIBIDO: /deployments, www.libreriasaber.com.ar, main, Mercado Pago
 
 Segunda ejecución: dependencias unitarias instaladas en raíz (corrección fallo inicial sólo de CI); ninguna versión activada previamente.
+
+Nueva ejecución solicitada tras corrección SHA y prueba D1: commits 95ebb6d2 y 0d653750. Preparar versión SIN activar tráfico; verificar CI y compilación.
