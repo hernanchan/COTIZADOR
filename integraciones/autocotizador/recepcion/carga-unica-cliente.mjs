@@ -3,6 +3,7 @@ import {clasificarDestino} from './destino-impresion.mjs';
 import {prepararBorradorPedido} from './preparar-borrador-pedido.mjs';
 import {componerCarritoPreliminar} from './componer-carrito-preliminar.mjs';
 import {seleccionarPaginas} from './seleccionar-paginas.mjs';
+import {decidirTamanoCliente} from './decision-tamano-impresion.mjs';
 import {clasificarPaginasPloteo} from './clasificar-paginas-ploteo.mjs';
 import {prepararLoteParcial,recomponerLoteParcial} from './cotizar-lote-parcial.mjs';
 const $=id=>document.getElementById(id);
@@ -150,7 +151,7 @@ function render(){
   if(!grupos.has(cat.id))grupos.set(cat.id,{...cat,indices:[]});
   grupos.get(cat.id).indices.push(i);
  });
- const orden=['a4','a3','cad','poster','mixtos','stickers','fotos','corte','grafica','pendientes'];
+ const orden=['pendientes','a4','a3','cad','poster','mixtos','stickers','fotos','corte','grafica'];
  for(const grupo of [...grupos.values()].sort((a,b)=>orden.indexOf(a.id)-orden.indexOf(b.id))){
   const bloque=document.createElement('section');bloque.className='grupo-pedido';
   const titulo=texto('h3',grupo.titulo+' · '+grupo.indices.length+' archivo(s)');
@@ -178,22 +179,37 @@ function render(){
   principal.append(resumen);
   if(e.paginas&&e.servicio==='auto'){
    const paginasFinal=paginasElegidas(e)||e.paginas;
-   const clasif=clasificarDestino(paginasFinal,e.seleccion);
+   const regla=decidirTamanoCliente(paginasFinal);
    const recomendada=tamañoEstandar(paginasFinal);
+   const pregunta=regla.requierePregunta&&e.seleccion==='sin-confirmar';
    const filaTam=document.createElement('div');filaTam.className='tamano-rapido';
-   const tag=texto('span','Imprimir en: ');filaTam.append(tag);
-   for(const [tam,label] of [['a4','A4'],['a3','A3'],['original','Tamaño original']]){
+   if(pregunta){
+    filaTam.classList.add('pregunta-tamano');
+    filaTam.setAttribute('role','group');
+    filaTam.setAttribute('aria-label','Confirmar tamaño de impresión de '+e.name);
+    filaTam.append(texto('strong','El PDF no es A4. ¿Cómo querés imprimirlo?'));
+    filaTam.append(texto('p','Medida detectada: '+[...new Set(regla.medidas)].join(' / ')+'.'));
+    if(regla.variosTamanos)
+     filaTam.append(texto('p','Este PDF contiene páginas de diferentes tamaños. Elegí el destino de impresión.'));
+   }else if(regla.forzarA4){
+    filaTam.append(texto('small','PDF de 20 × 20 cm: se imprime en hoja A4 sin recortar.'));
+   }else filaTam.append(texto('span','Imprimir en: '));
+   for(const [tam,label] of [['a4',pregunta?'Ajustar a A4':'A4'],
+     ['a3',pregunta?'Imprimir en A3':'A3'],
+     ['original',pregunta?'Mantener tamaño real':'Tamaño original']]){
+    if(regla.forzarA4&&tam==='original')continue;
     const btn=texto('button',label);btn.type='button';
     btn.className='tamano-opcion'+(e.seleccion===tam?' seleccionada':'');
     btn.setAttribute('aria-pressed',String(e.seleccion===tam));
     btn.onclick=()=>{e.seleccion=tam;cambio()};
     filaTam.append(btn);
    }
-   if(recomendada==='a4'&&clasif.cambioEscala){
-    const note=texto('small','Sugerido A4: se ajusta proporcionalmente, sin recortar.');
-    filaTam.append(note);
-   }else if(e.seleccion==='sin-confirmar'){
-    const note=texto('small','Elegí el tamaño para continuar.');filaTam.append(note);
+   if(pregunta){
+    filaTam.append(texto('small','Al ajustar a A4 o A3 se conserva la proporción, sin recortar. El tamaño real puede requerir ploteo.'));
+   }else if(e.seleccion==='original'&&!regla.a3Exacto&&!regla.a4Exacto){
+    filaTam.append(texto('small','El tamaño real puede no tener una tarifa disponible. En ese caso elegí A4 o A3.'));
+   }else if(recomendada==='a4'&&e.seleccion==='a4'&&!regla.a4Exacto&&!regla.forzarA4){
+    filaTam.append(texto('small','A4 seleccionado: se ajusta proporcionalmente, sin recortar.'));
    }
    principal.append(filaTam);
   }
@@ -332,13 +348,11 @@ async function analizarArchivoPDF(e,file){
     }
    }catch(_){/* Sin clase confirmada, el ploteo no obtiene precio final. */}
   }
-  const suggested=clasificarDestino(e.paginas);
-  e.requiereConfirmacion=suggested.requiereConfirmacion;
-  const estandar=tamañoEstandar(e.paginas);
-  if(estandar)e.seleccion=estandar;
-  else if(e.paginas.some(p=>Math.max(p.anchoCm,p.altoCm)>42.03||
-      Math.min(p.anchoCm,p.altoCm)>29.73))
-   e.seleccion='original';
+  const decision=decidirTamanoCliente(e.paginas);
+  // A4 real y 20x20 cm quedan preseleccionados; todos los demás,
+  // incluidos A3 y mayores de A3, exigen elección explícita del cliente.
+  e.requiereConfirmacion=decision.requierePregunta;
+  e.seleccion=decision.seleccionInicial;
   e.error=null;
  }catch(ex){e.error=String(ex.message||ex);e.paginas=null}
 }
