@@ -11,14 +11,15 @@ export function cotizarDocumentosIndividuales({archivos,precios}){
   if(!a||typeof a.id!=='string'||ids.has(a.id)||a.id!=='pdf'+(i+1)||
    !Number.isSafeInteger(a.paginas)||a.paginas<1||a.paginas>20000||
    !Number.isSafeInteger(a.copias)||a.copias<1||a.copias>500||
-   !['a4','a3'].includes(a.formato)||!['bn','color'].includes(a.modo)||
+   !['a5','a4','a3'].includes(a.formato)||!['bn','color'].includes(a.modo)||
    !['simple','double'].includes(a.caras)||!['ninguno','individual','grupo'].includes(a.anillado)||
    ![1,2,4,9].includes(a.paginasPorHoja??1)||
    (a.anillado==='grupo'&&!/^[1-9][0-9]?$/.test(String(a.grupoAnillado||''))))
    throw Error('Configuración de archivo inválida.');
   ids.add(a.id);
   const papel=a.modo==='bn'?'estandar':a.materialColor;
-  const color=precios[a.formato==='a4'?'colorA4':'colorA3'];
+  // A5 se imprime en su tamaño real y se factura según escala A4 existente.
+  const color=precios[a.formato==='a3'?'colorA3':'colorA4'];
   if(a.modo==='color'&&!color?.materials?.some(m=>m.id===papel))
    throw Error('Papel color no disponible.');
   const paginasPorHoja=a.paginasPorHoja??1;
@@ -40,8 +41,8 @@ export function cotizarDocumentosIndividuales({archivos,precios}){
  }
  let total=0,subtotalImpresiones=0,subtotalAnillados=0;
  for(const g of grupos.values()){
-  const base=precios[g.formato==='a4'?'bnA4':'bnA3'];
-  const color=precios[g.formato==='a4'?'colorA4':'colorA3'];
+  const base=precios[g.formato==='a3'?'bnA3':'bnA4'];
+  const color=precios[g.formato==='a3'?'colorA3':'colorA4'];
   const scales=(g.modo==='bn'?base:color)?.scales;
   if(!Array.isArray(scales))throw Error('Escalas no disponibles.');
   const ix=scales.findIndex(e=>g.cantidad>=Number(e.from||1)&&(e.to==null||g.cantidad<=Number(e.to)));
@@ -56,7 +57,7 @@ export function cotizarDocumentosIndividuales({archivos,precios}){
    let anillado=0;
    if(a.anillado==='individual'){
     const hojas=a.hojasPorJuego;
-    const filas=precios.bindings?.[a.formato]||[];
+    const filas=precios.bindings?.[a.formato==='a5'?'a4':a.formato]||[];
     const fila=filas.find(r=>hojas<=Number(r.to));
     if(!fila)throw Error('Anillado requiere revisión por cantidad de hojas.');
     anillado=Number(fila.price)*a.copias;
@@ -77,7 +78,7 @@ export function cotizarDocumentosIndividuales({archivos,precios}){
   if(docs.some(d=>d.formato!==formato))throw Error('Los PDF del grupo '+id+' deben tener el mismo tamaño de hoja.');
   if(docs.some(d=>d.copias!==copias))throw Error('Los PDF del grupo '+id+' deben tener la misma cantidad de juegos.');
   const hojas=docs.reduce((n,d)=>n+d.hojasPorJuego,0);
-  const fila=(precios.bindings?.[formato]||[]).find(r=>hojas<=Number(r.to));
+  const fila=(precios.bindings?.[formato==='a5'?'a4':formato]||[]).find(r=>hojas<=Number(r.to));
   if(!fila)throw Error('El grupo '+id+' supera la capacidad de anillado cotizable.');
   const subtotal=Number(fila.price)*copias;
   if(!Number.isFinite(subtotal)||subtotal<0)throw Error('Precio de anillado inválido.');
