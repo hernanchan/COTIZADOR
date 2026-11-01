@@ -14,6 +14,9 @@ test('portal actual conserva un CTA y scripts HTML válidos con TUS OFF y ON',as
   assert.ok(transformed.code.length>2500);
   assert.ok(match[1].includes('const TUS_ENABLED='+enabled));
   assert.ok(match[1].includes('const TUS_BLOCKED='+(!enabled)));
+  assert.ok(match[1].includes('ensayo-tus-comprobar'));
+  assert.ok(match[1].includes('TUS_ENABLED&&!tusPreflightOK'));
+  assert.ok(match[1].includes('STORAGE_FIRMA_OK'));
   assert.ok(html.includes('id="send-all-pdf"'));
   assert.ok(html.includes('id="precio-smart"'));
   assert.ok(match[1].includes('await enviarTUSDesdeCarrito(pending)'));
