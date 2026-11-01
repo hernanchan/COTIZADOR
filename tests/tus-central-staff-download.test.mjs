@@ -192,3 +192,34 @@ test('A5 original se presenta como A5, con tarifa A4 explícita, sin mutar la fi
  assert.match(source,/t\.formatoFinal==="a5"\?"Tarifa A4 vigente \(A5 sin ampliar\)"/);
  assert.match(source,/formatoFinal:texto\(w\.formatoFinal\)/);
 });
+
+
+test('14x20 real llega al D1 y se muestra como original con tarifa A4, no como A4',()=>{
+ const sha='a'.repeat(64),receipt='DOC-12345678-1234-4234-8234-1234567890ab';
+ const medidas=Array.from({length:14},(_,i)=>({pagina:i+1,anchoCm:14,altoCm:20}));
+ const job={orden:1,idTrabajo:'pdf1',servicio:'documentos',
+  fileId:'file1',nombreOriginal:'CARATULAS DIARIA.pdf',reciboPrivado:receipt,
+  sha256:sha,paginasOriginales:14,paginasElegidas:medidas.map(p=>p.pagina),
+  copias:1,formatoFinal:'personalizado_a4',tarifaAplicada:'a4',
+  medidasOriginalesCm:medidas,
+  carasPresupuestadas:'simple',paginasPorCaraPresupuestadas:1,
+  tipoAnillado:'ninguno',material:'estandar',modo:'bn',
+  pdfImprimibleVerificado:false,descargaPrivadaHabilitada:false};
+ const payload={schema:'saber-central-recepcion-verificada-v1',
+  orderId:webId,filesReceived:true,paymentAuthorized:false,
+  listoParaProducir:false,importeVerificado:1400,
+  recibos:[{fileId:'file1',receiptId:receipt,sha256:sha,bytes:15000,pages:14}],
+  ficha:{schema:'saber-central-ficha-produccion-v1',orderId:webId,
+   pagoConfirmado:false,listoParaProducir:false,totalVerificadoSinPago:1400,
+   trabajos:[job]}};
+ const normal=vm.runInContext('centralSafeManifest',ctx)(payload);
+ assert.equal(normal.trabajos[0].formatoFinal,'personalizado_a4');
+ assert.equal(normal.trabajos[0].tarifaAplicada,'a4');
+ assert.equal(normal.trabajos[0].medidasOriginalesCm.length,14);
+ assert.equal(normal.trabajos[0].medidasOriginalesCm[13].altoCm,20);
+ assert.match(source,/Original: /);
+ assert.match(source,/Tarifa A4 vigente \(original sin ampliar\)/);
+ const tampered=structuredClone(payload);
+ tampered.ficha.trabajos[0].medidasOriginalesCm[0].anchoCm=31;
+ assert.throws(()=>vm.runInContext('centralSafeManifest',ctx)(tampered),/medidas originales/i);
+});
