@@ -31,6 +31,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
 #vista-estado-pedido{background:#fff;border-radius:12px;padding:24px;margin:12px 0;border:1px solid #bad2e7}
 #vista-estado-pedido strong{display:block;font-size:21px;margin-bottom:8px}
 #vista-estado-pedido p{margin:5px 0}
+body.estado-registro #vista-estado-pedido{background:#ecfaf4;border:2px solid #12805c;box-shadow:0 4px 18px #0b58301c;scroll-margin-top:130px;text-align:center;padding:28px 18px}
+body.estado-registro #vista-estado-pedido strong{font-size:23px;color:#11543f}
+body.estado-registro #vista-estado-pedido .numero-confirmado{font-size:clamp(30px,6vw,52px);font-weight:850;color:#074a36;line-height:1.2;margin:14px 0}
+body.estado-registro #acciones-pedido{background:#e0f7e9;border-bottom-color:#12805c}
+body.estado-registro #send-all-pdf:disabled{opacity:1;background:#116b4f;color:#fff;cursor:default}
 body.estado-envio #smart,body.estado-registro #smart{display:none}
 [hidden]{display:none!important}
 #drop-pdf{display:block;border:2px dashed #8faec5;background:#f4f9fd;border-radius:12px;padding:16px;margin:12px 0;cursor:pointer}
@@ -91,14 +96,24 @@ if(!modoDiagnostico){
 const vistaEstadoPedido=document.getElementById('vista-estado-pedido');
 const rendimientoPrivado=document.getElementById('rendimiento-privado');
 let ultimoTotalServidor=null;
-function mostrarEstadoCliente(estado,titulo,detalle){
+function mostrarEstadoCliente(estado,titulo,detalle,numeroOrden=null){
+ const confirmado=estado==='registrado'&&/^\d{3,}$/.test(numeroOrden||'');
  document.body.classList.toggle('estado-envio',estado==='enviando');
- document.body.classList.toggle('estado-registro',estado==='registrado');
+ document.body.classList.toggle('estado-registro',confirmado);
  vistaEstadoPedido.hidden=!estado;
  if(!estado){vistaEstadoPedido.replaceChildren();return}
  const h=document.createElement('strong');h.textContent=titulo;
  const p=document.createElement('p');p.textContent=detalle;
- vistaEstadoPedido.replaceChildren(h,p);
+ if(confirmado){
+  const numero=document.createElement('p');
+  numero.className='numero-confirmado';
+  numero.textContent='Orden N.º '+numeroOrden;
+  vistaEstadoPedido.replaceChildren(h,numero,p);
+  batchProgress.textContent='Pedido recibido correctamente · Orden N.º '+numeroOrden+
+   ' · PDF verificados y registrados.';
+  sendAllButton.textContent='Orden N.º '+numeroOrden+' recibida';
+  vistaEstadoPedido.scrollIntoView({block:'start',behavior:'smooth'});
+ }else vistaEstadoPedido.replaceChildren(h,p);
 }
 let batchSending=false,smartReady=false,smartBlockedReason='',handoffInProgress=false,handoffResolve=null;
 const dropPdf=document.getElementById('drop-pdf'),batchFiles=document.getElementById('batch-files'),batchStatus=document.getElementById('batch-status');
@@ -312,7 +327,7 @@ function updateSummary(){
  sendAllButton.disabled=TUS_BLOCKED||(TUS_ENABLED&&!tusPreflightOK)||batchSending||registering||handoffInProgress||Boolean(registeredOrder)||
   (allRefs.length===0&&!smartReady)||withoutPdf!==0||
   allRefs.some(d=>!d.confirmacion&&!d.archivoLocal);
- sendAllButton.textContent=registeredOrder?'Pedido registrado':
+ sendAllButton.textContent=registeredOrder?'Orden N.º '+(registeredShortOrder||'')+' recibida':
   batchSending?'Enviando archivos…':registering?'Registrando pedido…':'Enviar mi pedido';
  registerButton.disabled=true;
 }
@@ -686,9 +701,9 @@ async function enviarTUSDesdeCarrito(pendientes){
  const valor=new Intl.NumberFormat('es-AR',{
   style:'currency',currency:'ARS',maximumFractionDigits:0
  }).format(ultimoTotalServidor);
- document.getElementById('precio-smart').textContent='Total verificado: '+valor+' · Sin cobro autorizado';
+ document.getElementById('precio-smart').textContent='Orden N.º '+registeredShortOrder+' · Total verificado: '+valor+' · Sin cobro autorizado';
  mostrarEstadoCliente('registrado','Pedido recibido correctamente',
-  'Orden de trabajo N.º '+registeredShortOrder+'. '+trabajos.length+' PDF verificados y registrados. Pago desactivado.');
+  trabajos.length+' PDF verificados y registrados. Conservá este número para identificar tu pedido. Pago desactivado.',registeredShortOrder);
  return resultado;
 }
 sendAllButton.addEventListener('click',async()=>{
@@ -803,7 +818,7 @@ sendAllButton.addEventListener('click',async()=>{
     new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(ultimoTotalServidor)+
     ' · Sin cobro autorizado';
   mostrarEstadoCliente('registrado','Pedido recibido correctamente',
-   'Orden de trabajo N.º '+registeredShortOrder+'. '+allEntries.length+' PDF verificados. Pago desactivado en esta prueba.');
+   allEntries.length+' PDF verificados y registrados. Conservá este número. Pago desactivado en esta prueba.',registeredShortOrder);
  }else{
   batchProgress.textContent='PDF recibidos; el registro quedó pendiente. Pulsá «Enviar mi pedido» para reintentar sin subir los PDF.';
   mostrarEstadoCliente(null);
