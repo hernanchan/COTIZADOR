@@ -37,3 +37,5 @@ Consultar pruebas del ensayo privado 14x20, versión del sitio de pruebas y acce
 Inspeccionar versión privada y resultado de test selector 1/2 páginas por cara, con 4/9 avanzadas, CI por trigger 967b70bb y HTTP401. No publicación ni cobro.
 
 Inspeccionar CI de corrección de selector invisible por estar oculto en panel: commit trigger 1c3010fb; tests de montaje antes de if(abierto!==i), estilos visibles y HTTP401. Sin cambios de cobro ni web pública.
+
+Verificar CI segundo fallo 2-up con tamaño sin confirmar para PDF 14×20; activar solo Worker documental privado, tests 14x20 pending, A3 pending, excluir A0, Basic 401 y pagos apagados. Commit d5de137e.
