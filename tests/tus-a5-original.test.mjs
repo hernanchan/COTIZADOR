@@ -31,7 +31,7 @@ async function quote(ancho,alto,seleccion,modo='bn',materialColor='obra70'){
 test('A5 original: tarifa A4, tamaño final A5 y sin ampliación',async()=>{
  const [a5,a4]=await Promise.all([
   quote(419.53,595.28,'original'),quote(595.28,841.89,'a4')]);
- assert.equal(a5.verificacion.importeRecalculado,a4.verificacion.importeRecalculado);
+ assert.equal(a5.verificacion.importeVerificado,a4.verificacion.importeVerificado);
  const t=a5.verificacion.ficha.trabajos[0];
  assert.equal(t.formatoFinal,'a5');
  assert.deepEqual(t.operaciones,['sin_escalado']);
