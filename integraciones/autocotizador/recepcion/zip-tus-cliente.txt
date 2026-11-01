@@ -1,0 +1,71 @@
+// ZIP STORE sin compresión: conserva los bytes originales de cada PDF.
+// No hay librerías externas ni enlaces públicos. CRC32 por fragmentos.
+const ZIP_TABLE=(()=>{
+ const table=new Uint32Array(256);
+ for(let n=0;n<256;n++){
+  let c=n;
+  for(let k=0;k<8;k++)c=(c&1)?(0xedb88320^(c>>>1)):(c>>>1);
+  table[n]=c>>>0;
+ }
+ return table;
+})();
+async function crc32Blob(blob){
+ let crc=0xffffffff;
+ for(let offset=0;offset<blob.size;offset+=1024*1024){
+  const bytes=new Uint8Array(await blob.slice(offset,offset+1024*1024).arrayBuffer());
+  for(const x of bytes)crc=ZIP_TABLE[(crc^x)&255]^(crc>>>8);
+ }
+ return (crc^0xffffffff)>>>0;
+}
+function zipName(name){
+ if(typeof name!=='string'||!name||name.length>180||
+    name.includes('/')||name.includes('\\')||name.includes('..')||
+    /[\x00-\x1f]/.test(name))
+  throw Error('Nombre de archivo ZIP inválido');
+ return name;
+}
+function zip32(buf,offset,value){buf.setUint32(offset,value>>>0,true)}
+function zip16(buf,offset,value){buf.setUint16(offset,value,true)}
+async function crearZipSinCompresion(entries,{progress=()=>{}}={}){
+ if(!Array.isArray(entries)||!entries.length||entries.length>33)
+  throw Error('Cantidad de archivos ZIP fuera del límite');
+ const encoder=new TextEncoder(),localParts=[],centralParts=[];
+ const seen=new Set();
+ let offset=0,total=0;
+ for(let i=0;i<entries.length;i++){
+  const entry=entries[i],name=zipName(entry?.name);
+  if(seen.has(name)||!(entry.blob instanceof Blob))
+   throw Error('Archivo ZIP faltante o duplicado');
+  seen.add(name);
+  const bytes=encoder.encode(name),blob=entry.blob;
+  if(bytes.length>65535||blob.size>0xffffffff)
+   throw Error('Archivo ZIP demasiado grande');
+  total+=blob.size;
+  // Proteger la sesión del operador frente a pedidos muy pesados.
+  if(total>160*1024*1024)
+   throw Error('Este pedido supera 160 MiB: descargá los originales por separado');
+  const crc=await crc32Blob(blob);
+  const local=new Uint8Array(30+bytes.length),lh=new DataView(local.buffer);
+  zip32(lh,0,0x04034b50);zip16(lh,4,20);zip16(lh,6,0x0800);
+  zip16(lh,8,0);zip16(lh,10,0);zip16(lh,12,0x0021);
+  zip32(lh,14,crc);zip32(lh,18,blob.size);zip32(lh,22,blob.size);
+  zip16(lh,26,bytes.length);zip16(lh,28,0);local.set(bytes,30);
+  localParts.push(local,blob);
+  const central=new Uint8Array(46+bytes.length),ch=new DataView(central.buffer);
+  zip32(ch,0,0x02014b50);zip16(ch,4,20);zip16(ch,6,20);
+  zip16(ch,8,0x0800);zip16(ch,10,0);zip16(ch,12,0);
+  zip16(ch,14,0x0021);zip32(ch,16,crc);zip32(ch,20,blob.size);
+  zip32(ch,24,blob.size);zip16(ch,28,bytes.length);
+  zip16(ch,30,0);zip16(ch,32,0);zip16(ch,34,0);
+  zip16(ch,36,0);zip32(ch,38,0);zip32(ch,42,offset);
+  central.set(bytes,46);centralParts.push(central);
+  offset+=local.length+blob.size;
+  progress(i+1,entries.length);
+ }
+ const centralSize=centralParts.reduce((n,x)=>n+x.length,0);
+ const end=new Uint8Array(22),view=new DataView(end.buffer);
+ zip32(view,0,0x06054b50);zip16(view,4,0);zip16(view,6,0);
+ zip16(view,8,entries.length);zip16(view,10,entries.length);
+ zip32(view,12,centralSize);zip32(view,16,offset);zip16(view,20,0);
+ return new Blob([...localParts,...centralParts,end],{type:'application/zip'});
+}
