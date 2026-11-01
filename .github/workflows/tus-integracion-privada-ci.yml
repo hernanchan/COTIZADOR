@@ -31,12 +31,13 @@ jobs:
           node --check integraciones/autocotizador/recepcion/tus-directo-cliente.mjs
           node --check integraciones/autocotizador/recepcion/pantalla-cotizador-v2-prueba-privada.mjs
           node --check integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs
-      - name: Compilar Worker completo, exclusivamente artefacto local descartable
+      - name: Compilar Worker completo con generación real de activos del portal
+        working-directory: integraciones/autocotizador/recepcion
         run: |
-          npx esbuild integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs \
-            --bundle --platform=browser --format=esm --target=es2022 \
-            --loader:.txt=text --loader:.html=text \
-            --outfile=/tmp/saber-tus-pruebas.mjs
-          node --check /tmp/saber-tus-pruebas.mjs
+          npm install --no-audit --no-fund
+          npm run build:unificado
+          node --check dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq '/api/ensayo-tus-iniciar' dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq '/api/ensayo-tus-registrar' dist/saber-documentos-cotizador-fase4.mjs
       - name: Confirmación SIN despliegues
         run: echo 'PRUEBA_TUS_PRIVADA_OK - SIN DESPLIEGUE - SIN PAGOS - WEB COMERCIAL INTACTA'
