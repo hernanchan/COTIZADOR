@@ -49,7 +49,13 @@ jobs:
             fi
             sleep 5
           done
-          jq -n --arg state "$status" --arg version "$active" --arg deployment "$deployment" --arg source "Cloudflare deployments GET" --arg branch "$BRANCH" --arg worker "saber-documentos-pruebas" --arg checked "$(date -u +%FT%TZ)"             '{estado:$state,worker:$worker,version_activa:$version,deployment_id:$deployment,origen:$source,rama:$branch,consultado_utc:$checked,nota:"No demuestra TUS E2E; no se enviaron archivos ni se activaron cobros."}' > "$temp/report.json"
+          # Verificación independiente sin contraseña: el portal debe devolver HTTP 401.
+          portal_http=$(curl --silent --show-error --max-time 25 --output /dev/null --write-out '%{http_code}' \
+            'https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/' || true)
+          protected=false
+          if [ "$portal_http" = "401" ]; then protected=true; fi
+          jq -n --arg state "$status" --arg version "$active" --arg deployment "$deployment" --arg source "Cloudflare deployments GET" --arg branch "$BRANCH" --arg worker "saber-documentos-pruebas" --arg checked "$(date -u +%FT%TZ)" --arg http "$portal_http" --argjson protected "$protected" \
+            '{estado:$state,worker:$worker,version_activa:$version,deployment_id:$deployment,origen:$source,rama:$branch,consultado_utc:$checked,portal_http_anonimo:$http,portal_protegido:$protected,nota:"No demuestra TUS E2E; no se enviaron archivos ni se activaron cobros."}' > "$temp/report.json"
           dest="docs/ESTADO-TUS-ACTIVACION-20261101.json"
           api="https://api.github.com/repos/$REPO/contents/$dest"
           encoded=$(base64 -w0 "$temp/report.json")
