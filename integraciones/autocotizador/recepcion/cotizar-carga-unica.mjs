@@ -39,7 +39,16 @@ function tipoOriginal(paginas){
   if(Math.abs(ancho-29.7)<=0.2&&Math.abs(largo-42)<=0.2)return 'a3';
   return null;
  });
- return opciones.every(v=>v===opciones[0])?opciones[0]:null;
+ const formato=opciones.every(v=>v===opciones[0])?opciones[0]:null;
+ if(formato)return formato;
+ // Cualquier tamaño real que ENTRE en A4 recibe su tarifa. La página
+ // mantiene sus propias medidas físicas: "personalizado_a4" NO es A4.
+ // Soporta PDF con varias medidas pequeñas sin modificar sus páginas.
+ const cabeEnA4=paginas.every(p=>{
+  const x=Math.min(p.anchoCm,p.altoCm),y=Math.max(p.anchoCm,p.altoCm);
+  return x<=21.1&&y<=29.8;
+ });
+ return cabeEnA4?'personalizado_a4':null;
 }
 /** Precio provisorio. Las medidas, clases y elecciones se declaran en el navegador;
  * jamás se usa este resultado para cobrar o imprimir sin verificación del PDF real.
@@ -78,10 +87,16 @@ export function cotizarCargaUnica({archivos,precios}){
    return;
   }
   if(!d.confirmado){pendientes.push({indice:i,nombre:a.nombre,motivo:'Confirmar tamaño final'});return}
+  // Se acordó que un PDF 20x20 debe salir en hoja A4, nunca original.
+  if(a.servicio==='auto'&&a.seleccion==='original'&&seleccionadas.every(p=>
+    Math.abs(Math.min(p.anchoCm,p.altoCm)-20)<=0.2&&
+    Math.abs(Math.max(p.anchoCm,p.altoCm)-20)<=0.2)){
+   pendientes.push({indice:i,nombre:a.nombre,motivo:'PDF 20 × 20 cm: elegí A4 para continuar.'});return;
+  }
   if(d.destino==='documentos'){
    const formato=d.tamanoFinal==='original'?tipoOriginal(seleccionadas):d.tamanoFinal;
-   if(!['a5','a4','a3'].includes(formato)){
-    pendientes.push({indice:i,nombre:a.nombre,motivo:'Tamaño original sin tarifa disponible. Elegí A4 o A3.'});return;
+   if(!['personalizado_a4','a5','a4','a3'].includes(formato)){
+    pendientes.push({indice:i,nombre:a.nombre,motivo:'El tamaño original supera el área A4 y no coincide con A3. Elegí un tamaño A4/A3 o consultá por ploteos.'});return;
    }
    const id='pdf'+(documentos.length+1);
    // A5 utiliza temporalmente la tarifa y catálogo A4, sin redimensionar el PDF.
@@ -95,7 +110,8 @@ export function cotizarCargaUnica({archivos,precios}){
     materialColor:a.modo==='color'?a.materialColor:'estandar',orden:i+1});
    plan.push({indice:i,nombre:a.nombre,origen:seleccionadas.map(p=>({numero:p.numero,anchoCm:p.anchoCm,altoCm:p.altoCm})),
     paginasElegidas:seleccionadas.map(p=>p.numero),paginasPorHoja:a.paginasPorHoja??1,
-    formatoFinal:formato,ajuste:d.cambioEscala?'proporcional_sin_recorte':'sin_escalado',destino:'documentos',id});
+    formatoFinal:formato,tarifaAplicada:formato==='personalizado_a4'||formato==='a5'?'a4':formato,
+    ajuste:d.cambioEscala?'proporcional_sin_recorte':'sin_escalado',destino:'documentos',id});
    return;
   }
   if((a.paginasPorHoja??1)!==1){
