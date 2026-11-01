@@ -1,0 +1,130 @@
+const state=document.getElementById('estado'),button=document.getElementById('zip');
+const qs=new URL(location.href).searchParams;
+const webOrderId=qs.get('webOrderId')||'';
+const isOrder=/^WEB-ENSAYO-[A-F0-9]{32}$/.test(webOrderId);
+const encoder=new TextEncoder();
+let ficha=null;
+function clean(v){return String(v==null?'NO CONSTA — verificar':v)}
+function format(t){
+ const mode=t.modo==='bn'?'B/N':t.modo==='color'?'Color':null;
+ const sides=t.carasPresupuestadas==='simple'?'Simple faz':
+  t.carasPresupuestadas==='double'?'Doble faz':null;
+ const ring=t.tipoAnillado==='ninguno'?'Sin anillado':
+  t.tipoAnillado==='individual'?'Anillado individual':
+  t.tipoAnillado==='grupo'?'Anillado en grupo (verificar integrantes)':null;
+ const pages=Array.isArray(t.paginasElegidas)&&t.paginasElegidas.length?
+  (t.paginasElegidas.length===t.paginasOriginales&&
+  t.paginasElegidas.every((v,i)=>v===i+1)?'Todas':t.paginasElegidas.join(', ')):null;
+ return [
+  ['Servicio',t.servicio],
+  ['Archivo original',t.nombreOriginal],
+  ['Páginas a imprimir',pages],
+  ['Tamaño',t.formatoFinal?.toUpperCase()],
+  ['Color',mode],['Caras',sides],
+  ['Páginas por cara',t.paginasPorCaraPresupuestadas],
+  ['Copias',t.copias],['Papel',t.material],['Anillado',ring],
+  ['Observaciones',t.descripcion]
+ ];
+}
+function textoOrden(d){
+ const lines=['LIBRERÍA SABER — ORDEN DE TRABAJO N.º '+d.numeroOrden,
+  'Referencia técnica: '+d.webOrderId,
+  'Estado: '+d.estadoPago+' — NO AUTORIZA IMPRIMIR NI ENTREGAR',
+  'Importe de referencia: ARS '+d.importe,
+  'Documentos: '+d.trabajos.length,''];
+ for(const [i,t] of d.trabajos.entries()){
+  lines.push('PDF '+String(i+1).padStart(2,'0')+' — '+t.nombreOriginal);
+  for(const [k,v] of format(t))lines.push('  '+k+': '+clean(v));
+  lines.push('');
+ }
+ lines.push('ATENCIÓN: confirmar cualquier dato que figure NO CONSTA.');
+ return lines.join('\n');
+}
+function escapeHtml(s){return clean(s).replace(/[&<>"']/g,c=>({
+ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+})[c])}
+function htmlOrden(d){
+ const sections=d.trabajos.map((t,i)=>
+  '<section><h2>PDF '+String(i+1).padStart(2,'0')+' · '+escapeHtml(t.nombreOriginal)+
+  '</h2><table>'+format(t).map(([k,v])=>'<tr><th>'+escapeHtml(k)+
+  '</th><td>'+escapeHtml(v)+'</td></tr>').join('')+'</table></section>').join('');
+ return '<!doctype html><html lang="es"><head><meta charset="utf-8">'+
+  '<title>Orden '+escapeHtml(d.numeroOrden)+'</title><style>'+
+  'body{font:14px Arial,sans-serif;margin:24px;color:#163552}h1{font-size:24px}'+
+  'section{break-inside:avoid;margin-top:20px}table{border-collapse:collapse;width:100%}'+
+  'th,td{border:1px solid #d5dce5;padding:7px;text-align:left}th{width:35%}'+
+  '.alert{border:2px solid #be6000;padding:10px;font-weight:bold}'+
+  '@media print{body{margin:13mm}}'+
+  '</style></head><body><h1>LIBRERÍA SABER · ORDEN N.º '+
+  escapeHtml(d.numeroOrden)+'</h1><p>Referencia interna: '+
+  escapeHtml(d.webOrderId)+'</p><p>Importe: ARS '+escapeHtml(d.importe)+
+  '</p><p class="alert">PAGO NO CONFIRMADO. NO IMPRIMIR NI ENTREGAR SIN AUTORIZACIÓN.</p>'+
+  sections+'<p>Si un campo indica NO CONSTA, verificar antes de imprimir.</p></body></html>';
+}
+async function fetchFicha(){
+ if(!isOrder)throw Error('Referencia del pedido incorrecta');
+ const res=await fetch('/prueba-v2/api/ensayo-tus-paquete-manifiesto',{
+  method:'POST',credentials:'same-origin',cache:'no-store',
+  headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({webOrderId})
+ });
+ const result=await res.json().catch(()=>({}));
+ if(!res.ok||result.ok!==true||result.webOrderId!==webOrderId||
+    !/^\d{3,}$/.test(result.numeroOrden||'')||
+    !Array.isArray(result.trabajos)||!result.trabajos.length||
+    result.paymentAuthorized!==false)
+  throw Error(result.error||'No se pudo verificar la orden de trabajo');
+ return result;
+}
+async function pdfOriginal(d,t){
+ const r=await fetch('/prueba-v2/api/ensayo-tus-descargar-personal',{
+  method:'POST',credentials:'same-origin',cache:'no-store',
+  headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({orderId:d.webOrderId,receiptId:t.reciboPrivado})
+ });
+ if(!r.ok||!String(r.headers.get('Content-Type')||'').startsWith('application/pdf'))
+  throw Error('No se pudo verificar el PDF '+t.orden+' (HTTP '+r.status+')');
+ const blob=await r.blob();
+ if(blob.size!==t.bytes||blob.size<5||blob.size>20*1024*1024)
+  throw Error('Archivo PDF incompleto: '+t.orden);
+ const head=new Uint8Array(await blob.slice(0,5).arrayBuffer());
+ if(String.fromCharCode(...head)!=='%PDF-')
+  throw Error('Contenido PDF inválido: '+t.orden);
+ return blob;
+}
+button.addEventListener('click',async()=>{
+ if(!ficha)return;
+ button.disabled=true;
+ try{
+  const entries=[];
+  for(let i=0;i<ficha.trabajos.length;i++){
+   const t=ficha.trabajos[i];
+   state.textContent='Descargando y verificando original '+(i+1)+'/'+ficha.trabajos.length+'…';
+   const pdf=await pdfOriginal(ficha,t);
+   entries.push({name:'PDF_'+String(i+1).padStart(2,'0')+'.pdf',blob:pdf});
+  }
+  const order='ORDEN_'+ficha.numeroOrden+'_INSTRUCCIONES';
+  entries.push({name:order+'.html',blob:new Blob([htmlOrden(ficha)],{type:'text/html'})});
+  entries.push({name:order+'.txt',blob:new Blob([textoOrden(ficha)],{type:'text/plain;charset=utf-8'})});
+  state.textContent='Armando ZIP y calculando integridad…';
+  const zip=await crearZipSinCompresion(entries,{
+   progress:(i,n)=>{state.textContent='Armando ZIP '+i+'/'+n+'…'}
+  });
+  const link=document.createElement('a'),url=URL.createObjectURL(zip);
+  link.href=url;link.download='ORDEN_'+ficha.numeroOrden+'.zip';
+  document.body.append(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
+  state.textContent='ZIP de la orden '+ficha.numeroOrden+' preparado. Archivos originales sin alterar.';
+ }catch(error){state.textContent='No se pudo armar el ZIP: '+String(error.message||error)}
+ finally{button.disabled=false}
+});
+(async()=>{
+ try{
+  ficha=await fetchFicha();
+  document.getElementById('numero').textContent='Orden de trabajo N.º '+ficha.numeroOrden;
+  document.getElementById('detalle').textContent=ficha.trabajos.length+
+   ' PDF · '+ficha.estadoPago+' · ARS '+ficha.importe;
+  button.disabled=false;
+  state.textContent='Listo para generar el ZIP. Se volverá a verificar cada PDF.';
+ }catch(error){state.textContent='Acceso bloqueado: '+String(error.message||error)}
+})();
