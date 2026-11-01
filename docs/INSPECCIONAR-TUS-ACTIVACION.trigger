@@ -35,3 +35,5 @@ Confirmar CI cda372ac prueba A5 contra total realmente verificado, 44+72+4, y pr
 Consultar pruebas del ensayo privado 14x20, versión del sitio de pruebas y acceso protegido.
 
 Inspeccionar versión privada y resultado de test selector 1/2 páginas por cara, con 4/9 avanzadas, CI por trigger 967b70bb y HTTP401. No publicación ni cobro.
+
+Inspeccionar CI de corrección de selector invisible por estar oculto en panel: commit trigger 1c3010fb; tests de montaje antes de if(abierto!==i), estilos visibles y HTTP401. Sin cambios de cobro ni web pública.
