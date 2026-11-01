@@ -16,3 +16,5 @@ Nueva ejecución solicitada tras corrección SHA y prueba D1: commits 95ebb6d2 y
 01/11/2026 — Diagnóstico modo seguro: captura de ensayo V2 confirma LECTURA_DRIVE y Turnstile, Supabase Storage sin objetos nuevos. Nueva compilación TUS con bloqueo explícito ante requisitos inválidos y listado de NOMBRES sin valores secretos. Primero preparar versión INACTIVA, NO promover tráfico hasta prueba controlada. Commits código: 46288b2d, f77336d8, 852d7cef, 2f161b09.
 
 01/11/2026 — Release diagnóstico v2 desde 3829f524: rama privada exige TUS sin fallback a Drive aun con flag ausente; al fallar muestra requisitos faltantes solo bajo Basic, nunca secretos; test de regresión actualizado. Crear únicamente versión inactiva.
+
+01-11-2026 — Nueva compilación privada inactiva posterior a la corrección manual por el propietario de DOCS_TUS_PUBLISHABLE_KEY y DOCS_TUS_SUPABASE_SERVICE_KEY en Cloudflare. No incorporar ni registrar secretos. Incluir bindings actuales con inherit:strict; CI antes de promover; no activar pagos, no cambiar web pública.
