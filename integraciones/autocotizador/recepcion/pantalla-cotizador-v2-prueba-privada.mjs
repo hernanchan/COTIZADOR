@@ -3,7 +3,7 @@
  * Sólo puede abrirse con la compuerta BASIC privada del Worker, apagada
  * por defecto, y no interactúa con la tienda pública.
  */
-export function paginaCotizadorV2PruebaPrivada(sitekey){
+export function paginaCotizadorV2PruebaPrivada(sitekey,tusEnabled=false){
  if(typeof sitekey!=='string'||!/^[a-zA-Z0-9._-]{10,200}$/.test(sitekey))
   throw Error('Turnstile privado sin configurar');
  return `<!doctype html><html lang="es"><head>
@@ -69,6 +69,11 @@ const list=document.getElementById('all'),status=document.getElementById('state'
 const registerButton=document.getElementById('register-private'),registerStatus=document.getElementById('register-status');
 const sendAllButton=document.getElementById('send-all-pdf'),batchProgress=document.getElementById('batch-progress');
 const modoDiagnostico=new URLSearchParams(location.search).get('diagnostico')==='1';
+const TUS_ENABLED=${tusEnabled===true};
+if(TUS_ENABLED){
+ document.getElementById('seguridad-privada').hidden=true;
+ document.querySelector('#recepcion-avanzada .warning').textContent='PDF enviados directamente a almacenamiento privado; precio y páginas revalidados por servidor. Sin cobros.';
+}
 if(!modoDiagnostico){
  document.getElementById('recepcion-avanzada').hidden=true;
  document.getElementById('comparacion-original').hidden=true;
@@ -274,11 +279,13 @@ function save(){
 }
 function updateSummary(){
  const allRefs=all.flatMap(item=>item.references);
- const verified=allRefs.filter(d=>d.confirmacion?.reciboGoogleVerificado===true&&
+ const verified=allRefs.filter(d=>TUS_ENABLED&&registeredOrder?true:
+  d.confirmacion?.reciboGoogleVerificado===true&&
   d.confirmacion?.paymentAuthorized===false&&
   (d.confirmacion?.cotizacionServidor?.estado==='PRELIMINAR_VERIFICADA_SIN_PEDIDO'||
    d.ploteoVerificado?.estado==='PRELIMINAR_VERIFICADA_SIN_PEDIDO'));
- const value=verified.reduce((n,d)=>n+
+ const value=TUS_ENABLED&&registeredOrder&&Number.isSafeInteger(ultimoTotalServidor)
+  ?ultimoTotalServidor:verified.reduce((n,d)=>n+
   (d.ploteoVerificado?.totalArs??d.confirmacion.cotizacionServidor.totalArs),0);
  const amount=Number.isSafeInteger(value)?new Intl.NumberFormat('es-AR',{
   style:'currency',currency:'ARS',maximumFractionDigits:0}).format(value):'Requiere revisión';
@@ -634,6 +641,43 @@ async function prepararDesdeCotizador(){
   return false;
  }finally{clearTimeout(timeout);handoffResolve=null;handoffInProgress=false;updateSummary()}
 }
+/** Se conserva el análisis/UX del cotizador y sólo cambia la recepción.
+ * Esta ruta está apagada salvo el flag seguro del Worker privado. */
+async function enviarTUSDesdeCarrito(pendientes){
+ if(!TUS_ENABLED)throw Error('Recepción TUS deshabilitada.');
+ if(pendientes.length<1||pendientes.length>10)
+  throw Error('Esta etapa privada admite hasta 10 PDF por pedido.');
+ const mod=await import('/prueba-v2/tus-directo.mjs');
+ const trabajos=pendientes.map(d=>mod.normalizarTrabajoTUS(d,d.batchInicio()));
+ batchProgress.textContent='Enviando PDF al almacenamiento privado…';
+ marcarTiempo('tus_inicio',{archivos:trabajos.length});
+ const resultado=await mod.enviarPedidoTUSV2({
+  orderId,clientOrderId,trabajos,
+  onProgress:p=>{
+   if(p.phase==='transferencia')
+    batchProgress.textContent='Recibiendo PDF: '+p.percent+'% · '+trabajos.length+' archivos.';
+   else if(p.phase==='servidor')
+    batchProgress.textContent='PDF recibidos. Validando páginas, precios y pedido en Central…';
+   else if(p.phase==='registrado')
+    batchProgress.textContent='Pedido verificado y registrado correctamente.';
+   else batchProgress.textContent='Preparando recepción privada…';
+   marcarTiempo('tus_'+p.phase,{archivos:trabajos.length});
+  }
+ });
+ if(resultado.carritoDocumentalV2!==true||
+    resultado.archivosVerificados!==trabajos.length||
+    resultado.webOrderId!==orderId||resultado.paymentAuthorized!==false)
+  throw Error('La Central no confirmó el pedido completo.');
+ ultimoTotalServidor=resultado.totalArs;
+ registeredOrder=resultado.orderId;
+ const valor=new Intl.NumberFormat('es-AR',{
+  style:'currency',currency:'ARS',maximumFractionDigits:0
+ }).format(ultimoTotalServidor);
+ document.getElementById('precio-smart').textContent='Total verificado: '+valor+' · Sin cobro autorizado';
+ mostrarEstadoCliente('registrado','Pedido recibido correctamente',
+  'Número de pedido: '+registeredOrder+'. '+trabajos.length+' PDF verificados y registrados. Pago desactivado.');
+ return resultado;
+}
 sendAllButton.addEventListener('click',async()=>{
  if(batchSending||registering||handoffInProgress||registeredOrder)return;
  iniciarMedicion();
@@ -651,6 +695,22 @@ sendAllButton.addEventListener('click',async()=>{
     pending.some(d=>!d.archivoLocal||typeof d.sendNow!=='function')){
   batchProgress.textContent='Faltan archivos o trabajos por completar antes del envío.';
   terminarMedicion('trabajos_incompletos');
+  return;
+ }
+ if(TUS_ENABLED){
+  batchSending=true;updateSummary();
+  mostrarEstadoCliente('enviando','Estamos recibiendo tus PDF',
+   'Envío privado y verificación automática; no cierres la pestaña.');
+  try{
+   await enviarTUSDesdeCarrito(pending);
+   terminarMedicion('tus_pedido_registrado');
+  }catch(error){
+   // El fallo posterior a subir no autoriza a borrar originales ni a cobrar.
+   batchProgress.textContent='Pedido pendiente: '+String(error?.message||error)+
+    '. Los PDF recibidos siguen privados hasta conciliar el pedido.';
+   mostrarEstadoCliente(null);
+   terminarMedicion('tus_pedido_pendiente');
+  }finally{batchSending=false;updateSummary();}
   return;
  }
  batchSending=true;updateSummary();
