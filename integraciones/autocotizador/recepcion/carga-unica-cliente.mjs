@@ -99,6 +99,18 @@ function selectorPaginasPorCara(e,indice){
  avanzadas.append(extra);fieldset.append(avanzadas);
  return fieldset;
 }
+// Mostrar SIEMPRE la decisión más frecuente junto al archivo, incluso
+// cuando el panel «Más opciones» está cerrado. Nada para ploteos/otros.
+function mostrarSelectorRapido(card,e,indice){
+ if(e.servicio!=='auto'||!e.paginas)return;
+ const paginas=paginasElegidas(e);
+ if(!paginas)return;
+ const destino=clasificarDestino(paginas,e.seleccion);
+ if(!destino.confirmado||destino.destino!=='documentos')return;
+ const field=selectorPaginasPorCara(e,indice);
+ field.classList.add('composicion-visible');
+ card.append(field);
+}
 function cantidadCopias(e){
  const l=texto('label',e.servicio==='grafica'?'Lotes (1 a 500) ':'Copias (1 a 500) ');
  const input=document.createElement('input');
@@ -286,6 +298,8 @@ function render(){
    $('estado').textContent=entries.length+' PDF en la lista. No hace falta volver a cargar los restantes.';
   };
   acciones.append(quitar);fila.append(acciones);card.append(fila);
+  mostrarSelectorRapido(card,e,i);
+  // La decisión de 1/2 páginas ya está fuera del panel: se ve sin hacer clic.
   if(abierto!==i){bloque.append(card);continue}
   const panel=document.createElement('div');panel.className='panel-edicion';
   if(e.error){
@@ -360,8 +374,7 @@ function render(){
    }else if(decision.destino==='documentos'){
     controles.append(valor('Impresión', [['bn','Blanco y negro'],['color','Color']],e.modo,v=>{e.modo=v;cambio()}));
     controles.append(valor('Caras', [['simple','Simple faz'],['double','Doble faz']],e.caras,v=>{e.caras=v;cambio()}));
-    controles.append(selectorPaginasPorCara(e,i));
-    panel.append(texto('p','Con 2 páginas por cara, se ubican dos páginas del PDF en una cara impresa y se ajusta la escala si hace falta. Con doble faz, hasta cuatro páginas del PDF por hoja física.'));
+    panel.append(texto('p','Elegí 1 o 2 páginas por cara directamente debajo del archivo. En doble faz, 2 páginas por cara permite hasta cuatro páginas del PDF por hoja física.'));
     const formato=decision.tamanoFinal==='original'?formatoOriginal(paginas):decision.tamanoFinal;
     if(e.modo==='color'&&['personalizado_a4','a5','a4','a3'].includes(formato)){
      const disponibles=catalogo[['a5','personalizado_a4'].includes(formato)?'a4':formato]||[];
