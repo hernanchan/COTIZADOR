@@ -37,7 +37,7 @@ export function normalizarTrabajoTUS(d,plan){
  const plot=d.ploteo||null;
  if(!plot&&!options)throw Error('Opciones de impresión incompletas.');
  const opcionTUS={
-  servicio:'auto',seleccion:plot?'original':options.formato,
+  servicio:'auto',seleccion:plot||options.formato==='personalizado_a4'?'original':options.formato,
   paginasSeleccionadas:'',copias:plot?plot.copias:options.copias,
   modo:meta.mode,caras:plot?'simple':options.caras,
   paginasPorHoja:plot?1:(options.paginasPorHoja??1),
