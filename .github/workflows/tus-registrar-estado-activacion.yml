@@ -41,7 +41,7 @@ jobs:
                 active=$(jq -r '.result.deployments[0].versions[]? | select(.percentage==100) | .version_id' "$temp/deployments.json" | head -n 1)
                 deployment=$(jq -r '.result.deployments[0].id // ""' "$temp/deployments.json")
                 label=$(jq -r '.result.deployments[0].annotations["workers/message"] // ""' "$temp/deployments.json")
-                if [ "$label" = "Ensayo privado TUS 100%, sin cobros ni cambios a web comercial" ] && [ -n "$active" ] && [ "$active" != "baed6a9f-9f1e-4f18-afa3-420bfc3d2669" ]; then
+                if [ "$label" = "Ensayo privado TUS 100%, sin cobros ni cambios a web comercial" ] && [ -n "$active" ] && [ "$active" != "c172461f-5986-4ca6-86e7-633b72bacbc2" ]; then
                   status="ACTIVA_PRIVADA"
                   break
                 fi
