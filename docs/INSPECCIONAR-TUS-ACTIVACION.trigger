@@ -13,3 +13,5 @@ Verificar resultado CI y despliegue activación e3b642ec en rama TUS tras correg
 Inspeccionar run privada descarga personal posterior a 686a3e7b, test focalizado D1, regresión y versión. No cambio de tráfico desde este informe.
 
 Consultar CI Worker documental ZIP numerado trigger 8cf46635, verificando tests y protección 401, sin PII ni claves.
+
+Consulta última ejecución 321b1257 de documentos, cliente muestra orden N.º 001, sin PDF enviado.
