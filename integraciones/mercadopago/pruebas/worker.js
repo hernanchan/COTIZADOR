@@ -487,6 +487,7 @@ async function centralPrepareDraft(req,env){
   const old=await env.DB.prepare("SELECT amount_ars,status FROM orders WHERE id=?").bind(previous.order_id).first();
   const manifest=await env.DB.prepare("SELECT web_order_id FROM central_document_manifests WHERE commercial_order_id=?").bind(previous.order_id).first();
   if(!old||manifest?.web_order_id!==data.webOrderId)return json({error:"Recepción del intento anterior no coincide"},409);
+  await env.DB.prepare("INSERT OR IGNORE INTO central_work_order_numbers(commercial_order_id) VALUES(?)").bind(previous.order_id).run();
   const short=await env.DB.prepare("SELECT number FROM central_work_order_numbers WHERE commercial_order_id=?").bind(previous.order_id).first();
   return json({created:true,idempotent:true,commercial_order_id:previous.order_id,
    numeroOrden:shortWorkNumber(short?.number),amount_ars:old.amount_ars,
@@ -544,6 +545,7 @@ async function centralPrepareDraft(req,env){
    ]);
    if(stored&&linked?.commercial_order_id===other.order_id&&
       stored.status==="awaiting_payment"&&stored.amount_ars===total)
+    await env.DB.prepare("INSERT OR IGNORE INTO central_work_order_numbers(commercial_order_id) VALUES(?)").bind(other.order_id).run();
     return json({created:true,idempotent:true,commercial_order_id:other.order_id,
      numeroOrden:shortWorkNumber((await env.DB.prepare("SELECT number FROM central_work_order_numbers WHERE commercial_order_id=?").bind(other.order_id).first())?.number),
      amount_ars:stored.amount_ars,state:stored.status,checkoutEnabled:false,paymentAuthorized:false});
