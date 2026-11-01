@@ -147,6 +147,8 @@ function centralSafeManifest(data){
    // Para recibos históricos sin este dato, null (jamás inferir "ninguno").
    tipoAnillado:w.servicio==="documentos"&&
      ["ninguno","individual","grupo"].includes(w.tipoAnillado)?w.tipoAnillado:null,
+   grupoAnillado:w.servicio==="documentos"&&w.tipoAnillado==="grupo"&&
+     /^[1-9][0-9]?$/.test(String(w.grupoAnillado||""))?String(w.grupoAnillado):null,
    material:texto(w.material),modo:texto(w.modo),productoId:texto(w.productoId),
    variante:texto(w.variante),metros:Number.isFinite(w.metros)&&w.metros>0?w.metros:null,
    descripcion:texto(w.descripcion,180),archivoFinalVerificado:false
@@ -291,6 +293,7 @@ async function centralTUSPackageManifest(req,env){
   carasPresupuestadas:t.carasPresupuestadas,
   paginasPorCaraPresupuestadas:t.paginasPorCaraPresupuestadas,
   modo:t.modo,material:t.material,tipoAnillado:t.tipoAnillado,
+  grupoAnillado:t.grupoAnillado,
   descripcion:t.descripcion,bytes:t.bytes
  }));
  if(trabajos.some(t=>!CENTRAL_RECEIPT.test(t.reciboPrivado||"")||
@@ -1042,6 +1045,7 @@ function agregarFichaDeImpresion(area,t){
   t.tipoAnillado==="individual"?"Anillado individual":
   t.tipoAnillado==="grupo"?"Anillado junto a otros archivos (verificar agrupación)":null;
  const papel={
+  estandar:"Papel estándar B/N (gramaje sin especificar)",
   obra70:"Papel obra 70 g",obra80:"Papel obra 80 g",recubierto:"Papel recubierto",
   fotografico:"Papel fotográfico"
  }[t.material]||t.material||null;
@@ -1078,7 +1082,8 @@ function agregarFichaDeImpresion(area,t){
  if(t.servicio==="ploteos")
   area.append(node("p","Ploteo: dimensiones, rollo y modo por página no constan en este resumen de la Central. No imprimir sin revisar el plano."));
  if(t.tipoAnillado==="grupo")
-  area.append(node("p","Grupo de anillado: falta conservar la composición del grupo en esta ficha."));
+  area.append(node("p","Grupo de anillado: "+(t.grupoAnillado||"NO CONSTA — verificar")+
+   ". Confirmar qué archivos integran el grupo antes del armado."));
  if(opciones.some(([,value])=>value===null))
   area.append(node("p","AVISO: la ficha histórica no conserva todas las instrucciones. Confirmar los campos marcados antes de imprimir."));
  const lines=["Pedido de impresión (sin pago confirmado)",t.nombreOriginal||"PDF",
