@@ -248,6 +248,20 @@ function render(){
   }else resumen.textContent=e.error?'Error de lectura':'Analizando PDF…';
   principal.append(resumen);
   if(e.paginas&&e.servicio==='auto'){
+   const elegidas=paginasElegidas(e)||e.paginas;
+   const destino=clasificarDestino(elegidas,e.seleccion);
+   if(destino.confirmado&&destino.destino==='ploteo'){
+    const cad=elegidas.filter(p=>p.modo==='cad').length;
+    const poster=elegidas.filter(p=>p.modo==='poster').length;
+    const tipo=cad===elegidas.length?'CAD · Plano técnico':
+     poster===elegidas.length?'PÓSTER / PLENO':
+     cad+poster===elegidas.length?'MIXTO · CAD y PÓSTER':'Tipo pendiente de análisis';
+    const marca=texto('strong','TIPO DETECTADO: '+tipo);
+    marca.className='clasificacion-ploteo-visible';
+    principal.append(marca);
+   }
+  }
+  if(e.paginas&&e.servicio==='auto'){
    const paginasFinal=paginasElegidas(e)||e.paginas;
    const regla=decidirTamanoCliente(paginasFinal);
    const recomendada=tamañoEstandar(paginasFinal);
