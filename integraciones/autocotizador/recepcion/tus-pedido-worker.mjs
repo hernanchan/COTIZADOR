@@ -187,8 +187,57 @@ export async function finalizarPedidoTUSPrivado(request,env,{
    checkoutEnabled:false,paymentAuthorized:false,listoParaProducir:false},422);
  }
 }
+/** Pregunta a D1 por un recibo mediante el Service Binding ya firmado.
+ * El operador no puede descargar un PDF no registrado en su pedido.
+ */
+export async function consultarReciboTUSFirmadoD1(env,orderId,receiptId,{
+ service=env?.SABER_CENTRAL,now=()=>Math.floor(Date.now()/1000),
+ uuid=()=>crypto.randomUUID(),subtle=crypto.subtle,
+}={}){
+ if(!ORDER.test(orderId||'')||!RECEIPT.test(receiptId||'')||
+    typeof service?.fetch!=='function'||
+    typeof env?.CENTRAL_BRIDGE_KEY!=='string'||env.CENTRAL_BRIDGE_KEY.length<32)
+  throw Error('No se puede verificar el recibo contra D1.');
+ let target;
+ try{target=new URL(env.CENTRAL_TEST_URL)}catch{throw Error('Central de ensayo ausente.')}
+ if(target.protocol!=='https:'||
+    !/^saber-pagos-pruebas\.[a-z0-9-]+\.workers\.dev$/.test(target.hostname)||
+    target.pathname!=='/internal/central/stage'||target.search||target.hash||
+    target.port||target.username||target.password)
+  throw Error('Destino de Central no autorizado.');
+ target.pathname='/internal/central/receipt-check';
+ const body=JSON.stringify({schema:'saber-central-tus-recibo-lookup-v1',webOrderId:orderId,receiptId});
+ const ts=now(),requestId=uuid();
+ if(!Number.isSafeInteger(ts)||!UUID.test(requestId))throw Error('Nonce de consulta D1 incorrecto.');
+ const key=await subtle.importKey('raw',new TextEncoder().encode(env.CENTRAL_BRIDGE_KEY),
+  {name:'HMAC',hash:'SHA-256'},false,['sign']);
+ const signature=Array.from(new Uint8Array(await subtle.sign('HMAC',key,
+  new TextEncoder().encode(ts+'\n'+requestId+'\n'+body))),v=>v.toString(16).padStart(2,'0')).join('');
+ const response=await service.fetch(new Request(target.href,{method:'POST',
+  headers:{'Content-Type':'application/json',
+   'x-saber-ts':String(ts),'x-saber-request-id':requestId,
+   'x-saber-signature':signature},body
+ }));
+ const raw=await response.text();
+ if(response.status!==200||raw.length>2400)
+  throw Error('D1 no confirmó la pertenencia del recibo.');
+ let data;
+ try{data=JSON.parse(raw)}catch{throw Error('Recibo D1 ilegible.')}
+ if(data?.ok!==true||data.found!==true||
+    data.schema!=='saber-central-tus-recibo-lookup-v1'||
+    data.webOrderId!==orderId||data.receiptId!==receiptId||
+    data.paymentAuthorized!==false||data.listoParaProducir!==false||
+    !SHA.test(data.sha256||'')||
+    !Number.isSafeInteger(data.bytes)||data.bytes<5||data.bytes>20*1024*1024||
+    !Number.isSafeInteger(data.pages)||data.pages<1||data.pages>2000)
+  throw Error('D1 devolvió un recibo fuera del pedido.');
+ return Object.freeze(data);
+}
+
 export async function descargarPdfTUSPersonal(request,env,{
- authorized=false,fetcher=fetch
+ authorized=false,fetcher=fetch,
+ revisarD1=consultarReciboTUSFirmadoD1,
+ subtle=crypto.subtle,
 }={}){
  try{
   ensureRequest(request,env,authorized);
@@ -196,15 +245,24 @@ export async function descargarPdfTUSPersonal(request,env,{
   if(!input||Object.keys(input).sort().join(',')!=='orderId,receiptId'||
      !ORDER.test(input.orderId||'')||!RECEIPT.test(input.receiptId||''))
    throw Error('Consulta de PDF inválida.');
+  // Primera barrera: confirmar pertenencia real D1 ANTES de descargar Storage.
+  const entry=await revisarD1(env,input.orderId,input.receiptId);
+  if(!entry||entry.receiptId!==input.receiptId||entry.webOrderId!==input.orderId||
+    entry.found!==true||!SHA.test(entry.sha256||'')||
+    !Number.isSafeInteger(entry.bytes)||entry.bytes<5||entry.bytes>20*1024*1024)
+   throw Error('El archivo no pertenece al pedido registrado.');
   const path='v2/'+input.orderId+'/'+input.receiptId.slice(4)+'.pdf';
   const bytes=await leerObjetoTUSPrivado(env,path,{fetcher});
-  // Verificar al menos estructura PDF al descargar; el SHA completo se
-  // validó antes de ingresar a D1. Acceso requiere auth de OPERADOR.
-  if(String.fromCharCode(...bytes.subarray(0,5))!=='%PDF-')
-   throw Error('Objeto privado no es PDF.');
+  if(bytes.length!==entry.bytes||String.fromCharCode(...bytes.subarray(0,5))!=='%PDF-')
+   throw Error('Objeto privado incompatible con D1.');
+  // Segunda barrera: el objeto descargado DEBE coincidir con el SHA de D1.
+  const digest=new Uint8Array(await subtle.digest('SHA-256',bytes));
+  const calculated=Array.from(digest,v=>v.toString(16).padStart(2,'0')).join('');
+  if(calculated!==entry.sha256)throw Error('Integridad del archivo D1 no confirmada.');
+  const filename=input.receiptId+'.pdf';
   return new Response(bytes,{status:200,headers:{
    'Content-Type':'application/pdf','Cache-Control':'no-store, private',
-   'Content-Disposition':'attachment; filename="documento-verificado.pdf"',
+   'Content-Disposition':'attachment; filename="'+filename+'"',
    'X-Content-Type-Options':'nosniff'
   }});
  }catch(_){return json({ok:false,error:'Descarga privada no autorizada.'},403);}
