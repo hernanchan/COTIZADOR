@@ -888,7 +888,7 @@ input{font:inherit;padding:10px;max-width:100%;border:1px solid #aab6c5;border-r
 button{font:inherit;padding:10px 14px;background:#174b8f;color:white;border:0;border-radius:7px;cursor:pointer}
 button:disabled{opacity:.5;cursor:default}.outline{color:#174b8f;background:white;border:1px solid #174b8f}
 .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}#details section{margin:14px 0;padding:13px;border:1px solid #d9e0ec;border-radius:10px;background:#f8fbff}#details section h4{margin:0 0 7px}#details section p{margin:6px 0}
-#status{min-height:1.5em;font-weight:600}.grid{display:grid;grid-template-columns:minmax(260px,1fr) minmax(280px,1.4fr);gap:16px}
+#status{min-height:1.5em;font-weight:600}.unpaid-result:not([hidden]){margin:12px 0;padding:12px;background:#eff6ff;border:1px solid #bfd4ea;border-radius:10px}.unpaid-result h4{margin:6px 0}.unpaid-result section{margin:10px 0;padding:12px;border:1px solid #d0e0ef;border-radius:8px;background:white}.unpaid-result p{margin:7px 0}.grid{display:grid;grid-template-columns:minmax(260px,1fr) minmax(280px,1.4fr);gap:16px}
 ol{padding-left:22px}li{padding:12px 6px;border-bottom:1px solid #e5ebf3}li button{margin-top:7px}
 pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px ui-monospace,monospace;background:#f0f3f9;padding:12px;border-radius:6px;max-height:450px;overflow:auto}
 @media(max-width:700px){.grid{grid-template-columns:1fr}}
@@ -950,34 +950,53 @@ if(x.produccion?.polaroidsExpress){
   details.append(button);
  }else details.append(node("p","PDF en Drive privado. Descarga administrativa pendiente de habilitación."));
 }status.textContent=""}catch(e){status.textContent=e.message}}
-async function showUnpaidDetails(id){
+async function showUnpaidDetails(id,target,trigger){
+ // Mostrar el resultado donde se hizo clic, no en una columna al final de las listas.
+ const panelList=document.querySelector("#unpaidDocs");
+ for(const other of panelList.querySelectorAll(".unpaid-result")){
+  if(other!==target){other.hidden=true;other.replaceChildren()}
+ }
+ target.hidden=false;
+ target.replaceChildren(node("p","Consultando los PDF de este pedido…"));
+ trigger.disabled=true;
+ trigger.textContent="Consultando…";
  try{
-  status.textContent="Consultando PDF privados del pedido…";
   const x=await api("/admin/api/central/unpaid-detail?id="+encodeURIComponent(id));
-  details.replaceChildren();
-  details.append(node("h3","Pedido "+id+" · SIN PAGO"));
-  details.append(node("p","Recepción "+x.documentos.webOrderId+" · "+money(x.documentos.totalDocumentos)+
+  if(!x?.documentos||!Array.isArray(x.documentos.trabajos))
+   throw Error("La Central no devolvió los datos de los archivos.");
+  target.replaceChildren();
+  target.append(node("h4","Pedido "+id+" · SIN PAGO"));
+  target.append(node("p","Recepción "+x.documentos.webOrderId+" · "+money(x.documentos.totalDocumentos)+
    " · "+x.documentos.archivos+" archivo(s)"));
-  details.append(node("p","Pedido recibido; cobro no confirmado. No autoriza impresión ni entrega."));
+  target.append(node("p","PDF originales recibidos. El pago no está confirmado; no imprimir ni entregar."));
   for(const t of x.documentos.trabajos){
    const area=node("section","");
    area.append(node("h4",t.orden+". "+t.nombreOriginal));
    area.append(node("p",t.paginasOriginales+" páginas · "+t.bytes+" bytes · "+t.servicio));
    if(x.documentos.esTUS){
     const action=node("button","Descargar PDF original");
+    action.type="button";
     action.addEventListener("click",()=>{
      const url=new URL("https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/personal-descargar");
      url.searchParams.set("webOrderId",x.documentos.webOrderId);
      url.searchParams.set("receiptId",t.reciboPrivado);
-     const link=document.createElement("a");link.href=url.href;link.target="_blank";link.rel="noopener noreferrer";
+     const link=document.createElement("a");
+     link.href=url.href;link.target="_blank";link.rel="noopener noreferrer";
      document.body.append(link);link.click();link.remove();
     });
     area.append(action);
    }else area.append(node("p","Este recibo no corresponde al ensayo Supabase/TUS."));
-   details.append(area);
+   target.append(area);
   }
-  status.textContent="Consulta privada completada. Pago NO confirmado.";
- }catch(e){status.textContent=String(e.message||e)}
+  if(x.documentos.trabajos.length===0)
+   target.append(node("p","No se encontraron archivos asociados al pedido."));
+  target.scrollIntoView({block:"nearest",behavior:"smooth"});
+ }catch(e){
+  target.replaceChildren(node("p","No se pudo abrir este pedido: "+String(e.message||e)));
+ }finally{
+  trigger.disabled=false;
+  trigger.textContent="Ver PDF privados";
+ }
 }
 async function refreshCronState(){
  const el=document.querySelector("#cronState");
@@ -1030,9 +1049,11 @@ document.querySelector("#refreshUnpaid").addEventListener("click",async()=>{
   for(const o of x.orders){
    const li=node("li",o.web_order_id+" · "+o.file_count+" PDF · Total pedido "+money(o.order_ars));
    li.append(node("p","Referencia de compra: "+o.commercial_order_id+" · Estado: pago sin confirmar"));
-   const btn=node("button","Ver PDF privados");btn.className="outline";
-   btn.addEventListener("click",()=>showUnpaidDetails(o.commercial_order_id));
+   const btn=node("button","Ver PDF privados");btn.className="outline";btn.type="button";
+   const panel=node("div","");panel.className="unpaid-result";panel.hidden=true;
+   btn.addEventListener("click",()=>showUnpaidDetails(o.commercial_order_id,panel,btn));
    li.append(btn);
+   li.append(panel);
    list.append(li);
   }
   status.textContent=x.orders.length+" pedido(s) en espera de pago";
