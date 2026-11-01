@@ -1,0 +1,62 @@
+name: Registrar estado REAL de activacion TUS privada
+on:
+  push:
+    branches:
+      - integracion/tus-pedido-privado-20261101
+    paths:
+      - docs/VERIFICAR-ESTADO-TUS-20261101.trigger
+
+permissions:
+  contents: write
+
+jobs:
+  consultar-estado:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Consultar Cloudflare y guardar resultado sin capturas ni secretos
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          CF_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$CF_TOKEN" && test -n "$GH_TOKEN"
+          temp=$(mktemp -d)
+          trap 'rm -rf "$temp"' EXIT
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-documentos-pruebas"
+          status="NO_CONFIRMADA"
+          active=""
+          deployment=""
+          for attempt in $(seq 1 12); do
+            if curl --fail --silent --show-error --max-time 20 -H "Authorization: Bearer $CF_TOKEN" "$root/deployments" > "$temp/deployments.json"; then
+              if jq -e '.success == true and (.result.deployments | type=="array") and (.result.deployments | length>0)' "$temp/deployments.json" >/dev/null; then
+                active=$(jq -r '.result.deployments[0].versions[]? | select(.percentage==100) | .version_id' "$temp/deployments.json" | head -n 1)
+                deployment=$(jq -r '.result.deployments[0].id // ""' "$temp/deployments.json")
+                label=$(jq -r '.result.deployments[0].annotations["workers/message"] // ""' "$temp/deployments.json")
+                if [ "$label" = "Ensayo privado TUS 100%, sin cobros ni cambios a web comercial" ] && [ -n "$active" ]; then
+                  status="ACTIVA_PRIVADA"
+                  break
+                fi
+              fi
+            fi
+            sleep 5
+          done
+          jq -n --arg state "$status" --arg version "$active" --arg deployment "$deployment" --arg source "Cloudflare deployments GET" --arg branch "$BRANCH" --arg worker "saber-documentos-pruebas" --arg checked "$(date -u +%FT%TZ)"             '{estado:$state,worker:$worker,version_activa:$version,deployment_id:$deployment,origen:$source,rama:$branch,consultado_utc:$checked,nota:"No demuestra TUS E2E; no se enviaron archivos ni se activaron cobros."}' > "$temp/report.json"
+          dest="docs/ESTADO-TUS-ACTIVACION-20261101.json"
+          api="https://api.github.com/repos/$REPO/contents/$dest"
+          encoded=$(base64 -w0 "$temp/report.json")
+          existing=$(curl --silent --show-error --max-time 20 --get -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" --data-urlencode "ref=$BRANCH" "$api" | jq -r '.sha // empty')
+          jq -n --arg message "docs(tus): registrar resultado de Cloudflare sin intervención del usuario" --arg content "$encoded" --arg branch "$BRANCH" --arg sha "$existing"             'if $sha=="" then {message:$message,content:$content,branch:$branch} else {message:$message,content:$content,branch:$branch,sha:$sha} end' > "$temp/write.json"
+          curl --fail --silent --show-error --max-time 30 -X PUT -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "Content-Type: application/json" --data-binary "@$temp/write.json" "$api" > "$temp/commit.json"
+          jq -e '.commit.sha | type=="string"' "$temp/commit.json" >/dev/null
+          echo "ESTADO_TUS=$status"
+          echo "VERSION_TUS_ACTIVA=$active"
+          echo "REGISTRO_EN_GITHUB=$dest"
