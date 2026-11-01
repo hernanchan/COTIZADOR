@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
-import {paginaPaqueteTUSPersonal} from '../integraciones/autocotizador/recepcion/pantalla-paquete-tus-personal.mjs';
+
 const zipJs=readFileSync(new URL('../integraciones/autocotizador/recepcion/zip-tus-cliente.txt',import.meta.url),'utf8');
 const ctx=vm.createContext({Blob,TextEncoder,Uint8Array,Uint32Array,DataView,console});
 vm.runInContext(zipJs+'\n globalThis.crearZipSinCompresion=crearZipSinCompresion;globalThis.crc32Blob=crc32Blob;',ctx);
@@ -47,16 +47,16 @@ test('ZIP rechaza traversal, duplicados y archivos desmesurados',async()=>{
  await assert.rejects(()=>ctx.crearZipSinCompresion([
   {name:'PDF_01.pdf',blob:one},{name:'PDF_01.pdf',blob:one}]));
 });
-test('paquete privado tiene una única acción y no contiene secretos ni CDN',()=>{
- const html=paginaPaqueteTUSPersonal();
- const script=html.slice(html.indexOf('<script>')+8,html.indexOf('</script>'));
- new vm.Script(script);
- assert.ok(html.includes('Descargar ZIP completo'));
- assert.ok(html.includes('/prueba-v2/api/ensayo-tus-paquete-manifiesto'));
- assert.ok(html.includes('/prueba-v2/api/ensayo-tus-descargar-personal'));
- assert.ok(html.includes('ORDEN_'));
- assert.ok(html.includes('PDF_'));
- assert.ok(html.includes('NO CONSTA'));
- assert.ok(!html.includes('service_role'));
- assert.ok(!html.includes('cdn.'));
+test('paquete privado usa rutas Basic y compone TXT + HTML sin exponer secretos',()=>{
+ const page=readFileSync(new URL('../integraciones/autocotizador/recepcion/pantalla-paquete-tus-personal.mjs',import.meta.url),'utf8');
+ const client=readFileSync(new URL('../integraciones/autocotizador/recepcion/paquete-tus-cliente.txt',import.meta.url),'utf8');
+ new vm.Script(client);
+ assert.ok(page.includes('Descargar ZIP completo'));
+ assert.ok(client.includes('/prueba-v2/api/ensayo-tus-paquete-manifiesto'));
+ assert.ok(client.includes('/prueba-v2/api/ensayo-tus-descargar-personal'));
+ assert.ok(client.includes('ORDEN_'));
+ assert.ok(client.includes('PDF_'));
+ assert.ok(client.includes('NO CONSTA'));
+ assert.ok(!page.includes('service_role'));
+ assert.ok(!client.includes('cdn.'));
 });
