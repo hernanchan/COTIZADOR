@@ -143,6 +143,10 @@ function centralSafeManifest(data){
    copias:copies??null,formatoFinal:texto(w.formatoFinal),
    carasPresupuestadas:w.servicio==="documentos"?(w.carasPresupuestadas??null):null,
    paginasPorCaraPresupuestadas:w.servicio==="documentos"?(w.paginasPorCaraPresupuestadas??null):null,
+   // Conservar sólo el anillado de la ficha VERIFICADA por el servidor.
+   // Para recibos históricos sin este dato, null (jamás inferir "ninguno").
+   tipoAnillado:w.servicio==="documentos"&&
+     ["ninguno","individual","grupo"].includes(w.tipoAnillado)?w.tipoAnillado:null,
    material:texto(w.material),modo:texto(w.modo),productoId:texto(w.productoId),
    variante:texto(w.variante),metros:Number.isFinite(w.metros)&&w.metros>0?w.metros:null,
    descripcion:texto(w.descripcion,180),archivoFinalVerificado:false
@@ -888,7 +892,7 @@ input{font:inherit;padding:10px;max-width:100%;border:1px solid #aab6c5;border-r
 button{font:inherit;padding:10px 14px;background:#174b8f;color:white;border:0;border-radius:7px;cursor:pointer}
 button:disabled{opacity:.5;cursor:default}.outline{color:#174b8f;background:white;border:1px solid #174b8f}
 .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}#details section{margin:14px 0;padding:13px;border:1px solid #d9e0ec;border-radius:10px;background:#f8fbff}#details section h4{margin:0 0 7px}#details section p{margin:6px 0}
-#status{min-height:1.5em;font-weight:600}.unpaid-result:not([hidden]){margin:12px 0;padding:12px;background:#eff6ff;border:1px solid #bfd4ea;border-radius:10px}.unpaid-result h4{margin:6px 0}.unpaid-result section{margin:10px 0;padding:12px;border:1px solid #d0e0ef;border-radius:8px;background:white}.unpaid-result p{margin:7px 0}.grid{display:grid;grid-template-columns:minmax(260px,1fr) minmax(280px,1.4fr);gap:16px}
+#status{min-height:1.5em;font-weight:600}.unpaid-result:not([hidden]){margin:12px 0;padding:12px;background:#eff6ff;border:1px solid #bfd4ea;border-radius:10px}.unpaid-result h4{margin:6px 0}.unpaid-result section{margin:10px 0;padding:12px;border:1px solid #d0e0ef;border-radius:8px;background:white}.unpaid-result p{margin:7px 0}.print-specs{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:2px 12px;margin:10px 0;padding:10px;background:#f7faff;border-radius:7px}.print-specs p{margin:5px 0}.print-missing{color:#a14404;font-weight:600}.grid{display:grid;grid-template-columns:minmax(260px,1fr) minmax(280px,1.4fr);gap:16px}
 ol{padding-left:22px}li{padding:12px 6px;border-bottom:1px solid #e5ebf3}li button{margin-top:7px}
 pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px ui-monospace,monospace;background:#f0f3f9;padding:12px;border-radius:6px;max-height:450px;overflow:auto}
 @media(max-width:700px){.grid{grid-template-columns:1fr}}
@@ -950,6 +954,71 @@ if(x.produccion?.polaroidsExpress){
   details.append(button);
  }else details.append(node("p","PDF en Drive privado. Descarga administrativa pendiente de habilitación."));
 }status.textContent=""}catch(e){status.textContent=e.message}}
+function agregarFichaDeImpresion(area,t){
+ // La ficha proviene del manifiesto privado de D1, NUNCA de parámetros URL
+ // ni del PDF original. Los datos ausentes se señalan: no inventar instrucciones.
+ const modo=(t.modo==="bn"||t.modo==="b/n")?"Blanco y negro":
+  t.modo==="color"?"Color":null;
+ const formato=(t.formatoFinal==="a4"||t.formatoFinal==="a3")?
+  t.formatoFinal.toUpperCase():null;
+ const caras=t.carasPresupuestadas==="simple"?"Simple faz":
+  t.carasPresupuestadas==="double"?"Doble faz":null;
+ const anillado=t.tipoAnillado==="ninguno"?"Sin anillado":
+  t.tipoAnillado==="individual"?"Anillado individual":
+  t.tipoAnillado==="grupo"?"Anillado junto a otros archivos (verificar agrupación)":null;
+ const papel={
+  obra70:"Papel obra 70 g",obra80:"Papel obra 80 g",recubierto:"Papel recubierto",
+  fotografico:"Papel fotográfico"
+ }[t.material]||t.material||null;
+ const paginas=Array.isArray(t.paginasElegidas)?t.paginasElegidas:[];
+ const todas=paginas.length===t.paginasOriginales&&
+  paginas.every((v,i)=>v===i+1);
+ const seleccion=todas?"Todas ("+t.paginasOriginales+")":
+  paginas.length?paginas.join(", "):null;
+ const descripcion=t.descripcion||null;
+ const opciones=[
+  ["Servicio",t.servicio==="documentos"?"Impresión de documentos":
+    t.servicio==="ploteos"?"Ploteo":t.servicio||null],
+  ["Páginas del archivo",Number.isSafeInteger(t.paginasOriginales)?String(t.paginasOriginales):null],
+  ["Páginas a imprimir",seleccion],
+  ["Tamaño final",formato],
+  ["Impresión",modo],
+  ["Caras",caras],
+  ["Páginas por cara",[1,2,4,9].includes(t.paginasPorCaraPresupuestadas)?
+    String(t.paginasPorCaraPresupuestadas):null],
+  ["Copias",Number.isSafeInteger(t.copias)&&t.copias>0?String(t.copias):null],
+  ["Papel",papel],
+  ["Anillado",anillado]
+ ];
+ const title=node("h4","Instrucciones para imprimir · ficha registrada");
+ area.append(title);
+ const grid=node("div","");grid.className="print-specs";
+ for(const [label,value] of opciones){
+  const line=node("p",label+": "+(value??"NO CONSTA — verificar"));
+  if(value===null)line.className="print-missing";
+  grid.append(line);
+ }
+ area.append(grid);
+ if(descripcion)area.append(node("p","Descripción técnica: "+descripcion));
+ if(t.servicio==="ploteos")
+  area.append(node("p","Ploteo: dimensiones, rollo y modo por página no constan en este resumen de la Central. No imprimir sin revisar el plano."));
+ if(t.tipoAnillado==="grupo")
+  area.append(node("p","Grupo de anillado: falta conservar la composición del grupo en esta ficha."));
+ if(opciones.some(([,value])=>value===null))
+  area.append(node("p","AVISO: la ficha histórica no conserva todas las instrucciones. Confirmar los campos marcados antes de imprimir."));
+ const lines=["Pedido de impresión (sin pago confirmado)",t.nombreOriginal||"PDF",
+  ...opciones.map(([k,v])=>k+": "+(v??"NO CONSTA — verificar")),
+  ...(descripcion?["Descripción técnica: "+descripcion]:[]),
+  "NO IMPRIMIR SIN PAGO CONFIRMADO Y VALIDACIÓN DE PRODUCCIÓN"];
+ const copy=node("button","Copiar instrucciones");copy.type="button";
+ copy.className="outline";
+ copy.addEventListener("click",async()=>{
+  try{await navigator.clipboard.writeText(lines.join("\n"));
+   copy.textContent="Instrucciones copiadas";
+  }catch{copy.textContent="No se pudo copiar; seleccioná el texto de la ficha."}
+ });
+ area.append(copy);
+}
 async function showUnpaidDetails(id,target,trigger){
  // Mostrar el resultado donde se hizo clic, no en una columna al final de las listas.
  const panelList=document.querySelector("#unpaidDocs");
@@ -973,6 +1042,7 @@ async function showUnpaidDetails(id,target,trigger){
    const area=node("section","");
    area.append(node("h4",t.orden+". "+t.nombreOriginal));
    area.append(node("p",t.paginasOriginales+" páginas · "+t.bytes+" bytes · "+t.servicio));
+   agregarFichaDeImpresion(area,t);
    if(x.documentos.esTUS){
     const action=node("button","Descargar PDF original");
     action.type="button";
