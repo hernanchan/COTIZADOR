@@ -31,3 +31,5 @@ Inspeccionar ejecución 1c654e0f: A4-only 20x20, non A4 requiere pregunta, 0 fal
 Inspeccionar ensayo A5 original + tarifa A4 commit 7e4e9b6b, CI TUS PDF real, protección 401 y rollout a solo Worker privado.
 
 Confirmar CI cda372ac prueba A5 contra total realmente verificado, 44+72+4, y protección HTTP 401.
+
+Consultar pruebas del ensayo privado 14x20, versión del sitio de pruebas y acceso protegido.
