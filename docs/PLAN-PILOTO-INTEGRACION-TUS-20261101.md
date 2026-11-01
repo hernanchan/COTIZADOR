@@ -245,3 +245,7 @@ En la rama experimental, comparar interfaces reales del Worker privado y `lab-tu
 ## Ensayo 14x20, 01/11/2026
 
 Se corrigió el presupuesto de originales de 14x20 cm con tarifa A4. CI privado aprobado para Centro y Documentos. Falta aceptación visual.
+
+## 01/11/2026 — Aceptación visual confirmada por usuario: PDF 14×20 cm
+
+Tras la implementación de `personalizado_a4`, el usuario volvió a cargar `CARATULAS DIARIA.pdf` (14 páginas de 14×20 cm), eligió «Mantener tamaño original» y confirmó «sí sí» a la consulta de si el precio se calculaba correctamente. **Estado: cotización visual ACEPTADA con PDF real**; tarifa de referencia A4 sin ampliar. Los tests del circuito simulado y CI ya constan arriba. **No confundir esta aceptación de cotización con envío de este PDF, generación de PDF final de producción ni impresión: siguen pendientes.** Prioridad siguiente: diseño y verificación del PDF imprimible privado por orden desde las opciones D1 verificadas, sin tocar originales, pagos o web pública.
