@@ -3,3 +3,5 @@
 # Sin modificaciones del Worker, sin datos secretos, sin cobros.
 
 2026-11-01: consultar nuevo despliegue de preflight seguro (posterior a la version 6e6ff6aa), guardar ID real y estado en JSON. No redeploy, no envios PDF.
+
+2026-11-01: validar version activada POSTERIOR a baed6a9f por corrección alcance Basic y cookie en /prueba-v2/api/; solo lectura Cloudflare, guardado GitHub. Si aún no está activa, NO declarar éxito.
