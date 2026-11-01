@@ -61,3 +61,14 @@ En la rama experimental, comparar interfaces reales del Worker privado y `lab-tu
 - El código de la rama ahora impide fallback al circuito Drive y muestra condiciones TUS incumplidas solo tras acceso Basic. El workflow de activación comprueba que /prueba-v2/ devuelve HTTP 401 sin acceso autenticado.
 - **Esto prueba despliegue activo protegido, NO prueba E2E TUS**: falta abrir /prueba-v2/ autenticado, comprobar que NO muestre bloqueo de TUS ni Turnstile y entonces realizar una única prueba controlada con dos PDF no confidenciales; observar transferencia Storage, registros D1, cotización y descarga desde Central.
 - No repetir pruebas por Drive ni promover versiones anteriores. No activar cobros ni modificar sitio comercial.
+
+
+## 01/11/2026 10:53 ART — fallo rápido de autorización TUS y protección previa
+
+- Primera prueba funcional de 2 PDF A4 (16 páginas cada uno, total preliminar ARS 2.432) mostró mensaje «Pedido pendiente: No se pudo autorizar la tanda de PDF», sin etapa específica. Evidencia de que TUS fue seleccionado, pero el pedido NO se registró. No repetir carga sin diagnóstico.
+- Se revisó `tus-pedido-worker.mjs`: el endpoint `/api/ensayo-tus-iniciar` devolvía el mismo error 403 para autenticación, metadatos o rechazo Storage; por eso la captura sola NO identifica causa definitiva.
+- Se implementó preflight autenticado `POST /api/ensayo-tus-comprobar` que solicita únicamente un token de firma a Storage con una ruta aleatoria, sin transmitir ni guardar PDF, sin exponer token ni secretos; respuesta restringida a códigos seguros `STORAGE_FIRMA_OK`, `STORAGE_HTTP_NNN`, `AUTORIZACION_PORTAL` o `STORAGE_FIRMA_ERROR`. El botón del cliente queda bloqueado hasta la respuesta positiva. En `/api/ensayo-tus-iniciar`, ahora se expone solo etapa segura (sin detalles ni valores sensibles).
+- Cambios de rama: `b8d67e71`, `6f13ef9c`, `749aa845`, `04a45a1a`, `c134a908`, `bf04446e`, `2b53da19`; auto-promoción privada disparada en commit `e26ac04c`.
+- **Activación nueva confirmada** por registro GitHub automático `docs/ESTADO-TUS-ACTIVACION-20261101.json`: versión `baed6a9f-9f1e-4f18-afa3-420bfc3d2669`, deployment `2fd51b70-4dc6-46a2-a474-2b1345d86387`, consulta Cloudflare 2026-11-01 13:53:02 UTC.
+- **PRÓXIMO PASO EXACTO:** abrir de nuevo el portal privado `/prueba-v2/` SIN subir archivos; observar mensaje de preflight en la barra superior. Si muestra `STORAGE_FIRMA_OK` indirectamente («Supabase/TUS verificado»), seguir a una sola prueba controlada de 2 PDF; si muestra `AUTORIZACION_PORTAL` o `STORAGE_HTTP_NNN`, corregir la causa específica, no solicitar otra carga. Después confirmar Storage, D1, precio y descarga desde Central.
+- No activar pagos, no modificar web comercial, no reintroducir Google Drive.
