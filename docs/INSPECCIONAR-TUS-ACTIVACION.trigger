@@ -53,3 +53,5 @@ Consultar CI activación ZIP Adobe tras commit 7d11936b: etiquetas PDF_01/origin
 2026-11-01 20:08 ART — Comprobar CI después de trigger b864f8cd: A0 97x61 se dirige automáticamente a ploteo original, quote CAD rollo90 $5900; A3/A5 siguen preguntando. Versión activa, HTTP401, sin pagos. No registrar aceptación visual del usuario.
 
 2026-11-01 ~20:16 ART — Inspeccionar rerun privado tras fix ruta fixture 06c8897c y trigger afce1f48; confirmar compilación, test quote 97x61 CAD rollo90, despliegue y HTTP401.
+
+2026-11-01 ~20:18 ART: run 676e968d, verify structural CAD vs raster Póster tests in actual mock classifier and visible type label, version activated and private HTTP401 before asking browser test.
