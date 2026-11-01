@@ -16,3 +16,5 @@ trigger=2026-11-01-tus-private-only
 2026-11-01 12:26 ART — pruebas y activación de firma privada con host directo https://<project>.storage.supabase.co para endpoints de firma y lectura, sin pasar por redireccionamientos del host API. Commits d66122a4 y 6bf2e97d; no se transfieren PDF, pagos ni sitio comercial. Revertir ante prueba HTTP 401 fallida.
 
 2026-11-01 — CAUSA IDENTIFICADA en documentación oficial Cloudflare Workers Request API: redirect:'error' NO es soportado y lanza TypeError ANTES de fetch HTTP, provocando STORAGE_FETCH_FAILURE. Corregidas firma y lectura privada a redirect:'manual', rechazo explícito de 3xx. Código 29339936, tests 49a304a3. Activar SOLO Worker de pruebas, con CI y comprobación HTTP401 anónimo; sin pagos ni sitio público.
+
+01-11-2026, prueba de descarga SOLO PERSONAL: añadir /prueba-v2/personal-descargar con Basic y POST /prueba-v2/api/ensayo-tus-descargar-personal con validación D1 pertenencia y SHA. Central pendiente separada. Ejecutar test central-bridge-d1 y regresión, publicar únicamente Worker documental privado con control HTTP401 y rollback. Commits ee64fca7 9603b392 c3b25caf 81d307e8 03929099 f5a10490.
