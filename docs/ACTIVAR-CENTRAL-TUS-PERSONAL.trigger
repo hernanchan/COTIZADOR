@@ -20,3 +20,5 @@ Activar Central versión de pedido corto visible también en respuesta de prepar
 2026-11-01 ~17:31 ART — A5 original: mostrar tamaño real A5 + tarifa A4 en ficha de impresión Centro, formatoFinal a5 inmutable, instructivo ZIP 'A5 sin ampliar', sin permitir imposición no verificada. Suite central requiere nuevo test A5; solo saber-pagos-pruebas, no web comercial ni pagos.
 
 2026-11-01 — Orden para originales pequeños como 14 × 20 cm: conservar medidas por página verificadas en D1, distinguir tamaño físico personalizado de tarifa A4, incluir medidas en vista de personal y manifiesto ZIP firmado. Rechazar medidas ausentes/manipuladas; tests Central obligatorios, solo entorno privado, pagos desactivados.
+
+2026-11-01 — Revalidar original menor que A4, 14 × 20 cm, tras actualizar test heredado de presentación A5; debe preservar medidas por página en D1 y ZIP, sin pagos ni producción, solo Central privada. Commit test de2ef457.
