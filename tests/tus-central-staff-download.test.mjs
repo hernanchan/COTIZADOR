@@ -17,13 +17,24 @@ const manifest={
   reciboPrivado:receipt,paginasOriginales:16,bytes:i?10131027:17849230,servicio:'documentos'
  }))
 };
+let allocatedNumber=null;
 const db={
  prepare(sql){
   let args=[];
   const st={
    bind(...p){args=p;return st},
-   async run(){return {meta:{changes:0}}},
+   async run(){
+    if(sql.includes("INSERT OR IGNORE INTO central_work_order_numbers")&&
+       args[0]===commercial&&allocatedNumber===null){
+     allocatedNumber=1;return {meta:{changes:1}};
+    }
+    return {meta:{changes:0}};
+   },
    async first(){
+    if(sql.includes('SELECT m.commercial_order_id FROM central_document_manifests m JOIN orders o'))
+     return args[0]===commercial?{commercial_order_id:commercial}:null;
+    if(sql.includes('SELECT number FROM central_work_order_numbers'))
+     return args[0]===commercial&&allocatedNumber!==null?{number:allocatedNumber}:null;
     if(sql.includes('FROM orders WHERE id=? AND status='))
       return args[0]===commercial?{id:commercial,status:'awaiting_payment',amount_ars:2432}:null;
     if(sql.includes('FROM central_document_manifests WHERE commercial_order_id=?'))
@@ -145,4 +156,32 @@ test('la normalización firmada conserva anillado y no lo inventa para pedidos h
  delete historical.ficha.trabajos[0].tipoAnillado;
  assert.equal(normalize(historical).trabajos[0].tipoAnillado,null);
  assert.equal(normalize(historical).pagoConfirmado,false);
+});
+
+
+test('secuencial corto 001 se asigna una sola vez a pedido histórico, solo administrador',async()=>{
+ const url='https://saber-pagos-pruebas.libreriasaber.workers.dev/admin/api/central/asignar-numero';
+ const payload=JSON.stringify({orderId:commercial});
+ const req=(key)=>new Request(url,{method:'POST',headers:{
+  'Content-Type':'application/json',Authorization:'Bearer '+key
+ },body:payload});
+ assert.equal((await ctx.worker.fetch(req('WRONG'),env)).status,401);
+ const first=await ctx.worker.fetch(req(env.DEMO_ADMIN_KEY),env);
+ assert.equal(first.status,200);
+ const x=await first.json();
+ assert.equal(x.numeroOrden,'001');
+ assert.equal(x.paymentAuthorized,false);
+ assert.equal(x.listoParaProducir,false);
+ const again=await ctx.worker.fetch(req(env.DEMO_ADMIN_KEY),env);
+ assert.equal((await again.json()).numeroOrden,'001');
+ assert.equal(allocatedNumber,1);
+ const detail=await call(env.DEMO_ADMIN_KEY);
+ const saved=await detail.json();
+ assert.equal(saved.documentos.numeroOrden,'001');
+});
+test('asignación nueva se guarda atómicamente en el lote de pedido junto al D1',()=>{
+ assert.match(source,/INSERT INTO central_work_order_numbers\(commercial_order_id\) VALUES\(\?\)/);
+ assert.match(source,/INTEGER PRIMARY KEY AUTOINCREMENT/);
+ assert.match(source,/INSERT OR IGNORE INTO central_work_order_numbers/);
+ assert.ok(!source.includes('ROW_NUMBER() OVER'));
 });
