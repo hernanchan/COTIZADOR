@@ -60,12 +60,16 @@ h2{font-size:19px;margin:20px 0 7px}
 #resumenPedido{margin:12px 0}#resumenPedido li{padding:5px 0;overflow-wrap:anywhere}#resumenPedido .advertencia{background:#fff1da;border-left:4px solid #d99428;padding:12px}
 @media(max-width:720px){.fila{grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;padding:12px}.fila-principal{grid-column:1/-1}.precio-archivo{text-align:left}.editar{justify-self:end}.panel-edicion .controles{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:440px){.panel-edicion .controles{grid-template-columns:1fr}}
+.composicion-visible{margin:0 15px 12px;max-width:100%;border-color:#9dbed6;background:#f5faff}
+.composicion-visible legend{font-size:15px}
+.composicion-visible .composicion-opciones{display:flex;align-items:stretch;gap:9px}
+@media(max-width:540px){.composicion-visible{margin:0 10px 10px}.composicion-visible .composicion-opcion{flex:1 1 105px}}
 .composicion-por-cara{grid-column:1/-1;min-width:0;border:1px solid #c5d8e7;border-radius:9px;padding:10px 12px;background:#fff}
 .composicion-por-cara legend{font-size:14px;font-weight:700;color:#19476b;padding:0 5px}
 .composicion-opciones{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.panel-edicion .composicion-opcion{flex:1 1 135px;display:flex;flex-direction:row;gap:9px;align-items:center;justify-content:center;min-height:44px;border:1px solid #b3cbde;border-radius:8px;background:#f6faff;padding:8px 12px;cursor:pointer;font-weight:650;font-size:14px}
+.archivo .composicion-opcion{flex:1 1 135px;display:flex;flex-direction:row;gap:9px;align-items:center;justify-content:center;min-height:44px;border:1px solid #b3cbde;border-radius:8px;background:#f6faff;padding:8px 12px;cursor:pointer;font-weight:650;font-size:14px}
 .composicion-opcion:has(input:checked){background:#deeffc;border-color:#0d527d;color:#0b496f}
-.panel-edicion .composicion-opcion input{appearance:auto;accent-color:#0d527d;width:18px;height:18px;min-height:18px;flex:0 0 18px;margin:0;padding:0;outline-offset:3px}
+.archivo .composicion-opcion input{appearance:auto;accent-color:#0d527d;width:18px;height:18px;min-height:18px;flex:0 0 18px;margin:0;padding:0;outline-offset:3px}
 .composicion-avanzada{margin:9px 0 0}
 .composicion-avanzada summary{font-size:13px;font-weight:600;color:#0d527d;cursor:pointer;display:list-item;list-style:disclosure-closed;margin:6px 0}
 .composicion-avanzada[open] summary{list-style:disclosure-open}
