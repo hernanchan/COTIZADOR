@@ -45,7 +45,7 @@ export function prepararFichaCentral({pedidoVerificado}){
        Math.ceil(fila.paginasElegidas.length/(detalles.paginasPorHoja??1))))
    throw Error('Composición documental distinta del presupuesto verificado.');
   if(fila.destino==='documentos'&&(
-     !['a4','a3'].includes(fila.formatoFinal)||
+     !['a5','a4','a3'].includes(fila.formatoFinal)||
      !['bn','color'].includes(detalles.modo)||
      !['simple','double'].includes(detalles.caras)||
      !['ninguno','individual','grupo'].includes(detalles.anillado)||
