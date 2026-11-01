@@ -95,13 +95,14 @@ export async function firmarSubidaSupabase(env,objectName,{fetcher=fetch}={}){
  try{
   r=await fetcher(url,{method:'POST',headers:{
     ...privateHeaders(env),'Content-Type':'application/json',
-  },body:'{}',redirect:'error'});
+  },body:'{}',redirect:'manual'});
  }catch{
   // No transmitir excepciones que puedan contener cabeceras o URLs.
   throw storageError('STORAGE_FETCH_FAILURE');
  }
  let raw;
  try{raw=await r.text()}catch{throw storageError('STORAGE_BODY_FAILURE')}
+ if(r.status>=300&&r.status<400)throw storageError('STORAGE_REDIRECT_BLOCKED');
  if(!r.ok)throw storageError('STORAGE_HTTP_'+r.status);
  if(raw.length>2000)throw storageError('STORAGE_RESPONSE_SIZE');
  let answer;
@@ -112,7 +113,8 @@ export async function firmarSubidaSupabase(env,objectName,{fetcher=fetch}={}){
 }
 export async function leerObjetoTUSPrivado(env,objectName,{fetcher=fetch}={}){
  const url=STORAGE+'/storage/v1/object/'+BUCKET+'/'+pathUrl(objectName);
- const r=await fetcher(url,{headers:privateHeaders(env),redirect:'error'});
+ const r=await fetcher(url,{headers:privateHeaders(env),redirect:'manual'});
+ if(r.status>=300&&r.status<400)throw Error('Redirección de Storage privada bloqueada.');
  if(!r.ok||Number(r.headers.get('Content-Length')||0)>20*1024*1024)
   throw Error('No se pudo leer el PDF privado.');
  const bytes=new Uint8Array(await r.arrayBuffer());
@@ -178,7 +180,7 @@ export async function comprobarTUSAntesDeEnviar(request,env,{
   return json({ok:true,etapa:'STORAGE_FIRMA_OK',paymentAuthorized:false,
    archivosSubidos:0});
  }catch(error){
-  const code=typeof error?.code==='string'&&/^STORAGE_(HTTP_[0-9]{3}|RESPONSE_SIZE|FETCH_FAILURE|BODY_FAILURE|RESPONSE_JSON|TOKEN_MISSING)$/.test(error.code)
+  const code=typeof error?.code==='string'&&/^STORAGE_(HTTP_[0-9]{3}|RESPONSE_SIZE|FETCH_FAILURE|BODY_FAILURE|RESPONSE_JSON|TOKEN_MISSING|REDIRECT_BLOCKED)$/.test(error.code)
    ?error.code:'STORAGE_FIRMA_ERROR';
   console.warn('saber_tus_private_preflight',code);
   return json({ok:false,etapa:code,paymentAuthorized:false,archivosSubidos:0},503);
@@ -204,7 +206,7 @@ export async function iniciarTandaTUSPrivada(request,env,{
    publishableKey:env.DOCS_TUS_PUBLISHABLE_KEY,
    paymentAuthorized:false,checkoutEnabled:false});
  }catch(e){
-  const code=typeof e?.code==='string'&&/^STORAGE_(HTTP_[0-9]{3}|RESPONSE_SIZE|FETCH_FAILURE|BODY_FAILURE|RESPONSE_JSON|TOKEN_MISSING)$/.test(e.code)
+  const code=typeof e?.code==='string'&&/^STORAGE_(HTTP_[0-9]{3}|RESPONSE_SIZE|FETCH_FAILURE|BODY_FAILURE|RESPONSE_JSON|TOKEN_MISSING|REDIRECT_BLOCKED)$/.test(e.code)
    ?e.code:etapa;
   console.warn('saber_tus_private_start',code);
   return json({ok:false,error:'No se pudo autorizar la tanda de PDF.',etapa:code,
