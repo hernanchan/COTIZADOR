@@ -52,17 +52,17 @@ export function esCadPorEstructuraPDF({miniatura,fnArray,OPS,texto=''}={}){
   if(op===OPS.constructPath)trazados++;
  }
  const continuo=miniatura.plenoContinuo;
- if(!Number.isFinite(continuo)||continuo>0.3)return false;
+ if(!Number.isFinite(continuo)||continuo>0.85)return false;
  // Láminas técnicas con rótulo: 1.000 trazados aislados son evidencia CAD.
- if(evidenciaPlanoTecnico(texto)&&trazados>=1000)return true;
+ if(evidenciaPlanoTecnico(texto)&&trazados>=1000&&continuo<=0.55)return true;
  // Sin rótulos recuperables, exigir MUCHÍSIMOS trazados y bajo pleno.
- return trazados>=12000&&continuo<=0.28;
+ return trazados>=12000&&continuo<=0.70;
 }
 /** No analizar todos los pósters: sólo los que parecen tramas de líneas. */
 export function ameritaVerificarEstructura({miniatura,texto='',textos=0}={}){
  return !!miniatura&&miniatura.modo==='poster'&&
   Number.isFinite(miniatura.cobertura)&&miniatura.cobertura>=0.30&&
-  Number.isFinite(miniatura.plenoContinuo)&&miniatura.plenoContinuo<=0.35&&
+  Number.isFinite(miniatura.plenoContinuo)&&miniatura.plenoContinuo<=0.85&&
   (evidenciaPlanoTecnico(texto)||textos>=30||
-   (miniatura.coberturaColor>=0.25&&miniatura.cobertura<=0.7));
+   (miniatura.coberturaColor>=0.20&&miniatura.cobertura<=0.80));
 }
