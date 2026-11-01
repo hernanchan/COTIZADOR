@@ -50,7 +50,7 @@ export function normalizarTrabajoTUS(d,plan){
  if(!Number.isSafeInteger(opcionTUS.copias)||opcionTUS.copias<1||
     opcionTUS.copias>200||
     !['simple','double'].includes(opcionTUS.caras)||
-    !['a4','a3','original'].includes(opcionTUS.seleccion)||
+    !['a5','a4','a3','original'].includes(opcionTUS.seleccion)||
     !['ninguno','individual'].includes(opcionTUS.anillado))
   throw Error('Opciones TUS incompatibles.');
  return {
