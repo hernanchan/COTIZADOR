@@ -60,3 +60,59 @@ test('paquete privado usa rutas Basic y compone TXT + HTML sin exponer secretos'
  assert.ok(!page.includes('service_role'));
  assert.ok(!client.includes('cdn.'));
 });
+
+
+test('orden numerada: relaciona PDF_01/PDF_02 con nombres originales y parámetros concretos de Adobe',()=>{
+ const client=readFileSync(new URL('../integraciones/autocotizador/recepcion/paquete-tus-cliente.txt',import.meta.url),'utf8');
+ const start=client.indexOf('function clean(v)'),end=client.indexOf('async function fetchFicha()',start);
+ assert.ok(start>=0&&end>start);
+ const functions=vm.runInNewContext(client.slice(start,end)+
+  '\n({formatoOrden,textoOrden,htmlOrden,nombreZip})');
+ const ordered={numeroOrden:'007',webOrderId:'WEB-ENSAYO-12345678901234567890123456789012',
+  importe:2432,estadoPago:'SIN_PAGO_CONFIRMADO',trabajos:[
+   {servicio:'documentos',nombreOriginal:'CARATULAS DIARIA.pdf',paginasOriginales:14,
+    paginasElegidas:Array.from({length:14},(_,i)=>i+1),formatoFinal:'personalizado_a4',
+    medidasOriginalesCm:Array.from({length:14},(_,i)=>({pagina:i+1,anchoCm:14,altoCm:20})),
+    tarifaAplicada:'a4',modo:'bn',carasPresupuestadas:'double',
+    paginasPorCaraPresupuestadas:2,copias:2,material:'estandar',tipoAnillado:'individual'},
+   {servicio:'documentos',nombreOriginal:'Cartel A4.pdf',paginasOriginales:5,
+    paginasElegidas:[1,3,5],formatoFinal:'a4',modo:'color',
+    carasPresupuestadas:'simple',paginasPorCaraPresupuestadas:1,
+    copias:1,material:'obra70',tipoAnillado:'ninguno'}
+  ]};
+ const txt=functions.textoOrden(ordered),html=functions.htmlOrden(ordered);
+ assert.equal(functions.nombreZip(0),'PDF_01.pdf');
+ assert.equal(functions.nombreZip(1),'PDF_02.pdf');
+ for(const [zip,original] of [['PDF_01.pdf','CARATULAS DIARIA.pdf'],['PDF_02.pdf','Cartel A4.pdf']]){
+  assert.ok(txt.includes(zip+' — '+original));
+  assert.ok(html.includes(zip+' · '+original));
+ }
+ for(const expected of ['14 × 20 cm','Múltiples en Adobe Acrobat: 2 páginas','Doble faz',
+  'Cantidad de copias: 2','Anillado individual','Páginas a imprimir: 1, 3, 5',
+  'Sin anillado','NO IMPRIMIR NI ENTREGAR','Papel obra 70 g','Tamaño real']){
+  assert.ok(txt.includes(expected),expected);
+ }
+ assert.ok(html.includes('size:A4'));
+ assert.ok(html.includes('NO IMPRIMIR NI ENTREGAR'));
+ assert.ok(!txt.includes('Referencia técnica:'),'No incluir UUID largo en la orden visible');
+ assert.ok(!txt.includes('NO CONSTA — verificar'),'Orden nueva completa sin supuestos ni campos opcionales vacíos');
+});
+test('anexo en Adobe advierte cuando faltan datos y escapa nombres hostiles de archivos',()=>{
+ const client=readFileSync(new URL('../integraciones/autocotizador/recepcion/paquete-tus-cliente.txt',import.meta.url),'utf8');
+ const start=client.indexOf('function clean(v)'),end=client.indexOf('async function fetchFicha()',start);
+ const render=vm.runInNewContext(client.slice(start,end)+'\n({textoOrden,htmlOrden})');
+ const receipt={numeroOrden:'001',estadoPago:'SIN_PAGO_CONFIRMADO',importe:200,trabajos:[
+  {servicio:'documentos',nombreOriginal:'<archivo>&\r\nOtra orden.pdf',
+   paginasOriginales:3,paginasElegidas:[1,2,3],formatoFinal:'a5',
+   carasPresupuestadas:'simple',paginasPorCaraPresupuestadas:1,
+   copias:1,modo:'color',material:'obra70'}
+ ]};
+ const txt=render.textoOrden(receipt);
+ const html=render.htmlOrden(receipt);
+ assert.ok(txt.includes('Anillado después de imprimir: NO CONSTA — verificar'));
+ assert.ok(txt.includes('SIN ampliar'));
+ assert.ok(!txt.includes('\r\nOtra orden.pdf'),'Control characters in original names must be normalized');
+ assert.ok(html.includes('&lt;archivo&gt;&amp;'));
+ assert.ok(!html.includes('<archivo>'));
+ assert.ok(html.includes('NO CONSTA'));
+});
