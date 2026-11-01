@@ -24,3 +24,5 @@ trigger=2026-11-01-tus-private-only
 2026-11-01 ~13:39 ART — ZIP privado numerado con instrucciones TXT+HTML, PDF originales en orden de ficha, CRC32 ZIP32 y límites de sesión. Worker documental: /prueba-v2/orden-paquete (Basic), POST /prueba-v2/api/ensayo-tus-paquete-manifiesto (Basic, HMAC D1), cada PDF sigue por descarga original D1+SHA. Central ya CI verde 41327349314, número D1 y reporte firmados. CI documental exige tests/tus-zip-orden-privada.test.mjs + tests/tus-paquete-manifiesto.test.mjs. Desplegar SOLO saber-documentos-pruebas con rollback HTTP401. No cobros, no web pública.
 
 Activar Worker documental para exigir numeroOrden D1 al completar pedido TUS y mostrar N.º 001 en confirmación del cliente. PDF/ZIP existentes sin cambios. CI completo con rollback.
+
+2026-11-01 — desplegar en worker DOCUMENTAL privado la validación completa de especificaciones B/N, color, gramaje/papel y grupo de anillado, evitando NO CONSTA cuando cliente eligió opciones. ZIP TXT/HTML muestra selección real; ensayos automatizados con 2 PDFs A4/A3 y A4 color N-up, y legado sin campos. Ejecutar pruebas y rollback sin tocar web pública ni habilitar pagos. Central ya 14/14 OK.
