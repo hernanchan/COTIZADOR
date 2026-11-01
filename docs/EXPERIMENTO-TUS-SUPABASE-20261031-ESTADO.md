@@ -110,3 +110,24 @@ El usuario abrió desde el móvil el enlace de invitación a `lab-tus-one-use` y
 - Además se comprobó remotamente que dependencias CDN `Uppy 3.6.1` CSS+JS y `esm.sh/pdf-lib@1.17.1` responden **HTTP200**; JS Uppy exporta explícitamente `Uppy`, `Dashboard` y `Tus`. No se ha simulado interacción de navegador ni descarga de paquetes secundarios, por tanto NO afirma que E2E ya pasó.
 - Invitación privada de laboratorio **ID `1836a4c3-a084-47c1-96d5-41df1bd05ff2`**, `unused=true`, `valid_now=true`, **520 minutos restantes** al verificar. El secreto de enlace no se registra en GitHub; entregarlo como fragmento `#k=` junto a página estática, nunca como query de Supabase GET. A las 23:53 ART equivale expiración ~08:34 ART del 1/11.
 - **SIGUIENTE PASO:** usuario abre **únicamente** nueva página HTML de GitHub Pages con token `#k` proporcionado por este chat y pulsa «Probar recepción de 2 PDF» UNA VEZ. La página genera dos PDF sintéticos de 16 y 94 páginas, transmite con Uppy/TUS de manera directa a bucket privado y solicita validación SHA/páginas/bytes a Edge. Pedir captura de final y no reintentar si hay error. Luego comprobar objeto(s) y estado en Supabase. **TODAVÍA NO HAY PRUEBA REAL DE RECEPCIÓN NI AHORRO DE LATENCIA.**
+
+
+## 31/10/2026 23:56 ART — ¡PRIMER ENSAYO TUS REAL 2/2 APROBADO! (PDF SINTÉTICOS PEQUEÑOS)
+
+**EVIDENCIA VISUAL Y COMPROBACIÓN SERVER-SIDE INDEPENDIENTE.** Usuario compartió captura de `https://hernanchan.github.io/saber-laboratorio-pdf/` mostrando «**ÉXITO: 2 de 2 PDF recibidos y verificados, sin cobros.**»; Dashboard Uppy 2 PDF en `Upload complete`, tilde verde. JSON de medición del navegador:
+- `verificados: "2 de 2"`; `paginas: [16,94]`; `integridadSha256: "correcta"`.
+- **Total: 6,19 segundos** desde pulsar; preparación `0,03 s`; subida TUS **1,10 s**; verificación en servidor **1,53 s**; resto del intervalo incluye conexiones, autorización y carga de módulos. Los tiempos son de la **captura**, no mediciones que hayamos deducido de logs.
+- `pedidosRegistrados: 0`, `cobros: false`. Nunca se conectó el ensayo a D1, Mercado Pago ni recepción del sitio comercial.
+
+**Verificaciones directas de Supabase después de la captura:**
+- Invitación `1836a4c3-a084-47c1-96d5-41df1bd05ff2` **consumida**, sesión de ensayo creada, ambas rutas asociadas.
+- Consulta de `storage.objects`: **2 de 2 objetos** bajo `saber-tus-lab`, ambos presentes, `application/pdf`; **2.251 bytes en total**, sin objetos adicionales en el bucket. **IMPORTANTE: archivos sintéticos MINÚSCULOS y muy comprimibles aunque tengan 16/94 páginas.**
+- Logs de red `function_edge_logs`/ `edge_logs`: `/start` HTTP200 a `2026-11-01 02:56:21.534 UTC`; DOS solicitudes de firma privada HTTP200; DOS operaciones TUS de creación HTTP201; `/verify` HTTP200 a `2026-11-01 02:56:24.196 UTC`. No se publicaron tokens ni rutas de objetos.
+- El verificador Edge de la sesión descarga los archivos PRIVADOS desde el bucket y ejecuta `verifyPrivatePdf` que computa digest SHA-256 de los bytes almacenados, comprueba cabecera/tamaño y `PDFDocument.load(...).getPageCount()` server-side; comprueba 16/94. No es simulación de red.
+- GitHub Pages nuevo se comprobó previamente HTTP200 `text/html`, `Uppy` JS y CSS y `pdf-lib` HTTP200. El antiguo problema de HTML `text/plain` se resolvió alojando la UI en GitHub Pages aislado.
+
+**Límite de evidencia, NO extrapolar:**
+- La comparación con el cotizador Worker→GAS→Drive (93,5s/97,7s y 1/2 PDF en los dos últimos ensayos) es **ilustrativa, NO científicamente equivalente**. Allí se enviaron PDFs reales grandes, acá **2.251 bytes** en conjunto. Los 6,19s incluyen otra red/documentos; no prueban el throughput a 5MB, 20MB, 60MB, ni la cotización CAD/ploteos ni pedido D1 ni pagos ni Central. No afirmar «sistema listo».
+- Próximo paso profesional: **otro único ensayo aislado con PDF sintéticos de tamaño representativo**, por ejemplo 2 PDF de 5–15 MiB, midiendo Mbps y verificando 2/2 SHA/páginas, y resiliencia TUS (corte de red), sin volver al circuito comercial. Ajustar el límite actual de 20MiB SOLO si el negocio requiere más y tras revisar Free y costos.
+- Invitación anterior consumida (uso único): **NO pedir que vuelvan a pulsar el botón**; debe emitirse invitación nueva para cualquier prueba posterior. No volver a usar PDF de clientes sin consentimiento ni seguridad auditada.
+- La arquitectura de subida directa a Storage con TUS y verificación server-side **está validada para PDF sintéticos de prueba**, y merece benchmarking con datos representativos, NO migración inmediata.
