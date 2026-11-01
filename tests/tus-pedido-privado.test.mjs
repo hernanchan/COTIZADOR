@@ -332,6 +332,8 @@ test('preflight privado de Supabase firma sin subir bytes ni exponer token',asyn
  const signed=await comprobarTUSAntesDeEnviar(request(),env,{authorized:true,fetcher:async(url,options)=>{
   calls++;
   assert.match(url,/\/storage\/v1\/object\/upload\/sign\/saber-tus-lab\/v2\/WEB-DIAGNOSTICO-/);
+  assert.equal(new URL(url).hostname,'qkbbqzbannyhuanngjpw.storage.supabase.co');
+  assert.equal(options.redirect,'error');
   assert.equal(options.method,'POST');
   assert.equal(options.body,'{}');
   assert.ok(options.headers.Authorization.startsWith('Bearer '));
