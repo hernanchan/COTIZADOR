@@ -11,7 +11,17 @@ function format(t){
   t.carasPresupuestadas==='double'?'Doble faz':null;
  const ring=t.tipoAnillado==='ninguno'?'Sin anillado':
   t.tipoAnillado==='individual'?'Anillado individual':
-  t.tipoAnillado==='grupo'?'Anillado en grupo (verificar integrantes)':null;
+  t.tipoAnillado==='grupo'
+   ?('Anillado en grupo '+clean(t.grupoAnillado)+' (confirmar integrantes)'):null;
+ const papelLegible={
+  estandar:'Papel estándar B/N (gramaje sin especificar)',
+  obra70:'Papel obra 70 g',obra80:'Papel obra 80 g',
+  obra140:'Papel obra 140 g',obra180:'Papel obra 180 g',
+  a3_color_obra80:'Papel obra 80 g A3',
+  a3_color_obra140:'Papel obra 140 g A3',
+  a3_color_obra180:'Papel obra 180 g A3',
+  recubierto:'Papel recubierto',fotografico:'Papel fotográfico'
+ }[t.material]||t.material||null;
  const pages=Array.isArray(t.paginasElegidas)&&t.paginasElegidas.length?
   (t.paginasElegidas.length===t.paginasOriginales&&
   t.paginasElegidas.every((v,i)=>v===i+1)?'Todas':t.paginasElegidas.join(', ')):null;
@@ -22,8 +32,8 @@ function format(t){
   ['Tamaño',t.formatoFinal?.toUpperCase()],
   ['Color',mode],['Caras',sides],
   ['Páginas por cara',t.paginasPorCaraPresupuestadas],
-  ['Copias',t.copias],['Papel',t.material],['Anillado',ring],
-  ['Observaciones',t.descripcion]
+  ['Copias',t.copias],['Papel',papelLegible],['Anillado',ring],
+  ...(t.descripcion?[['Observaciones',t.descripcion]]:[])
  ];
 }
 function textoOrden(d){
