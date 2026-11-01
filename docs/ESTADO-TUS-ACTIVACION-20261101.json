@@ -1,11 +1,11 @@
 {
   "estado": "ACTIVA_PRIVADA",
   "worker": "saber-documentos-pruebas",
-  "version_activa": "c172461f-5986-4ca6-86e7-633b72bacbc2",
-  "deployment_id": "b68dcb3a-dde1-4285-a2b0-d3fab823e513",
+  "version_activa": "76b3bd4f-4bc6-425b-b231-6866ce8249a8",
+  "deployment_id": "c53c204e-e5e7-4743-adbf-f54dcdc6077c",
   "origen": "Cloudflare deployments GET",
   "rama": "integracion/tus-pedido-privado-20261101",
-  "consultado_utc": "2026-11-01T15:20:58Z",
+  "consultado_utc": "2026-11-01T15:25:32Z",
   "portal_http_anonimo": "401",
   "portal_protegido": true,
   "nota": "No demuestra TUS E2E; no se enviaron archivos ni se activaron cobros."
