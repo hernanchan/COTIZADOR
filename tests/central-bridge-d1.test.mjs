@@ -879,3 +879,47 @@ test('carrera D1: reintento sólo confirma el pedido realmente guardado y su imp
   else env.CENTRAL_PREPARE_ENABLED=originalFlag;
  }
 });
+
+
+test('Centro privado: operador ve PDF TUS de pedido pendiente sin autorizar impresión',async()=>{
+ const doc=JSON.parse(JSON.stringify(packet));
+ doc.orderId='WEB-ENSAYO-'+randomUUID().replaceAll('-','').toUpperCase();
+ doc.ficha.orderId=doc.orderId;
+ for(let i=0;i<doc.recibos.length;i++){
+  doc.recibos[i].receiptId='DOC-'+randomUUID();
+  doc.ficha.trabajos[i].reciboPrivado=doc.recibos[i].receiptId;
+ }
+ const stage=await call('/internal/central/stage',doc);
+ assert.equal(stage.status,201,JSON.stringify(stage.result));
+ const prev=env.CENTRAL_PREPARE_ENABLED;env.CENTRAL_PREPARE_ENABLED='PRIVATE_TEST_ONLY';
+ let orderId;
+ try{
+  const made=await call('/internal/central/prepare-order',{
+   webOrderId:doc.orderId,clientOrderId:randomUUID(),items:[]
+  });
+  assert.equal(made.status,201,JSON.stringify(made.result));
+  orderId=made.result.commercial_order_id;
+ }finally{
+  if(prev===undefined)delete env.CENTRAL_PREPARE_ENABLED;
+  else env.CENTRAL_PREPARE_ENABLED=prev;
+ }
+ const endpoint='https://saber-pagos-pruebas.libreriasaber.workers.dev/admin/api/central/unpaid-detail?id='+orderId;
+ const missingAuth=await context.worker.fetch(new Request(endpoint),env);
+ assert.equal(missingAuth.status,401);
+ const authorized=await context.worker.fetch(new Request(endpoint,{headers:{
+  Authorization:'Bearer '+env.DEMO_ADMIN_KEY
+ }}),env);
+ assert.equal(authorized.status,200); 
+ const result=await authorized.json();
+ assert.equal(result.paymentAuthorized,false);
+ assert.equal(result.listoParaProducir,false);
+ assert.equal(result.documentos.esTUS,true);
+ assert.equal(result.documentos.webOrderId,doc.orderId);
+ assert.equal(result.documentos.trabajos.length,2);
+ assert.deepEqual(Array.from(result.documentos.trabajos.map(x=>x.reciboPrivado)).sort(),
+  Array.from(doc.recibos.map(x=>x.receiptId)).sort());
+ const old=await context.worker.fetch(new Request(endpoint.replace(orderId,randomUUID()),{
+  headers:{Authorization:'Bearer '+env.DEMO_ADMIN_KEY}
+ }),env);
+ assert.equal(old.status,404);
+});
