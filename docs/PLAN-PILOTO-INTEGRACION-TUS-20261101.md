@@ -116,3 +116,9 @@ En la rama experimental, comparar interfaces reales del Worker privado y `lab-tu
 - `tus-pedido-worker.mjs` usaba `redirect:'error'` en `firmarSubidaSupabase` y `leerObjetoTUSPrivado`. Se reemplazó por `redirect:'manual'` (válido en Workers) con rechazo explícito de HTTP 3xx, sin seguir Location ni exponer Authorization o apikey a otro destino. Se añadió código seguro `STORAGE_REDIRECT_BLOCKED`. Commits `29339936`, tests `49a304a3`.
 - CI/activación sólo entorno privado: run GitHub Actions `41321763599` SUCCESS, suite 23/23 + 67/67 + 4/4, Worker pruebas versión `8cf6c9cb-f52d-4508-bf2e-61b2dc483df6` activa según logs del workflow; control de acceso sin credenciales HTTP 401, web comercial y cobros no modificados. Trigger `e3b642ec`.
 - **Próximo paso**: abrir /prueba-v2/ con sesión privada y Ctrl+F5 **sin archivos**. Debe mostrar `Supabase/TUS verificado`; si no, usar el código granular sin cambiar credenciales ni reinstalar integraciones. Sólo tras preflight OK intentar un pedido de ensayo de 2 PDF; después comprobar Storage, D1 y descarga del comercio. No afirmar E2E hasta ese ensayo.
+
+## 01/11/2026 12:34 ART — PRE-FLIGHT REAL EXITOSO, E2E aún pendiente
+
+- Captura de la pantalla privada, ya con versión `8cf6c9cb-f52d-4508-bf2e-61b2dc483df6`, muestra literalmente: «Supabase/TUS verificado. Los PDF se enviarán directamente a almacenamiento privado.» La solicitud de firma sin subir PDF superó autenticación Worker y Storage.
+- Supabase SQL `storage.objects` (bucket `saber-tus-lab`) ANTES del primer nuevo ensayo: **4 objetos**, `max(created_at)=2026-11-01 03:05:05.775481+00`. Permite comparar llegada de 2 PDF nuevos sin identificar usuarios ni abrir documentos.
+- Siguiente paso exacto: UNA prueba de pedido con 2 PDF A4 de ensayo, B/N SF, una copia, sin anillado, un solo clic; luego consultar Storage nuevos, registro D1 y acceso privado. No declarar E2E hasta validar los tres. No activar cobros ni Google Drive.
