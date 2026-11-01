@@ -249,3 +249,12 @@ Se corrigió el presupuesto de originales de 14x20 cm con tarifa A4. CI privado 
 ## 01/11/2026 — Aceptación visual confirmada por usuario: PDF 14×20 cm
 
 Tras la implementación de `personalizado_a4`, el usuario volvió a cargar `CARATULAS DIARIA.pdf` (14 páginas de 14×20 cm), eligió «Mantener tamaño original» y confirmó «sí sí» a la consulta de si el precio se calculaba correctamente. **Estado: cotización visual ACEPTADA con PDF real**; tarifa de referencia A4 sin ampliar. Los tests del circuito simulado y CI ya constan arriba. **No confundir esta aceptación de cotización con envío de este PDF, generación de PDF final de producción ni impresión: siguen pendientes.** Prioridad siguiente: diseño y verificación del PDF imprimible privado por orden desde las opciones D1 verificadas, sin tocar originales, pagos o web pública.
+
+
+## 01/11/2026 — Selector simplificado de páginas por cara
+
+- El usuario aprobó presentar **1 página por cara** (opción predeterminada) y **2 páginas por cara** directamente; conservar **4 y 9 páginas** dentro de «Más opciones» para no complicar el proceso. Sólo se aplica a impresiones documentales A4/A3/A5/original pequeño, NO a ploteos ni otros servicios.
+- Implementado en `integraciones/autocotizador/recepcion/carga-unica-cliente.mjs`: radio accesible dentro de `fieldset` con opciones 1/2 y `details` 4/9; opciones avanzadas se mantienen abiertas cuando el valor seleccionado es 4/9. Cambios llaman al mismo `cambio()` y conservan `e.paginasPorHoja`, por lo que cotización, TUS, D1, orden y ZIP continúan leyendo el dato validado existente, sin alterar las tarifas.
+- CSS de `carga-unica-pagina.mjs`, prueba real del selector DOM en `paginas-por-cara-ui.test.mjs` (default, 2, avanzado, por archivo y por formato), incorporada a `test:handoff` de cada compilación.
+- GitHub Actions `41351302346` SUCCESS, 50+76+4 pruebas PASS/0 FAIL; Worker privado documental `saber-documentos-pruebas`, versión `2d97ee44-4ae6-4f5e-9c5d-c5210b8b9e87`; acceso anónimo HTTP 401, cobros inactivos, main y web comercial intactos.
+- Pendiente **comprobación visual del usuario**: refrescar Ctrl+F5 `https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/`, cargar PDF cualquiera, abrir los detalles y probar 2 páginas por cara. No enviar pedido ni suponer PDF compuesto listo para producción. Siguiente etapa: generación segura de PDF final/imposición, aún pendiente.
