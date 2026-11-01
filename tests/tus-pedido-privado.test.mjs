@@ -347,6 +347,25 @@ test('preflight privado de Supabase firma sin subir bytes ni exponer token',asyn
  assert.equal(rejected.status,503);
  const failure=await rejected.json();
  assert.equal(failure.etapa,'STORAGE_HTTP_401');
+ for(const [response,code] of [
+  [Response.json({url:'/storage/v1/object/upload/sign/obj?token=private-token'}),'STORAGE_TOKEN_MISSING'],
+  [new Response('garbled-json',{status:200}),'STORAGE_RESPONSE_JSON']
+ ]){
+  const failed=await comprobarTUSAntesDeEnviar(request(),env,{
+   authorized:true,fetcher:async()=>response
+  });
+  assert.equal(failed.status,503);
+  const result=await failed.json();
+  assert.equal(result.etapa,code);
+  assert.ok(!JSON.stringify(result).includes('private-token'));
+ }
+ const unreachable=await comprobarTUSAntesDeEnviar(request(),env,{
+  authorized:true,fetcher:async()=>{throw Error('Sensitive network details');}
+ });
+ assert.equal(unreachable.status,503);
+ const noNetwork=await unreachable.json();
+ assert.equal(noNetwork.etapa,'STORAGE_FETCH_FAILURE');
+ assert.ok(!JSON.stringify(noNetwork).includes('Sensitive network details'));
  assert.ok(!JSON.stringify(failure).includes('secret-error'));
  const forbidden=await comprobarTUSAntesDeEnviar(request(),env,{authorized:false,fetcher:async()=>{throw Error('must never call');}});
  assert.equal(forbidden.status,403);
