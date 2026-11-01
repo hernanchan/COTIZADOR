@@ -47,3 +47,5 @@ Consultar CI activación ZIP Adobe tras commit 7d11936b: etiquetas PDF_01/origin
 2026-11-01 inspeccionar CI ZIP ploteo tras trigger a0f0629b y Central 41358467843; pruebas de CAD/póster, 2 PDF firmados y render ZIP, versión activa HTTPS 401 sin cobros.
 
 2026-11-01 comprobar CI cargador de ploteos integrado, trigger 33a9b681, pruebas de ZIP y nuevos avisos, HTTP401.
+
+2026-11-01 confirmar run CI privado iniciado a213d112 con regresión plano real de red de líneas a dos resoluciones, verificar 0 fallos, versión activa y HTTP401, sin tocar producción.
