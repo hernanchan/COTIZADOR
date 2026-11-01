@@ -2,6 +2,14 @@
   "workflow": "tus-activar-ensayo-privado.yml",
   "runs": [
     {
+      "id": 41352145962,
+      "head_sha": "1c3010fb879bf3bbff7d1293d37d66c175c1543a",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-01T21:28:01Z",
+      "html_url": "https://github.com/hernanchan/COTIZADOR/actions/runs/41352145962"
+    },
+    {
       "id": 41351302346,
       "head_sha": "967b70bb3bc7e591b7322051234bd22dacdf1f2c",
       "status": "completed",
@@ -56,14 +64,6 @@
       "conclusion": "success",
       "created_at": "2026-11-01T17:20:18Z",
       "html_url": "https://github.com/hernanchan/COTIZADOR/actions/runs/41330956047"
-    },
-    {
-      "id": 41330836407,
-      "head_sha": "c425245ae658d45ab86b3359e59fbdb16e2210d8",
-      "status": "completed",
-      "conclusion": "failure",
-      "created_at": "2026-11-01T17:18:54Z",
-      "html_url": "https://github.com/hernanchan/COTIZADOR/actions/runs/41330836407"
     }
   ],
   "jobs_latest": [
