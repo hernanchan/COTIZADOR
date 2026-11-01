@@ -43,6 +43,9 @@ input:focus,select:focus{outline:3px solid #bedcf4;border-color:#2878ad}
 .acciones-archivo button{min-height:37px}
 .acciones-archivo button:disabled{opacity:.45;cursor:not-allowed}
 .fila-principal{min-width:0}.nombre{display:block;overflow-wrap:anywhere;font-size:16px;color:#143f62}
+.clasificacion-ploteo-visible{display:block;width:max-content;max-width:100%;
+margin-top:6px;padding:5px 10px;border-radius:6px;border:1px solid #a9c4d5;
+background:#edf5fb;color:#103d60;font-size:14px;letter-spacing:.01em}
 .resumen-archivo{font-size:14px;color:#53697b;margin-top:3px;line-height:1.35}
 .precio-archivo{text-align:right;font-weight:750;font-size:16px;white-space:nowrap;color:#154d73}
 .editar{border:1px solid #aac3d7;background:#fff;color:#0e5179;font-weight:700;border-radius:8px;font-size:14px;padding:9px 12px;cursor:pointer}
