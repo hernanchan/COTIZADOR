@@ -106,7 +106,17 @@ function mostrarSelectorRapido(card,e,indice){
  const paginas=paginasElegidas(e);
  if(!paginas)return;
  const destino=clasificarDestino(paginas,e.seleccion);
- if(!destino.confirmado||destino.destino!=='documentos')return;
+ // Mientras el cliente contesta «¿Cómo querés imprimirlo?»,
+ // todavía no hay destino confirmado. No ocultar entonces la opción 1/2.
+ // Solo se anticipa en originales que caben en A3; si exceden A3,
+ // esperar la elección y excluir ploteos y trabajos especiales.
+ const enA3=paginas.every(p=>
+  Number.isFinite(p.anchoCm)&&Number.isFinite(p.altoCm)&&
+  Math.min(p.anchoCm,p.altoCm)<=29.9&&
+  Math.max(p.anchoCm,p.altoCm)<=42.2);
+ const esDocumento=destino.confirmado?destino.destino==='documentos':
+  e.seleccion==='sin-confirmar'&&enA3;
+ if(!esDocumento)return;
  const field=selectorPaginasPorCara(e,indice);
  field.classList.add('composicion-visible');
  card.append(field);
