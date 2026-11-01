@@ -42,3 +42,5 @@ Revalidar mensaje definitivo número corto: test heredado esperaba «Orden de tr
 Revalidación precio A5: comparar IMPORTE VERIFICADO real del servidor entre PDF A5 original y PDF A4 equivalente (en lugar de campo interno inexistente), mismo precio A4, formato final A5 sin ampliar. Test corregido bfe9a203; activar solo worker documental privado con rollback.
 
 2026-11-01: ensayo privado de originales de 14 por 20 cm, cotización A4, tamaño sin cambios; pruebas de interfaz y recepción del pedido. No modificar sitio público ni pagos.
+
+2026-11-01 — En cotizador privado impresión documental A4/A3/A5/original pequeño: selector directo 1 o 2 páginas por cara (1 predeterminado) y 4/9 en Más opciones. Persistir paginasPorHoja en presupuesto verificado, recepción TUS, D1 e instrucciones; sin cambios de precios ni habilitación de PDF compuesto. Prueba real del selector DOM y compilación obligatoria. Desplegar únicamente saber-documentos-pruebas, con rollback y comprobación 401, no web pública ni cobros.
