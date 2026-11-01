@@ -1013,7 +1013,7 @@ function agregarFichaDeImpresion(area,t){
  const copy=node("button","Copiar instrucciones");copy.type="button";
  copy.className="outline";
  copy.addEventListener("click",async()=>{
-  try{await navigator.clipboard.writeText(lines.join("\n"));
+  try{await navigator.clipboard.writeText(lines.join("\\n"));
    copy.textContent="Instrucciones copiadas";
   }catch{copy.textContent="No se pudo copiar; seleccioná el texto de la ficha."}
  });
