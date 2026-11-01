@@ -52,3 +52,12 @@ En la rama experimental, comparar interfaces reales del Worker privado y `lab-tu
 - Corrección en rama `integracion/tus-pedido-privado-20261101`: `diagnosticarTUSPrivado(env)` ofrece exclusivamente los nombres de requisitos fallidos bajo portal Basic privado, sin valores de secretos; la nueva pantalla V2 impide el envío si TUS no está listo, en vez de caer en Drive. Incluye prueba de regresión sintáctica. Commits `46288b2d`, `f77336d8`, `852d7cef`, `2f161b09`, `312df392`, `3829f524`.
 - Se solicitó preparar una nueva versión PRIVADA INACTIVA por GitHub Actions, trigger commit `61fe82cb`. No está validada como compilada/desplegada/promovida en el instante de este registro.
 - PRÓXIMO PASO: comprobar que `Verificar integración TUS privada` y `Preparar TUS privado INACTIVO` de `61fe82cb` están verdes; localizar la versión nueva creada; promoverla únicamente al Worker `saber-documentos-pruebas`. Abrir `/prueba-v2/` SIN subir PDFs. Si muestra mensaje bloqueado, copiar SOLAMENTE nombres de requisitos fallidos y corregirlos en Cloudflare, sin revelar secretos ni más pruebas de archivos. Si la página confirma TUS habilitado y oculta Turnstile, entonces hacer una prueba E2E controlada. Nunca repetir un envío por Drive.
+
+
+## 01/11/2026 10:42 ART — activación automática confirmada
+
+- El workflow de GitHub desplegó en el Worker **de pruebas** `saber-documentos-pruebas` una versión de la rama TUS.
+- La comprobación autónoma contra Cloudflare `GET /deployments` quedó guardada en `docs/ESTADO-TUS-ACTIVACION-20261101.json`: `estado=ACTIVA_PRIVADA`, `version_activa=6e6ff6aa-b85c-4d67-a922-ebb31c74b37d`, `deployment_id=5dc27553-0f5f-4d8e-8093-07a2cd789574`, consulta `2026-11-01T13:42:26Z`.
+- El código de la rama ahora impide fallback al circuito Drive y muestra condiciones TUS incumplidas solo tras acceso Basic. El workflow de activación comprueba que /prueba-v2/ devuelve HTTP 401 sin acceso autenticado.
+- **Esto prueba despliegue activo protegido, NO prueba E2E TUS**: falta abrir /prueba-v2/ autenticado, comprobar que NO muestre bloqueo de TUS ni Turnstile y entonces realizar una única prueba controlada con dos PDF no confidenciales; observar transferencia Storage, registros D1, cotización y descarga desde Central.
+- No repetir pruebas por Drive ni promover versiones anteriores. No activar cobros ni modificar sitio comercial.
