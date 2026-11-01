@@ -45,3 +45,29 @@ test('A5 original color usa papel A4 sin cambiar el formato',async()=>{
  assert.equal(r.verificacion.ficha.trabajos[0].formatoFinal,'a5');
  assert.equal(r.verificacion.ficha.trabajos[0].material,'obra70');
 });
+
+
+test('14 × 20 cm: el precio es A4 pero el original y las 4 medidas sobreviven a la ficha',async()=>{
+ const [small,a4]=await Promise.all([
+  quote(14*72/2.54,20*72/2.54,'original'),
+  quote(595.28,841.89,'a4')
+ ]);
+ assert.equal(small.verificacion.importeVerificado,a4.verificacion.importeVerificado);
+ const t=small.verificacion.ficha.trabajos[0];
+ assert.equal(t.formatoFinal,'personalizado_a4');
+ assert.equal(t.tarifaAplicada,'a4');
+ assert.deepEqual(t.operaciones,['sin_escalado']);
+ assert.equal(t.medidasOriginalesCm.length,4);
+ for(const p of t.medidasOriginalesCm){
+  assert.ok(Math.abs(p.anchoCm-14)<0.02);
+  assert.ok(Math.abs(p.altoCm-20)<0.02);
+ }
+ assert.equal(t.tipoAnillado,'ninguno');
+ assert.equal(small.verificacion.paymentAuthorized,false);
+});
+test('tamaño original mayor que A4 sin tarifa propia no se cobra como A4',async()=>{
+ await assert.rejects(()=>quote(22*72/2.54,31*72/2.54,'original'),/revisión comercial|incompleto|tarifa/i);
+});
+test('excepción acordada: 20 × 20 cm no permite original sino A4',async()=>{
+ await assert.rejects(()=>quote(20*72/2.54,20*72/2.54,'original'),/revisión comercial|incompleto|A4/i);
+});
