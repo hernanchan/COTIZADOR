@@ -94,3 +94,38 @@ test('Portal Basic rechaza llamadas de clientes y devuelve ficha firmada al oper
  assert.equal(body.numeroOrden,'001');
  assert.equal(body.trabajos[0].nombreOriginal,'original.pdf');
 });
+
+
+test('Central devuelve en paquete privado el detalle inmutable por página de ploteo',async()=>{
+ const plano={orden:1,nombreOriginal:'Plano y póster.pdf',reciboPrivado:receipt,
+  servicio:'ploteos',paginasOriginales:2,paginasElegidas:[1,2],
+  copias:2,formatoFinal:'original',bytes:10131027,
+  planoPorPagina:[
+   {numeroOriginal:1,modo:'cad',anchoCm:60,altoCm:85,rollo:'rollo60',papel:'obra80'},
+   {numeroOriginal:2,modo:'poster',anchoCm:60,altoCm:85,rollo:'rec60',papel:'recubierto'}
+  ]};
+ const modified={...manifest,trabajos:[plano]};
+ const fakeDb={prepare(sql){
+  if(sql.includes('FROM central_document_manifests m JOIN orders o')&&
+     sql.includes('JOIN central_work_order_numbers')){
+   let order;
+   const item={bind(...args){order=args[0];return item},
+    async first(){return order===webOrderId?{web_order_id:webOrderId,
+     commercial_order_id:orderId,manifest_json:JSON.stringify(modified),
+     amount_ars:2432,file_count:1,number:1,status:'awaiting_payment'}:null}};
+   return item;
+  }
+  return db.prepare(sql);
+ }};
+ const r=await ctx.worker.fetch(await signed({schema:'saber-central-tus-package-v1',webOrderId}),
+  {...env,DB:fakeDb});
+ assert.equal(r.status,200);
+ const result=await r.json();
+ const t=result.trabajos[0];
+ assert.equal(t.servicio,'ploteos');
+ assert.equal(t.planoPorPagina.length,2);
+ assert.deepEqual(Array.from(t.planoPorPagina,p=>p.modo),['cad','poster']);
+ assert.equal(t.planoPorPagina[1].rollo,'rec60');
+ assert.equal(t.planoPorPagina[1].papel,'recubierto');
+ assert.equal(result.paymentAuthorized,false);
+});
