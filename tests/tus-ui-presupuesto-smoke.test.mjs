@@ -1,3 +1,4 @@
+import {paginaDescargaTUSPersonal} from '../integraciones/autocotizador/recepcion/pantalla-descarga-tus-personal.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {transform} from 'esbuild';
@@ -93,4 +94,23 @@ test('las solicitudes TUS comparten el alcance Basic /prueba-v2/ y cookie HttpOn
  assert.ok(worker.includes("page==='/prueba-v2/api/ensayo-tus-comprobar'"));
  assert.ok(worker.includes("page==='/prueba-v2/api/ensayo-tus-iniciar'"));
  assert.ok(worker.includes("page==='/prueba-v2/api/ensayo-tus-registrar'"));
+});
+
+
+test('descarga del personal exige Basic y consulta protegida D1+SHA; no publica URL Storage',async()=>{
+ const page=paginaDescargaTUSPersonal();
+ const script=page.match(/<script>([\s\S]+?)<\/script>/)?.[1];
+ assert.ok(script);
+ await transform(script,{loader:'js',format:'esm',target:'es2022'});
+ assert.match(page,/\bdescargar PDF original/i);
+ assert.ok(page.includes('/prueba-v2/api/ensayo-tus-descargar-personal'));
+ assert.ok(!page.includes('service_role'));
+ assert.ok(!page.includes('DOCS_TUS_SUPABASE_SERVICE_KEY'));
+ const worker=readFileSync(new URL('../integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs',import.meta.url),'utf8');
+ assert.ok(worker.includes("page==='/prueba-v2/personal-descargar'"));
+ assert.ok(worker.includes("page==='/prueba-v2/api/ensayo-tus-descargar-personal'"));
+ assert.ok(worker.includes("authorized:v2PrivateBrowserAuthorized(request,env)==='allow'"));
+ const central=readFileSync(new URL('../integraciones/mercadopago/pruebas/worker.js',import.meta.url),'utf8');
+ assert.ok(central.includes('"/admin/api/central/unpaid-detail"'));
+ assert.ok(central.includes('if(!tokenOK(req,env))return json({error:"No autorizado"},401);'));
 });
