@@ -872,6 +872,7 @@ async function centralAdminDetail(env,id){
  return {webOrderId:row.web_order_id,totalDocumentos:row.amount_ars,
   fechaRecepcion:row.created_at,archivos:row.file_count,
   estado:"DOCUMENTOS_VERIFICADOS_PDF_FINAL_PENDIENTE",
+  esTUS:/^WEB-ENSAYO-[A-F0-9]{32}$/.test(row.web_order_id),
   trabajos:document.trabajos,pdfFinalVerificado:false,listoParaProducir:false};
 }
 
@@ -949,6 +950,35 @@ if(x.produccion?.polaroidsExpress){
   details.append(button);
  }else details.append(node("p","PDF en Drive privado. Descarga administrativa pendiente de habilitación."));
 }status.textContent=""}catch(e){status.textContent=e.message}}
+async function showUnpaidDetails(id){
+ try{
+  status.textContent="Consultando PDF privados del pedido…";
+  const x=await api("/admin/api/central/unpaid-detail?id="+encodeURIComponent(id));
+  details.replaceChildren();
+  details.append(node("h3","Pedido "+id+" · SIN PAGO"));
+  details.append(node("p","Recepción "+x.documentos.webOrderId+" · "+money(x.documentos.totalDocumentos)+
+   " · "+x.documentos.archivos+" archivo(s)"));
+  details.append(node("p","Pedido recibido; cobro no confirmado. No autoriza impresión ni entrega."));
+  for(const t of x.documentos.trabajos){
+   const area=node("section","");
+   area.append(node("h4",t.orden+". "+t.nombreOriginal));
+   area.append(node("p",t.paginasOriginales+" páginas · "+t.bytes+" bytes · "+t.servicio));
+   if(x.documentos.esTUS){
+    const action=node("button","Descargar PDF original");
+    action.addEventListener("click",()=>{
+     const url=new URL("https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/personal-descargar");
+     url.searchParams.set("webOrderId",x.documentos.webOrderId);
+     url.searchParams.set("receiptId",t.reciboPrivado);
+     const link=document.createElement("a");link.href=url.href;link.target="_blank";link.rel="noopener noreferrer";
+     document.body.append(link);link.click();link.remove();
+    });
+    area.append(action);
+   }else area.append(node("p","Este recibo no corresponde al ensayo Supabase/TUS."));
+   details.append(area);
+  }
+  status.textContent="Consulta privada completada. Pago NO confirmado.";
+ }catch(e){status.textContent=String(e.message||e)}
+}
 async function refreshCronState(){
  const el=document.querySelector("#cronState");
  try{
@@ -1000,6 +1030,9 @@ document.querySelector("#refreshUnpaid").addEventListener("click",async()=>{
   for(const o of x.orders){
    const li=node("li",o.web_order_id+" · "+o.file_count+" PDF · Total pedido "+money(o.order_ars));
    li.append(node("p","Referencia de compra: "+o.commercial_order_id+" · Estado: pago sin confirmar"));
+   const btn=node("button","Ver PDF privados");btn.className="outline";
+   btn.addEventListener("click",()=>showUnpaidDetails(o.commercial_order_id));
+   li.append(btn);
    list.append(li);
   }
   status.textContent=x.orders.length+" pedido(s) en espera de pago";
@@ -1328,6 +1361,22 @@ export default {
     await ensurePaymentReviews(env);
     const rows=await env.DB.prepare("SELECT id,description,amount_ars,status,paid_at,created_at FROM orders WHERE status='paid' AND deposit_ars=amount_ars AND NOT EXISTS (SELECT 1 FROM payment_reviews WHERE order_id=orders.id AND state='revoked') ORDER BY paid_at DESC LIMIT 100").all();
     return json({orders:rows.results});
+   }
+   if(url.pathname==="/admin/api/central/unpaid-detail"&&req.method==="GET"){
+    if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+    const id=url.searchParams.get("id")||"";
+    if(!CENTRAL_UUID.test(id)||url.searchParams.size!==1)
+     return json({error:"Pedido inválido"},400);
+    await centralTables(env);
+    const order=await env.DB.prepare(
+     "SELECT id,status,amount_ars FROM orders WHERE id=? AND status='awaiting_payment' LIMIT 1"
+    ).bind(id).first();
+    if(!order)return json({error:"Pedido pendiente no encontrado"},404);
+    const documentos=await centralAdminDetail(env,id);
+    if(!documentos||!Array.isArray(documentos.trabajos)||
+       documentos.trabajos.length!==documentos.archivos)
+     return json({error:"Archivos del pedido pendientes de verificar"},409);
+    return json({documentos,paymentAuthorized:false,listoParaProducir:false});
    }
    if(url.pathname==="/admin/api/central/unpaid"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
