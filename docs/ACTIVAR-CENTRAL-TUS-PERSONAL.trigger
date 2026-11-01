@@ -12,3 +12,5 @@
 2026-11-01 ~13:35 ART — Prueba privada para número secuencial de orden D1 (001, 002...) y manifiesto de ZIP firmado HMAC. La Central asigna número atómico en la transacción del pedido nuevo o por POST administrador idempotente al abrir pedido histórico. La ruta entre Workers nunca expone Storage. Tests tests/tus-central-staff-download.test.mjs y tests/tus-paquete-manifiesto.test.mjs antes de desplegar solo saber-pagos-pruebas; rollback y paymentsEnabled=false. Sin tocar la web pública.
 
 CI reintento: la suite del manifiesto importa pdf-lib; ahora instalado explícitamente en workflow privado central (commit 4ae4c6c5). No publicar si fallan pruebas.
+
+Activar Central versión de pedido corto visible también en respuesta de prepare-order, incluyendo reintentos históricos. Sin cobros, JWT privados intactos. Revalidación CI.
