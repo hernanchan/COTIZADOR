@@ -83,3 +83,7 @@ Al concluir Etapa 1, crear `docs/ETAPA2-...-ESTADO.md`, actualizar aquí cuál e
 - Si el guardado falla, decirlo claramente y proporcionar el resumen para copiar; nunca simular continuidad persistida.
 - En el siguiente chat, consultar el registro actualizado y reanudar sin repetir decisiones, pruebas cerradas ni retroceder al 28 de octubre.
 - Esta medida es preventiva: no prometer detectar con precisión el momento de agotamiento del chat.
+
+## Actualización verificada — 01/11/2026, TUS/Central PDF originales
+
+**Leer primero** `docs/PLAN-PILOTO-INTEGRACION-TUS-20261101.md`, especialmente las entradas finales del 01/11. La integración TUS real consiguió recibir dos PDF en Storage privado (17.849.230 y 10.131.027 bytes) y el portal informó pedido comercial `e2d76c8b-ce1c-4daf-9030-4bd402295a68` por ARS 2.432 sin cobro. En la rama privada `integracion/tus-pedido-privado-20261101` se activaron descargas administrativas de originales TUS en Worker documental `677fed48` y Central `ed95d696`, con tests y acceso privado; **pendiente validar que el operador pueda descargar efectivamente ambos PDF reales desde /admin**. No declarar E2E de descarga ni PDF compuesto hasta su prueba. Mantener main/web pública/cobros intactos. Última nota de continuidad en `docs/PLAN-PILOTO-INTEGRACION-TUS-20261101.md`.
