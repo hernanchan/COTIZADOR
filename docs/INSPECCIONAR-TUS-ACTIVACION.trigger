@@ -17,3 +17,5 @@ Consultar CI Worker documental ZIP numerado trigger 8cf46635, verificando tests 
 Consulta última ejecución 321b1257 de documentos, cliente muestra orden N.º 001, sin PDF enviado.
 
 Consultar ejecución 5f914a55 con A4/A3 y nuevos datos completos de papel/anillado al ZIP; solo diagnóstico de CI privado.
+
+Verificar resultado de despliegue 527f2972 para mostrar éxito y número de orden corto; exigir test vm nuevo y autenticación privada intacta.
