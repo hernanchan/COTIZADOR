@@ -30,3 +30,5 @@ Activar Worker documental para exigir numeroOrden D1 al completar pedido TUS y m
 01-11-2026 confirmación de cliente visible: éxito únicamente con registro D1 confirmado y número corto, aviso grande y visible en el portal, scroll a confirmación y número de orden persistente en barra superior. Test VM confirma ausencia de éxito prematuro, número 007. Desplegar únicamente saber-documentos-pruebas, sin pagos ni web pública, con rollback de seguridad.
 
 Reintento corrección visual orden cliente: la suite detectó regex en plantilla HTML que debía escaparse dos veces y expresion de captura en test. Corregidos en commits 0f48843e y c8d7419b. Ejecutar validación CI y SOLO desplegar si pruebas pasan. Web comercial intacta.
+
+Revalidar mensaje definitivo número corto: test heredado esperaba «Orden de trabajo N.º» anterior, ahora el banner dice «Orden N.º», test corregido commit 7474b05b. Mantener despliegue privado y seguridad sin cambios.
