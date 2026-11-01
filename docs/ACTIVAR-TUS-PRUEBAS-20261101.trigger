@@ -34,3 +34,5 @@ Reintento corrección visual orden cliente: la suite detectó regex en plantilla
 Revalidar mensaje definitivo número corto: test heredado esperaba «Orden de trabajo N.º» anterior, ahora el banner dice «Orden N.º», test corregido commit 7474b05b. Mantener despliegue privado y seguridad sin cambios.
 
 2026-11-01 — Reponer pregunta de TAMAÑO REAL cuando PDF no es A4: escaneo 21,75×30,43, A3, A5, A0 y PDF mixtos necesitan elegir explícitamente ajustar A4, A3 o original; 20x20 cm se mantiene en A4. Mantener clasificación CAD/Póster, cotizador y TUS completos sin tocar cobros ni página comercial. Test obligatorio decision-tamano-impresion.test.mjs incorporado a npm run build:unificado. Desplegar solamente Worker documental privado y verificar rollback HTTP401. Commits 06467426 904e5071 5ddfbd29 13d9085b 9da7b087 8d75b67b.
+
+2026-11-01: reforzar regla 20x20 cm: sólo A4 visible incluso en controles avanzados; sin desvío A3 ni original. CI privado y test exacto, rollback anónimo 401, paymentsEnabled=false.
