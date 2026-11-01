@@ -23,3 +23,5 @@ Verificar resultado de despliegue 527f2972 para mostrar éxito y número de orde
 Confirmar ejecucion c425245a tras reparacion regex UI para banner de exito y N.º D1. Estado CI privado, rollback y protección 401.
 
 Obtener resultado final de CI bbe71928 confirmación del cliente y número corto. Verificar 42 tests, compilación, HTTP401.
+
+Verificar workflow size mandatory choice c02b157d, tests A3 A0 A5 scan 21,75 30,43 y 20x20, versión privada, HTTP401, no cambios de cobros.
