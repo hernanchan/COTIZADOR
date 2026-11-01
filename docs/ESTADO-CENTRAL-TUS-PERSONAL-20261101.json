@@ -1,6 +1,13 @@
 {
   "runs": [
     {
+      "id": 41348411627,
+      "head_sha": "3e46f66676c078d4ae108b08c35afb20d2610830",
+      "status": "completed",
+      "conclusion": "failure",
+      "html_url": "https://github.com/hernanchan/COTIZADOR/actions/runs/41348411627"
+    },
+    {
       "id": 41347248038,
       "head_sha": "2afcb0c50692e788d8ea7770ac4e6e103d9372f0",
       "status": "completed",
@@ -27,21 +34,16 @@
       "status": "completed",
       "conclusion": "success",
       "html_url": "https://github.com/hernanchan/COTIZADOR/actions/runs/41327349314"
-    },
-    {
-      "id": 41327269642,
-      "head_sha": "5cf72bcdc37f7862b4684daf10e5c5d855d3bcb8",
-      "status": "completed",
-      "conclusion": "failure",
-      "html_url": "https://github.com/hernanchan/COTIZADOR/actions/runs/41327269642"
     }
   ],
   "jobs": [
     {
-      "id": 124969605703,
+      "id": 124973122128,
       "name": "activar-central-pruebas",
-      "conclusion": "success",
-      "failed_steps": []
+      "conclusion": "failure",
+      "failed_steps": [
+        "Pruebas D1 del Centro aisladas de cobros"
+      ]
     }
   ]
 }
