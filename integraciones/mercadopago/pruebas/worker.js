@@ -577,11 +577,15 @@ async function centralPrepareDraft(req,env){
     env.DB.prepare("SELECT commercial_order_id FROM central_document_manifests WHERE web_order_id=?").bind(data.webOrderId).first()
    ]);
    if(stored&&linked?.commercial_order_id===other.order_id&&
-      stored.status==="awaiting_payment"&&stored.amount_ars===total)
+      stored.status==="awaiting_payment"&&stored.amount_ars===total){
     await env.DB.prepare("INSERT OR IGNORE INTO central_work_order_numbers(commercial_order_id) VALUES(?)").bind(other.order_id).run();
+    const number=await env.DB.prepare("SELECT number FROM central_work_order_numbers WHERE commercial_order_id=?").bind(other.order_id).first();
+    if(!Number.isSafeInteger(number?.number)||number.number<1)
+     return json({error:"Número de orden concurrente no confirmado"},409);
     return json({created:true,idempotent:true,commercial_order_id:other.order_id,
-     numeroOrden:shortWorkNumber((await env.DB.prepare("SELECT number FROM central_work_order_numbers WHERE commercial_order_id=?").bind(other.order_id).first())?.number),
+     numeroOrden:shortWorkNumber(number.number),
      amount_ars:stored.amount_ars,state:stored.status,checkoutEnabled:false,paymentAuthorized:false});
+   }
   }
   return json({error:"Pedido concurrente o recepción reutilizada"},409);
  }
