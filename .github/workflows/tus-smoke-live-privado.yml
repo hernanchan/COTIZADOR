@@ -35,11 +35,15 @@ jobs:
           for route in /prueba-v2/ /prueba-v2/carga-inteligente /prueba-v2/carga-inteligente.js; do
             status=$(curl --silent --show-error --max-time 20 -u "operador:$PASSWORD" -o "$workdir/page" -w '%{http_code}' "$docs$route")
             if [ "$status" != 200 ]; then echo "PRIVATE_AUTH_FAILED_$route_HTTP_$status"; exit 1; fi
+            echo "AUTHENTICATED_GET_OK route=$route bytes=$(wc -c < "$workdir/page")"
             case "$route" in
-              /prueba-v2/) grep -Fq 'id="smart"' "$workdir/page"; grep -Fq 'send-all-pdf' "$workdir/page";;
-              /prueba-v2/carga-inteligente) grep -Fq 'name="modoImpresionLote"' "$workdir/page"; grep -Fq 'id="zonaArchivos"' "$workdir/page"; grep -Fq 'id="configComunGlobal"' "$workdir/page";;
-              /prueba-v2/carga-inteligente.js) grep -Fq "aplicarConfiguracionComunAlDocumento" "$workdir/page"; grep -Fq "modoLote==='comun'" "$workdir/page";;
+              /prueba-v2/) markers=('id="smart"' 'send-all-pdf');;
+              /prueba-v2/carga-inteligente) markers=('name="modoImpresionLote"' 'id="zonaArchivos"' 'id="configComunGlobal"');;
+              /prueba-v2/carga-inteligente.js) markers=('aplicarConfiguracionComunAlDocumento' "modoLote==='comun'");;
             esac
+            for marker in "${markers[@]}"; do
+              if ! grep -Fq "$marker" "$workdir/page"; then echo "LIVE_UI_MARKER_NOT_FOUND route=$route marker=$marker"; exit 1; fi
+            done
           done
           echo "DOCUMENTS_PRIVATE_MODE_COMMON_AND_INDIVIDUAL_LIVE_OK"
           status=$(curl --silent --show-error --max-time 20 -o "$workdir/health" -w '%{http_code}' "$central/health")
