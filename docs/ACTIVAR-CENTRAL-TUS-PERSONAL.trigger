@@ -40,3 +40,5 @@ Activar Central versión de pedido corto visible también en respuesta de prepar
 2026-11-02 — Actualizar solo Worker saber-pagos-pruebas con cierre de bypass de preflight D1, commit 189c512, CI aprobado 41452231699. Rollback automático y HTTP401/health obligatorios. DOCS_SANDBOX_CHECKOUT_ENABLED permanece sin activar; no cobrar ni tocar web pública.
 
 2026-11-02 — Desplegar solo saber-pagos-pruebas la Central con acción de enlace de prueba Mercado Pago para documentos, protección contra pedido mixto Express y reutilización de preferencias. CI 41455248120 aprobado. Mantener compuerta sandbox actual sin cambios y pagos comerciales deshabilitados. Rollback y verificaciones HTTP401/health obligatorios.
+
+2026-11-02 — Reintentar despliegue SOLO de la Central de pruebas: corrección de layout de PDF y enlace sandbox, CI global 41455441360 aprobado. Mantener cerradas las compuertas de cobro; rollback automático y health obligatorio.
