@@ -1573,7 +1573,7 @@ async function audit(env,event,detail){
   await env.DB.prepare("INSERT INTO webhook_audit(event,detail) VALUES(?,?)").bind(event,detail).run();
  }catch(e){console.error("Webhook audit failed",e?.message||"unknown")}
 }
-async function documentSandboxEligibility(env,orderId){
+async function documentSandboxEligibility(env,orderId,allowExistingPreference=false){
   const order=await env.DB.prepare("SELECT id,amount_ars,deposit_ars,status,created_at,preference_id FROM orders WHERE id=?").bind(orderId).first();
   if(!order)return {reason:"PEDIDO_INEXISTENTE"};
   const manifest=await env.DB.prepare("SELECT amount_ars,file_count,manifest_json FROM central_document_manifests WHERE commercial_order_id=?").bind(order.id).first();
@@ -1585,7 +1585,7 @@ async function documentSandboxEligibility(env,orderId){
   const docs=lines.filter(x=>x.sku==="DOCS_VERIFIED");
   const total=lines.reduce((sum,x)=>sum+Number(x.line_total_ars),0);
   const reason=order.status!=="awaiting_payment"?"PEDIDO_NO_PENDIENTE":
-   order.preference_id?"PAGO_YA_INICIADO":
+   order.preference_id&&!allowExistingPreference?"PAGO_YA_INICIADO":
    !Number.isFinite(createdAt)||Date.now()>=createdAt+86400000?"COTIZACION_VENCIDA":
    !Number.isSafeInteger(order.amount_ars)||order.amount_ars<1||order.deposit_ars!==order.amount_ars?"PAGO_TOTAL_INVALIDO":
    !Number.isSafeInteger(manifest.amount_ars)||manifest.amount_ars<1||!Number.isSafeInteger(manifest.file_count)||manifest.file_count<1?"RECEPCION_INVALIDA":
@@ -1847,7 +1847,7 @@ export default {
     try{parsed=JSON.parse(manifest.manifest_json)}catch(_){}
     const createdAt=Date.parse(String(order.created_at||"").replace(" ","T")+"Z");
     const reason=order.status!=="awaiting_payment"?"PEDIDO_NO_PENDIENTE":
-     order.preference_id?"PAGO_YA_INICIADO":
+     order.preference_id&&!sandboxPrepare?"PAGO_YA_INICIADO":
      !Number.isSafeInteger(createdAt)||Date.now()>=createdAt+86400000?"COTIZACION_VENCIDA":
      !Number.isSafeInteger(order.amount_ars)||order.amount_ars<1||order.deposit_ars!==order.amount_ars?"PAGO_TOTAL_INVALIDO":
      !Number.isSafeInteger(manifest.amount_ars)||manifest.amount_ars<1||!Number.isSafeInteger(manifest.file_count)||manifest.file_count<1?"RECEPCION_INVALIDA":
@@ -1887,7 +1887,7 @@ export default {
       if(env.DOCS_SANDBOX_CHECKOUT_ENABLED!=="PRIVATE_TEST_ONLY")return json({error:"Cobro de documentos deshabilitado hasta preflight privado sandbox"},503);
       // Revalidar D1 AQUÍ, incluso cuando un cliente invoque /demo/checkout
       // directamente o falsifique encabezados. Nunca confiar en un header interno.
-      const verified=await documentSandboxEligibility(env,order.id);
+      const verified=await documentSandboxEligibility(env,order.id,true);
       if(verified.reason)return json({error:"Pedido documental no autorizado para sandbox",reason:verified.reason},409);
      }
     if(order.description==="Librería Saber · documentos verificados y tienda"&&!restricted){
