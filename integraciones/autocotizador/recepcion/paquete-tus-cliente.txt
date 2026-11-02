@@ -104,46 +104,6 @@ function formatoOrden(t,i){
  }
  return filas;
 }
-function textoOrden(d){
- const lines=['LIBRERÍA SABER — ORDEN DE TRABAJO N.º '+d.numeroOrden,
-  'ESTADO: '+d.estadoPago+' — NO IMPRIMIR NI ENTREGAR SIN AUTORIZACIÓN',
-  'Importe del pedido: ARS '+d.importe,
-  'Documentos: '+d.trabajos.length,
-  'Los PDF originales NO están modificados ni impuestos. Abrir cada PDF en Adobe Acrobat.',
-  ''];
- for(const [i,t] of d.trabajos.entries()){
-  lines.push('PDF '+String(i+1).padStart(2,'0')+' — '+nombreZip(i)+
-   ' — '+nombreSeguro(t.nombreOriginal));
-  for(const [k,v] of formatoOrden(t,i))lines.push('  '+k+': '+clean(v));
-  lines.push('');
- }
- lines.push('IMPORTANTE: comprobar la vista previa de Adobe, papel y escala antes de imprimir.');
- lines.push('Cualquier «NO CONSTA» requiere verificar la instrucción con el cliente.');
- return lines.join('\n');
-}
-function escapeHtml(s){return clean(s).replace(/[&<>"']/g,c=>({
- '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-})[c])}
-function htmlOrden(d){
- const sections=d.trabajos.map((t,i)=>
-  '<section><h2>'+escapeHtml(nombreZip(i))+' · '+escapeHtml(nombreSeguro(t.nombreOriginal))+
-  '</h2><table>'+formatoOrden(t,i).map(([k,v])=>'<tr><th>'+escapeHtml(k)+
-  '</th><td>'+escapeHtml(v)+'</td></tr>').join('')+'</table></section>').join('');
- return '<!doctype html><html lang="es"><head><meta charset="utf-8">'+
-  '<title>Orden '+escapeHtml(d.numeroOrden)+'</title><style>'+
-  '@page{size:A4;margin:12mm}body{font:12px Arial,sans-serif;margin:0;color:#17324c}'+
-  'h1{font-size:23px;margin:0 0 8px}h2{font-size:15px;margin:0 0 7px}'+
-  '.datos{font-size:13px;margin:5px 0 12px}section{break-inside:avoid;page-break-inside:avoid;margin-top:16px}'+
-  'table{border-collapse:collapse;width:100%}th,td{border:1px solid #cbd7e2;padding:5px 7px;text-align:left;vertical-align:top}'+
-  'th{width:39%;font-weight:bold;background:#f1f5f9}.alert{border:2px solid #ad5500;padding:9px;font-weight:bold}'+
-  '.nota{font-weight:bold;font-size:12px;margin:15px 0 0}'+
-  '</style></head><body><h1>LIBRERÍA SABER · ORDEN DE TRABAJO N.º '+
-  escapeHtml(d.numeroOrden)+'</h1><p class="datos">Documentos: '+
-  escapeHtml(d.trabajos.length)+' · Total: ARS '+escapeHtml(d.importe)+
-  '</p><p class="alert">PEDIDO SIN PAGO CONFIRMADO. NO IMPRIMIR NI ENTREGAR SIN AUTORIZACIÓN.</p>'+
-  '<p>Abrir en Adobe Acrobat los PDF indicados. Son originales sin modificar ni imponer.</p>'+
-  sections+'<p class="nota">Control: verificar vista previa, escala, páginas por cara, doble faz y papel. Si dice NO CONSTA, confirmar antes de imprimir.</p></body></html>';
-}
 async function fetchFicha(){
  if(!isOrder)throw Error('Referencia del pedido incorrecta');
  const res=await fetch('/prueba-v2/api/ensayo-tus-paquete-manifiesto',{
@@ -155,7 +115,9 @@ async function fetchFicha(){
  if(!res.ok||result.ok!==true||result.webOrderId!==webOrderId||
     !/^\d{3,}$/.test(result.numeroOrden||'')||
     !Array.isArray(result.trabajos)||!result.trabajos.length||
-    result.paymentAuthorized!==false)
+    result.paymentAuthorized!==false||
+    !['PAGADO_VERIFICADO','SIN_PAGO_CONFIRMADO'].includes(result.estadoPago)||
+    (result.estadoPago==='PAGADO_VERIFICADO'&&result.pagoVerificado!==true))
   throw Error(result.error||'No se pudo verificar la orden de trabajo');
  return result;
 }
@@ -207,9 +169,11 @@ async function descargarZip(){
   await Promise.all(Array.from({length:Math.min(3,trabajos.length)},()=>trabajador()));
   if(primerError)throw primerError;
   if(pdfs.some(x=>!x))throw Error('Faltan PDF originales para completar la orden.');
-  const order='ORDEN_'+ficha.numeroOrden+'_INSTRUCCIONES';
-  pdfs.push({name:order+'.html',blob:new Blob([htmlOrden(ficha)],{type:'text/html'})});
-  pdfs.push({name:order+'.txt',blob:new Blob([textoOrden(ficha)],{type:'text/plain;charset=utf-8'})});
+  const order='ORDEN_'+ficha.numeroOrden+'_TRABAJO';
+  const filas=ficha.trabajos.map((t,i)=>formatoOrden(t,i));
+  const ordenPdf=generarPdfOrdenTrabajo(ficha,filas);
+  if(ordenPdf.size<400||ordenPdf.size>2*1024*1024)throw Error('Orden de trabajo PDF inválida');
+  pdfs.push({name:order+'.pdf',blob:ordenPdf});
   state.textContent='Armando ZIP y comprobando integridad…';
   const zip=await crearZipSinCompresion(pdfs,{
    progress:(i,n)=>{state.textContent='Armando ZIP '+i+'/'+n+'…'}
@@ -231,7 +195,11 @@ button.addEventListener('click',descargarZip);
   document.getElementById('detalle').textContent=ficha.trabajos.length+
    ' PDF · '+ficha.estadoPago+' · ARS '+ficha.importe;
   button.disabled=false;
-  state.textContent='Orden verificada. Descarga automática del ZIP…';
+  const pago=ficha.estadoPago==='PAGADO_VERIFICADO'&&ficha.pagoVerificado===true;
+  document.getElementById('advertencia').textContent=pago?
+   'PAGO VERIFICADO. Preparación pendiente: revisar escala, doble faz, papel y PDF original antes de imprimir.':
+   'SIN PAGO CONFIRMADO. NO IMPRIMIR NI ENTREGAR.';
+  state.textContent='Orden y estado de pago verificados. Descarga automática del ZIP…';
   await descargarZip();
  }catch(error){state.textContent='Acceso bloqueado: '+String(error.message||error)}
 })();
