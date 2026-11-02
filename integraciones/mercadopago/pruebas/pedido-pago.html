@@ -7,7 +7,7 @@
 history.replaceState(null,'',location.pathname);
 const state=document.querySelector('#state'),reference=document.querySelector('#reference');
 async function refresh(){try{state.textContent='Consultando la confirmación del pago…';const result=await SaberCheckout.status();
- state.textContent=({paid:'Pago total confirmado. Recibimos tu pedido.',awaiting_payment:'El pago todavía no está confirmado. Si ya pagaste, esperá y volvé a verificar.',review:'El pago requiere revisión. No volveremos a cobrarlo automáticamente.',draft:'Todavía no hay un pedido preparado para pagar.'})[result.state]||'No se pudo comprobar el pedido.';
+ state.textContent=({paid:'Pago total confirmado. Recibimos tu pedido.',awaiting_payment:'El pago todavía no está confirmado. Si ya pagaste, esperá y volvé a verificar.',review:'El pago requiere revisión. No volveremos a cobrarlo automáticamente.',verifying_payment:'Estamos verificando la acreditación del pago. No vuelvas a pagarlo.',awaiting_bank_verification:'Transferencia pendiente de acreditación bancaria. No necesitás volver a pagar; verificaremos el ingreso antes de preparar tu trabajo.',draft:'Todavía no hay un pedido preparado para pagar.'})[result.state]||'No se pudo comprobar el pedido.';
  reference.textContent=result.order_id?'Pedido: '+result.order_id:'';
  document.querySelector('#retry').hidden=result.state!=='awaiting_payment';document.querySelector('#new').hidden=result.state!=='paid';
  }catch(e){state.textContent=e.message}}
