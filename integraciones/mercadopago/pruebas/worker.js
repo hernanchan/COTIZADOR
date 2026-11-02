@@ -1853,7 +1853,7 @@ export default {
     await ensureOrderItems(env);
     const restricted=await env.DB.prepare("SELECT sku FROM order_items WHERE order_id=? AND sku IN ('DOCS_VERIFIED','POLAROID_EXPRESS_A4') LIMIT 1").bind(orderId).first();
     if(restricted?.sku==="POLAROID_EXPRESS_A4")return json({error:"Cobro de Polaroids Express todavía deshabilitado"},503);
-     if(restricted?.sku==="DOCS_VERIFIED"&&(env.DOCS_SANDBOX_CHECKOUT_ENABLED!=="PRIVATE_TEST_ONLY"||req.headers.get("x-docs-sandbox-preflight")!=="PRIVATE_TEST_ONLY"))return json({error:"Cobro documental requiere preflight privado sandbox"},503);
+     if(restricted?.sku==="DOCS_VERIFIED"&&(env.DOCS_SANDBOX_CHECKOUT_ENABLED!=="PRIVATE_TEST_ONLY"||req.headers.get("x-docs-sandbox-preflight")!=="PRIVATE_TEST_ONLY"))return json({error:"Cobro de documentos deshabilitado hasta preflight privado sandbox"},503);
     if(order.description==="Librería Saber · documentos verificados y tienda"&&(env.DOCS_SANDBOX_CHECKOUT_ENABLED!=="PRIVATE_TEST_ONLY"||req.headers.get("x-docs-sandbox-preflight")!=="PRIVATE_TEST_ONLY"))return json({error:"Cobro de documentos aún no habilitado. Falta el ensayo integral."},503);
     if(order.description==="Librería Saber · Polaroids Express y tienda")return json({error:"Cobro de Polaroids Express aún no habilitado. Falta el ensayo integral."},503);
     // Evitar ofrecer Mercado Pago cuando el mismo pedido ya recibió instrucciones de transferencia.
