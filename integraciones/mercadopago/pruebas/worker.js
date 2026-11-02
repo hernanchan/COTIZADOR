@@ -1095,13 +1095,20 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px ui-monospace,monospace
 <header><div><h1>Centro de Pedidos · Pruebas</h1><div class="note">Solo pagos completos aprobados · No está conectado al sitio público</div></div></header>
 <fieldset><legend>Acceso privado</legend><div class="toolbar">
 <input type="password" autocomplete="off" id="secret" placeholder="Clave privada del panel" aria-label="Clave privada">
+<input type="text" id="productionOperator" maxlength="60" placeholder="Responsable del cambio" aria-label="Nombre de responsable" autocomplete="off">
 <button id="refresh">Consultar pedidos</button><button id="sync" class="outline">Verificar pagos pendientes</button>
 </div><p id="status" role="status" aria-live="polite"></p><p id="cronState" class="note">Conciliación automática: sin consultar.</p></fieldset>
 <fieldset><legend>Polaroids Express · PDF privado único</legend><button id="refreshExpress" class="outline">Consultar PDF recibidos</button><p class="note">Hasta cuatro hojas A4 por pedido. Archivo listo en Drive privado; el pago todavía no está confirmado.</p><ol id="expressReceipts"></ol></fieldset>
 <fieldset><legend>Recepciones de PDF verificadas sin pedido comercial</legend><div class="toolbar"><button id="refreshReceipts" class="outline">Consultar recepciones pendientes</button></div><p class="note">Documentos confirmados en Drive, todavía no vinculados a un pedido cobrado. No están listos para imprimir.</p><ol id="verifiedReceipts"></ol></fieldset>
 <fieldset><legend>Transferencias por conciliar · Sin producción</legend><button id="refreshTransfers" class="outline">Consultar transferencias pendientes</button><p class="note">Importes informados al cliente; comprobar la acreditación real en el banco. Ningún pedido se libera con un comprobante.</p><ol id="transferPending"></ol></fieldset>
 <fieldset><legend>Pedidos con PDF y pago pendiente</legend><button id="refreshUnpaid" class="outline">Consultar pedidos sin pago confirmado</button><ol id="unpaidDocs"></ol></fieldset>
-<div class="grid"><fieldset><legend>Pedidos pagados</legend><ol id="orders"></ol></fieldset><fieldset><legend>Detalle del pedido</legend>
+<div class="grid"><fieldset><legend>Seguimiento de pedidos</legend>
+<div class="toolbar"><label for="productionFilter">Mostrar</label>
+<select id="productionFilter"><option value="active">Trabajos activos</option>
+<option value="all">Todos los pedidos</option><option value="en_espera">En espera</option>
+<option value="listo">Listos para retirar</option><option value="entregado">Entregados</option></select></div>
+<p class="note">Primero aparecen los trabajos en espera y los pendientes. Descargar un ZIP no cambia ningún estado.</p>
+<ol id="orders"></ol></fieldset><fieldset><legend>Detalle del pedido</legend>
 <div id="details">Seleccioná un pedido para ver sus datos y archivos referenciados.</div></fieldset></div>
 <script>
 const secret=document.querySelector("#secret"),status=document.querySelector("#status"),orders=document.querySelector("#orders"),details=document.querySelector("#details");
@@ -1115,7 +1122,64 @@ async function apiPost(path,data){
 }
 async function api(path,method="GET"){const r=await fetch(path,{method,headers:{"Authorization":"Bearer "+secret.value},cache:"no-store"});const x=await r.json().catch(()=>({}));if(!r.ok)throw Error(r.status===401?"Clave incorrecta":x.error||"Error "+r.status);return x}
 function node(tag,txt){const x=document.createElement(tag);x.textContent=String(txt);return x}
-async function showOrder(id){try{status.textContent="Consultando detalle...";const x=await api("/admin/api/order?id="+encodeURIComponent(id));details.replaceChildren();details.append(node("h3","Pedido "+x.order.id));details.append(node("p","Total: "+money(x.order.amount_ars)+" · Aprobado: "+(x.order.paid_at||"sin fecha")));if(x.produccion){const pr=x.produccion;details.append(node("h4","Estado operativo: "+pr.estado.replaceAll("_"," ")));details.append(node("p",pr.mensaje));for(const t of pr.trabajos){const area=node("section","");area.append(node("h4",t.linea+". "+t.cantidad+" × "+t.descripcion+" — "+money(t.subtotal)));area.append(node("p","Estado: "+t.etapa.replaceAll("_"," ")+" · "+t.instruccion));const valores=Object.entries(t.especificaciones||{}).map(a=>a[0]+": "+a[1]).join(" · ");if(valores)area.append(node("p","Ficha técnica: "+valores));if(t.referencias?.length)area.append(node("p","Referencias privadas: "+t.referencias.join(", ")));details.append(area)}}else details.append(node("p","La ficha de producción no está disponible."));if(x.produccion?.documentosVerificados){
+function productionLabel(x){return ({
+ pendiente:"Pendiente",en_preparacion:"En preparación",en_espera:"En espera",
+ listo:"Listo para retirar",entregado:"Entregado"
+ })[x]||"Sin estado"}
+function renderProductionTracking(orderId,track){
+ const area=node("section","");
+ area.append(node("h4","Seguimiento · "+productionLabel(track.state)));
+ area.append(node("p","Último cambio: "+(track.updated_at||"sin movimientos")+
+  (track.operator?" · Responsable indicado: "+track.operator:"")));
+ const actions={
+  en_preparacion:"Empezar preparación",en_espera:"Poner en espera",
+  listo:"Marcar listo para retirar",entregado:"Marcar entregado"
+ };
+ for(const next of track.allowed||[]){
+  const btn=node("button",actions[next]||productionLabel(next));
+  btn.type="button";if(next==="en_espera")btn.className="outline";
+  btn.addEventListener("click",async()=>{
+   const person=document.querySelector("#productionOperator").value.trim();
+   if(person.length<2){status.textContent="Indicá el responsable antes de cambiar el estado.";return}
+   let reason="",confirmed=false;
+   if(next==="en_espera"){
+    reason=prompt("Motivo del problema o espera (obligatorio):")||"";
+    if(reason.trim().length<5){status.textContent="Se necesita un motivo de espera de al menos 5 caracteres.";return}
+   }
+   if(next==="listo"||next==="entregado"){
+    confirmed=confirm(next==="listo"?
+     "¿Comprobaste que todo el trabajo está terminado y listo para retirar?":
+     "¿Confirmás que el pedido fue entregado al cliente?");
+    if(!confirmed)return;
+   }
+   btn.disabled=true;
+   try{
+    await apiPost("/admin/api/central/production-status",{
+     order_id:orderId,from:track.state,to:next,version:track.version,
+     operator:person,reason,confirmed
+    });
+    await refresh();
+    await showOrder(orderId);
+   }catch(e){status.textContent="No se pudo cambiar el estado: "+String(e.message||e)}
+   finally{btn.disabled=false}
+  });
+  area.append(btn);
+ }
+ if(track.state==="entregado")area.append(node("p","Pedido entregado · historial conservado."));
+ if(track.history?.length){
+  const log=node("details","");
+  const summary=node("summary","Ver historial de movimientos");
+  log.append(summary);
+  for(const event of track.history){
+   log.append(node("p",(event.created_at||"Sin fecha")+" · "+
+    productionLabel(event.from_state)+" → "+productionLabel(event.to_state)+
+    " · "+event.operator+(event.reason?" · "+event.reason:"")));
+  }
+  area.append(log);
+ }
+ details.append(area);
+}
+async function showOrder(id){try{status.textContent="Consultando detalle...";const x=await api("/admin/api/order?id="+encodeURIComponent(id));details.replaceChildren();details.append(node("h3","Pedido "+x.order.id));details.append(node("p","Total: "+money(x.order.amount_ars)+" · Aprobado: "+(x.order.paid_at||"sin fecha")));if(x.produccion?.seguimiento)renderProductionTracking(id,x.produccion.seguimiento);if(x.produccion){const pr=x.produccion;details.append(node("h4","Estado operativo: "+pr.estado.replaceAll("_"," ")));details.append(node("p",pr.mensaje));for(const t of pr.trabajos){const area=node("section","");area.append(node("h4",t.linea+". "+t.cantidad+" × "+t.descripcion+" — "+money(t.subtotal)));area.append(node("p","Estado: "+t.etapa.replaceAll("_"," ")+" · "+t.instruccion));const valores=Object.entries(t.especificaciones||{}).map(a=>a[0]+": "+a[1]).join(" · ");if(valores)area.append(node("p","Ficha técnica: "+valores));if(t.referencias?.length)area.append(node("p","Referencias privadas: "+t.referencias.join(", ")));details.append(area)}}else details.append(node("p","La ficha de producción no está disponible."));if(x.produccion?.documentosVerificados){
  const d=x.produccion.documentosVerificados;
  details.append(node("h4",(d.numeroOrden?"Orden de trabajo N.º "+d.numeroOrden+" · ":"")+
   "PDF originales verificados · "+d.archivos+" archivo(s)"));
@@ -1365,7 +1429,27 @@ async function refreshCronState(){
   el.textContent="Última ejecución automática: "+fecha+" UTC · "+x.status+" · pedidos revisados: "+x.checked+" · registrados: "+x.registered+" · errores: "+x.errors;
  }catch(e){el.textContent="Conciliación automática: no se pudo consultar el registro."}
 }
-async function refresh(){try{status.textContent="Consultando...";await refreshCronState();const x=await api("/admin/api/orders");orders.replaceChildren();if(!x.orders.length)orders.append(node("li","Aún no hay pedidos con pago total confirmado."));for(const o of x.orders){const li=node("li",o.description+" · "+money(o.amount_ars)+" · "+(o.paid_at||"sin fecha"));li.append(node("div",o.id));const b=node("button","Ver detalle");b.addEventListener("click",()=>showOrder(o.id));li.append(b);orders.append(li)}status.textContent=x.orders.length+" pedido(s) pagado(s) encontrado(s)"}catch(e){status.textContent=e.message}}
+async function refresh(){try{
+ status.textContent="Consultando...";
+ await refreshCronState();
+ const x=await api("/admin/api/orders");
+ orders.replaceChildren();
+ const filter=document.querySelector("#productionFilter").value;
+ const active=x.orders.filter(o=>filter==="all"||(
+  filter==="active"?o.production_state&&o.production_state!=="entregado":o.production_state===filter));
+ if(!active.length)orders.append(node("li","No hay pedidos en esta categoría."));
+ for(const o of active){
+  const label=o.production_state?productionLabel(o.production_state):"Pedido histórico";
+  const title=(o.work_number?"Orden N.º "+String(o.work_number).padStart(3,"0"):"Pedido")+
+   " · "+label+" · "+money(o.amount_ars);
+  const li=node("li",title);
+  li.append(node("p",o.description+" · "+(o.paid_at||"sin fecha")));
+  const b=node("button","Ver pedido");b.addEventListener("click",()=>showOrder(o.id));
+  li.append(b);orders.append(li);
+ }
+ status.textContent=active.length+" pedido(s) visibles";
+ }catch(e){status.textContent=e.message}}
+document.querySelector("#productionFilter").addEventListener("change",refresh);
 document.querySelector("#refreshExpress").addEventListener("click",async()=>{
  const list=document.querySelector("#expressReceipts");list.replaceChildren();
  try{
