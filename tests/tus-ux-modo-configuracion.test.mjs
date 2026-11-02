@@ -16,15 +16,16 @@ test('private PDF editor requests configuration mode before upload',()=>{
 });
 test('shared mode preserves per-file size, pages, server quote and individual exceptions',()=>{
  assert.match(source,/let modoLote=null/);
+ assert.ok(source.includes('const configuracionComun={}'));
+ assert.ok(source.includes('function aplicarConfiguracionComunAlDocumento(e)'));
+ assert.ok(source.includes("if(modoLote!=='comun'||!e?.paginas"));
+ assert.ok(source.includes("if(!destino.confirmado||destino.destino!=='documentos')return"));
+ assert.ok(source.includes('if(global)configuracionComun[campo]=valor'));
+ assert.ok(source.includes('aplicarConfiguracionComunAlDocumento(entries[start+i])'));
+ assert.ok(source.includes("const barra=controlesComunes({id:'a4',indices},true)"));
+ assert.ok(!source.includes('bloque.append(comunes)'));
  assert.match(source,/campo\.disabled=!modoLote/);
  assert.match(source,/if\(!modoLote\)\{\$\('estado'\)/);
- assert.match(source,/const configuracionComun=\\{\\}/);
- assert.match(source,/function aplicarConfiguracionComunAlDocumento\\(e\\)/);
- assert.match(source,/if\\(modoLote!=='comun'\\|\\|!e\\?\\.paginas/);
- assert.match(source,/if\\(!destino.confirmado\\|\\|destino.destino!=='documentos'\\)return/);
- assert.match(source,/if\\(global\\)configuracionComun\\[campo\\]=valor/);
- assert.match(source,/aplicarConfiguracionComunAlDocumento\\(entries\\[start\\+i\\]\\)/);
- assert.match(source,/const barra=controlesComunes\\(\\{id:'a4',indices\\},true\\)/);
  assert.doesNotMatch(source,/bloque.append\\(comunes\\)/);
  assert.match(source,/function renderConfiguracionGlobal\(/);
  assert.match(source,/clasificarDestino\(paginasElegidas\(e\)\|\|e\.paginas,e\.seleccion\)\.destino==='documentos'/);
