@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {webcrypto} from 'node:crypto';
 import {paginaCotizadorV2PruebaPrivada} from './pantalla-cotizador-v2-prueba-privada.mjs';
-const html=paginaCotizadorV2PruebaPrivada('sitekey-test',{tusEnabled:true});
+const html=paginaCotizadorV2PruebaPrivada('sitekey-test',true);
 const script=html.match(/<script type="module">([\s\S]*?)<\/script>/)?.[1];
 assert.ok(script,'No se encontro el modulo del portal');
 const start="if(event.source===smart.contentWindow&&event.data?.type==='SABER_SMART_DOCUMENTS_TO_PRIVATE'){";
