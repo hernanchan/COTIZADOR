@@ -79,6 +79,7 @@ const registerButton=document.getElementById('register-private'),registerStatus=
 const sendAllButton=document.getElementById('send-all-pdf'),batchProgress=document.getElementById('batch-progress');
 const modoDiagnostico=new URLSearchParams(location.search).get('diagnostico')==='1';
 const TUS_ENABLED=${tusEnabled===true};
+ const MAX_PDF_PRIVADOS=TUS_ENABLED?10:30;
 const TUS_BLOCKED=${tusBloqueado};
 let tusPreflightOK=false;
 if(TUS_BLOCKED){
@@ -200,8 +201,8 @@ function assignFiles(files){
   batchStatus.textContent='Solo se admiten archivos PDF.';return;
  }
  const refs=all.flatMap(item=>item.references).filter(d=>!d.confirmacion);
- if(chosen.length>30||refs.length>30){
-  batchStatus.textContent='El máximo del ensayo es de 30 PDF.';return;
+ if(chosen.length>MAX_PDF_PRIVADOS||refs.length>MAX_PDF_PRIVADOS){
+  batchStatus.textContent='El máximo del ensayo es de '+MAX_PDF_PRIVADOS+' PDF.';return;
  }
  let assigned=0,unmatched=0,ambiguous=0;
  for(const file of chosen){
@@ -261,13 +262,13 @@ function restore(){
     !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(state.clientOrderId||'')||
     !Number.isSafeInteger(state.savedAt)||Date.now()-state.savedAt<0||
     Date.now()-state.savedAt>RECOVERY_MAX_AGE||!Array.isArray(state.items)||
-    state.items.length>30)return null;
+    state.items.length>MAX_PDF_PRIVADOS)return null;
   const seen=new Set(),items=[];
   let totalReferences=0;
   for(const item of state.items){
    if(!item||typeof item.name!=='string'||item.name.length>120||
     !Number.isFinite(item.price)||item.price<=0||
-    !Array.isArray(item.references)||item.references.length>30)return null;
+    !Array.isArray(item.references)||item.references.length>MAX_PDF_PRIVADOS)return null;
    const refs=[];
    for(const d of item.references){
     if(!d||!Number.isSafeInteger(d.itemIndex)||d.itemIndex<0||d.itemIndex>29||
@@ -747,7 +748,7 @@ sendAllButton.addEventListener('click',async()=>{
  const allEntries=all.flatMap(item=>item.references);
  const pending=allEntries.filter(d=>!d.confirmacion);
  for(const d of pending)d.ultimoErrorDeRecepcion='';
- if(!allEntries.length||allEntries.length>30||
+ if(!allEntries.length||allEntries.length>MAX_PDF_PRIVADOS||
     all.some(item=>!item.references.length)||
     pending.some(d=>!d.archivoLocal||typeof d.sendNow!=='function')){
   batchProgress.textContent='Faltan archivos o trabajos por completar antes del envío.';
@@ -1007,13 +1008,13 @@ window.addEventListener('message',async event=>{
   const payload=event.data;
   if(batchSending||registering||registeredOrder||!Array.isArray(payload.files)||
      !Array.isArray(payload.options)||payload.files.length!==payload.options.length||
-     payload.files.length<1||payload.files.length>30||
+     payload.files.length<1||payload.files.length>MAX_PDF_PRIVADOS||
      !Number.isSafeInteger(payload.total)||payload.total<1){
    batchStatus.textContent='Pedido inteligente inválido o recepción ocupada.';return;
   }
   const existing=all.flatMap(item=>item.references).length;
-  if(existing+payload.files.length>30){
-   batchStatus.textContent='El pedido supera los 30 PDF permitidos.';return;
+  if(existing+payload.files.length>MAX_PDF_PRIVADOS){
+   batchStatus.textContent='El pedido supera los '+MAX_PDF_PRIVADOS+' PDF permitidos.';return;
   }
   // Ningún dato de la clasificación preliminar se trata como precio confirmado.
   try{
@@ -1071,9 +1072,9 @@ window.addEventListener('message',async event=>{
  const p=event.data.payload;
  if(!p||p.type!=='print'||typeof p.name!=='string'||
     !Number.isFinite(p.price)||p.price<=0||
-    !Array.isArray(p.pdfDrafts)||p.pdfDrafts.length>30)return;
+    !Array.isArray(p.pdfDrafts)||p.pdfDrafts.length>MAX_PDF_PRIVADOS)return;
  const refs=[],seen=new Set();
- if(all.reduce((n,item)=>n+item.references.length,0)+p.pdfDrafts.length>30)return;
+ if(all.reduce((n,item)=>n+item.references.length,0)+p.pdfDrafts.length>MAX_PDF_PRIVADOS)return;
  for(const d of p.pdfDrafts){
   const r=d?.reference;
   if(!d||d.service!=='impresiones'||!Number.isSafeInteger(d.itemIndex)||
