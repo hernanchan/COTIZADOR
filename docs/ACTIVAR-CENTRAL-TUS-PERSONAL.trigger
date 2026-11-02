@@ -28,3 +28,5 @@ Activar Central versión de pedido corto visible también en respuesta de prepar
 2026-11-01: Actualizar texto de Centro: el operador imprime desde Adobe los PDF originales privados; no se genera PDF compuesto. CI obligatoria, despliegue solo Central de pruebas. Codigo dd1bbb40.
 
 2026-11-02 — Actualizar exclusivamente saber-pagos-pruebas con estados de transferencia bancaria pendiente, panel privado de conciliación y compuertas Checkout Pro todavía apagadas. Conservar D1 existente, rollback, HTTP401 y health paymentsEnabled=false. Documentos privado ya desplegado con CI 41440068092.
+
+2026-11-02 — Conciliación legible de transferencias pendientes: mostrar número comercial ya asignado (p.ej. 009) sin escribir números ni cambiar estado de cobro. CI 41446134719 aprobada. Deploy solo saber-pagos-pruebas con rollback HTTP401, health paymentsEnabled=false, no web comercial.
