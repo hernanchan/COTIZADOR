@@ -29,7 +29,7 @@ jobs:
         run: |
           set -euo pipefail
           npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.25.12
-          node --test tests/tus-pedido-privado.test.mjs tests/tus-ui-presupuesto-smoke.test.mjs tests/tus-central-d1-lookup.test.mjs tests/tus-central-staff-download.test.mjs tests/tus-zip-orden-privada.test.mjs tests/tus-zip-descarga-automatica.test.mjs tests/tus-paquete-manifiesto.test.mjs tests/tus-instrucciones-reales.test.mjs tests/tus-a5-original.test.mjs
+          node --test tests/tus-pedido-privado.test.mjs tests/tus-recuperar-en-d1.test.mjs tests/tus-ui-presupuesto-smoke.test.mjs tests/tus-central-d1-lookup.test.mjs tests/tus-central-staff-download.test.mjs tests/tus-zip-orden-privada.test.mjs tests/tus-zip-descarga-automatica.test.mjs tests/tus-paquete-manifiesto.test.mjs tests/tus-instrucciones-reales.test.mjs tests/tus-a5-original.test.mjs
       - name: Compilar el mismo Worker privado verificado
         working-directory: integraciones/autocotizador/recepcion
         run: |
