@@ -27,10 +27,13 @@ jobs:
           root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/$worker"
           curl -fsS --max-time 20 -H "Authorization: Bearer $TOKEN" "$root/deployments" -o /tmp/deployments-before.json
           jq -e '.success==true and (.result.deployments|type=="array") and (.result.deployments|length>0)' /tmp/deployments-before.json >/dev/null
+          echo "Current deployment version summary:"
+          jq -c '.result.deployments[0] | {id,versions:[.versions[]? | {version_id,percentage}]}' /tmp/deployments-before.json
           old_version=$(jq -r '
-            [.result.deployments[]?.versions[]? | select(.percentage==100) | .version_id] |
-            unique | if length==1 then .[0] else empty end' /tmp/deployments-before.json)
-          echo "Detected rollback candidate count: $(jq '[.result.deployments[]?.versions[]? | select(.percentage==100) | .version_id] | unique | length' /tmp/deployments-before.json)"
+            .result.deployments[0].versions as $versions |
+            if ($versions|type)=="array" and ($versions|length)==1 and
+               (($versions[0].percentage|tonumber?)==100)
+            then $versions[0].version_id else empty end' /tmp/deployments-before.json)
           [[ "$old_version" =~ ^[0-9a-f-]{36}$ ]] && [ "$old_version" != "$new_version" ] || { echo "ROLLBACK_VERSION_NOT_UNAMBIGUOUS"; exit 1; }
           echo "ROLLBACK_VERSION_READY"\n          curl -fsS --max-time 20 -H "Authorization: Bearer $TOKEN" "$root/versions/$new_version" -o /tmp/new-version-check.json\n          jq -e --arg id "$new_version" '.success==true and .result.id==$id' /tmp/new-version-check.json >/dev/null
           curl -fsS --max-time 20 -H "Authorization: Bearer $TOKEN" "$root/settings" -o /tmp/bindings-before.json
