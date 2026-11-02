@@ -1009,6 +1009,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px ui-monospace,monospace
 </div><p id="status" role="status" aria-live="polite"></p><p id="cronState" class="note">Conciliación automática: sin consultar.</p></fieldset>
 <fieldset><legend>Polaroids Express · PDF privado único</legend><button id="refreshExpress" class="outline">Consultar PDF recibidos</button><p class="note">Hasta cuatro hojas A4 por pedido. Archivo listo en Drive privado; el pago todavía no está confirmado.</p><ol id="expressReceipts"></ol></fieldset>
 <fieldset><legend>Recepciones de PDF verificadas sin pedido comercial</legend><div class="toolbar"><button id="refreshReceipts" class="outline">Consultar recepciones pendientes</button></div><p class="note">Documentos confirmados en Drive, todavía no vinculados a un pedido cobrado. No están listos para imprimir.</p><ol id="verifiedReceipts"></ol></fieldset>
+<fieldset><legend>Transferencias por conciliar · Sin producción</legend><button id="refreshTransfers" class="outline">Consultar transferencias pendientes</button><p class="note">Importes informados al cliente; comprobar la acreditación real en el banco. Ningún pedido se libera con un comprobante.</p><ol id="transferPending"></ol></fieldset>
 <fieldset><legend>Pedidos con PDF y pago pendiente</legend><button id="refreshUnpaid" class="outline">Consultar pedidos sin pago confirmado</button><ol id="unpaidDocs"></ol></fieldset>
 <div class="grid"><fieldset><legend>Pedidos pagados</legend><ol id="orders"></ol></fieldset><fieldset><legend>Detalle del pedido</legend>
 <div id="details">Seleccioná un pedido para ver sus datos y archivos referenciados.</div></fieldset></div>
@@ -1266,6 +1267,22 @@ document.querySelector("#refreshReceipts").addEventListener("click",async()=>{
    list.append(li);
   }
   status.textContent=x.manifests.length+" recepción(es) sin pedido comercial";
+ }catch(e){list.replaceChildren();status.textContent=e.message}
+});
+document.querySelector("#refreshTransfers").addEventListener("click",async()=>{
+ const list=document.querySelector("#transferPending");
+ try{
+  status.textContent="Consultando transferencias pendientes…";
+  const x=await api("/admin/api/transfers/pending");
+  list.replaceChildren();
+  if(!x.orders.length)list.append(node("li","No hay transferencias pendientes."));
+  for(const t of x.orders){
+   const li=node("li",(t.description||"Pedido")+" · "+money(t.amount_ars));
+   li.append(node("p","Referencia: "+t.order_id));
+   li.append(node("p","Solicitada: "+t.created_at+" · Acreditación NO verificada · NO imprimir"));
+   list.append(li);
+  }
+  status.textContent=x.orders.length+" transferencia(s) para conciliar en el banco";
  }catch(e){list.replaceChildren();status.textContent=e.message}
 });
 document.querySelector("#refreshUnpaid").addEventListener("click",async()=>{
@@ -1620,6 +1637,19 @@ export default {
     await ensureCronHealth(env);
     const lastRun=await env.DB.prepare("SELECT started_at,finished_at,status,checked,registered,errors FROM cron_health WHERE id=1").first();
     return json({lastRun,periodMinutes:10,note:"Solo ejecuciones programadas; no cuenta las verificaciones manuales."});
+   }
+   // Consulta privada y de SOLO LECTURA. Una instrucción de transferencia
+   // jamás habilita fabricación ni acredita fondos por sí sola.
+   if(url.pathname==="/admin/api/transfers/pending"&&req.method==="GET"){
+    if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+    if(env.TRANSFER_PRIVATE_ENABLED!=="PRIVATE_TEST_ONLY")
+     return json({error:"Conciliación de transferencias no habilitada"},503);
+    const exists=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='transfer_requests'").first();
+    if(!exists)return json({orders:[],payment_confirmed:false,production_enabled:false});
+    const rows=await env.DB.prepare(
+     "SELECT t.order_id,t.amount_ars,t.created_at,o.description,o.created_at AS order_created_at FROM transfer_requests t JOIN orders o ON o.id=t.order_id WHERE t.status='awaiting_bank_verification' AND o.status='awaiting_payment' AND o.deposit_ars=o.amount_ars AND t.amount_ars=o.amount_ars ORDER BY t.created_at ASC LIMIT 100"
+    ).all();
+    return json({orders:rows.results||[],payment_confirmed:false,production_enabled:false});
    }
    if(url.pathname==="/admin/api/orders"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
