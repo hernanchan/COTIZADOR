@@ -582,7 +582,8 @@ function render(){
     const opciones={formato:formato.value,caras:caras.value,
      copias:Number(copias.value),anillado:anillado.value,
      grupoAnillado:anillado.value==='grupo'?grupoAnillado.value:'',
-     materialColor:papel.value,paginasPorHoja:Number(paginasPorHoja.value)};
+     materialColor:papel.value,paginasPorHoja:Number(paginasPorHoja.value),
+     paginasSeleccionadas:d.opcionesInteligentes?.paginasSeleccionadas||''};
     return {meta:{orderId,fileId:fileIdParaReferencia(r),
       name:r.nombre,mode:mode.value,bytes:r.bytes,sha256:r.sha256,
       partBytes:512*1024,parts:Math.ceil(r.bytes/(512*1024))},
@@ -1070,6 +1071,8 @@ window.addEventListener('message',async event=>{
        !['simple','double'].includes(opt.caras)||
        !Number.isSafeInteger(opt.copias)||opt.copias<1||opt.copias>200||
        ![1,2,4,9].includes(opt.paginasPorHoja??1)||
+       (opt.paginasSeleccionadas!==undefined&&
+        (typeof opt.paginasSeleccionadas!=='string'||opt.paginasSeleccionadas.length>500))||
        !['ninguno','individual',...(TUS_ENABLED?['grupo']:[])].includes(opt.anillado)||
        (opt.anillado==='grupo'&&!/^[1-9][0-9]?$/.test(String(opt.grupoAnillado||'')))||
        (opt.anillado!=='grupo'&&Boolean(opt.grupoAnillado))||
