@@ -27,7 +27,7 @@ const scope={AbortSignal,Response,Request,URL,URLSearchParams,TextEncoder,crypto
 scope.globalThis=scope;
 vm.createContext(scope);
 vm.runInContext(source.replace('export default {','globalThis.worker = {'),scope);
-const env={DB,DEMO_ADMIN_KEY:'test-secret',TRANSFER_PRIVATE_ENABLED:'PRIVATE_TEST_ONLY',TRANSFER_ALIAS:'saber.pruebas',MP_TEST_ACCESS_TOKEN:'offline'};
+const env={DB,DEMO_ADMIN_KEY:'test-secret',TRANSFER_PRIVATE_ENABLED:'PRIVATE_TEST_ONLY',TRANSFER_ALIAS:'saber.pruebas',MP_TEST_ACCESS_TOKEN:'offline',MP_TEST_SELLER_ID:'123456',MP_WEBHOOK_SECRET:'offline-hmac',TEST_WEBHOOK_URL:'https://localhost.invalid/webhook'};
 async function call(body={},overrides={}){
  const result=await scope.worker.fetch(new Request('https://private.example/demo/transfer-request',{method:'POST',headers:{Authorization:'Bearer test-secret','Content-Type':'application/json'},body:JSON.stringify(body)}),{...env,...overrides});
  return {code:result.status,data:await result.json()};
