@@ -22,7 +22,7 @@ jobs:
       - name: Dependencias mínimas para pruebas y compilación
         run: npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.25.12
       - name: Contrato TUS y pipeline PDF real, sin D1 ni cuentas
-        run: node --test tests/tus-pedido-privado.test.mjs tests/tus-recuperar-en-d1.test.mjs tests/tus-pagos-prepublicacion-bloqueados.test.mjs tests/tus-pagos-concurrencia-d1.test.mjs tests/tus-pagos-preferencia-validada.test.mjs tests/tus-pagos-revocaciones.test.mjs tests/tus-central-pagos-verificados.test.mjs tests/tus-paginas-seleccionadas.test.mjs tests/tus-ui-cierre-operativo.test.mjs tests/tus-ui-presupuesto-smoke.test.mjs tests/tus-central-d1-lookup.test.mjs tests/tus-anillado-conjunto.test.mjs tests/tus-medidas-cad-visual.test.mjs
+        run: node --test tests/tus-pedido-privado.test.mjs tests/tus-recuperar-en-d1.test.mjs tests/tus-pagos-prepublicacion-bloqueados.test.mjs tests/tus-pagos-concurrencia-d1.test.mjs tests/tus-pagos-preferencia-validada.test.mjs tests/tus-pagos-revocaciones.test.mjs tests/tus-central-pagos-verificados.test.mjs tests/polaroids-interfaz-independiente.test.mjs tests/tus-paginas-seleccionadas.test.mjs tests/tus-ui-cierre-operativo.test.mjs tests/tus-ui-presupuesto-smoke.test.mjs tests/tus-central-d1-lookup.test.mjs tests/tus-anillado-conjunto.test.mjs tests/tus-medidas-cad-visual.test.mjs
       - name: Sintaxis de módulos integrados
         run: |
           node --check integraciones/autocotizador/recepcion/tus-pedido-contrato.mjs
