@@ -129,3 +129,37 @@ test('Central devuelve en paquete privado el detalle inmutable por página de pl
  assert.equal(t.planoPorPagina[1].papel,'recubierto');
  assert.equal(result.paymentAuthorized,false);
 });
+
+test('ZIP de pedido pagado exige conciliación verified y conserva bloqueo de impresión automática',async()=>{
+ let verified=false;
+ const dbPaid={prepare(sql){
+  if(sql.includes('FROM central_document_manifests m JOIN orders o')&&
+     sql.includes('JOIN central_work_order_numbers')){
+   const q={bind(){return q},async first(){return {
+    web_order_id:webOrderId,commercial_order_id:orderId,
+    manifest_json:JSON.stringify(manifest),amount_ars:2432,
+    file_count:1,number:13,status:'paid'
+   }}};
+   return q;
+  }
+  if(sql.includes("JOIN payment_reviews r ON r.order_id=o.id")){
+   const q={bind(){return q},async first(){return verified?{id:orderId}:null}};
+   return q;
+  }
+  return db.prepare(sql);
+ }};
+ const request=()=>signed({schema:'saber-central-tus-package-v1',webOrderId});
+ const blocked=await ctx.worker.fetch(await request(),{...env,DB:dbPaid});
+ assert.equal(blocked.status,409);
+ verified=true;
+ const response=await ctx.worker.fetch(await request(),{...env,DB:dbPaid});
+ assert.equal(response.status,200);
+ const item=await response.json();
+ assert.equal(item.numeroOrden,'013');
+ assert.equal(item.estadoPago,'PAGADO_VERIFICADO');
+ assert.equal(item.pagoVerificado,true);
+ assert.equal(item.paymentAuthorized,false);
+ assert.equal(item.listoParaProducir,false);
+ assert.equal(item.pdfImprimibleVerificado,false);
+ assert.equal(item.trabajos[0].reciboPrivado,receipt);
+});
