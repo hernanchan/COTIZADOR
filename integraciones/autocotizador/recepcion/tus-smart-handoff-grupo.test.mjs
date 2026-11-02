@@ -7,7 +7,7 @@ const start='const prepararEnvioPrivado=()=>{';
 const begin=source.indexOf(start);
 const end=source.indexOf('\n };\n bridgeButton.hidden=true',begin);
 assert.ok(begin>=0&&end>begin,'Falta transferencia del cliente');
-const handoff=new Function('leyendo','ultimoPresupuesto','entries','window','location','info',
+const handoff=new Function('leyendo','ultimoPresupuesto','entries','window','location','info','MAX_PDF_CARGA',
  source.slice(begin+start.length,end));
 
 function ensayo(grupo2='1'){
@@ -22,7 +22,7 @@ function ensayo(grupo2='1'){
  const quote={estado:'PRELIMINAR',total:5750,subtotalImpresiones:5750,plan};
  const sent=[],info={textContent:''};
  handoff(false,quote,entries,{parent:{postMessage:x=>sent.push(x)}},
-  {origin:'https://example.test'},info);
+  {origin:'https://example.test'},info,10);
  return {entries,sent,info};
 }
 
