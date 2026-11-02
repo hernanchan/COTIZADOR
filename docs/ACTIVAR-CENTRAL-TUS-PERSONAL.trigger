@@ -34,3 +34,5 @@ Activar Central versión de pedido corto visible también en respuesta de prepar
 2026-11-02 — Aplicar vencimiento 24 horas a solicitudes bancarias en paridad con Mercado Pago. Test D1 simulado en CI 41447987997 aprobado. Desplegar solo saber-pagos-pruebas, conservar bindings, verificar /health y rechazo HTTP401, rollback obligatorio. No activar pagos ni web pública.
 
 2026-11-02 — Desplegar solo Central privada con endpoint admin /admin/api/central/payment-preflight: cotejo de manifiesto D1, línea documental, pedido y pago completo, sin crear preferencia Mercado Pago ni acreditar ni autorizar producción. Suite CI 41448559285 verde; rollback, health sin pagos y HTTP401 obligatorios. No web pública.
+
+2026-11-02 — Desplegar exclusivamente saber-pagos-pruebas commit 1e74da2: ruta preflight/payment-sandbox-prepare agregada pero inhabilitada sin DOCS_SANDBOX_CHECKOUT_ENABLED=PRIVATE_TEST_ONLY. Probar 401 admin y health paymentsEnabled=false; rollback automático. No habilitar flag de pago, no hacer preferencias ni modificar producción.
