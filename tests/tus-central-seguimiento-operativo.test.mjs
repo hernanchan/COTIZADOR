@@ -140,7 +140,7 @@ test('tablero práctico: cuatro columnas, historial y control por tarjeta',()=>{
  assert.match(script,/sessionStorage\.setItem/);
  assert.match(script,/Descargar ZIP/);
  assert.doesNotMatch(script,/zip\.addEventListener\("click",\(\)=>\{[^}]*production-status/s);
- assert.match(script,/await refresh\(\{silent:true\}\)/);
+ assert.match(script,/await refresh\(\{silent:true,force:true\}\)/);
  assert.match(source,/state='verified'/);
 });
 test('GET del tablero incluye versión de D1 y recibo sin exponer credenciales',()=>{
