@@ -124,12 +124,31 @@ test('bloqueo por problemas requiere causa y puede retomarse',async()=>{
  assert.equal(resume.data.production.history.length,2);
  assert.equal(events[0].reason,'Documento ilegible');
 });
-test('interfaz incluye filtros y no marca realizado por descargar ZIP',()=>{
- assert.match(html,/id="productionFilter"/);
+test('tablero práctico: cuatro columnas, historial y control por tarjeta',()=>{
+ for(const stage of ['pendiente','en_preparacion','listo','en_espera','entregado']){
+  assert.ok(html.includes('id="lane-'+stage+'"'),stage);
+  assert.ok(html.includes('id="count-'+stage+'"'),stage);
+ }
+ assert.ok(html.indexOf('id="productionBoard"')<html.indexOf('Polaroids Express'));
  assert.match(html,/id="productionOperator"/);
- assert.match(script,/renderProductionTracking/);
- assert.match(script,/apiPost\("\/admin\/api\/central\/production-status"/);
- assert.match(script,/Descargar ZIP \+ orden de trabajo PDF/);
- assert.doesNotMatch(script,/pack\.addEventListener\("click",\(\)=>\{[^}]*production-status/s);
+ assert.match(script,/function boardCard\(order\)/);
+ assert.match(script,/function moveCard\(order,next,button\)/);
+ assert.match(script,/await apiPost\("\/admin\/api\/central\/production-status"/);
+ assert.match(script,/version:order\.production_version/);
+ assert.match(script,/setInterval\(\(\)=>\{/);
+ assert.match(script,/30000\)/);
+ assert.match(script,/sessionStorage\.setItem/);
+ assert.match(script,/Descargar ZIP/);
+ assert.doesNotMatch(script,/zip\.addEventListener\("click",\(\)=>\{[^}]*production-status/s);
+ assert.match(script,/await refresh\(\{silent:true\}\)/);
  assert.match(source,/state='verified'/);
+});
+test('GET del tablero incluye versión de D1 y recibo sin exponer credenciales',()=>{
+ const area=source.slice(source.indexOf('if(url.pathname==="/admin/api/orders"'),source.indexOf('if(url.pathname==="/admin/api/central/asignar-numero"'));
+ assert.match(area,/COALESCE\(s\.version,0\) AS production_version/);
+ assert.match(area,/m\.web_order_id AS web_order_id/);
+ assert.match(area,/m\.file_count AS file_count/);
+ assert.match(area,/payment_reviews/);
+ assert.match(area,/state='verified'/);
+ assert.doesNotMatch(area,/service_role|secret_text/);
 });
