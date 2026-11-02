@@ -30,3 +30,15 @@
 - Prueba real de dispositivos PC/móvil y revisión UX antes del GO/NO-GO comercial.
 
 Prohibiciones vigentes: no despliegue de `main`, no web pública, no cobros reales, no gastos no autorizados.
+
+## Validación real posterior: selección de 6 páginas
+- El titular confirmó una prueba adicional en navegador: **subió un PDF, seleccionó imprimir 6 páginas, el sistema cotizó y finalizó correctamente**.
+- Este ensayo acredita el flujo observable de selección parcial; no se informa un número de orden ni la cantidad de páginas originales, porque no fueron suministrados.
+- No equivale a validación de cobros: la web de pruebas continúa sin pago autorizado.
+
+## Pago total: primera barrera de seguridad verificada
+- Se incorporó la regresión `tests/tus-pagos-prepublicacion-bloqueados.test.mjs`, basada en el Worker de Mercado Pago real ejecutado dentro de un entorno aislado sin red.
+- Comprueba que pedidos con `DOCS_VERIFIED` solos o mezclados con artículos, y pedidos documentales legados, no generen preferencias de pago mientras el checkout esté cerrado.
+- Verifica que `/checkout/pay` continúe inhabilitado sin autorización y que la prueba no invoque Mercado Pago.
+- GitHub CI aprobado: https://github.com/hernanchan/COTIZADOR/actions/runs/41375932529
+- **No se activó checkout sandbox ni producción, ni se cambió el Worker de pagos.**
