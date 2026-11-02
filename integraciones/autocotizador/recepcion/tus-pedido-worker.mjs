@@ -259,6 +259,37 @@ export async function finalizarPedidoTUSPrivado(request,env,{
    checkoutEnabled:false,paymentAuthorized:false,listoParaProducir:false},422);
  }
 }
+/** Recupera una orden ya verificada en D1 SIN volver a leer ni subir PDF.
+ * La Central sólo prepara órdenes de manifiestos previamente firmados y
+ * guardados; clientOrderId reutilizado => mismo número, sin duplicación.
+ * No activa checkout, no devuelve rutas de Storage, no autoriza producción.
+ */
+export async function recuperarPedidoTUSPrivado(request,env,{
+ authorized=false,preparar=prepararDocumentosCentralFirmado
+}={}){
+ try{
+  ensureRequest(request,env,authorized);
+  const input=await bodyJSON(request);
+  if(!input||Object.keys(input).sort().join(',')!=='clientOrderId,orderId'||
+     !/^WEB-ENSAYO-[A-F0-9]{32}$/.test(input.orderId||'')||
+     !UUID.test(input.clientOrderId||''))
+   throw Error('Identificador de recuperación incorrecto.');
+  const p=await preparar({env,webOrderId:input.orderId,
+   clientOrderId:input.clientOrderId,items:[]});
+  if(!p?.created||!UUID.test(p.commercialOrderId||'')||
+     !/^\\d{3,}$/.test(p.numeroOrden||'')||
+     !Number.isSafeInteger(p.amountArs)||p.amountArs<1||
+     p.paymentAuthorized!==false||p.checkoutEnabled!==false)
+   throw Error('Central sin orden verificable.');
+  return json({ok:true,webOrderId:input.orderId,
+   orderId:p.commercialOrderId,numeroOrden:p.numeroOrden,
+   totalArs:p.amountArs,idempotent:p.idempotent,
+   checkoutEnabled:false,paymentAuthorized:false,listoParaProducir:false});
+ }catch(_){
+  return json({ok:false,error:'La orden sigue pendiente de conciliación.',
+   checkoutEnabled:false,paymentAuthorized:false,listoParaProducir:false},409);
+ }
+}
 /** Pregunta a D1 por un recibo mediante el Service Binding ya firmado.
  * El operador no puede descargar un PDF no registrado en su pedido.
  */
