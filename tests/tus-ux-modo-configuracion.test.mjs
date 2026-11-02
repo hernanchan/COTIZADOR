@@ -23,6 +23,9 @@ test('shared mode preserves per-file size, pages, server quote and individual ex
  assert.ok(source.includes("configuracionComun.anillado||''"));
  assert.ok(source.includes("copias.value=String(configuracionComun.copias)"));
  assert.ok(source.includes("if(modoLote==='comun')for(const e of entries)aplicarConfiguracionComunAlDocumento(e)"));
+ assert.ok(source.includes('btn.onclick=()=>{e.seleccion=tam;aplicarConfiguracionComunAlDocumento(e);cambio()}'));
+ assert.ok(source.includes("sel.value;aplicarConfiguracionComunAlDocumento(e);cambio()"));
+ assert.ok(source.includes('await analizarArchivoPDF(e,file);aplicarConfiguracionComunAlDocumento(e)'));
  assert.ok(source.includes('function aplicarConfiguracionComunAlDocumento(e)'));
  assert.ok(source.includes("if(modoLote!=='comun'||!e?.paginas"));
  assert.ok(source.includes("if(!destino.confirmado||destino.destino!=='documentos')return"));
