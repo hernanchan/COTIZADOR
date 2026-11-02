@@ -7,14 +7,14 @@ const start='const prepararEnvioPrivado=()=>{';
 const begin=source.indexOf(start);
 const end=source.indexOf('\n };\n bridgeButton.hidden=true',begin);
 assert.ok(begin>=0&&end>begin,'Falta transferencia del cliente');
-const handoff=new Function('leyendo','ultimoPresupuesto','entries','window','location','info','MAX_PDF_CARGA',
+const handoff=new Function('leyendo','ultimoPresupuesto','entries','window','location','info','MAX_PDF_CARGA','paginasElegidas',
  source.slice(begin+start.length,end));
 
 function ensayo(grupo2='1'){
  const archivo=i=>new File([new Uint8Array(128)],'PDF_'+i+'.pdf',{type:'application/pdf'});
  const entries=[1,2].map(i=>({
   archivoOriginal:archivo(i),name:'PDF_'+i+'.pdf',anillado:'grupo',
-  grupoAnillado:i===1?'1':grupo2,paginas:[1,2,3],
+  grupoAnillado:i===1?'1':grupo2,paginas:[{numero:1},{numero:2},{numero:3}],
   modo:'bn',caras:'simple',copias:2,paginasPorHoja:2,materialColor:'obra70'
  }));
  const plan=entries.map((e,i)=>({indice:i,destino:'documentos',formatoFinal:'a4',
@@ -22,7 +22,7 @@ function ensayo(grupo2='1'){
  const quote={estado:'PRELIMINAR',total:5750,subtotalImpresiones:5750,plan};
  const sent=[],info={textContent:''};
  handoff(false,quote,entries,{parent:{postMessage:x=>sent.push(x)}},
-  {origin:'https://example.test'},info,10);
+  {origin:'https://example.test'},info,10,e=>e.paginas);
  return {entries,sent,info};
 }
 
