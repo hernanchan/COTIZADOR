@@ -19,12 +19,10 @@ let ultimoPresupuesto=null;
 const pesos=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(n);
 function informarPrecioPrivado(estado,total=null){
  if(window.parent===window)return;
- const anillados=entries.filter(e=>e.anillado!=='ninguno');
- const sendable=estado==='listo'&&anillados.every(e=>e.anillado==='individual');
+ const sendable=estado==='listo'&&ultimoPresupuesto?.estado==='PRELIMINAR';
  window.parent.postMessage({type:'SABER_SMART_PRICE_STATE',estado,
   total:Number.isSafeInteger(total)&&total>0?total:null,
-  sendable,blockReason:anillados.some(e=>e.anillado==='grupo')?
-   'El anillado conjunto todavía no puede registrarse automáticamente. Elegí anillado individual o sin anillado.':null},location.origin);
+  sendable,blockReason:null},location.origin);
 }
 function importeArchivo(indice){
  if(!ultimoPresupuesto)return null;
@@ -183,7 +181,11 @@ function controlesComunes(grupo){
    const e=entries[i];
    if(campo==='modo'){e.modo=valor;e.materialColor=''}
    else if(campo==='caras')e.caras=valor;
-   else if(campo==='anillado'){e.anillado=valor;e.grupoAnillado=''}
+   else if(campo==='anillado'){
+    const id=/^grupo:([1-5])$/.exec(valor);
+    e.anillado=id?'grupo':valor;
+    e.grupoAnillado=id?id[1]:'';
+   }
    else if(campo==='papelPoster')e.papelPoster=valor;
    else if(campo==='copias')e.copias=valor;
   }
@@ -201,7 +203,7 @@ function controlesComunes(grupo){
  if(tipos){
   barra.append(accionComun('Impresión para todos',[['bn','Blanco y negro'],['color','Color']],v=>aplicar('modo',v)));
   barra.append(accionComun('Caras para todos',[['simple','Simple faz'],['double','Doble faz']],v=>aplicar('caras',v)));
-  barra.append(accionComun('Anillado para todos',[['ninguno','Sin anillado'],['individual','Individual por archivo']],v=>aplicar('anillado',v)));
+  barra.append(accionComun('Anillado para todos',[['ninguno','Sin anillado'],['individual','Individual por archivo'],...Array.from({length:5},(_,i)=>['grupo:'+(i+1),'Juntos · Grupo '+(i+1)])],v=>aplicar('anillado',v)));
  }
  if(['poster','mixtos'].includes(grupo.id))
   barra.append(accionComun('Papel de póster',[['obra80','Obra 80 g'],['recubierto','Recubierto 130 g']],v=>aplicar('papelPoster',v)));
@@ -557,7 +559,7 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
  bridgeButton.textContent='Agregar PDF al envío privado';
  const info=document.createElement('p');
  info.className='pie';info.setAttribute('role','status');
- info.textContent='Recepción privada de hasta 10 PDF por pedido (máximo 20 MB por archivo y 60 MB en total). Impresiones y ploteos se verifican y registran en la Central. La selección parcial de páginas y el anillado conjunto todavía requieren integración.';
+ info.textContent='Recepción privada de hasta 10 PDF por pedido (máximo 20 MB por archivo y 60 MB en total). Impresiones y ploteos se verifican y registran en la Central. La selección parcial de páginas todavía requiere integración.';
  const resumen=$('resumenPedido');
  resumen?.parentNode?.insertBefore(bridgeButton,resumen);
  bridgeButton.insertAdjacentElement('afterend',info);
@@ -599,8 +601,10 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
        e.archivoOriginal.size<5||e.archivoOriginal.size>20*1024*1024||
        e.name.length>120||!/\.pdf$/i.test(e.name))
      throw Error('La recepción privada admite PDF de hasta 20 MB por archivo.');
-    if(!['ninguno','individual'].includes(e.anillado))
-     throw Error('El anillado de varios PDF juntos sigue pendiente de integración.');
+    if(!['ninguno','individual','grupo'].includes(e.anillado)||
+       (e.anillado==='grupo'&&!/^[1-9][0-9]?$/.test(String(e.grupoAnillado||'')))||
+       (e.anillado!=='grupo'&&e.grupoAnillado))
+     throw Error('El grupo de anillado del PDF no es válido.');
     if(![1,2,4,9].includes(e.paginasPorHoja??1))
      throw Error('Composición por cara no admitida.');
     if(!Array.isArray(e.paginas)||e.paginas.length<1||
@@ -613,7 +617,8 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
     files.push(e.archivoOriginal);
     options.push({formato:plan.formatoFinal,modo:e.modo,caras:e.caras,
      copias:e.copias,materialColor:e.materialColor,
-     anillado:e.anillado,paginasPorHoja:e.paginasPorHoja??1,
+     anillado:e.anillado,grupoAnillado:e.anillado==='grupo'?String(e.grupoAnillado):'',
+     paginasPorHoja:e.paginasPorHoja??1,
      paginas:e.paginas.length,nombre:e.name});
    }
    if(files.length){
