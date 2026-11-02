@@ -56,6 +56,20 @@
   })();
   try{return await pending}finally{pending=null}
  }
+ async function transfer(){
+  if(pending)return pending;
+  pending=(async()=>{
+   await begin();
+   const body=adapter.fromLocalStorage();
+   const order=await api('cart-order',body);
+   if(order.paid)return {state:'paid',order_id:order.order_id};
+   if(order.total_ars!==body.displayTotal&&!global.confirm('El total actualizado es $ '+order.total_ars.toLocaleString('es-AR')+'. ¿Continuar?'))return {state:'cancelled'};
+   // El backend no confía en importes del cliente: transferencia pendiente
+   // hasta verificación bancaria independiente; nunca confirma producción.
+   return api('transfer',{order_id:order.order_id});
+  })();
+  try{return await pending}finally{pending=null}
+ }
  async function status(){await begin();return api('status',{})}
  async function newOrder(){
   const current=await status();if(current.state!=='paid')throw Error('El pago todavía no está confirmado.');
@@ -63,5 +77,5 @@
   if(saved?.order_id===current.order_id&&saved.cart===localStorage.getItem('saberCartV1'))localStorage.removeItem('saberCartV1');
   localStorage.removeItem('saberCheckoutIntentV2');localStorage.removeItem(savedKey);localStorage.removeItem('saberCheckoutSubmittedV1');session=null;
  }
- global.SaberCheckout=Object.freeze({begin,receipt,checkout,status,newOrder});
+ global.SaberCheckout=Object.freeze({begin,receipt,checkout,transfer,status,newOrder});
 })(window);
