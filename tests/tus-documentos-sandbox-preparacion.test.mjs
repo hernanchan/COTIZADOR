@@ -91,5 +91,5 @@ test('validated D1-only amount creates one sandbox preference and safely reuses 
  const first=await run();assert.equal(first.status,200,JSON.stringify(first.data));
  assert.equal(first.data.checkout_url,fakeUrl);assert.equal(preferencePosts,1);
  // Reuse is only permitted via the already validated preference ID.
- const again=await run();assert.equal(again.status,409);assert.equal(preferencePosts,1);
+ const again=await run();assert.equal(again.status,200,JSON.stringify(again.data));assert.equal(again.data.reused,true);assert.equal(again.data.checkout_url,fakeUrl);assert.equal(preferencePosts,1);
 });
