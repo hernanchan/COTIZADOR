@@ -49,3 +49,15 @@ test('portal TUS rechaza grupo sin identificador sin sumar al carrito',async()=>
  assert.equal(x.all.length,0);
  assert.match(x.batchStatus.textContent,/No se preparó la carga/);
 });
+
+test('el HTML generado reconoce un numero de orden real de tres digitos',()=>{
+ const line=script.split('\n').find(x=>x.includes("resultado.numeroOrden||''"));
+ assert.ok(line,'Falta validacion de numero de orden en navegador');
+ const match=line.match(/\/(\^.+\$)\/\.test/);
+ assert.ok(match,'Falta expresion de numero de orden');
+ const expression=new RegExp(match[1]);
+ assert.equal(expression.test('007'),true);
+ assert.equal(expression.test('1234'),true);
+ assert.equal(expression.test('7'),false);
+ assert.equal(expression.test('ABC'),false);
+});
