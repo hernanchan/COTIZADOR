@@ -1100,6 +1100,8 @@ button:disabled{opacity:.5;cursor:default}.outline{color:#174b8f;background:whit
 .board-card .actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
 .board-card button{font-size:.88rem;padding:8px 10px}
 .board-card .primary-next{flex:1 0 100%;font-weight:650}
+.board-feedback{font-size:.87rem;font-weight:600;min-height:0;color:#93410b;white-space:pre-wrap;margin:7px 0 0}
+.board-feedback:empty{display:none}
 .board-footer{margin-top:12px}
 #details{overflow-wrap:anywhere}#details button{margin:4px 7px 4px 0}
 @media(max-width:1150px){.board{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -1163,8 +1165,8 @@ function renderProductionTracking(orderId,track){
   const btn=node("button",actions[next]||productionLabel(next));
   btn.type="button";if(next==="en_espera")btn.className="outline";
   btn.addEventListener("click",async()=>{
-   const person=document.querySelector("#productionOperator").value.trim();
-   if(person.length<2){status.textContent="Indicá el responsable antes de cambiar el estado.";return}
+   const person=requestOperator();
+   if(!person){const msg="Indicá el responsable para cambiar el estado.";area.append(node("p",msg));status.textContent=msg;return}
    let reason="",confirmed=false;
    if(next==="en_espera"){
     reason=prompt("Motivo del problema o espera (obligatorio):")||"";
@@ -1454,6 +1456,19 @@ async function refreshCronState(){
  }catch(e){el.textContent="Conciliación automática: no se pudo consultar el registro."}
 }
 const operatorInput=document.querySelector("#productionOperator");
+function requestOperator(){
+ let who=operatorInput.value.trim();
+ if(who.length<2){
+  const typed=prompt("¿Quién se encarga de este pedido? Escribilo una sola vez por turno:");
+  if(typed===null)return null;
+  who=typed.trim();
+  if(who.length<2||who.length>60)return null;
+  operatorInput.value=who;
+ }
+ try{sessionStorage.setItem("saberProductionOperator",who)}catch(_){}
+ return who;
+}
+
 try{operatorInput.value=sessionStorage.getItem("saberProductionOperator")||""}catch(_){}
 operatorInput.addEventListener("change",()=>{
  try{sessionStorage.setItem("saberProductionOperator",operatorInput.value.trim())}catch(_){}
@@ -1492,37 +1507,49 @@ function boardCard(order){
  const detail=node("button","Detalle");detail.className="outline";
  detail.addEventListener("click",()=>showOrder(order.id));
  controls.append(detail);card.append(controls);
+ const feedback=node("p","");feedback.className="board-feedback";
+ feedback.setAttribute("role","status");feedback.setAttribute("aria-live","polite");
+ card.append(feedback);
  return card;
 }
 async function moveCard(order,next,button){
- const operator=operatorInput.value.trim();
- if(operator.length<2){
-  status.textContent="Primero escribí el responsable del turno, arriba del tablero.";
-  operatorInput.focus();return;
- }
+ const card=button.closest(".board-card");
+ const feedback=card?.querySelector(".board-feedback");
+ const inform=(message)=>{
+  if(feedback)feedback.textContent=message;
+  status.textContent=message;
+ };
+ const operator=requestOperator();
+ if(!operator){inform("Indicá quién está preparando el pedido; no se cambió el estado.");return}
  let reason="";
  if(next==="en_espera"){
-  const typed=prompt("¿Por qué se detiene la orden "+(order.work_number||"")+"?") ;
+  const typed=prompt("¿Por qué se detiene la orden "+(order.work_number||"")+"?");
   if(typed===null)return;
   reason=typed.trim();
-  if(reason.length<5){status.textContent="Escribí un motivo concreto de al menos 5 caracteres.";return}
+  if(reason.length<5){inform("Indicá el motivo de la espera (mínimo 5 caracteres).");return}
  }
  if(next==="entregado"&&!confirm("¿Confirmás que la orden "+(order.work_number||"")+" fue entregada al cliente?"))return;
  button.disabled=true;
+ if(feedback)feedback.textContent="Guardando cambio de estado…";
  try{
   await apiPost("/admin/api/central/production-status",{
    order_id:order.id,from:order.production_state,to:next,
    version:order.production_version,operator,reason,confirmed:next==="listo"||next==="entregado"
   });
-  await refresh({silent:true});
+  await refresh({silent:true,force:true});
   status.textContent="Orden "+(order.work_number||"")+" → "+productionLabel(next)+" · cambio registrado.";
  }catch(e){
-  status.textContent="No se cambió la orden. "+String(e.message||e);
-  await refresh({silent:true});
+  inform("No se pudo cambiar el estado: "+String(e.message||e));
  }finally{button.disabled=false}
 }
-async function refresh({silent=false}={}){
- if(refreshingBoard)return;
+async function refresh({silent=false,force=false}={}){
+ if(refreshingBoard){
+  if(force){
+   for(let i=0;i<20&&refreshingBoard;i++)
+    await new Promise(resolve=>setTimeout(resolve,150));
+   if(refreshingBoard)throw Error("La Central sigue actualizando. Volvé a consultar pedidos.");
+  }else return;
+ }
  refreshingBoard=true;
  try{
   if(!silent){status.textContent="Actualizando tablero…";await refreshCronState()}
