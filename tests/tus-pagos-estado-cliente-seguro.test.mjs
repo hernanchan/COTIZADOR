@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const src=readFileSync(new URL('../integraciones/mercadopago/pruebas/worker.js',import.meta.url),'utf8');
 const checkout=src.slice(src.indexOf('if(url.pathname==="/demo/checkout"'),src.indexOf('if(url.pathname==="/webhooks/mercadopago"'));
-const status=src.slice(src.indexOf('if(path==="/checkout/status")'),src.indexOf('let target;',src.indexOf('if(path==="/checkout/status")'));
+const status=src.slice(src.indexOf('if(path==="/checkout/status")'),src.indexOf('let target;',src.indexOf('if(path==="/checkout/status")')));
 test('checkout nuevo valida la preferencia remota con las mismas reglas que un reintento',()=>{
  assert.ok(checkout.includes('return returnPreference(preference.id,false)'));
  assert.ok(checkout.includes('return returnPreference(order.preference_id,true)'));
