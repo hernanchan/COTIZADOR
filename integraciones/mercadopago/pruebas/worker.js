@@ -1774,6 +1774,12 @@ export default {
     if(restricted)return json({error:"Cobro de trabajos con archivos todavía deshabilitado hasta la validación integral."},503);
     if(order.description==="Librería Saber · documentos verificados y tienda")return json({error:"Cobro de documentos aún no habilitado. Falta el ensayo integral."},503);
     if(order.description==="Librería Saber · Polaroids Express y tienda")return json({error:"Cobro de Polaroids Express aún no habilitado. Falta el ensayo integral."},503);
+    // Evitar ofrecer Mercado Pago cuando el mismo pedido ya recibió instrucciones de transferencia.
+    const transferTable=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='transfer_requests'").first();
+    if(transferTable){
+     const transfer=await env.DB.prepare("SELECT order_id FROM transfer_requests WHERE order_id=?").bind(orderId).first();
+     if(transfer)return json({error:"Este pedido ya está pendiente de transferencia. No generes un segundo pago."},409);
+    }
     if(order.status!=="awaiting_payment")return json({error:"El pedido ya está pago"},409);
     const expiresAt=new Date(String(order.created_at).replace(" ","T")+"Z").getTime()+24*60*60*1000;
     if(!Number.isFinite(expiresAt)||Date.now()>=expiresAt)return json({error:"La cotización venció; prepará un nuevo pedido"},409);
