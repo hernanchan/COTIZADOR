@@ -259,6 +259,15 @@ function render(){
     const marca=texto('strong','TIPO DETECTADO: '+tipo);
     marca.className='clasificacion-ploteo-visible';
     principal.append(marca);
+    const medidas=elegidas.map(p=>Number(p.anchoCm).toLocaleString('es-AR',{maximumFractionDigits:2})+
+     ' × '+Number(p.altoCm).toLocaleString('es-AR',{maximumFractionDigits:2})+' cm');
+    const unicas=[...new Set(medidas)];
+    const medidaVisible=texto('p','MEDIDA DETECTADA: '+(unicas.length===1
+     ?unicas[0]:(elegidas.length<=8
+      ?elegidas.map((p,j)=>'Pág. '+p.numero+': '+medidas[j]).join(' · ')
+      :unicas.join(' / '))));
+    medidaVisible.className='medida-ploteo-visible';
+    principal.append(medidaVisible);
    }
   }
   if(e.paginas&&e.servicio==='auto'){
