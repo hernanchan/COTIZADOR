@@ -18,8 +18,29 @@ const boot=prefix=>`<script>window.SABER_CHECKOUT_CONFIG=${JSON.stringify(config
 let shop=await read('vidriera/index.html');
 shop=shop.replace('</body>',boot('')+`<script>
 const payButton=document.querySelector('.checkout');
-payButton.textContent='Pagar el total con Mercado Pago';
-payButton.onclick=async()=>{payButton.disabled=true;try{const result=await SaberCheckout.checkout();if(result.state==='paid')alert('El pago ya está confirmado. Pedido '+result.order_id)}catch(e){alert(e.message)}finally{payButton.disabled=false}};
+const selector=document.createElement('fieldset');
+selector.innerHTML='<legend>Elegí cómo pagar</legend><label><input type="radio" name="medioPagoSaber" value="mp" checked> Tarjeta de crédito, débito o dinero en Mercado Pago</label><label><input type="radio" name="medioPagoSaber" value="transferencia"> Transferencia bancaria</label><p>No se aplican recargos ni descuentos en esta etapa de pruebas.</p>';
+payButton.before(selector);
+const instructions=document.createElement('p');instructions.setAttribute('role','status');
+selector.after(instructions);
+payButton.textContent='Continuar con el pago';
+payButton.onclick=async()=>{
+ payButton.disabled=true;
+ try{
+  const method=document.querySelector('input[name="medioPagoSaber"]:checked')?.value;
+  if(method==='transferencia'){
+   const result=await SaberCheckout.transfer();
+   if(result.state==='cancelled')return;
+   instructions.textContent=result.state==='paid'?'Pedido ya pagado':
+    'Transferí $ '+Number(result.amount_ars).toLocaleString('es-AR')+
+    ' al alias '+result.alias+'. Pedido: '+result.order_id+
+    '. Queda pendiente de acreditación bancaria. No es una confirmación de pago.';
+  }else{
+   const result=await SaberCheckout.checkout();
+   if(result.state==='paid')instructions.textContent='Pago confirmado. Pedido '+result.order_id;
+  }
+ }catch(e){instructions.textContent=e.message}finally{payButton.disabled=false}
+};
 document.querySelector('.deposit').hidden=true;
 document.querySelector('.cart-hint').textContent='Pago total. La confirmación depende de la verificación del pago y de los archivos recibidos.';
 </script></body>`);
