@@ -39,7 +39,7 @@ jobs:
             case "$route" in
               /prueba-v2/) markers=('id="smart"' 'send-all-pdf');;
               /prueba-v2/carga-inteligente) markers=('name="modoImpresionLote"' 'id="zonaArchivos"' 'id="configComunGlobal"');;
-              /prueba-v2/carga-inteligente.js) markers=('modoImpresionLote' 'configComunGlobal');;
+              /prueba-v2/carga-inteligente.js) markers=('modoImpresionLote' 'configComunGlobal' 'Páginas por cara para todos' 'Personalizar este PDF' 'Configuración compartida');;
             esac
             for marker in "${markers[@]}"; do
               if ! grep -Fq "$marker" "$workdir/page"; then echo "LIVE_UI_MARKER_NOT_FOUND route=$route marker=$marker"; exit 1; fi
