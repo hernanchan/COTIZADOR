@@ -47,96 +47,82 @@ test('ZIP rechaza traversal, duplicados y archivos desmesurados',async()=>{
  await assert.rejects(()=>ctx.crearZipSinCompresion([
   {name:'PDF_01.pdf',blob:one},{name:'PDF_01.pdf',blob:one}]));
 });
-test('paquete privado usa rutas Basic y compone TXT + HTML sin exponer secretos',()=>{
- const page=readFileSync(new URL('../integraciones/autocotizador/recepcion/pantalla-paquete-tus-personal.mjs',import.meta.url),'utf8');
- const client=readFileSync(new URL('../integraciones/autocotizador/recepcion/paquete-tus-cliente.txt',import.meta.url),'utf8');
- new vm.Script(client);
- assert.ok(page.includes('Descargar ZIP completo'));
- assert.ok(client.includes('/prueba-v2/api/ensayo-tus-paquete-manifiesto'));
- assert.ok(client.includes('/prueba-v2/api/ensayo-tus-descargar-personal'));
- assert.ok(client.includes('ORDEN_'));
- assert.ok(client.includes('PDF_'));
- assert.ok(client.includes('NO CONSTA'));
- assert.ok(!page.includes('service_role'));
- assert.ok(!client.includes('cdn.'));
-});
 
-
-test('orden numerada: relaciona PDF_01/PDF_02 con nombres originales y parámetros concretos de Adobe',()=>{
- const client=readFileSync(new URL('../integraciones/autocotizador/recepcion/paquete-tus-cliente.txt',import.meta.url),'utf8');
- const start=client.indexOf('function clean(v)'),end=client.indexOf('async function fetchFicha()',start);
- assert.ok(start>=0&&end>start);
- const functions=vm.runInNewContext(client.slice(start,end)+
-  '\n({formatoOrden,textoOrden,htmlOrden,nombreZip})');
- const ordered={numeroOrden:'007',webOrderId:'WEB-ENSAYO-12345678901234567890123456789012',
-  importe:2432,estadoPago:'SIN_PAGO_CONFIRMADO',trabajos:[
-   {servicio:'documentos',nombreOriginal:'CARATULAS DIARIA.pdf',paginasOriginales:14,
-    paginasElegidas:Array.from({length:14},(_,i)=>i+1),formatoFinal:'personalizado_a4',
-    medidasOriginalesCm:Array.from({length:14},(_,i)=>({pagina:i+1,anchoCm:14,altoCm:20})),
-    tarifaAplicada:'a4',modo:'bn',carasPresupuestadas:'double',
-    paginasPorCaraPresupuestadas:2,copias:2,material:'estandar',tipoAnillado:'individual'},
-   {servicio:'documentos',nombreOriginal:'Cartel A4.pdf',paginasOriginales:5,
-    paginasElegidas:[1,3,5],formatoFinal:'a4',modo:'color',
-    carasPresupuestadas:'simple',paginasPorCaraPresupuestadas:1,
-    copias:1,material:'obra70',tipoAnillado:'ninguno'}
-  ]};
- const txt=functions.textoOrden(ordered),html=functions.htmlOrden(ordered);
- assert.equal(functions.nombreZip(0),'PDF_01.pdf');
- assert.equal(functions.nombreZip(1),'PDF_02.pdf');
- for(const [zip,original] of [['PDF_01.pdf','CARATULAS DIARIA.pdf'],['PDF_02.pdf','Cartel A4.pdf']]){
-  assert.ok(txt.includes(zip+' — '+original));
-  assert.ok(html.includes(zip+' · '+original));
- }
- for(const expected of ['14 × 20 cm','Múltiples en Adobe Acrobat: 2 páginas','Doble faz',
-  'Cantidad de copias: 2','Anillado individual','Páginas a imprimir: 1, 3, 5',
-  'Sin anillado','NO IMPRIMIR NI ENTREGAR','Papel obra 70 g','A4; tamaño original sin ampliar']){
-  assert.ok(txt.includes(expected),expected);
- }
- assert.ok(html.includes('size:A4'));
- assert.ok(html.includes('NO IMPRIMIR NI ENTREGAR'));
- assert.ok(!txt.includes('Referencia técnica:'),'No incluir UUID largo en la orden visible');
- assert.ok(!txt.includes('NO CONSTA — verificar'),'Orden nueva completa sin supuestos ni campos opcionales vacíos');
-});
-test('anexo en Adobe advierte cuando faltan datos y escapa nombres hostiles de archivos',()=>{
- const client=readFileSync(new URL('../integraciones/autocotizador/recepcion/paquete-tus-cliente.txt',import.meta.url),'utf8');
- const start=client.indexOf('function clean(v)'),end=client.indexOf('async function fetchFicha()',start);
- const render=vm.runInNewContext(client.slice(start,end)+'\n({textoOrden,htmlOrden})');
- const receipt={numeroOrden:'001',estadoPago:'SIN_PAGO_CONFIRMADO',importe:200,trabajos:[
-  {servicio:'documentos',nombreOriginal:'<archivo>&\r\nOtra orden.pdf',
-   paginasOriginales:3,paginasElegidas:[1,2,3],formatoFinal:'a5',
-   carasPresupuestadas:'simple',paginasPorCaraPresupuestadas:1,
-   copias:1,modo:'color',material:'obra70'}
+const pdfCode=readFileSync(new URL('../integraciones/autocotizador/recepcion/pdf-orden-tus-cliente.txt',import.meta.url),'utf8');
+const paqueteCode=readFileSync(new URL('../integraciones/autocotizador/recepcion/paquete-tus-cliente.txt',import.meta.url),'utf8');
+const pre=paqueteCode.slice(paqueteCode.indexOf('function clean(v)'),paqueteCode.indexOf('async function fetchFicha()'));
+const printable=vm.createContext({Blob,console,TextEncoder});
+vm.runInContext(pdfCode+'\n'+pre+'\n'+
+ 'globalThis.pdf=generarPdfOrdenTrabajo;globalThis.filas=formatoOrden;globalThis.nombre=nombreZip;',printable);
+const base={numeroOrden:'013',importe:4730,estadoPago:'PAGADO_VERIFICADO',pagoVerificado:true,
+ webOrderId:'WEB-ENSAYO-12345678901234567890123456789012',
+ trabajos:[
+ {orden:1,nombreOriginal:'Día de las familias.pdf',servicio:'documentos',paginasOriginales:8,
+  paginasElegidas:[1,2,3,4,5,6,7,8],copias:1,formatoFinal:'a4',modo:'bn',
+  carasPresupuestadas:'double',paginasPorCaraPresupuestadas:2,
+  material:'obra70',tipoAnillado:'grupo',grupoAnillado:'1'},
+ {orden:2,nombreOriginal:'Plano CAD y Póster.pdf',servicio:'ploteos',paginasOriginales:2,
+  paginasElegidas:[1,2],copias:2,formatoFinal:'original',
+  planoPorPagina:[{numeroOriginal:1,modo:'cad',anchoCm:60,altoCm:85,
+   rollo:'rollo60',papel:'obra80'},{numeroOriginal:2,modo:'poster',
+   anchoCm:60,altoCm:85,rollo:'rec60',papel:'recubierto'}]}
  ]};
- const txt=render.textoOrden(receipt);
- const html=render.htmlOrden(receipt);
- assert.ok(txt.includes('Anillado después de imprimir: NO CONSTA — verificar'));
- assert.ok(txt.includes('SIN ampliar'));
- assert.ok(!txt.includes('\r\nOtra orden.pdf'),'Control characters in original names must be normalized');
- assert.ok(html.includes('&lt;archivo&gt;&amp;'));
- assert.ok(!html.includes('<archivo>'));
- assert.ok(html.includes('NO CONSTA'));
+function imprimir(d=base){
+ return printable.pdf(d,d.trabajos.map((t,i)=>printable.filas(t,i)));
+}
+function pdfTexto(buf){
+ // Los streams contienen únicamente literales hexadecimales WinAnsi.
+ return [...buf.matchAll(/<([0-9a-f]{6,})> Tj/g)]
+  .map(m=>Buffer.from(m[1],'hex').toString('latin1')).join('\n');
+}
+test('portal ZIP privado emplea descarga Basic y reemplaza HTML/TXT por orden PDF',()=>{
+ const html=readFileSync(new URL('../integraciones/autocotizador/recepcion/pantalla-paquete-tus-personal.mjs',import.meta.url),'utf8');
+ assert.match(html,/pdf-orden-tus-cliente\.txt/);
+ assert.match(html,/orden de trabajo en PDF A4/);
+ assert.match(paqueteCode,/crearZipSinCompresion/);
+ assert.match(paqueteCode,/generarPdfOrdenTrabajo\(ficha,filas\)/);
+ assert.match(paqueteCode,/ORDEN_/);
+ assert.match(paqueteCode,/\.pdf',blob:ordenPdf/);
+ assert.doesNotMatch(paqueteCode,/\.html',blob:|\.txt',blob:/);
+ assert.match(paqueteCode,/ensayo-tus-paquete-manifiesto/);
+ assert.match(paqueteCode,/ensayo-tus-descargar-personal/);
+ assert.doesNotMatch(paqueteCode,/service_role|getPublicUrl|supabase\.co\/storage/i);
 });
-
-
-test('ZIP de ploteos muestra CAD/Póster, rollo y papel por página verificada; nunca inventa valores',()=>{
- const client=readFileSync(new URL('../integraciones/autocotizador/recepcion/paquete-tus-cliente.txt',import.meta.url),'utf8');
- const start=client.indexOf('function clean(v)'),end=client.indexOf('async function fetchFicha()',start);
- const render=vm.runInNewContext(client.slice(start,end)+'\n({textoOrden,htmlOrden})');
- const data={numeroOrden:'041',estadoPago:'SIN_PAGO_CONFIRMADO',importe:12150,
-  trabajos:[{nombreOriginal:'PLANOS MUNICIPALES.pdf',servicio:'ploteos',
-   paginasOriginales:2,paginasElegidas:[1,2],copias:2,formatoFinal:'original',
-   planoPorPagina:[
-    {numeroOriginal:1,modo:'cad',anchoCm:60,altoCm:85,rollo:'rollo60',papel:'obra80'},
-    {numeroOriginal:2,modo:'poster',anchoCm:60,altoCm:85,rollo:'rec60',papel:'recubierto'}
-   ]}]};
- const txt=render.textoOrden(data),html=render.htmlOrden(data);
- for(const value of ['PDF_01.pdf','PLANOS MUNICIPALES.pdf','Ploteo de planos CAD / Póster',
-  'Tamaño real · sin ajustar escala','Página 1: CAD / plano · 60.00 × 85.00 cm · rollo60 · Obra 80 g',
-  'Página 2: Póster / pleno · 60.00 × 85.00 cm · rec60 · Recubierto','NO IMPRIMIR NI ENTREGAR']){
-  assert.ok(txt.includes(value),value);
+test('orden PDF A4 contiene número, pago verificado, originales e instrucciones Adobe',async()=>{
+ const blob=imprimir();
+ assert.equal(blob.type,'application/pdf');
+ const raw=Buffer.from(await blob.arrayBuffer()).toString('latin1');
+ assert.ok(raw.startsWith('%PDF-1.4\n'));
+ assert.match(raw,/\/MediaBox \[0 0 595 842\]/);
+ assert.match(raw,/\/BaseFont \/Helvetica/);
+ const txt=pdfTexto(raw);
+ for(const label of ['ORDEN DE TRABAJO','013','PAGO VERIFICADO','PDF 01',
+  'Día de las familias.pdf','Páginas a imprimir','Doble faz','Múltiples en Adobe Acrobat',
+  'Anillado en grupo','PDF 02','Póster','Recubierto','rollo60','NO IMPRIMIR']){
+  assert.ok(txt.includes(label),label);
  }
- assert.ok(html.includes('rec60'));
- assert.ok(!txt.includes('no contiene las instrucciones completas'));
- const anterior={...data,trabajos:[{...data.trabajos[0],planoPorPagina:null}]};
- assert.match(render.textoOrden(anterior),/Faltan medidas, rollo o tipo CAD\/Póster/);
+ assert.ok(!txt.includes('SIN PAGO CONFIRMADO'));
+ const xref=Number(raw.match(/startxref\n(\d+)\n%%EOF/)[1]);
+ assert.equal(raw.slice(xref,xref+5),'xref\n');
+});
+test('orden A4 informa SIN PAGO si no existe conciliación verified',async()=>{
+ const unpaid={...base,estadoPago:'SIN_PAGO_CONFIRMADO',pagoVerificado:false};
+ const text=pdfTexto(Buffer.from(await imprimir(unpaid).arrayBuffer()).toString('latin1'));
+ assert.match(text,/SIN PAGO CONFIRMADO/);
+ assert.doesNotMatch(text,/PAGO VERIFICADO EN CENTRAL/);
+ assert.throws(()=>imprimir({...base,pagoVerificado:false}),/verificación/);
+});
+test('orden PDF acepta acentos y reparte numerosas instrucciones en varias páginas',async()=>{
+ const many={...base,trabajos:Array.from({length:30},(_,i)=>({
+  ...base.trabajos[0],nombreOriginal:'Página '+(i+1)+' - Múltiples.pdf',
+  descripcion:'Preparación especial '+('No ampliar, doble faz, anillado en grupo. ').repeat(12)
+ }))};
+ const raw=Buffer.from(await imprimir(many).arrayBuffer()).toString('latin1');
+ const count=Number(raw.match(/\/Type \/Pages \/Count (\d+)/)[1]);
+ assert.ok(count>1);
+ const references=raw.match(/\/Type \/Page \/Parent 2 0 R/g)||[];
+ assert.equal(references.length,count);
+ const footer=pdfTexto(raw);
+ assert.match(footer,/Página 1 de /);
+ assert.match(footer,/PDF 30/);
 });
