@@ -130,3 +130,30 @@ test('cliente de prueba no anuncia falsamente que los ploteos quedan fuera de la
  assert.ok(!source.includes('Los ploteos se cotizan, pero quedan pendientes de integración'));
  assert.ok(source.includes('Las páginas elegidas se verifican sobre el PDF original antes de registrar la orden.'));
 });
+
+
+test('envío inteligente preserva 1-3,5 de ocho páginas y rechaza plan desactualizado',()=>{
+ const archivo=new File([new Uint8Array(500)],'Seleccion_A4.pdf',{type:'application/pdf'});
+ const e={
+  archivoOriginal:archivo,name:archivo.name,
+  paginas:Array.from({length:8},(_,i)=>({numero:i+1,anchoCm:21,altoCm:29.7})),
+  paginasSeleccionadas:'1-3,5',anillado:'ninguno',grupoAnillado:'',
+  paginasPorHoja:1,materialColor:'obra70',modo:'bn',caras:'simple',copias:1
+ };
+ const plan=[{indice:0,destino:'documentos',formatoFinal:'a4',paginasElegidas:[1,2,3,5]}];
+ const quote={estado:'PRELIMINAR',total:700,plan};
+ const sent=[],info={textContent:''};
+ const selected=x=>x.paginas.filter(p=>[1,2,3,5].includes(p.numero));
+ const receiver={parent:{postMessage:m=>sent.push(m)}};
+ clickHandler(false,quote,[e],receiver,{origin:'https://example.test'},info,10,selected);
+ assert.deepEqual(sent.map(x=>x.type),
+  ['SABER_SMART_DOCUMENTS_TO_PRIVATE','SABER_SMART_HANDOFF_READY'],info.textContent);
+ assert.equal(sent[0].options[0].paginasSeleccionadas,'1-3,5');
+ assert.equal(sent[0].options[0].paginas,8);
+ assert.equal(sent[0].files[0],archivo);
+ sent.length=0;
+ quote.plan[0].paginasElegidas=[1,2,3,4];
+ clickHandler(false,quote,[e],receiver,{origin:'https://example.test'},info,10,selected);
+ assert.deepEqual(sent.map(x=>x.type),['SABER_SMART_HANDOFF_ERROR']);
+ assert.match(info.textContent,/no coincide con el presupuesto/);
+});
