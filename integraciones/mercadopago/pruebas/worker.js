@@ -1743,9 +1743,22 @@ export default {
     if(order.deposit_ars!==order.amount_ars)return json({error:"El pedido anterior no corresponde a la modalidad de pago total"},409);
     async function returnPreference(id,reused){
      const preference=await mp(env,"/checkout/preferences/"+esc(id));
-     if(String(preference.external_reference||"")!==order.id)return json({error:"Preferencia incompatible con este pedido"},409);
-     const checkoutUrl=preference.sandbox_init_point||preference.init_point;
-     if(!/^https:\/\//.test(String(checkoutUrl||"")))return json({error:"Mercado Pago no devolvió un enlace válido"},502);
+     const lines=preference.items;
+     const valid=String(preference.id||"")===String(id)&&
+      String(preference.external_reference||"")===order.id&&
+      Array.isArray(lines)&&lines.length===1&&
+      lines[0].currency_id==="ARS"&&Number(lines[0].quantity)===1&&
+      Number.isSafeInteger(Number(lines[0].unit_price))&&
+      Number(lines[0].unit_price)===order.amount_ars&&
+      order.deposit_ars===order.amount_ars;
+     if(!valid)return json({error:"Preferencia incompatible con pedido, moneda o importe en D1"},409);
+     const checkoutUrl=preference.sandbox_init_point;
+     let safe=false;
+     try{
+      const u=new URL(checkoutUrl);
+      safe=u.protocol==="https:"&&/(^|\\.)(mercadopago\\.com|mercadopago\\.com\\.ar)$/.test(u.hostname);
+     }catch(_){}
+     if(!safe)return json({error:"Mercado Pago no devolvió un enlace sandbox válido"},502);
      return json({order_id:order.id,checkout_url:checkoutUrl,preference_id:id,reused});
     }
     if(order.preference_id)return returnPreference(order.preference_id,true);
