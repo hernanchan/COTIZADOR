@@ -77,7 +77,13 @@ jobs:
           fi
           echo "CENTRAL_TUS_PRIVATE_VERSION=$target"
           http=$(curl --silent --show-error --max-time 30 -o "$workdir/admin-response.txt" -w '%{http_code}'             "https://saber-pagos-pruebas.libreriasaber.workers.dev/admin/api/central/unpaid-detail?id=e2d76c8b-ce1c-4daf-9030-4bd402295a68" || true)
+          authSandbox=""
+          for attempt in 1 2 3 4 5 6 7 8; do
           authSandbox=$(curl --silent --show-error --max-time 20 -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"order_id":"5ad01300-f40a-43f2-a455-56616a8a9e04"}' "https://saber-pagos-pruebas.libreriasaber.workers.dev/admin/api/central/payment-sandbox-prepare" || true)
+            if [ "$authSandbox" = "401" ]; then break; fi
+            sleep 2
+          done
+          echo "SANDBOX_ADMIN_AUTH_HTTP=$authSandbox"
           health=$(curl --silent --show-error --max-time 30             "https://saber-pagos-pruebas.libreriasaber.workers.dev/health" || true)
           safe=false
           if [ "$http" = "401" ] && [ "$authSandbox" = "401" ] && echo "$health" | jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' >/dev/null; then safe=true; fi
