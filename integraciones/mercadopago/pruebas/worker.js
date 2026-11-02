@@ -1027,16 +1027,40 @@ async function api(path,method="GET"){const r=await fetch(path,{method,headers:{
 function node(tag,txt){const x=document.createElement(tag);x.textContent=String(txt);return x}
 async function showOrder(id){try{status.textContent="Consultando detalle...";const x=await api("/admin/api/order?id="+encodeURIComponent(id));details.replaceChildren();details.append(node("h3","Pedido "+x.order.id));details.append(node("p","Total: "+money(x.order.amount_ars)+" · Aprobado: "+(x.order.paid_at||"sin fecha")));if(x.produccion){const pr=x.produccion;details.append(node("h4","Estado operativo: "+pr.estado.replaceAll("_"," ")));details.append(node("p",pr.mensaje));for(const t of pr.trabajos){const area=node("section","");area.append(node("h4",t.linea+". "+t.cantidad+" × "+t.descripcion+" — "+money(t.subtotal)));area.append(node("p","Estado: "+t.etapa.replaceAll("_"," ")+" · "+t.instruccion));const valores=Object.entries(t.especificaciones||{}).map(a=>a[0]+": "+a[1]).join(" · ");if(valores)area.append(node("p","Ficha técnica: "+valores));if(t.referencias?.length)area.append(node("p","Referencias privadas: "+t.referencias.join(", ")));details.append(area)}}else details.append(node("p","La ficha de producción no está disponible."));if(x.produccion?.documentosVerificados){
  const d=x.produccion.documentosVerificados;
- details.append(node("h4","PDF originales verificados · "+d.archivos+" archivo(s)"));
- details.append(node("p","Recepción "+d.webOrderId+" · "+money(d.totalDocumentos)+" · PDF originales verificados. Preparación e impresión manual en Adobe Acrobat."));
- for(const t of d.trabajos){
-  const line=node("section","");
-  line.append(node("h4",t.orden+". "+t.nombreOriginal+" · "+t.servicio));
-  line.append(node("p","Páginas "+t.paginasElegidas.join(", ")+" de "+t.paginasOriginales+" · "+t.copias+" copia(s)/lote(s)"));
-  line.append(node("p","Recibo privado: "+t.reciboPrivado+" · Preparación: pendiente de PDF final"));
-  details.append(line);
+ details.append(node("h4",(d.numeroOrden?"Orden de trabajo N.º "+d.numeroOrden+" · ":"")+
+  "PDF originales verificados · "+d.archivos+" archivo(s)"));
+ details.append(node("p","PAGO VERIFICADO · "+money(d.totalDocumentos)+
+  " · Preparación de archivos pendiente. Los originales no están impuestos ni listos para imprimir automáticamente."));
+ if(!Array.isArray(d.trabajos)||d.trabajos.length!==d.archivos){
+  details.append(node("p","ALERTA: la cantidad de PDF no coincide con la recepción verificada; revisar antes de producir."));
+ }else{
+  for(const t of d.trabajos){
+   const line=node("section","");
+   line.append(node("h4",t.orden+". "+t.nombreOriginal+" · "+t.servicio));
+   line.append(node("p","Original verificado · "+t.paginasOriginales+" página(s) · "+
+    (Array.isArray(t.paginasElegidas)?t.paginasElegidas.length:0)+" seleccionadas · "+
+    t.copias+" copia(s)/lote(s)"));
+   agregarFichaDeImpresion(line,t,{pagado:true});
+   if(d.esTUS&&/^WEB-ENSAYO-[A-F0-9]{32}$/.test(d.webOrderId||"")&&
+      /^DOC-[a-f0-9-]{36}$/i.test(t.reciboPrivado||"")){
+    const action=node("button","Descargar PDF original verificado");
+    action.type="button";
+    action.addEventListener("click",()=>{
+     const url=new URL("https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/personal-descargar");
+     url.searchParams.set("webOrderId",d.webOrderId);
+     url.searchParams.set("receiptId",t.reciboPrivado);
+     const link=document.createElement("a");
+     link.href=url.href;link.target="_blank";link.rel="noopener noreferrer";
+     document.body.append(link);link.click();link.remove();
+    });
+    line.append(action);
+   }else line.append(node("p","Descarga de PDF original: referencia privada no disponible para esta recepción."));
+   line.append(node("p","PDF final / imposición: PENDIENTE · Verificar en Adobe Acrobat antes de imprimir."));
+   details.append(line);
+  }
  }
 }
+
 if(x.produccion?.polaroidsExpress){
  const d=x.produccion.polaroidsExpress;
  details.append(node("h4","Polaroids Express · PDF único verificado"));
@@ -1067,7 +1091,7 @@ if(x.produccion?.polaroidsExpress){
   details.append(button);
  }else details.append(node("p","PDF en Drive privado. Descarga administrativa pendiente de habilitación."));
 }status.textContent=""}catch(e){status.textContent=e.message}}
-function agregarFichaDeImpresion(area,t){
+function agregarFichaDeImpresion(area,t,{pagado=false}={}){
  // La ficha proviene del manifiesto privado de D1, NUNCA de parámetros URL
  // ni del PDF original. Los datos ausentes se señalan: no inventar instrucciones.
  const modo=(t.modo==="bn"||t.modo==="b/n")?"Blanco y negro":
@@ -1146,13 +1170,13 @@ function agregarFichaDeImpresion(area,t){
    ". Confirmar qué archivos integran el grupo antes del armado."));
  if(opciones.some(([,value])=>value===null))
   area.append(node("p","AVISO: la ficha histórica no conserva todas las instrucciones. Confirmar los campos marcados antes de imprimir."));
- const lines=["Pedido de impresión (sin pago confirmado)",t.nombreOriginal||"PDF",
+ const lines=[pagado?"PEDIDO PAGADO Y VERIFICADO · PREPARACIÓN PENDIENTE":"PEDIDO SIN PAGO CONFIRMADO",t.nombreOriginal||"PDF",
   ...opciones.map(([k,v])=>k+": "+(v??"NO CONSTA — verificar")),
   ...(t.servicio==="ploteos"&&Array.isArray(t.planoPorPagina)?
    t.planoPorPagina.map(p=>"Pág. "+p.numeroOriginal+" · "+p.modo+" · "+
     p.anchoCm+" × "+p.altoCm+" cm · rollo "+p.rollo+" · "+p.papel):[]),
   ...(descripcion?["Descripción técnica: "+descripcion]:[]),
-  "NO IMPRIMIR SIN PAGO CONFIRMADO Y VALIDACIÓN DE PRODUCCIÓN"];
+  pagado?"NO IMPRIMIR SIN COMPROBAR ORIGINAL, ESCALA, PAPEL Y PDF FINAL":"NO IMPRIMIR SIN PAGO CONFIRMADO Y VALIDACIÓN DE PRODUCCIÓN"];
  const copy=node("button","Copiar instrucciones");copy.type="button";
  copy.className="outline";
  copy.addEventListener("click",async()=>{
