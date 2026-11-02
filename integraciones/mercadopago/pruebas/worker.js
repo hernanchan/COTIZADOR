@@ -1277,8 +1277,9 @@ document.querySelector("#refreshTransfers").addEventListener("click",async()=>{
   list.replaceChildren();
   if(!x.orders.length)list.append(node("li","No hay transferencias pendientes."));
   for(const t of x.orders){
-   const li=node("li",(t.description||"Pedido")+" · "+money(t.amount_ars));
-   li.append(node("p","Referencia: "+t.order_id));
+   const ref=t.numero_orden?"Orden N.º "+String(t.numero_orden).padStart(3,"0"):"Pedido sin número comercial";
+   const li=node("li",ref+" · "+money(t.amount_ars));
+   li.append(node("p","Referencia de conciliación: "+t.order_id));
    li.append(node("p","Solicitada: "+t.created_at+" · Acreditación NO verificada · NO imprimir"));
    list.append(li);
   }
@@ -1646,8 +1647,9 @@ export default {
      return json({error:"Conciliación de transferencias no habilitada"},503);
     const exists=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='transfer_requests'").first();
     if(!exists)return json({orders:[],payment_confirmed:false,production_enabled:false});
+    await centralTables(env); // La numeración ya asignada se consulta sin crear números nuevos.
     const rows=await env.DB.prepare(
-     "SELECT t.order_id,t.amount_ars,t.created_at,o.description,o.created_at AS order_created_at FROM transfer_requests t JOIN orders o ON o.id=t.order_id WHERE t.status='awaiting_bank_verification' AND o.status='awaiting_payment' AND o.deposit_ars=o.amount_ars AND t.amount_ars=o.amount_ars ORDER BY t.created_at ASC LIMIT 100"
+     "SELECT t.order_id,t.amount_ars,t.created_at,o.description,o.created_at AS order_created_at,n.number AS numero_orden FROM transfer_requests t JOIN orders o ON o.id=t.order_id LEFT JOIN central_work_order_numbers n ON n.commercial_order_id=t.order_id WHERE t.status='awaiting_bank_verification' AND o.status='awaiting_payment' AND o.deposit_ars=o.amount_ars AND t.amount_ars=o.amount_ars ORDER BY t.created_at ASC LIMIT 100"
     ).all();
     return json({orders:rows.results||[],payment_confirmed:false,production_enabled:false});
    }
