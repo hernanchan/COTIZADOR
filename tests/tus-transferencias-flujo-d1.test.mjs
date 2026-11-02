@@ -33,7 +33,7 @@ async function call(body={},overrides={}){
  return {code:result.status,data:await result.json()};
 }
 test('confirmed document total becomes only a pending transfer, retries are idempotent',async()=>{
- row={id,amount_ars:8332,deposit_ars:8332,status:'awaiting_payment',preference_id:null};
+ row={id,amount_ars:8332,deposit_ars:8332,created_at:new Date().toISOString().slice(0,19).replace('T',' '),status:'awaiting_payment',preference_id:null};
  saved=null;writes=0;network=0;
  let r=await call({order_id:id});
  assert.equal(r.code,200);
@@ -44,7 +44,7 @@ test('confirmed document total becomes only a pending transfer, retries are idem
  assert.equal(r.code,200);assert.equal(writes,1);assert.equal(network,0);
 });
 test('previous MP preference, paid state, missing alias or disabled flag fail closed',async()=>{
- row={id,amount_ars:8332,deposit_ars:8332,status:'awaiting_payment',preference_id:'mp-old'};
+ row={id,amount_ars:8332,deposit_ars:8332,created_at:new Date().toISOString().slice(0,19).replace('T',' '),status:'awaiting_payment',preference_id:'mp-old'};
  saved=null;writes=0;
  assert.equal((await call({order_id:id})).code,409);
  row.preference_id=null;row.status='paid';
@@ -55,11 +55,20 @@ test('previous MP preference, paid state, missing alias or disabled flag fail cl
  assert.equal(writes,0);
 });
 test('tampered amount and unknown order are never approved',async()=>{
- row={id,amount_ars:8332,deposit_ars:8332,status:'awaiting_payment',preference_id:null};
+ row={id,amount_ars:8332,deposit_ars:8332,created_at:new Date().toISOString().slice(0,19).replace('T',' '),status:'awaiting_payment',preference_id:null};
  saved=null;writes=0;
  const tamper=await call({order_id:id,amount_ars:1,payment_confirmed:true});
  assert.equal(tamper.code,200);assert.equal(tamper.data.amount_ars,8332);
  assert.equal(tamper.data.payment_confirmed,false);
  assert.equal((await call({order_id:'00000000-0000-4000-8000-000000000000'})).code,404);
  assert.equal(network,0);
+});
+
+test('a bank transfer cannot be requested after the 24-hour quote expiry',async()=>{
+ row={id,amount_ars:8332,deposit_ars:8332,created_at:'2026-10-01 12:00:00',status:'awaiting_payment',preference_id:null};
+ saved=null;writes=0;
+ const r=await call({order_id:id});
+ assert.equal(r.code,409);
+ assert.match(r.data.error,/venci/i);
+ assert.equal(writes,0);
 });
