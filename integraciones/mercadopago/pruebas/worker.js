@@ -1436,7 +1436,7 @@ async function refresh(){try{
  orders.replaceChildren();
  const filter=document.querySelector("#productionFilter").value;
  const active=x.orders.filter(o=>filter==="all"||(
-  filter==="active"?o.production_state&&o.production_state!=="entregado":o.production_state===filter));
+  filter==="active"?(!o.production_state||o.production_state!=="entregado"):o.production_state===filter));
  if(!active.length)orders.append(node("li","No hay pedidos en esta categoría."));
  for(const o of active){
   const label=o.production_state?productionLabel(o.production_state):"Pedido histórico";
@@ -1947,6 +1947,10 @@ export default {
    if(url.pathname==="/admin/api/orders"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
     await ensurePaymentReviews(env);
+    if(env.CENTRAL_PRODUCTION_TRACKING_ENABLED!=="PRIVATE_TEST_ONLY"){
+     const previous=await env.DB.prepare("SELECT id,description,amount_ars,status,paid_at,created_at FROM orders WHERE status='paid' AND deposit_ars=amount_ars AND EXISTS (SELECT 1 FROM payment_reviews WHERE order_id=orders.id AND state='verified') ORDER BY paid_at DESC LIMIT 100").all();
+     return json({orders:previous.results});
+    }
     await centralTables(env);await centralProductionTables(env);
     const rows=await env.DB.prepare("SELECT o.id,o.description,o.amount_ars,o.status,o.paid_at,o.created_at,"+
      "CASE WHEN m.commercial_order_id IS NULL THEN NULL ELSE COALESCE(s.state,'pendiente') END AS production_state,"+
