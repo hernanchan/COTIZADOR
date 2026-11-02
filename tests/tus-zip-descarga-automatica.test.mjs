@@ -5,6 +5,7 @@ import vm from 'node:vm';
 
 const zipJs=readFileSync(new URL('../integraciones/autocotizador/recepcion/zip-tus-cliente.txt',import.meta.url),'utf8');
 const clientJs=readFileSync(new URL('../integraciones/autocotizador/recepcion/paquete-tus-cliente.txt',import.meta.url),'utf8');
+const pdfJs=readFileSync(new URL('../integraciones/autocotizador/recepcion/pdf-orden-tus-cliente.txt',import.meta.url),'utf8');
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const ORDER='WEB-ENSAYO-ABCDEF0123456789ABCDEF0123456789';
 
@@ -13,7 +14,7 @@ async function runCase({count=5,large=false,broken=false}={}){
  const button={disabled:true,textContent:'Descargar ZIP completo',
   addEventListener(type,fn){listeners[type]=fn}};
  const elements={estado:state,zip:button,numero:{textContent:''},
-  detalle:{textContent:''}};
+  detalle:{textContent:''},advertencia:{textContent:''}};
  const created=[],blobUrls=[];
  let active=0,maxActive=0,requests=0;
  const sources=Array.from({length:count},(_,i)=>
@@ -52,7 +53,7 @@ async function runCase({count=5,large=false,broken=false}={}){
    throw Error('Ruta inesperada '+path);
   }};
  const ctx=vm.createContext(env);
- vm.runInContext(zipJs+'\n'+clientJs,ctx);
+ vm.runInContext(zipJs+'\n'+pdfJs+'\n'+clientJs,ctx);
  for(let i=0;i<150&&!blobUrls.length&&!/No se pudo descargar/.test(state.textContent);i++)
   await delay(3);
  return {state,button,created,blobUrls,sources,maxActive,requests,listeners};
@@ -80,6 +81,12 @@ test('clic desde Central => ZIP se descarga automáticamente, PDF intactos, orde
   offset=start+size;
  }
  assert.equal(data.getUint32(offset,true),0x04034b50);
+ const nameLen=data.getUint16(offset+26,true);
+ const name=new TextDecoder().decode(bytes.slice(offset+30,offset+30+nameLen));
+ assert.equal(name,'ORDEN_027_TRABAJO.pdf');
+ const contentSize=data.getUint32(offset+18,true);
+ const pdfStart=offset+30+nameLen;
+ assert.equal(new TextDecoder().decode(bytes.slice(pdfStart,pdfStart+8)),'%PDF-1.4');
 });
 test('pedido mayor a 160 MiB se rechaza ANTES de descargar originales',async()=>{
  const x=await runCase({count:9,large:true});
