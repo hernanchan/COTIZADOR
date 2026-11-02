@@ -73,22 +73,31 @@ html.embedded .demo-cart{display:none}
 .receiver-health{border:1px solid #dfba72;background:#fff8ec;color:#6f521f;border-radius:10px;padding:12px 14px;margin-top:12px;font-size:13px;line-height:1.5}
 .receiver-health[hidden]{display:none!important}.receiver-health strong{display:block;margin-bottom:5px}
 .receiver-health a{font-weight:800;color:#16538c;text-decoration:underline}
+
+/* Flujo visual independiente inspirado en un cotizador por pasos; sin reutilizar código externo. */
+.header-offer{display:flex;flex-direction:column;gap:3px;text-align:right;font-size:12px;color:#245c92;white-space:nowrap}
+.header-offer span{color:#63748b;font-size:11px}
+.express-steps{max-width:1200px;margin:13px auto 0;padding:0 15px;display:flex;gap:8px}
+.express-steps span{flex:1;border:1px solid #dae3ef;border-radius:8px;background:#fff;color:#586b82;text-align:center;padding:10px 6px;font-size:12px;font-weight:700}
+.express-steps .step-now{background:#e9f3ff;border-color:#a8c7e8;color:#235e9d}
+@media(max-width:650px){.header-offer{white-space:normal;text-align:left}.express-steps{gap:5px;margin:9px auto 0;padding:0 10px}.express-steps span{font-size:10px;padding:8px 4px}header{flex-wrap:wrap}}
 </style>
 </head>
 <body>
-<header><div><div class="brand">Polaroids<span style="color:#7990a8"> / </span><em>hasta 24 fotos</em><span class="tag">Librería Saber</span></div><p>Editor Polaroids · fotos privadas, sin descarga pública</p></div><div style="font-size:12px;color:#62718a;text-align:right">2 columnas × 3 filas<br>Vista previa sin descarga</div></header>
+<header><div><div class="brand">Polaroids<span style="color:#7990a8"> / </span><em>Express</em><span class="tag">Librería Saber</span></div><p>Servicio independiente · tus fotos se preparan en forma privada</p></div><div class="header-offer"><strong>6 fotos por hoja A4</strong><span>$3.000 por hoja · hasta 24 fotos</span></div></header>
+<nav class="express-steps" aria-label="Pasos del pedido Polaroids"><span class="step-now">1 · Subí tus fotos</span><span>2 · Ajustá los encuadres</span><span>3 · Confirmá el pedido</span></nav>
 <main class="app">
 <section class="panel left">
   <div class="sheetnav" aria-label="Hojas de seis fotos">
 <div class="sheetnavtop"><b id="sheetPosition">Hoja 1 de 1</b><strong id="sheetPrice">Total: $3.000</strong></div>
 <div class="sheetnavbuttons"><button type="button" class="secondary" id="prevSheet">← Anterior</button><button type="button" class="secondary" id="nextSheet">Siguiente →</button><button type="button" class="secondary" id="addSheet">+ Otra hoja de 6</button><button type="button" class="secondary delete-sheet" id="deleteSheet">Eliminar hoja</button></div>
 <small id="sheetProgress">Hasta 24 fotos por pedido</small></div><div class="partial-notice" id="partialNotice" hidden aria-live="polite"></div>
-<div class="sect"><h2>1. Seleccioná tus fotos (hasta 60 juntas)</h2><small id="count">0 de 6</small></div>
-  <label class="drop" id="drop" for="inputPhotos" title="Seleccioná hasta 60 imágenes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4h16v16H4zM7 16l4-4 3 3 2-2 2 3M8 8h.01"/><path d="M12 2v4M10 4h4"/></svg><strong>Elegí hasta 24 fotos juntas o arrastralas acá</strong><p>JPG, PNG o WebP · Se distribuyen de a seis por hoja A4</p></label>
+<div class="sect"><h2>Elegí tus fotos (máximo 24)</h2><small id="count">0 de 6</small></div>
+  <label class="drop" id="drop" for="inputPhotos" title="Seleccioná hasta 24 imágenes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4h16v16H4zM7 16l4-4 3 3 2-2 2 3M8 8h.01"/><path d="M12 2v4M10 4h4"/></svg><strong>Elegí hasta 24 fotos juntas o arrastralas acá</strong><p>JPG, PNG o WebP · Se distribuyen de a seis por hoja A4</p></label>
   <input id="inputPhotos" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden>
   <input id="inputReplace" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" hidden>
   <div class="slots" id="slots"></div>
-  <div class="options"><label>2. Tus Polaroids</label>
+  <div class="options"><label>Formato de tus Polaroids</label>
   <div class="fixed-format"><strong>85 × 90 mm por fotografía</strong><span>Imagen interior 75 × 75 mm · borde blanco inferior de 11 mm</span></div>
   <div class="trim-tip">Las seis fotos se imprimirán y cortarán en Librería Saber. Vos podés ajustar cada encuadre; del corte nos encargamos nosotros.</div></div>
   <div id="secureReceptionNotice" class="secure-reception-note" hidden>
@@ -116,7 +125,7 @@ html.embedded .demo-cart{display:none}
 </section>
 <section class="panel right">
   <section id="sheetOverview" class="sheet-overview" hidden aria-label="Vista general de todas las hojas"><h3 id="overviewHeading">Todas tus hojas A4</h3><p>Tocá una hoja para verla más grande y ajustar sus fotografías.</p><div id="sheetOverviewGrid" class="sheet-overview-grid"></div></section>
-  <div class="sheet-title"><h2>Hoja seleccionada · vista ampliada</h2><small id="previewSheetLabel">Hoja 1 · A4 vertical</small></div>
+  <div class="sheet-title"><h2>Vista previa · ajustá cada foto</h2><small id="previewSheetLabel">Hoja 1 · A4 vertical</small></div>
   <div class="paper-holder"><canvas class="paper" id="preview" width="840" height="1188" title="Hacé clic en una foto para corregir su encuadre"></canvas></div>
   <section class="preview-guide" aria-label="Cómo ajustar tus fotografías">
     <h3>Cómo ajustar tus fotos</h3>
