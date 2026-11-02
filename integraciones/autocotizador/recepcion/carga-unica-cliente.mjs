@@ -8,6 +8,7 @@ import {clasificarPaginasPloteo} from './clasificar-paginas-ploteo.mjs';
 import {prepararLoteParcial,recomponerLoteParcial} from './cotizar-lote-parcial.mjs';
 const $=id=>document.getElementById(id);
 const entries=[];
+const MAX_PDF_CARGA=location.pathname==='/prueba-v2/carga-inteligente'?10:30;
 let leyendo=false;
 let version=0;
 let catalogo={a4:[],a3:[]};
@@ -466,7 +467,7 @@ async function analizarArchivoPDF(e,file){
 $('archivos').addEventListener('change',async ev=>{
  if(leyendo)return;
  const files=[...(ev.target.files||[])];ev.target.value='';
- if(entries.length+files.length>30){$('estado').textContent='Máximo 30 PDF.';return}
+ if(entries.length+files.length>MAX_PDF_CARGA){$('estado').textContent='Máximo '+MAX_PDF_CARGA+' PDF.';return}
  leyendo=true;
  // Mantener fichas compactas al cargar un lote; cada PDF se edita sólo si hace falta.
  if(!entries.length)abierto=-1;
@@ -567,7 +568,7 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
   try{
    if(leyendo||!ultimoPresupuesto||ultimoPresupuesto.estado!=='PRELIMINAR'||
       !Number.isSafeInteger(ultimoPresupuesto.total)||ultimoPresupuesto.total<1||
-      entries.length<1||entries.length>30||
+      entries.length<1||entries.length>MAX_PDF_CARGA||
       ultimoPresupuesto.plan?.length!==entries.length)
     throw Error('Completá primero la cotización de todos los documentos.');
    const files=[],options=[],ploteosPendientes=[];
