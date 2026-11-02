@@ -985,6 +985,82 @@ async function centralPolaroidDetail(env,id){
 function shortWorkNumber(n){
  return Number.isSafeInteger(n)&&n>0?String(n).padStart(3,"0"):null;
 }
+
+const PRODUCTION_STATES=["pendiente","en_preparacion","en_espera","listo","entregado"];
+const PRODUCTION_NEXT={
+ pendiente:["en_preparacion","en_espera"],
+ en_preparacion:["listo","en_espera"],
+ en_espera:["en_preparacion"],
+ listo:["entregado","en_preparacion","en_espera"],
+ entregado:[]
+};
+async function centralProductionTables(env){
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_production_status (order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE RESTRICT,state TEXT NOT NULL DEFAULT 'pendiente' CHECK(state IN ('pendiente','en_preparacion','en_espera','listo','entregado')),version INTEGER NOT NULL DEFAULT 0 CHECK(version>=0),operator TEXT,reason TEXT,updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_production_events (id INTEGER PRIMARY KEY AUTOINCREMENT,order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE RESTRICT,version INTEGER NOT NULL,from_state TEXT NOT NULL,to_state TEXT NOT NULL,operator TEXT NOT NULL,reason TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL DEFAULT (datetime('now')),UNIQUE(order_id,version))").run();
+}
+async function centralProductionDetail(env,id){
+ await centralProductionTables(env);
+ const current=await env.DB.prepare("SELECT state,version,operator,reason,updated_at FROM central_production_status WHERE order_id=?").bind(id).first();
+ const rows=await env.DB.prepare("SELECT version,from_state,to_state,operator,reason,created_at FROM central_production_events WHERE order_id=? ORDER BY version DESC LIMIT 30").bind(id).all();
+ return {state:current?.state||"pendiente",version:current?.version||0,
+  operator:current?.operator||null,updated_at:current?.updated_at||null,
+  history:rows.results||[],allowed:PRODUCTION_NEXT[current?.state||"pendiente"],productionAuthorized:false};
+}
+async function centralUpdateProduction(req,env){
+ if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+ if(env.CENTRAL_PRODUCTION_TRACKING_ENABLED!=="PRIVATE_TEST_ONLY")
+  return json({error:"Seguimiento operativo no habilitado"},503);
+ if(!/^application\/json(?:;|$)/i.test(req.headers.get("Content-Type")||""))
+  return json({error:"Formato JSON obligatorio"},415);
+ const raw=await req.text();
+ if(raw.length>1200)return json({error:"Solicitud demasiado extensa"},413);
+ let d;try{d=JSON.parse(raw)}catch{return json({error:"JSON incorrecto"},400)}
+ if(!d||typeof d!=="object"||Array.isArray(d)||
+    Object.keys(d).sort().join(",")!=="confirmed,from,operator,order_id,reason,to,version"||
+    !CENTRAL_UUID.test(d.order_id||"")||
+    !PRODUCTION_STATES.includes(d.from)||!PRODUCTION_STATES.includes(d.to)||
+    !Number.isSafeInteger(d.version)||d.version<0||
+    typeof d.operator!=="string"||d.operator.trim().length<2||d.operator.trim().length>60||
+    typeof d.reason!=="string"||d.reason.length>280||
+    typeof d.confirmed!=="boolean")
+  return json({error:"Datos del cambio inválidos"},400);
+ const operator=d.operator.trim(),reason=d.reason.trim();
+ if(!PRODUCTION_NEXT[d.from].includes(d.to))return json({error:"Transición no permitida"},409);
+ if(d.to==="en_espera"&&reason.length<5)return json({error:"Indicá el motivo de espera"},422);
+ if(["listo","entregado"].includes(d.to)&&!d.confirmed)
+  return json({error:"Confirmación operativa obligatoria"},422);
+ await ensurePaymentReviews(env);
+ await centralTables(env);
+ await centralProductionTables(env);
+ const eligible=await env.DB.prepare(
+  "SELECT o.id FROM orders o JOIN central_document_manifests m ON m.commercial_order_id=o.id "+
+  "WHERE o.id=? AND o.status='paid' AND o.paid_at IS NOT NULL "+
+  "AND o.deposit_ars=o.amount_ars AND EXISTS (SELECT 1 FROM payment_reviews p "+
+  "WHERE p.order_id=o.id AND p.state='verified') LIMIT 1"
+ ).bind(d.order_id).first();
+ if(!eligible)return json({error:"Pedido documental sin pago verificado"},409);
+ await env.DB.prepare("INSERT OR IGNORE INTO central_production_status(order_id) VALUES(?)").bind(d.order_id).run();
+ const prior=await env.DB.prepare("SELECT state,version FROM central_production_status WHERE order_id=?").bind(d.order_id).first();
+ if(!prior||prior.state!==d.from||prior.version!==d.version)
+  return json({error:"El estado cambió en otro puesto. Actualizá el pedido."},409);
+ const results=await env.DB.batch([
+  env.DB.prepare("UPDATE central_production_status SET state=?,version=version+1,operator=?,reason=?,updated_at=datetime('now') "+
+   "WHERE order_id=? AND state=? AND version=? AND EXISTS ("+
+   "SELECT 1 FROM orders o WHERE o.id=central_production_status.order_id "+
+   "AND o.status='paid' AND o.deposit_ars=o.amount_ars AND EXISTS ("+
+   "SELECT 1 FROM payment_reviews p WHERE p.order_id=o.id AND p.state='verified'))")
+   .bind(d.to,operator,reason,d.order_id,d.from,d.version),
+  env.DB.prepare("INSERT INTO central_production_events(order_id,version,from_state,to_state,operator,reason) "+
+   "SELECT ?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM central_production_status "+
+   "WHERE order_id=? AND state=? AND version=?)")
+   .bind(d.order_id,d.version+1,d.from,d.to,operator,reason,d.order_id,d.to,d.version+1)
+ ]);
+ if(Number(results?.[0]?.meta?.changes)!==1||Number(results?.[1]?.meta?.changes)!==1)
+  return json({error:"Cambio no confirmado; actualizá el pedido"},409);
+ const current=await centralProductionDetail(env,d.order_id);
+ return json({saved:true,production:current,productionAuthorized:false});
+}
+
 async function centralAdminDetail(env,id){
  await centralTables(env);
  const row=await env.DB.prepare("SELECT web_order_id,manifest_json,created_at,amount_ars,file_count FROM central_document_manifests WHERE commercial_order_id=?").bind(id).first();
@@ -1782,10 +1858,22 @@ export default {
     ).all();
     return json({orders:rows.results||[],payment_confirmed:false,production_enabled:false});
    }
+   if(url.pathname==="/admin/api/central/production-status"&&req.method==="POST")
+    return await centralUpdateProduction(req,env);
    if(url.pathname==="/admin/api/orders"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
     await ensurePaymentReviews(env);
-    const rows=await env.DB.prepare("SELECT id,description,amount_ars,status,paid_at,created_at FROM orders WHERE status='paid' AND deposit_ars=amount_ars AND EXISTS (SELECT 1 FROM payment_reviews WHERE order_id=orders.id AND state='verified') ORDER BY paid_at DESC LIMIT 100").all();
+    await centralTables(env);await centralProductionTables(env);
+    const rows=await env.DB.prepare("SELECT o.id,o.description,o.amount_ars,o.status,o.paid_at,o.created_at,"+
+     "CASE WHEN m.commercial_order_id IS NULL THEN NULL ELSE COALESCE(s.state,'pendiente') END AS production_state,"+
+     "n.number AS work_number FROM orders o "+
+     "LEFT JOIN central_document_manifests m ON m.commercial_order_id=o.id "+
+     "LEFT JOIN central_production_status s ON s.order_id=o.id "+
+     "LEFT JOIN central_work_order_numbers n ON n.commercial_order_id=o.id "+
+     "WHERE o.status='paid' AND o.deposit_ars=o.amount_ars AND EXISTS ("+
+     "SELECT 1 FROM payment_reviews WHERE order_id=o.id AND state='verified') "+
+     "ORDER BY CASE COALESCE(s.state,'pendiente') WHEN 'en_espera' THEN 0 WHEN 'pendiente' THEN 1 "+
+     "WHEN 'en_preparacion' THEN 2 WHEN 'listo' THEN 3 ELSE 4 END,o.paid_at DESC LIMIT 100").all();
     return json({orders:rows.results});
    }
    // Un pedido histórico se numera SOLO al solicitar su ficha desde un
@@ -1861,7 +1949,11 @@ export default {
     const rows=await env.DB.prepare("SELECT line_number,item_type,sku,title,quantity,unit_price_ars,line_total_ars,detail_json,file_references_json FROM order_items WHERE order_id=? ORDER BY line_number").bind(id).all();
     const central=await centralAdminDetail(env,id);
     const produccion=estadoProduccionPrivado(order,rows.results);
-    if(central)produccion.documentosVerificados=central;
+    if(central){
+     produccion.documentosVerificados=central;
+     if(env.CENTRAL_PRODUCTION_TRACKING_ENABLED==="PRIVATE_TEST_ONLY")
+      produccion.seguimiento=await centralProductionDetail(env,id);
+    }
     const express=await centralPolaroidDetail(env,id);
     if(express){
      // El estado paid por sí solo no demuestra una transacción validada.
