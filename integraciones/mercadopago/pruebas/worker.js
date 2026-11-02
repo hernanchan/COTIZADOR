@@ -1795,6 +1795,43 @@ export default {
     return json({order_id:order.id,amount_ars:order.amount_ars,alias,
      state:"awaiting_bank_verification",payment_confirmed:false,production_enabled:false});
    }
+   // Preflight de pago documental: consulta D1 sin generar preferencias ni
+   // tocar estados. La habilitación real del checkout permanece BLOQUEADA.
+   if(url.pathname==="/admin/api/central/payment-preflight"&&req.method==="POST"){
+    if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+    const body=await req.json().catch(()=>null);
+    if(!body||Object.keys(body).join(",")!=="order_id"||!isUUID(body.order_id))
+     return json({error:"Pedido inválido"},400);
+    await ensureOrderItems(env);
+    await centralTables(env);
+    const order=await env.DB.prepare("SELECT id,amount_ars,deposit_ars,status,created_at,preference_id FROM orders WHERE id=?").bind(body.order_id).first();
+    if(!order)return json({error:"Pedido inexistente"},404);
+    const manifest=await env.DB.prepare("SELECT amount_ars,file_count,manifest_json FROM central_document_manifests WHERE commercial_order_id=?").bind(order.id).first();
+    if(!manifest)return json({error:"Pedido sin recepción documental verificada"},409);
+    const lines=(await env.DB.prepare("SELECT sku,line_total_ars,quantity,unit_price_ars FROM order_items WHERE order_id=? ORDER BY line_number").bind(order.id).all()).results||[];
+    const lineTotal=lines.reduce((sum,line)=>sum+Number(line.line_total_ars),0);
+    const docs=lines.filter(line=>line.sku==="DOCS_VERIFIED");
+    let parsed=null;
+    try{parsed=JSON.parse(manifest.manifest_json)}catch(_){}
+    const createdAt=Date.parse(String(order.created_at||"").replace(" ","T")+"Z");
+    const reason=order.status!=="awaiting_payment"?"PEDIDO_NO_PENDIENTE":
+     order.preference_id?"PAGO_YA_INICIADO":
+     !Number.isSafeInteger(createdAt)||Date.now()>=createdAt+86400000?"COTIZACION_VENCIDA":
+     !Number.isSafeInteger(order.amount_ars)||order.amount_ars<1||order.deposit_ars!==order.amount_ars?"PAGO_TOTAL_INVALIDO":
+     !Number.isSafeInteger(manifest.amount_ars)||manifest.amount_ars<1||!Number.isSafeInteger(manifest.file_count)||manifest.file_count<1?"RECEPCION_INVALIDA":
+     !parsed||parsed.schema!=="saber-central-documentos-d1-v1"||parsed.importe!==manifest.amount_ars||
+       !Array.isArray(parsed.trabajos)||parsed.trabajos.length!==manifest.file_count?"MANIFIESTO_INVALIDO":
+     docs.length!==1||docs[0].line_total_ars!==manifest.amount_ars?"LINEA_DOCUMENTAL_INVALIDA":
+     !lines.length||lines.some(line=>!Number.isSafeInteger(line.line_total_ars)||line.line_total_ars<1||
+       !Number.isSafeInteger(line.quantity)||line.quantity<1||
+       !Number.isSafeInteger(line.unit_price_ars)||line.unit_price_ars<1)||
+       lineTotal!==order.amount_ars?"IMPORTE_NO_COINCIDE":null;
+    return json({order_id:order.id,ready_for_sandbox_test:reason===null,
+     reason:reason||"DOCUMENTOS_Y_TOTAL_VERIFICADOS",
+     amount_ars:order.amount_ars,documents_ars:manifest.amount_ars,
+     paymentAuthorized:false,productionAuthorized:false,
+     createsMercadoPagoPreference:false});
+   }
    if(url.pathname==="/demo/checkout"&&req.method==="POST"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
     const body=await req.json().catch(()=>null);
