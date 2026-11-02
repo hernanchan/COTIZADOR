@@ -4,6 +4,7 @@
  */
 import zipJs from './zip-tus-cliente.txt';
 import paqueteJs from './paquete-tus-cliente.txt';
+import pdfOrdenJs from './pdf-orden-tus-cliente.txt';
 export function paginaPaqueteTUSPersonal(){
  return `<!doctype html><html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -21,13 +22,14 @@ button:disabled{opacity:.5;cursor:not-allowed}
 </style></head><body><main>
 <h1 id="numero">Orden de trabajo · verificando…</h1>
 <p id="detalle"></p>
-<p>Se incluirán los PDF originales numerados y una hoja de instrucciones de impresión, en HTML imprimible y TXT. No se alteran los documentos.</p>
-<p class="warning">Ensayo privado: el pedido NO está pagado y no está autorizado para imprimir ni entregar.</p>
+<p>El ZIP contiene todos los PDF originales numerados y la orden de trabajo en PDF A4, lista para imprimir. Los originales no se alteran.</p>
+<p id="advertencia" class="warning">Comprobando el estado del pago en la Central. No imprimir todavía.</p>
 <button id="zip" disabled>Descargar ZIP completo</button>
 <p class="note">Los originales se comprueban nuevamente contra D1 y SHA-256 antes de incorporarlos.</p>
 <p id="estado" role="status" aria-live="polite">Verificando la orden con la Central…</p>
 </main><script>
 ${zipJs}
+${pdfOrdenJs}
 ${paqueteJs}
 </script></body></html>`;
 }
