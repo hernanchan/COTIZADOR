@@ -26,7 +26,7 @@ jobs:
         run: |
           set -euo pipefail
           npm install --no-save --no-audit --no-fund pdf-lib@1.17.1
-          node --test tests/tus-central-staff-download.test.mjs tests/tus-paquete-manifiesto.test.mjs tests/tus-instrucciones-reales.test.mjs tests/tus-documentos-sandbox-preparacion.test.mjs
+          node --test tests/tus-central-staff-download.test.mjs tests/tus-paquete-manifiesto.test.mjs tests/tus-instrucciones-reales.test.mjs tests/tus-documentos-sandbox-preparacion.test.mjs tests/tus-central-seguimiento-operativo.test.mjs tests/tus-central-pagos-verificados.test.mjs tests/tus-central-pedidos-pagados-ficha.test.mjs
           node --check integraciones/mercadopago/pruebas/worker.js
           grep -Fq '/admin/api/central/unpaid-detail' integraciones/mercadopago/pruebas/worker.js
           grep -Fq 'Descargar PDF original' integraciones/mercadopago/pruebas/worker.js
@@ -54,7 +54,7 @@ jobs:
           previous=$(jq -r '.result.deployments[0].versions[]? | select(.percentage==100) | .version_id' "$workdir/before.json" | head -n 1)
           test -n "$previous"
           echo "VERSION_CENTRAL_ANTERIOR=$previous"
-          jq -n --slurpfile settings "$workdir/settings.json"             '{main_module:"worker.js",annotations:{"workers/message":"Sandbox documental SOLO admin pruebas; sin pagos comerciales ni web publica."},bindings:([$settings[0].result.bindings[] | select(.name!="DOCS_SANDBOX_CHECKOUT_ENABLED") | {name,type:"inherit"}]+[{name:"DOCS_SANDBOX_CHECKOUT_ENABLED",type:"plain_text",text:"PRIVATE_TEST_ONLY"}])}' > "$workdir/metadata.json"
+          jq -n --slurpfile settings "$workdir/settings.json"             '{main_module:"worker.js",annotations:{"workers/message":"Sandbox documental SOLO admin pruebas; sin pagos comerciales ni web publica."},bindings:([$settings[0].result.bindings[] | select(.name!="DOCS_SANDBOX_CHECKOUT_ENABLED" and .name!="CENTRAL_PRODUCTION_TRACKING_ENABLED") | {name,type:"inherit"}]+[{name:"DOCS_SANDBOX_CHECKOUT_ENABLED",type:"plain_text",text:"PRIVATE_TEST_ONLY"},{name:"CENTRAL_PRODUCTION_TRACKING_ENABLED",type:"plain_text",text:"PRIVATE_TEST_ONLY"}])}' > "$workdir/metadata.json"
           curl --fail --silent --show-error --max-time 75             -H "$auth"             -F "metadata=@$workdir/metadata.json;type=application/json"             -F "worker.js=@integraciones/mercadopago/pruebas/worker.js;filename=worker.js;type=application/javascript+module"             "$root/versions?bindings_inherit=strict" > "$workdir/version.json"
           if ! jq -e '.success==true and (.result.id | type=="string")' "$workdir/version.json" >/dev/null; then
             jq -c '{success,errors:[.errors[]?|{code,message}]}' "$workdir/version.json"; exit 1
@@ -83,11 +83,18 @@ jobs:
             if [ "$authSandbox" = "401" ]; then break; fi
             sleep 2
           done
+          prodAuth=""
+          for attempt in 1 2 3 4 5 6 7 8; do
+            prodAuth=$(curl --silent --show-error --max-time 20 -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' "https://saber-pagos-pruebas.libreriasaber.workers.dev/admin/api/central/production-status" || true)
+            if [ "$prodAuth" = "401" ]; then break; fi
+            sleep 2
+          done
+          echo "PRODUCTION_TRACKING_UNAUTHORIZED_HTTP=$prodAuth"
           echo "SANDBOX_ADMIN_AUTH_HTTP=$authSandbox"
           health=$(curl --silent --show-error --max-time 30             "https://saber-pagos-pruebas.libreriasaber.workers.dev/health" || true)
           echo "$health" | jq -c '{ok,databaseReady,paymentsEnabled}' || true
           safe=false
-          if [ "$http" = "401" ] && [ "$authSandbox" = "401" ] && echo "$health" | jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' >/dev/null; then safe=true; fi
+          if [ "$http" = "401" ] && [ "$authSandbox" = "401" ] && [ "$prodAuth" = "401" ] && echo "$health" | jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' >/dev/null; then safe=true; fi
           if [ "$safe" != true ]; then
             echo "CENTRAL_PRIVATE_SAFETY_CHECK_FAILED:HTTP_$http - ROLLBACK"
             jq -n --arg v "$previous" '{strategy:"percentage",versions:[{percentage:100,version_id:$v}],annotations:{"workers/message":"Rollback automatico: centro privado seguridad o health falló"}}' > "$workdir/rollback.json"
@@ -95,4 +102,4 @@ jobs:
             jq -e '.success == true' "$workdir/rollback-result.json" >/dev/null
             exit 1
           fi
-          echo "CENTRAL_PROTECTED_HTTP401_AND_SANDBOX_ADMIN_HTTP401_AND_HEALTH_OK; PAGOS_COMERCIALES_DESACTIVADOS"
+          echo "CENTRAL_PROTECTED_HTTP401_AND_SANDBOX_ADMIN_HTTP401_AND_PRODUCTION_TRACKING_HTTP401_AND_HEALTH_OK; PAGOS_COMERCIALES_DESACTIVADOS"
