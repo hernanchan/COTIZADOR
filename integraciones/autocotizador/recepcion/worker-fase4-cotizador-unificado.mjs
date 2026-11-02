@@ -42,7 +42,7 @@ import {cotizarDocumentos} from '../pruebas/cotizar-documentos.mjs';
 import {cotizarDocumentosIndividuales} from '../pruebas/cotizar-documentos-individuales.mjs';
 import preciosPiloto from '../../../precios-web.json';
 import {verificarPdfAlmacenado} from './verificacion-pdf-drive-servidor.mjs';
-import {tusPrivadoConfigurado,diagnosticarTUSPrivado,comprobarTUSAntesDeEnviar,iniciarTandaTUSPrivada,finalizarPedidoTUSPrivado,descargarPdfTUSPersonal} from './tus-pedido-worker.mjs';
+import {tusPrivadoConfigurado,diagnosticarTUSPrivado,comprobarTUSAntesDeEnviar,iniciarTandaTUSPrivada,finalizarPedidoTUSPrivado,recuperarPedidoTUSPrivado,descargarPdfTUSPersonal} from './tus-pedido-worker.mjs';
 /**
  * SABER — DOCUMENTOS — ARCHIVO ÚNICO LISTO PARA PEGAR EN CLOUDFLARE
  *
@@ -1878,6 +1878,7 @@ export default {
        authorized:v2PrivateBrowserAuthorized(request,env)==='allow'
       });
     if(page==='/api/ensayo-tus-iniciar'||page==='/api/ensayo-tus-registrar'||
+       page==='/api/ensayo-tus-recuperar'||page==='/prueba-v2/api/ensayo-tus-recuperar'||
        page==='/api/ensayo-tus-comprobar'||
        page==='/prueba-v2/api/ensayo-tus-iniciar'||page==='/prueba-v2/api/ensayo-tus-registrar'||
        page==='/prueba-v2/api/ensayo-tus-comprobar'||page==='/api/ensayo-tus-descargar'){
@@ -1890,6 +1891,8 @@ export default {
         return iniciarTandaTUSPrivada(request,env,{authorized});
       if(page.endsWith('/ensayo-tus-registrar'))
         return finalizarPedidoTUSPrivado(request,env,{authorized,preciosServidor:preciosPiloto});
+      if(page.endsWith('/ensayo-tus-recuperar'))
+        return recuperarPedidoTUSPrivado(request,env,{authorized});
       return descargarPdfTUSPersonal(request,env,{authorized});
     }
     if(page==='/api/ensayo-preparar-documentos-lote')return apiFichaCentralPrivada(request,env,false,false,true,true);
