@@ -99,7 +99,7 @@ test('el portal privado recibe el evento real y agrega PDF con hash y precio, si
  const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
  const onMessage=new AsyncFunction('event','smart','batchSending','registering',
   'registeredOrder','all','batchStatus','used','save','render','updateSummary',
-  'status','document','crypto','File','TUS_ENABLED',script.slice(begin,finish));
+  'status','document','crypto','File','TUS_ENABLED','MAX_PDF_PRIVADOS',script.slice(begin,finish));
  const bytes=Math.round(2.35*1024*1024);
  const file=new File([new Uint8Array([37,80,68,70,45]),new Uint8Array(bytes-5)],
   'MUEBLES.pdf',{type:'application/pdf'});
@@ -113,7 +113,7 @@ test('el portal privado recibe el evento real y agrega PDF con hash y precio, si
    files:[file],options,total:800}
  },{contentWindow},false,false,false,all,batchStatus,used,
  ()=>updates++,()=>updates++,()=>updates++,
- status,{getElementById:()=>({open:false})},webcrypto,File,false);
+ status,{getElementById:()=>({open:false})},webcrypto,File,false,30);
  assert.equal(all.length,1,batchStatus.textContent);
  assert.equal(all[0].price,800);
  assert.equal(all[0].references.length,1);
