@@ -9,6 +9,7 @@ import {prepararLoteParcial,recomponerLoteParcial} from './cotizar-lote-parcial.
 const $=id=>document.getElementById(id);
 const entries=[];
 let modoLote=null; // El usuario elige antes de cargar: común o individual.
+const configuracionComun={}; // Opciones comunes persistentes para nuevos PDF compatibles.
 function actualizarModoLote(){
  const zona=$('zonaArchivos');if(zona)zona.hidden=!modoLote;
  const aviso=$('modoAviso');if(aviso)aviso.textContent=modoLote==='comun'?'Configuración común: las medidas y las páginas se revisan para cada PDF.':modoLote==='individual'?'Cada archivo conserva sus propias opciones, dentro del mismo pedido.':'Elegí una opción antes de subir archivos.';
@@ -179,23 +180,39 @@ function accionComun(titulo,opciones,aplicar){
  select.onchange=()=>{if(select.value)aplicar(select.value)};
  label.append(select);return label;
 }
+function aplicarConfiguracionComunAlDocumento(e){
+ if(modoLote!=='comun'||!e?.paginas||e.error||e.servicio!=='auto')return;
+ const paginas=paginasElegidas(e);if(!paginas)return;
+ const destino=clasificarDestino(paginas,e.seleccion);
+ if(!destino.confirmado||destino.destino!=='documentos')return;
+ for(const [campo,valor] of Object.entries(configuracionComun)){
+  if(campo==='modo'){e.modo=valor;e.materialColor=''}
+  else if(campo==='caras')e.caras=valor;
+  else if(campo==='copias')e.copias=valor;
+  else if(campo==='anillado'){
+   const g=/^grupo:([1-5])$/.exec(valor);
+   e.anillado=g?'grupo':valor;e.grupoAnillado=g?g[1]:'';
+  }
+ }
+}
 function renderConfiguracionGlobal(){
  const holder=$('configComunGlobal');if(!holder)return;
  holder.replaceChildren();holder.hidden=modoLote!=='comun';
  if(modoLote!=='comun')return;
  const indices=entries.map((e,i)=>({e,i})).filter(({e})=>e.paginas&&!e.error&&
   e.servicio==='auto'&&clasificarDestino(paginasElegidas(e)||e.paginas,e.seleccion).destino==='documentos').map(({i})=>i);
- if(indices.length<2){holder.append(texto('p','Cargá al menos dos PDF documentales para aplicar las mismas opciones.'));return}
- const barra=controlesComunes({id:'a4',indices});
+ if(!indices.length){holder.append(texto('p','Cargá al menos un PDF documental para definir las opciones compartidas.'));return}
+ const barra=controlesComunes({id:'a4',indices},true);
  if(barra){barra.querySelector('strong').textContent='Configuración compartida · '+indices.length+' documentos';holder.append(barra)}
  holder.append(texto('small','Cada PDF mantiene su tamaño y páginas seleccionadas. Si alguno necesita un ajuste especial, abrí su ficha individual.'));
 }
-function controlesComunes(grupo){
+function controlesComunes(grupo,global=false){
  const tipos=['personalizado_a4','a5','a4','a3'].includes(grupo.id),ploteo=['cad','poster','mixtos'].includes(grupo.id);
- if(grupo.indices.length<2||(!tipos&&!ploteo))return null;
+ if((grupo.indices.length<2&&!global)||(!tipos&&!ploteo))return null;
  const barra=document.createElement('div');barra.className='opciones-comunes';
  barra.append(texto('strong','Opciones para estos '+grupo.indices.length+' archivos'));
  const aplicar=(campo,valor)=>{
+  if(global)configuracionComun[campo]=valor;
   for(const i of grupo.indices){
    const e=entries[i];
    if(campo==='modo'){e.modo=valor;e.materialColor=''}
@@ -242,7 +259,9 @@ function render(){
   const bloque=document.createElement('section');bloque.className='grupo-pedido';
   const titulo=texto('h3',grupo.titulo+' · '+grupo.indices.length+' archivo(s)');
   titulo.className='titulo-grupo';bloque.append(titulo);
-  const comunes=modoLote==='comun'?null:controlesComunes(grupo);if(comunes)bloque.append(comunes);
+  // En modo individual cada PDF se configura desde su propia ficha.
+ // En modo común el único panel compartido está sobre la carga.
+ const comunes=null;if(comunes)bloque.append(comunes);
   for(const i of grupo.indices){
   const e=entries[i];
   const card=texto('section','');card.className='archivo';
@@ -511,6 +530,7 @@ $('archivos').addEventListener('change',async ev=>{
   while(siguiente<files.length){
    const i=siguiente++;
    await analizarArchivoPDF(entries[start+i],files[i]);
+   aplicarConfiguracionComunAlDocumento(entries[start+i]);
    render();
   }
  }));
