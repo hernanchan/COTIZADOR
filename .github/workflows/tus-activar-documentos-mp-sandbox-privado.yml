@@ -85,6 +85,7 @@ jobs:
           done
           echo "SANDBOX_ADMIN_AUTH_HTTP=$authSandbox"
           health=$(curl --silent --show-error --max-time 30             "https://saber-pagos-pruebas.libreriasaber.workers.dev/health" || true)
+          echo "$health" | jq -c '{ok,databaseReady,paymentsEnabled}' || true
           safe=false
           if [ "$http" = "401" ] && [ "$authSandbox" = "401" ] && echo "$health" | jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' >/dev/null; then safe=true; fi
           if [ "$safe" != true ]; then
