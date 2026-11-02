@@ -51,8 +51,9 @@ const scope={Request,Response,URL,URLSearchParams,AbortSignal,TextEncoder,crypto
   assert.equal(body.external_reference,id);
   return new Response(JSON.stringify({id:'789'}),{status:200});
  }
+ if(u.endsWith('/users/me'))return new Response(JSON.stringify({id:999,tags:['test_user']}),{status:200});
  if(u.endsWith('/checkout/preferences/789'))
-  return new Response(JSON.stringify({id:'789',external_reference:id,items:[{currency_id:'ARS',quantity:1,unit_price:9000}],sandbox_init_point:fakeUrl}),{status:200});
+  return new Response(JSON.stringify({id:'789',external_reference:id,collector_id:999,items:[{currency_id:'ARS',quantity:1,unit_price:9000}],init_point:fakeUrl}),{status:200});
  throw Error('Unexpected network: '+u);
 }};
 scope.globalThis=scope;vm.createContext(scope);
@@ -118,5 +119,5 @@ test('private Central exposes the operator-only sandbox preparation action',()=>
  assert.match(source,/Preparar enlace Mercado Pago \(ensayo\)/);
  assert.match(source,/apiPost\("\/admin\/api\/central\/payment-preflight"/);
  assert.match(source,/apiPost\("\/admin\/api\/central\/payment-sandbox-prepare"/);
- assert.match(source,/ENLACE DE PRUEBA/);
+ assert.match(source,/PRUEBA CON CUENTA COMPRADORA DE ENSAYO/);
 });
