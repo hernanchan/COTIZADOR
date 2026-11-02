@@ -277,7 +277,7 @@ export async function recuperarPedidoTUSPrivado(request,env,{
   const p=await preparar({env,webOrderId:input.orderId,
    clientOrderId:input.clientOrderId,items:[]});
   if(!p?.created||!UUID.test(p.commercialOrderId||'')||
-     !/^\\d{3,}$/.test(p.numeroOrden||'')||
+     !/^\d{3,}$/.test(p.numeroOrden||'')||
      !Number.isSafeInteger(p.amountArs)||p.amountArs<1||
      p.paymentAuthorized!==false||p.checkoutEnabled!==false)
    throw Error('Central sin orden verificable.');
