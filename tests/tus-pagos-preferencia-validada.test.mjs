@@ -14,6 +14,7 @@ const order={id,amount_ars:8332,deposit_ars:8332,status:'awaiting_payment',
 const DB={prepare(sql){
  let args=[];
  const q={bind(...v){args=v;return q},async first(){
+  if(sql.includes("FROM sqlite_master WHERE type='table' AND name='transfer_requests'"))return null;
   if(sql.includes('SELECT * FROM orders WHERE id='))return args[0]===id?order:null;
   if(sql.includes('SELECT sku FROM order_items WHERE order_id='))return null;
   throw Error('Unexpected D1 read: '+sql);
