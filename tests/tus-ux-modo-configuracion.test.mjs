@@ -17,6 +17,12 @@ test('private PDF editor requests configuration mode before upload',()=>{
 test('shared mode preserves per-file size, pages, server quote and individual exceptions',()=>{
  assert.match(source,/let modoLote=null/);
  assert.ok(source.includes('const configuracionComun={}'));
+ assert.ok(source.includes("select.value=seleccion"));
+ assert.ok(source.includes("configuracionComun.modo||''"));
+ assert.ok(source.includes("configuracionComun.caras||''"));
+ assert.ok(source.includes("configuracionComun.anillado||''"));
+ assert.ok(source.includes("copias.value=String(configuracionComun.copias)"));
+ assert.ok(source.includes("if(modoLote==='comun')for(const e of entries)aplicarConfiguracionComunAlDocumento(e)"));
  assert.ok(source.includes('function aplicarConfiguracionComunAlDocumento(e)'));
  assert.ok(source.includes("if(modoLote!=='comun'||!e?.paginas"));
  assert.ok(source.includes("if(!destino.confirmado||destino.destino!=='documentos')return"));
