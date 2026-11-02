@@ -1317,8 +1317,16 @@ async function reconcilePayment(env,paymentId){
  const mo=await mp(env,"/merchant_orders/"+esc(String(pay.order.id)));
  if(String(mo.preference_id)!==String(order.preference_id)||String(mo.external_reference)!==String(order.id)||!mo.payments?.some(p=>String(p.id)===String(pay.id)&&p.status==="approved"))return {registered:false,reason:"merchant_order_checks"};
  // Exclusivo de la cuenta de vendedor de prueba; no se procesan cobros productivos.
- if(order.status==="paid")return {registered:String(order.payment_id)===String(pay.id),alreadyRegistered:true};
+ // La Central exige revisión explícita: registrar el pago verificado desde el
+ // webhook, sin esperar al próximo cron. Una revocación es irreversible aquí.
+ const markVerified=()=>env.DB.prepare("INSERT INTO payment_reviews(order_id,state,checked_at) VALUES(?,'verified',datetime('now')) ON CONFLICT(order_id) DO UPDATE SET state=CASE WHEN payment_reviews.state='revoked' THEN 'revoked' ELSE 'verified' END,checked_at=datetime('now')").bind(order.id).run();
+ if(order.status==="paid"){
+  const samePayment=String(order.payment_id)===String(pay.id);
+  if(samePayment)await markVerified();
+  return {registered:samePayment,alreadyRegistered:true};
+ }
  const res=await env.DB.prepare("UPDATE orders SET status='paid',payment_id=?,paid_at=datetime('now') WHERE id=? AND status='awaiting_payment' AND payment_id IS NULL").bind(String(pay.id),order.id).run();
+ if(res.meta?.changes)await markVerified();
  return {registered:Boolean(res.meta?.changes)};
 }
 async function syncPendingPayments(env){
