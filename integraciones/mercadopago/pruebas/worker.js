@@ -882,7 +882,7 @@ async function centralPolaroidDownload(req,env,reference){
  await centralPolaroidTable(env);
  await ensurePaymentReviews(env);
  await ensureOrderItems(env);
- const row=await env.DB.prepare("SELECT p.reference,p.sha256,p.bytes,p.photos,p.sheets,p.amount_ars,p.commercial_order_id,o.status,o.payment_id,o.preference_id,o.paid_at,o.deposit_ars,o.amount_ars AS order_amount FROM central_polaroids_express p JOIN orders o ON o.id=p.commercial_order_id WHERE p.reference=? AND o.status='paid' AND o.deposit_ars=o.amount_ars AND o.paid_at IS NOT NULL AND o.payment_id IS NOT NULL AND o.preference_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM payment_reviews q WHERE q.order_id=o.id AND q.state='revoked')").bind(reference).first();
+ const row=await env.DB.prepare("SELECT p.reference,p.sha256,p.bytes,p.photos,p.sheets,p.amount_ars,p.commercial_order_id,o.status,o.payment_id,o.preference_id,o.paid_at,o.deposit_ars,o.amount_ars AS order_amount FROM central_polaroids_express p JOIN orders o ON o.id=p.commercial_order_id WHERE p.reference=? AND o.status='paid' AND o.deposit_ars=o.amount_ars AND o.paid_at IS NOT NULL AND o.payment_id IS NOT NULL AND o.preference_id IS NOT NULL AND EXISTS (SELECT 1 FROM payment_reviews q WHERE q.order_id=o.id AND q.state='verified')").bind(reference).first();
  if(!row)return json({error:"No existe PDF de pedido pagado verificable"},404);
  const lines=(await env.DB.prepare("SELECT sku,quantity,unit_price_ars,line_total_ars,file_references_json FROM order_items WHERE order_id=? ORDER BY line_number").bind(row.commercial_order_id).all()).results||[];
  if(!lines.length||lines.length>100||
@@ -1616,7 +1616,7 @@ export default {
    if(url.pathname==="/admin/api/orders"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
     await ensurePaymentReviews(env);
-    const rows=await env.DB.prepare("SELECT id,description,amount_ars,status,paid_at,created_at FROM orders WHERE status='paid' AND deposit_ars=amount_ars AND NOT EXISTS (SELECT 1 FROM payment_reviews WHERE order_id=orders.id AND state='revoked') ORDER BY paid_at DESC LIMIT 100").all();
+    const rows=await env.DB.prepare("SELECT id,description,amount_ars,status,paid_at,created_at FROM orders WHERE status='paid' AND deposit_ars=amount_ars AND EXISTS (SELECT 1 FROM payment_reviews WHERE order_id=orders.id AND state='verified') ORDER BY paid_at DESC LIMIT 100").all();
     return json({orders:rows.results});
    }
    // Un pedido histórico se numera SOLO al solicitar su ficha desde un
@@ -1686,7 +1686,7 @@ export default {
     const id=url.searchParams.get("id")||"";
     if(!/^[a-f0-9-]{36}$/i.test(id))return json({error:"ID de pedido inválido"},400);
     await ensurePaymentReviews(env);
-    const order=await env.DB.prepare("SELECT id,description,amount_ars,deposit_ars,status,paid_at,created_at,payment_id,preference_id FROM orders WHERE id=? AND status='paid' AND deposit_ars=amount_ars AND NOT EXISTS (SELECT 1 FROM payment_reviews WHERE order_id=orders.id AND state='revoked')").bind(id).first();
+    const order=await env.DB.prepare("SELECT id,description,amount_ars,deposit_ars,status,paid_at,created_at,payment_id,preference_id FROM orders WHERE id=? AND status='paid' AND deposit_ars=amount_ars AND EXISTS (SELECT 1 FROM payment_reviews WHERE order_id=orders.id AND state='verified')").bind(id).first();
     if(!order)return json({error:"Pedido pagado no encontrado"},404);
     await ensureOrderItems(env);
     const rows=await env.DB.prepare("SELECT line_number,item_type,sku,title,quantity,unit_price_ars,line_total_ars,detail_json,file_references_json FROM order_items WHERE order_id=? ORDER BY line_number").bind(id).all();
@@ -1878,7 +1878,7 @@ export default {
    if(url.pathname==="/demo/paid-orders"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"La clave de acceso del demo no coincide con DEMO_ADMIN_KEY en Cloudflare. No ingreses el nombre de la variable."},401);
     await ensurePaymentReviews(env);
-    const rows=await env.DB.prepare("SELECT id,description,amount_ars,deposit_ars,status,paid_at FROM orders WHERE status='paid' AND NOT EXISTS (SELECT 1 FROM payment_reviews WHERE order_id=orders.id AND state='revoked') ORDER BY paid_at DESC LIMIT 100").all();
+    const rows=await env.DB.prepare("SELECT id,description,amount_ars,deposit_ars,status,paid_at FROM orders WHERE status='paid' AND EXISTS (SELECT 1 FROM payment_reviews WHERE order_id=orders.id AND state='verified') ORDER BY paid_at DESC LIMIT 100").all();
     return json({orders:rows.results});
    }
    return json({error:"No encontrado"},404);
