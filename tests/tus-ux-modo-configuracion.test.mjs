@@ -42,3 +42,12 @@ test('shared mode preserves per-file size, pages, server quote and individual ex
  assert.match(source,/const lote=prepararLoteParcial\(entries\)/);
  assert.match(source,/const entries=\[\]/);
 });
+
+test('shared mode suppresses repeated per-file print widgets except explicit overrides',()=>{
+ assert.ok(source.includes("if(modoLote!=='comun'||pregunta)principal.append(filaTam)"));
+ assert.ok(source.includes("if(modoLote!=='comun'||abierto===i)mostrarSelectorRapido(card,e,i)"));
+ assert.ok(source.includes("modoLote==='comun'?'Personalizar este PDF':'Más opciones'"));
+ assert.ok(source.includes("accionComun('Páginas por cara para todos'"));
+ assert.ok(source.includes("else if(campo==='paginasPorHoja')e.paginasPorHoja=valor"));
+ assert.ok(source.includes("v=>aplicar('paginasPorHoja',Number(v))"));
+});
