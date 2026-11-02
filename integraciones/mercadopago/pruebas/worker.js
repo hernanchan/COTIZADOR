@@ -1881,7 +1881,7 @@ export default {
     // La prohibición de cobro depende de los trabajos, NO de una descripción:
     // un carrito mixto o un cambio de título nunca puede eludirla.
     await ensureOrderItems(env);
-    const restricted=await env.DB.prepare("SELECT sku FROM order_items WHERE order_id=? AND sku IN ('DOCS_VERIFIED','POLAROID_EXPRESS_A4') LIMIT 1").bind(orderId).first();
+    const restricted=await env.DB.prepare("SELECT sku FROM order_items WHERE order_id=? AND sku IN ('DOCS_VERIFIED','POLAROID_EXPRESS_A4') ORDER BY CASE WHEN sku='POLAROID_EXPRESS_A4' THEN 0 ELSE 1 END LIMIT 1").bind(orderId).first();
     if(restricted?.sku==="POLAROID_EXPRESS_A4")return json({error:"Cobro de Polaroids Express todavía deshabilitado"},503);
      if(restricted?.sku==="DOCS_VERIFIED"){
       if(env.DOCS_SANDBOX_CHECKOUT_ENABLED!=="PRIVATE_TEST_ONLY")return json({error:"Cobro de documentos deshabilitado hasta preflight privado sandbox"},503);
