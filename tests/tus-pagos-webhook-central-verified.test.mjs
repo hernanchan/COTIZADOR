@@ -16,6 +16,6 @@ test('commercial document and Express checkout remains blocked before approval',
  assert.match(checkout,/sku IN \('DOCS_VERIFIED','POLAROID_EXPRESS_A4'\)/);
  assert.match(checkout,/restricted\?\.sku===\"POLAROID_EXPRESS_A4\"/);
  assert.match(checkout,/restricted\?\.sku===\"DOCS_VERIFIED\"/);
- assert.match(checkout,/documentSandboxEligibility\(env,order.id\)/);
+ assert.match(checkout,/documentSandboxEligibility\(env,order.id,true\)/);
  assert.match(src,/env\.CHECKOUT_ENABLED!=="APROBADO"/);
 });
