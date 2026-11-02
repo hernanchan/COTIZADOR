@@ -62,3 +62,16 @@ test('la Central lista transferencias sin acreditar ni liberar la orden',()=>{
  assert.ok(worker.includes('api("/admin/api/transfers/pending")'));
  assert.ok(worker.includes('Acreditación NO verificada · NO imprimir'));
 });
+
+test('conciliacion de transferencias muestra numero de orden existente sin renumerar',()=>{
+ const start=worker.indexOf('if(url.pathname==="/admin/api/transfers/pending"');
+ const end=worker.indexOf('if(url.pathname==="/admin/api/orders"',start);
+ const route=worker.slice(start,end);
+ assert.ok(route.includes('await centralTables(env)'));
+ assert.ok(route.includes('LEFT JOIN central_work_order_numbers n ON n.commercial_order_id=t.order_id'));
+ assert.ok(route.includes('n.number AS numero_orden'));
+ assert.ok(!route.includes('INSERT INTO central_work_order_numbers'));
+ assert.ok(!route.includes('INSERT OR IGNORE INTO central_work_order_numbers'));
+ assert.ok(worker.includes('const ref=t.numero_orden?"Orden N.º "+String(t.numero_orden).padStart(3,"0")'));
+ assert.ok(worker.includes('Referencia de conciliación: '));
+});
