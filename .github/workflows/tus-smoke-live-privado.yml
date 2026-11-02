@@ -1,0 +1,49 @@
+name: Saber - smoke privado de Documentos y Central desplegados (solo GET)
+on:
+  push:
+    branches:
+      - integracion/tus-pedido-privado-20261101
+    paths:
+      - .github/workflows/tus-smoke-live-privado.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Consultar ambos Workers desplegados sin crear pedidos ni cobros
+        shell: bash
+        env:
+          PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$PASSWORD"
+          docs=https://saber-documentos-pruebas.libreriasaber.workers.dev
+          central=https://saber-pagos-pruebas.libreriasaber.workers.dev
+          workdir=$(mktemp -d)
+          trap 'rm -rf "$workdir"' EXIT
+          for target in "$docs/prueba-v2/" "$docs/prueba-v2/carga-inteligente" "$central/admin/api/orders" "$central/admin/api/transfers/pending"; do
+            status=$(curl --silent --show-error --max-time 20 -o "$workdir/anonymous" -w '%{http_code}' "$target")
+            if [ "$status" != 401 ]; then echo "PRIVATE_ROUTE_NOT_PROTECTED_HTTP_$status"; exit 1; fi
+          done
+          echo "BOTH_WORKERS_ANONYMOUS_ACCESS_DENIED"
+          for route in /prueba-v2/ /prueba-v2/carga-inteligente /prueba-v2/carga-inteligente.js; do
+            status=$(curl --silent --show-error --max-time 20 -u "operador:$PASSWORD" -o "$workdir/page" -w '%{http_code}' "$docs$route")
+            if [ "$status" != 200 ]; then echo "PRIVATE_AUTH_FAILED_$route_HTTP_$status"; exit 1; fi
+            case "$route" in
+              /prueba-v2/) grep -Fq 'id="smart"' "$workdir/page"; grep -Fq 'send-all-pdf' "$workdir/page";;
+              /prueba-v2/carga-inteligente) grep -Fq 'name="modoImpresionLote"' "$workdir/page"; grep -Fq 'id="zonaArchivos"' "$workdir/page"; grep -Fq 'id="configComunGlobal"' "$workdir/page";;
+              /prueba-v2/carga-inteligente.js) grep -Fq "aplicarConfiguracionComunAlDocumento" "$workdir/page"; grep -Fq "modoLote==='comun'" "$workdir/page";;
+            esac
+          done
+          echo "DOCUMENTS_PRIVATE_MODE_COMMON_AND_INDIVIDUAL_LIVE_OK"
+          status=$(curl --silent --show-error --max-time 20 -o "$workdir/health" -w '%{http_code}' "$central/health")
+          test "$status" = 200
+          jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$workdir/health" >/dev/null
+          echo "CENTRAL_DB_READY_PAYMENTS_DISABLED_LIVE_OK"
+          echo "GET_ONLY_NO_UPLOAD_NO_ORDER_NO_PAYMENT_NO_PUBLIC_WEB"
