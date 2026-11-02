@@ -50,6 +50,12 @@ const call=(path,body)=>sandbox.worker.fetch(new Request('https://sandbox.exampl
  body:JSON.stringify(body)
 }),env);
 
+test('commercial document and Express checkout remains blocked before approval',()=>{
+ const body=source.slice(source.indexOf('if(url.pathname==="/demo/checkout"'),source.indexOf('if(url.pathname==="/webhooks/mercadopago"'));
+ assert.match(body,/restricted\?\.sku==="POLAROID_EXPRESS_A4"/);
+ assert.match(body,/DOCS_SANDBOX_CHECKOUT_ENABLED/);
+ assert.match(body,/x-docs-sandbox-preflight/);
+});
 test('pedido TUS con PDF verificado no genera preferencia Mercado Pago desde demo',async()=>{
  for(const [name,items,description] of [
   ['documento solo',['DOCS_VERIFIED'],'Pedido A4'],
