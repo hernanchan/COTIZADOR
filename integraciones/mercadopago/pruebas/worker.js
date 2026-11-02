@@ -1324,6 +1324,32 @@ document.querySelector("#refreshUnpaid").addEventListener("click",async()=>{
    });
    li.append(sandboxButton);
    li.append(sandboxInfo);
+   const diagnosticButton=node("button","Diagnosticar intento de pago");
+   diagnosticButton.className="outline";diagnosticButton.type="button";
+   const diagnosticInfo=node("div","");
+   diagnosticButton.addEventListener("click",async()=>{
+    diagnosticButton.disabled=true;
+    diagnosticInfo.replaceChildren(node("p","Consultando estados en Mercado Pago…"));
+    try{
+     const d=await apiPost("/admin/api/central/payment-diagnostic",{order_id:o.commercial_order_id});
+     const texts=[
+      "Estado interno: "+d.order_state,
+      "Preferencia registrada: "+(d.preference_registered?"Sí":"No"),
+      "Preferencia vinculada al pedido: "+(d.preference_matches===undefined?"No consta":d.preference_matches?"Sí":"No"),
+      "Consulta de pagos: "+(d.payment_search_ok?"Correcta":"No disponible"),
+      "Intentos encontrados: "+d.payment_attempts.length,
+      ...d.payment_attempts.map(p=>"Pago "+p.status+" · "+p.status_detail+
+       " · importe "+(p.amount_matches?"correcto":"a revisar")),
+      "Consulta de órdenes MP: "+(d.merchant_order_search_ok?"Correcta":"No disponible"),
+      ...(d.merchant_orders||[]).map(m=>"Orden MP: "+m.status+
+       (m.payments.length?" · "+m.payments.map(p=>p.status+"/"+p.status_detail).join(", "):" · sin pagos"))
+     ];
+     diagnosticInfo.replaceChildren(...texts.map(t=>node("p",t)));
+    }catch(e){diagnosticInfo.replaceChildren(node("p",String(e.message||e)));}
+    finally{diagnosticButton.disabled=false;}
+   });
+   li.append(diagnosticButton);
+   li.append(diagnosticInfo);
    list.append(li);
   }
   status.textContent=x.orders.length+" pedido(s) en espera de pago";
@@ -1846,6 +1872,41 @@ export default {
      return json({error:"La transferencia requiere revisión administrativa"},409);
     return json({order_id:order.id,amount_ars:order.amount_ars,alias,
      state:"awaiting_bank_verification",payment_confirmed:false,production_enabled:false});
+   }
+   // Diagnóstico SOLO lectura. No cambia D1, no reconcilia ni autoriza impresión.
+   // Consulta la preferencia y los intentos registrados por Mercado Pago.
+   if(url.pathname==="/admin/api/central/payment-diagnostic"&&req.method==="POST"){
+    if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+    const body=await req.json().catch(()=>null);
+    if(!body||Object.keys(body).join(",")!=="order_id"||!isUUID(body.order_id))
+     return json({error:"Pedido inválido"},400);
+    const order=await env.DB.prepare("SELECT id,amount_ars,status,preference_id FROM orders WHERE id=?").bind(body.order_id).first();
+    if(!order)return json({error:"Pedido no encontrado"},404);
+    if(!order.preference_id)return json({order_state:order.status,preference_registered:false,
+     payment_attempts:[],payment_search_ok:true,merchant_order_search_ok:true,productionAuthorized:false});
+    const pref=await mp(env,"/checkout/preferences/"+esc(order.preference_id)).catch(()=>null);
+    const matchesPref=!!pref&&String(pref.id)===String(order.preference_id)&&String(pref.external_reference)===String(order.id);
+    const query=new URLSearchParams({external_reference:order.id,sort:"date_created",criteria:"desc",limit:"10"});
+    const [found,merchant]=await Promise.all([
+     mp(env,"/v1/payments/search?"+query).catch(()=>null),
+     mp(env,"/merchant_orders/search?"+new URLSearchParams({preference_id:String(order.preference_id)})).catch(()=>null)
+    ]);
+    const attempts=Array.isArray(found?.results)?found.results:[];
+    const safeAttempts=attempts.filter(p=>String(p.external_reference||"")===String(order.id))
+     .map(p=>({status:String(p.status||"unknown").slice(0,40),
+      status_detail:String(p.status_detail||"unknown").slice(0,80),
+      amount_matches:Number(p.transaction_amount)===Number(order.amount_ars),
+      preference_matches:!p.preference_id||String(p.preference_id)===String(order.preference_id)}));
+    const merchants=Array.isArray(merchant?.elements)?merchant.elements:[];
+    const safeMerchants=merchants.filter(m=>String(m.preference_id||"")===String(order.preference_id))
+     .map(m=>({status:String(m.status||"unknown").slice(0,40),
+      payments:Array.isArray(m.payments)?m.payments.map(p=>({
+       status:String(p.status||"unknown").slice(0,40),
+       status_detail:String(p.status_detail||"unknown").slice(0,80)})).slice(0,10):[]}));
+    return json({order_state:order.status,preference_registered:true,preference_matches:matchesPref,
+     preference_expired:pref?.expiration_date_to?Date.now()>Date.parse(pref.expiration_date_to):null,
+     payment_search_ok:found!==null,merchant_order_search_ok:merchant!==null,
+     payment_attempts:safeAttempts,merchant_orders:safeMerchants,productionAuthorized:false});
    }
    // Preflight de pago documental: consulta D1 sin generar preferencias ni
    // tocar estados. La habilitación real del checkout permanece BLOQUEADA.
