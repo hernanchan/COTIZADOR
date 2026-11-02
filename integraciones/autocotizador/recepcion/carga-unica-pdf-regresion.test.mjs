@@ -41,7 +41,7 @@ const marker="const prepararEnvioPrivado=()=>{";
 const begin=source.indexOf(marker);
 const finish=source.indexOf("\n };\n bridgeButton.hidden=true",begin);
 assert.ok(begin>=0&&finish>begin,'No se encontró el callback real del botón');
-const clickHandler=new Function('leyendo','ultimoPresupuesto','entries','window','location','info','MAX_PDF_CARGA',
+const clickHandler=new Function('leyendo','ultimoPresupuesto','entries','window','location','info','MAX_PDF_CARGA','paginasElegidas',
  source.slice(begin+marker.length,finish));
 
 function runPrivateHandoff(name='MUEBLES.pdf',size=2464154){
@@ -49,13 +49,13 @@ function runPrivateHandoff(name='MUEBLES.pdf',size=2464154){
  const sent=[],info={textContent:''};
  const entry={
   archivoOriginal:file,name:file.name,anillado:'ninguno',paginasPorHoja:1,
-  paginas:Array.from({length:8},(_,i)=>i+1),modo:'bn',caras:'simple',copias:1
+  paginas:Array.from({length:8},(_,i)=>({numero:i+1})),modo:'bn',caras:'simple',copias:1
  };
  const quote={estado:'PRELIMINAR',total:800,
   plan:[{indice:0,destino:'documentos',formatoFinal:'a4',
    paginasElegidas:Array.from({length:8},(_,i)=>i+1)}]};
  const window={parent:{postMessage:(payload,origin)=>sent.push({payload,origin})}};
- clickHandler(false,quote,[entry],window,{origin:'https://example.test'},info,30);
+ clickHandler(false,quote,[entry],window,{origin:'https://example.test'},info,30,e=>e.paginas);
  return {sent,info,file};
 }
 
@@ -128,5 +128,5 @@ test('el portal privado recibe el evento real y agrega PDF con hash y precio, si
 test('cliente de prueba no anuncia falsamente que los ploteos quedan fuera de la recepción TUS',()=>{
  assert.ok(source.includes('Impresiones y ploteos se verifican y registran en la Central'));
  assert.ok(!source.includes('Los ploteos se cotizan, pero quedan pendientes de integración'));
- assert.ok(source.includes('La selección parcial de páginas todavía requiere integración'));
+ assert.ok(source.includes('Las páginas elegidas se verifican sobre el PDF original antes de registrar la orden.'));
 });
