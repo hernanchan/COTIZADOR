@@ -332,10 +332,24 @@ async function centralTUSPackageManifest(req,env){
     !Number.isSafeInteger(t.bytes)||t.bytes<5||t.bytes>20*1024*1024)||
     new Set(trabajos.map(t=>t.reciboPrivado)).size!==trabajos.length)
   return json({ok:false,error:"Ficha incompleta"},409);
+ // El ZIP usa únicamente originales verificados. El estado PAGADO
+ // requiere, además del pedido, la conciliación explícita de D1.
+ let pagoVerificado=false;
+ if(row.status==="paid"){
+  await ensurePaymentReviews(env);
+  const review=await env.DB.prepare(
+   "SELECT o.id FROM orders o JOIN payment_reviews r ON r.order_id=o.id "+
+   "WHERE o.id=? AND o.status='paid' AND o.paid_at IS NOT NULL "+
+   "AND o.payment_id IS NOT NULL AND o.preference_id IS NOT NULL "+
+   "AND o.deposit_ars=o.amount_ars AND r.state='verified' LIMIT 1"
+  ).bind(row.commercial_order_id).first();
+  pagoVerificado=Boolean(review);
+  if(!pagoVerificado)return json({ok:false,error:"Pago sin conciliación verificada"},409);
+ }
  return json({ok:true,schema:p.schema,numeroOrden:shortWorkNumber(row.number),
   webOrderId:p.webOrderId,importe:row.amount_ars,trabajos,
-  estadoPago:row.status==="paid"?"REVISAR_PAGO":"SIN_PAGO_CONFIRMADO",
-  pdfImprimibleVerificado:false,listoParaProducir:false,
+  estadoPago:pagoVerificado?"PAGADO_VERIFICADO":"SIN_PAGO_CONFIRMADO",
+  pagoVerificado,pdfImprimibleVerificado:false,listoParaProducir:false,
   paymentAuthorized:false},200);
 }
 
@@ -1034,6 +1048,19 @@ async function showOrder(id){try{status.textContent="Consultando detalle...";con
  if(!Array.isArray(d.trabajos)||d.trabajos.length!==d.archivos){
   details.append(node("p","ALERTA: la cantidad de PDF no coincide con la recepción verificada; revisar antes de producir."));
  }else{
+  if(d.esTUS&&/^WEB-ENSAYO-[A-F0-9]{32}$/.test(d.webOrderId||"")&&d.numeroOrden){
+   const pack=node("button","Descargar ZIP + orden de trabajo PDF");
+   pack.type="button";
+   pack.addEventListener("click",()=>{
+    const url=new URL("https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/orden-paquete");
+    url.searchParams.set("webOrderId",d.webOrderId);
+    const link=document.createElement("a");
+    link.href=url.href;link.target="_blank";link.rel="noopener noreferrer";
+    document.body.append(link);link.click();link.remove();
+   });
+   details.append(pack);
+   details.append(node("p","ZIP: PDF originales numerados + orden de trabajo A4 en PDF. Armado privado; verificar en Adobe antes de imprimir."));
+  }
   for(const t of d.trabajos){
    const line=node("section","");
    line.append(node("h4",t.orden+". "+t.nombreOriginal+" · "+t.servicio));
