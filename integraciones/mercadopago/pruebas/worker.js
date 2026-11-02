@@ -1573,6 +1573,36 @@ async function audit(env,event,detail){
   await env.DB.prepare("INSERT INTO webhook_audit(event,detail) VALUES(?,?)").bind(event,detail).run();
  }catch(e){console.error("Webhook audit failed",e?.message||"unknown")}
 }
+async function documentSandboxEligibility(env,orderId){
+  const order=await env.DB.prepare("SELECT id,amount_ars,deposit_ars,status,created_at,preference_id FROM orders WHERE id=?").bind(orderId).first();
+  if(!order)return {reason:"PEDIDO_INEXISTENTE"};
+  const manifest=await env.DB.prepare("SELECT amount_ars,file_count,manifest_json FROM central_document_manifests WHERE commercial_order_id=?").bind(order.id).first();
+  if(!manifest)return {reason:"SIN_MANIFIESTO"};
+  const lines=(await env.DB.prepare("SELECT sku,line_total_ars,quantity,unit_price_ars FROM order_items WHERE order_id=? ORDER BY line_number").bind(order.id).all()).results||[];
+  let parsed=null;
+  try{parsed=JSON.parse(manifest.manifest_json)}catch(_){}
+  const createdAt=Date.parse(String(order.created_at||"").replace(" ","T")+"Z");
+  const docs=lines.filter(x=>x.sku==="DOCS_VERIFIED");
+  const total=lines.reduce((sum,x)=>sum+Number(x.line_total_ars),0);
+  const reason=order.status!=="awaiting_payment"?"PEDIDO_NO_PENDIENTE":
+   order.preference_id?"PAGO_YA_INICIADO":
+   !Number.isFinite(createdAt)||Date.now()>=createdAt+86400000?"COTIZACION_VENCIDA":
+   !Number.isSafeInteger(order.amount_ars)||order.amount_ars<1||order.deposit_ars!==order.amount_ars?"PAGO_TOTAL_INVALIDO":
+   !Number.isSafeInteger(manifest.amount_ars)||manifest.amount_ars<1||!Number.isSafeInteger(manifest.file_count)||manifest.file_count<1?"RECEPCION_INVALIDA":
+   !parsed||parsed.schema!=="saber-central-documentos-d1-v1"||parsed.importe!==manifest.amount_ars||
+    !Array.isArray(parsed.trabajos)||parsed.trabajos.length!==manifest.file_count?"MANIFIESTO_INVALIDO":
+   docs.length!==1||docs[0].line_total_ars!==manifest.amount_ars?"LINEA_DOCUMENTAL_INVALIDA":
+   !lines.length||lines.some(line=>!Number.isSafeInteger(line.line_total_ars)||line.line_total_ars<1||
+    !Number.isSafeInteger(line.quantity)||line.quantity<1||!Number.isSafeInteger(line.unit_price_ars)||line.unit_price_ars<1)||
+    total!==order.amount_ars?"IMPORTE_NO_COINCIDE":null;
+  if(reason)return {reason};
+  const transferTable=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='transfer_requests'").first();
+  if(transferTable){
+    const transfer=await env.DB.prepare("SELECT order_id FROM transfer_requests WHERE order_id=?").bind(order.id).first();
+    if(transfer)return {reason:"TRANSFERENCIA_EN_PROCESO"};
+  }
+  return {reason:null};
+}
 export default {
  async scheduled(event,env,ctx){
   ctx.waitUntil(runScheduledReconciliation(env).catch(e=>console.error("Scheduled payment sync failed",String(e?.message||"unknown").slice(0,120))));
@@ -1833,7 +1863,7 @@ export default {
      const table=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='transfer_requests'").first();
      if(table){const transfer=await env.DB.prepare("SELECT order_id FROM transfer_requests WHERE order_id=?").bind(order.id).first();
       if(transfer)return json({error:"Pedido pendiente de transferencia; no iniciar otro pago",paymentAuthorized:false},409);}
-     return await this.fetch(new Request(new URL("/demo/checkout",req.url),{method:"POST",headers:{Authorization:req.headers.get("Authorization"),"Content-Type":"application/json","x-docs-sandbox-preflight":"PRIVATE_TEST_ONLY"},body:JSON.stringify({order_id:order.id})}),env);
+     return await this.fetch(new Request(new URL("/demo/checkout",req.url),{method:"POST",headers:{Authorization:req.headers.get("Authorization"),"Content-Type":"application/json"},body:JSON.stringify({order_id:order.id})}),env);
     }
     return json({order_id:order.id,ready_for_sandbox_test:reason===null,
      reason:reason||"DOCUMENTOS_Y_TOTAL_VERIFICADOS",
@@ -1853,8 +1883,16 @@ export default {
     await ensureOrderItems(env);
     const restricted=await env.DB.prepare("SELECT sku FROM order_items WHERE order_id=? AND sku IN ('DOCS_VERIFIED','POLAROID_EXPRESS_A4') LIMIT 1").bind(orderId).first();
     if(restricted?.sku==="POLAROID_EXPRESS_A4")return json({error:"Cobro de Polaroids Express todavía deshabilitado"},503);
-     if(restricted?.sku==="DOCS_VERIFIED"&&(env.DOCS_SANDBOX_CHECKOUT_ENABLED!=="PRIVATE_TEST_ONLY"||req.headers.get("x-docs-sandbox-preflight")!=="PRIVATE_TEST_ONLY"))return json({error:"Cobro de documentos deshabilitado hasta preflight privado sandbox"},503);
-    if(order.description==="Librería Saber · documentos verificados y tienda"&&(env.DOCS_SANDBOX_CHECKOUT_ENABLED!=="PRIVATE_TEST_ONLY"||req.headers.get("x-docs-sandbox-preflight")!=="PRIVATE_TEST_ONLY"))return json({error:"Cobro de documentos aún no habilitado. Falta el ensayo integral."},503);
+     if(restricted?.sku==="DOCS_VERIFIED"){
+      if(env.DOCS_SANDBOX_CHECKOUT_ENABLED!=="PRIVATE_TEST_ONLY")return json({error:"Cobro de documentos deshabilitado hasta preflight privado sandbox"},503);
+      // Revalidar D1 AQUÍ, incluso cuando un cliente invoque /demo/checkout
+      // directamente o falsifique encabezados. Nunca confiar en un header interno.
+      const verified=await documentSandboxEligibility(env,order.id);
+      if(verified.reason)return json({error:"Pedido documental no autorizado para sandbox",reason:verified.reason},409);
+     }
+    if(order.description==="Librería Saber · documentos verificados y tienda"&&!restricted){
+      return json({error:"Pedido documental sin renglón verificable; cobro bloqueado"},503);
+     }
     if(order.description==="Librería Saber · Polaroids Express y tienda")return json({error:"Cobro de Polaroids Express aún no habilitado. Falta el ensayo integral."},503);
     // Evitar ofrecer Mercado Pago cuando el mismo pedido ya recibió instrucciones de transferencia.
     const transferTable=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='transfer_requests'").first();
