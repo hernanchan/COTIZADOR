@@ -261,7 +261,7 @@ function render(){
   titulo.className='titulo-grupo';bloque.append(titulo);
   // En modo individual cada PDF se configura desde su propia ficha.
  // En modo común el único panel compartido está sobre la carga.
- const comunes=null;if(comunes)bloque.append(comunes);
+ // No añadir una segunda barra de edición: las opciones viven en cada ficha.
   for(const i of grupo.indices){
   const e=entries[i];
   const card=texto('section','');card.className='archivo';
