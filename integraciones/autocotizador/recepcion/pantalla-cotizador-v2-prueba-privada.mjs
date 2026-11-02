@@ -498,18 +498,26 @@ function render(){
    });
    const caras=field('Caras', [['simple','Simple faz'],['double','Doble faz']]);
    const copias=field('Copias', Array.from({length:200},(_,i)=>[String(i+1),String(i+1)]));
-   const anillado=field('Anillado', [['ninguno','Sin anillado'],['individual','Anillado individual']]);
+   const anillado=field('Anillado', [
+     ['ninguno','Sin anillado'],['individual','Anillado individual'],
+     ...(TUS_ENABLED?[['grupo','Anillar varios PDF juntos']]:[])
+    ]);
+   const grupoAnillado=field('Grupo de anillado',Array.from({length:5},(_,i)=>[String(i+1),'Grupo '+(i+1)]));
+   const mostrarGrupo=()=>{grupoAnillado.parentElement.hidden=anillado.value!=='grupo'};
+   anillado.addEventListener('change',mostrarGrupo);
    const paginasPorHoja=field('Páginas por cara', [['1','1'],['2','2'],['4','4'],['9','9']]);
    if(d.opcionesInteligentes){
     mode.value=d.opcionesInteligentes.modo;
     caras.value=d.opcionesInteligentes.caras;
     copias.value=String(d.opcionesInteligentes.copias);
     anillado.value=d.opcionesInteligentes.anillado||'ninguno';
+    grupoAnillado.value=String(d.opcionesInteligentes.grupoAnillado||'1');
     paginasPorHoja.value=String(d.opcionesInteligentes.paginasPorHoja??1);
    }
    const warningBinding=document.createElement('p');
    warningBinding.className='state';
-   warningBinding.textContent='Anillado individual disponible en este ensayo; para anillar varios PDF juntos falta integrar el grupo completo.';
+   mostrarGrupo();
+   warningBinding.textContent=TUS_ENABLED?'El grupo se verifica y cotiza una sola vez para todos sus PDF.':'Anillado conjunto no disponible en esta recepción.';
    advanced.append(warningBinding);
    const btn=document.createElement('button');btn.type='button';btn.textContent='Reintentar solamente este PDF';
    btn.hidden=true;
@@ -518,11 +526,11 @@ function render(){
     const chosen=d.archivoLocal||file.files?.[0],turnstileToken=window.turnstile?.getResponse();
     if(!chosen||(!d.sesionTemporal&&!turnstileToken)||!papel.value){msg.textContent='Seleccioná el PDF y completá la verificación de seguridad.';return false}
     btn.disabled=true;file.disabled=true;mode.disabled=true;
-    for(const control of [formato,caras,copias,anillado,papel,paginasPorHoja])control.disabled=true;
+    for(const control of [formato,caras,copias,anillado,grupoAnillado,papel,paginasPorHoja])control.disabled=true;
     try{
      const result=await subirYVincularPdfCotizadorV2({
       archivo:chosen,referencia:r,orderId,modo:mode.value,turnstileToken,
-      opciones:{formato:formato.value,caras:caras.value,copias:Number(copias.value),anillado:anillado.value,materialColor:papel.value,paginasPorHoja:Number(paginasPorHoja.value)},
+      opciones:{formato:formato.value,caras:caras.value,copias:Number(copias.value),anillado:anillado.value,grupoAnillado:anillado.value==='grupo'?grupoAnillado.value:'',materialColor:papel.value,paginasPorHoja:Number(paginasPorHoja.value)},
       origin:location.origin,
       sesionPrevia:d.sesionTemporal||null,
       onSession:s=>{d.sesionTemporal=s;},
@@ -551,7 +559,7 @@ function render(){
      msg.textContent='No se confirmó la recepción: '+String(e.message||e)+
       (d.sesionTemporal?' Podés reintentar este PDF sin volver a enviar los bloques aceptados mientras permanezcas en esta página.':'');
      btn.disabled=false;file.disabled=false;mode.disabled=false;
-     for(const control of [formato,caras,copias,anillado,papel,paginasPorHoja])control.disabled=false;
+     for(const control of [formato,caras,copias,anillado,grupoAnillado,papel,paginasPorHoja])control.disabled=false;
      return false;
     }finally{window.turnstile?.reset()}
    };
@@ -565,6 +573,7 @@ function render(){
     d.archivoLocal=elegido;
     const opciones={formato:formato.value,caras:caras.value,
      copias:Number(copias.value),anillado:anillado.value,
+     grupoAnillado:anillado.value==='grupo'?grupoAnillado.value:'',
      materialColor:papel.value,paginasPorHoja:Number(paginasPorHoja.value)};
     return {meta:{orderId,fileId:fileIdParaReferencia(r),
       name:r.nombre,mode:mode.value,bytes:r.bytes,sha256:r.sha256,
@@ -1019,7 +1028,9 @@ window.addEventListener('message',async event=>{
        !['simple','double'].includes(opt.caras)||
        !Number.isSafeInteger(opt.copias)||opt.copias<1||opt.copias>200||
        ![1,2,4,9].includes(opt.paginasPorHoja??1)||
-       !['ninguno','individual'].includes(opt.anillado)||
+       !['ninguno','individual',...(TUS_ENABLED?['grupo']:[])].includes(opt.anillado)||
+       (opt.anillado==='grupo'&&!/^[1-9][0-9]?$/.test(String(opt.grupoAnillado||'')))||
+       (opt.anillado!=='grupo'&&Boolean(opt.grupoAnillado))||
        typeof opt.materialColor!=='string'||opt.materialColor.length>120)
      throw Error('Un PDF o sus opciones no cumplen los límites del receptor privado.');
     const header=new Uint8Array(await file.slice(0,5).arrayBuffer());
