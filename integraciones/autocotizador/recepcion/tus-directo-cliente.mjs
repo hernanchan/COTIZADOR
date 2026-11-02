@@ -38,7 +38,7 @@ export function normalizarTrabajoTUS(d,plan){
  if(!plot&&!options)throw Error('Opciones de impresión incompletas.');
  const opcionTUS={
   servicio:'auto',seleccion:plot||options.formato==='personalizado_a4'?'original':options.formato,
-  paginasSeleccionadas:'',copias:plot?plot.copias:options.copias,
+  paginasSeleccionadas:plot?'':(options.paginasSeleccionadas||''),copias:plot?plot.copias:options.copias,
   modo:meta.mode,caras:plot?'simple':options.caras,
   paginasPorHoja:plot?1:(options.paginasPorHoja??1),
   papelPoster:plot?plot.papelPoster:'obra80',
@@ -51,6 +51,8 @@ export function normalizarTrabajoTUS(d,plan){
  if(!Number.isSafeInteger(opcionTUS.copias)||opcionTUS.copias<1||
     opcionTUS.copias>200||
     !['simple','double'].includes(opcionTUS.caras)||
+    typeof opcionTUS.paginasSeleccionadas!=='string'||
+    opcionTUS.paginasSeleccionadas.length>500||
     !['a5','a4','a3','original'].includes(opcionTUS.seleccion)||
     !['ninguno','individual','grupo'].includes(opcionTUS.anillado)||
     (opcionTUS.anillado==='grupo'&&!/^[1-9][0-9]?$/.test(opcionTUS.grupoAnillado))||
