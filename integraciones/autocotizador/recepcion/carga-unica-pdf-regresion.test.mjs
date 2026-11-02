@@ -41,7 +41,7 @@ const marker="const prepararEnvioPrivado=()=>{";
 const begin=source.indexOf(marker);
 const finish=source.indexOf("\n };\n bridgeButton.hidden=true",begin);
 assert.ok(begin>=0&&finish>begin,'No se encontró el callback real del botón');
-const clickHandler=new Function('leyendo','ultimoPresupuesto','entries','window','location','info',
+const clickHandler=new Function('leyendo','ultimoPresupuesto','entries','window','location','info','MAX_PDF_CARGA',
  source.slice(begin+marker.length,finish));
 
 function runPrivateHandoff(name='MUEBLES.pdf',size=2464154){
@@ -55,7 +55,7 @@ function runPrivateHandoff(name='MUEBLES.pdf',size=2464154){
   plan:[{indice:0,destino:'documentos',formatoFinal:'a4',
    paginasElegidas:Array.from({length:8},(_,i)=>i+1)}]};
  const window={parent:{postMessage:(payload,origin)=>sent.push({payload,origin})}};
- clickHandler(false,quote,[entry],window,{origin:'https://example.test'},info);
+ clickHandler(false,quote,[entry],window,{origin:'https://example.test'},info,30);
  return {sent,info,file};
 }
 
