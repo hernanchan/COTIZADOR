@@ -1316,9 +1316,9 @@ document.querySelector("#refreshUnpaid").addEventListener("click",async()=>{
      const url=new URL(pay.checkout_url);
      if(url.protocol!=="https:"||!/(^|\\.)(mercadopago\\.com|mercadopago\\.com\\.ar)$/.test(url.hostname))
       throw Error("Mercado Pago devolvió un enlace no autorizado.");
-     const link=node("a","Abrir Mercado Pago sandbox");
+     const link=node("a","Abrir Mercado Pago con comprador de prueba");
      link.href=url.href;link.target="_blank";link.rel="noopener noreferrer";
-     sandboxInfo.replaceChildren(node("p","ENLACE DE PRUEBA · No autoriza producción ni confirma pagos."),link);
+     sandboxInfo.replaceChildren(node("p","PRUEBA CON CUENTA COMPRADORA DE ENSAYO · No autoriza producción ni confirma pagos."),link);
     }catch(e){sandboxInfo.replaceChildren(node("p",String(e.message||e)));}
     finally{sandboxButton.disabled=false;}
    });
@@ -1937,13 +1937,21 @@ export default {
       Number(lines[0].unit_price)===order.amount_ars&&
       order.deposit_ars===order.amount_ars;
      if(!valid)return json({error:"Preferencia incompatible con pedido, moneda o importe en D1"},409);
-     const checkoutUrl=preference.sandbox_init_point;
+     // Checkout Pro actual: prueba con init_point y vendedor test_user,
+     // NUNCA con sandbox_init_point (flujo obsoleto).
+     // No entregar un enlace de cobro si el token pertenece a un vendedor real.
+     const seller=await mp(env,"/users/me");
+     if(String(seller?.id)!==String(env.MP_TEST_SELLER_ID)||
+       !Array.isArray(seller?.tags)||!seller.tags.includes("test_user")||
+       String(preference.collector_id)!==String(seller.id))
+      return json({error:"El vendedor de Mercado Pago no está verificado como cuenta de prueba. Pago bloqueado."},409);
+     const checkoutUrl=preference.init_point;
      let safe=false;
      try{
       const u=new URL(checkoutUrl);
       safe=u.protocol==="https:"&&/(^|\.)(mercadopago\.com|mercadopago\.com\.ar)$/.test(u.hostname);
      }catch(_){}
-     if(!safe)return json({error:"Mercado Pago no devolvió un enlace sandbox válido"},502);
+     if(!safe)return json({error:"Mercado Pago no devolvió un enlace válido de Checkout Pro para pruebas"},502);
      return json({order_id:order.id,checkout_url:checkoutUrl,preference_id:id,reused});
     }
     if(order.preference_id)return returnPreference(order.preference_id,true);
@@ -1984,7 +1992,7 @@ export default {
      if(saved?.status!=="awaiting_payment"||!saved.preference_id)return json({error:"El estado del pedido cambió; actualizá la pantalla"},409);
      return returnPreference(saved.preference_id,true);
     }
-    // No aceptar init_point productivo ni un enlace HTTPS arbitrario.
+    // init_point es obligatorio para Checkout Pro; verificar vendedor test_user y URL antes de ofrecerlo.
     // Validar con la misma rutina que las preferencias recuperadas.
     return returnPreference(preference.id,false);
     }finally{await env.DB.prepare("DELETE FROM checkout_locks WHERE order_id=?").bind(order.id).run()}
