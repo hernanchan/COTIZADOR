@@ -128,5 +128,5 @@ test('el portal privado recibe el evento real y agrega PDF con hash y precio, si
 test('cliente de prueba no anuncia falsamente que los ploteos quedan fuera de la recepción TUS',()=>{
  assert.ok(source.includes('Impresiones y ploteos se verifican y registran en la Central'));
  assert.ok(!source.includes('Los ploteos se cotizan, pero quedan pendientes de integración'));
- assert.ok(source.includes('La selección parcial de páginas y el anillado conjunto todavía requieren integración'));
+ assert.ok(source.includes('La selección parcial de páginas todavía requiere integración'));
 });
