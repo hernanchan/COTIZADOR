@@ -42,7 +42,8 @@ export function normalizarTrabajoTUS(d,plan){
   modo:meta.mode,caras:plot?'simple':options.caras,
   paginasPorHoja:plot?1:(options.paginasPorHoja??1),
   papelPoster:plot?plot.papelPoster:'obra80',
-  anillado:plot?'ninguno':options.anillado,grupoAnillado:'',
+  anillado:plot?'ninguno':options.anillado,
+  grupoAnillado:plot?'':(options.anillado==='grupo'?String(options.grupoAnillado||''):''),
   materialColor:plot?'obra70':options.materialColor,
   productoFoto:'',productoGrafica:'',corteVariante:'gt3',corteMetros:1,
   ...(plot?{clasificacionCliente:plot.clasificacionCliente}:{})
@@ -51,7 +52,9 @@ export function normalizarTrabajoTUS(d,plan){
     opcionTUS.copias>200||
     !['simple','double'].includes(opcionTUS.caras)||
     !['a5','a4','a3','original'].includes(opcionTUS.seleccion)||
-    !['ninguno','individual'].includes(opcionTUS.anillado))
+    !['ninguno','individual','grupo'].includes(opcionTUS.anillado)||
+    (opcionTUS.anillado==='grupo'&&!/^[1-9][0-9]?$/.test(opcionTUS.grupoAnillado))||
+    (opcionTUS.anillado!=='grupo'&&opcionTUS.grupoAnillado!==''))
   throw Error('Opciones TUS incompatibles.');
  return {
   d,archivo:d.archivoLocal,
@@ -75,6 +78,24 @@ export async function enviarPedidoTUSV2({
   ids.add(t.meta.fileId);totalBytes+=t.meta.bytes;
  }
  if(totalBytes>60*1024*1024)throw Error('Tanda mayor que 60 MiB.');
+ // Comprobación previa a cualquier autorización o subida. El servidor
+ // vuelve a validar tamaño, copias, páginas y precio sobre los PDF reales.
+ const grupos=new Map();
+ for(const t of trabajos){
+  const o=t.opciones;
+  if(!o||!['ninguno','individual','grupo'].includes(o.anillado)||
+     (o.anillado==='grupo'&&!/^[1-9][0-9]?$/.test(String(o.grupoAnillado||'')))||
+     (o.anillado!=='grupo'&&o.grupoAnillado))
+   throw Error('Instrucciones de anillado inconsistentes.');
+  if(o.anillado!=='grupo')continue;
+  const id=String(o.grupoAnillado),miembros=grupos.get(id)||[];
+  miembros.push(o);grupos.set(id,miembros);
+ }
+ for(const [id,miembros] of grupos){
+  if(miembros.length<2||miembros.some(o=>
+      o.seleccion!==miembros[0].seleccion||o.copias!==miembros[0].copias))
+   throw Error('El grupo de anillado '+id+' requiere al menos dos PDF con igual tamaño y copias.');
+ }
  const mod=await loadUploader();
  if(typeof mod?.Uppy!=='function'||typeof mod?.Tus!=='function')
   throw Error('Cargador TUS no disponible.');
