@@ -736,6 +736,36 @@ async function enviarTUSDesdeCarrito(pendientes){
   trabajos.length+' PDF verificados y registrados. Conservá este número para identificar tu pedido. Pago desactivado.',registeredShortOrder);
  return resultado;
 }
+/** Recuperación idempotente en Central: ningún PDF se transfiere de nuevo. */
+async function recuperarNumeroCentralTUS(){
+ if(!TUS_ENABLED||registeredOrder)return false;
+ try{
+  const response=await fetch('/prueba-v2/api/ensayo-tus-recuperar',{
+   method:'POST',credentials:'same-origin',redirect:'error',
+   headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({orderId,clientOrderId})
+  });
+  const data=await response.json().catch(()=>null);
+  if(!response.ok||data?.ok!==true||data.webOrderId!==orderId||
+     !/^\\d{3,}$/.test(data.numeroOrden||'')||
+     !Number.isSafeInteger(data.totalArs)||data.totalArs<1||
+     data.paymentAuthorized!==false||data.checkoutEnabled!==false||
+     data.listoParaProducir!==false||typeof data.orderId!=='string')
+   return false;
+  registeredOrder=data.orderId;
+  registeredShortOrder=data.numeroOrden;
+  ultimoTotalServidor=data.totalArs;
+  const monto=new Intl.NumberFormat('es-AR',{
+   style:'currency',currency:'ARS',maximumFractionDigits:0
+  }).format(data.totalArs);
+  document.getElementById('precio-smart').textContent='Orden N.º '+
+   data.numeroOrden+' · Total verificado: '+monto+' · Sin cobro autorizado';
+  mostrarEstadoCliente('registrado','Pedido recibido correctamente',
+   'Orden recuperada desde D1 sin volver a subir los PDF. Pago desactivado.',
+   data.numeroOrden);
+  return true;
+ }catch{return false;}
+}
 sendAllButton.addEventListener('click',async()=>{
  if(batchSending||registering||handoffInProgress||registeredOrder||TUS_BLOCKED)return;
  iniciarMedicion();
@@ -763,11 +793,15 @@ sendAllButton.addEventListener('click',async()=>{
    await enviarTUSDesdeCarrito(pending);
    terminarMedicion('tus_pedido_registrado');
   }catch(error){
-   // El fallo posterior a subir no autoriza a borrar originales ni a cobrar.
-   batchProgress.textContent='Pedido pendiente: '+String(error?.message||error)+
-    '. Los PDF recibidos siguen privados hasta conciliar el pedido.';
-   mostrarEstadoCliente(null);
-   terminarMedicion('tus_pedido_pendiente');
+   // Reconciliar acuse perdido en D1 sin subir PDF ni cobrar.
+   if(await recuperarNumeroCentralTUS()){
+    terminarMedicion('tus_pedido_recuperado_sin_subida');
+   }else{
+    batchProgress.textContent='Pedido pendiente de conciliación: '+
+     String(error?.message||error)+'. Conservamos los PDF privados.';
+    mostrarEstadoCliente(null);
+    terminarMedicion('tus_pedido_pendiente');
+   }
   }finally{batchSending=false;updateSummary();}
   return;
  }
