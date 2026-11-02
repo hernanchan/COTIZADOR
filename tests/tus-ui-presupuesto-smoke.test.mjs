@@ -132,7 +132,7 @@ test('el cliente ve confirmación grande y número corto solo luego de registro 
  const progress={textContent:''},send={textContent:''};
  const context=vm.createContext({
   document:{body:{classList:{toggle(k,v){classes[k]=v}}},createElement(tag){
-   const node={tagName:tag,textContent:'',className:''};created.push(node);return node;
+   const node={tagName:tag,textContent:'',className:'',addEventListener(){}};created.push(node);return node;
   }},
   vistaEstadoPedido:view,batchProgress:progress,sendAllButton:send
  });
