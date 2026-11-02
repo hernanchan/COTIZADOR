@@ -68,3 +68,5 @@ Revalidación precio A5: comparar IMPORTE VERIFICADO real del servidor entre PDF
 2026-11-01 — Actualizar ÚNICAMENTE saber-documentos-pruebas desde CI d3b8cd0e aprobado. Verificar medidas de ploteos CAD/Póster visibles, máximo 10 PDF en portal TUS, opciones de grupo en portal avanzado y recibo numerado. Tests y rollback HTTP401 obligatorios. No publicar sitio web comercial ni activar cobros.
 
 2026-11-01 — Anillado conjunto ya integrado en carga inteligente: grupo 1-5, validación y handoff PDF completo hacia TUS, grupo por archivo, monto preliminar y servidor que recotiza. Tests Node obligatorios en package.json superados CI 41371901689. Deploy SOLO a saber-documentos-pruebas con rollback si HTTP 401 falla, sin pagos, sin web pública.
+
+2026-11-01 22:25 ART — Reparar la validación del número de orden de 3+ dígitos en el JavaScript realmente emitido por la plantilla del portal (el navegador rechazaba números como 007). Regresión exacta sobre HTML, CI 41372543728 OK. Activar SOLO Worker documental de pruebas con control Basic HTTP 401 y rollback; no modificar Central D1, precios, archivos existentes, producción ni pagos.
