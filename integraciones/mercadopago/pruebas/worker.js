@@ -1812,9 +1812,9 @@ export default {
      if(saved?.status!=="awaiting_payment"||!saved.preference_id)return json({error:"El estado del pedido cambió; actualizá la pantalla"},409);
      return returnPreference(saved.preference_id,true);
     }
-    const checkoutUrl=preference.sandbox_init_point||preference.init_point;
-    if(!/^https:\/\//.test(String(checkoutUrl||"")))return json({error:"Mercado Pago no devolvió un enlace válido"},502);
-    return json({order_id:order.id,checkout_url:checkoutUrl,preference_id:preference.id,reused:false});
+    // No aceptar init_point productivo ni un enlace HTTPS arbitrario.
+    // Validar con la misma rutina que las preferencias recuperadas.
+    return returnPreference(preference.id,false);
     }finally{await env.DB.prepare("DELETE FROM checkout_locks WHERE order_id=?").bind(order.id).run()}
    }
    if(url.pathname==="/webhooks/mercadopago"&&req.method==="POST"){
@@ -1938,7 +1938,10 @@ async function customerCheckout(req,env,worker){
   await ensurePaymentReviews(env);
   const order=await env.DB.prepare("SELECT amount_ars,status FROM orders WHERE id=?").bind(cart.order_id).first();
   const review=await env.DB.prepare("SELECT state FROM payment_reviews WHERE order_id=?").bind(cart.order_id).first();
-  return json({order_id:cart.order_id,total_ars:order.amount_ars,state:review?.state==="revoked"?"review":order.status});
+  if(!order)return json({error:"Pedido no encontrado"},404);
+  const state=review?.state==="revoked"?"review":
+   order.status==="paid"?(review?.state==="verified"?"paid":"verifying_payment"):order.status;
+  return json({order_id:cart.order_id,total_ars:order.amount_ars,state});
  }
  let target;
  if(path==="/checkout/polaroid-proof")target="/demo/polaroid-proof";
