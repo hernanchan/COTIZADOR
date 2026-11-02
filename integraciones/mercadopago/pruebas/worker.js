@@ -1797,7 +1797,9 @@ export default {
    }
    // Preflight de pago documental: consulta D1 sin generar preferencias ni
    // tocar estados. La habilitación real del checkout permanece BLOQUEADA.
-   if(url.pathname==="/admin/api/central/payment-preflight"&&req.method==="POST"){
+   if(["/admin/api/central/payment-preflight","/admin/api/central/payment-sandbox-prepare"].includes(url.pathname)&&req.method==="POST"){
+    const sandboxPrepare=url.pathname==="/admin/api/central/payment-sandbox-prepare";
+    if(sandboxPrepare&&env.DOCS_SANDBOX_CHECKOUT_ENABLED!=="PRIVATE_TEST_ONLY")return json({error:"Pago documental sandbox deshabilitado"},503);
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
     const body=await req.json().catch(()=>null);
     if(!body||Object.keys(body).join(",")!=="order_id"||!isUUID(body.order_id))
@@ -1826,6 +1828,13 @@ export default {
        !Number.isSafeInteger(line.quantity)||line.quantity<1||
        !Number.isSafeInteger(line.unit_price_ars)||line.unit_price_ars<1)||
        lineTotal!==order.amount_ars?"IMPORTE_NO_COINCIDE":null;
+    if(sandboxPrepare){
+     if(reason)return json({error:"Pedido no apto para pago de pruebas",reason,paymentAuthorized:false,productionAuthorized:false},409);
+     const table=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='transfer_requests'").first();
+     if(table){const transfer=await env.DB.prepare("SELECT order_id FROM transfer_requests WHERE order_id=?").bind(order.id).first();
+      if(transfer)return json({error:"Pedido pendiente de transferencia; no iniciar otro pago",paymentAuthorized:false},409);}
+     return await this.fetch(new Request(new URL("/demo/checkout",req.url),{method:"POST",headers:{Authorization:req.headers.get("Authorization"),"Content-Type":"application/json","x-docs-sandbox-preflight":"PRIVATE_TEST_ONLY"},body:JSON.stringify({order_id:order.id})}),env);
+    }
     return json({order_id:order.id,ready_for_sandbox_test:reason===null,
      reason:reason||"DOCUMENTOS_Y_TOTAL_VERIFICADOS",
      amount_ars:order.amount_ars,documents_ars:manifest.amount_ars,
@@ -1843,8 +1852,9 @@ export default {
     // un carrito mixto o un cambio de título nunca puede eludirla.
     await ensureOrderItems(env);
     const restricted=await env.DB.prepare("SELECT sku FROM order_items WHERE order_id=? AND sku IN ('DOCS_VERIFIED','POLAROID_EXPRESS_A4') LIMIT 1").bind(orderId).first();
-    if(restricted)return json({error:"Cobro de trabajos con archivos todavía deshabilitado hasta la validación integral."},503);
-    if(order.description==="Librería Saber · documentos verificados y tienda")return json({error:"Cobro de documentos aún no habilitado. Falta el ensayo integral."},503);
+    if(restricted?.sku==="POLAROID_EXPRESS_A4")return json({error:"Cobro de Polaroids Express todavía deshabilitado"},503);
+     if(restricted?.sku==="DOCS_VERIFIED"&&(env.DOCS_SANDBOX_CHECKOUT_ENABLED!=="PRIVATE_TEST_ONLY"||req.headers.get("x-docs-sandbox-preflight")!=="PRIVATE_TEST_ONLY"))return json({error:"Cobro documental requiere preflight privado sandbox"},503);
+    if(order.description==="Librería Saber · documentos verificados y tienda"&&(env.DOCS_SANDBOX_CHECKOUT_ENABLED!=="PRIVATE_TEST_ONLY"||req.headers.get("x-docs-sandbox-preflight")!=="PRIVATE_TEST_ONLY"))return json({error:"Cobro de documentos aún no habilitado. Falta el ensayo integral."},503);
     if(order.description==="Librería Saber · Polaroids Express y tienda")return json({error:"Cobro de Polaroids Express aún no habilitado. Falta el ensayo integral."},503);
     // Evitar ofrecer Mercado Pago cuando el mismo pedido ya recibió instrucciones de transferencia.
     const transferTable=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='transfer_requests'").first();
