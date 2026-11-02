@@ -1969,8 +1969,17 @@ async function customerCheckout(req,env,worker){
   const order=await env.DB.prepare("SELECT amount_ars,status FROM orders WHERE id=?").bind(cart.order_id).first();
   const review=await env.DB.prepare("SELECT state FROM payment_reviews WHERE order_id=?").bind(cart.order_id).first();
   if(!order)return json({error:"Pedido no encontrado"},404);
-  const state=review?.state==="revoked"?"review":
+  let state=review?.state==="revoked"?"review":
    order.status==="paid"?(review?.state==="verified"?"paid":"verifying_payment"):order.status;
+  // Una orden con instrucciones de transferencia no debe aparecer como
+  // "pendiente de tarjeta" ni permitir un segundo checkout desde el retorno.
+  if(state==="awaiting_payment"){
+   const table=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='transfer_requests'").first();
+   if(table){
+    const transfer=await env.DB.prepare("SELECT status FROM transfer_requests WHERE order_id=?").bind(cart.order_id).first();
+    if(transfer?.status==="awaiting_bank_verification")state="awaiting_bank_verification";
+   }
+  }
   return json({order_id:cart.order_id,total_ars:order.amount_ars,state});
  }
  let target;
