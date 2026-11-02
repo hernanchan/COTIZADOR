@@ -24,7 +24,7 @@ const DB={prepare(sql){
   if(sql.startsWith('SELECT id,amount_ars,deposit_ars,status,created_at,preference_id FROM orders'))return args[0]===id?order:null;
   if(sql.startsWith('SELECT amount_ars,file_count,manifest_json FROM central_document_manifests'))return args[0]===id?manifest:null;
   if(sql.startsWith('SELECT * FROM orders WHERE id='))return args[0]===id?order:null;
-  if(sql.startsWith('SELECT sku FROM order_items WHERE order_id='))return lines.find(x=>x.sku==='DOCS_VERIFIED')||null;
+  if(sql.startsWith('SELECT sku FROM order_items WHERE order_id='))return lines.find(x=>x.sku==='POLAROID_EXPRESS_A4')||lines.find(x=>x.sku==='DOCS_VERIFIED')||null;
   if(sql.includes("FROM sqlite_master WHERE type='table' AND name='transfer_requests'"))return transfer?{name:'transfer_requests'}:null;
   if(sql.startsWith('SELECT order_id FROM transfer_requests'))return transfer?{order_id:id}:null;
   if(sql.startsWith('SELECT preference_id,status FROM orders'))return {preference_id:order.preference_id,status:order.status};
@@ -92,4 +92,24 @@ test('validated D1-only amount creates one sandbox preference and safely reuses 
  assert.equal(first.data.checkout_url,fakeUrl);assert.equal(preferencePosts,1);
  // Reuse is only permitted via the already validated preference ID.
  const again=await run();assert.equal(again.status,200,JSON.stringify(again.data));assert.equal(again.data.reused,true);assert.equal(again.data.checkout_url,fakeUrl);assert.equal(preferencePosts,1);
+});
+
+test('direct checkout rechecks D1 despite an untrusted preflight header',async()=>{
+ reset();env.DOCS_SANDBOX_CHECKOUT_ENABLED='PRIVATE_TEST_ONLY';
+ manifest=null;
+ const r=await scope.worker.fetch(new Request('https://test.invalid/demo/checkout',{method:'POST',
+  headers:{Authorization:'Bearer test-admin','Content-Type':'application/json','x-docs-sandbox-preflight':'PRIVATE_TEST_ONLY'},
+  body:JSON.stringify({order_id:id})}),env);
+ assert.equal(r.status,409);
+ assert.equal(network,0);
+});
+test('mixed document and Polaroids Express order is blocked without payment call',async()=>{
+ reset();env.DOCS_SANDBOX_CHECKOUT_ENABLED='PRIVATE_TEST_ONLY';
+ lines.push({sku:'POLAROID_EXPRESS_A4',line_total_ars:1,unit_price_ars:1,quantity:1});
+ assert.match(source,/ORDER BY CASE WHEN sku='POLAROID_EXPRESS_A4' THEN 0 ELSE 1 END LIMIT 1/);
+ const r=await scope.worker.fetch(new Request('https://test.invalid/demo/checkout',{method:'POST',
+  headers:{Authorization:'Bearer test-admin','Content-Type':'application/json'},
+  body:JSON.stringify({order_id:id})}),env);
+ assert.equal(r.status,503);
+ assert.equal(network,0);
 });
