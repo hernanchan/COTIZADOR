@@ -33,3 +33,14 @@ test('cliente y preview muestran transferencia pendiente sin precios inventados'
  assert.ok(preview.includes('Queda pendiente de acreditación bancaria'));
  assert.ok(preview.includes('No se aplican recargos ni descuentos'));
 });
+
+test('retorno de pago distingue transferencia pendiente y no ofrece pagar otra vez',()=>{
+ const page=readFileSync(new URL('../integraciones/mercadopago/pruebas/pedido-pago.html',import.meta.url),'utf8');
+ const status=worker.slice(worker.indexOf('if(path==="/checkout/status")'),worker.indexOf('let target;',worker.indexOf('if(path==="/checkout/status")')));
+ assert.ok(status.includes('if(state==="awaiting_payment")'));
+ assert.ok(status.includes('FROM transfer_requests WHERE order_id=?'));
+ assert.ok(status.includes('state="awaiting_bank_verification"'));
+ assert.ok(page.includes('awaiting_bank_verification:'));
+ assert.ok(page.includes('verifying_payment:'));
+ assert.ok(page.includes("document.querySelector('#retry').hidden=result.state!=='awaiting_payment'"));
+});
