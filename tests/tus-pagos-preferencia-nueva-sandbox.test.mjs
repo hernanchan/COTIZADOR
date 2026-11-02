@@ -16,6 +16,7 @@ function setup(remote){
   let args=[];
   const q={bind(...v){args=v;return q},
    async first(){
+    if(sql.includes("FROM sqlite_master WHERE type='table' AND name='transfer_requests'"))return null;
     if(sql.includes('SELECT * FROM orders WHERE id=?'))return order;
     if(sql.includes('SELECT sku FROM order_items WHERE order_id=?'))return null;
     if(sql.includes('SELECT preference_id,status FROM orders WHERE id=?'))return order;
