@@ -113,3 +113,10 @@ test('mixed document and Polaroids Express order is blocked without payment call
  assert.equal(r.status,503);
  assert.equal(network,0);
 });
+
+test('private Central exposes the operator-only sandbox preparation action',()=>{
+ assert.match(source,/Preparar enlace Mercado Pago \(ensayo\)/);
+ assert.match(source,/apiPost\("\/admin\/api\/central\/payment-preflight"/);
+ assert.match(source,/apiPost\("\/admin\/api\/central\/payment-sandbox-prepare"/);
+ assert.match(source,/ENLACE DE PRUEBA/);
+});
