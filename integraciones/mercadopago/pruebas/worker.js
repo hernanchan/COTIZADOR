@@ -1079,7 +1079,7 @@ const adminHtml = `<!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title>Centro de Pedidos | Librería Saber · Pruebas</title>
 <style>
-*{box-sizing:border-box}body{font:15px system-ui,Arial,sans-serif;max-width:1020px;margin:25px auto;padding:16px;color:#17283d;background:#f6f8fb}
+*{box-sizing:border-box}body{font:15px system-ui,Arial,sans-serif;max-width:1450px;margin:20px auto;padding:16px;color:#17283d;background:#f6f8fb}
 header{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
 h1{margin:0 0 6px;color:#163c73;font-size:1.55rem}.note{font-size:.87rem;color:#57677e}
 fieldset{border:1px solid #d9e0ec;border-radius:12px;background:white;padding:16px;margin:16px 0}
@@ -1087,7 +1087,24 @@ input{font:inherit;padding:10px;max-width:100%;border:1px solid #aab6c5;border-r
 button{font:inherit;padding:10px 14px;background:#174b8f;color:white;border:0;border-radius:7px;cursor:pointer}
 button:disabled{opacity:.5;cursor:default}.outline{color:#174b8f;background:white;border:1px solid #174b8f}
 .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}#details section{margin:14px 0;padding:13px;border:1px solid #d9e0ec;border-radius:10px;background:#f8fbff}#details section h4{margin:0 0 7px}#details section p{margin:6px 0}
-#status{min-height:1.5em;font-weight:600}.unpaid-result:not([hidden]){margin:12px 0;padding:12px;background:#eff6ff;border:1px solid #bfd4ea;border-radius:10px}.unpaid-result h4{margin:6px 0}.unpaid-result section{margin:10px 0;padding:12px;border:1px solid #d0e0ef;border-radius:8px;background:white}.unpaid-result p{margin:7px 0}.print-specs{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:2px 12px;margin:10px 0;padding:10px;background:#f7faff;border-radius:7px}.print-specs p{margin:5px 0}.print-missing{color:#a14404;font-weight:600}.grid{display:grid;grid-template-columns:minmax(260px,1fr) minmax(280px,1.4fr);gap:16px}
+#status{min-height:1.5em;font-weight:600}
+.board{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:14px}
+.board-lane{border:1px solid #d2ddea;border-radius:12px;background:#f0f4f8;min-width:0;padding:10px}
+.board-lane h3{font-size:1rem;margin:3px 0 12px;display:flex;align-items:center;justify-content:space-between;gap:6px}
+.board-count{font-size:.84rem;border-radius:30px;padding:2px 9px;background:#fff;border:1px solid #dae3ee}
+.board-cards{display:flex;flex-direction:column;gap:10px;min-height:65px}
+.board-card{padding:13px;background:#fff;border:1px solid #d9e2ed;border-radius:10px;box-shadow:0 1px 3px #142a4514;overflow-wrap:anywhere}
+.board-card h4{font-size:1rem;margin:0 0 5px;color:#153956}
+.board-card p{font-size:.88rem;margin:7px 0;color:#415469}
+.board-card .money{font-size:1rem;font-weight:700;color:#193d6a}
+.board-card .actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.board-card button{font-size:.88rem;padding:8px 10px}
+.board-card .primary-next{flex:1 0 100%;font-weight:650}
+.board-footer{margin-top:12px}
+#details{overflow-wrap:anywhere}#details button{margin:4px 7px 4px 0}
+@media(max-width:1150px){.board{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:630px){.board{grid-template-columns:1fr}.board-lane{padding:12px}.board-card .actions button{flex-grow:1}}
+.unpaid-result:not([hidden]){margin:12px 0;padding:12px;background:#eff6ff;border:1px solid #bfd4ea;border-radius:10px}.unpaid-result h4{margin:6px 0}.unpaid-result section{margin:10px 0;padding:12px;border:1px solid #d0e0ef;border-radius:8px;background:white}.unpaid-result p{margin:7px 0}.print-specs{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:2px 12px;margin:10px 0;padding:10px;background:#f7faff;border-radius:7px}.print-specs p{margin:5px 0}.print-missing{color:#a14404;font-weight:600}.grid{display:grid;grid-template-columns:minmax(260px,1fr) minmax(280px,1.4fr);gap:16px}
 ol{padding-left:22px}li{padding:12px 6px;border-bottom:1px solid #e5ebf3}li button{margin-top:7px}
 pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px ui-monospace,monospace;background:#f0f3f9;padding:12px;border-radius:6px;max-height:450px;overflow:auto}
 @media(max-width:700px){.grid{grid-template-columns:1fr}}
@@ -1098,18 +1115,25 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px ui-monospace,monospace
 <input type="text" id="productionOperator" maxlength="60" placeholder="Responsable del cambio" aria-label="Nombre de responsable" autocomplete="off">
 <button id="refresh">Consultar pedidos</button><button id="sync" class="outline">Verificar pagos pendientes</button>
 </div><p id="status" role="status" aria-live="polite"></p><p id="cronState" class="note">Conciliación automática: sin consultar.</p></fieldset>
+<fieldset id="productionBoardArea"><legend>Tablero de producción · pedidos pagos</legend>
+<p class="note">Cada pedido avanza de columna al registrar su estado. Descargar el ZIP no cambia el seguimiento. Actualización automática cada 30 segundos mientras el panel esté abierto.</p>
+<div class="board" id="productionBoard">
+<section class="board-lane" aria-label="Trabajos pendientes"><h3>Pendientes <span class="board-count" id="count-pendiente">0</span></h3><div class="board-cards" id="lane-pendiente"></div></section>
+<section class="board-lane" aria-label="Trabajos en preparación"><h3>En preparación <span class="board-count" id="count-en_preparacion">0</span></h3><div class="board-cards" id="lane-en_preparacion"></div></section>
+<section class="board-lane" aria-label="Trabajos listos"><h3>Listos para retirar <span class="board-count" id="count-listo">0</span></h3><div class="board-cards" id="lane-listo"></div></section>
+<section class="board-lane" aria-label="Trabajos en espera"><h3>En espera <span class="board-count" id="count-en_espera">0</span></h3><div class="board-cards" id="lane-en_espera"></div></section>
+</div>
+<div class="board-footer">
+<details><summary>Entregados · historial (<span id="count-entregado">0</span>)</summary><div class="board-cards" id="lane-entregado"></div></details>
+<details><summary>Otros pedidos pagados (<span id="count-other">0</span>)</summary><div id="orders"></div></details>
+</div></fieldset>
+<fieldset><legend>Detalle de pedido e instrucciones</legend>
+<div id="details">Elegí «Detalle» en un pedido para consultar las instrucciones, archivos e historial.</div></fieldset>
 <fieldset><legend>Polaroids Express · PDF privado único</legend><button id="refreshExpress" class="outline">Consultar PDF recibidos</button><p class="note">Hasta cuatro hojas A4 por pedido. Archivo listo en Drive privado; el pago todavía no está confirmado.</p><ol id="expressReceipts"></ol></fieldset>
 <fieldset><legend>Recepciones de PDF verificadas sin pedido comercial</legend><div class="toolbar"><button id="refreshReceipts" class="outline">Consultar recepciones pendientes</button></div><p class="note">Documentos confirmados en Drive, todavía no vinculados a un pedido cobrado. No están listos para imprimir.</p><ol id="verifiedReceipts"></ol></fieldset>
 <fieldset><legend>Transferencias por conciliar · Sin producción</legend><button id="refreshTransfers" class="outline">Consultar transferencias pendientes</button><p class="note">Importes informados al cliente; comprobar la acreditación real en el banco. Ningún pedido se libera con un comprobante.</p><ol id="transferPending"></ol></fieldset>
 <fieldset><legend>Pedidos con PDF y pago pendiente</legend><button id="refreshUnpaid" class="outline">Consultar pedidos sin pago confirmado</button><ol id="unpaidDocs"></ol></fieldset>
-<div class="grid"><fieldset><legend>Seguimiento de pedidos</legend>
-<div class="toolbar"><label for="productionFilter">Mostrar</label>
-<select id="productionFilter"><option value="active">Trabajos activos</option>
-<option value="all">Todos los pedidos</option><option value="en_espera">En espera</option>
-<option value="listo">Listos para retirar</option><option value="entregado">Entregados</option></select></div>
-<p class="note">Primero aparecen los trabajos en espera y los pendientes. Descargar un ZIP no cambia ningún estado.</p>
-<ol id="orders"></ol></fieldset><fieldset><legend>Detalle del pedido</legend>
-<div id="details">Seleccioná un pedido para ver sus datos y archivos referenciados.</div></fieldset></div>
+
 <script>
 const secret=document.querySelector("#secret"),status=document.querySelector("#status"),orders=document.querySelector("#orders"),details=document.querySelector("#details");
 function money(n){return new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0}).format(Number(n)||0)}
@@ -1429,27 +1453,115 @@ async function refreshCronState(){
   el.textContent="Última ejecución automática: "+fecha+" UTC · "+x.status+" · pedidos revisados: "+x.checked+" · registrados: "+x.registered+" · errores: "+x.errors;
  }catch(e){el.textContent="Conciliación automática: no se pudo consultar el registro."}
 }
-async function refresh(){try{
- status.textContent="Consultando...";
- await refreshCronState();
- const x=await api("/admin/api/orders");
- orders.replaceChildren();
- const filter=document.querySelector("#productionFilter").value;
- const active=x.orders.filter(o=>filter==="all"||(
-  filter==="active"?(!o.production_state||o.production_state!=="entregado"):o.production_state===filter));
- if(!active.length)orders.append(node("li","No hay pedidos en esta categoría."));
- for(const o of active){
-  const label=o.production_state?productionLabel(o.production_state):"Pedido histórico";
-  const title=(o.work_number?"Orden N.º "+String(o.work_number).padStart(3,"0"):"Pedido")+
-   " · "+label+" · "+money(o.amount_ars);
-  const li=node("li",title);
-  li.append(node("p",o.description+" · "+(o.paid_at||"sin fecha")));
-  const b=node("button","Ver pedido");b.addEventListener("click",()=>showOrder(o.id));
-  li.append(b);orders.append(li);
+const operatorInput=document.querySelector("#productionOperator");
+try{operatorInput.value=sessionStorage.getItem("saberProductionOperator")||""}catch(_){}
+operatorInput.addEventListener("change",()=>{
+ try{sessionStorage.setItem("saberProductionOperator",operatorInput.value.trim())}catch(_){}
+});
+const lanes=["pendiente","en_preparacion","listo","en_espera","entregado"];
+let refreshingBoard=false;
+function boardCard(order){
+ const card=node("article","");card.className="board-card";
+ const num=order.work_number?String(order.work_number).padStart(3,"0"):"Sin número";
+ const heading=node("h4","Orden "+num);card.append(heading);
+ card.append(node("p",String(order.description||"Pedido documental").slice(0,130)));
+ const totals=node("p",money(order.amount_ars)+" · "+(order.file_count||0)+" PDF · Pago verificado");
+ totals.className="money";card.append(totals);
+ const controls=node("div","");controls.className="actions";
+ const current=order.production_state;
+ const next=({pendiente:"en_preparacion",en_preparacion:"listo",en_espera:"en_preparacion",listo:"entregado"})[current];
+ const name=({en_preparacion:current==="en_espera"?"Retomar":"Iniciar trabajo",listo:"Marcar listo",entregado:"Entregado"})[next];
+ if(next){
+  const main=node("button",name);main.className="primary-next";
+  main.addEventListener("click",()=>moveCard(order,next,main));controls.append(main);
  }
- status.textContent=active.length+" pedido(s) visibles";
- }catch(e){status.textContent=e.message}}
-document.querySelector("#productionFilter").addEventListener("change",refresh);
+ if(["pendiente","en_preparacion","listo"].includes(current)){
+  const hold=node("button","En espera");hold.className="outline";
+  hold.addEventListener("click",()=>moveCard(order,"en_espera",hold));controls.append(hold);
+ }
+ if(current!=="entregado"&&/^WEB-ENSAYO-[A-F0-9]{32}$/.test(order.web_order_id||"")){
+  const zip=node("button","Descargar ZIP");zip.className="outline";
+  zip.addEventListener("click",()=>{
+   const u=new URL("https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/orden-paquete");
+   u.searchParams.set("webOrderId",order.web_order_id);
+   const link=document.createElement("a");
+   link.href=u.href;link.target="_blank";link.rel="noopener noreferrer";
+   document.body.append(link);link.click();link.remove();
+  });controls.append(zip);
+ }
+ const detail=node("button","Detalle");detail.className="outline";
+ detail.addEventListener("click",()=>showOrder(order.id));
+ controls.append(detail);card.append(controls);
+ return card;
+}
+async function moveCard(order,next,button){
+ const operator=operatorInput.value.trim();
+ if(operator.length<2){
+  status.textContent="Primero escribí el responsable del turno, arriba del tablero.";
+  operatorInput.focus();return;
+ }
+ let reason="";
+ if(next==="en_espera"){
+  const typed=prompt("¿Por qué se detiene la orden "+(order.work_number||"")+"?") ;
+  if(typed===null)return;
+  reason=typed.trim();
+  if(reason.length<5){status.textContent="Escribí un motivo concreto de al menos 5 caracteres.";return}
+ }
+ if(next==="entregado"&&!confirm("¿Confirmás que la orden "+(order.work_number||"")+" fue entregada al cliente?"))return;
+ button.disabled=true;
+ try{
+  await apiPost("/admin/api/central/production-status",{
+   order_id:order.id,from:order.production_state,to:next,
+   version:order.production_version,operator,reason,confirmed:next==="listo"||next==="entregado"
+  });
+  await refresh({silent:true});
+  status.textContent="Orden "+(order.work_number||"")+" → "+productionLabel(next)+" · cambio registrado.";
+ }catch(e){
+  status.textContent="No se cambió la orden. "+String(e.message||e);
+  await refresh({silent:true});
+ }finally{button.disabled=false}
+}
+async function refresh({silent=false}={}){
+ if(refreshingBoard)return;
+ refreshingBoard=true;
+ try{
+  if(!silent){status.textContent="Actualizando tablero…";await refreshCronState()}
+  const response=await api("/admin/api/orders");
+  const ordersList=Array.isArray(response.orders)?response.orders:[];
+  const counts={pendiente:0,en_preparacion:0,listo:0,en_espera:0,entregado:0};
+  for(const name of lanes)document.querySelector("#lane-"+name).replaceChildren();
+  orders.replaceChildren();
+  let other=0;
+  for(const o of ordersList){
+   if(Object.prototype.hasOwnProperty.call(counts,o.production_state)){
+    counts[o.production_state]++;
+    document.querySelector("#lane-"+o.production_state).append(boardCard(o));
+   }else{
+    other++;
+    const item=node("p",(o.description||"Pedido")+
+     " · "+money(o.amount_ars)+" · pago confirmado");
+    const b=node("button","Detalle");b.className="outline";
+    b.addEventListener("click",()=>showOrder(o.id));
+    item.append(b);orders.append(item);
+   }
+  }
+  for(const name of lanes){
+   document.querySelector("#count-"+name).textContent=counts[name];
+   if(counts[name]===0){
+    const empty=node("p","Sin trabajos");empty.className="note";
+    document.querySelector("#lane-"+name).append(empty);
+   }
+  }
+  document.querySelector("#count-other").textContent=other;
+  if(other===0)orders.append(node("p","No hay otros pedidos pagados."));
+  if(!silent)status.textContent="Tablero actualizado · "+
+   (counts.pendiente+counts.en_preparacion+counts.listo+counts.en_espera)+" trabajos activos";
+ }catch(e){status.textContent="No se pudo actualizar el tablero: "+String(e.message||e)}
+ finally{refreshingBoard=false}
+}
+setInterval(()=>{
+ if(!document.hidden&&secret.value.trim())refresh({silent:true});
+},30000);
 document.querySelector("#refreshExpress").addEventListener("click",async()=>{
  const list=document.querySelector("#expressReceipts");list.replaceChildren();
  try{
@@ -1954,7 +2066,8 @@ export default {
     await centralTables(env);await centralProductionTables(env);
     const rows=await env.DB.prepare("SELECT o.id,o.description,o.amount_ars,o.status,o.paid_at,o.created_at,"+
      "CASE WHEN m.commercial_order_id IS NULL THEN NULL ELSE COALESCE(s.state,'pendiente') END AS production_state,"+
-     "n.number AS work_number FROM orders o "+
+     "n.number AS work_number,m.file_count AS file_count,m.web_order_id AS web_order_id,"+
+     "COALESCE(s.version,0) AS production_version FROM orders o "+
      "LEFT JOIN central_document_manifests m ON m.commercial_order_id=o.id "+
      "LEFT JOIN central_production_status s ON s.order_id=o.id "+
      "LEFT JOIN central_work_order_numbers n ON n.commercial_order_id=o.id "+
