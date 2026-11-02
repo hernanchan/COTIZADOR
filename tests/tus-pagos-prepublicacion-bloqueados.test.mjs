@@ -77,3 +77,9 @@ test('ruta de compra comercial sigue apagada sin autorización de checkout',asyn
  assert.equal(preferences,0);
  assert.equal(networkCalls,0);
 });
+
+test('preflight-only sandbox flag cannot enable commercial checkout',()=>{
+ assert.match(source,/DOCS_SANDBOX_CHECKOUT_ENABLED!=="PRIVATE_TEST_ONLY"/);
+ assert.match(source,/x-docs-sandbox-preflight/);
+ assert.match(source,/payment-sandbox-prepare/);
+});
