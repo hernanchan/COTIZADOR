@@ -1736,6 +1736,30 @@ export default {
     await env.DB.prepare("INSERT INTO orders(id,description,amount_ars,deposit_ars) VALUES(?,?,?,?)").bind(id,"Pedido ficticio de prueba",10000,10000).run();
     return json({id,total:10000,amount_to_pay:10000},201);
    }
+   // Solicitud de transferencia PRIVADA: no verifica movimientos bancarios ni
+   // transforma un comprobante aportado por el comprador en un pago aprobado.
+   if(url.pathname==="/demo/transfer-request"&&req.method==="POST"){
+    if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+    if(env.TRANSFER_PRIVATE_ENABLED!=="PRIVATE_TEST_ONLY")return json({error:"Transferencias todavía no disponibles"},503);
+    const body=await req.json().catch(()=>null);
+    if(!body||!isUUID(body.order_id))return json({error:"Pedido inválido"},400);
+    const alias=String(env.TRANSFER_ALIAS||"").trim();
+    if(!/^[A-Za-z0-9._-]{6,50}$/.test(alias))return json({error:"Cuenta de transferencia no configurada"},503);
+    const order=await env.DB.prepare("SELECT id,amount_ars,deposit_ars,status,preference_id FROM orders WHERE id=?").bind(body.order_id).first();
+    if(!order)return json({error:"Pedido inexistente"},404);
+    if(order.status!=="awaiting_payment"||order.preference_id||order.amount_ars!==order.deposit_ars||
+       !Number.isSafeInteger(order.amount_ars)||order.amount_ars<1)
+     return json({error:"Pedido incompatible o con pago iniciado"},409);
+    // Un pedido con documentos verificados NO puede confirmarse para producción
+    // mediante esta ruta. La solicitud sólo conserva el estado pendiente.
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS transfer_requests (order_id TEXT PRIMARY KEY REFERENCES orders(id),amount_ars INTEGER NOT NULL CHECK(amount_ars>0),status TEXT NOT NULL CHECK(status='awaiting_bank_verification'),created_at TEXT NOT NULL DEFAULT(datetime('now')))").run();
+    await env.DB.prepare("INSERT OR IGNORE INTO transfer_requests(order_id,amount_ars,status) VALUES(?,?,'awaiting_bank_verification')").bind(order.id,order.amount_ars).run();
+    const saved=await env.DB.prepare("SELECT amount_ars,status FROM transfer_requests WHERE order_id=?").bind(order.id).first();
+    if(saved?.amount_ars!==order.amount_ars||saved.status!=="awaiting_bank_verification")
+     return json({error:"La transferencia requiere revisión administrativa"},409);
+    return json({order_id:order.id,amount_ars:order.amount_ars,alias,
+     state:"awaiting_bank_verification",payment_confirmed:false,production_enabled:false});
+   }
    if(url.pathname==="/demo/checkout"&&req.method==="POST"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
     const body=await req.json().catch(()=>null);
@@ -1949,6 +1973,10 @@ async function customerCheckout(req,env,worker){
  else if(path==="/checkout/pay"){
   if(!cart||cart.order_id!==body.order_id)return json({error:"Pedido ajeno a esta sesión"},403);
   target="/demo/checkout";
+ }else if(path==="/checkout/transfer"){
+  if(!cart||cart.order_id!==body.order_id)return json({error:"Pedido ajeno a esta sesión"},403);
+  if(env.TRANSFER_PRIVATE_ENABLED!=="PRIVATE_TEST_ONLY")return json({error:"Transferencias todavía no disponibles"},503);
+  target="/demo/transfer-request";
  }else return json({error:"Operación desconocida"},404);
  return worker.fetch(new Request(new URL(target,req.url),{method:"POST",headers:{Authorization:"Bearer "+env.DEMO_ADMIN_KEY,"Content-Type":"application/json"},body:JSON.stringify(body)}),env);
 }
