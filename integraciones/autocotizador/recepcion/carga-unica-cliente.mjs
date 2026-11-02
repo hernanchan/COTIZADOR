@@ -170,13 +170,13 @@ function grupoVisible(e){
  if(poster)return {id:'poster',titulo:'Póster / pleno'};
  return {id:'cad',titulo:'Planos CAD'};
 }
-function accionComun(titulo,opciones,aplicar){
+function accionComun(titulo,opciones,aplicar,seleccion=''){
  const label=texto('label',titulo);
  const select=document.createElement('select');
  select.setAttribute('aria-label',titulo);
  select.add(new Option('Elegir…',''));
  for(const [valor,nombre] of opciones)select.add(new Option(nombre,valor));
- select.value='';
+ select.value=seleccion;
  select.onchange=()=>{if(select.value)aplicar(select.value)};
  label.append(select);return label;
 }
@@ -230,6 +230,7 @@ function controlesComunes(grupo,global=false){
  const lCopias=texto('label','Copias para todos');
  const copias=document.createElement('input');copias.type='number';copias.min='1';copias.max='500';copias.step='1';
  copias.placeholder='1 a 500';copias.setAttribute('aria-label','Aplicar copias a todo el grupo');
+ if(global&&Number.isSafeInteger(configuracionComun.copias))copias.value=String(configuracionComun.copias);
  copias.onchange=()=>{
   const v=Number(copias.value);
   if(!Number.isSafeInteger(v)||v<1||v>500){copias.setCustomValidity('Elegí de 1 a 500 copias');copias.reportValidity();return}
@@ -237,9 +238,9 @@ function controlesComunes(grupo,global=false){
  };
  lCopias.append(copias);barra.append(lCopias);
  if(tipos){
-  barra.append(accionComun('Impresión para todos',[['bn','Blanco y negro'],['color','Color']],v=>aplicar('modo',v)));
-  barra.append(accionComun('Caras para todos',[['simple','Simple faz'],['double','Doble faz']],v=>aplicar('caras',v)));
-  barra.append(accionComun('Anillado para todos',[['ninguno','Sin anillado'],['individual','Individual por archivo'],...Array.from({length:5},(_,i)=>['grupo:'+(i+1),'Juntos · Grupo '+(i+1)])],v=>aplicar('anillado',v)));
+  barra.append(accionComun('Impresión para todos',[['bn','Blanco y negro'],['color','Color']],v=>aplicar('modo',v),global?(configuracionComun.modo||''):''));
+  barra.append(accionComun('Caras para todos',[['simple','Simple faz'],['double','Doble faz']],v=>aplicar('caras',v),global?(configuracionComun.caras||''):''));
+  barra.append(accionComun('Anillado para todos',[['ninguno','Sin anillado'],['individual','Individual por archivo'],...Array.from({length:5},(_,i)=>['grupo:'+(i+1),'Juntos · Grupo '+(i+1)])],v=>aplicar('anillado',v),global?(configuracionComun.anillado||''):''));
  }
  if(['poster','mixtos'].includes(grupo.id))
   barra.append(accionComun('Papel de póster',[['obra80','Obra 80 g'],['recubierto','Recubierto 130 g']],v=>aplicar('papelPoster',v)));
@@ -507,7 +508,9 @@ document.querySelectorAll('input[name="modoImpresionLote"]').forEach(input=>{
   if(!input.checked)return;
   modoLote=input.value;
   actualizarModoLote();
-  render();
+  // Al activar modo común sobre un lote existente, reutilizar las preferencias explícitas previas.
+  if(modoLote==='comun')for(const e of entries)aplicarConfiguracionComunAlDocumento(e);
+  cambio();
  });
 });
 actualizarModoLote();
