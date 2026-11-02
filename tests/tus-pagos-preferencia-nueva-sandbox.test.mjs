@@ -38,6 +38,7 @@ function setup(remote){
  const sandbox={AbortSignal,Request,Response,URL,URLSearchParams,TextEncoder,crypto:webcrypto,console,
   fetch:async(url,init={})=>{
    const u=String(url);calls.push({url:u,method:init.method||'GET'});
+   if(u.endsWith('/users/me'))return response({id:123,tags:['test_user']});
    if(!u.includes('/checkout/preferences'))throw Error('Unexpected network: '+u);
    return response(init.method==='POST'?{id:'789',init_point:'https://www.mercadopago.com.ar/live'}:remote);
   }};
@@ -54,7 +55,7 @@ function setup(remote){
  return {call,calls,order};
 }
 const preference=()=>({id:'789',external_reference:id,
- items:[{currency_id:'ARS',quantity:1,unit_price:8332}],sandbox_init_point:fakeUrl});
+ collector_id:123,items:[{currency_id:'ARS',quantity:1,unit_price:8332}],init_point:fakeUrl});
 test('new sandbox preference is re-read and verified against D1 before redirect',async()=>{
  const x=setup(preference());const result=await x.call();
  assert.equal(result.status,200,JSON.stringify(result.body));
@@ -62,13 +63,14 @@ test('new sandbox preference is re-read and verified against D1 before redirect'
  assert.equal(result.body.reused,false);
  assert.equal(x.order.preference_id,'789');
  assert.equal(x.calls.filter(x=>x.method==='POST').length,1);
- assert.equal(x.calls.filter(x=>x.method==='GET').length,1);
+ assert.equal(x.calls.filter(x=>x.method==='GET').length,2);
 });
 test('new preference refuses live-only, invalid amount or external checkout URL',async()=>{
  for(const mutate of [
-  p=>{delete p.sandbox_init_point;p.init_point='https://www.mercadopago.com.ar/live'},
+  p=>{delete p.init_point},
   p=>{p.items[0].unit_price=1},
-  p=>{p.sandbox_init_point='https://attacker.invalid/pay'}
+  p=>{p.init_point='https://attacker.invalid/pay'},
+  p=>{p.collector_id=999}
  ]){
   const p=preference();mutate(p);const x=setup(p);const result=await x.call();
   assert.ok(result.status>=400,JSON.stringify(result.body));
