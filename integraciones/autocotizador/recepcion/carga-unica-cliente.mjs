@@ -8,6 +8,13 @@ import {clasificarPaginasPloteo} from './clasificar-paginas-ploteo.mjs';
 import {prepararLoteParcial,recomponerLoteParcial} from './cotizar-lote-parcial.mjs';
 const $=id=>document.getElementById(id);
 const entries=[];
+let modoLote=null; // El usuario elige antes de cargar: común o individual.
+function actualizarModoLote(){
+ const zona=$('zonaArchivos');if(zona)zona.hidden=!modoLote;
+ const aviso=$('modoAviso');if(aviso)aviso.textContent=modoLote==='comun'?'Configuración común: las medidas y las páginas se revisan para cada PDF.':modoLote==='individual'?'Cada archivo conserva sus propias opciones, dentro del mismo pedido.':'Elegí una opción antes de subir archivos.';
+ const campo=$('archivos');if(campo)campo.disabled=!modoLote;
+}
+
 const MAX_PDF_CARGA=location.pathname==='/prueba-v2/carga-inteligente'?10:30;
 let leyendo=false;
 let version=0;
@@ -172,6 +179,17 @@ function accionComun(titulo,opciones,aplicar){
  select.onchange=()=>{if(select.value)aplicar(select.value)};
  label.append(select);return label;
 }
+function renderConfiguracionGlobal(){
+ const holder=$('configComunGlobal');if(!holder)return;
+ holder.replaceChildren();holder.hidden=modoLote!=='comun';
+ if(modoLote!=='comun')return;
+ const indices=entries.map((e,i)=>({e,i})).filter(({e})=>e.paginas&&!e.error&&
+  e.servicio==='auto'&&clasificarDestino(paginasElegidas(e)||e.paginas,e.seleccion).destino==='documentos').map(({i})=>i);
+ if(indices.length<2){holder.append(texto('p','Cargá al menos dos PDF documentales para aplicar las mismas opciones.'));return}
+ const barra=controlesComunes({id:'a4',indices});
+ if(barra){barra.querySelector('strong').textContent='Configuración compartida · '+indices.length+' documentos';holder.append(barra)}
+ holder.append(texto('small','Cada PDF mantiene su tamaño y páginas seleccionadas. Si alguno necesita un ajuste especial, abrí su ficha individual.'));
+}
 function controlesComunes(grupo){
  const tipos=['personalizado_a4','a5','a4','a3'].includes(grupo.id),ploteo=['cad','poster','mixtos'].includes(grupo.id);
  if(grupo.indices.length<2||(!tipos&&!ploteo))return null;
@@ -211,6 +229,7 @@ function controlesComunes(grupo){
  return barra;
 }
 function render(){
+ renderConfiguracionGlobal();
  const lista=$('lista');lista.replaceChildren();
  const grupos=new Map();
  entries.forEach((e,i)=>{
@@ -223,7 +242,7 @@ function render(){
   const bloque=document.createElement('section');bloque.className='grupo-pedido';
   const titulo=texto('h3',grupo.titulo+' · '+grupo.indices.length+' archivo(s)');
   titulo.className='titulo-grupo';bloque.append(titulo);
-  const comunes=controlesComunes(grupo);if(comunes)bloque.append(comunes);
+  const comunes=modoLote==='comun'?null:controlesComunes(grupo);if(comunes)bloque.append(comunes);
   for(const i of grupo.indices){
   const e=entries[i];
   const card=texto('section','');card.className='archivo';
@@ -464,7 +483,17 @@ async function analizarArchivoPDF(e,file){
   e.error=null;
  }catch(ex){e.error=String(ex.message||ex);e.paginas=null}
 }
+document.querySelectorAll('input[name="modoImpresionLote"]').forEach(input=>{
+ input.addEventListener('change',()=>{
+  if(!input.checked)return;
+  modoLote=input.value;
+  actualizarModoLote();
+  render();
+ });
+});
+actualizarModoLote();
 $('archivos').addEventListener('change',async ev=>{
+ if(!modoLote){$('estado').textContent='Elegí cómo querés configurar los archivos antes de subirlos.';return;}
  if(leyendo)return;
  const files=[...(ev.target.files||[])];ev.target.value='';
  if(entries.length+files.length>MAX_PDF_CARGA){$('estado').textContent='Máximo '+MAX_PDF_CARGA+' PDF.';return}
