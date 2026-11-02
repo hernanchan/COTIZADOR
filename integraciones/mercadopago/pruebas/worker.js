@@ -1301,6 +1301,7 @@ document.querySelector("#refreshUnpaid").addEventListener("click",async()=>{
    const panel=node("div","");panel.className="unpaid-result";panel.hidden=true;
    btn.addEventListener("click",()=>showUnpaidDetails(o.commercial_order_id,panel,btn));
    li.append(btn);
+   li.append(panel);
    const sandboxButton=node("button","Preparar enlace Mercado Pago (ensayo)");
    sandboxButton.className="outline";sandboxButton.type="button";
    const sandboxInfo=node("div","");
@@ -1323,7 +1324,6 @@ document.querySelector("#refreshUnpaid").addEventListener("click",async()=>{
    });
    li.append(sandboxButton);
    li.append(sandboxInfo);
-   li.append(panel);
    list.append(li);
   }
   status.textContent=x.orders.length+" pedido(s) en espera de pago";
