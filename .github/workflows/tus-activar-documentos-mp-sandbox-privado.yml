@@ -26,7 +26,7 @@ jobs:
         run: |
           set -euo pipefail
           npm install --no-save --no-audit --no-fund pdf-lib@1.17.1
-          node --test tests/tus-central-staff-download.test.mjs tests/tus-paquete-manifiesto.test.mjs tests/tus-instrucciones-reales.test.mjs tests/tus-documentos-sandbox-preparacion.test.mjs tests/tus-central-seguimiento-operativo.test.mjs tests/tus-central-pagos-verificados.test.mjs tests/tus-central-pedidos-pagados-ficha.test.mjs
+          node --test tests/tus-central-staff-download.test.mjs tests/tus-paquete-manifiesto.test.mjs tests/tus-instrucciones-reales.test.mjs tests/tus-documentos-sandbox-preparacion.test.mjs tests/tus-central-seguimiento-operativo.test.mjs tests/tus-central-tablero-click-real.test.mjs tests/tus-central-pagos-verificados.test.mjs tests/tus-central-pedidos-pagados-ficha.test.mjs
           node --check integraciones/mercadopago/pruebas/worker.js
           grep -Fq '/admin/api/central/unpaid-detail' integraciones/mercadopago/pruebas/worker.js
           grep -Fq 'Descargar PDF original' integraciones/mercadopago/pruebas/worker.js
