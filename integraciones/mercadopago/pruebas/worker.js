@@ -1328,8 +1328,13 @@ async function syncPendingPayments(env){
  const paid=await env.DB.prepare("SELECT id,payment_id FROM orders WHERE status='paid' AND payment_id IS NOT NULL ORDER BY COALESCE((SELECT checked_at FROM payment_reviews WHERE order_id=orders.id),'') ASC LIMIT 20").all();
  const summary={checked:0,registered:0,errors:0};
  for(const order of paid.results||[]){
-  try{await reconcilePayment(env,order.payment_id);
-   await env.DB.prepare("INSERT INTO payment_reviews(order_id,state,checked_at) VALUES(?,'verified',datetime('now')) ON CONFLICT(order_id) DO UPDATE SET checked_at=datetime('now')").bind(order.id).run();
+  try{
+   const result=await reconcilePayment(env,order.payment_id);
+   if(result.registered){
+    await env.DB.prepare("INSERT INTO payment_reviews(order_id,state,checked_at) VALUES(?,'verified',datetime('now')) ON CONFLICT(order_id) DO UPDATE SET state=CASE WHEN payment_reviews.state='revoked' THEN 'revoked' ELSE 'verified' END,checked_at=datetime('now')").bind(order.id).run();
+   }else if(result.reason!=="payment_revoked"){
+    summary.errors++;
+   }
   }catch{summary.errors++}
  }
  for(const order of pending.results||[]){
@@ -1756,7 +1761,7 @@ export default {
      let safe=false;
      try{
       const u=new URL(checkoutUrl);
-      safe=u.protocol==="https:"&&/(^|\\.)(mercadopago\\.com|mercadopago\\.com\\.ar)$/.test(u.hostname);
+      safe=u.protocol==="https:"&&/(^|\.)(mercadopago\.com|mercadopago\.com\.ar)$/.test(u.hostname);
      }catch(_){}
      if(!safe)return json({error:"Mercado Pago no devolvió un enlace sandbox válido"},502);
      return json({order_id:order.id,checkout_url:checkoutUrl,preference_id:id,reused});
