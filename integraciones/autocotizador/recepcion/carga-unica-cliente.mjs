@@ -189,6 +189,7 @@ function aplicarConfiguracionComunAlDocumento(e){
   if(campo==='modo'){e.modo=valor;e.materialColor=''}
   else if(campo==='caras')e.caras=valor;
   else if(campo==='copias')e.copias=valor;
+  else if(campo==='paginasPorHoja')e.paginasPorHoja=valor;
   else if(campo==='anillado'){
    const g=/^grupo:([1-5])$/.exec(valor);
    e.anillado=g?'grupo':valor;e.grupoAnillado=g?g[1]:'';
@@ -204,7 +205,7 @@ function renderConfiguracionGlobal(){
  if(!indices.length){holder.append(texto('p','Cargá al menos un PDF documental para definir las opciones compartidas.'));return}
  const barra=controlesComunes({id:'a4',indices},true);
  if(barra){barra.querySelector('strong').textContent='Configuración compartida · '+indices.length+' documentos';holder.append(barra)}
- holder.append(texto('small','Cada PDF mantiene su tamaño y páginas seleccionadas. Si alguno necesita un ajuste especial, abrí su ficha individual.'));
+ holder.append(texto('small','Estas opciones se aplican a todos los documentos compatibles. Las fichas inferiores muestran solo el resumen y las decisiones de tamaño necesarias; podés personalizar un PDF como excepción.'));
 }
 function controlesComunes(grupo,global=false){
  const tipos=['personalizado_a4','a5','a4','a3'].includes(grupo.id),ploteo=['cad','poster','mixtos'].includes(grupo.id);
@@ -224,6 +225,7 @@ function controlesComunes(grupo,global=false){
    }
    else if(campo==='papelPoster')e.papelPoster=valor;
    else if(campo==='copias')e.copias=valor;
+   else if(campo==='paginasPorHoja')e.paginasPorHoja=valor;
   }
   cambio();
  };
@@ -240,6 +242,7 @@ function controlesComunes(grupo,global=false){
  if(tipos){
   barra.append(accionComun('Impresión para todos',[['bn','Blanco y negro'],['color','Color']],v=>aplicar('modo',v),global?(configuracionComun.modo||''):''));
   barra.append(accionComun('Caras para todos',[['simple','Simple faz'],['double','Doble faz']],v=>aplicar('caras',v),global?(configuracionComun.caras||''):''));
+  barra.append(accionComun('Páginas por cara para todos',[['1','1 página'],['2','2 páginas'],['4','4 páginas'],['9','9 páginas']],v=>aplicar('paginasPorHoja',Number(v)),global?String(configuracionComun.paginasPorHoja||''):''));
   barra.append(accionComun('Anillado para todos',[['ninguno','Sin anillado'],['individual','Individual por archivo'],...Array.from({length:5},(_,i)=>['grupo:'+(i+1),'Juntos · Grupo '+(i+1)])],v=>aplicar('anillado',v),global?(configuracionComun.anillado||''):''));
  }
  if(['poster','mixtos'].includes(grupo.id))
@@ -352,12 +355,12 @@ function render(){
    }else if(recomendada==='a4'&&e.seleccion==='a4'&&!regla.a4Exacto&&!regla.forzarA4){
     filaTam.append(texto('small','A4 seleccionado: se ajusta proporcionalmente, sin recortar.'));
    }
-   principal.append(filaTam);
+   if(modoLote!=='comun'||pregunta)principal.append(filaTam);
   }
   fila.append(principal);
   const importe=texto('span',importeArchivo(i)||(e.error?'Revisar':(e.seleccion==='sin-confirmar'&&!['fotos','corte','grafica'].includes(e.servicio))?'Pendiente':'Por calcular'));
   importe.className='precio-archivo';fila.append(importe);
-  const boton=texto('button',abierto===i?'Cerrar detalles':'Más opciones');
+  const boton=texto('button',abierto===i?'Cerrar detalles':modoLote==='comun'?'Personalizar este PDF':'Más opciones');
   boton.className='editar';boton.type='button';boton.setAttribute('aria-expanded',String(abierto===i));
   boton.onclick=()=>{abierto=abierto===i?-1:i;render()};
   const acciones=document.createElement('div');acciones.className='acciones-archivo';
@@ -375,7 +378,8 @@ function render(){
    $('estado').textContent=entries.length+' PDF en la lista. No hace falta volver a cargar los restantes.';
   };
   acciones.append(quitar);fila.append(acciones);card.append(fila);
-  mostrarSelectorRapido(card,e,i);
+  // En modo común no repetir 1/2 páginas por cara en cada ficha.
+  if(modoLote!=='comun'||abierto===i)mostrarSelectorRapido(card,e,i);
   // La decisión de 1/2 páginas ya está fuera del panel: se ve sin hacer clic.
   if(abierto!==i){bloque.append(card);continue}
   const panel=document.createElement('div');panel.className='panel-edicion';
