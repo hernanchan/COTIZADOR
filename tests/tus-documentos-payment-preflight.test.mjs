@@ -11,7 +11,7 @@ const db={prepare(sql){
  let values=[];
  const q={bind(...v){values=v;return q},async run(){
   writes.push(sql);
-  if(sql.startsWith('CREATE TABLE IF NOT EXISTS'))return {success:true};
+  if(sql.startsWith('CREATE TABLE IF NOT EXISTS')||sql.startsWith('CREATE INDEX IF NOT EXISTS'))return {success:true};
   throw Error('Unexpected D1 write '+sql);
  },async first(){
   if(sql.startsWith('SELECT id,amount_ars,deposit_ars,status,created_at,preference_id FROM orders'))return values[0]===id?order:null;
@@ -48,7 +48,7 @@ test('valid paid-in-full document + mixed order is eligible only for sandbox tes
  assert.equal(data.amount_ars,9000);
  assert.equal(data.documents_ars,8000);
  assert.equal(network,0);
- assert.ok(writes.every(x=>x.startsWith('CREATE TABLE IF NOT EXISTS')));
+ assert.ok(writes.every(x=>x.startsWith('CREATE TABLE IF NOT EXISTS')||x.startsWith('CREATE INDEX IF NOT EXISTS')));
 });
 test('unverified D1 manifest and mismatched amount are not eligible',async()=>{
  reset();manifest=null;
