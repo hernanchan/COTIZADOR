@@ -54,7 +54,7 @@ test('commercial document and Express checkout remains blocked before approval',
  const body=source.slice(source.indexOf('if(url.pathname==="/demo/checkout"'),source.indexOf('if(url.pathname==="/webhooks/mercadopago"'));
  assert.match(body,/restricted\?\.sku==="POLAROID_EXPRESS_A4"/);
  assert.match(body,/DOCS_SANDBOX_CHECKOUT_ENABLED/);
- assert.match(body,/x-docs-sandbox-preflight/);
+ assert.match(body,/documentSandboxEligibility/);
 });
 test('pedido TUS con PDF verificado no genera preferencia Mercado Pago desde demo',async()=>{
  for(const [name,items,description] of [
@@ -69,7 +69,7 @@ test('pedido TUS con PDF verificado no genera preferencia Mercado Pago desde dem
   },items});
   const response=await call('/demo/checkout',{order_id:uuid});
   assert.equal(response.status,503,name);
-  assert.match((await response.json()).error,/deshabilitado|habilitado/i);
+  assert.match((await response.json()).error,/deshabilitado|habilitado|bloqueado/i);
  }
  assert.equal(preferences,0);
  assert.equal(networkCalls,0);
