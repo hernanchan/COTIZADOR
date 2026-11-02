@@ -560,7 +560,7 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
  bridgeButton.textContent='Agregar PDF al envío privado';
  const info=document.createElement('p');
  info.className='pie';info.setAttribute('role','status');
- info.textContent='Recepción privada de hasta 10 PDF por pedido (máximo 20 MB por archivo y 60 MB en total). Impresiones y ploteos se verifican y registran en la Central. La selección parcial de páginas todavía requiere integración.';
+ info.textContent='Recepción privada de hasta 10 PDF por pedido (máximo 20 MB por archivo y 60 MB en total). Impresiones y ploteos se verifican y registran en la Central. Las páginas elegidas se verifican sobre el PDF original antes de registrar la orden.';
  const resumen=$('resumenPedido');
  resumen?.parentNode?.insertBefore(bridgeButton,resumen);
  bridgeButton.insertAdjacentElement('afterend',info);
@@ -608,9 +608,12 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
      throw Error('El grupo de anillado del PDF no es válido.');
     if(![1,2,4,9].includes(e.paginasPorHoja??1))
      throw Error('Composición por cara no admitida.');
-    if(!Array.isArray(e.paginas)||e.paginas.length<1||
-       e.paginas.length>2000||plan.paginasElegidas.length!==e.paginas.length)
-     throw Error('El envío directo admite PDF completos, sin selección parcial de páginas.');
+    const elegidas=paginasElegidas(e);
+    if(!Array.isArray(e.paginas)||e.paginas.length<1||e.paginas.length>2000||
+       !elegidas||!Array.isArray(plan.paginasElegidas)||
+       elegidas.length!==plan.paginasElegidas.length||
+       elegidas.some((pagina,k)=>pagina.numero!==plan.paginasElegidas[k]))
+     throw Error('La selección de páginas no coincide con el presupuesto.');
     if(!['personalizado_a4','a5','a4','a3'].includes(plan.formatoFinal)||
        !['bn','color'].includes(e.modo)||!['simple','double'].includes(e.caras)||
        !Number.isSafeInteger(e.copias)||e.copias<1||e.copias>200)
@@ -619,7 +622,7 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
     options.push({formato:plan.formatoFinal,modo:e.modo,caras:e.caras,
      copias:e.copias,materialColor:e.materialColor,
      anillado:e.anillado,grupoAnillado:e.anillado==='grupo'?String(e.grupoAnillado):'',
-     paginasPorHoja:e.paginasPorHoja??1,
+     paginasSeleccionadas:e.paginasSeleccionadas||'',paginasPorHoja:e.paginasPorHoja??1,
      paginas:e.paginas.length,nombre:e.name});
    }
    if(files.length){
