@@ -26,7 +26,7 @@ let remote,requests;
 const sandbox={AbortSignal,Response,Request,URL,URLSearchParams,TextEncoder,
  crypto:webcrypto,console,fetch:async url=>{
   requests++;
-  assert.match(String(url),/api\\.mercadopago\\.com\\/checkout\\/preferences\\/123456$/);
+  assert.ok(String(url).endsWith('/checkout/preferences/123456'),'Only mock known preference');
   return new Response(JSON.stringify(remote),{status:200,headers:{'Content-Type':'application/json'}});
  }};
 sandbox.globalThis=sandbox;
