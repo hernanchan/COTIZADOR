@@ -45,7 +45,7 @@ jobs:
           trap 'rm -rf "$workdir"' EXIT
           curl --fail --silent --show-error --max-time 25 -H "$auth" "$root/settings" > "$workdir/settings.json"
           jq -e '.success == true and (.result.bindings | type == "array")' "$workdir/settings.json" >/dev/null
-          for binding in DB CENTRAL_BRIDGE_KEY DEMO_ADMIN_KEY MP_TEST_ACCESS_TOKEN; do
+          for binding in DB CENTRAL_BRIDGE_KEY DEMO_ADMIN_KEY MP_TEST_ACCESS_TOKEN MP_TEST_SELLER_ID MP_WEBHOOK_SECRET TEST_WEBHOOK_URL; do
             jq -e --arg name "$binding" '.result.bindings | any(.name==$name)' "$workdir/settings.json" >/dev/null
           done
           jq -e '.result.bindings | any(.name=="DB" and (.type=="d1" or .type=="d1_database"))' "$workdir/settings.json" >/dev/null
