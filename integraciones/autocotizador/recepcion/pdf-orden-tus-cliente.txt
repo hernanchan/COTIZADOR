@@ -1,0 +1,147 @@
+/* Generación local de una orden A4 PDF (sin red, bibliotecas externas ni modificar originales).
+ * Helvetica WinAnsi; contenido codificado en hexadecimal para conservar tildes.
+ * Genera varias páginas si una orden tiene numerosos trabajos o detalles.
+ */
+function pdfOrdenWinAnsi(value){
+ const map={8364:128,8218:130,402:131,8222:132,8230:133,8224:134,
+  8225:135,710:136,8240:137,352:138,8249:139,338:140,381:142,
+  8216:145,8217:146,8220:147,8221:148,8226:149,8211:150,8212:151,
+  732:152,8482:153,353:154,8250:155,339:156,382:158,376:159};
+ const out=[];
+ for(const ch of String(value)){
+  const cp=ch.codePointAt(0);
+  if(cp===10||cp===13||cp===9){out.push(32);continue}
+  if(cp>=32&&cp<=255){out.push(cp);continue}
+  if(map[cp]!==undefined){out.push(map[cp]);continue}
+  out.push(63);
+ }
+ return out;
+}
+function pdfOrdenHex(value){
+ return pdfOrdenWinAnsi(value).map(n=>n.toString(16).padStart(2,'0')).join('');
+}
+function pdfOrdenMedida(text,pt){
+ let width=0;
+ for(const b of pdfOrdenWinAnsi(text)){
+  if(b===32)width+=0.28;
+  else if(".,:;!|iIl'".includes(String.fromCharCode(b)))width+=0.27;
+  else if("MW@#%&".includes(String.fromCharCode(b)))width+=0.88;
+  else if(b>=65&&b<=90)width+=0.68;
+  else width+=0.55;
+ }
+ return width*pt;
+}
+function pdfOrdenLineas(text,fontSize,maxWidth){
+ const lines=[];
+ const input=String(text==null?'NO CONSTA - verificar':text).replace(/[\r\n\t]+/g,' ').trim();
+ const words=input.split(/\s+/).filter(Boolean);
+ let line='';
+ const push=()=>{if(line){lines.push(line);line=''}};
+ for(const word of words){
+  const candidate=line?line+' '+word:word;
+  if(pdfOrdenMedida(candidate,fontSize)<=maxWidth){line=candidate;continue}
+  push();
+  if(pdfOrdenMedida(word,fontSize)<=maxWidth){line=word;continue}
+  let piece='';
+  for(const char of word){
+   if(piece&&pdfOrdenMedida(piece+char,fontSize)>maxWidth){lines.push(piece);piece=''}
+   piece+=char;
+  }
+  line=piece;
+ }
+ push();
+ return lines.length?lines:[''];
+}
+function generarPdfOrdenTrabajo(d,filasDeTrabajo){
+ if(!d||!Array.isArray(d.trabajos)||!d.trabajos.length||d.trabajos.length>30||
+    !/^\d{3,}$/.test(String(d.numeroOrden||''))||
+    !Number.isSafeInteger(Number(d.importe))||Number(d.importe)<1||
+    !Array.isArray(filasDeTrabajo)||filasDeTrabajo.length!==d.trabajos.length)
+  throw Error('Ficha de orden inválida para PDF');
+ if(d.estadoPago!=='PAGADO_VERIFICADO'&&d.estadoPago!=='SIN_PAGO_CONFIRMADO')
+  throw Error('Estado de pago no verificable');
+ const verified=d.estadoPago==='PAGADO_VERIFICADO'&&d.pagoVerificado===true;
+ if(d.estadoPago==='PAGADO_VERIFICADO'&&!verified)
+  throw Error('Falta verificación D1 del pago');
+ const pages=[];
+ let body=[],y=0;
+ const margin=44,maxX=595-2*margin,bottom=61;
+ const write=(line,pt=9,bold=false,x=margin)=>{
+  body.push('BT /'+(bold?'F2':'F1')+' '+pt+' Tf 1 0 0 1 '+x+' '+y.toFixed(1)+
+   ' Tm <'+pdfOrdenHex(line)+'> Tj ET');
+ };
+ const rule=()=>{
+  body.push('0.78 0.83 0.89 RG 0.5 w '+margin+' '+y.toFixed(1)+
+   ' m '+(595-margin)+' '+y.toFixed(1)+' l S');
+ };
+ const page=()=>{
+  if(body.length)pages.push(body.join('\n')+'\n');
+  body=[];y=798;
+  write('LIBRERÍA SABER  |  ORDEN DE TRABAJO N.º '+d.numeroOrden,15,true);y-=25;
+  write('Pedido: '+String(d.webOrderId||'NO CONSTA'),8,false);y-=18;
+  write('Documentos: '+d.trabajos.length+'  |  Total documentos: $ '+d.importe+' ARS',10,true);y-=20;
+  const status=verified?'PAGO VERIFICADO EN CENTRAL - PREPARACIÓN PENDIENTE':
+   'SIN PAGO CONFIRMADO - NO IMPRIMIR NI ENTREGAR';
+  write(status,9,true);y-=16;
+  write('Los PDF incluidos son originales. No están impuestos ni listos automáticamente.',8);y-=14;
+  rule();y-=19;
+ };
+ const ensure=(minHeight=14)=>{if(y-minHeight<bottom)page()};
+ const paragraph=(text,pt=9,bold=false,indent=0)=>{
+  const x=margin+indent,w=maxX-indent;
+  for(const line of pdfOrdenLineas(text,pt,w)){
+   ensure(pt*1.5);
+   write(line,pt,bold,x);
+   y-=pt*1.5;
+  }
+ };
+ page();
+ for(let i=0;i<d.trabajos.length;i++){
+  const t=d.trabajos[i];
+  if(!t||typeof t.nombreOriginal!=='string'||!Array.isArray(filasDeTrabajo[i]))
+   throw Error('Datos incompletos del PDF '+(i+1));
+  ensure(95);
+  paragraph('PDF '+String(i+1).padStart(2,'0')+' - '+t.nombreOriginal,11,true);y-=4;
+  for(const field of filasDeTrabajo[i]){
+   if(!Array.isArray(field)||field.length!==2)throw Error('Instrucción incorrecta');
+   const label=String(field[0]||'Dato');
+   const value=String(field[1]===null||field[1]===undefined?'NO CONSTA - verificar':field[1]);
+   paragraph(label+': '+value,9,false,10);
+  }
+  y-=9;ensure(7);rule();y-=17;
+ }
+ ensure(49);
+ paragraph('CONTROL OBLIGATORIO: revisar cada PDF en Adobe Acrobat, escala, color, caras, páginas por hoja y papel.',9,true);
+ paragraph(verified?'Pago verificado. NO IMPRIMIR hasta controlar originales y configuración de producción.':
+  'SIN PAGO CONFIRMADO. NO IMPRIMIR NI ENTREGAR.',9,true);
+ pages.push(body.join('\n')+'\n');
+ if(pages.length>100)throw Error('La orden tiene demasiadas páginas');
+ const obj=[];
+ const add=(value)=>{obj.push(value);return obj.length};
+ const catalog=add('<< /Type /Catalog /Pages 2 0 R >>');
+ const pageRoot=add('');const normal=add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
+ const bold=add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
+ const refs=[];
+ for(let i=0;i<pages.length;i++){
+  const pageNum=add(''),contentNum=add('');
+  refs.push(pageNum+' 0 R');
+  const footer='Página '+(i+1)+' de '+pages.length+'   |   Orden '+d.numeroOrden;
+  const stream=pages[i]+'BT /F1 8 Tf 1 0 0 1 44 36 Tm <'+pdfOrdenHex(footer)+'> Tj ET\n';
+  obj[contentNum-1]='<< /Length '+stream.length+' >>\nstream\n'+stream+'endstream';
+  obj[pageNum-1]='<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] '+
+   '/Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents '+contentNum+' 0 R >>';
+ }
+ obj[pageRoot-1]='<< /Type /Pages /Count '+pages.length+' /Kids ['+refs.join(' ')+'] >>';
+ let pdf='%PDF-1.4\n';
+ const offsets=[0];
+ for(let i=0;i<obj.length;i++){
+  offsets.push(pdf.length);
+  pdf+=(i+1)+' 0 obj\n'+obj[i]+'\nendobj\n';
+ }
+ const xref=pdf.length;
+ pdf+='xref\n0 '+(obj.length+1)+'\n0000000000 65535 f \n';
+ for(let i=1;i<offsets.length;i++)pdf+=String(offsets[i]).padStart(10,'0')+' 00000 n \n';
+ pdf+='trailer\n<< /Size '+(obj.length+1)+' /Root '+catalog+' 0 R >>\nstartxref\n'+xref+'\n%%EOF\n';
+ if(!/^[\x00-\x7f]*$/.test(pdf))throw Error('La orden PDF contiene bytes no soportados');
+ return new Blob([pdf],{type:'application/pdf'});
+}
