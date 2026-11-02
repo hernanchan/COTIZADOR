@@ -10,7 +10,7 @@ let row=null, saved=null, writes=0, network=0;
 const DB={prepare(sql){
  let args=[];
  const q={bind(...a){args=a;return q},async first(){
-  if(sql.includes('SELECT id,amount_ars,deposit_ars,status,preference_id FROM orders WHERE id=?'))return args[0]===id?row:null;
+  if(sql.includes('SELECT id,amount_ars,deposit_ars,status,preference_id,created_at FROM orders WHERE id=?'))return args[0]===id?row:null;
   if(sql.includes('SELECT amount_ars,status FROM transfer_requests WHERE order_id=?'))return saved;
   throw Error('unexpected D1 read '+sql);
  },async run(){
