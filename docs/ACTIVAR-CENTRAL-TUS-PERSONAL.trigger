@@ -36,3 +36,5 @@ Activar Central versión de pedido corto visible también en respuesta de prepar
 2026-11-02 — Desplegar solo Central privada con endpoint admin /admin/api/central/payment-preflight: cotejo de manifiesto D1, línea documental, pedido y pago completo, sin crear preferencia Mercado Pago ni acreditar ni autorizar producción. Suite CI 41448559285 verde; rollback, health sin pagos y HTTP401 obligatorios. No web pública.
 
 2026-11-02 — Desplegar exclusivamente saber-pagos-pruebas commit 1e74da2: ruta preflight/payment-sandbox-prepare agregada pero inhabilitada sin DOCS_SANDBOX_CHECKOUT_ENABLED=PRIVATE_TEST_ONLY. Probar 401 admin y health paymentsEnabled=false; rollback automático. No habilitar flag de pago, no hacer preferencias ni modificar producción.
+
+2026-11-02 — Actualizar solo Worker saber-pagos-pruebas con cierre de bypass de preflight D1, commit 189c512, CI aprobado 41452231699. Rollback automático y HTTP401/health obligatorios. DOCS_SANDBOX_CHECKOUT_ENABLED permanece sin activar; no cobrar ni tocar web pública.
