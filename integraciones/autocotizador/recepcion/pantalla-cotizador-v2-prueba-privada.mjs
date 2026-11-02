@@ -724,7 +724,7 @@ async function enviarTUSDesdeCarrito(pendientes){
     resultado.webOrderId!==orderId||resultado.paymentAuthorized!==false)
   throw Error('La Central no confirmó el pedido completo.');
  ultimoTotalServidor=resultado.totalArs;
- if(!/^\d{3,}$/.test(resultado.numeroOrden||''))
+ if(!/^\\d{3,}$/.test(resultado.numeroOrden||''))
   throw Error('La Central no confirmó el número de orden.');
  registeredOrder=resultado.orderId;
  registeredShortOrder=resultado.numeroOrden;
