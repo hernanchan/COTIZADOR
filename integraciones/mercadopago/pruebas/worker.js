@@ -1301,6 +1301,28 @@ document.querySelector("#refreshUnpaid").addEventListener("click",async()=>{
    const panel=node("div","");panel.className="unpaid-result";panel.hidden=true;
    btn.addEventListener("click",()=>showUnpaidDetails(o.commercial_order_id,panel,btn));
    li.append(btn);
+   const sandboxButton=node("button","Preparar enlace Mercado Pago (ensayo)");
+   sandboxButton.className="outline";sandboxButton.type="button";
+   const sandboxInfo=node("div","");
+   sandboxButton.addEventListener("click",async()=>{
+    sandboxButton.disabled=true;
+    sandboxInfo.replaceChildren(node("p","Validando importe y documentos en D1…"));
+    try{
+     const pre=await apiPost("/admin/api/central/payment-preflight",{order_id:o.commercial_order_id});
+     if(!pre.ready_for_sandbox_test&&pre.reason!=="PAGO_YA_INICIADO")
+      throw Error("Pedido no apto para ensayo: "+pre.reason);
+     const pay=await apiPost("/admin/api/central/payment-sandbox-prepare",{order_id:o.commercial_order_id});
+     const url=new URL(pay.checkout_url);
+     if(url.protocol!=="https:"||!/(^|\\.)(mercadopago\\.com|mercadopago\\.com\\.ar)$/.test(url.hostname))
+      throw Error("Mercado Pago devolvió un enlace no autorizado.");
+     const link=node("a","Abrir Mercado Pago sandbox");
+     link.href=url.href;link.target="_blank";link.rel="noopener noreferrer";
+     sandboxInfo.replaceChildren(node("p","ENLACE DE PRUEBA · No autoriza producción ni confirma pagos."),link);
+    }catch(e){sandboxInfo.replaceChildren(node("p",String(e.message||e)));}
+    finally{sandboxButton.disabled=false;}
+   });
+   li.append(sandboxButton);
+   li.append(sandboxInfo);
    li.append(panel);
    list.append(li);
   }
