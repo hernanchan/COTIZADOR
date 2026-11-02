@@ -109,7 +109,14 @@ function mostrarEstadoCliente(estado,titulo,detalle,numeroOrden=null){
   const numero=document.createElement('p');
   numero.className='numero-confirmado';
   numero.textContent='Orden N.º '+numeroOrden;
-  vistaEstadoPedido.replaceChildren(h,numero,p);
+  const nuevoPedido=document.createElement('button');
+  nuevoPedido.type='button';
+  nuevoPedido.textContent='Iniciar otro pedido';
+  nuevoPedido.addEventListener('click',()=>{
+   try{sessionStorage.removeItem(RECOVERY_KEY)}catch{}
+   location.assign('/prueba-v2/');
+  });
+  vistaEstadoPedido.replaceChildren(h,numero,p,nuevoPedido);
   batchProgress.textContent='Pedido recibido correctamente · Orden N.º '+numeroOrden+
    ' · PDF verificados y registrados.';
   sendAllButton.textContent='Orden N.º '+numeroOrden+' recibida';
