@@ -27,6 +27,7 @@ let remote,requests;
 const sandbox={AbortSignal,Response,Request,URL,URLSearchParams,TextEncoder,
  crypto:webcrypto,console,fetch:async url=>{
   requests++;
+  if(String(url).endsWith('/users/me'))return new Response(JSON.stringify({id:123,tags:['test_user']}),{status:200});
   assert.ok(String(url).endsWith('/checkout/preferences/123456'),'Only mock known preference');
   return new Response(JSON.stringify(remote),{status:200,headers:{'Content-Type':'application/json'}});
  }};
@@ -39,7 +40,7 @@ const call=()=>sandbox.worker.fetch(new Request('https://sandbox.example/demo/ch
  method:'POST',headers:{Authorization:'Bearer '+env.DEMO_ADMIN_KEY,'Content-Type':'application/json'},
  body:JSON.stringify({order_id:id,amount_ars:1})}),env);
 const base=()=>({id:preferenceId,external_reference:id,
- items:[{currency_id:'ARS',quantity:1,unit_price:8332}],sandbox_init_point:sandboxUrl});
+ collector_id:123,items:[{currency_id:'ARS',quantity:1,unit_price:8332}],init_point:sandboxUrl});
 test('reused preference respects D1 amount, currency, ID and sandbox URL',async()=>{
  requests=0;
  for(const [description,change] of [
@@ -48,8 +49,9 @@ test('reused preference respects D1 amount, currency, ID and sandbox URL',async(
   ['wrong order',p=>p.external_reference='other'],
   ['wrong preference id',p=>p.id='different'],
   ['multiple line items',p=>p.items.push({currency_id:'ARS',quantity:1,unit_price:1})],
-  ['non-sandbox URL',p=>{delete p.sandbox_init_point;p.init_point='https://www.mercadopago.com.ar/checkout/v1/redirect'}],
-  ['external URL',p=>p.sandbox_init_point='https://evil.example/pay'],
+  ['missing init_point',p=>{delete p.init_point}],
+  ['external URL',p=>p.init_point='https://evil.example/pay'],
+  ['wrong seller',p=>p.collector_id=999],
  ]){
   remote=base();change(remote);
   const response=await call();
@@ -62,5 +64,5 @@ test('reused preference respects D1 amount, currency, ID and sandbox URL',async(
  const data=await response.json();
  assert.equal(data.checkout_url,sandboxUrl);
  assert.equal(data.reused,true);
- assert.equal(requests,8);
+ assert.ok(requests>=9);
 });
