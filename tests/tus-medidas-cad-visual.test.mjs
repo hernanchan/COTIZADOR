@@ -10,3 +10,10 @@ test('ploteo informa al cliente CAD/Postér y las medidas detectadas en centíme
  assert.match(client,/p\.altoCm/);
  assert.match(client,/Pág\. /);
 });
+
+test('receptor TUS privado anuncia y controla el maximo de 10 PDF antes de subir',()=>{
+ const portal=readFileSync(new URL('../integraciones/autocotizador/recepcion/pantalla-cotizador-v2-prueba-privada.mjs',import.meta.url),'utf8');
+ assert.match(portal,/const MAX_PDF_PRIVADOS=TUS_ENABLED\?10:30/);
+ assert.match(portal,/existing\+payload\.files\.length>MAX_PDF_PRIVADOS/);
+ assert.match(portal,/allEntries\.length>MAX_PDF_PRIVADOS/);
+});
