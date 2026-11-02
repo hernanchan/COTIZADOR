@@ -1777,8 +1777,11 @@ export default {
     if(!body||!isUUID(body.order_id))return json({error:"Pedido inválido"},400);
     const alias=String(env.TRANSFER_ALIAS||"").trim();
     if(!/^[A-Za-z0-9._-]{6,50}$/.test(alias))return json({error:"Cuenta de transferencia no configurada"},503);
-    const order=await env.DB.prepare("SELECT id,amount_ars,deposit_ars,status,preference_id FROM orders WHERE id=?").bind(body.order_id).first();
+    const order=await env.DB.prepare("SELECT id,amount_ars,deposit_ars,status,preference_id,created_at FROM orders WHERE id=?").bind(body.order_id).first();
     if(!order)return json({error:"Pedido inexistente"},404);
+    const createdAt=Date.parse(String(order.created_at||"").replace(" ","T")+"Z");
+    if(!Number.isFinite(createdAt)||Date.now()>=createdAt+24*60*60*1000)
+     return json({error:"La cotización venció; prepará un nuevo pedido"},409);
     if(order.status!=="awaiting_payment"||order.preference_id||order.amount_ars!==order.deposit_ars||
        !Number.isSafeInteger(order.amount_ars)||order.amount_ars<1)
      return json({error:"Pedido incompatible o con pago iniciado"},409);
