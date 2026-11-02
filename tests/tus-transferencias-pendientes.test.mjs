@@ -44,3 +44,21 @@ test('retorno de pago distingue transferencia pendiente y no ofrece pagar otra v
  assert.ok(page.includes('verifying_payment:'));
  assert.ok(page.includes("document.querySelector('#retry').hidden=result.state!=='awaiting_payment'"));
 });
+
+test('la Central lista transferencias sin acreditar ni liberar la orden',()=>{
+ const start=worker.indexOf('if(url.pathname==="/admin/api/transfers/pending"');
+ const end=worker.indexOf('if(url.pathname==="/admin/api/orders"',start);
+ const route=worker.slice(start,end);
+ assert.ok(start>=0&&end>start);
+ assert.ok(route.includes('if(!tokenOK(req,env))'));
+ assert.ok(route.includes('env.TRANSFER_PRIVATE_ENABLED!=="PRIVATE_TEST_ONLY"'));
+ assert.ok(route.includes("t.status='awaiting_bank_verification'"));
+ assert.ok(route.includes("o.status='awaiting_payment'"));
+ assert.ok(route.includes("t.amount_ars=o.amount_ars"));
+ assert.ok(route.includes("payment_confirmed:false,production_enabled:false"));
+ assert.ok(!route.includes("UPDATE orders"));
+ assert.ok(worker.includes('id="refreshTransfers"'));
+ assert.ok(worker.includes('id="transferPending"'));
+ assert.ok(worker.includes('api("/admin/api/transfers/pending")'));
+ assert.ok(worker.includes('Acreditación NO verificada · NO imprimir'));
+});
