@@ -80,3 +80,5 @@ Revalidación precio A5: comparar IMPORTE VERIFICADO real del servidor entre PDF
 2026-11-02 — Desplegar exclusivamente en saber-documentos-pruebas la versión actual con selección común/individual y TUS, tras stage inactivo exitoso (run 41439956566). Mantener Basic HTTP 401, rollback obligatorio, sin cobros ni cambios en libreriasaber.com.ar.
 
 2026-11-02 — Corrección UX 'Todos iguales': evitar controles de impresión repetidos por archivo, conservar confirmación de tamaño individual obligatoria y opción explícita Personalizar este PDF. Configuración conjunta suma páginas por cara (1/2/4/9). CI 41442977582 success; desplegar solo saber-documentos-pruebas con rollback Basic 401, sin pagos ni web pública.
+
+2026-11-02 — Implementar en portal ZIP de operador privado orden de trabajo PDF A4 con instrucciones, y validación del pago de D1 en la Central. Pruebas CI 41481137495 aprobadas. Desplegar exclusivamente Worker saber-documentos-pruebas (Basic HTTP401, bindings inalterados, rollback); no publicar web comercial ni cambiar pagos.
