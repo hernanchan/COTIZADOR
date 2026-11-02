@@ -42,6 +42,7 @@ vm.runInContext(source.replace('export default {','globalThis.worker = {'),sandb
 const env={
  DB,DEMO_ADMIN_KEY:'clave-falsa-solo-ensayo',
  MP_TEST_ACCESS_TOKEN:'sin-acceso-real',
+ MP_TEST_SELLER_ID:'999111222',MP_WEBHOOK_SECRET:'fake-hmac-solo-pruebas',
  TEST_WEBHOOK_URL:'https://localhost.invalid/webhooks/mercadopago'
 };
 const call=(path,body)=>sandbox.worker.fetch(new Request('https://sandbox.example'+path,{
