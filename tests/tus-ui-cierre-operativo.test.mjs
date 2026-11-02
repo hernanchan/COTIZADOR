@@ -35,7 +35,7 @@ test('confirmación final ofrece iniciar otro pedido y descarta la referencia lo
  const store={removeItem(k){removed.push(k)}};
  const location={assign(path){visited.push(path)}};
  const run=new Function('document','batchProgress','sendAllButton','sessionStorage',
-  'RECOVERY_KEY','location',script.slice(start,end)+
+  'RECOVERY_KEY','location','const vistaEstadoPedido=document.getElementById("vista-estado-pedido");\n'+script.slice(start,end)+
   '\nmostrarEstadoCliente("registrado","Pedido recibido", "3 archivos", "008");return vistaEstadoPedido;');
  const result=run(doc,progress,send,store,'saber-v2-ensayo-metadatos-v1',location);
  assert.equal(result.hidden,false);
