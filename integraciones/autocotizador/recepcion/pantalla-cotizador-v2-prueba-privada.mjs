@@ -734,12 +734,28 @@ async function enviarTUSDesdeCarrito(pendientes){
  if(!TUS_ENABLED)throw Error('Recepción TUS deshabilitada.');
  if(pendientes.length<1||pendientes.length>10)
   throw Error('Esta etapa privada admite hasta 10 PDF por pedido.');
+ // Si el tarifario D1 cambió mientras el cliente configuraba los PDF,
+ // lo informamos ANTES de subir archivos. No se acepta una revisión vieja.
+ const preciosVistos=await catalogPromise;
+ let expectedPriceVersion;
+ if(typeof preciosVistos.priceVersion==='string'){
+  const actual=await fetch('/prueba-v2/precios-web.json?revision='+Date.now(),{
+   credentials:'same-origin',cache:'no-store'});
+  if(!actual.ok)throw Error('No pudimos comprobar la tarifa actual. No se subieron archivos.');
+  const vigente=await actual.json();
+  if(vigente.priceVersion!==preciosVistos.priceVersion){
+   const error=Error('La tarifa cambió mientras preparabas el pedido. Revisá el precio actualizado antes de enviarlo.');
+   error.code='TARIFA_ANTES_DE_SUBIR';
+   throw error;
+  }
+  expectedPriceVersion=preciosVistos.priceVersion;
+ }
  const mod=await import('/prueba-v2/tus-directo.mjs');
  const trabajos=pendientes.map(d=>mod.normalizarTrabajoTUS(d,d.batchInicio()));
  batchProgress.textContent='Enviando PDF al almacenamiento privado…';
  marcarTiempo('tus_inicio',{archivos:trabajos.length});
  const resultado=await mod.enviarPedidoTUSV2({
-  orderId,clientOrderId,trabajos,telefono:telefonoContacto.value.trim(),
+  orderId,clientOrderId,trabajos,telefono:telefonoContacto.value.trim(),expectedPriceVersion,
   onProgress:p=>{
    if(p.phase==='transferencia')
     batchProgress.textContent='Recibiendo PDF: '+p.percent+'% · '+trabajos.length+' archivos.';
@@ -830,8 +846,15 @@ sendAllButton.addEventListener('click',async()=>{
    await enviarTUSDesdeCarrito(pending);
    terminarMedicion('tus_pedido_registrado');
   }catch(error){
-   // Reconciliar acuse perdido en D1 sin subir PDF ni cobrar.
-   if(await recuperarNumeroCentralTUS()){
+   if(error?.code==='TARIFA_ANTES_DE_SUBIR'){
+    batchProgress.textContent=error.message+' No se subieron archivos.';
+    mostrarEstadoCliente(null);
+    terminarMedicion('tarifa_cambiada_antes_subida');
+   }else if(error?.code==='TARIFA_MODIFICADA'){
+    batchProgress.textContent=error.message+' Los archivos enviados permanecen privados. Es necesario actualizar la cotización antes de registrar el pedido.';
+    mostrarEstadoCliente(null);
+    terminarMedicion('tarifa_cambiada_durante_subida');
+   }else if(await recuperarNumeroCentralTUS()){
     terminarMedicion('tus_pedido_recuperado_sin_subida');
    }else{
     batchProgress.textContent='Pedido pendiente de conciliación: '+
