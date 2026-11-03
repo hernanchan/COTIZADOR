@@ -5,7 +5,7 @@
 - Si en un futuro se activa en entorno privado esa bandera, exige sesión Basic/cookie V2 válida o token de personal interno. Si D1 no está disponible, rechaza precio y cobro en vez de recalcular silenciosamente con el catálogo histórico. Se devuelve un error legible, sin autorizar pago.
 - Versión y fecha van separadas: `priceVersion=d1-approved-revision-N` y `generatedAt` ISO derivado de la aprobación en el historial D1; la fecha es compatible con el cotizador existente.
 - Prueba de negocio: 10 impresiones B/N A4 simple faz cambian de ARS 1.000 a ARS 1.200 al aprobar tarifa unitaria de ARS 100 a 120 en una simulación, aunque haya un borrador de ARS 555; no se altera ningún precio real. Se prueba firma, revisión, falla de D1 y ausencia de fallback.
-- Paridad incompleta documentada en `docs/AUDITORIA-TARIFAS-Y-PROMOS-20261103.md`. Discrepancia: Póster recubierto 60 cm, ARS 18.704/metro en `precios-web.json` vs ARS 17.300 en `config.json`. Sin decisión comercial; NO activar.
+- Paridad incompleta documentada en `docs/AUDITORIA-TARIFAS-Y-PROMOS-20261103.md`. **Póster recubierto 130 g, rollo 60 cm: valor real confirmado por el titular el 03/11/2026 = ARS 18.700 por metro**. Unificados archivos de tarifas y línea base del editor privado en código. No publicado aún; faltan las demás verificaciones comerciales.
 - Faltan: renovar permiso Cloudflare 401; desplegar sólo Workers privados; probar en navegador/orden real sandbox; bloquear aceptación de presupuesto si una tarifa cambia entre la vista y el registro; validar equivalencia de las promociones y de los productos de la vidriera (Google Sheets CSV) antes de publicar.
 
 ## 03/11/2026 — Avance real de administración de tarifas (posterior al bloque inicial)
