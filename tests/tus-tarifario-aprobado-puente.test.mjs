@@ -17,7 +17,7 @@ const central={
  CENTRAL_BRIDGE_ENABLED:'PRIVATE_TEST_ONLY',PRICE_ADMIN_PRIVATE_ENABLED:'PRIVATE_TEST_ONLY',
  CENTRAL_BRIDGE_KEY:key,DEMO_ADMIN_KEY:'ADMIN-CLAVE-INDEPENDIENTE',MP_WEBHOOK_SECRET:'WEBHOOK-DISTINTO',
  DB:{prepare(sql){
-  return {async run(){return {meta:{changes:1}}},async first(){
+  return {bind(...args){this.args=args;return this},async run(){return {meta:{changes:1}}},async first(){
    if(sql.includes('SELECT revision,approved_revision,draft_json,approved_json'))return {...head};
    if(sql.includes('SELECT created_at FROM central_pricing_admin_history'))return {created_at:'2026-11-03 10:00:00'};
    return null;
