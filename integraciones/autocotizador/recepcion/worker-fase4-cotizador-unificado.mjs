@@ -1737,7 +1737,8 @@ async function v2SessionMac(secret,timestamp){
  return Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
 }
 async function v2SessionCookie(env,path='/api/ensayo-preparar-documentos-v2-lote'){
- if(path!=='/api/ensayo-preparar-documentos-v2-lote'&&path!=='/api/ensayo-tus-'&&path!=='/prueba-v2/api/')
+ if(!['/api/ensayo-preparar-documentos-v2-lote','/api/ensayo-tus-',
+  '/prueba-v2/api/','/api/ensayo-materiales-rapido','/api/ensayo-carga-unica'].includes(path))
   throw Error('Ruta de cookie privada no autorizada.');
  const timestamp=Math.floor(Date.now()/1000);
  return V2_SESSION_COOKIE+'='+timestamp+'.'+
@@ -1821,6 +1822,10 @@ async function v2PrivateBrowserResponse(request,env,path){
    const responseHeaders=new Headers({...headers,
     'Content-Type':'text/html; charset=utf-8'});
    responseHeaders.append('Set-Cookie',await v2SessionCookie(env));
+   // El cotizador inteligente pide materiales por GET y presupuesto por POST.
+   // Sólo estas dos rutas reciben sesión de precios privada.
+   responseHeaders.append('Set-Cookie',await v2SessionCookie(env,'/api/ensayo-materiales-rapido'));
+   responseHeaders.append('Set-Cookie',await v2SessionCookie(env,'/api/ensayo-carga-unica'));
    // El fetch TUS necesita cookie privada propia; el navegador no siempre
    // reenvía credenciales Basic tras la carga inicial del portal.
    if(tusPrivadoConfigurado(env)){
@@ -1996,7 +2001,14 @@ export default {
           return testResponse({ok:false,error:'Solicitud no autorizada.',paymentAuthorized:false},403);
         const body=await request.text();
         if(body.length>500000)throw Error('Datos demasiado extensos.');
-        const data=cotizarCargaUnica({...JSON.parse(body),precios:await preciosPrivados(env,request)});
+        const solicitud=JSON.parse(body);
+        // Separar la falta de sesión/catálogo D1 (503) de un PDF mal configurado (400).
+        // No usar tarifas viejas si la revisión aprobada no está disponible.
+        let tarifaVigente;
+        try{tarifaVigente=await preciosPrivados(env,request);}
+        catch(_){return testResponse({ok:false,error:'No pudimos verificar los precios vigentes. Actualizá la pantalla e intentá otra vez.',
+          paymentAuthorized:false},503);}
+        const data=cotizarCargaUnica({...solicitud,precios:tarifaVigente});
         return testResponse(data);
       }catch(_){return testResponse({ok:false,error:'Datos inválidos o trabajo pendiente de revisión.',paymentAuthorized:false},400)}
     }
