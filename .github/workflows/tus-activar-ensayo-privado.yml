@@ -29,7 +29,7 @@ jobs:
         run: |
           set -euo pipefail
           npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.25.12
-          node --test tests/tus-pedido-privado.test.mjs tests/tus-recuperar-en-d1.test.mjs tests/tus-pagos-prepublicacion-bloqueados.test.mjs tests/tus-paginas-seleccionadas.test.mjs tests/tus-ui-cierre-operativo.test.mjs tests/tus-ui-presupuesto-smoke.test.mjs tests/tus-central-d1-lookup.test.mjs tests/tus-central-staff-download.test.mjs tests/tus-zip-orden-privada.test.mjs tests/tus-zip-descarga-automatica.test.mjs tests/tus-paquete-manifiesto.test.mjs tests/tus-instrucciones-reales.test.mjs tests/tus-a5-original.test.mjs
+          node --test tests/tus-pedido-privado.test.mjs tests/tus-pago-cliente-sandbox.test.mjs tests/tus-recuperar-en-d1.test.mjs tests/tus-pagos-prepublicacion-bloqueados.test.mjs tests/tus-paginas-seleccionadas.test.mjs tests/tus-ui-cierre-operativo.test.mjs tests/tus-ui-presupuesto-smoke.test.mjs tests/tus-central-d1-lookup.test.mjs tests/tus-central-staff-download.test.mjs tests/tus-zip-orden-privada.test.mjs tests/tus-zip-descarga-automatica.test.mjs tests/tus-paquete-manifiesto.test.mjs tests/tus-instrucciones-reales.test.mjs tests/tus-a5-original.test.mjs
       - name: Compilar el mismo Worker privado verificado
         working-directory: integraciones/autocotizador/recepcion
         run: |
@@ -71,11 +71,15 @@ jobs:
           previous=$(jq -r '.result.deployments[0].versions[]? | select(.percentage == 100) | .version_id' "$workdir/before.json" | head -n 1)
           test -n "$previous"
           echo "VERSION_ANTERIOR=$previous"
-          mode=OFF
           last=$(tail -n 1 docs/ACTIVAR-TUS-PRUEBAS-20261101.trigger | tr -d '\r')
+          mode=$(jq -r '[.result.bindings[] | select(.name=="DOCS_PRICE_ADMIN_D1_ENABLED" and .type=="plain_text") | .text][0] // "OFF"' "$workdir/settings.json")
+          if [ "$mode" != "PRIVATE_TEST_ONLY" ]; then mode=OFF; fi
           if [ "$last" = "ENABLE_PRIVATE_D1_PRICING_2026_11_03" ]; then mode=PRIVATE_TEST_ONLY; fi
-          echo "DOCS_PRICE_ADMIN_D1_ENABLED=$mode (sólo Worker documentos pruebas)"
-          jq -n --slurpfile settings "$workdir/settings.json" --arg mode "$mode"             '{main_module:"index.mjs",annotations:{"workers/message":"Saber TUS SOLO ensayo privado. No web comercial. Sin pagos."},bindings:([$settings[0].result.bindings[] | select(.name!="DOCS_PRICE_ADMIN_D1_ENABLED") | {name,type:"inherit"}]+[{name:"DOCS_PRICE_ADMIN_D1_ENABLED",type:"plain_text",text:$mode}])}' > "$workdir/metadata.json"
+          clientMode=$(jq -r '[.result.bindings[] | select(.name=="DOCS_CLIENT_SANDBOX_CHECKOUT_ENABLED" and .type=="plain_text") | .text][0] // "OFF"' "$workdir/settings.json")
+          if [ "$clientMode" != "PRIVATE_TEST_ONLY" ]; then clientMode=OFF; fi
+          if [ "$last" = "ENABLE_PRIVATE_SANDBOX_CLIENT_PAYMENT_2026_11_03" ]; then clientMode=PRIVATE_TEST_ONLY; fi
+          echo "DOCS_PRICE_ADMIN_D1_ENABLED=$mode; DOCS_CLIENT_SANDBOX_CHECKOUT_ENABLED=$clientMode (sólo Worker documentos pruebas)"
+          jq -n --slurpfile settings "$workdir/settings.json" --arg mode "$mode" --arg clientMode "$clientMode"             '{main_module:"index.mjs",annotations:{"workers/message":"Saber TUS y MP test_user SOLO ensayo privado. No web comercial."},bindings:([$settings[0].result.bindings[] | select(.name!="DOCS_PRICE_ADMIN_D1_ENABLED" and .name!="DOCS_CLIENT_SANDBOX_CHECKOUT_ENABLED") | {name,type:"inherit"}]+[{name:"DOCS_PRICE_ADMIN_D1_ENABLED",type:"plain_text",text:$mode},{name:"DOCS_CLIENT_SANDBOX_CHECKOUT_ENABLED",type:"plain_text",text:$clientMode}])}' > "$workdir/metadata.json"
           curl --fail --silent --show-error --max-time 90             -H "$auth"             -F "metadata=@$workdir/metadata.json;type=application/json"             -F "index.mjs=@integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs;filename=index.mjs;type=application/javascript+module"             "$root/versions?bindings_inherit=strict" > "$workdir/version.json"
           if ! jq -e '.success == true and (.result.id | type == "string")' "$workdir/version.json" >/dev/null; then
             jq -c '{success,errors:[.errors[]?|{code,message}]}' "$workdir/version.json"
