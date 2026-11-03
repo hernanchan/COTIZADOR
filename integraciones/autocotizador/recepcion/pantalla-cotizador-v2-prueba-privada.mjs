@@ -26,6 +26,12 @@ button{border:0;background:#0a5583;color:#fff;padding:10px 15px;border-radius:8p
 button:disabled{opacity:.45;cursor:not-allowed}
 .state{white-space:pre-wrap;overflow-wrap:anywhere;color:#0a3158;font-size:13px}
 .warning{background:#fff2db;border-left:4px solid #f7931e;padding:10px;margin-bottom:12px}
+#cliente-telefono-label{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:13px;font-weight:700;color:#123852}
+#cliente-telefono{width:190px;max-width:100%;font-size:15px;padding:9px 10px;border:1px solid #7599b9;border-radius:8px;background:#fff}
+#cliente-telefono:focus{outline:2px solid #1c7db5}
+.contacto-ayuda,.contacto-error{flex-basis:100%;font-size:12px;line-height:1.2;margin:0}
+.contacto-ayuda{color:#52677a}.contacto-error{color:#a12828;font-weight:700}
+.contacto-error:empty{display:none}
 #acciones-pedido{position:sticky;top:0;z-index:30;background:#eaf3fa;border-bottom:2px solid #aecce5;padding:8px max(15px,calc((100vw - 1110px)/2));box-shadow:0 3px 9px #0a315812;display:flex;align-items:center;gap:12px;flex-wrap:wrap}#precio-smart{flex:1;font-size:16px;font-weight:750;color:#0a3158}#send-all-pdf{font-weight:750;background:#095985;white-space:nowrap;min-height:43px}#batch-progress{flex-basis:100%;margin:0;font-size:12px;line-height:1.2}#recepcion-avanzada>summary{font-size:13px!important;color:#536475}#seguridad-privada{max-width:1110px;margin:7px auto 0;padding:0 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}#seguridad-privada .cf-turnstile{margin:0} @media(max-width:600px){#acciones-pedido{padding:8px 12px}#send-all-pdf{width:100%}}
 .cf-turnstile{margin:15px 0}
 #vista-estado-pedido{background:#fff;border-radius:12px;padding:24px;margin:12px 0;border:1px solid #bad2e7}
@@ -44,7 +50,13 @@ body.estado-envio #smart,body.estado-registro #smart{display:none}
 @media(max-width:840px){main{display:block}.panel{margin-bottom:14px}iframe{min-height:740px}}
 </style></head><body>
 <header><h1>LIBRERÍA SABER · Cotizador V2 en ensayo privado</h1><small style="color:#d5e3f0">Sin cobros, sin órdenes de producción y sin publicación comercial.</small></header>
-<div id="acciones-pedido"><div id="precio-smart" role="status" aria-live="polite">Presupuesto preliminar: todavía sin cotizar · No autoriza cobro</div><button id="send-all-pdf" type="button" disabled>Enviar mi pedido</button><p id="batch-progress" class="state" role="status" aria-live="polite">Cargá tus PDF y revisá las opciones.</p></div>
+<div id="acciones-pedido"><div id="precio-smart" role="status" aria-live="polite">Presupuesto preliminar: todavía sin cotizar · No autoriza cobro</div>
+<label id="cliente-telefono-label" for="cliente-telefono">Teléfono de contacto *
+<input id="cliente-telefono" type="tel" inputmode="tel" autocomplete="tel" maxlength="26" placeholder="Ej.: 351 555 1234" required aria-describedby="cliente-telefono-ayuda cliente-telefono-error">
+</label><button id="send-all-pdf" type="button" disabled>Enviar mi pedido</button>
+<p id="cliente-telefono-ayuda" class="contacto-ayuda">Para consultar algo de tu archivo o avisarte cuando esté listo. No se usa para publicidad.</p>
+<p id="cliente-telefono-error" class="contacto-error" role="alert" aria-live="polite"></p>
+<p id="batch-progress" class="state" role="status" aria-live="polite">Cargá tus PDF y revisá las opciones.</p></div>
 <section role="alert" class="warning" style="margin:12px auto;max-width:1110px" ${tusBloqueado?'':'hidden'}>Supabase/TUS no está operativo. El envío está BLOQUEADO para evitar volver a Google Drive. Revisar: ${fallas.join(', ')||'configuración privada'}. No vuelvas a subir PDF todavía.</section>
 <div id="seguridad-privada"><small>Verificación de seguridad para el envío:</small><div class="cf-turnstile" data-sitekey="${sitekey}" data-action="documentos"></div></div>
 <div style="max-width:1140px;margin:18px auto 0;padding:0 14px">
@@ -77,6 +89,18 @@ const list=document.getElementById('all'),status=document.getElementById('state'
  summary=document.getElementById('order-summary');
 const registerButton=document.getElementById('register-private'),registerStatus=document.getElementById('register-status');
 const sendAllButton=document.getElementById('send-all-pdf'),batchProgress=document.getElementById('batch-progress');
+const telefonoContacto=document.getElementById('cliente-telefono');
+const telefonoError=document.getElementById('cliente-telefono-error');
+function telefonoValido(){
+ const original=telefonoContacto.value.trim();
+ const numeros=original.replace(/\\D/g,'');
+ const correcto=/^\\+?[0-9 ()-]{10,26}$/.test(original)&&numeros.length>=10&&numeros.length<=15;
+ telefonoError.textContent=correcto?'':'Ingresá un teléfono de contacto válido (con código de área).';
+ telefonoContacto.setAttribute('aria-invalid',correcto?'false':'true');
+ return correcto?original:null;
+}
+telefonoContacto.addEventListener('input',()=>{telefonoError.textContent='';telefonoContacto.removeAttribute('aria-invalid')});
+
 const modoDiagnostico=new URLSearchParams(location.search).get('diagnostico')==='1';
 const TUS_ENABLED=${tusEnabled===true};
  const MAX_PDF_PRIVADOS=TUS_ENABLED?10:30;
@@ -715,7 +739,7 @@ async function enviarTUSDesdeCarrito(pendientes){
  batchProgress.textContent='Enviando PDF al almacenamiento privado…';
  marcarTiempo('tus_inicio',{archivos:trabajos.length});
  const resultado=await mod.enviarPedidoTUSV2({
-  orderId,clientOrderId,trabajos,
+  orderId,clientOrderId,trabajos,telefono:telefonoContacto.value.trim(),
   onProgress:p=>{
    if(p.phase==='transferencia')
     batchProgress.textContent='Recibiendo PDF: '+p.percent+'% · '+trabajos.length+' archivos.';
@@ -776,6 +800,11 @@ async function recuperarNumeroCentralTUS(){
 }
 sendAllButton.addEventListener('click',async()=>{
  if(batchSending||registering||handoffInProgress||registeredOrder||TUS_BLOCKED)return;
+ if(!telefonoValido()){
+  telefonoContacto.focus();
+  batchProgress.textContent='Completá el teléfono para enviar el pedido.';
+  return;
+ }
  iniciarMedicion();
  if(all.flatMap(item=>item.references).length===0){
   if(!smartReady){batchProgress.textContent=smartBlockedReason||'El presupuesto no está listo para enviar.';terminarMedicion('presupuesto_incompleto');return;}
