@@ -143,3 +143,43 @@ test('rechaza inyección de configuración, precios negativos y promociones inco
  }
  assert.equal(head.revision,revision);
 });
+
+test('la vista previa calcula ejemplos y cambios sin guardar ni aprobar la versión',async()=>{
+ const beforeRevision=head.revision;
+ const input=(await (await call('/admin/api/pricing')).json());
+ const current=input.fields.find(x=>x.path==='prices.bnA4.scales.0.simple')?.value;
+ assert.ok(Number.isFinite(current));
+ const target=current===120?121:120;
+ const result=await call('/admin/api/pricing/preview',{method:'POST',body:{
+  operator:'Responsable mostrador',expectedRevision:beforeRevision,
+  changes:[{path:'prices.bnA4.scales.0.simple',value:target}]
+ }});
+ assert.equal(result.status,200);
+ const preview=await result.json();
+ assert.equal(preview.preview,true);
+ assert.equal(preview.revision,beforeRevision);
+ assert.equal(preview.commercialPublication,false);
+ assert.equal(preview.paymentsEnabled,false);
+ assert.ok(preview.edits.some(x=>x.path==='prices.bnA4.scales.0.simple'&&x.after===target));
+ const sample=preview.examples.find(x=>x.label==='A4 B/N · 10 caras simple faz');
+ assert.equal(sample.after,target*10);
+ assert.ok(sample.before>0);
+ assert.equal(head.revision,beforeRevision,'Una simulación no incrementa versión de D1');
+ assert.equal((await (await call('/admin/api/pricing')).json()).revision,beforeRevision);
+});
+test('vista previa rechaza campos no editables, errores y revisiones obsoletas',async()=>{
+ for(const changes of [[{path:'prices.plotter.supports.1.widthCm',value:42}],
+   [{path:'prices.bnA4.scales.0.simple',value:-1}],
+   [{path:'prices.bnA4.scales.0.simple',value:10},{path:'prices.bnA4.scales.0.simple',value:20}]]){
+  const r=await call('/admin/api/pricing/preview',{method:'POST',body:{
+   operator:'Responsable',expectedRevision:head.revision,changes
+  }});
+  assert.equal(r.status,422);
+ }
+ assert.equal((await call('/admin/api/pricing/preview',{method:'POST',
+  body:{operator:'Responsable',expectedRevision:head.revision-1,changes:[]}})).status,409);
+ assert.equal((await call('/admin/api/pricing/preview',{key:'incorrecta',method:'POST',
+  body:{operator:'Responsable',expectedRevision:head.revision,changes:[]}})).status,401);
+ assert.equal((await call('/admin/api/pricing/preview',{method:'POST',settings:{...env,PRICE_ADMIN_PRIVATE_ENABLED:'OFF'},
+  body:{operator:'Responsable',expectedRevision:head.revision,changes:[]}})).status,503);
+});
