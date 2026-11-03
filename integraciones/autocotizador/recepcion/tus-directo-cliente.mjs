@@ -17,9 +17,13 @@ const call=async(path,body,fetcher)=>{
   headers:{'Content-Type':'application/json'},body:JSON.stringify(body)
  });
  const data=await response.json().catch(()=>null);
- if(!response.ok||data?.ok!==true)
-  throw Error((data?.error||'No se pudo completar el ensayo TUS.')+
+ if(!response.ok||data?.ok!==true){
+  const error=Error((data?.error||'No se pudo completar el ensayo TUS.')+
    (typeof data?.etapa==='string'&&/^[A-Z0-9_]{3,40}$/.test(data.etapa)?' ['+data.etapa+']':''));
+  if(response.status===409&&data?.code==='TARIFA_MODIFICADA')
+   error.code='TARIFA_MODIFICADA';
+  throw error;
+ }
  return data;
 };
 export function normalizarTrabajoTUS(d,plan){
@@ -66,7 +70,7 @@ export function normalizarTrabajoTUS(d,plan){
  };
 }
 export async function enviarPedidoTUSV2({
- orderId,clientOrderId,trabajos,telefono,onProgress=()=>{},
+ orderId,clientOrderId,trabajos,telefono,expectedPriceVersion,onProgress=()=>{},
  fetcher=fetch,loadUploader=()=>import('https://releases.transloadit.com/uppy/v3.6.1/uppy.min.mjs')
 }={}){
  if(!WEB.test(orderId||'')||!UUID.test(clientOrderId||'')||
@@ -80,6 +84,9 @@ export async function enviarPedidoTUSV2({
   ids.add(t.meta.fileId);totalBytes+=t.meta.bytes;
  }
  if(totalBytes>60*1024*1024)throw Error('Tanda mayor que 60 MiB.');
+ if(expectedPriceVersion!==undefined&&
+    (typeof expectedPriceVersion!=='string'||!/^d1-approved-revision-[1-9][0-9]{0,9}$/.test(expectedPriceVersion)))
+  throw Error('La versión de precio enviada no es válida.');
  if(telefono!==undefined){
   const digits=String(telefono||'').replace(/\D/g,'');
   if(typeof telefono!=='string'||!/^[+]?[0-9 ()-]{10,26}$/.test(telefono.trim())||
@@ -167,6 +174,7 @@ export async function enviarPedidoTUSV2({
   const finalized=await call('/prueba-v2/api/ensayo-tus-registrar',{
    orderId,clientOrderId,
    ...(typeof telefono==='string'?{telefono:telefono.trim()}:{}),
+   ...(typeof expectedPriceVersion==='string'?{expectedPriceVersion}:{}),
    entries:trabajos.map((t,i)=>({
     proof:started.sessions[i].proof,opciones:t.opciones
    }))
