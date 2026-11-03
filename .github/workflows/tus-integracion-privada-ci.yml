@@ -94,6 +94,23 @@ jobs:
              probe.paymentAuthorized!==false)
             throw Error('Resumen D1 privado o barreras comerciales inválidas');
           console.info('SONDA_D1_HTTP401_SIN_AUTORIZAR_Y_HTTP200_BASIC_OK');
+
+          const enabledEnv={...fakeEnv,DOCS_PRICE_ADMIN_D1_ENABLED:'PRIVATE_TEST_ONLY'};
+          const priceUrl='https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/precios-web.json';
+          const unauthorized=await worker.fetch(new Request(priceUrl),enabledEnv,{});
+          if(unauthorized.status!==401)throw Error('El catálogo D1 no debe ser público.');
+          const approved=await worker.fetch(new Request(priceUrl,{headers:{Authorization:credential}}),enabledEnv,{});
+          if(approved.status!==200)throw Error('El navegador autenticado no pudo obtener precios D1 aprobados.');
+          const prices=await approved.json();
+          if(prices.priceVersion!=='d1-approved-revision-3'||prices.bnA4.scales[0].simple!==100||
+             prices.plotter.supports.find(x=>x.id==='rec60')?.posterPerMeter!==18700)
+            throw Error('Las tarifas aprobadas no se reflejan en el mismo JSON del cliente.');
+          const quote=await worker.fetch(new Request('https://saber-documentos-pruebas.libreriasaber.workers.dev/api/ensayo-materiales-rapido',{headers:{Authorization:credential}}),enabledEnv,{});
+          if(quote.status!==200)throw Error('La ruta de materiales no pudo cotizar con D1 aprobado.');
+          const blockedNoD1=await worker.fetch(new Request(priceUrl,{headers:{Authorization:credential}}),
+            {...enabledEnv,SABER_CENTRAL:{fetch:async()=>new Response('D1 fuera de servicio',{status:503})}},{});
+          if(blockedNoD1.status!==503)throw Error('D1 caído debe impedir devolver valores de catálogo anterior.');
+          console.info('CATALOGO_D1_ON_PROTEGIDO_401_AUTENTICADO_200_FALLA_503_SIN_FALLBACK');
           NODE
       - name: Confirmación SIN despliegues
         run: echo 'PRUEBA_TUS_PRIVADA_OK - SIN DESPLIEGUE - SIN PAGOS - WEB COMERCIAL INTACTA'
