@@ -2482,6 +2482,59 @@ async function audit(env,event,detail){
   await env.DB.prepare("INSERT INTO webhook_audit(event,detail) VALUES(?,?)").bind(event,detail).run();
  }catch(e){console.error("Webhook audit failed",e?.message||"unknown")}
 }
+/**
+ * Compra integral en ENSAYO PRIVADO. Solo llega por HMAC desde el Worker
+ * documental; nunca expone la clave admin ni acepta precio del navegador.
+ */
+async function centralClientSandboxPayment(req,env,dispatch){
+ const signed=await centralReadSigned(req,env);
+ if(signed.error)return json({ok:false,error:signed.error},signed.status);
+ if(env.DOCS_SANDBOX_CHECKOUT_ENABLED!=="PRIVATE_TEST_ONLY"||
+    env.CENTRAL_PREPARE_ENABLED!=="PRIVATE_TEST_ONLY")
+  return json({ok:false,error:"Sandbox documental deshabilitado"},503);
+ const p=signed.payload;
+ if(!p||typeof p!=="object"||Array.isArray(p)||
+    Object.keys(p).sort().join(",")!=="action,clientOrderId,commercialOrderId,webOrderId"||
+    !["start","status"].includes(p.action)||
+    !CENTRAL_UUID.test(p.clientOrderId||"")||
+    !CENTRAL_UUID.test(p.commercialOrderId||"")||
+    !/^WEB-ENSAYO-[A-F0-9]{32}$/.test(p.webOrderId||""))
+  return json({ok:false,error:"Identificación de compra incorrecta"},400);
+ await centralTables(env);
+ await ensureOrderItems(env);
+ // Tres identidades deben coincidir en D1; conocer una orden corta no basta.
+ const belongs=await env.DB.prepare(
+  "SELECT o.id,o.status FROM orders o "+
+  "JOIN cart_requests c ON c.order_id=o.id "+
+  "JOIN central_document_manifests m ON m.commercial_order_id=o.id "+
+  "WHERE o.id=? AND c.client_order_id=? AND m.web_order_id=? LIMIT 1"
+ ).bind(p.commercialOrderId,p.clientOrderId,p.webOrderId).first();
+ if(!belongs)return json({ok:false,error:"La orden no corresponde a esta sesión"},403);
+ if(p.action==="status"){
+  await ensurePaymentReviews(env);
+  const r=await env.DB.prepare("SELECT state FROM payment_reviews WHERE order_id=?").bind(belongs.id).first();
+  const estado=r?.state==="revoked"?"revocado":
+   belongs.status==="paid"&&r?.state==="verified"?"pagado":"pendiente";
+  return json({ok:true,commercialOrderId:belongs.id,estado,paymentAuthorized:estado==="pagado"});
+ }
+ if(typeof dispatch!=="function"||typeof env.DEMO_ADMIN_KEY!=="string"||!env.DEMO_ADMIN_KEY)
+  return json({ok:false,error:"Pasarela privada no disponible"},503);
+ const eligibility=await documentSandboxEligibility(env,belongs.id,true);
+ if(eligibility.reason)return json({ok:false,error:"Pedido no apto para pago: "+eligibility.reason},409);
+ // Reutilizar validación D1, vendedor test_user, importe, expiración e idempotencia MP.
+ const result=await dispatch(new Request(new URL("/demo/checkout",req.url),{
+  method:"POST",headers:{"Authorization":"Bearer "+env.DEMO_ADMIN_KEY,
+   "Content-Type":"application/json"},body:JSON.stringify({order_id:belongs.id})
+ }));
+ const raw=await result.text();
+ let checkout;try{checkout=JSON.parse(raw)}catch{return json({ok:false,error:"Respuesta de pasarela inválida"},502)}
+ if(!result.ok)return json({ok:false,error:String(checkout?.error||"No se pudo preparar Mercado Pago").slice(0,160)},result.status);
+ if(checkout.order_id!==belongs.id||typeof checkout.checkout_url!=="string")
+  return json({ok:false,error:"Enlace de pago no coincidente"},502);
+ return json({ok:true,commercialOrderId:belongs.id,checkoutUrl:checkout.checkout_url,
+  estado:"pendiente"});
+}
+
 async function documentSandboxEligibility(env,orderId,allowExistingPreference=false){
   const order=await env.DB.prepare("SELECT id,amount_ars,deposit_ars,status,created_at,preference_id FROM orders WHERE id=?").bind(orderId).first();
   if(!order)return {reason:"PEDIDO_INEXISTENTE"};
@@ -2570,6 +2623,8 @@ export default {
    if(url.pathname==="/internal/central/tus-package")return await centralTUSPackageManifest(req,env);
    if(url.pathname==="/internal/central/link")return await centralLink(req,env);
    if(url.pathname==="/internal/central/prepare-order")return await centralPrepareDraft(req,env);
+   if(url.pathname==="/internal/central/payment-sandbox-client")
+    return await centralClientSandboxPayment(req,env,(internal)=>this.fetch(internal,env));
    if(url.pathname==="/internal/central/pricing-snapshot")
     return await priceAdminApprovedSnapshot(req,env);
    if(url.pathname.startsWith("/checkout/"))return await customerCheckout(req,env,this);
