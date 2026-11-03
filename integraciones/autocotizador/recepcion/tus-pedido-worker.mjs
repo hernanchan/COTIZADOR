@@ -213,6 +213,20 @@ export async function iniciarTandaTUSPrivada(request,env,{
    paymentAuthorized:false},403);
  }
 }
+/** Evita registrar un pedido con un precio mostrado en una revisión anterior.
+ * No se aplica al tarifario de legado cuando la integración D1 permanece apagada.
+ */
+export function verificarVersionPrecioPedido({versionVista,preciosServidor,tarifarioD1Activo=false}={}){
+ if(!tarifarioD1Activo)return {ok:true,legacy:true};
+ const actual=preciosServidor?.priceVersion;
+ if(typeof actual!=='string'||!/^d1-approved-revision-[1-9][0-9]{0,9}$/.test(actual))
+  return {ok:false,reason:'Tarifario aprobado no verificable'};
+ if(typeof versionVista!=='string'||!/^d1-approved-revision-[1-9][0-9]{0,9}$/.test(versionVista))
+  return {ok:false,reason:'Falta versión de presupuesto'};
+ if(actual!==versionVista)
+  return {ok:false,reason:'La tarifa cambió desde la cotización inicial'};
+ return {ok:true,version:actual};
+}
 export async function finalizarPedidoTUSPrivado(request,env,{
  authorized=false,fetcher=fetch,preciosServidor,puente,ahora,
  registrar=registrarManifiestoV2EnCentral,
@@ -221,7 +235,9 @@ export async function finalizarPedidoTUSPrivado(request,env,{
  try{
   ensureRequest(request,env,authorized);
   const input=await bodyJSON(request);
-  if(!input||!['clientOrderId,entries,orderId','clientOrderId,entries,orderId,telefono'].includes(Object.keys(input).sort().join(','))||
+  if(!input||!['clientOrderId,entries,orderId','clientOrderId,entries,orderId,telefono',
+    'clientOrderId,entries,expectedPriceVersion,orderId',
+    'clientOrderId,entries,expectedPriceVersion,orderId,telefono'].includes(Object.keys(input).sort().join(','))||
      !UUID.test(input.clientOrderId||''))
    throw Error('Pedido privado inválido.');
   if(input.telefono!==undefined){
@@ -230,6 +246,13 @@ export async function finalizarPedidoTUSPrivado(request,env,{
       d.length<10||d.length>15)
     throw Error('Teléfono de contacto inválido.');
   }
+  const version=verificarVersionPrecioPedido({
+   versionVista:input.expectedPriceVersion,
+   preciosServidor,tarifarioD1Activo:env?.DOCS_PRICE_ADMIN_D1_ENABLED==='PRIVATE_TEST_ONLY'
+  });
+  if(!version.ok)return json({ok:false,error:'El presupuesto cambió. Revisá el precio actualizado antes de confirmar el pedido.',
+   code:'TARIFA_MODIFICADA',checkoutEnabled:false,paymentAuthorized:false,
+   listoParaProducir:false},409);
   const checked=await verificarTandaTUSYRecalcular({
    orderId:input.orderId,entries:input.entries,
    secret:env.DOCS_TUS_RECEIPT_KEY,ahora,
