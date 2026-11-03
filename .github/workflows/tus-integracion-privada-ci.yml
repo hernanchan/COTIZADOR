@@ -61,6 +61,39 @@ jobs:
           const safe=await blocked.json();
           if(safe.paymentAuthorized!==false)throw new Error('Nunca habilitar cobros por error de precios.');
           console.info('PRECIOS_D1_PRIVADOS_CERRADOS_503_SIN_FALLBACK');
+          const probeUrl='https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/admin-tarifario-ensayo';
+          const noAuth=await worker.fetch(new Request(probeUrl),{}, {});
+          if(noAuth.status!==401)throw Error('La sonda D1 debe pedir autenticación Basic.');
+          const fs=await import('node:fs');
+          const baseline=JSON.parse(fs.readFileSync('../../../precios-web.json','utf8'));
+          const fakeEnv={
+            DOCS_V2_PRIVATE_UI_ENABLED:'PRIVATE_TEST_ONLY',
+            DOCS_V2_PRIVATE_UI_SECRET:'a'.repeat(32),
+            DOCS_CENTRAL_ADMIN_KEY:'b'.repeat(32),DOCS_RELAY_KEY:'c'.repeat(32),
+            CENTRAL_BRIDGE_KEY:'d'.repeat(32),
+            SABER_CENTRAL:{fetch:async signed=>{
+              if(signed.headers.get('x-saber-signature')?.length!==64)throw Error('Falta HMAC entre Workers');
+              const payload=await signed.json();
+              if(payload.schema!=='saber-price-snapshot-v1'||payload.purpose!=='quote-private-test')
+                throw Error('Solicitud D1 sin contrato');
+              return new Response(JSON.stringify({ok:true,schema:'saber-price-snapshot-v1',
+                approvedRevision:3,approvedAt:'2026-11-03T10:00:00Z',
+                prices:baseline,promotions:{codes:[]},commercialRelease:false,
+                paymentAuthorized:false,source:'private-d1-approved-only'}),
+                {headers:{'Content-Type':'application/json'}});
+            }}
+          };
+          const credential='Basic '+Buffer.from('operador:'+'a'.repeat(32)).toString('base64');
+          const accepted=await worker.fetch(new Request(probeUrl,{headers:{Authorization:credential}}),fakeEnv,{});
+          if(accepted.status!==200)throw Error('La sonda autenticada no pudo leer el catálogo D1 aprobado.');
+          const probe=await accepted.json();
+          if(probe.priceVersion!=='d1-approved-revision-3'||
+             probe.a4_bn_1_a_10_sf_ars!==100||
+             probe.poster_recubierto_60cm_metro_ars!==18700||
+             probe.docsPriceAdminD1Enabled!==false||
+             probe.paymentAuthorized!==false)
+            throw Error('Resumen D1 privado o barreras comerciales inválidas');
+          console.info('SONDA_D1_HTTP401_SIN_AUTORIZAR_Y_HTTP200_BASIC_OK');
           NODE
       - name: Confirmación SIN despliegues
         run: echo 'PRUEBA_TUS_PRIVADA_OK - SIN DESPLIEGUE - SIN PAGOS - WEB COMERCIAL INTACTA'
