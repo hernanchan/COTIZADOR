@@ -4,6 +4,7 @@ import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 import {webcrypto} from 'node:crypto';
 import {prepararDocumentosCentralFirmado} from '../integraciones/autocotizador/recepcion/preparar-documentos-central.mjs';
+import {paginaCotizadorV2PruebaPrivada} from '../integraciones/autocotizador/recepcion/pantalla-cotizador-v2-prueba-privada.mjs';
 
 const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
 const ui=read('integraciones/autocotizador/recepcion/pantalla-cotizador-v2-prueba-privada.mjs');
@@ -20,7 +21,8 @@ test('UI exige un único teléfono al enviar, conserva cotización independiente
  assert.match(ui,/No se usa para publicidad/i);
  assert.match(ui,/para enviar el pedido/i);
  assert.doesNotMatch(ui,/localStorage\.setItem\(['"]cliente-telefono/);
- const m=/function telefonoValido\(\)\{[\s\S]+?telefonoContacto\.addEventListener/.exec(ui);
+ const rendered=paginaCotizadorV2PruebaPrivada('0123456789abcdef',true,{invalidos:[]});
+ const m=/function telefonoValido\(\)\{[\s\S]+?telefonoContacto\.addEventListener/.exec(rendered);
  assert.ok(m,'Se encuentra la validación de teléfono');
  const fake={value:'+54 9 351 555 1234',setAttribute(){},removeAttribute(){}};
  const error={textContent:''};
