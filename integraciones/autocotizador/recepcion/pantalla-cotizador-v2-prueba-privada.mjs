@@ -142,7 +142,7 @@ function mostrarEstadoCliente(estado,titulo,detalle,numeroOrden=null){
    location.assign('/prueba-v2/');
   });
   vistaEstadoPedido.replaceChildren(h,numero,p,nuevoPedido);
-   if(SANDBOX_PAYMENT_ENABLED&&TUS_ENABLED&&registeredOrder)vistaEstadoPedido.append(pagoSandboxEnRecibo());
+   if(typeof SANDBOX_PAYMENT_ENABLED!=='undefined'&&SANDBOX_PAYMENT_ENABLED&&TUS_ENABLED&&registeredOrder)vistaEstadoPedido.append(pagoSandboxEnRecibo());
   batchProgress.textContent='Pedido recibido correctamente · Orden N.º '+numeroOrden+
    ' · PDF verificados y registrados.';
   sendAllButton.textContent='Orden N.º '+numeroOrden+' recibida';
@@ -845,7 +845,7 @@ async function enviarTUSDesdeCarrito(pendientes){
  }).format(ultimoTotalServidor);
  document.getElementById('precio-smart').textContent='Orden N.º '+registeredShortOrder+' · Total verificado: '+valor+' · Sin cobro autorizado';
  mostrarEstadoCliente('registrado','Pedido recibido correctamente',
-  trabajos.length+' PDF verificados y registrados. Conservá este número para identificar tu pedido. '+(SANDBOX_PAYMENT_ENABLED?'Continuá al pago de prueba.':'Pago desactivado.'),registeredShortOrder);
+  trabajos.length+' PDF verificados y registrados. Conservá este número para identificar tu pedido. '+(typeof SANDBOX_PAYMENT_ENABLED!=='undefined'&&SANDBOX_PAYMENT_ENABLED?'Continuá al pago de prueba.':'Pago desactivado.'),registeredShortOrder);
  return resultado;
 }
 /** Recuperación idempotente en Central: ningún PDF se transfiere de nuevo. */
@@ -873,7 +873,7 @@ async function recuperarNumeroCentralTUS(){
   document.getElementById('precio-smart').textContent='Orden N.º '+
    data.numeroOrden+' · Total verificado: '+monto+' · Sin cobro autorizado';
   mostrarEstadoCliente('registrado','Pedido recibido correctamente',
-   'Orden recuperada desde D1 sin volver a subir los PDF. '+(SANDBOX_PAYMENT_ENABLED?'Continuá al pago de prueba.':'Pago desactivado.'),
+   'Orden recuperada desde D1 sin volver a subir los PDF. '+(typeof SANDBOX_PAYMENT_ENABLED!=='undefined'&&SANDBOX_PAYMENT_ENABLED?'Continuá al pago de prueba.':'Pago desactivado.'),
    data.numeroOrden);
   return true;
  }catch{return false;}
