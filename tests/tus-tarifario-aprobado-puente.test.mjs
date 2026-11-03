@@ -4,6 +4,7 @@ import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 import {webcrypto,randomUUID} from 'node:crypto';
 import {obtenerTarifarioD1Privado} from '../integraciones/autocotizador/recepcion/obtener-tarifario-d1-privado.mjs';
+import {cotizarDocumentos} from '../integraciones/autocotizador/pruebas/cotizar-documentos.mjs';
 const source=readFileSync(new URL('../integraciones/mercadopago/pruebas/worker.js',import.meta.url),'utf8');
 const docs=readFileSync(new URL('../integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs',import.meta.url),'utf8');
 const ctx=vm.createContext({Request,Response,URL,URLSearchParams,TextEncoder,crypto:webcrypto,console});
@@ -63,4 +64,23 @@ test('el motor documental usa el mismo catálogo D1 para carga, presupuesto, TUS
  assert.match(docs,/La versión de precios privada requiere sesión autorizada/);
  assert.equal((docs.match(/preciosPiloto/g)||[]).length,2,
   'No dejar rutas de cotización con lista vieja en la rama D1');
+});
+
+test('un cambio aprobado se refleja en el cálculo PRELIMINAR sin arrastrar el borrador',async()=>{
+ const data=JSON.parse(JSON.stringify(baseline));
+ data.prices.bnA4.scales[0].simple=120;
+ const pending=JSON.parse(JSON.stringify(data));
+ pending.prices.bnA4.scales[0].simple=555;
+ head={revision:9,approved_revision:8,approved_json:JSON.stringify(data),
+  draft_json:JSON.stringify(pending)};
+ const current=await obtenerTarifarioD1Privado(docsEnv,opts());
+ const options={archivos:[{id:'pdf-1',paginas:10,modo:'bn',orden:1}],
+  copias:1,formato:'a4',caras:'simple',anillado:'ninguno',materialColor:'obra70'};
+ const before=cotizarDocumentos({...options,precios:baseline.prices});
+ const after=cotizarDocumentos({...options,precios:current.prices});
+ assert.equal(before.total,1000);
+ assert.equal(after.total,1200);
+ assert.equal(current.revision,8);
+ assert.equal(current.prices.bnA4.scales[0].simple,120);
+ assert.notEqual(after.total,5550,'No aplicar un borrador privado sin aprobar');
 });
