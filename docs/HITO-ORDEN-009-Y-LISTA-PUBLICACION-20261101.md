@@ -49,3 +49,12 @@ Prohibiciones vigentes: no despliegue de `main`, no web pública, no cobros real
 - En el chat sucesor el operador abrió el Centro de Pedidos privado y confirmó expresamente **«sí sí ahí aparece»**. Esto valida la presencia de la orden 014 en la Central según prueba humana. No implica por sí solo ZIP descargado, contenido de instrucciones correcto o pago realizado.
 - **Siguiente paso puntual:** sin volver a enviar PDF, desde Central abrir la orden 014 y descargar el ZIP de producción para corroborar PDF original e instrucciones HTML/TXT. Las configuraciones detalladas que explican los ARS 1.600 no se acreditaron mediante la captura de recibo; no inferir error de tarifa comparando con un ensayo anterior de ARS 1.000.
 - Continúan ensayos privados. No tocar `main`, web comercial, cobros reales ni publicaciones de producción.
+
+## 03/11/2026 — Criterio de liberación de producción reiterado por el propietario
+
+- El propietario validó orden 014 en Central y confirmó que el PDF/ZIP funcionan, pero recordó que **NO desea revisar manualmente pedidos impagos**: estos son intentos o abandonos y no originan trabajo de producción.
+- **Mercado Pago (futuro flujo real):** conciliación automática, mediante webhook verificado y consulta autenticada al proveedor de pagos; validar `approved`, importe, moneda, identificación de pedido y ausencia de reversión antes de marcar pagado. No aceptar redirección del navegador como comprobación. Al quedar pagado y con archivos íntegros, mover a bandeja de producción sin intervención manual de cobro.
+- **Transferencia bancaria:** ofrecerla; requiere comprobar acreditación real en banco antes de marcar pagado o liberar producción, salvo que en futuro exista conciliación bancaria automatizada. El comprobante compartido por el cliente no basta.
+- **Pedidos impagos:** mantener en bandeja separada, sin preparar/descargar/impresión operativa como tarea habitual; se puede conservar acceso técnico administrativo para diagnóstico. No tomar 'PDF verificado y registrado' como 'pago confirmado'.
+- Estado a 03/11: ensayo privado, cobros reales inactivos; el botón «Preparar enlace Mercado Pago (ensayo)» no significa checkout real integrado y aprobado. La inspección de ZIP orden 014 fue una prueba técnica de integridad, no un paso manual obligatorio en cada venta.
+- **Próximo frente prioritario:** circuito pago total sandbox Mercado Pago → notificación → conciliación → habilitación de pedido en Central, y alternativa transferencia confirmada manualmente. Sin activar cobros reales ni publicar sin autorización.
