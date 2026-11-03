@@ -1041,7 +1041,7 @@ function priceAdminFields(){
     const tierPart=path.find((_,i)=>i>1&&["scales","prices"].includes(path[i-1]));
     const tier=tierPart===undefined?null:priceAdminAt(PRICE_ADMIN_BASELINE,path.slice(0,path.indexOf(tierPart)+1).join("."));
     const materialName=owner?.name||owner?.paper||owner?.size||owner?.id||"";
-    const scale=tier?.label||(tier&&"from" in tier?String(tier.from)+" a "+(tier.to??"más"):"");
+    const scale=tier&&typeof tier==="object"?(tier.label||(Object.prototype.hasOwnProperty.call(tier,"from")?String(tier.from)+" a "+(tier.to??"más"):"")):"";
     const face=({simple:"Simple faz",double:"Doble faz",unit:"Unidad",price:"Precio",cadPerMeter:"CAD por metro",posterPerMeter:"Póster por metro",minimumPrice:"Precio mínimo",pricePerMeter:"Precio por metro"})[key]||"Precio";
     fields.push({path:path.join("."),category,label:[materialName,scale,face].filter(Boolean).join(" · "),kind:"price",baseline:v});
   }
