@@ -13,7 +13,7 @@ Fecha: 03/11/2026. Rama privada `integracion/tus-pedido-privado-20261101`. No pu
 
 - **Impresiones A4 B/N (SF/DF) y A4 color obra 70 g:** los tramos comparados entre `precios-web.json` y `config.json` coinciden.
 - **Anillados A4:** los tres tramos comparados coinciden.
-- **Ploteo Póster / pleno, recubierto 130 g, rollo 60 cm:** **DISCREPANCIA**. `precios-web.json`: **ARS 18.704 por metro**. `config.json`: **ARS 17.300 por metro**. Confirmar precio vigente con titular antes de publicar.
+- **Ploteo Póster / pleno, recubierto 130 g, rollo 60 cm:** **PRECIO REAL CONFIRMADO POR EL TITULAR (03/11/2026): ARS 18.700 por metro**. Se unificaron `precios-web.json`, `config.json` y el catálogo base del editor D1 en la rama de pruebas. El valor anterior (ARS 18.704/metro frente a ARS 17.300/metro) queda registrado como discrepancia resuelta. **Aún no desplegado ni publicado en la web comercial.**
 - No se considera finalizada la comparación de todos los servicios, materiales, cupones y reglas: los esquemas no tienen una correspondencia uno a uno para todo el catálogo.
 
 ## Promociones que no se deben perder
