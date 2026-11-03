@@ -72,6 +72,19 @@ test('panel privado: UI sin publicación comercial, campos agrupados y JS sintá
  assert.ok(vm.runInContext('PRICE_ADMIN_FIELDS.filter(x=>x.category==="Promos semanales").length',ctx)>=10);
  assert.match(adminHtml,/option value="Promos semanales"/);
 });
+test('la administración de precios tiene página propia con mismas autorizaciones de API',async()=>{
+ const worker=vm.runInContext('worker',ctx);
+ const response=await worker.fetch(new Request(id+'/admin/precios'),{},{});
+ assert.equal(response.status,200);
+ const html=await response.text();
+ assert.match(html,/id="priceAdminFieldset"/);
+ assert.match(html,/id="privateAccess"/);
+ assert.match(html,/body\.price-only/);
+ assert.match(html,/location\.pathname==='\/admin\/precios'/);
+ assert.match(html,/id="priceSave"/);
+ assert.match(html,/id="priceApprove"/);
+ assert.match(html,/noindex,nofollow/);
+});
 test('ningún tarifario se expone ni se modifica sin autorización y flag privado',async()=>{
  assert.equal((await call('/admin/api/pricing',{key:'incorrecta'})).status,401);
  assert.equal((await call('/admin/api/pricing',{settings:{...env,PRICE_ADMIN_PRIVATE_ENABLED:'OFF'}})).status,503);
