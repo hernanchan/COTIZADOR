@@ -1120,8 +1120,14 @@ async function priceAdminApprovedSnapshot(req,env){
  catch(_){return json({ok:false,error:"Versión tarifaria ilegible",paymentAuthorized:false},409)}
  if(!priceAdminValidatePayload(snapshot))
   return json({ok:false,error:"Versión tarifaria inválida",paymentAuthorized:false},409);
+ const approval=await env.DB.prepare("SELECT created_at FROM central_pricing_admin_history WHERE revision=? AND action='approve' LIMIT 1")
+  .bind(head.approved_revision).first();
+ if(!approval||typeof approval.created_at!=="string"||
+    !/^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$/.test(approval.created_at))
+  return json({ok:false,error:"No se pudo comprobar la fecha de aprobación",paymentAuthorized:false},409);
+ const approvedAt=approval.created_at.replace(" ","T")+"Z";
  return json({ok:true,schema:"saber-price-snapshot-v1",approvedRevision:head.approved_revision,
-  prices:snapshot.prices,promotions:snapshot.promotions,paymentAuthorized:false,
+  approvedAt,prices:snapshot.prices,promotions:snapshot.promotions,paymentAuthorized:false,
   commercialRelease:false,source:"private-d1-approved-only"},200);
 }
 async function priceAdminHandle(req,env,pathname){
