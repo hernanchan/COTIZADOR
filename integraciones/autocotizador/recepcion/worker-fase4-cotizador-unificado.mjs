@@ -42,12 +42,6 @@ import {cotizarDocumentos} from '../pruebas/cotizar-documentos.mjs';
 import {cotizarDocumentosIndividuales} from '../pruebas/cotizar-documentos-individuales.mjs';
 import preciosPiloto from '../../../precios-web.json';
 import {obtenerTarifarioD1Privado} from './obtener-tarifario-d1-privado.mjs';
-/** Catálogo aprobado D1, flag apagado hasta paridad comercial y revisión visual. */
-async function preciosPrivados(env){
- if(env?.DOCS_PRICE_ADMIN_D1_ENABLED!=='PRIVATE_TEST_ONLY')return preciosPiloto;
- return (await obtenerTarifarioD1Privado(env)).prices;
-}
-
 import {verificarPdfAlmacenado} from './verificacion-pdf-drive-servidor.mjs';
 import {tusPrivadoConfigurado,diagnosticarTUSPrivado,comprobarTUSAntesDeEnviar,iniciarTandaTUSPrivada,finalizarPedidoTUSPrivado,recuperarPedidoTUSPrivado,descargarPdfTUSPersonal} from './tus-pedido-worker.mjs';
 /**
@@ -66,6 +60,29 @@ import {tusPrivadoConfigurado,diagnosticarTUSPrivado,comprobarTUSAntesDeEnviar,i
  * DOCS_UPLOAD_ENABLED no activa la subida, incluso si se cambia a true.
  * Nunca usar en producción tal cual.
  */
+/** Catálogo de pruebas, D1 desactivado salvo habilitación privada explícita.
+ * Requiere autorización por sesión V2 o credencial interna de personal.
+ * Si falla la lectura D1, no sustituye el último precio sin avisar.
+ */
+async function preciosPrivados(env,request){
+ if(env?.DOCS_PRICE_ADMIN_D1_ENABLED!=='PRIVATE_TEST_ONLY')return preciosPiloto;
+ if(!(request instanceof Request))throw Error('Tarifario privado requiere una solicitud autorizada.');
+ let staff=false;
+ const secret=env?.DOCS_CENTRAL_ADMIN_KEY;
+ if(typeof secret==='string'&&secret.length>=32){
+  const expected='Bearer '+secret,got=request.headers.get('Authorization')||'';
+  if(expected.length===got.length){
+   let difference=0;
+   for(let i=0;i<got.length;i++)difference|=expected.charCodeAt(i)^got.charCodeAt(i);
+   staff=difference===0;
+  }
+ }
+ if(!staff&&v2PrivateBrowserAuthorized(request,env)!=='allow'&&
+    !(await v2SessionAuthorized(request,env)))
+  throw Error('La versión de precios privada requiere sesión autorizada.');
+ return (await obtenerTarifarioD1Privado(env)).prices;
+}
+
 const INTERNAL_ALLOW_UPLOADS = false;
 const WORKER_SERVICE = 'saber-documentos-pruebas';
 
@@ -738,7 +755,7 @@ function presupuestoHtml(env) {
   'X-Robots-Tag':'noindex,nofollow','X-Frame-Options':'DENY','X-Content-Type-Options':'nosniff'}});
 }
 async function presupuestoPost(request,env){
- const preciosActuales=await preciosPrivados(env);
+ const preciosActuales=await preciosPrivados(env,request);
  if(request.method!=='POST')return closed();
  if(!allowed(request,env))return testResponse({ok:false,error:'Origen no permitido',paymentAuthorized:false},403);
  let o;
@@ -1051,7 +1068,7 @@ async function fase4PrivateVerified(env,session,metrics=null,preferirInfo=false,
  * No registra órdenes, no escribe en D1 y no emite autorización de pago.
  */
 async function v2CotizarPloteoVerificado(request,env){
- const preciosActuales=await preciosPrivados(env);
+ const preciosActuales=await preciosPrivados(env,request);
  if(request.method!=='POST')return closed();
  if(!allowed(request,env)||v2PrivateBrowserAuthorized(request,env)!=='allow')
   return testResponse({ok:false,error:'Acceso privado requerido',paymentAuthorized:false},401);
@@ -1100,7 +1117,7 @@ async function v2CotizarPloteoVerificado(request,env){
 }
 
 async function v2VincularPdf(request,env){
- const preciosActuales=await preciosPrivados(env);
+ const preciosActuales=await preciosPrivados(env,request);
  if(env?.DOCS_V2_RECEIPT_LINK_ENABLED!=='PRIVATE_TEST_ONLY'||
     env?.DOCS_EXTENDED_RECEIVER_ENABLED!=='PRIVATE_TEST_ONLY')
   return testResponse({ok:false,error:'Enlace V2 deshabilitado',paymentAuthorized:false},503);
@@ -1195,7 +1212,7 @@ async function v2VincularPdf(request,env){
 }
 
 async function fase4Quote(request,env){
- const preciosActuales=await preciosPrivados(env);
+ const preciosActuales=await preciosPrivados(env,request);
  if(request.method!=='POST')return closed();
  if(!allowed(request,env))return testResponse({ok:false,error:'Origen no permitido',paymentAuthorized:false},403);
  let o;
@@ -1254,7 +1271,7 @@ function validarLote(op,maxFiles=5){
    new Set(op.sesiones.map(s=>s.uploadId)).size===op.sesiones.length;
 }
 async function fase4QuoteLote(request,env,extended=false){
- const preciosActuales=await preciosPrivados(env);
+ const preciosActuales=await preciosPrivados(env,request);
  if(extended&&env?.DOCS_EXTENDED_RECEIVER_ENABLED!=='PRIVATE_TEST_ONLY')
   return testResponse({ok:false,error:'Cotización ampliada privada deshabilitada',paymentAuthorized:false},503);
  const maxFiles=extended?30:5,maxFileBytes=extended?DOCS_MAX:FASE4_QUOTA_BYTES;
@@ -1291,7 +1308,7 @@ async function fase4QuoteLote(request,env,extended=false){
 
 /** Cotización preliminar sin subida: nunca crea recibos ni autoriza pagos. */
 async function cotizacionRapida(request,env){
- const preciosActuales=await preciosPrivados(env);
+ const preciosActuales=await preciosPrivados(env,request);
  if(request.method!=='POST')return closed();
  if(!allowed(request,env))
   return testResponse({ok:false,error:'Origen no permitido',paymentAuthorized:false},403);
@@ -1328,7 +1345,7 @@ async function cotizacionRapida(request,env){
 }
 /** Catálogo público limitado a identificadores y nombres de materiales color (sin tarifas). */
 async function catalogoMaterialesRapido(request,env){
- const preciosActuales=await preciosPrivados(env);
+ const preciosActuales=await preciosPrivados(env,request);
  if(request.method!=='GET')return closed();
  if(new URL(request.url).origin!==new URL(env.DOCS_ALLOWED_ORIGIN||request.url).origin)
   return testResponse({ok:false,error:'Origen no permitido'},403);
@@ -1337,7 +1354,7 @@ async function catalogoMaterialesRapido(request,env){
 }
 /** Ploteos preliminares: nunca autoriza pagos ni recibe originales. */
 async function catalogoPloteos(request,env){
- const preciosActuales=await preciosPrivados(env);
+ const preciosActuales=await preciosPrivados(env,request);
  if(request.method!=='GET')return closed();
  if(new URL(request.url).origin!==new URL(env.DOCS_ALLOWED_ORIGIN||request.url).origin)
   return testResponse({ok:false,error:'Origen no permitido'},403);
@@ -1346,7 +1363,7 @@ async function catalogoPloteos(request,env){
  }))});
 }
 async function cotizacionPloteos(request,env){
- const preciosActuales=await preciosPrivados(env);
+ const preciosActuales=await preciosPrivados(env,request);
  if(request.method!=='POST')return closed();
  if(!allowed(request,env))return testResponse({ok:false,error:'Origen no permitido',paymentAuthorized:false},403);
  try{
@@ -1415,7 +1432,7 @@ async function diagnosticoPuenteCentral(request,env){
 }
 
 async function apiFichaCentralPrivada(request,env,sincronizar=false,mixto=false,lote=false,documental=false,compuesto=false,v2=false){
- const preciosActuales=await preciosPrivados(env);
+ const preciosActuales=await preciosPrivados(env,request);
  if(request.method!=='POST')return closed();
  if(!allowed(request,env))
   return testResponse({ok:false,error:'Origen no permitido',paymentAuthorized:false},403);
@@ -1567,7 +1584,7 @@ async function apiFichaCentralPrivada(request,env,sincronizar=false,mixto=false,
  * El importe proviene exclusivamente del servidor, no del navegador.
  */
 async function apiPrepararDocumentosV2Lote(request,env){
- const preciosActuales=await preciosPrivados(env);
+ const preciosActuales=await preciosPrivados(env,request);
  if(request.method!=='POST')return closed();
  if(!allowed(request,env))
   return testResponse({ok:false,error:'Origen no permitido',paymentAuthorized:false},403);
@@ -1830,7 +1847,7 @@ async function v2PrivateBrowserResponse(request,env,path){
     ...headers,'Content-Type':'text/html; charset=utf-8'}});
   }
   if(path==='/prueba-v2/precios-web.json')
-   return new Response(JSON.stringify(await preciosPrivados(env)),{status:200,headers:{
+   return new Response(JSON.stringify(await preciosPrivados(env,request)),{status:200,headers:{
     ...headers,'Content-Type':'application/json; charset=utf-8'}});
   if(path==='/prueba-v2/cotizador-v2-ensayo-archivos.mjs')
    return new Response(v2ReaderClientJs,{status:200,headers:{
@@ -1911,7 +1928,7 @@ export default {
       if(page.endsWith('/ensayo-tus-iniciar'))
         return iniciarTandaTUSPrivada(request,env,{authorized});
       if(page.endsWith('/ensayo-tus-registrar'))
-        return finalizarPedidoTUSPrivado(request,env,{authorized,preciosServidor:await preciosPrivados(env)});
+        return finalizarPedidoTUSPrivado(request,env,{authorized,preciosServidor:await preciosPrivados(env,request)});
       if(page.endsWith('/ensayo-tus-recuperar'))
         return recuperarPedidoTUSPrivado(request,env,{authorized});
       return descargarPdfTUSPersonal(request,env,{authorized});
@@ -1928,7 +1945,7 @@ export default {
           return testResponse({ok:false,error:'Solicitud no autorizada.',paymentAuthorized:false},403);
         const body=await request.text();
         if(body.length>500000)throw Error('Datos demasiado extensos.');
-        const data=cotizarCargaUnica({...JSON.parse(body),precios:await preciosPrivados(env)});
+        const data=cotizarCargaUnica({...JSON.parse(body),precios:await preciosPrivados(env,request)});
         return testResponse(data);
       }catch(_){return testResponse({ok:false,error:'Datos inválidos o trabajo pendiente de revisión.',paymentAuthorized:false},400)}
     }
