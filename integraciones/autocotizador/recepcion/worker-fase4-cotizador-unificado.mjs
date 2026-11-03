@@ -1819,7 +1819,7 @@ async function v2PrivateBrowserResponse(request,env,path){
    }});
   }
   if(path==='/prueba-v2/'){
-   const html=paginaCotizadorV2PruebaPrivada(env.DOCS_TURNSTILE_SITE_KEY,tusPrivadoConfigurado(env),diagnosticarTUSPrivado(env));
+   const html=paginaCotizadorV2PruebaPrivada(env.DOCS_TURNSTILE_SITE_KEY,tusPrivadoConfigurado(env),diagnosticarTUSPrivado(env),env.DOCS_CLIENT_SANDBOX_CHECKOUT_ENABLED==='PRIVATE_TEST_ONLY');
    const responseHeaders=new Headers({...headers,
     'Content-Type':'text/html; charset=utf-8'});
    responseHeaders.append('Set-Cookie',await v2SessionCookie(env));
