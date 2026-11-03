@@ -45,6 +45,7 @@ jobs:
         env:
           ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
           TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+          OPERATOR_PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
         run: |
           set -euo pipefail
           test -n "$ACCOUNT" && test -n "$TOKEN"
@@ -70,7 +71,11 @@ jobs:
           previous=$(jq -r '.result.deployments[0].versions[]? | select(.percentage == 100) | .version_id' "$workdir/before.json" | head -n 1)
           test -n "$previous"
           echo "VERSION_ANTERIOR=$previous"
-          jq -n --slurpfile settings "$workdir/settings.json"             '{main_module:"index.mjs",annotations:{"workers/message":"Saber TUS SOLO ensayo privado. No web comercial. Sin pagos."},bindings:([$settings[0].result.bindings[] | select(.name!="DOCS_PRICE_ADMIN_D1_ENABLED") | {name,type:"inherit"}]+[{name:"DOCS_PRICE_ADMIN_D1_ENABLED",type:"plain_text",text:"OFF"}])}' > "$workdir/metadata.json"
+          mode=OFF
+          last=$(tail -n 1 docs/ACTIVAR-TUS-PRUEBAS-20261101.trigger | tr -d '\r')
+          if [ "$last" = "ENABLE_PRIVATE_D1_PRICING_2026_11_03" ]; then mode=PRIVATE_TEST_ONLY; fi
+          echo "DOCS_PRICE_ADMIN_D1_ENABLED=$mode (sólo Worker documentos pruebas)"
+          jq -n --slurpfile settings "$workdir/settings.json" --arg mode "$mode"             '{main_module:"index.mjs",annotations:{"workers/message":"Saber TUS SOLO ensayo privado. No web comercial. Sin pagos."},bindings:([$settings[0].result.bindings[] | select(.name!="DOCS_PRICE_ADMIN_D1_ENABLED") | {name,type:"inherit"}]+[{name:"DOCS_PRICE_ADMIN_D1_ENABLED",type:"plain_text",text:$mode}])}' > "$workdir/metadata.json"
           curl --fail --silent --show-error --max-time 90             -H "$auth"             -F "metadata=@$workdir/metadata.json;type=application/json"             -F "index.mjs=@integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs;filename=index.mjs;type=application/javascript+module"             "$root/versions?bindings_inherit=strict" > "$workdir/version.json"
           if ! jq -e '.success == true and (.result.id | type == "string")' "$workdir/version.json" >/dev/null; then
             jq -c '{success,errors:[.errors[]?|{code,message}]}' "$workdir/version.json"
@@ -111,5 +116,33 @@ jobs:
             curl --silent --show-error --max-time 60 -H "$auth" -H "Content-Type: application/json" --data-binary "@$workdir/rollback.json" "$root/deployments" > "$workdir/rollback-result.json"
             jq -e '.success == true' "$workdir/rollback-result.json" >/dev/null
             exit 1
+          fi
+          if [ "$mode" = "PRIVATE_TEST_ONLY" ]; then
+            if [ -z "$OPERATOR_PASSWORD" ]; then
+              echo "NO_OPERATOR_KEY_TO_VERIFY_D1 - ROLLBACK"
+              checked=false
+            else
+              url="https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/precios-web.json"
+              checked=false
+              for attempt in 1 2 3 4; do
+                code=$(curl --silent --show-error --max-time 30 --user "operador:$OPERATOR_PASSWORD" --output "$workdir/price-check.json" --write-out '%{http_code}' "$url" || true)
+                if [ "$code" = "200" ] && jq -e '
+                   (.priceVersion | test("^d1-approved-revision-[1-9][0-9]*$")) and
+                   .bnA4.scales[0].simple==100 and
+                   ([.plotter.supports[] | select(.id=="rec60") | .posterPerMeter] == [18700])
+                   ' "$workdir/price-check.json" >/dev/null 2>&1; then
+                   checked=true; break
+                fi
+                sleep 2
+              done
+            fi
+            if [ "$checked" != "true" ]; then
+              echo "PRIVATE_D1_APPROVED_PRICE_CHECK_FAILED - ROLLBACK"
+              jq -n --arg v "$previous" '{strategy:"percentage",versions:[{percentage:100,version_id:$v}],annotations:{"workers/message":"Rollback D1 pricing verification failed"}}' > "$workdir/rollback-price.json"
+              curl --fail --silent --show-error --max-time 60 -H "$auth" -H "Content-Type: application/json" --data-binary "@$workdir/rollback-price.json" "$root/deployments" > "$workdir/rollback-result.json"
+              jq -e '.success == true' "$workdir/rollback-result.json" >/dev/null
+              exit 1
+            fi
+            echo "PRIVATE_D1_APPROVED_PRICE_VERSION_OK_A4_100_POSTER_REC60_18700"
           fi
           echo "ENSAYO_PRIVADO_HTTP_401_OK - PRODUCCION_COMERCIAL_INTACTA - PAGOS_DESACTIVADOS"
