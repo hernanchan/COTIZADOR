@@ -41,6 +41,13 @@ import rapidoClienteJs from './cotizador-rapido-cliente.txt';
 import {cotizarDocumentos} from '../pruebas/cotizar-documentos.mjs';
 import {cotizarDocumentosIndividuales} from '../pruebas/cotizar-documentos-individuales.mjs';
 import preciosPiloto from '../../../precios-web.json';
+import {obtenerTarifarioD1Privado} from './obtener-tarifario-d1-privado.mjs';
+/** Catálogo aprobado D1, flag apagado hasta paridad comercial y revisión visual. */
+async function preciosPrivados(env){
+ if(env?.DOCS_PRICE_ADMIN_D1_ENABLED!=='PRIVATE_TEST_ONLY')return preciosPiloto;
+ return (await obtenerTarifarioD1Privado(env)).prices;
+}
+
 import {verificarPdfAlmacenado} from './verificacion-pdf-drive-servidor.mjs';
 import {tusPrivadoConfigurado,diagnosticarTUSPrivado,comprobarTUSAntesDeEnviar,iniciarTandaTUSPrivada,finalizarPedidoTUSPrivado,recuperarPedidoTUSPrivado,descargarPdfTUSPersonal} from './tus-pedido-worker.mjs';
 /**
@@ -731,6 +738,7 @@ function presupuestoHtml(env) {
   'X-Robots-Tag':'noindex,nofollow','X-Frame-Options':'DENY','X-Content-Type-Options':'nosniff'}});
 }
 async function presupuestoPost(request,env){
+ const preciosActuales=await preciosPrivados(env);
  if(request.method!=='POST')return closed();
  if(!allowed(request,env))return testResponse({ok:false,error:'Origen no permitido',paymentAuthorized:false},403);
  let o;
@@ -763,7 +771,7 @@ async function presupuestoPost(request,env){
     formato:o.formato,caras:o.caras,copias:o.copias,
     anillado:o.anillado,materialColor:'obra70'};
   const output=prepararPresupuestoDocumentos({
-    solicitud,recibosConfiables:[r],tarifasServidor:preciosPiloto
+    solicitud,recibosConfiables:[r],tarifasServidor:preciosActuales
   });
   const q=output.quote;
   if(!Number.isSafeInteger(q.total)||q.total<=0||output.paymentAuthorized!==false)
@@ -1043,6 +1051,7 @@ async function fase4PrivateVerified(env,session,metrics=null,preferirInfo=false,
  * No registra órdenes, no escribe en D1 y no emite autorización de pago.
  */
 async function v2CotizarPloteoVerificado(request,env){
+ const preciosActuales=await preciosPrivados(env);
  if(request.method!=='POST')return closed();
  if(!allowed(request,env)||v2PrivateBrowserAuthorized(request,env)!=='allow')
   return testResponse({ok:false,error:'Acceso privado requerido',paymentAuthorized:false},401);
@@ -1079,7 +1088,7 @@ async function v2CotizarPloteoVerificado(request,env){
   const medidas=await medidasPdfServidor(original);
   const quote=cotizarPloteoReciboVerificado({
    recibo,medidas,clasificacionCliente:input.clasificacionCliente,
-   copias:input.copias,papelPoster:input.papelPoster,precios:preciosPiloto
+   copias:input.copias,papelPoster:input.papelPoster,precios:preciosActuales
   });
   return testResponse({ok:true,orderId:recibo.orderId,receiptId:recibo.receiptId,
    sha256:recibo.sha256,quote,checkoutEnabled:false,
@@ -1091,6 +1100,7 @@ async function v2CotizarPloteoVerificado(request,env){
 }
 
 async function v2VincularPdf(request,env){
+ const preciosActuales=await preciosPrivados(env);
  if(env?.DOCS_V2_RECEIPT_LINK_ENABLED!=='PRIVATE_TEST_ONLY'||
     env?.DOCS_EXTENDED_RECEIVER_ENABLED!=='PRIVATE_TEST_ONLY')
   return testResponse({ok:false,error:'Enlace V2 deshabilitado',paymentAuthorized:false},503);
@@ -1118,7 +1128,7 @@ async function v2VincularPdf(request,env){
        !Number.isSafeInteger(input.opciones.copias)||
        input.opciones.copias<1||input.opciones.copias>200||
        typeof input.opciones.materialColor!=='string'||
-       !(preciosPiloto[input.opciones.formato==='a4'?'colorA4':'colorA3']?.materials||[])
+       !(preciosActuales[input.opciones.formato==='a4'?'colorA4':'colorA3']?.materials||[])
         .some(m=>m.id===input.opciones.materialColor))))
    throw Error('Solicitud V2 inválida');
  }catch(_){
@@ -1150,10 +1160,10 @@ async function v2VincularPdf(request,env){
    if((o.paginasPorHoja??1)!==1){
     const medidas={pageCount:recibo.pages,pageMetrics:recibo.serverPageMetrics};
     const presupuesto=cotizarNupReciboVerificado({
-     recibo,medidas,opciones:o,precios:preciosPiloto
+     recibo,medidas,opciones:o,precios:preciosActuales
     });
     return testResponse({...link,ok:true,comprobanteServidor,cotizacionServidor:{
-     ...presupuesto,priceVersion:preciosPiloto.generatedAt||'catalogo-local'
+     ...presupuesto,priceVersion:preciosActuales.generatedAt||'catalogo-local'
     },paymentAuthorized:false,checkoutEnabled:false},200);
    }
    const budget=prepararPresupuestoDocumentos({
@@ -1161,7 +1171,7 @@ async function v2VincularPdf(request,env){
      id:recibo.fileId,nombre:recibo.name,modo:recibo.mode,orden:1
     }],formato:o.formato,caras:o.caras,copias:o.copias,
     anillado:o.anillado==='individual'?'juntos':'ninguno',materialColor:o.materialColor},
-    recibosConfiables:[recibo],tarifasServidor:preciosPiloto
+    recibosConfiables:[recibo],tarifasServidor:preciosActuales
    });
    if(budget.paymentAuthorized!==false||
       !Number.isSafeInteger(budget.quote?.total)||budget.quote.total<=0)
@@ -1185,6 +1195,7 @@ async function v2VincularPdf(request,env){
 }
 
 async function fase4Quote(request,env){
+ const preciosActuales=await preciosPrivados(env);
  if(request.method!=='POST')return closed();
  if(!allowed(request,env))return testResponse({ok:false,error:'Origen no permitido',paymentAuthorized:false},403);
  let o;
@@ -1199,7 +1210,7 @@ async function fase4Quote(request,env){
    const req={orderId:r.orderId,archivos:[{id:r.fileId,nombre:r.name,modo:r.mode,orden:1}],
      formato:o.formato,caras:o.caras,copias:o.copias,anillado:o.anillado,materialColor:'obra70'};
    const budget=prepararPresupuestoDocumentos({solicitud:req,
-     recibosConfiables:[r],tarifasServidor:preciosPiloto});
+     recibosConfiables:[r],tarifasServidor:preciosActuales});
    if(budget.paymentAuthorized!==false||budget.quote.total<=0||
       !Number.isSafeInteger(budget.quote.total))throw Error('Importe no aprobado');
    return testResponse({ok:true,receiptId:r.receiptId,pages:r.pages,copias:o.copias,
@@ -1243,6 +1254,7 @@ function validarLote(op,maxFiles=5){
    new Set(op.sesiones.map(s=>s.uploadId)).size===op.sesiones.length;
 }
 async function fase4QuoteLote(request,env,extended=false){
+ const preciosActuales=await preciosPrivados(env);
  if(extended&&env?.DOCS_EXTENDED_RECEIVER_ENABLED!=='PRIVATE_TEST_ONLY')
   return testResponse({ok:false,error:'Cotización ampliada privada deshabilitada',paymentAuthorized:false},503);
  const maxFiles=extended?30:5,maxFileBytes=extended?DOCS_MAX:FASE4_QUOTA_BYTES;
@@ -1267,7 +1279,7 @@ async function fase4QuoteLote(request,env,extended=false){
    }
    const result=cotizarLoteVerificado({recibosVerificados:recibos,
      formato:op.formato,caras:op.caras,copias:op.copias,
-     anillado:op.anillado,materialColor:'obra70',precios:preciosPiloto,
+     anillado:op.anillado,materialColor:'obra70',precios:preciosActuales,
      maxFiles,maxFileBytes,requireSharedOrder:extended});
    return testResponse({...result,tiempoServidorMs:Date.now()-start,
      tiemposPorArchivo,paymentAuthorized:false},200);
@@ -1279,6 +1291,7 @@ async function fase4QuoteLote(request,env,extended=false){
 
 /** Cotización preliminar sin subida: nunca crea recibos ni autoriza pagos. */
 async function cotizacionRapida(request,env){
+ const preciosActuales=await preciosPrivados(env);
  if(request.method!=='POST')return closed();
  if(!allowed(request,env))
   return testResponse({ok:false,error:'Origen no permitido',paymentAuthorized:false},403);
@@ -1300,7 +1313,7 @@ async function cotizacionRapida(request,env){
     throw Error('Documentos incorrectos');
   }
   const individuales=p.archivos.every(a=>Object.hasOwn(a,'formato'));
-  const d=individuales?cotizarDocumentosIndividuales({archivos:p.archivos,precios:preciosPiloto}):cotizarDocumentos({...p,materialColor:'obra70',precios:preciosPiloto});
+  const d=individuales?cotizarDocumentosIndividuales({archivos:p.archivos,precios:preciosActuales}):cotizarDocumentos({...p,materialColor:'obra70',precios:preciosActuales});
   if(!Number.isFinite(d.total)||d.total<0)throw Error('Importe no calculable');
   return testResponse({
    ok:true,estado:'PRELIMINAR_SIN_VERIFICAR',paymentAuthorized:false,
@@ -1314,30 +1327,33 @@ async function cotizacionRapida(request,env){
  }catch(_){return testResponse({ok:false,error:'No se pudo calcular el precio orientativo.',paymentAuthorized:false},400)}
 }
 /** Catálogo público limitado a identificadores y nombres de materiales color (sin tarifas). */
-function catalogoMaterialesRapido(request,env){
+async function catalogoMaterialesRapido(request,env){
+ const preciosActuales=await preciosPrivados(env);
  if(request.method!=='GET')return closed();
  if(new URL(request.url).origin!==new URL(env.DOCS_ALLOWED_ORIGIN||request.url).origin)
   return testResponse({ok:false,error:'Origen no permitido'},403);
- const clean=(key)=>(preciosPiloto[key]?.materials||[]).map(m=>({id:m.id,name:m.name,family:m.family||''}));
- return testResponse({ok:true,materials:{a4:clean('colorA4'),a3:clean('colorA3')},photos:preciosPiloto.photos.products.filter(p=>p.size!=='Polaroid').map(p=>({id:p.id,name:p.paper+' · '+p.size})),cutVariants:preciosPiloto.cutPlotter.variants.map(v=>({id:v.id,name:v.name})),graphicProducts:GRAFICA_COMERCIAL.map(p=>({id:p.id,name:p.familia+' · '+p.descripcion}))});
+ const clean=(key)=>(preciosActuales[key]?.materials||[]).map(m=>({id:m.id,name:m.name,family:m.family||''}));
+ return testResponse({ok:true,materials:{a4:clean('colorA4'),a3:clean('colorA3')},photos:preciosActuales.photos.products.filter(p=>p.size!=='Polaroid').map(p=>({id:p.id,name:p.paper+' · '+p.size})),cutVariants:preciosActuales.cutPlotter.variants.map(v=>({id:v.id,name:v.name})),graphicProducts:GRAFICA_COMERCIAL.map(p=>({id:p.id,name:p.familia+' · '+p.descripcion}))});
 }
 /** Ploteos preliminares: nunca autoriza pagos ni recibe originales. */
-function catalogoPloteos(request,env){
+async function catalogoPloteos(request,env){
+ const preciosActuales=await preciosPrivados(env);
  if(request.method!=='GET')return closed();
  if(new URL(request.url).origin!==new URL(env.DOCS_ALLOWED_ORIGIN||request.url).origin)
   return testResponse({ok:false,error:'Origen no permitido'},403);
- return testResponse({ok:true,supports:preciosPiloto.plotter.supports.map(x=>({
+ return testResponse({ok:true,supports:preciosActuales.plotter.supports.map(x=>({
   id:x.id,name:x.name,widthCm:x.widthCm
  }))});
 }
 async function cotizacionPloteos(request,env){
+ const preciosActuales=await preciosPrivados(env);
  if(request.method!=='POST')return closed();
  if(!allowed(request,env))return testResponse({ok:false,error:'Origen no permitido',paymentAuthorized:false},403);
  try{
   const p=await readLimited(request);
   if(!p||typeof p!=='object'||Array.isArray(p)||
    Object.keys(p).join(',')!=='trabajos')throw Error('Solicitud inválida');
-  const detalle=cotizarPloteosRapido({trabajos:p.trabajos,precios:preciosPiloto});
+  const detalle=cotizarPloteosRapido({trabajos:p.trabajos,precios:preciosActuales});
   return testResponse({ok:true,paymentAuthorized:false,estado:'PRELIMINAR_SIN_VERIFICAR',resumen:detalle});
  }catch(_){return testResponse({ok:false,error:'Revisá las medidas y que el material admita el ancho del ploteo.',paymentAuthorized:false},400)}
 }
@@ -1399,6 +1415,7 @@ async function diagnosticoPuenteCentral(request,env){
 }
 
 async function apiFichaCentralPrivada(request,env,sincronizar=false,mixto=false,lote=false,documental=false,compuesto=false,v2=false){
+ const preciosActuales=await preciosPrivados(env);
  if(request.method!=='POST')return closed();
  if(!allowed(request,env))
   return testResponse({ok:false,error:'Origen no permitido',paymentAuthorized:false},403);
@@ -1451,7 +1468,7 @@ async function apiFichaCentralPrivada(request,env,sincronizar=false,mixto=false,
       env.CENTRAL_BRIDGE_KEY===env.DOCS_RELAY_KEY))
     return testResponse({ok:false,error:'Sincronización con D1 no habilitada',paymentAuthorized:false},503);
   const parametros={consultarFirmado:p=>postToScript(env,p,fetch,420000),
-   preciosServidor:preciosPiloto};
+   preciosServidor:preciosActuales};
   const extended=env?.DOCS_EXTENDED_RECEIVER_ENABLED==='PRIVATE_TEST_ONLY';
   const result=lote||compuesto?
    await fase4FichaCentralLotePrivada({...parametros,
@@ -1550,6 +1567,7 @@ async function apiFichaCentralPrivada(request,env,sincronizar=false,mixto=false,
  * El importe proviene exclusivamente del servidor, no del navegador.
  */
 async function apiPrepararDocumentosV2Lote(request,env){
+ const preciosActuales=await preciosPrivados(env);
  if(request.method!=='POST')return closed();
  if(!allowed(request,env))
   return testResponse({ok:false,error:'Origen no permitido',paymentAuthorized:false},403);
@@ -1597,14 +1615,14 @@ async function apiPrepararDocumentosV2Lote(request,env){
   const rutaLegada=()=>fase4FichaCentralLotePrivada({
    sesiones:input.sesiones,
    consultarFirmado:p=>postToScript(env,p,fetch,420000),
-   preciosServidor:preciosPiloto,maxFiles:30,maxFileBytes:20*1024*1024
+   preciosServidor:preciosActuales,maxFiles:30,maxFileBytes:20*1024*1024
   });
   let verificacion;
   if(input.sesiones.every(e=>e?.comprobanteServidor)){
    try{
     verificacion=await verificarPedidoPorComprobantes({
      sesiones:input.sesiones,manifiesto:input.manifiesto,
-     secret:env.DOCS_RELAY_KEY,preciosServidor:preciosPiloto
+     secret:env.DOCS_RELAY_KEY,preciosServidor:preciosActuales
     });
    }catch(error){
     // Una prueba genuina que envejeció no obliga al cliente a re-subir.
@@ -1812,7 +1830,7 @@ async function v2PrivateBrowserResponse(request,env,path){
     ...headers,'Content-Type':'text/html; charset=utf-8'}});
   }
   if(path==='/prueba-v2/precios-web.json')
-   return new Response(JSON.stringify(preciosPiloto),{status:200,headers:{
+   return new Response(JSON.stringify(await preciosPrivados(env)),{status:200,headers:{
     ...headers,'Content-Type':'application/json; charset=utf-8'}});
   if(path==='/prueba-v2/cotizador-v2-ensayo-archivos.mjs')
    return new Response(v2ReaderClientJs,{status:200,headers:{
@@ -1893,7 +1911,7 @@ export default {
       if(page.endsWith('/ensayo-tus-iniciar'))
         return iniciarTandaTUSPrivada(request,env,{authorized});
       if(page.endsWith('/ensayo-tus-registrar'))
-        return finalizarPedidoTUSPrivado(request,env,{authorized,preciosServidor:preciosPiloto});
+        return finalizarPedidoTUSPrivado(request,env,{authorized,preciosServidor:await preciosPrivados(env)});
       if(page.endsWith('/ensayo-tus-recuperar'))
         return recuperarPedidoTUSPrivado(request,env,{authorized});
       return descargarPdfTUSPersonal(request,env,{authorized});
@@ -1910,7 +1928,7 @@ export default {
           return testResponse({ok:false,error:'Solicitud no autorizada.',paymentAuthorized:false},403);
         const body=await request.text();
         if(body.length>500000)throw Error('Datos demasiado extensos.');
-        const data=cotizarCargaUnica({...JSON.parse(body),precios:preciosPiloto});
+        const data=cotizarCargaUnica({...JSON.parse(body),precios:await preciosPrivados(env)});
         return testResponse(data);
       }catch(_){return testResponse({ok:false,error:'Datos inválidos o trabajo pendiente de revisión.',paymentAuthorized:false},400)}
     }
