@@ -1356,9 +1356,15 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px ui-monospace,monospace
 #priceDiffs{margin:12px 0;max-height:190px;overflow:auto;border:1px solid #e2e7ed;border-radius:7px;padding:9px}
 @media(max-width:700px){.price-line{grid-template-columns:minmax(0,1fr) 108px}.price-line input[type=number]{width:100px}.price-line .reference{display:none}}
 
+body.price-only{max-width:1080px}
+body.price-only fieldset:not(#privateAccess):not(#priceAdminFieldset){display:none}
+body.price-only #privateAccess #refresh,body.price-only #privateAccess #sync{display:none}
+body.price-only #openPricing{display:none}
+body.price-only #priceAdminFieldset{margin-top:9px}
+body.price-only #priceAdminFieldset summary{font-size:1.3rem}
 </style></head><body>
 <header><div><h1>Centro de Pedidos · Pruebas</h1><div class="note">Solo pagos completos aprobados · No está conectado al sitio público</div></div></header>
-<fieldset><legend>Acceso privado</legend><div class="toolbar">
+<fieldset id="privateAccess"><legend>Acceso privado</legend><div class="toolbar">
 <input type="password" autocomplete="off" id="secret" placeholder="Clave privada del panel" aria-label="Clave privada">
 <input type="text" id="productionOperator" maxlength="60" placeholder="Responsable del cambio" aria-label="Nombre de responsable" autocomplete="off">
 <button id="refresh">Consultar pedidos</button><button id="sync" class="outline">Verificar pagos pendientes</button><button id="openPricing" class="outline" type="button">Editar precios y promociones</button>
@@ -1375,7 +1381,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px ui-monospace,monospace
 <details><summary>Entregados · historial (<span id="count-entregado">0</span>)</summary><div class="board-cards" id="lane-entregado"></div></details>
 <details><summary>Otros pedidos pagados (<span id="count-other">0</span>)</summary><div id="orders"></div></details>
 </div></fieldset>
-<fieldset><details id="pricingPanel" class="pricing-panel"><summary>Precios y promociones · administración privada</summary>
+<fieldset id="priceAdminFieldset"><details id="pricingPanel" class="pricing-panel"><summary>Precios y promociones · administración privada</summary>
 <p class="price-note">Ensayo: estos valores provienen de un tarifario histórico del 21/08/2026 y de los cupones existentes. Guardar o aprobar aquí NO cambia los precios de la web pública, los pagos ni el cotizador. Primero hay que validar los precios comerciales reales y conectar un único tarifario al motor.</p>
 <div class="price-toolbar">
 <button id="priceLoad" type="button">Cargar tarifas</button>
@@ -2101,6 +2107,12 @@ priceApproveButton.addEventListener("click",async()=>{
   priceMessage.textContent="Versión aprobada para ENSAYO privado. Todavía NO modifica ninguna cotización.";
  }catch(e){priceMessage.textContent=String(e.message||e);priceApproveButton.disabled=false}
 });
+if(typeof location!=='undefined'&&location.pathname==='/admin/precios'){
+ document.body.classList.add('price-only');
+ document.querySelector('#pricingPanel').open=true;
+ document.title='Administración de precios | Librería Saber · Pruebas';
+ document.querySelector('h1').textContent='Precios y promociones · Librería Saber';
+}
 document.querySelector("#openPricing").addEventListener("click",()=>{
  const panel=document.querySelector("#pricingPanel");
  panel.open=true;panel.scrollIntoView({behavior:"smooth",block:"start"});
@@ -2411,7 +2423,7 @@ export default {
   const url=new URL(req.url);
   if(url.pathname==="/demo/polaroids"&&req.method==="GET")return new Response(polaroidDemoHtml,{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","referrer-policy":"no-referrer","x-robots-tag":"noindex,nofollow"}});
   if(url.pathname==="/demo"&&req.method==="GET")return new Response(demoHtml,{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store"}});
-  if(url.pathname==="/admin"&&req.method==="GET")return new Response(adminHtml,{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","referrer-policy":"no-referrer","x-robots-tag":"noindex,nofollow","x-content-type-options":"nosniff"}});
+  if((url.pathname==="/admin"||url.pathname==="/admin/precios")&&req.method==="GET")return new Response(adminHtml,{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","referrer-policy":"no-referrer","x-robots-tag":"noindex,nofollow","x-content-type-options":"nosniff"}});
   if(url.pathname==="/health"&&req.method==="GET"){
    const configured=Boolean(env.DB&&env.MP_TEST_ACCESS_TOKEN&&env.DEMO_ADMIN_KEY&&env.MP_TEST_SELLER_ID&&env.TEST_WEBHOOK_URL&&env.MP_WEBHOOK_SECRET);
    let databaseReady=false;
