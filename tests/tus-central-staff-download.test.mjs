@@ -37,7 +37,8 @@ const db={
      return args[0]===commercial&&allocatedNumber!==null?{number:allocatedNumber}:null;
     if(sql.includes('FROM orders WHERE id=? AND status='))
       return args[0]===commercial?{id:commercial,status:'awaiting_payment',amount_ars:2432}:null;
-    if(sql.includes('FROM central_document_manifests WHERE commercial_order_id=?'))
+    if(sql.includes('FROM central_document_manifests m LEFT JOIN central_order_contacts c')||
+       sql.includes('FROM central_document_manifests WHERE commercial_order_id=?'))
       return args[0]===commercial?{web_order_id:webId,manifest_json:JSON.stringify(manifest),
        amount_ars:2432,file_count:2,created_at:'2026-11-01 15:36:00'}:null;
     return null;
