@@ -1,3 +1,11 @@
+## 03/11/2026 — Sonda segura de precios D1 en Worker documental (desplegada)
+
+- **Versión privada activa:** `saber-documentos-pruebas` `22c620bc-528d-4873-bdbb-5d9cd823c77b`. Ejecución [41647377570](https://github.com/hernanchan/COTIZADOR/actions/runs/41647377570) SUCCESS, prueba de HTTP401 anónimo y cobros comerciales desactivados.
+- **Nueva ruta de lectura, sin cambios de precio:** `/prueba-v2/admin-tarifario-ensayo` protegida por la contraseña HTTP Basic del operador de documentos (usuario `operador`). Consulta la versión aprobada real en D1 mediante Service Binding firmado HMAC; devuelve únicamente `priceVersion`, precio B/N A4 1–10 simple faz, precio póster recubierto 60 cm y bandera de activación. No revela nombre/contacto, claves ni originales. Si no puede comprobar D1 responde 503 sin importes inventados.
+- **Flag `DOCS_PRICE_ADMIN_D1_ENABLED` sigue `OFF` en el cotizador:** se mantiene estable el circuito actual hasta que se valide la sonda en navegador con los valores aprobados (100 ARS B/N A4; 18.700 ARS/m recubierto 60). La sonda consulta D1 forzando la lectura exclusivamente dentro de ese endpoint autorizado, sin habilitar cobro, catálogo nuevo ni recotización de órdenes.
+- **Prueba previa al despliegue:** [41647232650](https://github.com/hernanchan/COTIZADOR/actions/runs/41647232650), incluye Basic 401, respuesta 200 autorizada con HMAC estructurado, versión, tarifas y ausencia de publicación.
+- **Pendiente inmediato:** solicitar lectura de la sonda al operador, comprobar JSON y número de revisión real, luego habilitar cuidadosamente fuente D1 únicamente en el Worker privado con validaciones funcionales y reversión.
+
 ## 03/11/2026 — Despliegues privados completados tras renovación token Cloudflare
 
 - **Central privada `saber-pagos-pruebas`: DESPLEGADA** en Cloudflare versión `ca72fea0-b59b-496e-b972-4c383b200a2d`, run GitHub Actions [41644913428](https://github.com/hernanchan/COTIZADOR/actions/runs/41644913428) SUCCESS. Se activó `PRICE_ADMIN_PRIVATE_ENABLED=PRIVATE_TEST_ONLY` para el editor `/admin/precios`. Verificados `/admin/api/pricing` anónimo HTTP 401, estados administrativos HTTP 401, `/health` `ok=true,databaseReady=true,paymentsEnabled=false`. **No es publicación comercial.**
