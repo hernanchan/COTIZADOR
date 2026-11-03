@@ -26,6 +26,7 @@ import {guardarPdfCompuestoPrivado} from './guardar-pdf-compuesto-privado.mjs';
 import {registrarPdfCompuestoCentralFirmado} from './registrar-pdf-compuesto-central.mjs';
 import {verificarVinculoCotizadorV2} from './verificar-vinculo-cotizador-v2.mjs';
 import {paginaCotizadorV2PruebaPrivada} from './pantalla-cotizador-v2-prueba-privada.mjs';
+import {pagoTUSSandboxCliente} from './tus-pago-sandbox-cliente.mjs';
 import {paginaDescargaTUSPersonal} from './pantalla-descarga-tus-personal.mjs';
 import {paginaPaqueteTUSPersonal} from './pantalla-paquete-tus-personal.mjs';
 import {consultarPaqueteTUSPersonal} from './tus-paquete-personal.mjs';
@@ -1962,6 +1963,11 @@ export default {
     if(page==='/api/ensayo-preparar-documentos-v2-lote')return apiPrepararDocumentosV2Lote(request,env);
     // V1 TUS: solo entorno privado y autorizado, nunca comercial ni pagos.
     // Ficha D1 para el ZIP, estrictamente Basic del operador.
+    if(page==='/prueba-v2/api/ensayo-tus-pago-sandbox')
+      return pagoTUSSandboxCliente(request,env,{
+       authorized:v2PrivateBrowserAuthorized(request,env)==='allow'||
+        (await v2SessionAuthorized(request,env))
+      });
     if(page==='/prueba-v2/api/ensayo-tus-paquete-manifiesto')
       return consultarPaqueteTUSPersonal(request,env,{
        authorized:v2PrivateBrowserAuthorized(request,env)==='allow'
