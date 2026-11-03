@@ -1130,6 +1130,43 @@ async function priceAdminApprovedSnapshot(req,env){
   approvedAt,prices:snapshot.prices,promotions:snapshot.promotions,paymentAuthorized:false,
   commercialRelease:false,source:"private-d1-approved-only"},200);
 }
+
+/** Simulación PREVIA para detectar cambios accidentales. No calcula
+ * promociones ni importa al checkout; usa solo tarifas de ejemplo.
+ */
+function priceAdminExamples(prices){
+ const p=prices?.prices;
+ if(!p)throw Error("Tarifario incompleto");
+ const a4Color=p.colorA4.materials.find(x=>x.id==="obra70");
+ const rec60=p.plotter.supports.find(x=>x.id==="rec60");
+ if(!a4Color||!rec60)throw Error("Material de ejemplo no encontrado");
+ const samples=[
+  ["A4 B/N · 10 caras simple faz",10*p.bnA4.scales[0].simple],
+  ["A4 B/N · 100 caras doble faz",100*p.bnA4.scales.find(x=>100>=x.from&&(x.to===null||100<=x.to)).double],
+  ["A4 color obra 70 g · 10 caras simple faz",10*a4Color.prices[0].simple],
+  ["Anillado A4 · hasta 100 hojas",p.bindings.a4[0].price],
+  ["Póster recubierto 130 g · 60 cm · 1 metro",rec60.posterPerMeter]
+ ];
+ if(samples.some(row=>!Number.isFinite(row[1])||row[1]<0))
+  throw Error("Valor de simulación inválido");
+ return samples.map(([label,total])=>({label,total}));
+}
+function priceAdminPreview(base,proposed){
+ if(!priceAdminValidatePayload(base)||!priceAdminValidatePayload(proposed))
+  throw Error("Datos de vista previa inválidos");
+ const edits=PRICE_ADMIN_FIELDS.flatMap(field=>{
+  const before=priceAdminAt(base,field.path),after=priceAdminAt(proposed,field.path);
+  return before===after?[]:[{
+   path:field.path,category:field.category,label:field.label,before,after,
+   ...(typeof before==="number"&&before>0?
+    {changePercent:Math.round(((after-before)/before)*10000)/100}:{})
+  }];
+ });
+ const earlier=priceAdminExamples(base),later=priceAdminExamples(proposed);
+ return {edits,
+  examples:earlier.map((row,i)=>({label:row.label,before:row.total,after:later[i].total})),
+  caution:"Simulación orientativa sin promociones, cupones ni costos adicionales. No publica ni habilita cobros."};
+}
 async function priceAdminHandle(req,env,pathname){
  if(!tokenOK(req,env))return json({error:"No autorizado"},401);
  if(env.PRICE_ADMIN_PRIVATE_ENABLED!=="PRIVATE_TEST_ONLY")
@@ -1157,6 +1194,26 @@ async function priceAdminHandle(req,env,pathname){
  const head=await priceAdminHead(env);
  if(head.revision!==d.expectedRevision)
   return json({error:"Otra computadora modificó el tarifario. Volvé a cargar antes de guardar."},409);
+ if(pathname==="/admin/api/pricing/preview"){
+  if(!d||Object.keys(d).sort().join(",")!=="changes,expectedRevision,operator"||
+     !Array.isArray(d.changes)||d.changes.length>100)
+   return json({error:"Vista previa inválida"},422);
+  const before=priceAdminCurrent(head),after=priceAdminClone(before);
+  const seen=new Set();
+  for(const edit of d.changes){
+   if(!edit||Object.keys(edit).sort().join(",")!=="path,value"||
+      typeof edit.path!=="string"||seen.has(edit.path)||
+      !PRICE_ADMIN_ALLOWED.has(edit.path)||
+      !priceAdminValidValue(PRICE_ADMIN_ALLOWED.get(edit.path),edit.value))
+    return json({error:"Cambio no permitido en vista previa"},422);
+   seen.add(edit.path);priceAdminSet(after,edit.path,edit.value);
+  }
+  if(!priceAdminValidatePayload(after))return json({error:"Tarifario resultante inválido"},422);
+  const base=head.approved_json?JSON.parse(head.approved_json):priceAdminClone(PRICE_ADMIN_BASELINE);
+  const pending=priceAdminPreview(base,after);
+  return json({preview:true,revision:head.revision,approvedRevision:head.approved_revision,
+   ...pending,paymentsEnabled:false,commercialPublication:false});
+ }
  let next,action,changed=0,update;
  if(pathname==="/admin/api/pricing/draft"){
   if(!d||Object.keys(d).sort().join(",")!=="changes,expectedRevision,operator"||
