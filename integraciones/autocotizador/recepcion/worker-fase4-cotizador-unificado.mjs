@@ -1758,6 +1758,33 @@ async function v2SessionAuthorized(request,env){
  let diff=0;for(let i=0;i<64;i++)diff|=mac.charCodeAt(i)^match[2].charCodeAt(i);
  return diff===0;
 }
+/** Diagnóstico de sólo lectura para validar conexión D1 REAL ANTES de cambiar
+ * DOCS_PRICE_ADMIN_D1_ENABLED del motor. Requiere HTTP Basic del operador,
+ * devuelve solo versión y dos tarifas de referencia, sin tokens ni datos personales.
+ */
+async function probeTarifarioD1SoloOperador(request,env){
+ if(request.method!=='GET')return closed();
+ const authorized=v2PrivateBrowserAuthorized(request,env);
+ if(authorized!=='allow')
+  return new Response('Autenticación privada requerida',{
+   status:401,headers:{'WWW-Authenticate':'Basic realm="Saber V2 Ensayo Privado", charset="UTF-8"',
+    'Cache-Control':'no-store,private','X-Robots-Tag':'noindex,nofollow'}});
+ try{
+  const r=await obtenerTarifarioD1Privado({...env,DOCS_PRICE_ADMIN_D1_ENABLED:'PRIVATE_TEST_ONLY'});
+  const a4=r.prices?.bnA4?.scales?.[0]?.simple;
+  const rec60=r.prices?.plotter?.supports?.find(x=>x.id==='rec60')?.posterPerMeter;
+  if(!Number.isFinite(a4)||a4<=0||!Number.isFinite(rec60)||rec60<=0)
+   throw Error('Tarifario incompleto');
+  return testResponse({ok:true,privateProbe:true,source:'d1-approved-only',
+   priceVersion:r.prices.priceVersion,
+   a4_bn_1_a_10_sf_ars:a4,poster_recubierto_60cm_metro_ars:rec60,
+   docsPriceAdminD1Enabled:env.DOCS_PRICE_ADMIN_D1_ENABLED==='PRIVATE_TEST_ONLY',
+   paymentAuthorized:false,commercialPublication:false},200);
+ }catch(_){
+  return testResponse({ok:false,error:'No se pudo comprobar el tarifario aprobado de D1.',
+   privateProbe:true,paymentAuthorized:false,commercialPublication:false},503);
+ }
+}
 async function v2PrivateBrowserResponse(request,env,path){
  if(request.method!=='GET')return closed();
  const status=v2PrivateBrowserAuthorized(request,env);
@@ -1891,6 +1918,8 @@ async function v2PrivateBrowserResponse(request,env,path){
 export default {
   async fetch(request, env, ctx) {
     const page=new URL(request.url).pathname;
+    if(page==='/prueba-v2/admin-tarifario-ensayo')
+      return probeTarifarioD1SoloOperador(request,env);
     if(page==='/prueba-v2/'||page==='/prueba-v2/orden-paquete'||page==='/prueba-v2/personal-descargar'||page==='/prueba-v2/cotizador'||
        page==='/prueba-v2/carga-inteligente'||
        page==='/prueba-v2/carga-inteligente.js'||
