@@ -1411,6 +1411,9 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px ui-monospace,monospace
 .price-head{font-size:.85rem;color:#53657b;font-weight:700}
 #priceMessage{font-weight:650;white-space:pre-wrap}
 #priceDiffs{margin:12px 0;max-height:190px;overflow:auto;border:1px solid #e2e7ed;border-radius:7px;padding:9px}
+#pricePreviewResult{margin:10px 0;padding:12px;background:#f8fbff;border:1px solid #c7d9ee;border-radius:8px}
+#pricePreviewResult p{margin:6px 0;font-size:.9rem}
+#pricePreviewResult strong{font-weight:700}
 @media(max-width:700px){.price-line{grid-template-columns:minmax(0,1fr) 108px}.price-line input[type=number]{width:100px}.price-line .reference{display:none}}
 
 body.price-only{max-width:1080px}
@@ -1450,9 +1453,11 @@ body.price-only #priceAdminFieldset summary{font-size:1.3rem}
 <div id="priceItems"></div>
 <div id="priceDiffs">Sin cambios pendientes.</div>
 <div class="price-toolbar">
+<button type="button" id="pricePreviewButton" class="outline" disabled>Ver impacto antes de guardar</button>
 <button type="button" id="priceSave" disabled>Guardar borrador</button>
 <button type="button" id="priceApprove" class="outline" disabled>Aprobar solo para ensayo</button>
 </div>
+<div id="pricePreviewResult" aria-live="polite">La vista previa compara los valores que editarías con los aprobados para ensayo. No cambia ningún cobro.</div>
 <details><summary>Historial de versiones y restauración</summary><ol id="priceHistory"></ol></details>
 </details></fieldset>
 <fieldset><legend>Detalle de pedido e instrucciones</legend>
@@ -2037,6 +2042,8 @@ document.querySelector("#refreshUnpaid").addEventListener("click",async()=>{
  }catch(e){list.replaceChildren();status.textContent=e.message}
 });
 
+const pricePreviewButton=document.querySelector("#pricePreviewButton");
+const pricePreviewResult=document.querySelector("#pricePreviewResult");
 const priceLoadButton=document.querySelector("#priceLoad");
 const priceSaveButton=document.querySelector("#priceSave");
 const priceApproveButton=document.querySelector("#priceApprove");
@@ -2052,6 +2059,7 @@ function priceEditSummary(){
  if(!priceSnapshot)return;
  const items=[...priceChanges.entries()];
  priceSaveButton.disabled=items.length===0;
+ pricePreviewButton.disabled=false;
  priceApproveButton.disabled=!priceSnapshot.draftPresent||items.length>0;
  priceDiffs.replaceChildren(node("strong",items.length+" cambio(s) sin guardar."));
  for(const [path,value] of items.slice(0,35)){
@@ -2092,6 +2100,7 @@ function priceRender(){
    if(value===field.value)priceChanges.delete(field.path);
    else priceChanges.set(field.path,value);
    row.classList.toggle("modified",priceChanges.has(field.path));
+   pricePreviewResult.textContent="Hay cambios nuevos. Volvé a ver el impacto antes de guardar.";
    priceEditSummary();
   });
   name.htmlFor="";
@@ -2132,6 +2141,7 @@ async function priceLoad(){
  try{
   const data=await api("/admin/api/pricing");
   priceSnapshot=data;priceChanges=new Map();
+  pricePreviewResult.textContent="Revisá la vista previa antes de aprobar. Aún no se modifica ningún precio comercial.";
   priceRender();priceHistoryRender();
   priceMessage.textContent="Revisión "+data.revision+" · "+
    (data.draftPresent?"Hay un borrador para revisar.":"Sin borradores.")+
@@ -2139,6 +2149,36 @@ async function priceLoad(){
  }catch(e){priceMessage.textContent="No se pudieron cargar precios: "+String(e.message||e)}
  finally{priceLoadButton.disabled=false}
 }
+pricePreviewButton.addEventListener("click",async()=>{
+ if(!priceSnapshot)return;
+ const operator=requestOperator();if(!operator)return;
+ pricePreviewButton.disabled=true;
+ pricePreviewResult.textContent="Calculando simulación sin modificar tarifas…";
+ try{
+  const before=priceSnapshot.revision;
+  const result=await apiPost("/admin/api/pricing/preview",{
+   operator,expectedRevision:before,
+   changes:[...priceChanges.entries()].map(([path,value])=>({path,value}))
+  });
+  if(result.revision!==before)throw Error("La revisión cambió; volvé a cargar.");
+  pricePreviewResult.replaceChildren(node("strong",
+   result.edits.length+" diferencias respecto de la última versión aprobada para ensayo."));
+  if(!result.edits.length)pricePreviewResult.append(node("p","No hay diferencias que afecten el tarifario."));
+  for(const edit of result.edits.slice(0,30)){
+   const fmt=v=>typeof v==="boolean"?(v?"Activo":"Inactivo"):String(v);
+   pricePreviewResult.append(node("p",edit.category+" · "+edit.label+": "+fmt(edit.before)+" → "+fmt(edit.after)+
+    (typeof edit.changePercent==="number"?" ("+(edit.changePercent>=0?"+":"")+edit.changePercent+"%)":"")));
+  }
+  if(result.edits.length>30)pricePreviewResult.append(node("p","Y "+(result.edits.length-30)+" diferencias más."));
+  pricePreviewResult.append(node("strong","Ejemplos sin promociones ni costos adicionales"));
+  for(const row of result.examples){
+   pricePreviewResult.append(node("p",row.label+": $"+row.before.toLocaleString("es-AR")+" → $"+
+    row.after.toLocaleString("es-AR")));
+  }
+  pricePreviewResult.append(node("p",result.caution));
+ }catch(e){pricePreviewResult.textContent="No se pudo mostrar el impacto: "+String(e.message||e)}
+ finally{pricePreviewButton.disabled=false}
+});
 priceLoadButton.addEventListener("click",priceLoad);
 priceGroup.addEventListener("change",priceRender);
 priceSearch.addEventListener("input",priceRender);
