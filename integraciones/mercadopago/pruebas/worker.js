@@ -1294,12 +1294,31 @@ button:disabled{opacity:.5;cursor:default}.outline{color:#174b8f;background:whit
 ol{padding-left:22px}li{padding:12px 6px;border-bottom:1px solid #e5ebf3}li button{margin-top:7px}
 pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px ui-monospace,monospace;background:#f0f3f9;padding:12px;border-radius:6px;max-height:450px;overflow:auto}
 @media(max-width:700px){.grid{grid-template-columns:1fr}}
+
+.pricing-panel>summary{cursor:pointer;font-size:1.13rem;font-weight:750;color:#163c73;padding:4px}
+.pricing-panel .price-note{background:#fff5dd;padding:10px 12px;border:1px solid #e1b96b;border-radius:8px;margin:12px 0;font-size:.9rem}
+.price-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0}
+.price-toolbar input[type="search"]{min-width:185px}
+.price-toolbar select{padding:10px;border:1px solid #aab6c5;border-radius:7px;max-width:100%;font:inherit;background:white}
+.price-line{display:grid;grid-template-columns:minmax(210px,1fr) 150px 150px;align-items:center;gap:10px;padding:10px 7px;border-bottom:1px solid #e2e7ed}
+.price-line:nth-child(odd){background:#f7faff}
+.price-line label{font-size:.9rem;font-weight:600}
+.price-line small{color:#53657b;display:block}
+.price-line input[type=number]{width:140px}
+.price-line input[type=checkbox]{width:22px;height:22px;justify-self:center;accent-color:#174b8f}
+.price-line .reference{font-size:.85rem;color:#59677b}
+.price-line.modified{background:#eff9f2}
+.price-head{font-size:.85rem;color:#53657b;font-weight:700}
+#priceMessage{font-weight:650;white-space:pre-wrap}
+#priceDiffs{margin:12px 0;max-height:190px;overflow:auto;border:1px solid #e2e7ed;border-radius:7px;padding:9px}
+@media(max-width:700px){.price-line{grid-template-columns:minmax(0,1fr) 108px}.price-line input[type=number]{width:100px}.price-line .reference{display:none}}
+
 </style></head><body>
 <header><div><h1>Centro de Pedidos · Pruebas</h1><div class="note">Solo pagos completos aprobados · No está conectado al sitio público</div></div></header>
 <fieldset><legend>Acceso privado</legend><div class="toolbar">
 <input type="password" autocomplete="off" id="secret" placeholder="Clave privada del panel" aria-label="Clave privada">
 <input type="text" id="productionOperator" maxlength="60" placeholder="Responsable del cambio" aria-label="Nombre de responsable" autocomplete="off">
-<button id="refresh">Consultar pedidos</button><button id="sync" class="outline">Verificar pagos pendientes</button>
+<button id="refresh">Consultar pedidos</button><button id="sync" class="outline">Verificar pagos pendientes</button><button id="openPricing" class="outline" type="button">Editar precios y promociones</button>
 </div><p id="status" role="status" aria-live="polite"></p><p id="cronState" class="note">Conciliación automática: sin consultar.</p></fieldset>
 <fieldset id="productionBoardArea"><legend>Tablero de producción · pedidos pagos</legend>
 <p class="note">Cada pedido avanza de columna al registrar su estado. Descargar el ZIP no cambia el seguimiento. Actualización automática cada 30 segundos mientras el panel esté abierto.</p>
@@ -1313,6 +1332,23 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px ui-monospace,monospace
 <details><summary>Entregados · historial (<span id="count-entregado">0</span>)</summary><div class="board-cards" id="lane-entregado"></div></details>
 <details><summary>Otros pedidos pagados (<span id="count-other">0</span>)</summary><div id="orders"></div></details>
 </div></fieldset>
+<fieldset><details id="pricingPanel" class="pricing-panel"><summary>Precios y promociones · administración privada</summary>
+<p class="price-note">Ensayo: estos valores provienen de un tarifario histórico del 21/08/2026 y de los cupones existentes. Guardar o aprobar aquí NO cambia los precios de la web pública, los pagos ni el cotizador. Primero hay que validar los precios comerciales reales y conectar un único tarifario al motor.</p>
+<div class="price-toolbar">
+<button id="priceLoad" type="button">Cargar tarifas</button>
+<label>Rubro <select id="priceGroup"><option value="B/N A4">B/N A4</option><option value="Color A4">Color A4</option><option value="B/N A3">B/N A3</option><option value="Color A3">Color A3</option><option value="Fotografías">Fotografías</option><option value="Stickers">Stickers</option><option value="Anillados">Anillados</option><option value="Ploteos">Ploteos</option><option value="Plotter de corte">Plotter de corte</option><option value="Cupones">Cupones</option></select></label>
+<label>Buscar <input type="search" id="priceSearch" placeholder="Papel, escala, producto o código"></label>
+</div>
+<p id="priceMessage" role="status" aria-live="polite">Pulsá «Cargar tarifas». La carga es solo de lectura.</p>
+<div class="price-line price-head"><span>Servicio y escala</span><span>Valor</span><span>Referencia anterior</span></div>
+<div id="priceItems"></div>
+<div id="priceDiffs">Sin cambios pendientes.</div>
+<div class="price-toolbar">
+<button type="button" id="priceSave" disabled>Guardar borrador</button>
+<button type="button" id="priceApprove" class="outline" disabled>Aprobar solo para ensayo</button>
+</div>
+<details><summary>Historial de versiones y restauración</summary><ol id="priceHistory"></ol></details>
+</details></fieldset>
 <fieldset><legend>Detalle de pedido e instrucciones</legend>
 <div id="details">Elegí «Detalle» en un pedido para consultar las instrucciones, archivos e historial.</div></fieldset>
 <fieldset><legend>Polaroids Express · PDF privado único</legend><button id="refreshExpress" class="outline">Consultar PDF recibidos</button><p class="note">Hasta cuatro hojas A4 por pedido. Archivo listo en Drive privado; el pago todavía no está confirmado.</p><ol id="expressReceipts"></ol></fieldset>
@@ -1894,6 +1930,140 @@ document.querySelector("#refreshUnpaid").addEventListener("click",async()=>{
   status.textContent=x.orders.length+" pedido(s) en espera de pago";
  }catch(e){list.replaceChildren();status.textContent=e.message}
 });
+
+const priceLoadButton=document.querySelector("#priceLoad");
+const priceSaveButton=document.querySelector("#priceSave");
+const priceApproveButton=document.querySelector("#priceApprove");
+const priceMessage=document.querySelector("#priceMessage");
+const priceItems=document.querySelector("#priceItems");
+const priceGroup=document.querySelector("#priceGroup");
+const priceSearch=document.querySelector("#priceSearch");
+const priceDiffs=document.querySelector("#priceDiffs");
+const priceHistory=document.querySelector("#priceHistory");
+let priceSnapshot=null;
+let priceChanges=new Map();
+function priceEditSummary(){
+ if(!priceSnapshot)return;
+ const items=[...priceChanges.entries()];
+ priceSaveButton.disabled=items.length===0;
+ priceApproveButton.disabled=!priceSnapshot.draftPresent||items.length>0;
+ priceDiffs.replaceChildren(node("strong",items.length+" cambio(s) sin guardar."));
+ for(const [path,value] of items.slice(0,35)){
+  const field=priceSnapshot.fields.find(x=>x.path===path);
+  if(!field)continue;
+  priceDiffs.append(node("p",field.category+" · "+field.label+": "+field.value+" → "+value));
+ }
+ if(items.length>35)priceDiffs.append(node("p","Y "+(items.length-35)+" cambios más."));
+}
+function priceRender(){
+ priceItems.replaceChildren();
+ if(!priceSnapshot){priceItems.append(node("p","Cargá las tarifas para comenzar."));return}
+ const q=priceSearch.value.trim().toLowerCase();
+ const filtered=priceSnapshot.fields.filter(field=>
+  (q?(field.category+" "+field.label+" "+field.path).toLowerCase().includes(q):field.category===priceGroup.value));
+ for(const field of filtered){
+  const row=node("div","");row.className="price-line";
+  const name=node("label",field.category+" · "+field.label);
+  const input=document.createElement("input");
+  input.type=field.kind==="boolean"?"checkbox":"number";
+  if(field.kind==="boolean")input.checked=priceChanges.has(field.path)?priceChanges.get(field.path):field.value;
+  else{
+   input.min=field.kind==="percent"?"0":"0.01";
+   input.max=field.kind==="percent"?"50":"50000000";
+   input.step="0.01";
+   input.value=String(priceChanges.has(field.path)?priceChanges.get(field.path):field.value);
+  }
+  input.addEventListener("change",()=>{
+   const value=field.kind==="boolean"?input.checked:Number(input.value);
+   const valid=field.kind==="boolean"||(
+    Number.isFinite(value)&&
+    (field.kind==="percent"?value>=0&&value<=50:value>0&&value<=50000000)&&
+    Math.abs(value*100-Math.round(value*100))<0.000001);
+   if(!valid){
+    priceMessage.textContent="Revisá "+field.label+": solo valores positivos, hasta dos decimales.";
+    input.value=String(field.value);return;
+   }
+   if(value===field.value)priceChanges.delete(field.path);
+   else priceChanges.set(field.path,value);
+   row.classList.toggle("modified",priceChanges.has(field.path));
+   priceEditSummary();
+  });
+  name.htmlFor="";
+  const reference=node("span",String(field.value));reference.className="reference";
+  row.append(name,input,reference);
+  row.classList.toggle("modified",priceChanges.has(field.path));
+  priceItems.append(row);
+ }
+ if(!filtered.length)priceItems.append(node("p","No hay precios para ese filtro."));
+ priceEditSummary();
+}
+function priceHistoryRender(){
+ priceHistory.replaceChildren();
+ for(const item of priceSnapshot?.history||[]){
+  const li=node("li","Revisión "+item.revision+" · "+item.action+
+    " · "+item.operator+" · "+item.created_at+" · "+item.changed_count+" campo(s)");
+  const btn=node("button","Preparar restauración de esta versión");
+  btn.className="outline";btn.type="button";
+  btn.addEventListener("click",async()=>{
+   const operator=requestOperator();
+   if(!operator)return;
+   if(!confirm("¿Preparar revisión "+item.revision+" como borrador? No se modifica la web ni se publica nada."))return;
+   try{
+    btn.disabled=true;
+    await apiPost("/admin/api/pricing/restore",{operator,expectedRevision:priceSnapshot.revision,restoreRevision:item.revision});
+    await priceLoad();
+    priceMessage.textContent="Revisión recuperada como borrador privado. Revisá antes de aprobar.";
+   }catch(e){priceMessage.textContent=String(e.message||e)}
+   finally{btn.disabled=false}
+  });
+  li.append(btn);priceHistory.append(li);
+ }
+ if(!priceHistory.children.length)priceHistory.append(node("li","Aún no hay versiones guardadas."));
+}
+async function priceLoad(){
+ priceLoadButton.disabled=true;
+ priceMessage.textContent="Leyendo tarifas privadas…";
+ try{
+  const data=await api("/admin/api/pricing");
+  priceSnapshot=data;priceChanges=new Map();
+  priceRender();priceHistoryRender();
+  priceMessage.textContent="Revisión "+data.revision+" · "+
+   (data.draftPresent?"Hay un borrador para revisar.":"Sin borradores.")+
+   " No cambia el cotizador ni la web pública.";
+ }catch(e){priceMessage.textContent="No se pudieron cargar precios: "+String(e.message||e)}
+ finally{priceLoadButton.disabled=false}
+}
+priceLoadButton.addEventListener("click",priceLoad);
+priceGroup.addEventListener("change",priceRender);
+priceSearch.addEventListener("input",priceRender);
+priceSaveButton.addEventListener("click",async()=>{
+ if(!priceSnapshot||!priceChanges.size)return;
+ const operator=requestOperator();if(!operator)return;
+ priceSaveButton.disabled=true;
+ try{
+  await apiPost("/admin/api/pricing/draft",{operator,expectedRevision:priceSnapshot.revision,
+   changes:[...priceChanges.entries()].map(([path,value])=>({path,value}))});
+  await priceLoad();
+  priceMessage.textContent="Borrador guardado en D1; NO publicado. Revisá las tarifas antes de aprobar para ensayo.";
+ }catch(e){priceMessage.textContent=String(e.message||e);priceSaveButton.disabled=false}
+});
+priceApproveButton.addEventListener("click",async()=>{
+ if(!priceSnapshot||!priceSnapshot.draftPresent||priceChanges.size)return;
+ const operator=requestOperator();if(!operator)return;
+ if(!confirm("¿Aprobar esta versión solo dentro del panel privado? NO modifica cotizador ni precios comerciales."))return;
+ priceApproveButton.disabled=true;
+ try{
+  await apiPost("/admin/api/pricing/approve",{operator,expectedRevision:priceSnapshot.revision,confirmed:true});
+  await priceLoad();
+  priceMessage.textContent="Versión aprobada para ENSAYO privado. Todavía NO modifica ninguna cotización.";
+ }catch(e){priceMessage.textContent=String(e.message||e);priceApproveButton.disabled=false}
+});
+document.querySelector("#openPricing").addEventListener("click",()=>{
+ const panel=document.querySelector("#pricingPanel");
+ panel.open=true;panel.scrollIntoView({behavior:"smooth",block:"start"});
+ if(!priceSnapshot)priceLoad();
+});
+
 document.querySelector("#refresh").addEventListener("click",refresh);
 document.querySelector("#sync").addEventListener("click",async()=>{try{status.textContent="Verificando pagos en Mercado Pago...";const x=await api("/demo/sync-pending","POST");await refresh();status.textContent+=" · Sincronizados: "+x.registered+" · Errores: "+x.errors}catch(e){status.textContent=e.message}});
 </script></body></html>`;
