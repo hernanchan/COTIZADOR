@@ -221,9 +221,15 @@ export async function finalizarPedidoTUSPrivado(request,env,{
  try{
   ensureRequest(request,env,authorized);
   const input=await bodyJSON(request);
-  if(!input||Object.keys(input).sort().join(',')!=='clientOrderId,entries,orderId'||
+  if(!input||!['clientOrderId,entries,orderId','clientOrderId,entries,orderId,telefono'].includes(Object.keys(input).sort().join(','))||
      !UUID.test(input.clientOrderId||''))
    throw Error('Pedido privado inválido.');
+  if(input.telefono!==undefined){
+   const d=String(input.telefono||'').replace(/\D/g,'');
+   if(typeof input.telefono!=='string'||!/^[+]?[0-9 ()-]{10,26}$/.test(input.telefono.trim())||
+      d.length<10||d.length>15)
+    throw Error('Teléfono de contacto inválido.');
+  }
   const checked=await verificarTandaTUSYRecalcular({
    orderId:input.orderId,entries:input.entries,
    secret:env.DOCS_TUS_RECEIPT_KEY,ahora,
@@ -238,7 +244,8 @@ export async function finalizarPedidoTUSPrivado(request,env,{
     registrado.archivos!==checked.claims.length||registrado.registeredInD1!==true)
    throw Error('Registro privado de D1 incongruente.');
   const pedido=await preparar({
-   env,webOrderId:registrado.orderId,clientOrderId:input.clientOrderId,items:[]
+   env,webOrderId:registrado.orderId,clientOrderId:input.clientOrderId,items:[],
+   ...(input.telefono?{telefono:input.telefono.trim()}:{})
   });
   if(pedido.amountArs!==checked.verificacion.importeVerificado||
      pedido.paymentAuthorized!==false)
