@@ -1098,6 +1098,32 @@ function priceAdminCurrent(head){
  if(!priceAdminValidatePayload(current))throw Error("Tarifario guardado no válido");
  return current;
 }
+/** Única lectura del tarifario APROBADO, sin borradores ni importes sin revisar.
+ * HMAC obligatorio entre Workers. No publica, cobra ni altera cotizaciones.
+ */
+async function priceAdminApprovedSnapshot(req,env){
+ const signed=await centralReadSigned(req,env);
+ if(signed.error)return json({ok:false,error:signed.error,paymentAuthorized:false},signed.status);
+ if(env.PRICE_ADMIN_PRIVATE_ENABLED!=="PRIVATE_TEST_ONLY")
+  return json({ok:false,error:"Tarifario privado deshabilitado",paymentAuthorized:false},503);
+ const d=signed.payload;
+ if(!d||typeof d!=="object"||Array.isArray(d)||
+    Object.keys(d).sort().join(",")!=="purpose,schema"||
+    d.schema!=="saber-price-snapshot-v1"||d.purpose!=="quote-private-test")
+  return json({ok:false,error:"Petición de precios sin contrato válido",paymentAuthorized:false},422);
+ await priceAdminTables(env);
+ const head=await priceAdminHead(env);
+ if(!head.approved_json||!Number.isSafeInteger(head.approved_revision)||head.approved_revision<1)
+  return json({ok:false,error:"No existe versión tarifaria aprobada para ensayos",paymentAuthorized:false},409);
+ let snapshot;
+ try{snapshot=JSON.parse(head.approved_json)}
+ catch(_){return json({ok:false,error:"Versión tarifaria ilegible",paymentAuthorized:false},409)}
+ if(!priceAdminValidatePayload(snapshot))
+  return json({ok:false,error:"Versión tarifaria inválida",paymentAuthorized:false},409);
+ return json({ok:true,schema:"saber-price-snapshot-v1",approvedRevision:head.approved_revision,
+  prices:snapshot.prices,promotions:snapshot.promotions,paymentAuthorized:false,
+  commercialRelease:false,source:"private-d1-approved-only"},200);
+}
 async function priceAdminHandle(req,env,pathname){
  if(!tokenOK(req,env))return json({error:"No autorizado"},401);
  if(env.PRICE_ADMIN_PRIVATE_ENABLED!=="PRIVATE_TEST_ONLY")
@@ -2429,6 +2455,8 @@ export default {
    if(url.pathname==="/internal/central/tus-package")return await centralTUSPackageManifest(req,env);
    if(url.pathname==="/internal/central/link")return await centralLink(req,env);
    if(url.pathname==="/internal/central/prepare-order")return await centralPrepareDraft(req,env);
+   if(url.pathname==="/internal/central/pricing-snapshot")
+    return await priceAdminApprovedSnapshot(req,env);
    if(url.pathname.startsWith("/checkout/"))return await customerCheckout(req,env,this);
    // Solo un operador que conoce DEMO_ADMIN_KEY puede preparar un pedido ficticio.
    if(url.pathname==="/admin/api/cron-status"&&req.method==="GET"){
