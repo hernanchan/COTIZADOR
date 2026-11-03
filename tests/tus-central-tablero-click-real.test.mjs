@@ -28,7 +28,8 @@ function scene({promptValue='Responsable del mostrador',failCode=null}={}){
  const elements=new Map();
  for(const id of ['secret','productionOperator','status','details','orders',
   'refreshExpress','refreshReceipts','refreshTransfers','refreshUnpaid','refresh',
-  'sync','cronState','count-other',...['pendiente','en_preparacion','listo',
+  'sync','cronState','count-other','priceLoad','priceSave','priceApprove','priceMessage',
+  'priceItems','priceGroup','priceSearch','priceDiffs','priceHistory','openPricing','pricingPanel',...['pendiente','en_preparacion','listo',
    'en_espera','entregado'].flatMap(x=>['lane-'+x,'count-'+x])]){
   elements.set('#'+id,new Element('div'));
  }
