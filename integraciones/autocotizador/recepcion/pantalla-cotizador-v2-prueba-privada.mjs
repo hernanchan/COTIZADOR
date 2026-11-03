@@ -3,7 +3,7 @@
  * Sólo puede abrirse con la compuerta BASIC privada del Worker, apagada
  * por defecto, y no interactúa con la tienda pública.
  */
-export function paginaCotizadorV2PruebaPrivada(sitekey,tusEnabled=false,tusDiagnostico=null){
+export function paginaCotizadorV2PruebaPrivada(sitekey,tusEnabled=false,tusDiagnostico=null,sandboxEnabled=false){
  // En esta rama de integración el portal NUNCA vuelve silenciosamente a Drive.
  const tusBloqueado=!tusEnabled;
  const fallas=Array.isArray(tusDiagnostico?.invalidos)?tusDiagnostico.invalidos:[];
@@ -49,7 +49,7 @@ body.estado-envio #smart,body.estado-registro #smart{display:none}
 #drop-pdf input{display:block;margin-top:8px}
 @media(max-width:840px){main{display:block}.panel{margin-bottom:14px}iframe{min-height:740px}}
 </style></head><body>
-<header><h1>LIBRERÍA SABER · Cotizador V2 en ensayo privado</h1><small style="color:#d5e3f0">Sin cobros, sin órdenes de producción y sin publicación comercial.</small></header>
+<header><h1>LIBRERÍA SABER · Cotizador V2 en ensayo privado</h1><small style="color:#d5e3f0">${sandboxEnabled?'Solo pagos con usuarios de prueba; sin cobros reales ni publicación comercial.':'Sin cobros, sin órdenes de producción y sin publicación comercial.'}</small></header>
 <div id="acciones-pedido"><div id="precio-smart" role="status" aria-live="polite">Presupuesto preliminar: todavía sin cotizar · No autoriza cobro</div>
 <label id="cliente-telefono-label" for="cliente-telefono">Teléfono de contacto *
 <input id="cliente-telefono" type="tel" inputmode="tel" autocomplete="tel" maxlength="26" placeholder="Ej.: 351 555 1234" required aria-describedby="cliente-telefono-ayuda cliente-telefono-error">
@@ -103,6 +103,7 @@ telefonoContacto.addEventListener('input',()=>{telefonoError.textContent='';tele
 
 const modoDiagnostico=new URLSearchParams(location.search).get('diagnostico')==='1';
 const TUS_ENABLED=${tusEnabled===true};
+ const SANDBOX_PAYMENT_ENABLED=${sandboxEnabled===true};
  const MAX_PDF_PRIVADOS=TUS_ENABLED?10:30;
 const TUS_BLOCKED=${tusBloqueado};
 let tusPreflightOK=false;
@@ -141,11 +142,74 @@ function mostrarEstadoCliente(estado,titulo,detalle,numeroOrden=null){
    location.assign('/prueba-v2/');
   });
   vistaEstadoPedido.replaceChildren(h,numero,p,nuevoPedido);
+   if(SANDBOX_PAYMENT_ENABLED&&TUS_ENABLED&&registeredOrder)vistaEstadoPedido.append(pagoSandboxEnRecibo());
   batchProgress.textContent='Pedido recibido correctamente · Orden N.º '+numeroOrden+
    ' · PDF verificados y registrados.';
   sendAllButton.textContent='Orden N.º '+numeroOrden+' recibida';
   vistaEstadoPedido.scrollIntoView({block:'start',behavior:'smooth'});
  }else vistaEstadoPedido.replaceChildren(h,p);
+}
+function pagoSandboxEnRecibo(){
+ const wrap=document.createElement('section'),mensaje=document.createElement('p'),
+  boton=document.createElement('button'),revisar=document.createElement('button');
+ wrap.style.margin='18px auto';mensaje.setAttribute('role','status');
+ boton.textContent='Pagar con Mercado Pago (prueba)';
+ revisar.textContent='Consultar confirmación';
+ revisar.style.marginLeft='8px';
+ mensaje.textContent='Solo cuenta compradora de prueba; no usar dinero real.';
+ const api=async action=>{
+  const response=await fetch('/prueba-v2/api/ensayo-tus-pago-sandbox',{
+   method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({action,webOrderId:orderId,clientOrderId,commercialOrderId:registeredOrder})
+  });
+  const result=await response.json().catch(()=>null);
+  if(!response.ok||result?.ok!==true)throw Error(result?.error||'No se pudo verificar el pago.');
+  return result;
+ };
+ let timer=null;
+ const check=async()=>{
+  const result=await api('status');
+  if(result.estado==='pagado'){
+   mensaje.textContent='Pago de prueba confirmado automáticamente. Ya figura como pagado en Central.';
+   boton.disabled=true;boton.textContent='Pago de prueba confirmado';
+   if(timer)clearInterval(timer);
+   return;
+  }
+  if(result.estado==='revocado'){
+   mensaje.textContent='Pago revertido. No se debe preparar este pedido.';
+   boton.disabled=true;if(timer)clearInterval(timer);
+   return;
+  }
+  mensaje.textContent='Pago pendiente. La confirmación depende de Mercado Pago, no de esta pantalla.';
+ };
+ revisar.addEventListener('click',async()=>{
+  revisar.disabled=true;
+  try{await check()}catch(e){mensaje.textContent=String(e.message||e)}
+  finally{revisar.disabled=false}
+ });
+ boton.addEventListener('click',async()=>{
+  boton.disabled=true;mensaje.textContent='Preparando el pago seguro de prueba…';
+  try{
+   const result=await api('start');
+   const url=new URL(result.checkoutUrl);
+   if(url.protocol!=='https:'||!/(^|\\.)(mercadopago\\.com|mercadopago\\.com\\.ar)$/.test(url.hostname))
+    throw Error('Enlace de pago no permitido.');
+   const link=document.createElement('a');
+   link.href=url.href;link.target='_blank';link.rel='noopener noreferrer';
+   link.textContent='Abrir Mercado Pago de prueba';
+   link.style.cssText='display:inline-block;margin:9px;padding:11px;border-radius:8px;color:white;background:#095985';
+   link.addEventListener('click',()=>{
+    let tries=0;
+    timer=setInterval(async()=>{
+     if(++tries>150){clearInterval(timer);return}
+     try{await check()}catch{}
+    },6000);
+   },{once:true});
+   wrap.append(link);
+   mensaje.textContent='Abrí el enlace en otra pestaña. La Central verificará el cobro automáticamente.';
+  }catch(e){mensaje.textContent=String(e.message||e);boton.disabled=false}
+ });
+ wrap.append(boton,revisar,mensaje);return wrap;
 }
 let batchSending=false,smartReady=false,smartBlockedReason='',handoffInProgress=false,handoffResolve=null;
 const dropPdf=document.getElementById('drop-pdf'),batchFiles=document.getElementById('batch-files'),batchStatus=document.getElementById('batch-status');
@@ -781,7 +845,7 @@ async function enviarTUSDesdeCarrito(pendientes){
  }).format(ultimoTotalServidor);
  document.getElementById('precio-smart').textContent='Orden N.º '+registeredShortOrder+' · Total verificado: '+valor+' · Sin cobro autorizado';
  mostrarEstadoCliente('registrado','Pedido recibido correctamente',
-  trabajos.length+' PDF verificados y registrados. Conservá este número para identificar tu pedido. Pago desactivado.',registeredShortOrder);
+  trabajos.length+' PDF verificados y registrados. Conservá este número para identificar tu pedido. '+(SANDBOX_PAYMENT_ENABLED?'Continuá al pago de prueba.':'Pago desactivado.'),registeredShortOrder);
  return resultado;
 }
 /** Recuperación idempotente en Central: ningún PDF se transfiere de nuevo. */
@@ -809,7 +873,7 @@ async function recuperarNumeroCentralTUS(){
   document.getElementById('precio-smart').textContent='Orden N.º '+
    data.numeroOrden+' · Total verificado: '+monto+' · Sin cobro autorizado';
   mostrarEstadoCliente('registrado','Pedido recibido correctamente',
-   'Orden recuperada desde D1 sin volver a subir los PDF. Pago desactivado.',
+   'Orden recuperada desde D1 sin volver a subir los PDF. '+(SANDBOX_PAYMENT_ENABLED?'Continuá al pago de prueba.':'Pago desactivado.'),
    data.numeroOrden);
   return true;
  }catch{return false;}
