@@ -70,7 +70,7 @@ jobs:
           previous=$(jq -r '.result.deployments[0].versions[]? | select(.percentage == 100) | .version_id' "$workdir/before.json" | head -n 1)
           test -n "$previous"
           echo "VERSION_ANTERIOR=$previous"
-          jq -n --slurpfile settings "$workdir/settings.json"             '{main_module:"index.mjs",annotations:{"workers/message":"Saber TUS SOLO ensayo privado. No web comercial. Sin pagos."},bindings:[$settings[0].result.bindings[] | {name,type:"inherit"}]}' > "$workdir/metadata.json"
+          jq -n --slurpfile settings "$workdir/settings.json"             '{main_module:"index.mjs",annotations:{"workers/message":"Saber TUS SOLO ensayo privado. No web comercial. Sin pagos."},bindings:([$settings[0].result.bindings[] | select(.name!="DOCS_PRICE_ADMIN_D1_ENABLED") | {name,type:"inherit"}]+[{name:"DOCS_PRICE_ADMIN_D1_ENABLED",type:"plain_text",text:"OFF"}])}' > "$workdir/metadata.json"
           curl --fail --silent --show-error --max-time 90             -H "$auth"             -F "metadata=@$workdir/metadata.json;type=application/json"             -F "index.mjs=@integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs;filename=index.mjs;type=application/javascript+module"             "$root/versions?bindings_inherit=strict" > "$workdir/version.json"
           if ! jq -e '.success == true and (.result.id | type == "string")' "$workdir/version.json" >/dev/null; then
             jq -c '{success,errors:[.errors[]?|{code,message}]}' "$workdir/version.json"
