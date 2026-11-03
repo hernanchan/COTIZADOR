@@ -42,3 +42,10 @@ Prohibiciones vigentes: no despliegue de `main`, no web pública, no cobros real
 - Verifica que `/checkout/pay` continúe inhabilitado sin autorización y que la prueba no invoque Mercado Pago.
 - GitHub CI aprobado: https://github.com/hernanchan/COTIZADOR/actions/runs/41375932529
 - **No se activó checkout sandbox ni producción, ni se cambió el Worker de pagos.**
+
+## 03/11/2026 — Pedido 014 verificado en navegador y visible en Central
+
+- Captura del operador en `/prueba-v2/`: mensaje **«Pedido recibido correctamente»**, **orden N.º 014**, **1 PDF verificado y registrado**, **total ARS 1.600**, teléfono de contacto introducido, **sin cobro autorizado**. No guardar número de teléfono ni datos del PDF en GitHub.
+- En el chat sucesor el operador abrió el Centro de Pedidos privado y confirmó expresamente **«sí sí ahí aparece»**. Esto valida la presencia de la orden 014 en la Central según prueba humana. No implica por sí solo ZIP descargado, contenido de instrucciones correcto o pago realizado.
+- **Siguiente paso puntual:** sin volver a enviar PDF, desde Central abrir la orden 014 y descargar el ZIP de producción para corroborar PDF original e instrucciones HTML/TXT. Las configuraciones detalladas que explican los ARS 1.600 no se acreditaron mediante la captura de recibo; no inferir error de tarifa comparando con un ensayo anterior de ARS 1.000.
+- Continúan ensayos privados. No tocar `main`, web comercial, cobros reales ni publicaciones de producción.
