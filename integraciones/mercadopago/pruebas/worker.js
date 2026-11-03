@@ -996,6 +996,180 @@ function shortWorkNumber(n){
  return Number.isSafeInteger(n)&&n>0?String(n).padStart(3,"0"):null;
 }
 
+
+/* Administración V1 de tarifario PRIVADO. No gobierna todavía el cotizador público.
+ * Fuente histórica importada: precios-web.json (21/08/2026) y promos.json.
+ * Un borrador/aprobación de ensayo jamás activa cobros ni modifica la vidriera.
+ */
+const PRICE_ADMIN_BASELINE={"prices":{"schema":"saber-web-prices-v1","generatedAt":"2026-08-21T13:50:37.427Z","source":"Presupuestador Saber V13.23.5","note":"Archivo comercial: contiene precios de venta. No incluye costos internos, factores de costo, ganancias, historial ni ventas.","bnA4":{"scales":[{"from":1,"to":10,"label":"1 a 10","simple":100,"double":100},{"from":11,"to":30,"label":"11 a 30","simple":84,"double":80},{"from":31,"to":100,"label":"31 a 100","simple":76,"double":64},{"from":101,"to":200,"label":"101 a 200","simple":66,"double":56},{"from":201,"to":300,"label":"201 a 300","simple":63,"double":50},{"from":301,"to":null,"label":"301+","simple":49,"double":42}]},"colorA4":{"scales":[{"from":1,"to":10,"label":"1 a 10"},{"from":11,"to":20,"label":"11 a 20"},{"from":21,"to":50,"label":"21 a 50"},{"from":51,"to":100,"label":"51 a 100"},{"from":101,"to":null,"label":"+100"}],"materials":[{"id":"obra70","name":"Obra 70 g","family":"Obra","prices":[{"simple":200,"double":200},{"simple":180,"double":180},{"simple":160,"double":160},{"simple":140,"double":126},{"simple":90,"double":90}]},{"id":"obra140","name":"Obra 140 A4","family":"Obra","prices":[{"simple":600,"double":600},{"simple":600,"double":600},{"simple":500,"double":500},{"simple":500,"double":500},{"simple":500,"double":500}]},{"id":"obra180","name":"Obra 180 A4","family":"Obra","prices":[{"simple":800,"double":800},{"simple":800,"double":800},{"simple":700,"double":700},{"simple":700,"double":700},{"simple":700,"double":700}]},{"id":"custom_color_1784038750485_d5c0","name":"Ilustraci{on d/faz 120g","family":"Ilustración","prices":[{"simple":500,"double":500},{"simple":500,"double":500},{"simple":500,"double":500},{"simple":400,"double":400},{"simple":400,"double":400}]},{"id":"ilustr120","name":"Ilustración 120 A4","family":"Ilustración","prices":[{"simple":700,"double":700},{"simple":700,"double":700},{"simple":600,"double":600},{"simple":600,"double":600},{"simple":500,"double":500}]},{"id":"ilustr180","name":"Ilustración 180 g A4","family":"Ilustración","prices":[{"simple":800,"double":800},{"simple":800,"double":800},{"simple":700,"double":700},{"simple":700,"double":700},{"simple":700,"double":700}]},{"id":"custom_color_1787306408531_5eab","name":"Ilustracion 200 grs","family":"Ilustración","prices":[{"simple":1000,"double":1000},{"simple":1000,"double":1000},{"simple":900,"double":900},{"simple":900,"double":900},{"simple":900,"double":900}]},{"id":"ilustrDF240A4","name":"Ilustración D/F 240 g A4","family":"Ilustración","prices":[{"simple":1000,"double":1000},{"simple":1000,"double":1000},{"simple":900,"double":900},{"simple":900,"double":900},{"simple":900,"double":900}]},{"id":"fotografico","name":"Fotográfico A4","family":"Fotográfico","prices":[{"simple":1600,"double":1600},{"simple":1500,"double":1500},{"simple":1400,"double":1400},{"simple":1400,"double":1400},{"simple":1400,"double":1400}]},{"id":"adhesivo","name":"Adhesivo A4","family":"Adhesivo","prices":[{"simple":1900,"double":1900},{"simple":1800,"double":1800},{"simple":1700,"double":1700},{"simple":1700,"double":1700},{"simple":1600,"double":1600}]},{"id":"filmilo","name":"Filmilo A4","family":"Otros","prices":[{"simple":4200,"double":4200},{"simple":4000,"double":4000},{"simple":3800,"double":3800},{"simple":3700,"double":3700},{"simple":3600,"double":3600}]},{"id":"holofan","name":"Holofan A4","family":"Otros","prices":[{"simple":4200,"double":4200},{"simple":4000,"double":4000},{"simple":3800,"double":3800},{"simple":3700,"double":3700},{"simple":3600,"double":3600}]},{"id":"matelina","name":"Matelina A4","family":"Otros","prices":[{"simple":1200,"double":1200},{"simple":1100,"double":1100},{"simple":1100,"double":1100},{"simple":1100,"double":1100},{"simple":1000,"double":1000}]},{"id":"natucraft","name":"Natucraft A4","family":"Otros","prices":[{"simple":2200,"double":2200},{"simple":2100,"double":2100},{"simple":2000,"double":2000},{"simple":1900,"double":1900},{"simple":1900,"double":1900}]},{"id":"tapaCartonA4","name":"Tapa cartón A4","family":"Otros","prices":[{"simple":900,"double":900},{"simple":900,"double":900},{"simple":800,"double":800},{"simple":800,"double":800},{"simple":800,"double":800}]},{"id":"tatufan","name":"Tatufan A4","family":"Otros","prices":[{"simple":5200,"double":5200},{"simple":4900,"double":4900},{"simple":4700,"double":4700},{"simple":4600,"double":4600},{"simple":4400,"double":4400}]}]},"bnA3":{"scales":[{"from":1,"to":10,"label":"1 a 10","simple":500,"double":500},{"from":11,"to":30,"label":"11 a 30","simple":465,"double":447},{"from":31,"to":100,"label":"31 a 100","simple":430,"double":394},{"from":101,"to":200,"label":"101 a 200","simple":394,"double":341},{"from":201,"to":300,"label":"201 a 300","simple":366,"double":318},{"from":301,"to":null,"label":"301+","simple":282,"double":212}]},"colorA3":{"scales":[{"from":1,"to":10,"label":"1 a 10"},{"from":11,"to":20,"label":"11 a 20"},{"from":21,"to":50,"label":"21 a 50"},{"from":51,"to":100,"label":"51 a 100"},{"from":101,"to":null,"label":"+100"}],"materials":[{"id":"a3_color_obra80","name":"Color A3 · Obra 80 g","family":"Obra","prices":[{"simple":1000,"double":1000},{"simple":930,"double":894},{"simple":930,"double":894},{"simple":860,"double":788},{"simple":788,"double":682}]},{"id":"a3_color_obra140","name":"Color A3 · Obra 140","family":"Obra","prices":[{"simple":1200,"double":1200},{"simple":1140,"double":1140},{"simple":1100,"double":1100},{"simple":1050,"double":1050},{"simple":1000,"double":1000}]},{"id":"a3_color_obra180","name":"Color A3 · Obra 180","family":"Obra","prices":[{"simple":1560,"double":1560},{"simple":1482,"double":1482},{"simple":1430,"double":1430},{"simple":1365,"double":1365},{"simple":1300,"double":1300}]},{"id":"a3_color_ilustr120","name":"Color A3 · Ilustración 120","family":"Ilustración","prices":[{"simple":1499.74,"double":1499.74},{"simple":1421.2,"double":1421.2},{"simple":1346.4,"double":1346.4},{"simple":1309,"double":1309},{"simple":1215.5,"double":1215.5}]},{"id":"custom_a3_1787306995917_e35f","name":"Color A3 · Ilustracion 200 grs","family":"Ilustración","prices":[{"simple":2362.5,"double":2362.5},{"simple":2205,"double":2205},{"simple":2126.25,"double":2126.25},{"simple":1984.5,"double":1984.5},{"simple":1890,"double":1890}]},{"id":"a3_color_autoadh","name":"Color A3 · Autoadhesivo","family":"Adhesivo","prices":[{"simple":3290,"double":3290},{"simple":3055,"double":3055},{"simple":2961,"double":2961},{"simple":2820,"double":2820},{"simple":2350,"double":2350}]}]},"photos":{"scales":[{"from":1,"to":19,"label":"1 a 19"},{"from":20,"to":49,"label":"+20"},{"from":50,"to":99,"label":"+50"},{"from":100,"to":null,"label":"+100"}],"products":[{"id":"foto_10x15","paper":"Papel fotográfico","size":"10x15","prices":[500,475,450,435]},{"id":"foto_13x18","paper":"Papel fotográfico","size":"13x18","prices":[800,760,720,696]},{"id":"foto_a4","paper":"Papel fotográfico","size":"A4","prices":[1600,1520,1440,1392]},{"id":"foto_a3","paper":"Papel fotográfico","size":"A3","prices":[3500,3325,3150,3045]},{"id":"foto_polaroid","paper":"Papel fotográfico","size":"Polaroid","prices":[3000,3000,3000,3000]},{"id":"foto_carnet","paper":"Papel fotográfico","size":"Carnet","prices":[1000,1000,1000,1000]},{"id":"luster_10x15","paper":"Luster","size":"10x15","prices":[800,760,720,696]},{"id":"luster_13x18","paper":"Luster","size":"13x18","prices":[1200,1140,1080,1044]},{"id":"luster_a4","paper":"Luster","size":"A4","prices":[2500,2375,2250,2175]},{"id":"luster_a3","paper":"Luster","size":"A3","prices":[4500,4275,4050,3915]},{"id":"luster_polaroid","paper":"Luster","size":"Polaroid","prices":[3000,3000,3000,3000]}]},"stickers":{"tiers":[{"from":1,"to":20,"discount":0},{"from":21,"to":null,"discount":10}],"products":[{"id":"sticker_a4","name":"Plancha A4 con precorte","size":"A4","prices":[{"from":1,"to":20,"unit":3000},{"from":21,"to":null,"unit":2700}]},{"id":"sticker_a3","name":"Plancha A3 con precorte","size":"A3","prices":[{"from":1,"to":20,"unit":5000},{"from":21,"to":null,"unit":4500}]}]},"bindings":{"a4":[{"to":100,"price":2330},{"to":200,"price":2580},{"to":350,"price":3800}],"a3":[{"to":100,"price":4660},{"to":200,"price":5160},{"to":350,"price":7600}]},"plotter":{"roundTo":100,"minMeters":0,"supports":[{"id":"rollo42","name":"Rollo 42","widthCm":42,"cadPerMeter":3618,"posterPerMeter":6534},{"id":"rollo60","name":"Rollo 60","widthCm":60,"cadPerMeter":5184,"posterPerMeter":9072},{"id":"rollo90","name":"Rollo 90","widthCm":90,"cadPerMeter":6024,"posterPerMeter":9912},{"id":"rec60","name":"Recubierto 130 g 60","widthCm":60,"cadPerMeter":14168,"posterPerMeter":18704},{"id":"rec90","name":"Recubierto 130 g 90","widthCm":90,"cadPerMeter":17668,"posterPerMeter":22204}]},"cutPlotter":{"minimumPrice":5000,"roundTo":100,"variants":[{"id":"gt3","name":"Piezas +3 cm","pricePerMeter":31200},{"id":"lt3","name":"Piezas -3 cm","pricePerMeter":39000},{"id":"solo","name":"Corte solo","pricePerMeter":23999.96}]}},"promotions":{"enabled":true,"one_code_at_a_time":true,"codes":[{"code":"PROMOFINDE","active":false,"label":"20% OFF en todo el carrito","type":"percent_total","percent":20},{"code":"MARTESDECOPIAS","active":false,"label":"10% en impresiones","type":"percent_kinds","percent":10,"kinds":["impresiones"]},{"code":"FOTOSPREMIUM","active":false,"label":"Premium al precio normal (10x15/13x18/A4)","type":"photo_premium_to_normal"},{"code":"ANILLADO0","active":true,"label":"Anillado gratis","type":"free_binding"},{"code":"STICKER10","active":false,"label":"10% Stickers A3","type":"percent_adh_types","percent":10,"types":["stickers_a3"]}]}};
+const PRICE_ADMIN_GROUPS=Object.freeze({
+ bnA4:"B/N A4",colorA4:"Color A4",bnA3:"B/N A3",colorA3:"Color A3",
+ photos:"Fotografías",stickers:"Stickers",bindings:"Anillados",
+ plotter:"Ploteos",cutPlotter:"Plotter de corte",promotions:"Cupones"
+});
+function priceAdminClone(value){return JSON.parse(JSON.stringify(value))}
+function priceAdminAt(data,path){
+ let at=data;
+ for(const part of path.split(".")){
+  if(at==null||!Object.prototype.hasOwnProperty.call(at,part))return undefined;
+  at=at[part];
+ }
+ return at;
+}
+function priceAdminSet(data,path,value){
+ const parts=path.split(".");
+ const last=parts.pop();
+ let parent=data;
+ for(const part of parts)parent=parent[part];
+ parent[last]=value;
+}
+function priceAdminFields(){
+ const fields=[];
+ const allowed=new Set(["simple","double","price","unit","cadPerMeter","posterPerMeter","minimumPrice","pricePerMeter"]);
+ const recurse=(v,path)=>{
+  if(Array.isArray(v)){v.forEach((part,i)=>recurse(part,path.concat(String(i))));return}
+  if(v&&typeof v==="object"){for(const [key,value] of Object.entries(v))recurse(value,path.concat(key));return}
+  const root=path[0],key=path[path.length-1],rootName=root==="promotions"?"promotions":root==="prices"?path[1]:root;
+  if(root==="prices"&&
+   (allowed.has(key)||(path[1]==="photos"&&path.includes("prices")&&/^\d+$/.test(key)))&&
+   typeof v==="number"){
+    const prefix=path.slice(0,-1),current=priceAdminAt(PRICE_ADMIN_BASELINE,prefix.join("."));
+    const category=PRICE_ADMIN_GROUPS[rootName];
+    if(!category)return;
+    const item=path.find((_,i)=>i>1&&["materials","products","supports","variants"].includes(path[i-1]));
+    const owner=item===undefined?null:priceAdminAt(PRICE_ADMIN_BASELINE,path.slice(0,path.indexOf(item)+1).join("."));
+    const tierPart=path.find((_,i)=>i>1&&["scales","prices"].includes(path[i-1]));
+    const tier=tierPart===undefined?null:priceAdminAt(PRICE_ADMIN_BASELINE,path.slice(0,path.indexOf(tierPart)+1).join("."));
+    const materialName=owner?.name||owner?.paper||owner?.size||owner?.id||"";
+    const scale=tier?.label||(tier&&"from" in tier?String(tier.from)+" a "+(tier.to??"más"):"");
+    const face=({simple:"Simple faz",double:"Doble faz",unit:"Unidad",price:"Precio",cadPerMeter:"CAD por metro",posterPerMeter:"Póster por metro",minimumPrice:"Precio mínimo",pricePerMeter:"Precio por metro"})[key]||"Precio";
+    fields.push({path:path.join("."),category,label:[materialName,scale,face].filter(Boolean).join(" · "),kind:"price",baseline:v});
+  }
+  if(root==="promotions"&&path[1]==="codes"&&
+    (key==="active"&&typeof v==="boolean"||key==="percent"&&typeof v==="number")){
+    const promo=priceAdminAt(PRICE_ADMIN_BASELINE,path.slice(0,3).join("."));
+    fields.push({path:path.join("."),category:"Cupones",label:(promo?.code||"Cupón")+" · "+(key==="active"?"Activo":"Descuento %"),kind:key==="active"?"boolean":"percent",baseline:v});
+  }
+ };
+ recurse(PRICE_ADMIN_BASELINE,[]);
+ return fields;
+}
+const PRICE_ADMIN_FIELDS=priceAdminFields();
+const PRICE_ADMIN_ALLOWED=new Map(PRICE_ADMIN_FIELDS.map(x=>[x.path,x]));
+function priceAdminValidValue(field,value){
+ if(field.kind==="boolean")return typeof value==="boolean";
+ if(typeof value!=="number"||!Number.isFinite(value))return false;
+ if(field.kind==="percent")return value>=0&&value<=50&&Math.round(value*100)===value*100;
+ return value>0&&value<=50000000&&Math.abs(value*100-Math.round(value*100))<0.000001;
+}
+function priceAdminValidatePayload(payload){
+ if(!payload||typeof payload!=="object"||Array.isArray(payload))return false;
+ for(const field of PRICE_ADMIN_FIELDS){
+  if(!priceAdminValidValue(field,priceAdminAt(payload,field.path)))return false;
+ }
+ return JSON.stringify(Object.keys(payload).sort())===JSON.stringify(["prices","promotions"])&&
+  payload.prices?.schema===PRICE_ADMIN_BASELINE.prices.schema&&
+  payload.promotions?.one_code_at_a_time===PRICE_ADMIN_BASELINE.promotions.one_code_at_a_time;
+}
+async function priceAdminTables(env){
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_pricing_admin_head (id INTEGER PRIMARY KEY CHECK(id=1),revision INTEGER NOT NULL DEFAULT 0,approved_revision INTEGER NOT NULL DEFAULT 0,draft_json TEXT,approved_json TEXT,updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+ await env.DB.prepare("INSERT OR IGNORE INTO central_pricing_admin_head(id) VALUES(1)").run();
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_pricing_admin_history (revision INTEGER PRIMARY KEY,action TEXT NOT NULL CHECK(action IN ('draft','approve','restore')),operator TEXT NOT NULL,payload_json TEXT NOT NULL,changed_count INTEGER NOT NULL,created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+}
+async function priceAdminHead(env){
+ const row=await env.DB.prepare("SELECT revision,approved_revision,draft_json,approved_json,updated_at FROM central_pricing_admin_head WHERE id=1").first();
+ if(!row)throw Error("No está disponible el catálogo de prueba");
+ return row;
+}
+function priceAdminCurrent(head){
+ const raw=head.draft_json||head.approved_json;
+ const current=raw?JSON.parse(raw):priceAdminClone(PRICE_ADMIN_BASELINE);
+ if(!priceAdminValidatePayload(current))throw Error("Tarifario guardado no válido");
+ return current;
+}
+async function priceAdminHandle(req,env,pathname){
+ if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+ if(env.PRICE_ADMIN_PRIVATE_ENABLED!=="PRIVATE_TEST_ONLY")
+  return json({error:"Editor de tarifas privado inactivo"},503);
+ await priceAdminTables(env);
+ if(pathname==="/admin/api/pricing"&&req.method==="GET"){
+  const head=await priceAdminHead(env);
+  const current=priceAdminCurrent(head);
+  const history=(await env.DB.prepare("SELECT revision,action,operator,changed_count,created_at FROM central_pricing_admin_history ORDER BY revision DESC LIMIT 15").all()).results||[];
+  return json({revision:head.revision,approvedRevision:head.approved_revision,
+   draftPresent:!!head.draft_json,baselineSource:"precios-web.json (21/08/2026); cupones promos.json",
+   caution:"Tarifas históricas para revisión. No gobiernan pedidos ni la web pública.",
+   fields:PRICE_ADMIN_FIELDS.map(field=>({...field,value:priceAdminAt(current,field.path)})),
+   history,publicPricingConnected:false,paymentsEnabled:false});
+ }
+ if(req.method!=="POST")return json({error:"Método no permitido"},405);
+ const raw=await req.text();
+ if(raw.length>25000)return json({error:"Solicitud demasiado extensa"},413);
+ let d;
+ try{d=JSON.parse(raw)}catch{return json({error:"Solicitud inválida"},400)}
+ const actor=d?.operator;
+ if(typeof actor!=="string"||actor.trim().length<2||actor.trim().length>60||
+    !Number.isSafeInteger(d?.expectedRevision)||d.expectedRevision<0)
+  return json({error:"Responsable o revisión inválidos"},422);
+ const head=await priceAdminHead(env);
+ if(head.revision!==d.expectedRevision)
+  return json({error:"Otra computadora modificó el tarifario. Volvé a cargar antes de guardar."},409);
+ let next,action,changed=0,update;
+ if(pathname==="/admin/api/pricing/draft"){
+  if(!d||Object.keys(d).sort().join(",")!=="changes,expectedRevision,operator"||
+     !Array.isArray(d.changes)||d.changes.length<1||d.changes.length>100)
+   return json({error:"Modificaciones inválidas"},422);
+  next=priceAdminCurrent(head);
+  const seen=new Set();
+  for(const entry of d.changes){
+   if(!entry||typeof entry.path!=="string"||
+      Object.keys(entry).sort().join(",")!=="path,value"||
+      !PRICE_ADMIN_ALLOWED.has(entry.path)||seen.has(entry.path)||
+      !priceAdminValidValue(PRICE_ADMIN_ALLOWED.get(entry.path),entry.value))
+    return json({error:"Valor o campo de tarifa no permitido"},422);
+   seen.add(entry.path);
+   if(priceAdminAt(next,entry.path)!==entry.value){
+    priceAdminSet(next,entry.path,entry.value);changed++;
+   }
+  }
+  if(changed===0)return json({error:"No hay cambios nuevos para guardar"},409);
+  action="draft";
+  update=env.DB.prepare("UPDATE central_pricing_admin_head SET draft_json=?,revision=revision+1,updated_at=datetime('now') WHERE id=1 AND revision=?")
+   .bind(JSON.stringify(next),head.revision);
+ }else if(pathname==="/admin/api/pricing/approve"){
+  if(!d||Object.keys(d).sort().join(",")!=="confirmed,expectedRevision,operator"||
+    d.confirmed!==true||!head.draft_json)
+   return json({error:"Primero guardá un borrador válido y confirmá su aprobación privada"},422);
+  next=priceAdminCurrent(head);action="approve";
+  changed=0;
+  update=env.DB.prepare("UPDATE central_pricing_admin_head SET approved_json=draft_json,draft_json=NULL,approved_revision=revision+1,revision=revision+1,updated_at=datetime('now') WHERE id=1 AND revision=? AND draft_json IS NOT NULL")
+   .bind(head.revision);
+ }else if(pathname==="/admin/api/pricing/restore"){
+  if(!d||Object.keys(d).sort().join(",")!=="expectedRevision,operator,restoreRevision"||
+    !Number.isSafeInteger(d.restoreRevision)||d.restoreRevision<1)
+   return json({error:"Versión a restaurar inválida"},422);
+  const past=await env.DB.prepare("SELECT payload_json FROM central_pricing_admin_history WHERE revision=?").bind(d.restoreRevision).first();
+  if(!past)return json({error:"Revisión no encontrada"},404);
+  try{next=JSON.parse(past.payload_json)}catch{return json({error:"Revisión histórica ilegible"},409)}
+  if(!priceAdminValidatePayload(next))return json({error:"La revisión histórica no es válida"},409);
+  action="restore";changed=0;
+  update=env.DB.prepare("UPDATE central_pricing_admin_head SET draft_json=?,revision=revision+1,updated_at=datetime('now') WHERE id=1 AND revision=?")
+   .bind(JSON.stringify(next),head.revision);
+ }else return json({error:"Ruta inválida"},404);
+ const revised=head.revision+1;
+ try{
+  const res=await env.DB.batch([
+   update,
+   env.DB.prepare("INSERT INTO central_pricing_admin_history(revision,action,operator,payload_json,changed_count) SELECT revision,?,?,?,? FROM central_pricing_admin_head WHERE id=1 AND revision=?")
+    .bind(action,actor.trim(),JSON.stringify(next),changed,revised)
+  ]);
+  if(res?.[0]?.meta?.changes!==1||res?.[1]?.meta?.changes!==1)
+   return json({error:"No se confirmó el guardado. Actualizá el panel."},409);
+ }catch{return json({error:"Guardado simultáneo o error de D1; actualizá el panel"},409)}
+ return json({saved:true,action,revision:revised,approvedPrivateOnly:action==="approve",
+  publicPricingConnected:false,paymentsEnabled:false});
+}
+
 const PRODUCTION_STATES=["pendiente","en_preparacion","en_espera","listo","entregado"];
 const PRODUCTION_NEXT={
  pendiente:["en_preparacion","en_espera"],
@@ -2096,6 +2270,8 @@ export default {
     ).all();
     return json({orders:rows.results||[],payment_confirmed:false,production_enabled:false});
    }
+   if(url.pathname.startsWith("/admin/api/pricing"))
+    return await priceAdminHandle(req,env,url.pathname);
    if(url.pathname==="/admin/api/central/production-status"&&req.method==="POST")
     return await centralUpdateProduction(req,env);
    if(url.pathname==="/admin/api/orders"&&req.method==="GET"){
