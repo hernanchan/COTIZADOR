@@ -63,6 +63,8 @@
 
 ## Ubicación de los registros
 
+**03/11/2026 — ETAPA ACTIVA: pago total Sandbox desde cliente PDF hasta Central.** Código y despliegues privados completos, pago humano E2E pendiente. Continuar desde `docs/ENSAYO-COMPRA-INTEGRAL-20261103.md` (Central privada `f58d58ae`, documental `043b49db`, sin web pública ni cobros reales); no volver a verificar el ZIP de la orden 014.
+
 - Método de desarrollo y producto (acuerdos vigentes): `docs/METODO-PERMANENTE-DESARROLLO-EN-DEFINICION-20261029.md`.
 - Registro histórico de etapa: `docs/ETAPA1-IMPRESIONES-PLOTEOS-CIERRE.md`.
 - Incidencia técnica vigente y próximo paso: `docs/DIAGNOSTICO-502-LOTE-20261028.md`.
