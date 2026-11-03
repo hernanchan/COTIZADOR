@@ -53,6 +53,14 @@ jobs:
           const body=await response.json();
           if(body.paymentAuthorized!==false)throw new Error('Pagos deben quedar bloqueados.');
           console.info('COMPILADO_PRIVADO_CERRADO_'+response.status);
+          const quoteUrl='https://saber-documentos-pruebas.libreriasaber.workers.dev/api/ensayo-materiales-rapido';
+          const disabled=await worker.fetch(new Request(quoteUrl),{}, {});
+          if(disabled.status!==200)throw new Error('El catálogo piloto actual debe seguir funcionando con el flag apagado.');
+          const blocked=await worker.fetch(new Request(quoteUrl),{DOCS_PRICE_ADMIN_D1_ENABLED:'PRIVATE_TEST_ONLY'}, {});
+          if(blocked.status!==503)throw new Error('Sin sesión ni D1 no debe cotizar con tarifas antiguas cuando el flag está activo.');
+          const safe=await blocked.json();
+          if(safe.paymentAuthorized!==false)throw new Error('Nunca habilitar cobros por error de precios.');
+          console.info('PRECIOS_D1_PRIVADOS_CERRADOS_503_SIN_FALLBACK');
           NODE
       - name: Confirmación SIN despliegues
         run: echo 'PRUEBA_TUS_PRIVADA_OK - SIN DESPLIEGUE - SIN PAGOS - WEB COMERCIAL INTACTA'
