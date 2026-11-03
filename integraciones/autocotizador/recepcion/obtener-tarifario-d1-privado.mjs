@@ -39,12 +39,15 @@ export async function obtenerTarifarioD1Privado(env,{
  if(data?.ok!==true||data.schema!==SCHEMA||data.source!=='private-d1-approved-only'||
     data.commercialRelease!==false||data.paymentAuthorized!==false||
     !Number.isSafeInteger(data.approvedRevision)||data.approvedRevision<1||
+    typeof data.approvedAt!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(data.approvedAt)||
+    !Number.isFinite(Date.parse(data.approvedAt))||
     data.prices?.schema!=='saber-web-prices-v1'||
     !Array.isArray(data.prices.bnA4?.scales)||
     !Array.isArray(data.prices.colorA4?.materials)||
     !Array.isArray(data.prices.plotter?.supports)||
     !Array.isArray(data.promotions?.codes))
   throw Error('Respuesta D1 no cumple contrato de tarifas aprobadas.');
- return {prices:{...data.prices,generatedAt:'d1-approved-revision-'+data.approvedRevision},
+ return {prices:{...data.prices,generatedAt:data.approvedAt,
+   priceVersion:'d1-approved-revision-'+data.approvedRevision},
   promotions:data.promotions,revision:data.approvedRevision,source:data.source};
 }
