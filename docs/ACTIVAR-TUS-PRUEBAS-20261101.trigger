@@ -90,3 +90,5 @@ Revalidación precio A5: comparar IMPORTE VERIFICADO real del servidor entre PDF
 ENABLE_PRIVATE_D1_PRICING_2026_11_03
 2026-11-03 — CORRECCIÓN COTIZACIÓN D1: ruta /api/ensayo-materiales-rapido y /api/ensayo-carga-unica necesitan cookies HttpOnly por ruta, emitidas desde portal privado. CI 41663314558 SUCCESS con prueba E2E: sesión de iframe sin Basic, materiales 200, A4 dos páginas B/N $200, sin sesión D1 bloquea con 503. Desplegar solamente Worker de ensayo con D1 privado aprobado ON, HTTP 401 anónimo, validación A4 SF 100 y póster rec60 18700, rollback. Pagos reales y web comercial intactos.
 ENABLE_PRIVATE_D1_PRICING_2026_11_03
+2026-11-03 — Central MP sandbox privado activa f58d58ae (run 41668849260 success, HTTP 401, no pago comercial). Desplegar SOLO Worker documental privado con botón cliente pago test_user, proxy HMAC y status; conservar D1 aprobado de precios, rollback Basic 401, sin main ni web pública.
+ENABLE_PRIVATE_SANDBOX_CLIENT_PAYMENT_2026_11_03
