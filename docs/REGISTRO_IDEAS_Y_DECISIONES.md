@@ -1,3 +1,10 @@
+## 03/11/2026 — Despliegues privados completados tras renovación token Cloudflare
+
+- **Central privada `saber-pagos-pruebas`: DESPLEGADA** en Cloudflare versión `ca72fea0-b59b-496e-b972-4c383b200a2d`, run GitHub Actions [41644913428](https://github.com/hernanchan/COTIZADOR/actions/runs/41644913428) SUCCESS. Se activó `PRICE_ADMIN_PRIVATE_ENABLED=PRIVATE_TEST_ONLY` para el editor `/admin/precios`. Verificados `/admin/api/pricing` anónimo HTTP 401, estados administrativos HTTP 401, `/health` `ok=true,databaseReady=true,paymentsEnabled=false`. **No es publicación comercial.**
+- **Documentos/TUS privado `saber-documentos-pruebas`: DESPLEGADO** versión `887c01c5-4753-4a4f-a37c-ca9d1880eac9`, run [41645075210](https://github.com/hernanchan/COTIZADOR/actions/runs/41645075210) SUCCESS. Compilación y pruebas obligatorias aprobadas, `/prueba-v2/` sin credenciales devuelve HTTP 401, sin cambios al sitio público. **DOCS_PRICE_ADMIN_D1_ENABLED=OFF** explícito en deployment; aunque panel admin ya guarda D1, los presupuestos del portal V2 AÚN NO LEEN esas tarifas hasta probar y habilitar deliberadamente la integración privada.
+- **Pendiente inmediato:** abrir el editor en navegador con la misma clave de Central y verificar rubros, vista previa de tarifa de ensayo, guardado de borradores, aprobación privada e historial. No usar ni publicar cambios comerciales antes de reconciliar tarifas y promociones.
+- **Página de ensayo:** `https://saber-pagos-pruebas.libreriasaber.workers.dev/admin/precios`. Nunca solicitar que usuario publique claves en un chat.
+
 ## 03/11/2026 — Vista previa de precios antes de guardar (último avance)
 
 - Editor privado `/admin/precios`: nuevo botón **«Ver impacto antes de guardar»** con control de acceso al endpoint `POST /admin/api/pricing/preview`. Muestra qué campos se modificarían y ejemplos de presupuestos A4 B/N, A4 color obra 70 g, anillado y póster recubierto 60 cm. Informa porcentajes de diferencia e identifica que la simulación NO incluye cupones, promociones ni costos adicionales.
