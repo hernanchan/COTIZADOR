@@ -1,3 +1,11 @@
+## 03/11/2026 — **D1 ACTIVO en cotizador privado** (no en producción)
+
+- Confirmación en navegador del titular: `/prueba-v2/admin-tarifario-ensayo` devolvió `ok=true`, `priceVersion=d1-approved-revision-3`, `a4_bn_1_a_10_sf_ars=100`, `poster_recubierto_60cm_metro_ars=18700`, `docsPriceAdminD1Enabled=false` antes del cambio, `paymentAuthorized=false`, `commercialPublication=false`.
+- **Activación privada posterior exitosa** en `saber-documentos-pruebas`, versión Cloudflare `a59d7f61-bea0-4058-83e5-1647e1d4d958`, GitHub Actions [41655893131](https://github.com/hernanchan/COTIZADOR/actions/runs/41655893131) **SUCCESS**. Se comprobó en despliegue que `DOCS_PRICE_ADMIN_D1_ENABLED=PRIVATE_TEST_ONLY`. Consulta real autenticada a `/prueba-v2/precios-web.json` confirmó revisión D1 válida, A4 simple faz ARS 100 y póster recubierto 60 cm ARS 18.700/m. Se verificó 401 anónimo para el portal y pagos comerciales desactivados.
+- **Seguridad:** bandera controlada por última línea del trigger `docs/ACTIVAR-TUS-PRUEBAS-20261101.trigger` (texto exacto `ENABLE_PRIVATE_D1_PRICING_2026_11_03`). El workflow usa `SABER_V2_OPERATOR_PASSWORD` de GitHub Environment para comprobar el catálogo autenticado. Si falla, revierte la versión anterior automáticamente. No compartir ni registrar secretos.
+- **CI** del motor ON, sonda y falla cerrada 503: [41655600694](https://github.com/hernanchan/COTIZADOR/actions/runs/41655600694) SUCCESS. El servidor debe comparar revisión de precio al registrar pedido TUS. Pantalla `/prueba-v2/` debería consumir las tarifas D1 aprobadas; falta prueba manual de presupuesto con PDF real y visualización de versión en el navegador tras esta activación.
+- **NO ACTIVA** el cotizador comercial `libreriasaber.com.ar`, ni pagos reales, ni funciones de delivery. Todavía falta armonizar resto de precios, descuentos semanales, productos Sheets y verificar que cualquier actualización de tarifas no modifique pedidos existentes.
+
 ## 03/11/2026 — Sonda segura de precios D1 en Worker documental (desplegada)
 
 - **Versión privada activa:** `saber-documentos-pruebas` `22c620bc-528d-4873-bdbb-5d9cd823c77b`. Ejecución [41647377570](https://github.com/hernanchan/COTIZADOR/actions/runs/41647377570) SUCCESS, prueba de HTTP401 anónimo y cobros comerciales desactivados.
