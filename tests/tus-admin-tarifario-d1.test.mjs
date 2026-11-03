@@ -68,6 +68,9 @@ test('panel privado: UI sin publicación comercial, campos agrupados y JS sintá
  assert.match(adminHtml,/NO cambia los precios de la web pública/);
  assert.ok(vm.runInContext('PRICE_ADMIN_FIELDS.length',ctx)>310);
  assert.equal(vm.runInContext('priceAdminAt(PRICE_ADMIN_BASELINE,"prices.bnA4.scales.0.simple")',ctx),100);
+ assert.equal(vm.runInContext('PRICE_ADMIN_BASELINE.promotions.weekly.length',ctx),7);
+ assert.ok(vm.runInContext('PRICE_ADMIN_FIELDS.filter(x=>x.category==="Promos semanales").length',ctx)>=10);
+ assert.match(adminHtml,/option value="Promos semanales"/);
 });
 test('ningún tarifario se expone ni se modifica sin autorización y flag privado',async()=>{
  assert.equal((await call('/admin/api/pricing',{key:'incorrecta'})).status,401);
