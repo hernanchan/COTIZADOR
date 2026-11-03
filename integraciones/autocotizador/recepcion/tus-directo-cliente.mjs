@@ -66,7 +66,7 @@ export function normalizarTrabajoTUS(d,plan){
  };
 }
 export async function enviarPedidoTUSV2({
- orderId,clientOrderId,trabajos,onProgress=()=>{},
+ orderId,clientOrderId,trabajos,telefono,onProgress=()=>{},
  fetcher=fetch,loadUploader=()=>import('https://releases.transloadit.com/uppy/v3.6.1/uppy.min.mjs')
 }={}){
  if(!WEB.test(orderId||'')||!UUID.test(clientOrderId||'')||
@@ -80,6 +80,12 @@ export async function enviarPedidoTUSV2({
   ids.add(t.meta.fileId);totalBytes+=t.meta.bytes;
  }
  if(totalBytes>60*1024*1024)throw Error('Tanda mayor que 60 MiB.');
+ if(telefono!==undefined){
+  const digits=String(telefono||'').replace(/\D/g,'');
+  if(typeof telefono!=='string'||!/^[+]?[0-9 ()-]{10,26}$/.test(telefono.trim())||
+     digits.length<10||digits.length>15)
+   throw Error('Ingresá un teléfono válido para el pedido.');
+ }
  // Comprobación previa a cualquier autorización o subida. El servidor
  // vuelve a validar tamaño, copias, páginas y precio sobre los PDF reales.
  const grupos=new Map();
@@ -160,6 +166,7 @@ export async function enviarPedidoTUSV2({
   // TODOS los archivos, verifica SHA+páginas+medidas y recalcula precios.
   const finalized=await call('/prueba-v2/api/ensayo-tus-registrar',{
    orderId,clientOrderId,
+   ...(typeof telefono==='string'?{telefono:telefono.trim()}:{}),
    entries:trabajos.map((t,i)=>({
     proof:started.sessions[i].proof,opciones:t.opciones
    }))
