@@ -1036,12 +1036,18 @@ function priceAdminFields(){
     const prefix=path.slice(0,-1),current=priceAdminAt(PRICE_ADMIN_BASELINE,prefix.join("."));
     const category=PRICE_ADMIN_GROUPS[rootName];
     if(!category)return;
-    const item=path.find((_,i)=>i>1&&["materials","products","supports","variants"].includes(path[i-1]));
-    const owner=item===undefined?null:priceAdminAt(PRICE_ADMIN_BASELINE,path.slice(0,path.indexOf(item)+1).join("."));
-    const tierPart=path.find((_,i)=>i>1&&["scales","prices"].includes(path[i-1]));
-    const tier=tierPart===undefined?null:priceAdminAt(PRICE_ADMIN_BASELINE,path.slice(0,path.indexOf(tierPart)+1).join("."));
+    const ownerIndex=path.findIndex((_,i)=>i>1&&["materials","products","supports","variants"].includes(path[i-1]));
+    const owner=ownerIndex<0?null:priceAdminAt(PRICE_ADMIN_BASELINE,path.slice(0,ownerIndex+1).join("."));
+    const tierIndex=path.findIndex((_,i)=>i>1&&["scales","prices"].includes(path[i-1]));
+    const tier=tierIndex<0?null:priceAdminAt(PRICE_ADMIN_BASELINE,path.slice(0,tierIndex+1).join("."));
     const materialName=owner?.name||owner?.paper||owner?.size||owner?.id||"";
-    const scale=tier&&typeof tier==="object"?(tier.label||(Object.prototype.hasOwnProperty.call(tier,"from")?String(tier.from)+" a "+(tier.to??"más"):"")):"";
+    let scale=tier&&typeof tier==="object"?(tier.label||(Object.prototype.hasOwnProperty.call(tier,"from")?String(tier.from)+" a "+(tier.to??"más"):"")):"";
+    if(!scale&&tierIndex>=0&&path[tierIndex-1]==="prices"){
+     const tierLabel=priceAdminAt(PRICE_ADMIN_BASELINE,"prices."+path[1]+".scales."+path[tierIndex]+".label");
+     if(typeof tierLabel==="string")scale=tierLabel;
+    }
+    if(!scale&&tierIndex>=0&&path[1]==="bindings"&&tier&&typeof tier==="object"&&Number.isFinite(tier.to))
+     scale="Hasta "+tier.to+" hojas";
     const face=({simple:"Simple faz",double:"Doble faz",unit:"Unidad",price:"Precio",cadPerMeter:"CAD por metro",posterPerMeter:"Póster por metro",minimumPrice:"Precio mínimo",pricePerMeter:"Precio por metro"})[key]||"Precio";
     fields.push({path:path.join("."),category,label:[materialName,scale,face].filter(Boolean).join(" · "),kind:"price",baseline:v});
   }
