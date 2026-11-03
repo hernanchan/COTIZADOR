@@ -19,6 +19,7 @@ const central={
  DB:{prepare(sql){
   return {async run(){return {meta:{changes:1}}},async first(){
    if(sql.includes('SELECT revision,approved_revision,draft_json,approved_json'))return {...head};
+   if(sql.includes('SELECT created_at FROM central_pricing_admin_history'))return {created_at:'2026-11-03 10:00:00'};
    return null;
   }};
  }}
@@ -45,7 +46,8 @@ test('D1 devuelve SOLO versión aprobada, nunca borrador en edición',async()=>{
  const result=await obtenerTarifarioD1Privado(docsEnv,opts());
  assert.equal(result.prices.bnA4.scales[0].simple,100);
  assert.equal(result.revision,2);
- assert.equal(result.prices.generatedAt,'d1-approved-revision-2');
+ assert.equal(result.prices.generatedAt,'2026-11-03T10:00:00Z');
+ assert.equal(result.prices.priceVersion,'d1-approved-revision-2');
  assert.equal(result.promotions.weekly.length,7);
  assert.equal(result.source,'private-d1-approved-only');
 });
