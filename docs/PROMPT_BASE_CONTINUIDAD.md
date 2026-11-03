@@ -137,3 +137,11 @@ Al concluir Etapa 1, crear `docs/ETAPA2-...-ESTADO.md`, actualizar aquí cuál e
 
 
 **01/11/2026 20:26 — REGRESIÓN CAD PÓSTER CONFIRMADA EN CHROME Y SEGUNDA DEFENSA DESPLEGADA:** captura del usuario con mismo municipal PDF 97,01×61,49 en Póster/pleno ARS9.700 (debería CAD ARS5.900). A pesar de corrección anterior de cobertura 360/720; usuario avisó no estar seguro, se le confirmó **PÓSTER**, se pidió NO ENVIAR. Se vio falla del análisis en navegador real. Nueva función independiente `esCadPorEstructuraPDF` en `discriminar-plano-denso.mjs` + `page.getOperatorList` en `clasificar-paginas-ploteo.mjs`: miles de trazados sin imagen raster/sombreado y bajo continuo => CAD; raster => Póster, sin confiar únicamente en texto/PyMuPDF. Visual de tarjeta ahora dice `TIPO DETECTADO: CAD / PÓSTER / MIXTO` antes de abrir detalles. Tests de función real con mock PDF.js y píxeles sintéticos, no del PDF original renderizado en Chrome. CI **41361987568** 151 PASS, versión privada **813c5a07**, HTTP401, pagos apagados, web comercial/main/central intactos. **PENDIENTE comprobar en Chrome con el archivo real tras Ctrl+F5**; si falla de nuevo no pedirle que envíe ni afirmar que está resuelto, inspeccionar operadores reales. Última sección de `docs/PLAN-PILOTO-INTEGRACION-TUS-20261101.md` contiene detalles y pruebas.
+
+## ESTADO ACTIVO — 03/11/2026, compra integral sandbox
+
+- El ensayo de compra desde el cliente está desarrollado y **desplegado solo en Workers privados**. Ver `docs/ENSAYO-COMPRA-INTEGRAL-20261103.md` para pasos, pruebas y límites exactos.
+- Central privada `saber-pagos-pruebas`, versión `f58d58ae-4368-4dbf-b778-e4c17c09e2ed`, despliegue GitHub Actions 41668849260 SUCCESS.
+- Documentos `saber-documentos-pruebas`, versión `043b49db-2c70-4b19-9174-af7c65dc1d48`, despliegue GitHub Actions 41669021788 SUCCESS.
+- **Pendiente prioritario:** el titular realiza en Chrome una compra de ensayo desde PDF + teléfono → Enviar pedido → **Pagar con Mercado Pago (prueba)** → comprador de prueba → verificar pago automáticamente y orden PAGADA en Central. No afirmar éxito E2E hasta esa aceptación.
+- La orden 014 por $1600 ya fue registrada en Central y su ZIP probado. No repetir verificaciones de impagos; no tocar producción comercial ni activar cobros reales.
