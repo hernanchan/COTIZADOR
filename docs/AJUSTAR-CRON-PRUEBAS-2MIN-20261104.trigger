@@ -1,0 +1,1 @@
+2026-11-04 — Reducir sólo el cron de reconciliación de saber-pagos-pruebas de 10 a 2 minutos; mismo Worker, acceso 401, Mercado Pago sandbox y controles de rollback. Sin pagos reales, sin web pública, sin costos fuera de la cuota gratuita.
