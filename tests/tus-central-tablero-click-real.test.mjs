@@ -41,6 +41,7 @@ function scene({promptValue='Responsable del mostrador',failCode=null}={}){
  const calls=[];
  const document={
   hidden:false,
+  addEventListener(){},
   querySelector(selector){if(!elements.has(selector))throw Error('Missing DOM '+selector);return elements.get(selector)},
   createElement(tag){return new Element(tag)},body:new Element('body')
  };
