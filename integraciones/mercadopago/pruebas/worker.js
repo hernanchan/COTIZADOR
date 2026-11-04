@@ -345,6 +345,19 @@ async function centralTUSPackageManifest(req,env){
    "AND o.deposit_ars=o.amount_ars AND r.state='verified' LIMIT 1"
   ).bind(row.commercial_order_id).first();
   pagoVerificado=Boolean(review);
+  if(!pagoVerificado){
+   const table=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='bank_accreditations'").first();
+   if(table){
+    const bank=await env.DB.prepare(
+     "SELECT o.id FROM orders o JOIN payment_reviews r ON r.order_id=o.id "+
+     "JOIN bank_accreditations b ON b.order_id=o.id AND b.amount_ars=o.amount_ars "+
+     "WHERE o.id=? AND o.status='paid' AND o.paid_at IS NOT NULL "+
+     "AND o.deposit_ars=o.amount_ars AND o.payment_id IS NULL AND o.preference_id IS NULL "+
+     "AND r.state='verified' LIMIT 1"
+    ).bind(row.commercial_order_id).first();
+    pagoVerificado=Boolean(bank);
+   }
+  }
   if(!pagoVerificado)return json({ok:false,error:"Pago sin conciliación verificada"},409);
  }
  return json({ok:true,schema:p.schema,numeroOrden:shortWorkNumber(row.number),
@@ -2521,6 +2534,80 @@ async function audit(env,event,detail){
  * Compra integral en ENSAYO PRIVADO. Solo llega por HMAC desde el Worker
  * documental; nunca expone la clave admin ni acepta precio del navegador.
  */
+async function ensureBankAccreditations(env){
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS bank_accreditations (order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE RESTRICT,amount_ars INTEGER NOT NULL CHECK(amount_ars>0),operator TEXT NOT NULL,bank_reference TEXT NOT NULL UNIQUE,recorded_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+}
+async function centralApproveBankTransfer(req,env){
+ if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+ if(env.TRANSFER_PRIVATE_ENABLED!=="PRIVATE_TEST_ONLY"||env.DOCS_SANDBOX_CHECKOUT_ENABLED!=="PRIVATE_TEST_ONLY")
+  return json({error:"Acreditación bancaria privada deshabilitada"},503);
+ const origin=req.headers.get("Origin");
+ if(origin&&origin!==new URL(req.url).origin)return json({error:"Origen no autorizado"},403);
+ if(!/^application\/json(?:;|$)/i.test(req.headers.get("Content-Type")||""))
+  return json({error:"Formato JSON obligatorio"},415);
+ const raw=await req.text();
+ if(raw.length>1200)return json({error:"Solicitud demasiado extensa"},413);
+ let d;try{d=JSON.parse(raw)}catch{return json({error:"Solicitud inválida"},400)}
+ if(!d||typeof d!=="object"||Array.isArray(d)||
+    Object.keys(d).sort().join(",")!=="amount_ars,bank_reference,confirmed,operator,order_id"||
+    !CENTRAL_UUID.test(d.order_id||"")||
+    !Number.isSafeInteger(d.amount_ars)||d.amount_ars<1||d.confirmed!==true||
+    typeof d.operator!=="string"||d.operator.trim().length<2||d.operator.trim().length>60||
+    typeof d.bank_reference!=="string")
+  return json({error:"Datos de acreditación incompletos"},400);
+ const operator=d.operator.trim(),reference=d.bank_reference.trim().toUpperCase();
+ if(!/^[A-Z0-9][A-Z0-9._/-]{5,79}$/.test(reference))
+  return json({error:"Ingresá la referencia de la operación que figura en el banco"},422);
+ await centralTables(env);await ensureOrderItems(env);await ensurePaymentReviews(env);
+ await ensureBankAccreditations(env);
+ const order=await env.DB.prepare(
+  "SELECT o.id,o.status,o.amount_ars,o.deposit_ars,o.preference_id,o.payment_id,"+
+  "t.amount_ars AS transfer_amount,m.amount_ars AS document_amount,m.file_count,"+
+  "(SELECT COALESCE(SUM(line_total_ars),0) FROM order_items WHERE order_id=o.id) AS items_total,"+
+  "(SELECT COUNT(*) FROM order_items WHERE order_id=o.id AND sku='DOCS_VERIFIED') AS document_lines "+
+  "FROM orders o JOIN transfer_requests t ON t.order_id=o.id "+
+  "JOIN central_document_manifests m ON m.commercial_order_id=o.id WHERE o.id=?"
+ ).bind(d.order_id).first();
+ if(!order||order.status!=="awaiting_payment"||order.preference_id||order.payment_id||
+    order.amount_ars!==d.amount_ars||order.deposit_ars!==order.amount_ars||
+    order.transfer_amount!==order.amount_ars||order.document_amount!==order.amount_ars||
+    !Number.isSafeInteger(order.file_count)||order.file_count<1||
+    order.items_total!==order.amount_ars||order.document_lines!==1)
+  return json({error:"Importe o estado de pedido no coincide con la transferencia pendiente"},409);
+ const existing=await env.DB.prepare("SELECT state FROM payment_reviews WHERE order_id=?").bind(d.order_id).first();
+ if(existing)return json({error:"El pedido ya tiene una revisión de pago"},409);
+ // Transacción D1: un crédito único, cambio de pedido y revisión de pago juntos.
+ let result;
+ try{
+  result=await env.DB.batch([
+   env.DB.prepare("INSERT INTO bank_accreditations(order_id,amount_ars,operator,bank_reference) "+
+    "SELECT o.id,o.amount_ars,?,? FROM orders o JOIN transfer_requests t ON t.order_id=o.id "+
+    "JOIN central_document_manifests m ON m.commercial_order_id=o.id "+
+    "WHERE o.id=? AND o.status='awaiting_payment' AND o.preference_id IS NULL AND o.payment_id IS NULL "+
+    "AND o.deposit_ars=o.amount_ars AND t.status='awaiting_bank_verification' "+
+    "AND t.amount_ars=o.amount_ars AND m.amount_ars=o.amount_ars "+
+    "AND NOT EXISTS(SELECT 1 FROM payment_reviews p WHERE p.order_id=o.id)")
+    .bind(operator,reference,d.order_id),
+   env.DB.prepare("UPDATE orders SET status='paid',paid_at=datetime('now') "+
+    "WHERE id=? AND status='awaiting_payment' AND preference_id IS NULL AND payment_id IS NULL "+
+    "AND deposit_ars=amount_ars AND EXISTS(SELECT 1 FROM bank_accreditations b "+
+    "WHERE b.order_id=orders.id AND b.amount_ars=orders.amount_ars)")
+    .bind(d.order_id),
+   env.DB.prepare("INSERT INTO payment_reviews(order_id,state,checked_at) "+
+    "SELECT o.id,'verified',datetime('now') FROM orders o "+
+    "JOIN bank_accreditations b ON b.order_id=o.id AND b.amount_ars=o.amount_ars "+
+    "WHERE o.id=? AND o.status='paid' AND o.paid_at IS NOT NULL "+
+    "AND NOT EXISTS(SELECT 1 FROM payment_reviews p WHERE p.order_id=o.id)")
+    .bind(d.order_id)
+  ]);
+ }catch(_){return json({error:"Operación bancaria ya usada o acreditación simultánea. Actualizá la bandeja."},409)}
+ if(!Array.isArray(result)||result.length!==3||result.some(x=>Number(x?.meta?.changes)!==1))
+  return json({error:"No se pudo completar la acreditación; revisar estado en Central"},409);
+ const audit=await env.DB.prepare("SELECT operator,recorded_at FROM bank_accreditations WHERE order_id=?").bind(d.order_id).first();
+ return json({ok:true,order_id:d.order_id,amount_ars:d.amount_ars,state:"pagado",
+  payment_confirmed:true,operator:audit.operator,recorded_at:audit.recorded_at,production_enabled:false});
+}
+
 async function centralClientSandboxPayment(req,env,dispatch){
  const signed=await centralReadSigned(req,env);
  if(signed.error)return json({ok:false,error:signed.error},signed.status);
@@ -2530,7 +2617,7 @@ async function centralClientSandboxPayment(req,env,dispatch){
  const p=signed.payload;
  if(!p||typeof p!=="object"||Array.isArray(p)||
     Object.keys(p).sort().join(",")!=="action,clientOrderId,commercialOrderId,webOrderId"||
-    !["start","status"].includes(p.action)||
+    !["start","status","bank"].includes(p.action)||
     !CENTRAL_UUID.test(p.clientOrderId||"")||
     !CENTRAL_UUID.test(p.commercialOrderId||"")||
     !/^WEB-ENSAYO-[A-F0-9]{32}$/.test(p.webOrderId||""))
@@ -2545,6 +2632,22 @@ async function centralClientSandboxPayment(req,env,dispatch){
   "WHERE o.id=? AND c.client_order_id=? AND m.web_order_id=? LIMIT 1"
  ).bind(p.commercialOrderId,p.clientOrderId,p.webOrderId).first();
  if(!belongs)return json({ok:false,error:"La orden no corresponde a esta sesión"},403);
+ if(p.action==="bank"){
+  if(env.TRANSFER_PRIVATE_ENABLED!=="PRIVATE_TEST_ONLY")return json({ok:false,error:"Transferencias privadas no habilitadas"},503);
+  const eligible=await documentSandboxEligibility(env,belongs.id,false);
+  if(eligible.reason&&eligible.reason!=="TRANSFERENCIA_EN_PROCESO")
+   return json({ok:false,error:"Pedido no apto para transferencia: "+eligible.reason},409);
+  if(typeof dispatch!=="function"||!env.DEMO_ADMIN_KEY)return json({ok:false,error:"Central no disponible"},503);
+  const response=await dispatch(new Request(new URL("/demo/transfer-request",req.url),{
+   method:"POST",headers:{Authorization:"Bearer "+env.DEMO_ADMIN_KEY,"Content-Type":"application/json"},
+   body:JSON.stringify({order_id:belongs.id})
+  }));
+  const result=await response.json().catch(()=>null);
+  if(!response.ok||result?.order_id!==belongs.id||result.state!=="awaiting_bank_verification")
+   return json({ok:false,error:String(result?.error||"Transferencia no disponible").slice(0,160)},response.status===409?409:503);
+  return json({ok:true,commercialOrderId:belongs.id,estado:"transferencia_pendiente",
+   alias:result.alias,amountArs:result.amount_ars,paymentAuthorized:false});
+ }
  if(p.action==="status"){
   // Esta verificación es automática: el comprador nunca presiona un botón
   // administrativo. Mercado Pago se consulta solo para su propia orden D1,
@@ -2554,8 +2657,14 @@ async function centralClientSandboxPayment(req,env,dispatch){
   await ensurePaymentReviews(env);
   const fresh=await env.DB.prepare("SELECT status FROM orders WHERE id=?").bind(belongs.id).first();
   const r=await env.DB.prepare("SELECT state FROM payment_reviews WHERE order_id=?").bind(belongs.id).first();
+  let transfer=null;
+  if(fresh?.status==="awaiting_payment"){
+   const table=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='transfer_requests'").first();
+   if(table)transfer=await env.DB.prepare("SELECT status FROM transfer_requests WHERE order_id=?").bind(belongs.id).first();
+  }
   const estado=r?.state==="revoked"?"revocado":
-   fresh?.status==="paid"&&r?.state==="verified"?"pagado":"pendiente";
+   fresh?.status==="paid"&&r?.state==="verified"?"pagado":
+   transfer?.status==="awaiting_bank_verification"?"transferencia_pendiente":"pendiente";
   return json({ok:true,commercialOrderId:belongs.id,estado,paymentAuthorized:estado==="pagado"});
  }
  if(typeof dispatch!=="function"||typeof env.DEMO_ADMIN_KEY!=="string"||!env.DEMO_ADMIN_KEY)
@@ -2678,7 +2787,8 @@ export default {
    }
    // Consulta privada y de SOLO LECTURA. Una instrucción de transferencia
    // jamás habilita fabricación ni acredita fondos por sí sola.
-   if(url.pathname==="/admin/api/transfers/pending"&&req.method==="GET"){
+   if(url.pathname==="/admin/api/transfers/approve"&&req.method==="POST")return await centralApproveBankTransfer(req,env);
+    if(url.pathname==="/admin/api/transfers/pending"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
     if(env.TRANSFER_PRIVATE_ENABLED!=="PRIVATE_TEST_ONLY")
      return json({error:"Conciliación de transferencias no habilitada"},503);
@@ -2802,7 +2912,9 @@ export default {
      express.descargaHabilitada=express.descargaHabilitada&&express.pagoConfirmado;
      produccion.polaroidsExpress=express;
     }
-    return json({order,items:rows.results,produccion});
+    const existsBank=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='bank_accreditations'").first();
+    const bankAccreditation=existsBank?await env.DB.prepare("SELECT amount_ars,operator,bank_reference,recorded_at FROM bank_accreditations WHERE order_id=?").bind(id).first():null;
+    return json({order,items:rows.results,produccion,bankAccreditation:bankAccreditation||null});
    }
    if(url.pathname==="/demo/catalog"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
