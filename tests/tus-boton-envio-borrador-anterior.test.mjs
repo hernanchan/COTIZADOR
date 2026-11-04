@@ -1,0 +1,59 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {paginaCotizadorV2PruebaPrivada} from '../integraciones/autocotizador/recepcion/pantalla-cotizador-v2-prueba-privada.mjs';
+const html=paginaCotizadorV2PruebaPrivada('test-sitekey-1234567890',true,{invalidos:[]},true);
+const script=html.match(/<script type="module">([\s\S]*?)<\/script>/)?.[1]||'';
+const begin=script.indexOf('function borradorAnteriorSinPDF(){');
+const end=script.indexOf('function updateSummary(){',begin);
+assert.ok(begin>0&&end>begin,'No se encontró separación de borrador y botón de envío');
+const block=script.slice(begin,end);
+
+function probar({smartReady=true,preflight=true,blocked=false,all=[],refsConfirmadas=false}={}){
+ let orderId='OLD-ORDER',clientOrderId='OLD-CLIENT';
+ const used=new Set(['oldref']),removed=[];
+ const sessionStorage={removeItem:key=>removed.push(key)};
+ const TUS_ENABLED=true,TUS_BLOCKED=blocked,tusPreflightOK=preflight;
+ const batchSending=false,registering=false,handoffInProgress=false,registeredOrder=null,smartBlockedReason='';
+ const newOrderId=()=> 'WEB-ENSAYO-NEW',newClientOrderId=()=> 'NEW-CLIENT';
+ const RECOVERY_KEY='saber-v2-ensayo-metadatos-v1';
+ const fn=new Function('all','used','sessionStorage','smartReady','TUS_ENABLED','TUS_BLOCKED','tusPreflightOK',
+  'batchSending','registering','handoffInProgress','registeredOrder','smartBlockedReason','newOrderId',
+  'newClientOrderId','RECOVERY_KEY',
+  'let orderId="OLD-ORDER",clientOrderId="OLD-CLIENT";'+block+'\n'+
+  'return {reason:motivoBloqueoEnvio(),discarded:descartarBorradorAnteriorParaPedidoNuevo(),'+
+  'all,orderId,clientOrderId};');
+ const result=fn(all,used,sessionStorage,smartReady,TUS_ENABLED,TUS_BLOCKED,tusPreflightOK,
+  batchSending,registering,handoffInProgress,registeredOrder,smartBlockedReason,newOrderId,newClientOrderId,RECOVERY_KEY);
+ return {...result,removed,used};
+}
+
+test('PDF nuevo cotizado habilita envío sin borrar datos del PDF actual',()=>{
+ const q=probar();
+ assert.equal(q.reason,'');
+ assert.equal(q.discarded,false);
+ assert.equal(q.orderId,'OLD-ORDER');
+});
+test('borrador anterior sin File no bloquea el PDF nuevo ni mezcla identificadores',()=>{
+ const borrador=[{name:'antiguo.pdf',references:[{reference:{nombre:'antiguo.pdf'}}]}];
+ const q=probar({all:borrador});
+ assert.equal(q.reason,'');
+ assert.equal(q.discarded,true);
+ assert.equal(q.all.length,0);
+ assert.equal(q.used.size,0);
+ assert.equal(q.orderId,'WEB-ENSAYO-NEW');
+ assert.equal(q.clientOrderId,'NEW-CLIENT');
+ assert.deepEqual(q.removed,['saber-v2-ensayo-metadatos-v1']);
+});
+test('el preflight TUS fallido prevalece aunque haya presupuesto válido',()=>{
+ const q=probar({preflight:false});
+ assert.match(q.reason,/almacenamiento privado/);
+});
+test('no habilita enviar si aún no terminó la cotización',()=>{
+ const q=probar({smartReady:false});
+ assert.match(q.reason,/presupuesto completo/);
+});
+test('un envío en curso no se reactiva por mensajes nuevos del iframe',()=>{
+ assert.match(script,/if\(batchSending\)return 'Los archivos se están enviando'/);
+ assert.match(script,/sendAllButton.disabled=Boolean\(bloqueo\)/);
+ assert.match(script,/if\(descartarBorradorAnteriorParaPedidoNuevo\(\)\)/);
+});
