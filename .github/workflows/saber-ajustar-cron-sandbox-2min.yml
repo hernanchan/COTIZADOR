@@ -1,0 +1,55 @@
+name: Saber - ajustar cron respaldo SOLO Central de PRUEBAS a 2 min
+on:
+  push:
+    branches:
+      - integracion/tus-pedido-privado-20261101
+    paths:
+      - docs/AJUSTAR-CRON-PRUEBAS-2MIN-20261104.trigger
+permissions:
+  contents: read
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Cambiar únicamente cron de Worker privado con comprobación y rollback
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          base="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-pagos-pruebas"
+          dir=$(mktemp -d)
+          trap 'rm -rf "$dir"' EXIT
+          auth="Authorization: Bearer $TOKEN"
+          curl -fsS --max-time 25 -H "$auth" "$base/settings" -o "$dir/settings"
+          jq -e '.success==true and (.result.bindings|any(.name=="DOCS_SANDBOX_CHECKOUT_ENABLED" and .type=="plain_text" and .text=="PRIVATE_TEST_ONLY")) and ([.result.bindings[]|select(.name=="CHECKOUT_ENABLED" or .name=="PAYMENTS_ENABLED")|.text] | all(.!="APROBADO" and .!="true"))' "$dir/settings" >/dev/null
+          curl -fsS --max-time 25 -H "$auth" "$base/schedules" -o "$dir/before"
+          jq -e '.success==true and ([.result.schedules[]?.cron] == ["*/10 * * * *"])' "$dir/before" >/dev/null || {
+            echo "CRON_PREVIO_INESPERADO_NO_SE_MODIFICA";exit 1
+          }
+          echo "CRON_PREVIO_VERIFICADO=10MIN"
+          echo '[{"cron":"*/2 * * * *"}]' > "$dir/target"
+          code=$(curl --silent --show-error --max-time 35 -w '%{http_code}' -o "$dir/update" -X PUT -H "$auth" -H "Content-Type: application/json" --data-binary "@$dir/target" "$base/schedules")
+          if [ "$code" != "200" ] || ! jq -e '.success==true' "$dir/update" >/dev/null; then
+            echo "CRON_UPDATE_NO_CONFIRMADO_HTTP_$code";exit 1
+          fi
+          valid=false
+          for attempt in 1 2 3 4 5; do
+            if curl -fsS --max-time 20 -H "$auth" "$base/schedules" -o "$dir/after" &&
+               jq -e '.success==true and ([.result.schedules[]?.cron]==["*/2 * * * *"])' "$dir/after" >/dev/null; then valid=true;break;fi
+            sleep 2
+          done
+          health=$(curl -fsS --max-time 25 "https://saber-pagos-pruebas.libreriasaber.workers.dev/health" || true)
+          if [ "$valid" != true ] || ! echo "$health" | jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' >/dev/null 2>&1; then
+            echo "CRON_VERIFICACION_FALLO_ROLLBACK"
+            curl -fsS --max-time 30 -X PUT -H "$auth" -H "Content-Type: application/json" -d '[{"cron":"*/10 * * * *"}]' "$base/schedules" -o "$dir/rollback"
+            jq -e '.success==true and ([.result.schedules[]?.cron]==["*/10 * * * *"])' "$dir/rollback" >/dev/null
+            exit 1
+          fi
+          echo "CRON_PRIVADO=2MIN_VERIFICADO; SIN CAMBIOS A PRODUCCION_COMERCIAL"
