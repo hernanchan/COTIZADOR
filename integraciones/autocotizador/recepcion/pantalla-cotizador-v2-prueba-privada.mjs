@@ -1152,7 +1152,7 @@ window.addEventListener('message',async event=>{
     style:'currency',currency:'ARS',maximumFractionDigits:0}).format(price)+' · Sin cobro autorizado';
   else if(status==='calculando')headerPrice.textContent='Recalculando presupuesto…';
   else if(status==='incompleto')headerPrice.textContent='Presupuesto incompleto · Corregí los archivos pendientes';
-  else if(status==='error')headerPrice.textContent='Sin presupuesto · Revisá el error en la carga';
+  else if(status==='error')headerPrice.textContent='Presupuesto pendiente · '+(smartBlockedReason||'No pudimos consultar el servidor. El PDF sigue cargado; reintentá el cálculo abajo.');
   else if(status==='esperando')headerPrice.textContent='Presupuesto preliminar: todavía sin cotizar';
   return;
  }
