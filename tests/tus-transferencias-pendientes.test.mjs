@@ -60,7 +60,7 @@ test('la Central lista transferencias sin acreditar ni liberar la orden',()=>{
  assert.ok(worker.includes('id="refreshTransfers"'));
  assert.ok(worker.includes('id="transferPending"'));
  assert.ok(worker.includes('api("/admin/api/transfers/pending")'));
- assert.ok(worker.includes('Acreditación NO verificada · NO imprimir'));
+ assert.ok(worker.includes('Pago NO verificado · NO imprimir'));
 });
 
 test('conciliacion de transferencias muestra numero de orden existente sin renumerar',()=>{
@@ -72,6 +72,8 @@ test('conciliacion de transferencias muestra numero de orden existente sin renum
  assert.ok(route.includes('n.number AS numero_orden'));
  assert.ok(!route.includes('INSERT INTO central_work_order_numbers'));
  assert.ok(!route.includes('INSERT OR IGNORE INTO central_work_order_numbers'));
- assert.ok(worker.includes('const ref=t.numero_orden?"Orden N.º "+String(t.numero_orden).padStart(3,"0")'));
- assert.ok(worker.includes('Referencia de conciliación: '));
+ assert.ok(worker.includes('const orderLabel=t.numero_orden?"Orden N.º "+String(t.numero_orden).padStart(3,"0")'));
+ assert.ok(worker.includes('Referencia de operación bancaria (obligatoria):'));
+ assert.ok(worker.includes('key!==transferVisibleKey'));
+ assert.ok(worker.includes('refreshTransfers({silent:true})'));
 });
