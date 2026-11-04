@@ -145,3 +145,11 @@ Al concluir Etapa 1, crear `docs/ETAPA2-...-ESTADO.md`, actualizar aquí cuál e
 - Documentos `saber-documentos-pruebas`, versión `043b49db-2c70-4b19-9174-af7c65dc1d48`, despliegue GitHub Actions 41669021788 SUCCESS.
 - **Pendiente prioritario:** el titular realiza en Chrome una compra de ensayo desde PDF + teléfono → Enviar pedido → **Pagar con Mercado Pago (prueba)** → comprador de prueba → verificar pago automáticamente y orden PAGADA en Central. No afirmar éxito E2E hasta esa aceptación.
 - La orden 014 por $1600 ya fue registrada en Central y su ZIP probado. No repetir verificaciones de impagos; no tocar producción comercial ni activar cobros reales.
+
+
+## Continuidad 04/11/2026 — Acreditación manual bancaria
+- Rama de trabajo: `integracion/tus-pedido-privado-20261101`. Leer `AGENTS.md`, libreta y ensayo integral antes de tocar producción.
+- Orden 018: usuario confirmó Mercado Pago Sandbox → Nuevos automáticamente, sin F5; no repetir.
+- Transferencias: se implementó en rama el registro atómico `bank_accreditations`, `POST /admin/api/transfers/approve`, la interfaz Central y la opción cliente TUS por HMAC. Examinar los resultados CI y despliegues **antes de llamar terminado**.
+- Prueba bancaria SIEMPRE con datos ficticios, alias de ensayo, sin mover dinero. Un comprobante NO confirma pago; solo autorización humana tras lectura bancaria real.
+- Siguiente paso técnico: validar `tests/tus-transferencias-acreditacion.test.mjs` y el CI integrado; verificar flags y desplegar solo Workers de pruebas mediante flujos con rollback, jamás main, web comercial o cobros reales.
