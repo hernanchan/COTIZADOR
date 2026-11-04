@@ -1,0 +1,61 @@
+name: Saber - diagnóstico privado webhook y cron SOLO lectura
+on:
+  push:
+    branches:
+      - integracion/tus-pedido-privado-20261101
+    paths:
+      - docs/DIAGNOSTICO-WEBHOOK-CRON-20261104.trigger
+permissions:
+  contents: read
+jobs:
+  diagnostico:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Comprobar configuración y cron SIN revelar secretos ni modificar Cloudflare
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          base="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-pagos-pruebas"
+          temp=$(mktemp -d)
+          trap 'rm -rf "$temp"' EXIT
+          curl --fail --silent --show-error --max-time 25 -H "Authorization: Bearer $TOKEN" "$base/settings" > "$temp/settings"
+          jq -e '.success==true and (.result.bindings|type=="array")' "$temp/settings" >/dev/null
+          for n in DB MP_TEST_ACCESS_TOKEN MP_TEST_SELLER_ID TEST_WEBHOOK_URL MP_WEBHOOK_SECRET CENTRAL_BRIDGE_KEY; do
+            jq -e --arg name "$n" '.result.bindings|any(.name==$name)' "$temp/settings" >/dev/null
+            echo "CONFIG_PRESENCIA_${n}=SI"
+          done
+          jq -e '.result.bindings|any(.name=="DOCS_SANDBOX_CHECKOUT_ENABLED" and .type=="plain_text" and .text=="PRIVATE_TEST_ONLY")' "$temp/settings" >/dev/null
+          echo "CHECKOUT_SANDBOX_PRIVADO=ON"
+          jq -e '.result.bindings|all(.[]|select(.name=="CHECKOUT_ENABLED" or .name=="PAYMENTS_ENABLED")|.text!="APROBADO" and .text!="true")' "$temp/settings" >/dev/null
+          echo "CHECKOUT_COMERCIAL=OFF"
+          webhookType=$(jq -r '[.result.bindings[]|select(.name=="TEST_WEBHOOK_URL")|.type][0]//"absent"' "$temp/settings")
+          echo "WEBHOOK_BINDING_TYPE=$webhookType"
+          # Solo comparar si Cloudflare expone plain_text; nunca imprimir URL ni token.
+          if [ "$webhookType" = "plain_text" ]; then
+            if jq -e '.result.bindings|any(.name=="TEST_WEBHOOK_URL" and .text=="https://saber-pagos-pruebas.libreriasaber.workers.dev/webhooks/mercadopago")' "$temp/settings" >/dev/null; then
+              echo "WEBHOOK_URL_EXACTA=SI"
+            else
+              echo "WEBHOOK_URL_EXACTA=NO"
+            fi
+          else
+            echo "WEBHOOK_URL_EXACTA=NO_COMPROBABLE_SIN_SECRETO"
+          fi
+          http=$(curl --silent --show-error --max-time 25 -o "$temp/schedules" -w '%{http_code}' -H "Authorization: Bearer $TOKEN" "$base/schedules" || true)
+          echo "CRON_CONFIG_HTTP=$http"
+          if [ "$http" = "200" ]; then
+            jq -c '{success,crons:[.result.schedules[]?.cron]}' "$temp/schedules"
+          else
+            echo "CRON_NO_VERIFICABLE_CON_ESTE_TOKEN"
+          fi
+          curl --fail --silent --show-error --max-time 20 "https://saber-pagos-pruebas.libreriasaber.workers.dev/health" > "$temp/health"
+          jq -c '{ok,databaseReady,paymentsEnabled}' "$temp/health"
+          jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$temp/health" >/dev/null
+          echo "DIAGNOSTICO_SOLO_LECTURA_FINALIZADO"
