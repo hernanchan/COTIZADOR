@@ -378,8 +378,9 @@ function restore(){
   return {orderId:state.orderId,clientOrderId:state.clientOrderId,items,seen};
  }catch{return null}
 }
-const previous=restore(),orderId=previous?.orderId||newOrderId();
-const clientOrderId=previous?.clientOrderId||newClientOrderId();
+const previous=restore();
+let orderId=previous?.orderId||newOrderId();
+let clientOrderId=previous?.clientOrderId||newClientOrderId();
 const all=previous?.items||[],used=previous?.seen||new Set();
 function save(){
  try{
@@ -397,6 +398,37 @@ function save(){
   const encoded=JSON.stringify({orderId,clientOrderId,items,savedAt:Date.now()});
   if(encoded.length<=RECOVERY_MAX_BYTES)sessionStorage.setItem(RECOVERY_KEY,encoded);
  }catch{/* Modo privado o cuota: la cotización sigue funcionando sin persistencia. */}
+}
+// El análisis nuevo del iframe tiene prioridad sobre metadatos restaurados.
+// Esos metadatos carecen de objetos File y no deben bloquear un nuevo PDF.
+function borradorAnteriorSinPDF(){
+ return all.length>0&&all.every(item=>item.references.every(d=>
+  !d.archivoLocal&&!d.confirmacion));
+}
+function motivoBloqueoEnvio(){
+ const refs=all.flatMap(item=>item.references);
+ if(TUS_BLOCKED)return 'Recepción privada no configurada.';
+ if(TUS_ENABLED&&!tusPreflightOK)return 'Comprobación del almacenamiento privado pendiente o fallida.';
+ if(batchSending)return 'Los archivos se están enviando.';
+ if(registering)return 'Se está registrando el pedido.';
+ if(handoffInProgress)return 'Preparando los archivos del pedido.';
+ if(registeredOrder)return 'El pedido ya fue registrado.';
+ if(smartReady&&(refs.length===0||borradorAnteriorSinPDF()))return '';
+ if(!refs.length)return smartBlockedReason||'Todavía no hay un presupuesto completo listo para enviar.';
+ if(all.some(item=>item.references.length===0))
+  return 'Hay un trabajo anterior sin PDF; quitá ese borrador antes de enviar.';
+ if(refs.some(d=>!d.confirmacion&&!d.archivoLocal))
+  return 'Hay un PDF anterior sin archivo local; cargá de nuevo ese PDF o iniciá un nuevo trabajo.';
+ return '';
+}
+function descartarBorradorAnteriorParaPedidoNuevo(){
+ if(!smartReady||!borradorAnteriorSinPDF())return false;
+ all.length=0;
+ used.clear();
+ try{sessionStorage.removeItem(RECOVERY_KEY)}catch{}
+ orderId=newOrderId();
+ clientOrderId=newClientOrderId();
+ return true;
 }
 function updateSummary(){
  const allRefs=all.flatMap(item=>item.references);
@@ -420,9 +452,11 @@ function updateSummary(){
    (withoutPdf?' · '+withoutPdf+' trabajos sin PDF':'')+
    ' · Central D1: '+(registeredOrder?'registrado':'pendiente')+' · Cobros desactivados.';
  summary.append(title,detail);
- sendAllButton.disabled=TUS_BLOCKED||(TUS_ENABLED&&!tusPreflightOK)||batchSending||registering||handoffInProgress||Boolean(registeredOrder)||
-  (allRefs.length===0&&!smartReady)||withoutPdf!==0||
-  allRefs.some(d=>!d.confirmacion&&!d.archivoLocal);
+ const bloqueo=motivoBloqueoEnvio();
+ sendAllButton.disabled=Boolean(bloqueo);
+ sendAllButton.title=bloqueo||'Enviar el pedido cotizado';
+ if(bloqueo&&smartReady&&!batchSending&&!registering&&!registeredOrder)
+  batchProgress.textContent='Envío pendiente: '+bloqueo;
  sendAllButton.textContent=registeredOrder?'Orden N.º '+(registeredShortOrder||'')+' recibida':
   batchSending?'Enviando archivos…':registering?'Registrando pedido…':'Enviar mi pedido';
  registerButton.disabled=true;
@@ -886,6 +920,9 @@ sendAllButton.addEventListener('click',async()=>{
   return;
  }
  iniciarMedicion();
+ // No mezclar PDF nuevo con referencias restauradas sin su File original.
+ if(descartarBorradorAnteriorParaPedidoNuevo())
+  batchProgress.textContent='Pedido nuevo preparado; el borrador anterior no se mezclará.';
  if(all.flatMap(item=>item.references).length===0){
   if(!smartReady){batchProgress.textContent=smartBlockedReason||'El presupuesto no está listo para enviar.';terminarMedicion('presupuesto_incompleto');return;}
   marcarTiempo('preparacion_inicio');
