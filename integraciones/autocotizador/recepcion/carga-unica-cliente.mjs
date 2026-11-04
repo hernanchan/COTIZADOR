@@ -266,7 +266,8 @@ function renderAnilladosConjuntos(){
  panel.append(texto('p','Elegí qué archivos van juntos y su orden. Podés combinar B/N, color y caras diferentes, siempre que los PDF del grupo tengan el mismo tamaño de papel y cantidad de copias.'));
  const todos=document.createElement('button');todos.type='button';
  todos.className='editar';todos.textContent='Anillar todos juntos';
- const compatibles=docs.every(x=>x.categoria.id===docs[0].categoria.id&&x.e.copias===docs[0].e.copias);
+ const compatibles=docs.every(x=>x.categoria.id===docs[0].categoria.id&&
+  x.e.seleccion===docs[0].e.seleccion&&x.e.copias===docs[0].e.copias);
  todos.disabled=leyendo||!compatibles;
  todos.title=compatibles?'Unir todos los documentos en el grupo 1':'Igualá tamaño y copias, o creá grupos diferentes.';
  todos.onclick=()=>{
@@ -312,7 +313,8 @@ function renderAnilladosConjuntos(){
  }
  for(const [id,miembros] of grupos){
   const ok=miembros.length>=2&&miembros.every(e=>
-   grupoVisible(e).id===grupoVisible(miembros[0]).id&&e.copias===miembros[0].copias);
+   grupoVisible(e).id===grupoVisible(miembros[0]).id&&
+   e.seleccion===miembros[0].seleccion&&e.copias===miembros[0].copias);
   const aviso=texto('p',ok
    ?'Grupo '+id+': '+miembros.length+' PDF en este orden · '+miembros[0].copias+' anillado(s); precio confirmado por servidor.'
    :'Grupo '+id+': elegí al menos dos PDF del mismo tamaño y cantidad de copias.');

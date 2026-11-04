@@ -119,9 +119,10 @@ test('instrucciones de impresión visibles, sin asumir opciones ausentes',()=>{
  const parsed=generated.slice(generated.indexOf('<script>')+8,generated.indexOf('</script>'));
  new vm.Script(parsed);
  assert.ok(client.includes('function agregarFichaDeImpresion('));
- assert.ok(client.includes('agregarFichaDeImpresion(area,t);'));
+  assert.ok(client.includes('agregarFichaDeImpresion(area,t,{trabajos:x.documentos.trabajos});'));
  assert.ok(client.includes('NO CONSTA — verificar'));
  assert.ok(client.includes('tipoAnillado'));
+  assert.ok(client.includes('ANILLADO CONJUNTO'));
  assert.ok(client.includes('Páginas por cara'));
  assert.ok(client.includes('Copiar instrucciones'));
  assert.ok(client.includes('NO IMPRIMIR SIN PAGO CONFIRMADO'));

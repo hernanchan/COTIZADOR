@@ -19,7 +19,7 @@ test('paid-order Central JavaScript compiles with the complete operator print sh
  assert.match(paid,/documentosVerificados/);
  assert.match(paid,/PAGO VERIFICADO/);
  assert.match(paid,/d\.numeroOrden/);
- assert.match(paid,/agregarFichaDeImpresion\(line,t,\{pagado:true\}\)/);
+  assert.ok(paid.includes('agregarFichaDeImpresion(line,t,{pagado:true,trabajos:d.documentos.trabajos});'));
  assert.match(paid,/Array\.isArray\(d\.trabajos\)/);
  assert.match(paid,/d\.trabajos\.length!==d\.archivos/);
 });
@@ -38,8 +38,10 @@ test('paid print instructions never report an unverified print-ready PDF',()=>{
  assert.match(spec,/NO IMPRIMIR SIN PAGO CONFIRMADO Y VALIDACIÓN DE PRODUCCIÓN/);
  assert.match(spec,/NO CONSTA — verificar/);
  assert.match(spec,/Copiar instrucciones/);
- assert.match(client,/agregarFichaDeImpresion\(area,t\)/);
- assert.match(src,/listoParaProducir:false/);
+  assert.ok(client.includes('agregarFichaDeImpresion(area,t,{trabajos:x.documentos.trabajos});'));
+ assert.match(spec,/ANILLADO CONJUNTO/);
+  assert.match(spec,/hojas físicas por anillado/);
+  assert.match(src,/listoParaProducir:false/);
 });
 test('order API still requires paid order with verified D1 payment review',()=>{
  const section=src.slice(src.indexOf('if(url.pathname==="/admin/api/order"'),src.indexOf('if(url.pathname==="/demo/catalog"'));
