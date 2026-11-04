@@ -41,10 +41,11 @@ const DB={
     const {sql,args}=q;
     if(sql.startsWith('INSERT INTO bank_accreditations')){
      const [operator,reference,id]=args;
+     const clave=reference.replaceAll(' ','-');
      if(id!==model.id||model.status!=='awaiting_payment'||model.preference_id||
-        model.review||bankReferences.has(reference)||model.bank)throw Error('constraint');
+        model.review||bankReferences.has(clave)||model.bank)throw Error('constraint');
      model.bank={operator,bank_reference:reference,recorded_at:'2026-11-04 18:00:00'};
-     bankReferences.set(reference,id);
+     bankReferences.set(clave,id);
     }else if(sql.startsWith("UPDATE orders SET status='paid'")){
      if(args[0]!==model.id||!model.bank)throw Error('not paid');
      model.status='paid';model.paid_at='2026-11-04 18:00:00';
@@ -126,11 +127,21 @@ test('referencia bancaria con espacios se normaliza y no acredita comprobantes n
  reset();bankReferences.clear();
  const paid=await call(valid(firstId,'banco mp 34 55'));
  assert.equal(paid.code,200);
- assert.equal(model.bank.bank_reference,'BANCO-MP-34-55');
+ assert.equal(model.bank.bank_reference,'BANCO MP 34 55');
  reset(secondId);
  assert.equal((await call(valid(secondId,'BANCO-MP-34-55'))).code,409);
  assert.equal(model.status,'awaiting_payment');
  assert.equal((await call(valid(secondId,'captura enviada.png'))).code,422);
+});
+
+test('espacios repetidos se conservan normalizados sin perder bloqueo de duplicados',async()=>{
+ reset();bankReferences.clear();
+ const r=await call(valid(firstId,'   banco    mp   34 55   '));
+ assert.equal(r.code,200);
+ assert.equal(model.bank.bank_reference,'BANCO MP 34 55');
+ reset(secondId);
+ assert.equal((await call(valid(secondId,'BANCO-MP-34-55'))).code,409);
+ assert.equal(model.status,'awaiting_payment');
 });
 
 test('misma referencia bancaria no puede acreditar segundo pedido',async()=>{
@@ -147,6 +158,7 @@ test('misma referencia bancaria no puede acreditar segundo pedido',async()=>{
 test('el contrato conserva MP, y el recibo cliente nunca confirma banca',()=>{
  assert.match(source,/\/admin\/api\/transfers\/approve/);
  assert.match(source,/bank_reference TEXT NOT NULL UNIQUE/);
+ assert.match(source,/idx_bank_reference_espacios_guiones/);
  assert.match(source,/JOIN bank_accreditations b ON b.order_id=o.id AND b.amount_ars=o.amount_ars/);
  assert.match(source,/TRANSFER_PRIVATE_ENABLED!=="PRIVATE_TEST_ONLY"/);
  assert.match(source,/env\.DB\.batch\(\[/);
@@ -219,7 +231,7 @@ test('botón de acreditación: falta de referencia visible, confirmación explí
  assert.equal(calls.length,1);
  assert.equal(calls[0].path,'/admin/api/transfers/approve');
  assert.equal(calls[0].payload.confirmed,true);
- assert.equal(calls[0].payload.bank_reference,'BANCO-MP-34-55');
+ assert.equal(calls[0].payload.bank_reference,'BANCO MP 34 55');
  assert.equal(confirms,1);
  assert.equal(boardRefreshes,1);
  assert.equal(controls['#transferCount'].textContent,'0 pendiente(s)');

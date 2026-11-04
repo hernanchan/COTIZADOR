@@ -2023,7 +2023,7 @@ async function refreshTransfers({silent=false,force=false}={}){
     reference.type="text";reference.maxLength=80;reference.autocomplete="off";
     reference.placeholder="Ej.: Banco MP 34 55";
     reference.setAttribute("aria-label","Referencia única de la operación bancaria");
-    const note=node("p","Podés usar espacios en la referencia. Comprobá importe y operación en el banco. Solo ENSAYO privado; nunca transfieras dinero al alias ficticio.");
+    const note=node("p","Los espacios se conservan en la referencia registrada. Comprobá importe y operación en el banco. Solo ENSAYO privado; nunca transfieras dinero al alias ficticio.");
     note.className="note";
     const feedback=node("p","");
     feedback.className="transfer-feedback";feedback.setAttribute("role","status");
@@ -2031,10 +2031,10 @@ async function refreshTransfers({silent=false,force=false}={}){
     approve.type="button";
     approve.addEventListener("click",async()=>{
      const operator=requestOperator();
-     const bankReference=reference.value.trim().toUpperCase().replace(/\s+/g,"-");
+     const bankReference=reference.value.trim().toUpperCase().replace(/\s+/g," ");
      const inform=message=>{feedback.textContent=message;panel.textContent=orderLabel+": "+message;status.textContent=message};
      if(!operator){inform("Falta indicar el responsable. Completalo en el encabezado.");operatorInput.focus();return}
-     if(!/^[A-Z0-9][A-Z0-9._/-]{5,79}$/.test(bankReference)||/\.(?:PDF|PNG|JPE?G|WEBP)$/.test(bankReference)){
+     if(!/^[A-Z0-9][A-Z0-9._/ -]{5,79}$/.test(bankReference)||/\.(?:PDF|PNG|JPE?G|WEBP)$/.test(bankReference)){
       inform("Ingresá la referencia de 6 a 80 caracteres. Podés usar espacios entre letras y números.");
       reference.setAttribute("aria-invalid","true");reference.focus();return;
      }
@@ -2634,6 +2634,7 @@ async function audit(env,event,detail){
  */
 async function ensureBankAccreditations(env){
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS bank_accreditations (order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE RESTRICT,amount_ars INTEGER NOT NULL CHECK(amount_ars>0),operator TEXT NOT NULL,bank_reference TEXT NOT NULL UNIQUE,recorded_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+ await env.DB.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_bank_reference_espacios_guiones ON bank_accreditations(REPLACE(bank_reference, ' ', '-'))").run();
 }
 async function centralApproveBankTransfer(req,env){
  if(!tokenOK(req,env))return json({error:"No autorizado"},401);
@@ -2653,8 +2654,8 @@ async function centralApproveBankTransfer(req,env){
     typeof d.operator!=="string"||d.operator.trim().length<2||d.operator.trim().length>60||
     typeof d.bank_reference!=="string")
   return json({error:"Datos de acreditación incompletos"},400);
- const operator=d.operator.trim(),reference=d.bank_reference.trim().toUpperCase().replace(/\s+/g,"-");
- if(!/^[A-Z0-9][A-Z0-9._/-]{5,79}$/.test(reference)||/\.(?:PDF|PNG|JPE?G|WEBP)$/.test(reference))
+ const operator=d.operator.trim(),reference=d.bank_reference.trim().toUpperCase().replace(/\s+/g," ");
+ if(!/^[A-Z0-9][A-Z0-9._/ -]{5,79}$/.test(reference)||/\.(?:PDF|PNG|JPE?G|WEBP)$/.test(reference))
   return json({error:"Ingresá la referencia de la operación que figura en el banco"},422);
  await centralTables(env);await ensureOrderItems(env);await ensurePaymentReviews(env);
  await ensureBankAccreditations(env);

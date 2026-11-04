@@ -361,3 +361,9 @@ Se conserva el cálculo existente de hojas físicas y tarifa única por grupo (s
 - Worker Central **`saber-pagos-pruebas`**: GitHub Actions `41928278342` **SUCCESS**. Versión nueva activa `d06e4a9c-cbd2-4af9-b94b-d284fd76b910` (antes `9dc45162-5ef1-4d29-80c8-999aa887faaa`). Comprobados HTTP 401 administrativo, `/health` y `paymentsEnabled=false`.
 - No se cambió `main`, web pública, carga TUS, Mercado Pago real ni transferencias comerciales. PDF originales intactos.
 - **Aceptación humana pendiente:** ensayo privado con tres PDF reales y revisión en Central del ZIP/hoja de anillado conjunto; no crear pedido real ni gastar dinero.
+
+### 04/11/2026 — Referencia bancaria con espacios (corrección postaceptación)
+- El usuario validó nuevamente la recepción automática de transferencia de ENSAYO, sin repetir MP ni anillado; observó que la referencia seguía perdiendo espacios tras acreditar.
+- Causa: frontend y backend sustituían cada espacio por guion. Se conserva ahora el espacio en el texto normalizado (mayúsculas, espacios repetidos a uno), y la referencia mostrada en el detalle de Central mantiene esos espacios.
+- Seguridad: índice único D1 sobre `REPLACE(bank_reference,' ','-')`; `BANCO MP 34 55` y `BANCO-MP-34-55` son la misma operación para impedir duplicados, incluyendo históricos. No se reescriben referencias anteriores ni se modifica MP, Supabase/TUS o web pública.
+- Estado inicial: código y prueba integrados en la rama, pendiente ejecutar CI y despliegue de `saber-pagos-pruebas`.
