@@ -1399,6 +1399,7 @@ button:disabled{opacity:.5;cursor:default}.outline{color:#174b8f;background:whit
 .board-card .primary-next{flex:1 0 100%;font-weight:650}
 .board-feedback{font-size:.87rem;font-weight:600;min-height:0;color:#93410b;white-space:pre-wrap;margin:7px 0 0}
 .board-feedback:empty{display:none}
+.transfer-feedback{color:#85510d;font-weight:650;white-space:pre-wrap;margin:8px 0}.transfer-feedback:empty{display:none}#bankTransfersArea li{padding:12px 6px}#bankTransfersArea label{display:block;margin:10px 0 5px;font-weight:650}#bankTransfersArea input{min-width:min(100%,330px)}#bankTransfersArea button{display:block;margin-top:9px}#bankTransfersArea strong{color:#174b8f}
 .board-footer{margin-top:12px}
 #details{overflow-wrap:anywhere}#details button{margin:4px 7px 4px 0}
 @media(max-width:1150px){.board{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -1442,6 +1443,7 @@ body.price-only #priceAdminFieldset summary{font-size:1.3rem}
 <input type="text" id="productionOperator" maxlength="60" placeholder="Responsable del cambio" aria-label="Nombre de responsable" autocomplete="off">
 <button id="refresh">Consultar pedidos</button><button id="sync" class="outline">Verificar pagos pendientes</button><button id="openPricing" class="outline" type="button">Editar precios y promociones</button>
 </div><p id="status" role="status" aria-live="polite"></p><p id="cronState" class="note">Conciliación automática: sin consultar.</p></fieldset>
+<fieldset id="bankTransfersArea"><legend>Transferencias por verificar · <strong id="transferCount">0 pendientes</strong></legend><p class="note">Los pendientes se cargan solos y se actualizan cada 30 segundos. Comprobar el ingreso en el banco: un comprobante del cliente no acredita el pago. Operación limitada al ENSAYO privado.</p><p id="transferPanelStatus" class="transfer-feedback" role="status" aria-live="polite">Ingresá la clave privada para consultar las transferencias.</p><ol id="transferPending"></ol><button id="refreshTransfers" class="outline" type="button">Actualizar ahora</button></fieldset>
 <fieldset id="productionBoardArea"><legend>Tablero de producción · pedidos pagos</legend>
 <p class="note">Cada pedido avanza de columna al registrar su estado. Descargar el ZIP no cambia el seguimiento. Actualización automática cada 30 segundos mientras el panel esté abierto.</p>
 <div class="board" id="productionBoard">
@@ -1477,7 +1479,7 @@ body.price-only #priceAdminFieldset summary{font-size:1.3rem}
 <div id="details">Elegí «Detalle» en un pedido para consultar las instrucciones, archivos e historial.</div></fieldset>
 <fieldset><legend>Polaroids Express · PDF privado único</legend><button id="refreshExpress" class="outline">Consultar PDF recibidos</button><p class="note">Hasta cuatro hojas A4 por pedido. Archivo listo en Drive privado; el pago todavía no está confirmado.</p><ol id="expressReceipts"></ol></fieldset>
 <fieldset><legend>Recepciones de PDF verificadas sin pedido comercial</legend><div class="toolbar"><button id="refreshReceipts" class="outline">Consultar recepciones pendientes</button></div><p class="note">Documentos confirmados en Drive, todavía no vinculados a un pedido cobrado. No están listos para imprimir.</p><ol id="verifiedReceipts"></ol></fieldset>
-<fieldset><legend>Transferencias por verificar · Acreditación bancaria manual</legend><button id="refreshTransfers" class="outline">Consultar transferencias pendientes</button><p class="note">Importes informados al cliente; comprobar la acreditación real en el banco. Ningún pedido se libera con un comprobante.</p><ol id="transferPending"></ol></fieldset>
+
 <fieldset><legend>Pedidos con PDF y pago pendiente</legend><button id="refreshUnpaid" class="outline">Consultar pedidos sin pago confirmado</button><ol id="unpaidDocs"></ol></fieldset>
 
 <script>
@@ -1939,7 +1941,10 @@ async function refresh({silent=false,force=false}={}){
  finally{refreshingBoard=false}
 }
 setInterval(()=>{
- if(!document.hidden&&secret.value.trim())refresh({silent:true});
+ if(!document.hidden&&secret.value.trim()){
+  refresh({silent:true});
+  refreshTransfers({silent:true});
+ }
 },30000);
 document.querySelector("#refreshExpress").addEventListener("click",async()=>{
  const list=document.querySelector("#expressReceipts");list.replaceChildren();
@@ -1971,52 +1976,86 @@ document.querySelector("#refreshReceipts").addEventListener("click",async()=>{
   status.textContent=x.manifests.length+" recepción(es) sin pedido comercial";
  }catch(e){list.replaceChildren();status.textContent=e.message}
 });
-document.querySelector("#refreshTransfers").addEventListener("click",async()=>{
+let refreshingTransfers=false,transferVisibleKey="";
+async function refreshTransfers({silent=false,force=false}={}){
+ if(refreshingTransfers)return;
+ const panel=document.querySelector("#transferPanelStatus");
  const list=document.querySelector("#transferPending");
+ if(!secret.value.trim()){
+  panel.textContent="Ingresá la clave privada para consultar las transferencias.";
+  return;
+ }
+ refreshingTransfers=true;
  try{
-  status.textContent="Consultando transferencias pendientes…";
-  const x=await api("/admin/api/transfers/pending");
-  list.replaceChildren();
-  if(!x.orders.length)list.append(node("li","No hay transferencias pendientes."));
-  for(const t of x.orders){
-   const ref=t.numero_orden?"Orden N.º "+String(t.numero_orden).padStart(3,"0"):"Pedido sin número comercial";
-   const li=node("li",ref+" · "+money(t.amount_ars));
-   li.append(node("p","Referencia de conciliación: "+t.order_id));
-   li.append(node("p","Solicitada: "+t.created_at+" · Acreditación NO verificada · NO imprimir"));
-   const reference=node("input","");
-   reference.type="text";reference.maxLength=80;reference.autocomplete="off";
-   reference.placeholder="Referencia bancaria comprobada";
-   reference.setAttribute("aria-label","Referencia única de operación bancaria");
-   const approve=node("button","Confirmar acreditación bancaria");
-   approve.type="button";
-   const feedback=node("p","");feedback.setAttribute("role","status");
-   approve.addEventListener("click",async()=>{
-    const person=requestOperator();
-    const bankReference=reference.value.trim().toUpperCase();
-    if(!person){feedback.textContent="Indicá el responsable en el encabezado.";return}
-    if(!/^[A-Z0-9][A-Z0-9._/-]{5,79}$/.test(bankReference)){
-     feedback.textContent="Ingresá la referencia única que aparece en el extracto bancario.";return;
-    }
-    if(!confirm("¿Verificaste personalmente en el banco el ingreso exacto de "+money(t.amount_ars)+
-     " para "+ref+"? El comprobante del cliente NO alcanza."))return;
-    approve.disabled=true;feedback.textContent="Registrando acreditación…";
-    try{
-     const saved=await apiPost("/admin/api/transfers/approve",{
-      order_id:t.order_id,amount_ars:t.amount_ars,bank_reference:bankReference,
-      operator:person,confirmed:true
-     });
-     if(saved.ok!==true||saved.payment_confirmed!==true)throw Error("La Central no confirmó la operación");
-     feedback.textContent="Acreditación registrada · "+saved.operator+" · "+saved.recorded_at;
-     await refresh({force:true});
-     document.querySelector("#refreshTransfers").click();
-    }catch(e){approve.disabled=false;feedback.textContent="Sin acreditar: "+String(e.message||e)}
-   });
-   li.append(reference,approve,feedback);
-   list.append(li);
+  if(!silent)panel.textContent="Consultando transferencias…";
+  const result=await api("/admin/api/transfers/pending");
+  const pending=Array.isArray(result.orders)?result.orders:[];
+  const key=pending.map(t=>t.order_id+":"+t.amount_ars).join("|");
+  document.querySelector("#transferCount").textContent=pending.length+" pendiente(s)";
+  // No reconstruir el formulario si la cola no cambió: conservar referencias mientras se escriben.
+  if(force||key!==transferVisibleKey||(!list.children.length)){
+   list.replaceChildren();
+   transferVisibleKey=key;
+   if(!pending.length)list.append(node("li","No hay transferencias pendientes."));
+   for(const t of pending){
+    const orderLabel=t.numero_orden?"Orden N.º "+String(t.numero_orden).padStart(3,"0"):"Pedido sin número comercial";
+    const item=node("li",orderLabel+" · "+money(t.amount_ars)+" · PENDIENTE");
+    item.append(node("p","Solicitada: "+t.created_at+" · Pago NO verificado · NO imprimir"));
+    const label=node("label","Referencia de operación bancaria (obligatoria):");
+    const reference=node("input","");
+    reference.type="text";reference.maxLength=80;reference.autocomplete="off";
+    reference.placeholder="Ej.: BANCO-OPERACION-123456";
+    reference.setAttribute("aria-label","Referencia única de la operación bancaria");
+    const note=node("p","Comprobá importe y referencia. En este entorno privado solo se realizan ensayos; nunca transfieras dinero al alias ficticio.");
+    note.className="note";
+    const feedback=node("p","");
+    feedback.className="transfer-feedback";feedback.setAttribute("role","status");
+    const approve=node("button","Confirmar acreditación de ensayo");
+    approve.type="button";
+    approve.addEventListener("click",async()=>{
+     const operator=requestOperator();
+     const bankReference=reference.value.trim().toUpperCase();
+     const inform=message=>{feedback.textContent=message;panel.textContent=orderLabel+": "+message;status.textContent=message};
+     if(!operator){inform("Falta indicar el responsable. Completalo en el encabezado.");operatorInput.focus();return}
+     if(!/^[A-Z0-9][A-Z0-9._/-]{5,79}$/.test(bankReference)){
+      inform("Falta la referencia bancaria: ingresá al menos 6 caracteres (letras o números).");
+      reference.setAttribute("aria-invalid","true");reference.focus();return;
+     }
+     reference.setAttribute("aria-invalid","false");
+     if(!confirm("¿Confirmás la acreditación de ENSAYO por "+money(t.amount_ars)+" de "+orderLabel+"? Debés haber cotejado el movimiento. Esto no acredita dinero real.")){
+      inform("Acreditación cancelada; el pedido sigue pendiente.");return;
+     }
+     approve.disabled=true;
+     inform("Registrando la acreditación de ensayo…");
+     let approved=false;
+     try{
+      const saved=await apiPost("/admin/api/transfers/approve",{
+       order_id:t.order_id,amount_ars:t.amount_ars,bank_reference:bankReference,
+       operator,confirmed:true
+      });
+      if(saved.ok!==true||saved.payment_confirmed!==true)throw Error("El servidor no confirmó la acreditación");
+      approved=true;
+      await refreshTransfers({silent:true,force:true});
+      await refresh({silent:true,force:true});
+      panel.textContent=orderLabel+" acreditada en ENSAYO · "+saved.operator+" · "+saved.recorded_at+
+       ". Ya debe figurar en «Nuevos · pagos confirmados».";
+      status.textContent=panel.textContent;
+     }catch(e){
+      inform((approved?"Acreditado, pero no se pudo actualizar el tablero: ":"No se acreditó: ")+String(e.message||e));
+     }finally{if(!approved)approve.disabled=false}
+    });
+    item.append(label,reference,note,feedback,approve);
+    list.append(item);
+   }
   }
-  status.textContent=x.orders.length+" transferencia(s) para conciliar en el banco";
- }catch(e){list.replaceChildren();status.textContent=e.message}
-});
+  if(!silent)panel.textContent=pending.length?
+   pending.length+" transferencia(s) esperando verificación. Es necesario indicar responsable y referencia.":"Sin transferencias por verificar.";
+ }catch(e){
+  panel.textContent="No se pudieron cargar las transferencias: "+String(e.message||e);
+  if(!silent)status.textContent=panel.textContent;
+ }finally{refreshingTransfers=false}
+}
+document.querySelector("#refreshTransfers").addEventListener("click",()=>refreshTransfers({force:true}));
 document.querySelector("#refreshUnpaid").addEventListener("click",async()=>{
  const list=document.querySelector("#unpaidDocs");
  try{
@@ -2261,7 +2300,17 @@ document.querySelector("#openPricing").addEventListener("click",()=>{
  if(!priceSnapshot)priceLoad();
 });
 
-document.querySelector("#refresh").addEventListener("click",refresh);
+document.querySelector("#refresh").addEventListener("click",async()=>{
+ await Promise.all([refresh(),refreshTransfers({force:true})]);
+});
+secret.addEventListener("change",()=>{
+ if(secret.value.trim()){refresh({silent:true});refreshTransfers({silent:true})}
+});
+document.addEventListener("visibilitychange",()=>{
+ if(!document.hidden&&secret.value.trim()){
+  refresh({silent:true});refreshTransfers({silent:true});
+ }
+});
 document.querySelector("#sync").addEventListener("click",async()=>{try{status.textContent="Verificando pagos en Mercado Pago...";const x=await api("/demo/sync-pending","POST");await refresh();status.textContent+=" · Sincronizados: "+x.registered+" · Errores: "+x.errors}catch(e){status.textContent=e.message}});
 </script></body></html>`;
 async function paymentEnvironmentAllowed(env,pay){
