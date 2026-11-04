@@ -37,7 +37,8 @@ function setup(statuses=['pendiente']){
   if(body.action==='bank')return {ok:true,json:async()=>({ok:true,estado:'transferencia_pendiente',alias:'saber.pruebas',amountArs:800})};
   if(body.action==='start')return {ok:true,json:async()=>({ok:true,
    checkoutUrl:'https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=TEST'})};
-  return {ok:true,json:async()=>({ok:true,estado:statuses.shift()||'pendiente'})};
+  const next=statuses.shift()||'pendiente';
+  return {ok:true,json:async()=>({ok:true,...(typeof next==='string'?{estado:next}:next)})};
  };
  const wrap=maker(document,fetch,(fn,ms)=>{interval={fn,ms};return 1;},
   'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa','019',800,
@@ -104,4 +105,23 @@ test('transferencia comunica alias e importe exacto sin aprobar el pago por el c
  assert.equal(s.button.disabled,true);
  assert.equal(s.bankButton.disabled,true);
  assert.doesNotMatch(s.price.textContent,/Pago de prueba confirmado/);
+});
+
+test('reabrir una transferencia recupera alias e importe desde estado, sin crear otra',async()=>{
+ const s=setup([{estado:'transferencia_pendiente',alias:'no.transferir.ensayo',amountArs:800}]);
+ await flush();
+ assert.deepEqual(s.requests.map(r=>r.body.action),['status']);
+ assert.match(s.nodes.map(n=>n.textContent).join(' '),/Alias de ENSAYO: no\.transferir\.ensayo/);
+ assert.match(s.byClass('pago-estado').textContent,/transferencia pendiente/);
+ assert.equal(s.button.disabled,true);
+ assert.equal(s.bankButton.disabled,true);
+ assert.doesNotMatch(s.price.textContent,/Pago de prueba confirmado/);
+});
+
+test('una transferencia sin importe coincidente no muestra alias falso al reabrir',async()=>{
+ const s=setup([{estado:'transferencia_pendiente',alias:'no.transferir.ensayo',amountArs:1}]);
+ await flush();
+ assert.equal(s.nodes.some(n=>String(n.textContent).includes('Alias de ENSAYO:')),false);
+ assert.match(s.byClass('pago-estado').textContent,/transferencia pendiente/);
+ assert.equal(s.button.disabled,true);
 });
