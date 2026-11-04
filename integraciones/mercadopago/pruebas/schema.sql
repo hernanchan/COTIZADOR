@@ -58,6 +58,15 @@ CREATE TABLE IF NOT EXISTS payment_reviews (
  state TEXT NOT NULL CHECK(state IN ('verified','revoked')),
  checked_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+-- Registro manual de ingreso bancario: referencia única impide imputar un movimiento a dos órdenes.
+-- Se conserva separado de Mercado Pago y de la solicitud sin acreditar.
+CREATE TABLE IF NOT EXISTS bank_accreditations (
+ order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE RESTRICT,
+ amount_ars INTEGER NOT NULL CHECK(amount_ars>0),
+ operator TEXT NOT NULL,
+ bank_reference TEXT NOT NULL UNIQUE,
+ recorded_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 CREATE TABLE IF NOT EXISTS checkout_sessions (
  token_hash TEXT PRIMARY KEY,
  client_order_id TEXT NOT NULL,
