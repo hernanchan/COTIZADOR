@@ -6,6 +6,7 @@ import {seleccionarPaginas} from './seleccionar-paginas.mjs';
 import {decidirTamanoCliente} from './decision-tamano-impresion.mjs';
 import {clasificarPaginasPloteo} from './clasificar-paginas-ploteo.mjs';
 import {prepararLoteParcial,recomponerLoteParcial} from './cotizar-lote-parcial.mjs';
+import {solicitarCotizacionPrivada} from './solicitar-cotizacion-privada.mjs';
 const $=id=>document.getElementById(id);
 const entries=[];
 let modoLote=null; // El usuario elige antes de cargar: común o individual.
@@ -26,12 +27,12 @@ let productosGrafica=[];
 let abierto=-1;
 let ultimoPresupuesto=null;
 const pesos=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(n);
-function informarPrecioPrivado(estado,total=null){
+function informarPrecioPrivado(estado,total=null,motivo=''){
  if(window.parent===window)return;
  const sendable=estado==='listo'&&ultimoPresupuesto?.estado==='PRELIMINAR';
  window.parent.postMessage({type:'SABER_SMART_PRICE_STATE',estado,
   total:Number.isSafeInteger(total)&&total>0?total:null,
-  sendable,blockReason:null},location.origin);
+  sendable,blockReason:estado==='error'?String(motivo||'No se pudo verificar el precio.').slice(0,220):null},location.origin);
 }
 function importeArchivo(indice){
  if(!ultimoPresupuesto)return null;
@@ -545,6 +546,7 @@ $('archivos').addEventListener('change',async ev=>{
 });
 async function cotizar(){
  const n=++version,out=$('presupuesto');
+ $('reintentarPresupuesto')?.remove();
  informarPrecioPrivado('calculando');
  $('prepararPedido').disabled=true;
  $('resumenPedido').replaceChildren();
@@ -574,9 +576,7 @@ async function cotizar(){
  }
  // Los materiales de color se completan antes de formar el payload.
  const archivos=prepararLoteParcial(entries).archivos;
- try{const r=await fetch('/api/ensayo-carga-unica',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({archivos})});const respuesta=await r.json();if(n!==version)return;
- if(!r.ok||respuesta.ok!==true||respuesta.paymentAuthorized!==false)
-  throw Error(respuesta.error||'Sin cotización');
+ try{const respuesta=await solicitarCotizacionPrivada(archivos);if(n!==version)return;
  const d=recomponerLoteParcial(respuesta,lote);
  ultimoPresupuesto=d;
  informarPrecioPrivado(d.estado==='PRELIMINAR'?'listo':'incompleto',d.total);
@@ -597,7 +597,21 @@ async function cotizar(){
  }
  if(d.plan.length)out.append(texto('p','Precio orientativo. Los archivos no se enviaron ni se autoriza el cobro.'));
  render();
- }catch(e){if(n===version){informarPrecioPrivado('error');out.textContent='No fue posible cotizar: '+String(e.message||e);render()}}
+ }catch(e){if(n===version){
+   const razon=String(e.message||e).slice(0,220);
+   informarPrecioPrivado('error',null,razon);
+   out.textContent='Presupuesto pendiente: '+razon;
+   render();
+   // El iframe oculta el bloque de presupuesto: el motivo y la recuperación
+   // deben mostrarse junto a los PDF, no al final de la página.
+   $('estado').textContent='No pudimos calcular el presupuesto: '+razon+
+    ' El PDF sigue cargado; no lo vuelvas a seleccionar.';
+   const boton=texto('button','Reintentar presupuesto sin volver a subir');
+   boton.id='reintentarPresupuesto';boton.type='button';
+   boton.style.cssText='margin:8px 0 15px;padding:10px;border:1px solid #2878ad;border-radius:8px;background:#eef7ff;color:#174c72;font-weight:700;cursor:pointer';
+   boton.onclick=()=>{boton.remove();cotizar()};
+   $('estado').insertAdjacentElement('afterend',boton);
+  }}
 }
 async function iniciar(){
  try{const r=await fetch('/api/ensayo-materiales-rapido',{cache:'no-store'});const x=await r.json();if(!r.ok||!x.ok||!x.materials)throw Error('Catálogo inaccesible');catalogo=x.materials;productosFoto=x.photos||[];variantesCorte=x.cutVariants||[];productosGrafica=x.graphicProducts||[];}
