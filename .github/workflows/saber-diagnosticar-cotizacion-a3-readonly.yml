@@ -63,4 +63,13 @@ jobs:
             "$root/api/ensayo-carga-unica" || true)
           echo "COTIZACION_SESION_SIN_BASIC_HTTP=$cookieHttp"
           jq -c '{ok,estado,error,total,paymentAuthorized}' "$tmp/cookiequote" 2>/dev/null || echo 'SESION_RESPUESTA_NO_JSON'
+          jsHttp=$(curl -sS --max-time 30 -o "$tmp/asset.js" -w '%{http_code}' \
+            --user "operador:$OPERATOR_PASSWORD" "$root/prueba-v2/carga-inteligente.js" || true)
+          echo "COTIZADOR_ASSET_HTTP=$jsHttp"
+          if [ "$jsHttp" = "200" ] && grep -Fq 'Reintentar presupuesto sin volver a subir' "$tmp/asset.js"; then
+            echo 'COTIZADOR_RECUPERACION_ARCHIVO_DESPLEGADA=SI'
+          else
+            echo 'COTIZADOR_RECUPERACION_ARCHIVO_DESPLEGADA=NO'
+            exit 1
+          fi
           echo 'SOLO_COTIZACION_PRELIMINAR_SIN_SUBIDA_SIN_PAGO'
