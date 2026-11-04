@@ -949,7 +949,7 @@ async function enviarTUSDesdeCarrito(pendientes){
  }).format(ultimoTotalServidor);
  document.getElementById('precio-smart').textContent='Orden N.º '+registeredShortOrder+' · Total: '+valor+(typeof SANDBOX_PAYMENT_ENABLED!=='undefined'&&SANDBOX_PAYMENT_ENABLED?' · Elegí cómo pagar (prueba)':' · Pago no disponible');
  mostrarEstadoCliente('registrado','Pedido recibido correctamente',
-  trabajos.length+' PDF recibidos. Conservá el número de orden. '+(SANDBOX_PAYMENT_ENABLED?'Elegí un medio de pago de prueba.':'Pago no disponible.'),registeredShortOrder);
+  trabajos.length+' PDF recibidos. Conservá el número de orden. '+(typeof SANDBOX_PAYMENT_ENABLED!=='undefined'&&SANDBOX_PAYMENT_ENABLED?'Elegí un medio de pago de prueba.':'Pago no disponible.'),registeredShortOrder);
  return resultado;
 }
 /** Recuperación idempotente en Central: ningún PDF se transfiere de nuevo. */
@@ -977,7 +977,7 @@ async function recuperarNumeroCentralTUS(){
   document.getElementById('precio-smart').textContent='Orden N.º '+
    data.numeroOrden+' · Total: '+monto+(typeof SANDBOX_PAYMENT_ENABLED!=='undefined'&&SANDBOX_PAYMENT_ENABLED?' · Elegí cómo pagar (prueba)':' · Pago no disponible');
   mostrarEstadoCliente('registrado','Pedido recibido correctamente',
-   'Tu pedido está guardado; no necesitás volver a subir los archivos. '+(SANDBOX_PAYMENT_ENABLED?'Elegí un medio de pago de prueba.':'Pago no disponible.'),
+   'Tu pedido está guardado; no necesitás volver a subir los archivos. '+(typeof SANDBOX_PAYMENT_ENABLED!=='undefined'&&SANDBOX_PAYMENT_ENABLED?'Elegí un medio de pago de prueba.':'Pago no disponible.'),
    data.numeroOrden);
   return true;
  }catch{return false;}
