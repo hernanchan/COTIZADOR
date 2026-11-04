@@ -152,7 +152,8 @@ function mostrarEstadoCliente(estado,titulo,detalle,numeroOrden=null){
 }
 function pagoSandboxEnRecibo(){
  const wrap=document.createElement('section'),mensaje=document.createElement('p'),
-  boton=document.createElement('button'),estado=document.createElement('p'),
+  boton=document.createElement('button'),transferButton=document.createElement('button'),
+   transferInfo=document.createElement('p'),estado=document.createElement('p'),
   total=document.createElement('p'),nota=document.createElement('p');
  wrap.className='estado-pago-sandbox';
  mensaje.setAttribute('role','status');mensaje.setAttribute('aria-live','polite');
@@ -163,6 +164,8 @@ function pagoSandboxEnRecibo(){
    style:'currency',currency:'ARS',maximumFractionDigits:0
   }).format(ultimoTotalServidor):'Total verificado en la orden';
  boton.type='button';boton.textContent='Pagar con Mercado Pago (prueba)';
+  transferButton.type='button';transferButton.textContent='Transferencia bancaria (prueba)';
+  transferInfo.className='pago-nota';
  nota.className='pago-nota';
  nota.textContent='Ensayo privado: usá solamente la cuenta compradora de prueba, nunca dinero real.';
  mensaje.textContent='El estado se consulta automáticamente. No necesitás verificar el pago manualmente.';
@@ -177,6 +180,7 @@ function pagoSandboxEnRecibo(){
   return result;
  };
  let consultando=false,pagado=false,revocado=false,preparandoPago=false;
+  let transferenciaPendiente=false,preparandoTransferencia=false;
  const check=async()=>{
   if(consultando||!registeredOrder)return;
   consultando=true;
@@ -187,6 +191,7 @@ function pagoSandboxEnRecibo(){
     estado.textContent='Estado del pago: confirmado';
     mensaje.textContent='Pago recibido. Tu pedido ya figura como pagado en la Central.';
     boton.disabled=true;boton.textContent='Pago confirmado';
+     transferButton.disabled=true;
     document.getElementById('precio-smart').textContent='Orden N.º '+
      (registeredShortOrder||'')+' · Pago de prueba confirmado';
     return;
@@ -196,9 +201,17 @@ function pagoSandboxEnRecibo(){
     estado.textContent='Estado del pago: requiere revisión';
     mensaje.textContent='El pago fue revertido. El pedido no debe prepararse.';
     boton.disabled=true;boton.textContent='Pago revertido';
+     transferButton.disabled=true;
     return;
    }
-   if(!pagado&&!revocado&&!preparandoPago){
+   if(result.estado==='transferencia_pendiente'){
+     transferenciaPendiente=true;
+     estado.textContent='Estado del pago: transferencia pendiente de acreditación';
+     mensaje.textContent='Solo Librería Saber puede confirmar el ingreso desde su banco. No se prepara el pedido todavía.';
+     boton.disabled=true;transferButton.disabled=true;
+     return;
+    }
+    if(!pagado&&!revocado&&!preparandoPago&&!transferenciaPendiente){
     estado.textContent='Estado del pago: pendiente';
     mensaje.textContent='Esperando confirmación de Mercado Pago. Esta pantalla se actualiza sola.';
    }
@@ -215,7 +228,7 @@ function pagoSandboxEnRecibo(){
  });
  void check();
  boton.addEventListener('click',async()=>{
-  if(pagado||revocado||preparandoPago)return;
+  if(pagado||revocado||preparandoPago||transferenciaPendiente||preparandoTransferencia)return;
   preparandoPago=true;boton.disabled=true;
   mensaje.textContent='Preparando el pago seguro de prueba…';
   try{
@@ -238,7 +251,27 @@ function pagoSandboxEnRecibo(){
    }
   }finally{preparandoPago=false}
  });
- wrap.append(total,estado,boton,mensaje,nota);
+ transferButton.addEventListener('click',async()=>{
+   if(pagado||revocado||preparandoPago||preparandoTransferencia||transferenciaPendiente)return;
+   preparandoTransferencia=true;transferButton.disabled=true;
+   mensaje.textContent='Preparando instrucciones bancarias de ensayo…';
+   try{
+    const result=await api('bank');
+    if(result.estado!=='transferencia_pendiente'||
+       result.amountArs!==ultimoTotalServidor||typeof result.alias!=='string')
+     throw Error('La cuenta o el importe no coinciden con tu pedido.');
+    transferenciaPendiente=true;boton.disabled=true;
+    estado.textContent='Estado del pago: transferencia pendiente de acreditación';
+    transferInfo.textContent='Orden N.º '+registeredShortOrder+' · Importe exacto: '+
+     new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(result.amountArs)+
+     ' · Alias de ENSAYO: '+result.alias;
+    mensaje.textContent='No envíes dinero real. La Central confirmará el pedido solamente cuando el operador verifique el banco.';
+    transferButton.textContent='Esperando acreditación bancaria';
+   }catch(e){
+    if(!transferenciaPendiente){transferButton.disabled=false;mensaje.textContent=String(e.message||e);}
+   }finally{preparandoTransferencia=false}
+  });
+  wrap.append(total,estado,boton,transferButton,transferInfo,mensaje,nota);
  return wrap;
 }
 let batchSending=false,smartReady=false,smartBlockedReason='',handoffInProgress=false,handoffResolve=null;
