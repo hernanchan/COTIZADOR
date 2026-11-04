@@ -28,7 +28,7 @@ export async function pagoTUSSandboxCliente(request,env,{authorized=false,subtle
  }catch{return reply({ok:false,error:'Solicitud inválida'},400)}
  if(!data||typeof data!=='object'||Array.isArray(data)||
     Object.keys(data).sort().join(',')!=='action,clientOrderId,commercialOrderId,webOrderId'||
-    !['start','status'].includes(data.action)||
+    !['start','status','bank'].includes(data.action)||
     !UUID.test(data.clientOrderId||'')||!UUID.test(data.commercialOrderId||'')||
     !WEB.test(data.webOrderId||''))
   return reply({ok:false,error:'Pedido de prueba inválido'},400);
@@ -57,6 +57,14 @@ export async function pagoTUSSandboxCliente(request,env,{authorized=false,subtle
   if(!response.ok)return reply({ok:false,error:String(result?.error||'No se pudo preparar el pago').slice(0,180)},response.status===409?409:502);
   if(result?.ok!==true||result.commercialOrderId!==data.commercialOrderId)
    return reply({ok:false,error:'El pago no corresponde al pedido'},502);
+  if(data.action==='bank'){
+   if(result.estado!=='transferencia_pendiente'||result.paymentAuthorized!==false||
+      typeof result.alias!=='string'||!/^[A-Za-z0-9._-]{6,50}$/.test(result.alias)||
+      !Number.isSafeInteger(result.amountArs)||result.amountArs<1)
+    return reply({ok:false,error:'La instrucción bancaria no pudo verificarse'},502);
+   return reply({ok:true,estado:'transferencia_pendiente',alias:result.alias,
+    amountArs:result.amountArs,orderId:data.commercialOrderId,paymentAuthorized:false});
+  }
   if(data.action==='start'){
    let safe=false;
    try{const link=new URL(result.checkoutUrl);
@@ -65,7 +73,7 @@ export async function pagoTUSSandboxCliente(request,env,{authorized=false,subtle
    if(!safe)return reply({ok:false,error:'Mercado Pago no devolvió un enlace seguro'},502);
    return reply({ok:true,estado:'pendiente',checkoutUrl:result.checkoutUrl,orderId:data.commercialOrderId});
   }
-  if(!['pendiente','pagado','revocado'].includes(result.estado))
+  if(!['pendiente','pagado','revocado','transferencia_pendiente'].includes(result.estado))
    return reply({ok:false,error:'Estado de pago no verificable'},502);
   return reply({ok:true,estado:result.estado,orderId:data.commercialOrderId});
  }catch{return reply({ok:false,error:'No se pudo contactar la Central privada'},502)}
