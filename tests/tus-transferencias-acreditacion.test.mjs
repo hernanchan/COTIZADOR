@@ -211,7 +211,7 @@ test('botón de acreditación: falta de referencia visible, confirmación explí
  await button.events.click();
  assert.equal(calls.length,0,'No aprobar sin referencia');
  assert.equal(focused,input);
- assert.match(controls['#transferPanelStatus'].textContent,/Falta la referencia bancaria/);
+ assert.match(controls['#transferPanelStatus'].textContent,/Ingresá la referencia de 6 a 80 caracteres/);
  input.value='banco mp 34 55';
  await context.refreshTransfers({silent:true});
  assert.equal(controls['#transferPending'].children[0],item,'Polling no destruye formulario en edición');
