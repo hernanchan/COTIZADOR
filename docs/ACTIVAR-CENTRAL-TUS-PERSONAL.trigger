@@ -42,3 +42,5 @@ Activar Central versión de pedido corto visible también en respuesta de prepar
 2026-11-02 — Desplegar solo saber-pagos-pruebas la Central con acción de enlace de prueba Mercado Pago para documentos, protección contra pedido mixto Express y reutilización de preferencias. CI 41455248120 aprobado. Mantener compuerta sandbox actual sin cambios y pagos comerciales deshabilitados. Rollback y verificaciones HTTP401/health obligatorios.
 
 2026-11-02 — Reintentar despliegue SOLO de la Central de pruebas: corrección de layout de PDF y enlace sandbox, CI global 41455441360 aprobado. Mantener cerradas las compuertas de cobro; rollback automático y health obligatorio.
+
+2026-11-04 — DESPLEGAR SOLO saber-pagos-pruebas: ficha Central de anillado conjunto con integrantes, orden, hojas y juegos derivados de manifiesto D1; sin alterar MP, transferencias, cobro ni base de pedidos. CI 41928147607 SUCCESS. Verificar HTTP 401 y health paymentsEnabled=false, con rollback; web comercial intacta.

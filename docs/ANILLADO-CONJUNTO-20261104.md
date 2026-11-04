@@ -14,3 +14,6 @@ Primero CI de rama privada. Después despliegue exclusivamente en los Workers pr
 
 ## Pendiente posterior
 Estimación de tiempos de preparación según cola, complejidad y horario.
+
+### Validación técnica
+GitHub Actions `41928147607` — SUCCESS (CI completa, compilación del Worker, pruebas de grupos y contrato existente). Se solicitaron despliegues aislados de Central y portal documental en esta rama; resultados se deben registrar por número de ejecución, sin inferir éxito por el push.

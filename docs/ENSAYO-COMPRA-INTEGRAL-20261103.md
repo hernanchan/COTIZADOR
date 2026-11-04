@@ -120,3 +120,7 @@ Abrir https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/ y Ct
 ## 04/11/2026 — Anillado conjunto, rama privada
 
 Se conserva el cálculo existente de hojas físicas y tarifa única por grupo (sin fusionar originales). Se implementaron selección por PDF, hasta cinco grupos, orden editable, y visualización de integrantes/hojas/juegos en la ficha de Central y el PDF de instrucciones del ZIP. Test nuevo `tests/tus-anillado-conjunto-ui-zip.test.mjs`, junto al test TUS real que ya existía. Especificación en `docs/ANILLADO-CONJUNTO-20261104.md`. **Estado de este cambio: guardado en GitHub, pendiente de CI y despliegue privado verificado.** No cambiar `main`, web pública, pagos ni transporte TUS.
+
+### 04/11/2026 — CI del anillado conjunto
+- Código: commits `25706e7` y `b081204`. CI verificada: GitHub Actions `41928147607` — **SUCCESS**.
+- Se activan despliegues ÚNICAMENTE de Workers privados para UI documental + ficha Central; verificar versiones y estado antes de cerrar.
