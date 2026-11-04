@@ -2707,7 +2707,7 @@ async function centralClientSandboxPayment(req,env,dispatch){
  await ensureOrderItems(env);
  // Tres identidades deben coincidir en D1; conocer una orden corta no basta.
  const belongs=await env.DB.prepare(
-  "SELECT o.id,o.status FROM orders o "+
+  "SELECT o.id,o.status,o.amount_ars FROM orders o "+
   "JOIN cart_requests c ON c.order_id=o.id "+
   "JOIN central_document_manifests m ON m.commercial_order_id=o.id "+
   "WHERE o.id=? AND c.client_order_id=? AND m.web_order_id=? LIMIT 1"
@@ -2741,12 +2741,22 @@ async function centralClientSandboxPayment(req,env,dispatch){
   let transfer=null;
   if(fresh?.status==="awaiting_payment"){
    const table=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='transfer_requests'").first();
-   if(table)transfer=await env.DB.prepare("SELECT status FROM transfer_requests WHERE order_id=?").bind(belongs.id).first();
+   if(table)transfer=await env.DB.prepare("SELECT status,amount_ars FROM transfer_requests WHERE order_id=?").bind(belongs.id).first();
   }
   const estado=r?.state==="revoked"?"revocado":
    fresh?.status==="paid"&&r?.state==="verified"?"pagado":
    transfer?.status==="awaiting_bank_verification"?"transferencia_pendiente":"pendiente";
-  return json({ok:true,commercialOrderId:belongs.id,estado,paymentAuthorized:estado==="pagado"});
+  // Instrucciones recuperables sólo por la sesión de los tres identificadores,
+  // y únicamente para transferencias pendientes; nunca confirmar el pago aquí.
+  const alias=String(env.TRANSFER_ALIAS||"").trim();
+  const instrucciones=estado==="transferencia_pendiente"&&
+   env.TRANSFER_PRIVATE_ENABLED==="PRIVATE_TEST_ONLY"&&
+   /^[A-Za-z0-9._-]{6,50}$/.test(alias)&&
+   Number.isSafeInteger(transfer?.amount_ars)&&
+   transfer.amount_ars===belongs.amount_ars&&transfer.amount_ars>0?
+   {alias,amountArs:transfer.amount_ars}:{};
+  return json({ok:true,commercialOrderId:belongs.id,estado,
+   ...instrucciones,paymentAuthorized:estado==="pagado"});
  }
  if(typeof dispatch!=="function"||typeof env.DEMO_ADMIN_KEY!=="string"||!env.DEMO_ADMIN_KEY)
   return json({ok:false,error:"Pasarela privada no disponible"},503);
