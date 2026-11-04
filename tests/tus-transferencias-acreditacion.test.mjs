@@ -88,7 +88,7 @@ test('sin clave, flag, origen o confirmación explícita NO acredita',async()=>{
  assert.equal((await call(valid(),{env:{DOCS_SANDBOX_CHECKOUT_ENABLED:'OFF'}})).code,503);
  assert.equal((await call(valid(),{origin:'https://untrusted.test'})).code,403);
  assert.equal((await call({...valid(),confirmed:false})).code,400);
- assert.equal((await call({...valid(),bank_reference:'captura.jpeg'})).code,422);
+ assert.equal((await call({...valid(),bank_reference:'captura enviada.png'})).code,422);
  assert.equal(model.status,'awaiting_payment');
  assert.equal(model.review,null);
  assert.equal(model.bank,null);
