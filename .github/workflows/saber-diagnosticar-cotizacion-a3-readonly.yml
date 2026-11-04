@@ -52,4 +52,15 @@ jobs:
           echo "COTIZACION_A3_HTTP=$quoteHttp"
           jq -c '{ok,estado,error,total,paymentAuthorized,
             pendientes:[.pendientes[]?|{motivo}]}' "$tmp/quote" 2>/dev/null || echo 'COTIZACION_RESPUESTA_NO_JSON'
+          # Reproducir navegador: Basic solo en HTML, POST posterior sin Basic.
+          htmlHttp=$(curl -sS --max-time 25 -o "$tmp/html" -w '%{http_code}' \
+            -c "$tmp/cookies" --user "operador:$OPERATOR_PASSWORD" \
+            "$root/prueba-v2/" || true)
+          echo "PORTAL_CON_BASIC_HTTP=$htmlHttp"
+          cookieHttp=$(curl -sS --max-time 35 -o "$tmp/cookiequote" -w '%{http_code}' \
+            -b "$tmp/cookies" -X POST -H "Origin: $root" -H 'Sec-Fetch-Site: same-origin' \
+            -H 'Content-Type: application/json' --data-binary "@$tmp/data" \
+            "$root/api/ensayo-carga-unica" || true)
+          echo "COTIZACION_SESION_SIN_BASIC_HTTP=$cookieHttp"
+          jq -c '{ok,estado,error,total,paymentAuthorized}' "$tmp/cookiequote" 2>/dev/null || echo 'SESION_RESPUESTA_NO_JSON'
           echo 'SOLO_COTIZACION_PRELIMINAR_SIN_SUBIDA_SIN_PAGO'
