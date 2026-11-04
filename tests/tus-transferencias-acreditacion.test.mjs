@@ -64,7 +64,9 @@ scope.globalThis=scope;
 vm.createContext(scope);
 vm.runInContext(source.replace('export default {','globalThis.worker = {'),scope);
 const env={DB,DEMO_ADMIN_KEY:'secret-for-tests',TRANSFER_PRIVATE_ENABLED:'PRIVATE_TEST_ONLY',
- DOCS_SANDBOX_CHECKOUT_ENABLED:'PRIVATE_TEST_ONLY'};
+ DOCS_SANDBOX_CHECKOUT_ENABLED:'PRIVATE_TEST_ONLY',
+ MP_TEST_ACCESS_TOKEN:'offline',MP_TEST_SELLER_ID:'test-seller',
+ TEST_WEBHOOK_URL:'https://example.invalid/webhooks/test',MP_WEBHOOK_SECRET:'test-signature'};
 async function call(data={},opts={}){
  const req=new Request('https://payments.test/admin/api/transfers/approve',{
   method:'POST',headers:{'Content-Type':'application/json',
