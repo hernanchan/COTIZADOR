@@ -44,3 +44,5 @@ Activar Central versión de pedido corto visible también en respuesta de prepar
 2026-11-02 — Reintentar despliegue SOLO de la Central de pruebas: corrección de layout de PDF y enlace sandbox, CI global 41455441360 aprobado. Mantener cerradas las compuertas de cobro; rollback automático y health obligatorio.
 
 2026-11-04 — DESPLEGAR SOLO saber-pagos-pruebas: ficha Central de anillado conjunto con integrantes, orden, hojas y juegos derivados de manifiesto D1; sin alterar MP, transferencias, cobro ni base de pedidos. CI 41928147607 SUCCESS. Verificar HTTP 401 y health paymentsEnabled=false, con rollback; web comercial intacta.
+
+2026-11-04 — Actualización de interfaz de referencias bancarias, solo Central de ensayos. CI 41931816288 SUCCESS. Conserva configuración y reversión.
