@@ -1432,7 +1432,7 @@ body.price-only #priceAdminFieldset summary{font-size:1.3rem}
 <fieldset id="productionBoardArea"><legend>Tablero de producción · pedidos pagos</legend>
 <p class="note">Cada pedido avanza de columna al registrar su estado. Descargar el ZIP no cambia el seguimiento. Actualización automática cada 30 segundos mientras el panel esté abierto.</p>
 <div class="board" id="productionBoard">
-<section class="board-lane" aria-label="Trabajos pendientes"><h3>Pendientes <span class="board-count" id="count-pendiente">0</span></h3><div class="board-cards" id="lane-pendiente"></div></section>
+<section class="board-lane" aria-label="Pedidos nuevos pagados"><h3>Nuevos · pagos confirmados <span class="board-count" id="count-pendiente">0</span></h3><div class="board-cards" id="lane-pendiente"></div></section>
 <section class="board-lane" aria-label="Trabajos en preparación"><h3>En preparación <span class="board-count" id="count-en_preparacion">0</span></h3><div class="board-cards" id="lane-en_preparacion"></div></section>
 <section class="board-lane" aria-label="Trabajos listos"><h3>Listos para retirar <span class="board-count" id="count-listo">0</span></h3><div class="board-cards" id="lane-listo"></div></section>
 <section class="board-lane" aria-label="Trabajos en espera"><h3>En espera <span class="board-count" id="count-en_espera">0</span></h3><div class="board-cards" id="lane-en_espera"></div></section>
@@ -1464,7 +1464,7 @@ body.price-only #priceAdminFieldset summary{font-size:1.3rem}
 <div id="details">Elegí «Detalle» en un pedido para consultar las instrucciones, archivos e historial.</div></fieldset>
 <fieldset><legend>Polaroids Express · PDF privado único</legend><button id="refreshExpress" class="outline">Consultar PDF recibidos</button><p class="note">Hasta cuatro hojas A4 por pedido. Archivo listo en Drive privado; el pago todavía no está confirmado.</p><ol id="expressReceipts"></ol></fieldset>
 <fieldset><legend>Recepciones de PDF verificadas sin pedido comercial</legend><div class="toolbar"><button id="refreshReceipts" class="outline">Consultar recepciones pendientes</button></div><p class="note">Documentos confirmados en Drive, todavía no vinculados a un pedido cobrado. No están listos para imprimir.</p><ol id="verifiedReceipts"></ol></fieldset>
-<fieldset><legend>Transferencias por conciliar · Sin producción</legend><button id="refreshTransfers" class="outline">Consultar transferencias pendientes</button><p class="note">Importes informados al cliente; comprobar la acreditación real en el banco. Ningún pedido se libera con un comprobante.</p><ol id="transferPending"></ol></fieldset>
+<fieldset><legend>Transferencias por verificar · Acreditación bancaria manual</legend><button id="refreshTransfers" class="outline">Consultar transferencias pendientes</button><p class="note">Importes informados al cliente; comprobar la acreditación real en el banco. Ningún pedido se libera con un comprobante.</p><ol id="transferPending"></ol></fieldset>
 <fieldset><legend>Pedidos con PDF y pago pendiente</legend><button id="refreshUnpaid" class="outline">Consultar pedidos sin pago confirmado</button><ol id="unpaidDocs"></ol></fieldset>
 
 <script>
@@ -2256,6 +2256,41 @@ async function reconcilePayment(env,paymentId){
  if(res.meta?.changes)await markVerified();
  return {registered:Boolean(res.meta?.changes)};
 }
+/**
+ * Respaldo de conciliación sin intervención del mostrador.
+ * Sólo se invoca tras validar HMAC y la triple pertenencia cliente/pedido/PDF.
+ * La confirmación sigue dependiendo de la API autenticada de MP, nunca del navegador.
+ */
+async function reconcileCustomerPaymentIfDue(env,orderId){
+ if(env.DOCS_SANDBOX_CHECKOUT_ENABLED!=="PRIVATE_TEST_ONLY")return false;
+ const current=await env.DB.prepare("SELECT status,preference_id FROM orders WHERE id=?").bind(orderId).first();
+ if(current?.status!=="awaiting_payment"||!current.preference_id)return false;
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS customer_payment_rechecks (order_id TEXT PRIMARY KEY,checked_at TEXT NOT NULL)").run();
+ const slot=await env.DB.prepare(
+  "INSERT INTO customer_payment_rechecks(order_id,checked_at) VALUES(?,datetime('now')) "+
+  "ON CONFLICT(order_id) DO UPDATE SET checked_at=excluded.checked_at "+
+  "WHERE customer_payment_rechecks.checked_at<=datetime('now','-25 seconds')"
+ ).bind(orderId).run();
+ if(!slot.meta?.changes)return false;
+ try{
+  const query=new URLSearchParams({external_reference:orderId,limit:"10",sort:"date_created",criteria:"desc"});
+  const search=await mp(env,"/v1/payments/search?"+query);
+  for(const payment of search.results||[]){
+   if(payment.status!=="approved"||String(payment.external_reference||"")!==orderId||
+      !/^[0-9]{1,30}$/.test(String(payment.id||"")))continue;
+   const result=await reconcilePayment(env,String(payment.id));
+   if(result.registered){
+    await audit(env,"client_payment_confirmed","server_verified");
+    return true;
+   }
+  }
+ }catch(error){
+  // No simular un pago por error de red: sigue en espera y lo reintenta el cron.
+  console.warn("Sandbox buyer payment recheck failed",String(error?.message||"unknown").slice(0,95));
+  await audit(env,"client_payment_recheck_failed","provider_or_database_unavailable");
+ }
+ return false;
+}
 async function syncPendingPayments(env){
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS reconciliation_checks(order_id TEXT PRIMARY KEY,checked_at TEXT NOT NULL)").run();
  const pending=await env.DB.prepare("SELECT id FROM orders WHERE status='awaiting_payment' AND preference_id IS NOT NULL ORDER BY COALESCE((SELECT checked_at FROM reconciliation_checks WHERE order_id=orders.id),'') ASC,created_at ASC LIMIT 20").all();
@@ -2511,10 +2546,16 @@ async function centralClientSandboxPayment(req,env,dispatch){
  ).bind(p.commercialOrderId,p.clientOrderId,p.webOrderId).first();
  if(!belongs)return json({ok:false,error:"La orden no corresponde a esta sesión"},403);
  if(p.action==="status"){
+  // Esta verificación es automática: el comprador nunca presiona un botón
+  // administrativo. Mercado Pago se consulta solo para su propia orden D1,
+  // con límite persistente de una verificación cada 25 segundos.
+  if(belongs.status==="awaiting_payment")
+   await reconcileCustomerPaymentIfDue(env,belongs.id);
   await ensurePaymentReviews(env);
+  const fresh=await env.DB.prepare("SELECT status FROM orders WHERE id=?").bind(belongs.id).first();
   const r=await env.DB.prepare("SELECT state FROM payment_reviews WHERE order_id=?").bind(belongs.id).first();
   const estado=r?.state==="revoked"?"revocado":
-   belongs.status==="paid"&&r?.state==="verified"?"pagado":"pendiente";
+   fresh?.status==="paid"&&r?.state==="verified"?"pagado":"pendiente";
   return json({ok:true,commercialOrderId:belongs.id,estado,paymentAuthorized:estado==="pagado"});
  }
  if(typeof dispatch!=="function"||typeof env.DEMO_ADMIN_KEY!=="string"||!env.DEMO_ADMIN_KEY)
