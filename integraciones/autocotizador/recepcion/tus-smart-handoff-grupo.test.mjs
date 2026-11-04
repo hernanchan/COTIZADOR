@@ -43,7 +43,7 @@ test('grupo sin identificador se rechaza antes de enviar PDF',()=>{
  assert.match(info.textContent,/grupo de anillado/);
 });
 test('presupuesto completo habilita el botón de un grupo; incompleto lo bloquea',()=>{
- const begin=source.indexOf('function informarPrecioPrivado(estado,total=null){');
+ const begin=source.indexOf('function informarPrecioPrivado(');
  const end=source.indexOf('\nfunction importeArchivo(',begin);
  assert.ok(begin>=0&&end>begin);
  const fn=new Function('estado','total','entries','ultimoPresupuesto','window','location',
