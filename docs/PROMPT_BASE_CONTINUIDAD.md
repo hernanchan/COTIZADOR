@@ -153,3 +153,11 @@ Al concluir Etapa 1, crear `docs/ETAPA2-...-ESTADO.md`, actualizar aquí cuál e
 - Transferencias: se implementó en rama el registro atómico `bank_accreditations`, `POST /admin/api/transfers/approve`, la interfaz Central y la opción cliente TUS por HMAC. Examinar los resultados CI y despliegues **antes de llamar terminado**.
 - Prueba bancaria SIEMPRE con datos ficticios, alias de ensayo, sin mover dinero. Un comprobante NO confirma pago; solo autorización humana tras lectura bancaria real.
 - Siguiente paso técnico: validar `tests/tus-transferencias-acreditacion.test.mjs` y el CI integrado; verificar flags y desplegar solo Workers de pruebas mediante flujos con rollback, jamás main, web comercial o cobros reales.
+
+
+### Confirmación de despliegues privados — 04/11/2026
+- CI integral último: GitHub Actions `41917541026` **SUCCESS**. Acreditación simulada sobre D1 ficticio en tests, con casos negativos de autenticación, importe, preferencia MP y referencia reutilizada; pruebas de UI de transferencia y de MP.
+- Central / Worker `saber-pagos-pruebas`: despliegue `41917440876` **SUCCESS**, versión `807478c8-43f5-4d64-a6b7-5f91d1f999b2`. `/admin/api/transfers/approve` no autorizado devuelve HTTP 401; `health`: `ok=true`, `databaseReady=true`, `paymentsEnabled=false`.
+- Documentos / Worker `saber-documentos-pruebas`: despliegue `41917541287` **SUCCESS**, versión `988fb18e-8233-4980-9e1c-a938b2c2dc23`. Portal sin credenciales HTTP 401; tarifa D1 de ensayo verificada; sin publicar sitio comercial.
+- Alias explícitamente ficticio `no.transferir.ensayo`; NO ENVIAR DINERO. No está verificada una acreditación con movimiento bancario real ni validado el clic humano completo en Central con una orden ficticia persistida en D1: distinguir de las pruebas automáticas aprobadas.
+- Mercado Pago Sandbox existente y orden 018 no se reensayaron ni modificaron. La orden 019 no acredita pago. `main` y `libreriasaber.com.ar` intactos. El tiempo estimado de preparación queda para después.
