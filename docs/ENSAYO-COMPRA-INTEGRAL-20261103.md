@@ -90,3 +90,11 @@ Abrir https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/ y Ct
 - Cliente TUS privado: la sesión de tres identificadores pasa por HMAC y ofrece transferencia de **ensayo** con alias e importe devueltos por la Central, manteniendo Mercado Pago sin cambios. La pantalla distingue transferencia pendiente y pago confirmado.
 - Central: bandeja existente añade confirmación humana con identificador de operación bancaria; solo después aparece en Nuevos. La ficha pagada informa responsable y fecha; los ZIP pagados aceptan constancia bancaria verificada como alternativa segura a MP.
 - `TRANSFER_PRIVATE_ENABLED` y `TRANSFER_ALIAS` requieren configuración exclusiva de pruebas. No usar alias comercial ni dinero real. No afirmar despliegue ni prueba humana hasta el resultado de CI/smoke; no ejecutar pruebas de pago MP repetidas.
+
+
+### Confirmación de despliegues privados — 04/11/2026
+- CI integral último: GitHub Actions `41917541026` **SUCCESS**. Acreditación simulada sobre D1 ficticio en tests, con casos negativos de autenticación, importe, preferencia MP y referencia reutilizada; pruebas de UI de transferencia y de MP.
+- Central / Worker `saber-pagos-pruebas`: despliegue `41917440876` **SUCCESS**, versión `807478c8-43f5-4d64-a6b7-5f91d1f999b2`. `/admin/api/transfers/approve` no autorizado devuelve HTTP 401; `health`: `ok=true`, `databaseReady=true`, `paymentsEnabled=false`.
+- Documentos / Worker `saber-documentos-pruebas`: despliegue `41917541287` **SUCCESS**, versión `988fb18e-8233-4980-9e1c-a938b2c2dc23`. Portal sin credenciales HTTP 401; tarifa D1 de ensayo verificada; sin publicar sitio comercial.
+- Alias explícitamente ficticio `no.transferir.ensayo`; NO ENVIAR DINERO. No está verificada una acreditación con movimiento bancario real ni validado el clic humano completo en Central con una orden ficticia persistida en D1: distinguir de las pruebas automáticas aprobadas.
+- Mercado Pago Sandbox existente y orden 018 no se reensayaron ni modificaron. La orden 019 no acredita pago. `main` y `libreriasaber.com.ar` intactos. El tiempo estimado de preparación queda para después.
