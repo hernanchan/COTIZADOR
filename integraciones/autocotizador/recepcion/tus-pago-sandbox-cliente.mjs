@@ -75,6 +75,16 @@ export async function pagoTUSSandboxCliente(request,env,{authorized=false,subtle
   }
   if(!['pendiente','pagado','revocado','transferencia_pendiente'].includes(result.estado))
    return reply({ok:false,error:'Estado de pago no verificable'},502);
-  return reply({ok:true,estado:result.estado,orderId:data.commercialOrderId});
+  // Releer las instrucciones desde D1, nunca del navegador; no autoriza pagos.
+  let instructions={};
+  if(result.estado==='transferencia_pendiente'&&
+     (result.alias!==undefined||result.amountArs!==undefined)){
+   if(result.paymentAuthorized!==false||typeof result.alias!=='string'||
+      !/^[A-Za-z0-9._-]{6,50}$/.test(result.alias)||
+      !Number.isSafeInteger(result.amountArs)||result.amountArs<1)
+    return reply({ok:false,error:'Instrucciones bancarias inválidas'},502);
+   instructions={alias:result.alias,amountArs:result.amountArs};
+  }
+  return reply({ok:true,estado:result.estado,...instructions,orderId:data.commercialOrderId});
  }catch{return reply({ok:false,error:'No se pudo contactar la Central privada'},502)}
 }
