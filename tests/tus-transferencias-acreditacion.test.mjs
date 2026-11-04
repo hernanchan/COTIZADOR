@@ -122,6 +122,17 @@ test('confirmación bancaria manual hace una sola transición con auditoría de 
  assert.equal(model.status,'paid');
 });
 
+test('referencia bancaria con espacios se normaliza y no acredita comprobantes ni reutilizaciones',async()=>{
+ reset();bankReferences.clear();
+ const paid=await call(valid(firstId,'banco mp 34 55'));
+ assert.equal(paid.code,200);
+ assert.equal(model.bank.bank_reference,'BANCO-MP-34-55');
+ reset(secondId);
+ assert.equal((await call(valid(secondId,'BANCO-MP-34-55'))).code,409);
+ assert.equal(model.status,'awaiting_payment');
+ assert.equal((await call(valid(secondId,'captura enviada.png'))).code,422);
+});
+
 test('misma referencia bancaria no puede acreditar segundo pedido',async()=>{
  reset();bankReferences.clear();
  assert.equal((await call(valid())).code,200);
@@ -201,14 +212,14 @@ test('botón de acreditación: falta de referencia visible, confirmación explí
  assert.equal(calls.length,0,'No aprobar sin referencia');
  assert.equal(focused,input);
  assert.match(controls['#transferPanelStatus'].textContent,/Falta la referencia bancaria/);
- input.value='BANCO-PRUEBA-20';
+ input.value='banco mp 34 55';
  await context.refreshTransfers({silent:true});
  assert.equal(controls['#transferPending'].children[0],item,'Polling no destruye formulario en edición');
  await button.events.click();
  assert.equal(calls.length,1);
  assert.equal(calls[0].path,'/admin/api/transfers/approve');
  assert.equal(calls[0].payload.confirmed,true);
- assert.equal(calls[0].payload.bank_reference,'BANCO-PRUEBA-20');
+ assert.equal(calls[0].payload.bank_reference,'BANCO-MP-34-55');
  assert.equal(confirms,1);
  assert.equal(boardRefreshes,1);
  assert.equal(controls['#transferCount'].textContent,'0 pendiente(s)');
