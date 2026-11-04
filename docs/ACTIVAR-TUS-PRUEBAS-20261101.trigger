@@ -97,3 +97,5 @@ ENABLE_PRIVATE_D1_PRICING_2026_11_03
 ENABLE_PRIVATE_SANDBOX_CLIENT_PAYMENT_2026_11_03
 
 2026-11-04 — Poner a disposición SOLO en el portal DOCUMENTAL privado la elección de transferencia ficticia (alias no.transferir.ensayo) y estado pendiente por HMAC. Central bancaria privada ya desplegada en run 41917440876 SUCCESS. Probar cambios con CI, compilar, preservar configuración/TUS/precios/MP, y verificar Basic HTTP 401 + rollback. Sin dinero real, sin modificación de main, web comercial ni otros Workers. El cliente nunca puede aprobar una transferencia; solo Central administrativa.
+
+2026-11-04 — Actualizar portal documental privado: recuperar alias de transferencia pendiente desde la Central sin iniciar otra; mostrar total y estado en lenguaje simple. Suite CI 41924983711 correcta y Central privada actualizada. Mantener compuertas, datos privados, reversión y sitio público intacto.
