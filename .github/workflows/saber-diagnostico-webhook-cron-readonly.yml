@@ -34,7 +34,7 @@ jobs:
           done
           jq -e '.result.bindings|any(.name=="DOCS_SANDBOX_CHECKOUT_ENABLED" and .type=="plain_text" and .text=="PRIVATE_TEST_ONLY")' "$temp/settings" >/dev/null
           echo "CHECKOUT_SANDBOX_PRIVADO=ON"
-          jq -e '.result.bindings|all(.[]|select(.name=="CHECKOUT_ENABLED" or .name=="PAYMENTS_ENABLED")|.text!="APROBADO" and .text!="true")' "$temp/settings" >/dev/null
+          jq -e '[.result.bindings[]|select(.name=="CHECKOUT_ENABLED" or .name=="PAYMENTS_ENABLED")|.text] | all(.!="APROBADO" and .!="true")' "$temp/settings" >/dev/null
           echo "CHECKOUT_COMERCIAL=OFF"
           webhookType=$(jq -r '[.result.bindings[]|select(.name=="TEST_WEBHOOK_URL")|.type][0]//"absent"' "$temp/settings")
           echo "WEBHOOK_BINDING_TYPE=$webhookType"
