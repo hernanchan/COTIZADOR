@@ -53,7 +53,7 @@ test('no habilita enviar si aún no terminó la cotización',()=>{
  assert.match(q.reason,/presupuesto completo/);
 });
 test('un envío en curso no se reactiva por mensajes nuevos del iframe',()=>{
- assert.match(script,/if\(batchSending\)return 'Los archivos se están enviando'/);
+ assert.match(script,/if\(batchSending\)return 'Los archivos se están enviando\.'/);
  assert.match(script,/sendAllButton.disabled=Boolean\(bloqueo\)/);
  assert.match(script,/if\(descartarBorradorAnteriorParaPedidoNuevo\(\)\)/);
 });
