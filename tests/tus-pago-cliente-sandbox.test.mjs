@@ -78,3 +78,30 @@ test('Portal de cliente no incluye token MP/admin y retiene verificación del se
  assert.match(s,/data\.estado==='pagado'|result\.estado==='pagado'/);
  assert.doesNotMatch(s,/MP_TEST_ACCESS_TOKEN|DEMO_ADMIN_KEY/);
 });
+
+test('reconsulta privada de transferencia recupera importe y alias verificados por Central',async()=>{
+ const env=baseEnv();
+ env.SABER_CENTRAL.fetch=async r=>{
+  assert.equal((await r.json()).action,'status');
+  return new Response(JSON.stringify({ok:true,commercialOrderId:ids.commercialOrderId,
+   estado:'transferencia_pendiente',alias:'no.transferir.ensayo',amountArs:600,paymentAuthorized:false}));
+ };
+ const result=await pagoTUSSandboxCliente(request({...ids,action:'status'}),env,{authorized:true});
+ assert.equal(result.status,200);
+ assert.deepEqual(await result.json(),{ok:true,estado:'transferencia_pendiente',
+  alias:'no.transferir.ensayo',amountArs:600,orderId:ids.commercialOrderId});
+});
+test('proxy bloquea instrucciones bancarias incorrectas y no las agrega a pago MP',async()=>{
+ const env=baseEnv();
+ env.SABER_CENTRAL.fetch=async()=>new Response(JSON.stringify({
+  ok:true,commercialOrderId:ids.commercialOrderId,
+  estado:'transferencia_pendiente',alias:'http://otro sitio',amountArs:600,paymentAuthorized:false
+ }));
+ const bad=await pagoTUSSandboxCliente(request({...ids,action:'status'}),env,{authorized:true});
+ assert.equal(bad.status,502);
+ env.SABER_CENTRAL.fetch=async()=>new Response(JSON.stringify({
+  ok:true,commercialOrderId:ids.commercialOrderId,estado:'pagado'
+ }));
+ const paid=await pagoTUSSandboxCliente(request({...ids,action:'status'}),env,{authorized:true});
+ assert.deepEqual(await paid.json(),{ok:true,estado:'pagado',orderId:ids.commercialOrderId});
+});
