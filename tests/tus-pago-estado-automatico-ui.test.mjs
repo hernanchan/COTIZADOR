@@ -34,6 +34,7 @@ function setup(statuses=['pendiente']){
   const body=JSON.parse(opts.body);requests.push({url,opts,body});
   assert.equal(url,'/prueba-v2/api/ensayo-tus-pago-sandbox');
   assert.equal(opts.credentials,'same-origin');
+  if(body.action==='bank')return {ok:true,json:async()=>({ok:true,estado:'transferencia_pendiente',alias:'saber.pruebas',amountArs:800})};
   if(body.action==='start')return {ok:true,json:async()=>({ok:true,
    checkoutUrl:'https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=TEST'})};
   return {ok:true,json:async()=>({ok:true,estado:statuses.shift()||'pendiente'})};
@@ -44,7 +45,8 @@ function setup(statuses=['pendiente']){
   'bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb');
  const byClass=cls=>nodes.find(n=>n.className===cls);
  const button=nodes.find(n=>n.tag==='button');
- return {wrap,button,price,requests,interval,callbacks,document,byClass,nodes};
+ const bankButton=nodes.find(n=>n.tag==='button'&&n.textContent==='Transferencia bancaria (prueba)');
+ return {wrap,button,bankButton,price,requests,interval,callbacks,document,byClass,nodes};
 }
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 
@@ -54,7 +56,8 @@ test('recibo muestra pedido, precio y estado; no contiene botón de consulta man
  assert.match(s.byClass('pago-total').textContent,/\$.*800/);
  assert.match(s.byClass('pago-estado').textContent,/pendiente/);
  assert.equal(s.button.textContent,'Pagar con Mercado Pago (prueba)');
- assert.equal(s.nodes.filter(n=>n.tag==='button').length,1);
+ assert.equal(s.nodes.filter(n=>n.tag==='button').length,2);
+ assert.equal(s.bankButton.textContent,'Transferencia bancaria (prueba)');
  assert.equal(s.requests[0].body.action,'status');
  assert.equal(s.requests.filter(r=>r.body.action==='start').length,0);
  assert.equal(s.interval.ms,30000);
@@ -88,5 +91,17 @@ test('la acción de pagar prepara enlace solo por clic y nunca declara pago conf
  assert.deepEqual(s.requests.map(r=>r.body.action).slice(0,2),['status','start']);
  assert.ok(s.nodes.some(n=>n.tag==='a'&&n.href?.startsWith('https://www.mercadopago.com.ar/')));
  assert.match(s.byClass('pago-estado').textContent,/pendiente/);
+ assert.doesNotMatch(s.price.textContent,/Pago de prueba confirmado/);
+});
+
+test('transferencia comunica alias e importe exacto sin aprobar el pago por el cliente',async()=>{
+ const s=setup(['pendiente']);
+ await flush();
+ await s.bankButton.events.click();await flush();
+ assert.deepEqual(s.requests.map(r=>r.body.action),['status','bank']);
+ assert.match(s.nodes.map(n=>n.textContent).join(' '),/Alias de ENSAYO: saber\.pruebas/);
+ assert.match(s.byClass('pago-estado').textContent,/transferencia pendiente/);
+ assert.equal(s.button.disabled,true);
+ assert.equal(s.bankButton.disabled,true);
  assert.doesNotMatch(s.price.textContent,/Pago de prueba confirmado/);
 });
