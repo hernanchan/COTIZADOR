@@ -1,0 +1,55 @@
+name: Saber - reproducir cotización A3 privada (sin PDF ni pago)
+on:
+  push:
+    branches:
+      - integracion/tus-pedido-privado-20261101
+    paths:
+      - docs/DIAGNOSTICAR-COTIZACION-A3-20261104.trigger
+permissions:
+  contents: read
+jobs:
+  reproducir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    env:
+      OPERATOR_PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+    steps:
+      - name: Cotización sintética segura en endpoint privado - solo lectura
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$OPERATOR_PASSWORD"
+          root="https://saber-documentos-pruebas.libreriasaber.workers.dev"
+          tmp=$(mktemp -d)
+          trap 'rm -rf "$tmp"' EXIT
+          priceHttp=$(curl -sS --max-time 30 -o "$tmp/price" -w '%{http_code}' --user "operador:$OPERATOR_PASSWORD" "$root/prueba-v2/precios-web.json" || true)
+          echo "TARIFARIO_HTTP=$priceHttp"
+          if [ "$priceHttp" = "200" ]; then
+            jq -c '{version:.priceVersion,
+              tieneA4:(.bnA4.scales|type=="array"),
+              tieneA3:(.bnA3.scales|type=="array"),
+              bna3Tramo11:(.bnA3.scales|any(.from<=11 and (.to>=11 or .to==null))),
+              tieneColorA3:(.colorA3.materials|type=="array")}' "$tmp/price"
+          fi
+          python3 - "$tmp/data" <<'PY'
+          import sys,json
+          page=[{"numero":i,"anchoCm":24.57,"altoCm":37.8,"modo":"sin-clasificar"} for i in range(1,12)]
+          file={"nombre":"regresion-a3-sintetica.pdf","paginas":page,
+          "paginasSeleccionadas":"","seleccion":"a3","servicio":"auto",
+          "productoFoto":"","productoGrafica":"","corteVariante":"gt3","corteMetros":1,
+          "copias":1,"modo":"bn","caras":"simple","paginasPorHoja":1,
+          "papelPoster":"obra80","anillado":"ninguno","grupoAnillado":"","materialColor":""}
+          with open(sys.argv[1],"w") as f:json.dump({"archivos":[file]},f)
+          PY
+          quoteHttp=$(curl -sS --max-time 35 -o "$tmp/quote" -w '%{http_code}' \
+            --user "operador:$OPERATOR_PASSWORD" -X POST \
+            -H "Origin: $root" -H "Sec-Fetch-Site: same-origin" \
+            -H 'Content-Type: application/json' --data-binary "@$tmp/data" \
+            "$root/api/ensayo-carga-unica" || true)
+          echo "COTIZACION_A3_HTTP=$quoteHttp"
+          jq -c '{ok,estado,error,total,paymentAuthorized,
+            pendientes:[.pendientes[]?|{motivo}]}' "$tmp/quote" 2>/dev/null || echo 'COTIZACION_RESPUESTA_NO_JSON'
+          echo 'SOLO_COTIZACION_PRELIMINAR_SIN_SUBIDA_SIN_PAGO'
