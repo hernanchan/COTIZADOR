@@ -250,8 +250,81 @@ function controlesComunes(grupo,global=false){
   barra.append(accionComun('Papel de póster',[['obra80','Obra 80 g'],['recubierto','Recubierto 130 g']],v=>aplicar('papelPoster',v)));
  return barra;
 }
+let anilladosAbierto=false;
+function renderAnilladosConjuntos(){
+ const host=$('anilladosConjuntos');if(!host)return;
+ host.replaceChildren();
+ const docs=entries.map((e,i)=>({e,i,categoria:grupoVisible(e)}))
+  .filter(x=>!x.e.error&&x.e.paginas&&x.e.servicio==='auto'&&
+   ['personalizado_a4','a5','a4','a3'].includes(x.categoria.id));
+ host.hidden=docs.length<2;
+ if(docs.length<2)return;
+ const panel=document.createElement('details');panel.className='anillado-conjunto';
+ panel.open=anilladosAbierto||docs.some(x=>x.e.anillado==='grupo');
+ panel.addEventListener('toggle',()=>{anilladosAbierto=panel.open});
+ panel.append(texto('summary','¿Querés anillar varios PDF juntos? · Orden y grupos'));
+ panel.append(texto('p','Elegí qué archivos van juntos y su orden. Podés combinar B/N, color y caras diferentes, siempre que los PDF del grupo tengan el mismo tamaño de papel y cantidad de copias.'));
+ const todos=document.createElement('button');todos.type='button';
+ todos.className='editar';todos.textContent='Anillar todos juntos';
+ const compatibles=docs.every(x=>x.categoria.id===docs[0].categoria.id&&x.e.copias===docs[0].e.copias);
+ todos.disabled=leyendo||!compatibles;
+ todos.title=compatibles?'Unir todos los documentos en el grupo 1':'Igualá tamaño y copias, o creá grupos diferentes.';
+ todos.onclick=()=>{
+  if(leyendo||!compatibles)return;
+  for(const {e} of docs){e.anillado='grupo';e.grupoAnillado='1'}
+  anilladosAbierto=true;cambio();
+ };
+ panel.append(todos);
+ const lista=document.createElement('div');lista.className='anillado-filas';
+ for(let pos=0;pos<docs.length;pos++){
+  const {e,i}=docs[pos],fila=document.createElement('div');fila.className='anillado-fila';
+  const l=texto('label',String(pos+1).padStart(2,'0')+'. '+e.name);
+  const s=document.createElement('select');s.setAttribute('aria-label','Anillado de '+e.name);
+  for(const [v,n] of [['ninguno','Sin anillado'],['individual','Individual'],
+   ...Array.from({length:5},(_,j)=>['grupo:'+(j+1),'Junto · Grupo '+(j+1)])])
+   s.add(new Option(n,v));
+  s.value=e.anillado==='grupo'?'grupo:'+e.grupoAnillado:e.anillado;
+  s.onchange=()=>{
+   const g=/^grupo:([1-5])$/.exec(s.value);
+   e.anillado=g?'grupo':s.value;e.grupoAnillado=g?g[1]:'';
+   anilladosAbierto=true;cambio();
+  };
+  l.append(s);
+  const acciones=document.createElement('div');acciones.className='anillado-orden';
+  for(const [nombre,dir] of [['Subir',-1],['Bajar',1]]){
+   const b=document.createElement('button');b.type='button';b.className='editar';
+   b.textContent=nombre;b.setAttribute('aria-label',nombre+' '+e.name);
+   b.disabled=leyendo||pos+dir<0||pos+dir>=docs.length;
+   b.onclick=()=>{
+    if(leyendo||!docs[pos+dir])return;
+    const destino=docs[pos+dir].i,[trabajo]=entries.splice(i,1);
+    entries.splice(destino,0,trabajo);abierto=-1;anilladosAbierto=true;cambio();
+   };
+   acciones.append(b);
+  }
+  fila.append(l,acciones);lista.append(fila);
+ }
+ panel.append(lista);
+ const grupos=new Map();
+ for(const {e} of docs)if(e.anillado==='grupo'){
+  const id=String(e.grupoAnillado),miembros=grupos.get(id)||[];
+  miembros.push(e);grupos.set(id,miembros);
+ }
+ for(const [id,miembros] of grupos){
+  const ok=miembros.length>=2&&miembros.every(e=>
+   grupoVisible(e).id===grupoVisible(miembros[0]).id&&e.copias===miembros[0].copias);
+  const aviso=texto('p',ok
+   ?'Grupo '+id+': '+miembros.length+' PDF en este orden · '+miembros[0].copias+' anillado(s); precio confirmado por servidor.'
+   :'Grupo '+id+': elegí al menos dos PDF del mismo tamaño y cantidad de copias.');
+  if(!ok)aviso.className='advertencia';
+  panel.append(aviso);
+ }
+ host.append(panel);
+}
+
 function render(){
  renderConfiguracionGlobal();
+ renderAnilladosConjuntos();
  const lista=$('lista');lista.replaceChildren();
  const grupos=new Map();
  entries.forEach((e,i)=>{

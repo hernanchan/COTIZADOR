@@ -116,3 +116,7 @@ Abrir https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/ y Ct
 - **Despliegue Documentos**: Workflow `41925109062` **SUCCESS**, Worker `saber-documentos-pruebas` versión `96263ed4-f42a-4caf-8a3d-7ca1b8525c62`. `PRIVATE_D1_APPROVED_PRICE_VERSION_OK_A4_100_POSTER_REC60_18700`, HTTP 401 anónimo, sitio público intacto.
 - **Regresión**: CI completa `41925109056` **SUCCESS**, incluye recuperación del alias en UI y contrato de estado HMAC; no se realizó todavía nueva prueba humana reabriendo una transferencia pendiente después de recargar Chrome: validar oportunamente con próximo pedido de ensayo, sin repetir pruebas MP ni generar movimientos reales.
 - **Próximo frente**: seguir mejoras de UX y presupuestación del cotizador con el método único y pruebas previas; estimación de tiempo de entrega queda anotada para después y no integrada aún.
+
+## 04/11/2026 — Anillado conjunto, rama privada
+
+Se conserva el cálculo existente de hojas físicas y tarifa única por grupo (sin fusionar originales). Se implementaron selección por PDF, hasta cinco grupos, orden editable, y visualización de integrantes/hojas/juegos en la ficha de Central y el PDF de instrucciones del ZIP. Test nuevo `tests/tus-anillado-conjunto-ui-zip.test.mjs`, junto al test TUS real que ya existía. Especificación en `docs/ANILLADO-CONJUNTO-20261104.md`. **Estado de este cambio: guardado en GitHub, pendiente de CI y despliegue privado verificado.** No cambiar `main`, web pública, pagos ni transporte TUS.

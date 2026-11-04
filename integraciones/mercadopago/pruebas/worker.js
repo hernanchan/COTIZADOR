@@ -1586,7 +1586,7 @@ async function showOrder(id){try{status.textContent="Consultando detalle...";con
    line.append(node("p","Original verificado · "+t.paginasOriginales+" página(s) · "+
     (Array.isArray(t.paginasElegidas)?t.paginasElegidas.length:0)+" seleccionadas · "+
     t.copias+" copia(s)/lote(s)"));
-   agregarFichaDeImpresion(line,t,{pagado:true});
+   agregarFichaDeImpresion(line,t,{pagado:true,trabajos:d.documentos.trabajos});
    if(d.esTUS&&/^WEB-ENSAYO-[A-F0-9]{32}$/.test(d.webOrderId||"")&&
       /^DOC-[a-f0-9-]{36}$/i.test(t.reciboPrivado||"")){
     const action=node("button","Descargar PDF original verificado");
@@ -1637,7 +1637,7 @@ if(x.produccion?.polaroidsExpress){
   details.append(button);
  }else details.append(node("p","PDF en Drive privado. Descarga administrativa pendiente de habilitación."));
 }status.textContent=""}catch(e){status.textContent=e.message}}
-function agregarFichaDeImpresion(area,t,{pagado=false}={}){
+function agregarFichaDeImpresion(area,t,{pagado=false,trabajos=[]}={}){
  // La ficha proviene del manifiesto privado de D1, NUNCA de parámetros URL
  // ni del PDF original. Los datos ausentes se señalan: no inventar instrucciones.
  const modo=(t.modo==="bn"||t.modo==="b/n")?"Blanco y negro":
@@ -1711,9 +1711,26 @@ function agregarFichaDeImpresion(area,t,{pagado=false}={}){
    }
   }else area.append(node("p","Ploteo: instrucciones históricas sin medidas verificadas. Revisar original antes de imprimir."));
  }
- if(t.tipoAnillado==="grupo")
-  area.append(node("p","Grupo de anillado: "+(t.grupoAnillado||"NO CONSTA — verificar")+
-   ". Confirmar qué archivos integran el grupo antes del armado."));
+ if(t.tipoAnillado==="grupo"){
+  const miembros=Array.isArray(trabajos)?trabajos.filter(w=>
+   w.servicio==="documentos"&&w.tipoAnillado==="grupo"&&
+   w.grupoAnillado===t.grupoAnillado).sort((a,b)=>a.orden-b.orden):[];
+  const correcto=miembros.length>=2&&miembros.every(w=>
+   w.formatoFinal===t.formatoFinal&&w.copias===t.copias&&
+   Number.isSafeInteger(w.copias)&&w.copias>=1&&
+   ["simple","double"].includes(w.carasPresupuestadas)&&
+   [1,2,4,9].includes(w.paginasPorCaraPresupuestadas)&&
+   Array.isArray(w.paginasElegidas)&&w.paginasElegidas.length>0);
+  const hojas=correcto?miembros.reduce((s,w)=>s+
+   Math.ceil(Math.ceil(w.paginasElegidas.length/w.paginasPorCaraPresupuestadas)/
+    (w.carasPresupuestadas==="double"?2:1)),0):null;
+  const nombres=miembros.map(w=>w.orden+". "+w.nombreOriginal).join(" → ");
+  area.append(node("p",correcto?
+   "ANILLADO CONJUNTO · Grupo "+t.grupoAnillado+" · "+t.copias+
+   " anillado(s) · "+hojas+" hojas físicas por anillado. Orden: "+nombres:
+   "Grupo de anillado "+(t.grupoAnillado||"NO CONSTA")+
+   ": datos históricos incompletos; verificar integrantes y hojas antes de armar."));
+ }
  if(opciones.some(([,value])=>value===null))
   area.append(node("p","AVISO: la ficha histórica no conserva todas las instrucciones. Confirmar los campos marcados antes de imprimir."));
  const lines=[pagado?"PEDIDO PAGADO Y VERIFICADO · PREPARACIÓN PENDIENTE":"PEDIDO SIN PAGO CONFIRMADO",t.nombreOriginal||"PDF",
@@ -1772,7 +1789,7 @@ async function showUnpaidDetails(id,target,trigger){
    const area=node("section","");
    area.append(node("h4",t.orden+". "+t.nombreOriginal));
    area.append(node("p",t.paginasOriginales+" páginas · "+t.bytes+" bytes · "+t.servicio));
-   agregarFichaDeImpresion(area,t);
+   agregarFichaDeImpresion(area,t,{trabajos:x.documentos.trabajos});
    if(x.documentos.esTUS){
     const action=node("button","Descargar PDF original");
     action.type="button";

@@ -169,3 +169,5 @@ Al concluir Etapa 1, crear `docs/ETAPA2-...-ESTADO.md`, actualizar aquí cuál e
 - **Aceptación pendiente específica**: cuando exista una NUEVA transferencia de ensayo, comprobar una sola vez que reabrir el recibo repone el alias y total; no volver a emitir o pagar MP 018 ni repetir la operación 020.
 - **Siguiente desarrollo**: auditoría de tareas funcionales/UX del cotizador todavía abiertas según la libreta: tamaños e imposición, anillados, promociones y configuración de precios. No reintroducir pantallas técnicas al cliente ni cambiar el método de trabajo. La estimación de tiempos se mantiene en la libreta **para una etapa posterior**.
 - **Evidencia extensa**: `docs/ENSAYO-COMPRA-INTEGRAL-20261103.md`, apartado «Aceptación humana 020 + recuperación de pago bancario desplegada».
+
+> 04/11/2026 — Anillado conjunto: consultar `docs/ANILLADO-CONJUNTO-20261104.md`. No rehacer motor ni repetir ensayos 018 y 020. Rama privada.

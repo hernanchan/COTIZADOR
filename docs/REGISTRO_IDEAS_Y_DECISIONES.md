@@ -350,3 +350,7 @@ Cada vez que surja una propuesta: agregar nueva entrada o actualizar la correspo
 - El código privado registra `bank_accreditations` (operador, fecha, importe y referencia única por movimiento) y habilita Nuevos únicamente tras acreditación explícita; no modificar MP Sandbox aprobado.
 - **Tiempo estimado de preparación**: ya registrado como pendiente, NO implementar en esta fase. Dependerá de tipo/cantidad, cola y horario, ajustable desde Central.
 - El sitio público, main y dinero real continúan desactivados durante los ensayos.
+
+## 04/11/2026 — Anillado conjunto, rama privada
+
+Se conserva el cálculo existente de hojas físicas y tarifa única por grupo (sin fusionar originales). Se implementaron selección por PDF, hasta cinco grupos, orden editable, y visualización de integrantes/hojas/juegos en la ficha de Central y el PDF de instrucciones del ZIP. Test nuevo `tests/tus-anillado-conjunto-ui-zip.test.mjs`, junto al test TUS real que ya existía. Especificación en `docs/ANILLADO-CONJUNTO-20261104.md`. **Estado de este cambio: guardado en GitHub, pendiente de CI y despliegue privado verificado.** No cambiar `main`, web pública, pagos ni transporte TUS.

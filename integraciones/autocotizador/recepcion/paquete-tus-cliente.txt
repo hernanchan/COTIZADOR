@@ -9,7 +9,37 @@ function nombreSeguro(v){
  return clean(v).replace(/[\x00-\x1f\x7f]+/g,' ').replace(/\s+/g,' ').trim();
 }
 function nombreZip(i){return 'PDF_'+String(i+1).padStart(2,'0')+'.pdf'}
-function formatoOrden(t,i){
+/** Resumen de armado desde la ficha D1: nunca altera precios ni originales. */
+function resumirGruposAnillado(trabajos){
+ const grupos=new Map(),result=new Map();
+ if(!Array.isArray(trabajos))return result;
+ trabajos.forEach((t,i)=>{
+  if(t?.servicio!=='documentos'||t.tipoAnillado!=='grupo'||
+     !/^[1-9][0-9]?$/.test(String(t.grupoAnillado||'')))return;
+  const id=String(t.grupoAnillado),miembros=grupos.get(id)||[];
+  miembros.push({t,i});grupos.set(id,miembros);
+ });
+ for(const [id,miembros] of grupos){
+  const base=miembros[0]?.t;
+  const valido=miembros.length>=2&&miembros.every(({t})=>
+   t.formatoFinal===base.formatoFinal&&t.copias===base.copias&&
+   Number.isSafeInteger(t.copias)&&t.copias>=1&&
+   ['simple','double'].includes(t.carasPresupuestadas)&&
+   [1,2,4,9].includes(t.paginasPorCaraPresupuestadas)&&
+   Array.isArray(t.paginasElegidas)&&t.paginasElegidas.length>=1&&
+   t.paginasElegidas.every(n=>Number.isSafeInteger(n)&&n>=1&&n<=t.paginasOriginales));
+  const orden=miembros.map(({t,i})=>
+   nombreZip(i)+' ('+nombreSeguro(t.nombreOriginal)+')').join(' → ');
+  const hojas=valido?miembros.reduce((s,{t})=>s+
+   Math.ceil(Math.ceil(t.paginasElegidas.length/t.paginasPorCaraPresupuestadas)/
+    (t.carasPresupuestadas==='double'?2:1)),0):null;
+  result.set(id,{grupo:id,valido,orden,hojasPorJuego:hojas,
+   juegos:valido?base.copias:null,integrantes:miembros.length});
+ }
+ return result;
+}
+
+function formatoOrden(t,i,resumenGrupos=null){
  const medidas=t.formatoFinal==='personalizado_a4'&&Array.isArray(t.medidasOriginalesCm)
   ?t.medidasOriginalesCm.map(p=>({
    pagina:p.pagina,valor:Number(p.anchoCm.toFixed(2))+' × '+
@@ -22,10 +52,11 @@ function formatoOrden(t,i){
  const color=t.modo==='bn'?'Blanco y negro':t.modo==='color'?'Color':null;
  const caras=t.carasPresupuestadas==='simple'?'Simple faz (una cara por hoja)':
   t.carasPresupuestadas==='double'?'Doble faz (ambas caras de la hoja)':null;
+ const grupo=t.tipoAnillado==='grupo'?resumenGrupos?.get(String(t.grupoAnillado)):null;
  const anillado=t.tipoAnillado==='ninguno'?'Sin anillado':
   t.tipoAnillado==='individual'?'Anillado individual':
   t.tipoAnillado==='grupo'
-   ?'Anillado en grupo '+clean(t.grupoAnillado)+' (confirmar integrantes)':null;
+   ?'Anillado en grupo '+clean(t.grupoAnillado)+(grupo?.valido?' · '+grupo.juegos+' juego(s), '+grupo.hojasPorJuego+' hojas por juego':' (confirmar integrantes)'):null;
  const papeles={
   estandar:'Papel estándar B/N (gramaje sin especificar)',
   obra70:'Papel obra 70 g',obra80:'Papel obra 80 g',
@@ -67,6 +98,11 @@ function formatoOrden(t,i){
   ['Cantidad de copias',t.copias],
   ['Material / papel',papel],
   ['Anillado después de imprimir',anillado],
+  ...(grupo?.valido?[
+   ['Orden de armado del grupo '+grupo.grupo,grupo.orden],
+   ['Hojas físicas de cada anillado',grupo.hojasPorJuego],
+   ['Cantidad de anillados de este grupo',grupo.juegos]
+  ]:[]),
   ...(t.descripcion?[['Observaciones del pedido',nombreSeguro(t.descripcion)]]:[])
  ];
  if(t.servicio==='ploteos'){
@@ -170,7 +206,8 @@ async function descargarZip(){
   if(primerError)throw primerError;
   if(pdfs.some(x=>!x))throw Error('Faltan PDF originales para completar la orden.');
   const order='ORDEN_'+ficha.numeroOrden+'_TRABAJO';
-  const filas=ficha.trabajos.map((t,i)=>formatoOrden(t,i));
+  const resumenGrupos=resumirGruposAnillado(ficha.trabajos);
+   const filas=ficha.trabajos.map((t,i)=>formatoOrden(t,i,resumenGrupos));
   const ordenPdf=generarPdfOrdenTrabajo(ficha,filas);
   if(ordenPdf.size<400||ordenPdf.size>2*1024*1024)throw Error('Orden de trabajo PDF inválida');
   pdfs.push({name:order+'.pdf',blob:ordenPdf});
