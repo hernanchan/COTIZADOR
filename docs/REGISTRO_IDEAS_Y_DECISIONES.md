@@ -1,3 +1,22 @@
+## 04/11/2026 — NUEVA IDEA EN LIBRETA: demora estimada de preparación para el cliente (PENDIENTE)
+
+**Decisión del titular:** registrar la idea ahora y NO comenzar su implementación hasta cerrar el flujo integral de compra real en sandbox (PDF → cotización → datos → pedido → MP test_user → acreditación automática → Central Nuevos); después cerrar la validación manual de transferencias y revisar regresiones. Estado: **IDEA APROBADA PARA ESTUDIO, NO IMPLEMENTADA NI DESPLEGADA**. No desviar el desarrollo ni cambiar UI de pruebas por esta funcionalidad ahora.
+
+**Necesidad de negocio:** informar al cliente, **antes de pagar**, cuándo podría estar listo su trabajo para retirar, con un plazo estimado comprensible (ej. «Estimamos que estará listo hoy por la tarde»). Es una orientación, NO una promesa exacta ni una hora ficticia. Mostrar también la expectativa tras el pago y en el seguimiento del pedido, identificando si se trata de preparación o de entrega a domicilio.
+
+**Criterios de implementación propuestos (por validar con operación real):**
+- La estimación depende del **tipo de trabajo** (PDF simple B/N/color, anillado, CAD/póster, stickers, fotografías, etc.), **carga real** (páginas, cantidad de copias, impresión doble faz, formatos, cantidad de archivos, otros acabados), **cola de pedidos ya pagados**, capacidad disponible de los equipos y **horario de atención** (incluidos cierres no laborables).
+- **Solo pedidos con pago verificado** ingresan a la cola firme; una transferencia pendiente o un carrito abandonado no reservan capacidad de producción. La estimación mostrada antes de pagar es provisional y puede cambiar al confirmarse el cobro; mostrarlo sin inducir a error.
+- Permitir al administrador **configurar parámetros, excepciones y demoras generales desde la Central**, sin editar código/GitHub; distinguir tiempo estimado de preparación y de delivery. Incluir aviso razonable si la cola está saturada o el trabajo es especial / requiere revisión.
+- Calcular y mostrar una **ventana temporal o franja horaria** en vez de minutos de falsa precisión, en el momento correcto de la compra. Tomar horarios reales desde una configuración administrable, no codificarlos en el frontend.
+- En los primeros ensayos, utilizar estimaciones **configuradas y comprobables** desde Central antes de incorporar lógica de capacidad compleja. Auditar cambios y medir tiempos reales de preparación para calibrar.
+- Pruebas de aceptación futuras: pedido simple sin cola, cola de varios pagos, cierre de horario, turno siguiente, trabajo grande, transferencia pendiente y reprogramación manual, en celular y escritorio. Nunca deshabilitar ni alterar el cálculo de precio, subir PDF o pagar por añadir ETA.
+- Evitar prometer **2 horas** o **mañana** como plazos reales sin datos de productividad y cola. El ejemplo de mensaje es ilustrativo.
+
+**Próximo paso ahora (sin implementar ETA):** continuar el ensayo E2E de pago automático que motivó el proyecto. Última aceptación humana: cotizador volvió a habilitar «Enviar mi pedido» con PDF pequeño tras la corrección de borrador anterior; aún hay que validar la compra completa sin pulsar conciliación administrativa. Registrar ETA como siguiente mejora UX operativa posterior al cierre de pagos/transferencias.
+
+---
+
 ## 03/11/2026 — Reparación cotizador sin presupuesto tras activar D1 (DESPLEGADA Y PROBADA)
 
 - El titular mostró captura del cotizador privado `/prueba-v2/`: un PDF A4 de **2 páginas** reconocido, pero precio en **«Por calcular»** y barra **«Sin presupuesto · Revisá el error en la carga»**. La causa identificada en código fue que la consulta de precios D1 exigía sesión protegida, mientras la sesión del portal se entregaba con cookies solo para TUS y no para el GET `/api/ensayo-materiales-rapido` ni el POST `/api/ensayo-carga-unica` usados desde el iframe inteligente.
