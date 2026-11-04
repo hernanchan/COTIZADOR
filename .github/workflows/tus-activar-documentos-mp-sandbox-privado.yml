@@ -26,7 +26,7 @@ jobs:
         run: |
           set -euo pipefail
           npm install --no-save --no-audit --no-fund pdf-lib@1.17.1
-          node --test tests/tus-central-staff-download.test.mjs tests/tus-paquete-manifiesto.test.mjs tests/tus-instrucciones-reales.test.mjs tests/tus-documentos-sandbox-preparacion.test.mjs tests/tus-pago-cliente-sandbox.test.mjs tests/tus-pagos-autoconciliacion-cliente.test.mjs tests/tus-central-seguimiento-operativo.test.mjs tests/tus-telefono-contacto-pedido.test.mjs tests/tus-admin-tarifario-d1.test.mjs tests/tus-tarifario-aprobado-puente.test.mjs tests/tus-bloqueo-version-precios.test.mjs tests/tus-central-tablero-click-real.test.mjs tests/tus-central-pagos-verificados.test.mjs tests/tus-central-pedidos-pagados-ficha.test.mjs
+          node --test tests/tus-central-staff-download.test.mjs tests/tus-paquete-manifiesto.test.mjs tests/tus-instrucciones-reales.test.mjs tests/tus-documentos-sandbox-preparacion.test.mjs tests/tus-pago-cliente-sandbox.test.mjs tests/tus-pagos-autoconciliacion-cliente.test.mjs tests/tus-central-seguimiento-operativo.test.mjs tests/tus-telefono-contacto-pedido.test.mjs tests/tus-admin-tarifario-d1.test.mjs tests/tus-tarifario-aprobado-puente.test.mjs tests/tus-bloqueo-version-precios.test.mjs tests/tus-central-tablero-click-real.test.mjs tests/tus-central-pagos-verificados.test.mjs tests/tus-central-pedidos-pagados-ficha.test.mjs tests/tus-transferencias-acreditacion.test.mjs tests/tus-transferencias-pendientes.test.mjs
           node --check integraciones/mercadopago/pruebas/worker.js
           grep -Fq '/internal/central/payment-sandbox-client' integraciones/mercadopago/pruebas/worker.js
           grep -Fq '/admin/api/central/unpaid-detail' integraciones/mercadopago/pruebas/worker.js
@@ -55,7 +55,7 @@ jobs:
           previous=$(jq -r '.result.deployments[0].versions[]? | select(.percentage==100) | .version_id' "$workdir/before.json" | head -n 1)
           test -n "$previous"
           echo "VERSION_CENTRAL_ANTERIOR=$previous"
-          jq -n --slurpfile settings "$workdir/settings.json"             '{main_module:"worker.js",annotations:{"workers/message":"Sandbox documental SOLO admin pruebas; sin pagos comerciales ni web publica."},bindings:([$settings[0].result.bindings[] | select(.name!="DOCS_SANDBOX_CHECKOUT_ENABLED" and .name!="CENTRAL_PRODUCTION_TRACKING_ENABLED" and .name!="PRICE_ADMIN_PRIVATE_ENABLED") | {name,type:"inherit"}]+[{name:"DOCS_SANDBOX_CHECKOUT_ENABLED",type:"plain_text",text:"PRIVATE_TEST_ONLY"},{name:"CENTRAL_PRODUCTION_TRACKING_ENABLED",type:"plain_text",text:"PRIVATE_TEST_ONLY"},{name:"PRICE_ADMIN_PRIVATE_ENABLED",type:"plain_text",text:"PRIVATE_TEST_ONLY"}])}' > "$workdir/metadata.json"
+          jq -n --slurpfile settings "$workdir/settings.json"             '{main_module:"worker.js",annotations:{"workers/message":"Sandbox documental SOLO admin pruebas; sin pagos comerciales ni web publica."},bindings:([$settings[0].result.bindings[] | select(.name!="DOCS_SANDBOX_CHECKOUT_ENABLED" and .name!="CENTRAL_PRODUCTION_TRACKING_ENABLED" and .name!="PRICE_ADMIN_PRIVATE_ENABLED" and .name!="TRANSFER_PRIVATE_ENABLED" and .name!="TRANSFER_ALIAS") | {name,type:"inherit"}]+[{name:"DOCS_SANDBOX_CHECKOUT_ENABLED",type:"plain_text",text:"PRIVATE_TEST_ONLY"},{name:"CENTRAL_PRODUCTION_TRACKING_ENABLED",type:"plain_text",text:"PRIVATE_TEST_ONLY"},{name:"PRICE_ADMIN_PRIVATE_ENABLED",type:"plain_text",text:"PRIVATE_TEST_ONLY"},{name:"TRANSFER_PRIVATE_ENABLED",type:"plain_text",text:"PRIVATE_TEST_ONLY"},{name:"TRANSFER_ALIAS",type:"plain_text",text:"saber.ensayo.pruebas"}])}' > "$workdir/metadata.json"
           curl --fail --silent --show-error --max-time 75             -H "$auth"             -F "metadata=@$workdir/metadata.json;type=application/json"             -F "worker.js=@integraciones/mercadopago/pruebas/worker.js;filename=worker.js;type=application/javascript+module"             "$root/versions?bindings_inherit=strict" > "$workdir/version.json"
           if ! jq -e '.success==true and (.result.id | type=="string")' "$workdir/version.json" >/dev/null; then
             jq -c '{success,errors:[.errors[]?|{code,message}]}' "$workdir/version.json"; exit 1
@@ -91,13 +91,15 @@ jobs:
             sleep 2
           done
           priceAuth=$(curl --silent --show-error --max-time 20 -o /dev/null -w '%{http_code}' "https://saber-pagos-pruebas.libreriasaber.workers.dev/admin/api/pricing" || true)
+          transferAuth=$(curl --silent --show-error --max-time 20 -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' "https://saber-pagos-pruebas.libreriasaber.workers.dev/admin/api/transfers/approve" || true)
+          echo "BANK_APPROVAL_UNAUTHORIZED_HTTP=$transferAuth"
           echo "PRICE_ADMIN_UNAUTHORIZED_HTTP=$priceAuth"
           echo "PRODUCTION_TRACKING_UNAUTHORIZED_HTTP=$prodAuth"
           echo "SANDBOX_ADMIN_AUTH_HTTP=$authSandbox"
           health=$(curl --silent --show-error --max-time 30             "https://saber-pagos-pruebas.libreriasaber.workers.dev/health" || true)
           echo "$health" | jq -c '{ok,databaseReady,paymentsEnabled}' || true
           safe=false
-          if [ "$http" = "401" ] && [ "$authSandbox" = "401" ] && [ "$prodAuth" = "401" ] && [ "$priceAuth" = "401" ] && echo "$health" | jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' >/dev/null; then safe=true; fi
+          if [ "$http" = "401" ] && [ "$authSandbox" = "401" ] && [ "$prodAuth" = "401" ] && [ "$priceAuth" = "401" ] && [ "$transferAuth" = "401" ] && echo "$health" | jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' >/dev/null; then safe=true; fi
           if [ "$safe" != true ]; then
             echo "CENTRAL_PRIVATE_SAFETY_CHECK_FAILED:HTTP_$http - ROLLBACK"
             jq -n --arg v "$previous" '{strategy:"percentage",versions:[{percentage:100,version_id:$v}],annotations:{"workers/message":"Rollback automatico: centro privado seguridad o health falló"}}' > "$workdir/rollback.json"
