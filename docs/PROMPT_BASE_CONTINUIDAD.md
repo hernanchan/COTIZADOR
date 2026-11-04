@@ -171,3 +171,8 @@ Al concluir Etapa 1, crear `docs/ETAPA2-...-ESTADO.md`, actualizar aquí cuál e
 - **Evidencia extensa**: `docs/ENSAYO-COMPRA-INTEGRAL-20261103.md`, apartado «Aceptación humana 020 + recuperación de pago bancario desplegada».
 
 > 04/11/2026 — Anillado conjunto: consultar `docs/ANILLADO-CONJUNTO-20261104.md`. No rehacer motor ni repetir ensayos 018 y 020. Rama privada.
+
+### 04/11/2026 — Espacios en referencia: CI y deploy privado confirmados
+- Implementación `e5fe5ce1`: referencia con espacios conservados en la ficha y protegidos contra duplicados con guiones históricos.
+- CI integral `41931816288` **SUCCESS**. Activación exclusiva Central `41931953195` **SUCCESS**; nueva versión `saber-pagos-pruebas` `309d2794-f642-4594-a524-6c7cac93de76` (anterior `d06e4a9c-cbd2-4af9-b94b-d284fd76b910`). Verificaciones: HTTP 401, health OK y `paymentsEnabled=false`. CI de activación `41931953071` **SUCCESS**.
+- Usuario confirmó recepción automática de transferencia de prueba y aprobó las demás funciones; **la preservación de espacios en una nueva acreditación no tiene aún aceptación manual posterior al deploy**. No repetir pedidos 018 y 020. `main` y web pública sin cambios.

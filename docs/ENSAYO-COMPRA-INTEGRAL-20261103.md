@@ -137,3 +137,8 @@ Se conserva el cálculo existente de hojas físicas y tarifa única por grupo (s
 - Causa: frontend y backend sustituían cada espacio por guion. Se conserva ahora el espacio en el texto normalizado (mayúsculas, espacios repetidos a uno), y la referencia mostrada en el detalle de Central mantiene esos espacios.
 - Seguridad: índice único D1 sobre `REPLACE(bank_reference,' ','-')`; `BANCO MP 34 55` y `BANCO-MP-34-55` son la misma operación para impedir duplicados, incluyendo históricos. No se reescriben referencias anteriores ni se modifica MP, Supabase/TUS o web pública.
 - Estado inicial: código y prueba integrados en la rama, pendiente ejecutar CI y despliegue de `saber-pagos-pruebas`.
+
+### 04/11/2026 — Espacios en referencia: CI y deploy privado confirmados
+- Implementación `e5fe5ce1`: referencia con espacios conservados en la ficha y protegidos contra duplicados con guiones históricos.
+- CI integral `41931816288` **SUCCESS**. Activación exclusiva Central `41931953195` **SUCCESS**; nueva versión `saber-pagos-pruebas` `309d2794-f642-4594-a524-6c7cac93de76` (anterior `d06e4a9c-cbd2-4af9-b94b-d284fd76b910`). Verificaciones: HTTP 401, health OK y `paymentsEnabled=false`. CI de activación `41931953071` **SUCCESS**.
+- Usuario confirmó recepción automática de transferencia de prueba y aprobó las demás funciones; **la preservación de espacios en una nueva acreditación no tiene aún aceptación manual posterior al deploy**. No repetir pedidos 018 y 020. `main` y web pública sin cambios.
