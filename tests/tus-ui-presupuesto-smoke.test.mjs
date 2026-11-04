@@ -75,7 +75,7 @@ test('TUS solicitado pero mal configurado bloquea Google Drive e informa solamen
  assert.match(html,/Supabase\/TUS no está operativo/);
  assert.match(html,/DOCS_TUS_SUPABASE_SERVICE_KEY/);
  assert.match(html,/const TUS_BLOCKED=true/);
- assert.match(html,/sendAllButton\.disabled=TUS_BLOCKED\|\|/);
+ assert.match(html,/if\(TUS_BLOCKED\)return 'Recepción privada no configurada\.'/);
  const script=html.match(/<script type="module">([\s\S]+?)<\/script>/)?.[1];
  assert.ok(script);
  await transform(script,{loader:'js',format:'esm',target:'es2022'});
