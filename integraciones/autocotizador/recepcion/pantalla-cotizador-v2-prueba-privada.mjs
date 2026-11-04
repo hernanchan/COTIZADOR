@@ -947,7 +947,7 @@ async function enviarTUSDesdeCarrito(pendientes){
  const valor=new Intl.NumberFormat('es-AR',{
   style:'currency',currency:'ARS',maximumFractionDigits:0
  }).format(ultimoTotalServidor);
- document.getElementById('precio-smart').textContent='Orden N.º '+registeredShortOrder+' · Total: '+valor+(SANDBOX_PAYMENT_ENABLED?' · Elegí cómo pagar (prueba)':' · Pago no disponible');
+ document.getElementById('precio-smart').textContent='Orden N.º '+registeredShortOrder+' · Total: '+valor+(typeof SANDBOX_PAYMENT_ENABLED!=='undefined'&&SANDBOX_PAYMENT_ENABLED?' · Elegí cómo pagar (prueba)':' · Pago no disponible');
  mostrarEstadoCliente('registrado','Pedido recibido correctamente',
   trabajos.length+' PDF recibidos. Conservá el número de orden. '+(SANDBOX_PAYMENT_ENABLED?'Elegí un medio de pago de prueba.':'Pago no disponible.'),registeredShortOrder);
  return resultado;
@@ -975,7 +975,7 @@ async function recuperarNumeroCentralTUS(){
    style:'currency',currency:'ARS',maximumFractionDigits:0
   }).format(data.totalArs);
   document.getElementById('precio-smart').textContent='Orden N.º '+
-   data.numeroOrden+' · Total: '+monto+(SANDBOX_PAYMENT_ENABLED?' · Elegí cómo pagar (prueba)':' · Pago no disponible');
+   data.numeroOrden+' · Total: '+monto+(typeof SANDBOX_PAYMENT_ENABLED!=='undefined'&&SANDBOX_PAYMENT_ENABLED?' · Elegí cómo pagar (prueba)':' · Pago no disponible');
   mostrarEstadoCliente('registrado','Pedido recibido correctamente',
    'Tu pedido está guardado; no necesitás volver a subir los archivos. '+(SANDBOX_PAYMENT_ENABLED?'Elegí un medio de pago de prueba.':'Pago no disponible.'),
    data.numeroOrden);
