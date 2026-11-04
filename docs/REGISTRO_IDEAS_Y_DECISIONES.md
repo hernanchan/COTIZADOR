@@ -342,3 +342,11 @@ Cada vez que surja una propuesta: agregar nueva entrada o actualizar la correspo
 - [Pruebas de pagos](../integraciones/mercadopago/pruebas/README.md)
 
 **Alcance de esta bitácora:** es documentación y planificación, no evidencia de despliegue. Mantener el estado exacto de cada idea al actualizarla.
+
+
+## 04/11/2026 — Transferencias y decisiones preservadas
+- Prioridad de desarrollo: cerrar **transferencia bancaria con acreditación manual** antes de tiempo estimado de entrega, promociones, ajustes visuales o publicación pública.
+- Para una transferencia, el cliente ve **orden corta + importe exacto + alias**; se mantiene pendiente hasta revisar el movimiento en el banco y aprobar manualmente desde Central. Capturas y declaraciones no prueban ingreso.
+- El código privado registra `bank_accreditations` (operador, fecha, importe y referencia única por movimiento) y habilita Nuevos únicamente tras acreditación explícita; no modificar MP Sandbox aprobado.
+- **Tiempo estimado de preparación**: ya registrado como pendiente, NO implementar en esta fase. Dependerá de tipo/cantidad, cola y horario, ajustable desde Central.
+- El sitio público, main y dinero real continúan desactivados durante los ensayos.
