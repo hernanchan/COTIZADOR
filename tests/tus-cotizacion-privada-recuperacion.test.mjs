@@ -13,7 +13,7 @@ const archivo={nombre:'test-A3-11.pdf',paginas,paginasSeleccionadas:'',seleccion
  papelPoster:'obra80',anillado:'ninguno',grupoAnillado:'',materialColor:''};
 const ok={ok:true,estado:'PRELIMINAR',paymentAuthorized:false,total:5115,pendientes:[],plan:[]};
 test('11 páginas A3 no bloquean la cotización solo por tamaño mixto de 0,01 cm',()=>{
- const out=cotizarCargaUnica({archivos:[archivo],precios});
+ const out=cotizarCargaUnica({archivos:[archivo],precios:prices});
  assert.equal(out.ok,true);
  assert.equal(out.estado,'PRELIMINAR');
  assert.equal(out.total,11*465);
