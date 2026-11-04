@@ -37,6 +37,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 #vista-estado-pedido{background:#fff;border-radius:12px;padding:24px;margin:12px 0;border:1px solid #bad2e7}
 #vista-estado-pedido strong{display:block;font-size:21px;margin-bottom:8px}
 #vista-estado-pedido p{margin:5px 0}
+.estado-pago-sandbox{max-width:540px;margin:18px auto 4px;padding:15px;border:1px solid #bed5e7;border-radius:10px;background:#fff;text-align:center}.estado-pago-sandbox .pago-total{font-size:22px;font-weight:800;color:#133d62}.estado-pago-sandbox .pago-estado{font-weight:750;color:#714b16}.estado-pago-sandbox .pago-nota{font-size:12px;color:#52677a}.estado-pago-sandbox button{margin:10px auto 4px}
 body.estado-registro #vista-estado-pedido{background:#ecfaf4;border:2px solid #12805c;box-shadow:0 4px 18px #0b58301c;scroll-margin-top:130px;text-align:center;padding:28px 18px}
 body.estado-registro #vista-estado-pedido strong{font-size:23px;color:#11543f}
 body.estado-registro #vista-estado-pedido .numero-confirmado{font-size:clamp(30px,6vw,52px);font-weight:850;color:#074a36;line-height:1.2;margin:14px 0}
@@ -151,44 +152,72 @@ function mostrarEstadoCliente(estado,titulo,detalle,numeroOrden=null){
 }
 function pagoSandboxEnRecibo(){
  const wrap=document.createElement('section'),mensaje=document.createElement('p'),
-  boton=document.createElement('button'),revisar=document.createElement('button');
- wrap.style.margin='18px auto';mensaje.setAttribute('role','status');
- boton.textContent='Pagar con Mercado Pago (prueba)';
- revisar.textContent='Consultar confirmación';
- revisar.style.marginLeft='8px';
- mensaje.textContent='Solo cuenta compradora de prueba; no usar dinero real.';
+  boton=document.createElement('button'),estado=document.createElement('p'),
+  total=document.createElement('p'),nota=document.createElement('p');
+ wrap.className='estado-pago-sandbox';
+ mensaje.setAttribute('role','status');mensaje.setAttribute('aria-live','polite');
+ estado.className='pago-estado';estado.textContent='Estado del pago: pendiente';
+ total.className='pago-total';
+ total.textContent=Number.isSafeInteger(ultimoTotalServidor)&&ultimoTotalServidor>0?
+  'Total del pedido: '+new Intl.NumberFormat('es-AR',{
+   style:'currency',currency:'ARS',maximumFractionDigits:0
+  }).format(ultimoTotalServidor):'Total verificado en la orden';
+ boton.type='button';boton.textContent='Pagar con Mercado Pago (prueba)';
+ nota.className='pago-nota';
+ nota.textContent='Ensayo privado: usá solamente la cuenta compradora de prueba, nunca dinero real.';
+ mensaje.textContent='El estado se consulta automáticamente. No necesitás verificar el pago manualmente.';
  const api=async action=>{
   const response=await fetch('/prueba-v2/api/ensayo-tus-pago-sandbox',{
-   method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},
+   method:'POST',credentials:'same-origin',cache:'no-store',
+   headers:{'Content-Type':'application/json'},
    body:JSON.stringify({action,webOrderId:orderId,clientOrderId,commercialOrderId:registeredOrder})
   });
   const result=await response.json().catch(()=>null);
   if(!response.ok||result?.ok!==true)throw Error(result?.error||'No se pudo verificar el pago.');
   return result;
  };
- let timer=null;
+ let consultando=false,pagado=false,revocado=false,preparandoPago=false;
  const check=async()=>{
-  const result=await api('status');
-  if(result.estado==='pagado'){
-   mensaje.textContent='Pago de prueba confirmado automáticamente. Ya figura como pagado en Central.';
-   boton.disabled=true;boton.textContent='Pago de prueba confirmado';
-   if(timer)clearInterval(timer);
-   return;
-  }
-  if(result.estado==='revocado'){
-   mensaje.textContent='Pago revertido. No se debe preparar este pedido.';
-   boton.disabled=true;if(timer)clearInterval(timer);
-   return;
-  }
-  mensaje.textContent='Pago pendiente. La confirmación depende de Mercado Pago, no de esta pantalla.';
+  if(consultando||!registeredOrder)return;
+  consultando=true;
+  try{
+   const result=await api('status');
+   if(result.estado==='pagado'){
+    pagado=true;revocado=false;
+    estado.textContent='Estado del pago: confirmado';
+    mensaje.textContent='Pago recibido. Tu pedido ya figura como pagado en la Central.';
+    boton.disabled=true;boton.textContent='Pago confirmado';
+    document.getElementById('precio-smart').textContent='Orden N.º '+
+     (registeredShortOrder||'')+' · Pago de prueba confirmado';
+    return;
+   }
+   if(result.estado==='revocado'){
+    pagado=false;revocado=true;
+    estado.textContent='Estado del pago: requiere revisión';
+    mensaje.textContent='El pago fue revertido. El pedido no debe prepararse.';
+    boton.disabled=true;boton.textContent='Pago revertido';
+    return;
+   }
+   if(!pagado&&!revocado&&!preparandoPago){
+    estado.textContent='Estado del pago: pendiente';
+    mensaje.textContent='Esperando confirmación de Mercado Pago. Esta pantalla se actualiza sola.';
+   }
+  }catch(_){
+   if(!pagado&&!revocado&&!preparandoPago)
+    mensaje.textContent='No pudimos consultar el estado. Reintentaremos automáticamente.';
+  }finally{consultando=false}
  };
- revisar.addEventListener('click',async()=>{
-  revisar.disabled=true;
-  try{await check()}catch(e){mensaje.textContent=String(e.message||e)}
-  finally{revisar.disabled=false}
+ // El servidor verifica los pagos pendientes con su propio límite de frecuencia.
+ // Esta consulta nunca crea cobros, cambia importes ni habilita producción.
+ setInterval(()=>{if(!document.hidden)void check()},30000);
+ document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden)void check();
  });
+ void check();
  boton.addEventListener('click',async()=>{
-  boton.disabled=true;mensaje.textContent='Preparando el pago seguro de prueba…';
+  if(pagado||revocado||preparandoPago)return;
+  preparandoPago=true;boton.disabled=true;
+  mensaje.textContent='Preparando el pago seguro de prueba…';
   try{
    const result=await api('start');
    const url=new URL(result.checkoutUrl);
@@ -198,18 +227,19 @@ function pagoSandboxEnRecibo(){
    link.href=url.href;link.target='_blank';link.rel='noopener noreferrer';
    link.textContent='Abrir Mercado Pago de prueba';
    link.style.cssText='display:inline-block;margin:9px;padding:11px;border-radius:8px;color:white;background:#095985';
-   link.addEventListener('click',()=>{
-    let tries=0;
-    timer=setInterval(async()=>{
-     if(++tries>150){clearInterval(timer);return}
-     try{await check()}catch{}
-    },6000);
-   },{once:true});
-   wrap.append(link);
-   mensaje.textContent='Abrí el enlace en otra pestaña. La Central verificará el cobro automáticamente.';
-  }catch(e){mensaje.textContent=String(e.message||e);boton.disabled=false}
+   wrap.insertBefore(link,mensaje);
+   boton.textContent='Enlace de pago preparado';
+   mensaje.textContent='Abrí Mercado Pago de prueba en otra pestaña. Al regresar, el pago se verificará automáticamente.';
+   void check();
+  }catch(e){
+   if(!pagado&&!revocado){
+    mensaje.textContent=String(e.message||e);
+    boton.disabled=false;
+   }
+  }finally{preparandoPago=false}
  });
- wrap.append(boton,revisar,mensaje);return wrap;
+ wrap.append(total,estado,boton,mensaje,nota);
+ return wrap;
 }
 let batchSending=false,smartReady=false,smartBlockedReason='',handoffInProgress=false,handoffResolve=null;
 const dropPdf=document.getElementById('drop-pdf'),batchFiles=document.getElementById('batch-files'),batchStatus=document.getElementById('batch-status');
