@@ -23,3 +23,5 @@ Activar solamente la compuerta DOCS_SANDBOX_CHECKOUT_ENABLED=PRIVATE_TEST_ONLY e
 2026-11-03 — Desplegar SOLO Central privada actualizada con ruta HMAC /internal/central/payment-sandbox-client para ensayo E2E PDF → MP comprador test_user → webhook → D1; checkout comercial apagado, sin tocar main/web pública, con HTTP401 y rollback.
 
 2026-11-04 — CORRECCIÓN PRIVADA: conciliación secundaria iniciada automáticamente desde consulta de estado de comprador, con throttling D1 de 25 segundos, validación MP autenticada y triple asociación de pedido. Tablero etiqueta Nuevos pagos confirmados. CI 41846960392 SUCCESS. Desplegar solo saber-pagos-pruebas, preservar sandbox y HTTP 401/health/rollback, sin activar pagos reales ni web comercial.
+
+2026-11-04 — UI de cron sincronizada a dos minutos para respaldo sandbox; actualizar solo Worker Central de pruebas, con pruebas y rollback HTTP401/health; cron Cloudflare será ajustado de forma separada, solo si coincide con */10.
