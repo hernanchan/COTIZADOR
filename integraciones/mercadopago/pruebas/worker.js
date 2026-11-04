@@ -2004,9 +2004,9 @@ async function refreshTransfers({silent=false,force=false}={}){
     const label=node("label","Referencia de operación bancaria (obligatoria):");
     const reference=node("input","");
     reference.type="text";reference.maxLength=80;reference.autocomplete="off";
-    reference.placeholder="Ej.: BANCO-OPERACION-123456";
+    reference.placeholder="Ej.: Banco MP 34 55";
     reference.setAttribute("aria-label","Referencia única de la operación bancaria");
-    const note=node("p","Comprobá importe y referencia. En este entorno privado solo se realizan ensayos; nunca transfieras dinero al alias ficticio.");
+    const note=node("p","Podés usar espacios en la referencia. Comprobá importe y operación en el banco. Solo ENSAYO privado; nunca transfieras dinero al alias ficticio.");
     note.className="note";
     const feedback=node("p","");
     feedback.className="transfer-feedback";feedback.setAttribute("role","status");
@@ -2014,11 +2014,11 @@ async function refreshTransfers({silent=false,force=false}={}){
     approve.type="button";
     approve.addEventListener("click",async()=>{
      const operator=requestOperator();
-     const bankReference=reference.value.trim().toUpperCase();
+     const bankReference=reference.value.trim().toUpperCase().replace(/\s+/g,"-");
      const inform=message=>{feedback.textContent=message;panel.textContent=orderLabel+": "+message;status.textContent=message};
      if(!operator){inform("Falta indicar el responsable. Completalo en el encabezado.");operatorInput.focus();return}
-     if(!/^[A-Z0-9][A-Z0-9._/-]{5,79}$/.test(bankReference)){
-      inform("Falta la referencia bancaria: ingresá al menos 6 caracteres (letras o números).");
+     if(!/^[A-Z0-9][A-Z0-9._/-]{5,79}$/.test(bankReference)||/\.(?:PDF|PNG|JPE?G|WEBP)$/.test(bankReference)){
+      inform("Ingresá la referencia de 6 a 80 caracteres. Podés usar espacios entre letras y números.");
       reference.setAttribute("aria-invalid","true");reference.focus();return;
      }
      reference.setAttribute("aria-invalid","false");
@@ -2636,8 +2636,8 @@ async function centralApproveBankTransfer(req,env){
     typeof d.operator!=="string"||d.operator.trim().length<2||d.operator.trim().length>60||
     typeof d.bank_reference!=="string")
   return json({error:"Datos de acreditación incompletos"},400);
- const operator=d.operator.trim(),reference=d.bank_reference.trim().toUpperCase();
- if(!/^[A-Z0-9][A-Z0-9._/-]{5,79}$/.test(reference))
+ const operator=d.operator.trim(),reference=d.bank_reference.trim().toUpperCase().replace(/\s+/g,"-");
+ if(!/^[A-Z0-9][A-Z0-9._/-]{5,79}$/.test(reference)||/\.(?:PDF|PNG|JPE?G|WEBP)$/.test(reference))
   return json({error:"Ingresá la referencia de la operación que figura en el banco"},422);
  await centralTables(env);await ensureOrderItems(env);await ensurePaymentReviews(env);
  await ensureBankAccreditations(env);
