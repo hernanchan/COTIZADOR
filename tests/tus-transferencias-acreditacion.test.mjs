@@ -153,7 +153,7 @@ test('el contrato conserva MP, y el recibo cliente nunca confirma banca',()=>{
  assert.match(client,/data.action==='bank'/);
  assert.match(page,/Pagar con Mercado Pago \(prueba\)/);
  assert.match(page,/Transferencia bancaria \(prueba\)/);
- assert.match(page,/Solo Librería Saber puede confirmar el ingreso/);
+ assert.match(page,/Solo Librería Saber confirma el ingreso/);
  assert.doesNotMatch(client,/\/admin\/api\/transfers\/approve/);
  assert.doesNotMatch(page,/\/admin\/api\/transfers\/approve/);
 });
