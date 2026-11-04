@@ -2674,7 +2674,7 @@ export default {
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
     await ensureCronHealth(env);
     const lastRun=await env.DB.prepare("SELECT started_at,finished_at,status,checked,registered,errors FROM cron_health WHERE id=1").first();
-    return json({lastRun,periodMinutes:10,note:"Solo ejecuciones programadas; no cuenta las verificaciones manuales."});
+    return json({lastRun,periodMinutes:2,note:"Conciliación programada de respaldo en entorno privado; no incluye comprobaciones manuales."});
    }
    // Consulta privada y de SOLO LECTURA. Una instrucción de transferencia
    // jamás habilita fabricación ni acredita fondos por sí sola.
