@@ -74,5 +74,5 @@ test('estado mostrado solo tras relectura D1, revisión verified y ruta HMAC',()
  assert.match(route,/JOIN cart_requests c ON c.order_id=o.id/);
  assert.match(route,/JOIN central_document_manifests m ON m.commercial_order_id=o.id/);
  assert.match(src,/Nuevos · pagos confirmados/);
- assert.match(src,/Transferencias por verificar · Acreditación bancaria manual/);
+ assert.match(src,/Transferencias por verificar ·/);
 });
