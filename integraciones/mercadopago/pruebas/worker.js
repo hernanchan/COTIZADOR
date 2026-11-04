@@ -1549,7 +1549,10 @@ function renderProductionTracking(orderId,track){
  }
  details.append(area);
 }
-async function showOrder(id){try{status.textContent="Consultando detalle...";const x=await api("/admin/api/order?id="+encodeURIComponent(id));details.replaceChildren();details.append(node("h3","Pedido "+x.order.id));details.append(node("p","Total: "+money(x.order.amount_ars)+" · Aprobado: "+(x.order.paid_at||"sin fecha")));if(x.produccion?.seguimiento)renderProductionTracking(id,x.produccion.seguimiento);if(x.produccion){const pr=x.produccion;details.append(node("h4","Estado operativo: "+pr.estado.replaceAll("_"," ")));details.append(node("p",pr.mensaje));for(const t of pr.trabajos){const area=node("section","");area.append(node("h4",t.linea+". "+t.cantidad+" × "+t.descripcion+" — "+money(t.subtotal)));area.append(node("p","Estado: "+t.etapa.replaceAll("_"," ")+" · "+t.instruccion));const valores=Object.entries(t.especificaciones||{}).map(a=>a[0]+": "+a[1]).join(" · ");if(valores)area.append(node("p","Ficha técnica: "+valores));if(t.referencias?.length)area.append(node("p","Referencias privadas: "+t.referencias.join(", ")));details.append(area)}}else details.append(node("p","La ficha de producción no está disponible."));if(x.produccion?.documentosVerificados){
+async function showOrder(id){try{status.textContent="Consultando detalle...";const x=await api("/admin/api/order?id="+encodeURIComponent(id));details.replaceChildren();details.append(node("h3","Pedido "+x.order.id));details.append(node("p","Total: "+money(x.order.amount_ars)+" · Aprobado: "+(x.order.paid_at||"sin fecha")));if(x.bankAccreditation){
+ details.append(node("p","Acreditación bancaria verificada por "+x.bankAccreditation.operator+
+  " · "+x.bankAccreditation.recorded_at+" · Ref.: "+x.bankAccreditation.bank_reference));
+}if(x.produccion?.seguimiento)renderProductionTracking(id,x.produccion.seguimiento);if(x.produccion){const pr=x.produccion;details.append(node("h4","Estado operativo: "+pr.estado.replaceAll("_"," ")));details.append(node("p",pr.mensaje));for(const t of pr.trabajos){const area=node("section","");area.append(node("h4",t.linea+". "+t.cantidad+" × "+t.descripcion+" — "+money(t.subtotal)));area.append(node("p","Estado: "+t.etapa.replaceAll("_"," ")+" · "+t.instruccion));const valores=Object.entries(t.especificaciones||{}).map(a=>a[0]+": "+a[1]).join(" · ");if(valores)area.append(node("p","Ficha técnica: "+valores));if(t.referencias?.length)area.append(node("p","Referencias privadas: "+t.referencias.join(", ")));details.append(area)}}else details.append(node("p","La ficha de producción no está disponible."));if(x.produccion?.documentosVerificados){
  const d=x.produccion.documentosVerificados;
  details.append(node("h4",(d.numeroOrden?"Orden de trabajo N.º "+d.numeroOrden+" · ":"")+
   "PDF originales verificados · "+d.archivos+" archivo(s)"));
@@ -1980,6 +1983,35 @@ document.querySelector("#refreshTransfers").addEventListener("click",async()=>{
    const li=node("li",ref+" · "+money(t.amount_ars));
    li.append(node("p","Referencia de conciliación: "+t.order_id));
    li.append(node("p","Solicitada: "+t.created_at+" · Acreditación NO verificada · NO imprimir"));
+   const reference=node("input","");
+   reference.type="text";reference.maxLength=80;reference.autocomplete="off";
+   reference.placeholder="Referencia bancaria comprobada";
+   reference.setAttribute("aria-label","Referencia única de operación bancaria");
+   const approve=node("button","Confirmar acreditación bancaria");
+   approve.type="button";
+   const feedback=node("p","");feedback.setAttribute("role","status");
+   approve.addEventListener("click",async()=>{
+    const person=requestOperator();
+    const bankReference=reference.value.trim().toUpperCase();
+    if(!person){feedback.textContent="Indicá el responsable en el encabezado.";return}
+    if(!/^[A-Z0-9][A-Z0-9._/-]{5,79}$/.test(bankReference)){
+     feedback.textContent="Ingresá la referencia única que aparece en el extracto bancario.";return;
+    }
+    if(!confirm("¿Verificaste personalmente en el banco el ingreso exacto de "+money(t.amount_ars)+
+     " para "+ref+"? El comprobante del cliente NO alcanza."))return;
+    approve.disabled=true;feedback.textContent="Registrando acreditación…";
+    try{
+     const saved=await apiPost("/admin/api/transfers/approve",{
+      order_id:t.order_id,amount_ars:t.amount_ars,bank_reference:bankReference,
+      operator:person,confirmed:true
+     });
+     if(saved.ok!==true||saved.payment_confirmed!==true)throw Error("La Central no confirmó la operación");
+     feedback.textContent="Acreditación registrada · "+saved.operator+" · "+saved.recorded_at;
+     await refresh({force:true});
+     document.querySelector("#refreshTransfers").click();
+    }catch(e){approve.disabled=false;feedback.textContent="Sin acreditar: "+String(e.message||e)}
+   });
+   li.append(reference,approve,feedback);
    list.append(li);
   }
   status.textContent=x.orders.length+" transferencia(s) para conciliar en el banco";
