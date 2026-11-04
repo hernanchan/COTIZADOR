@@ -207,7 +207,14 @@ function pagoSandboxEnRecibo(){
    if(result.estado==='transferencia_pendiente'){
      transferenciaPendiente=true;
      estado.textContent='Estado del pago: transferencia pendiente de acreditación';
-     mensaje.textContent='Solo Librería Saber puede confirmar el ingreso desde su banco. No se prepara el pedido todavía.';
+     // El servidor devuelve las instrucciones sin volver a iniciar la transferencia.
+     if(typeof result.alias==='string'&&/^[A-Za-z0-9._-]{6,50}$/.test(result.alias)&&
+        result.amountArs===ultimoTotalServidor){
+      transferInfo.textContent='Orden N.º '+registeredShortOrder+' · Importe exacto: '+
+       new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(result.amountArs)+
+       ' · Alias de ENSAYO: '+result.alias;
+     }
+     mensaje.textContent='Transferencia pendiente. Solo Librería Saber confirma el ingreso. No envíes dinero real en este ensayo.';
      boton.disabled=true;transferButton.disabled=true;
      return;
     }
@@ -940,9 +947,9 @@ async function enviarTUSDesdeCarrito(pendientes){
  const valor=new Intl.NumberFormat('es-AR',{
   style:'currency',currency:'ARS',maximumFractionDigits:0
  }).format(ultimoTotalServidor);
- document.getElementById('precio-smart').textContent='Orden N.º '+registeredShortOrder+' · Total verificado: '+valor+' · Sin cobro autorizado';
+ document.getElementById('precio-smart').textContent='Orden N.º '+registeredShortOrder+' · Total: '+valor+(SANDBOX_PAYMENT_ENABLED?' · Elegí cómo pagar (prueba)':' · Pago no disponible');
  mostrarEstadoCliente('registrado','Pedido recibido correctamente',
-  trabajos.length+' PDF verificados y registrados. Conservá este número para identificar tu pedido. '+(typeof SANDBOX_PAYMENT_ENABLED!=='undefined'&&SANDBOX_PAYMENT_ENABLED?'Continuá al pago de prueba.':'Pago desactivado.'),registeredShortOrder);
+  trabajos.length+' PDF recibidos. Conservá el número de orden. '+(SANDBOX_PAYMENT_ENABLED?'Elegí un medio de pago de prueba.':'Pago no disponible.'),registeredShortOrder);
  return resultado;
 }
 /** Recuperación idempotente en Central: ningún PDF se transfiere de nuevo. */
@@ -968,9 +975,9 @@ async function recuperarNumeroCentralTUS(){
    style:'currency',currency:'ARS',maximumFractionDigits:0
   }).format(data.totalArs);
   document.getElementById('precio-smart').textContent='Orden N.º '+
-   data.numeroOrden+' · Total verificado: '+monto+' · Sin cobro autorizado';
+   data.numeroOrden+' · Total: '+monto+(SANDBOX_PAYMENT_ENABLED?' · Elegí cómo pagar (prueba)':' · Pago no disponible');
   mostrarEstadoCliente('registrado','Pedido recibido correctamente',
-   'Orden recuperada desde D1 sin volver a subir los PDF. '+(typeof SANDBOX_PAYMENT_ENABLED!=='undefined'&&SANDBOX_PAYMENT_ENABLED?'Continuá al pago de prueba.':'Pago desactivado.'),
+   'Tu pedido está guardado; no necesitás volver a subir los archivos. '+(SANDBOX_PAYMENT_ENABLED?'Elegí un medio de pago de prueba.':'Pago no disponible.'),
    data.numeroOrden);
   return true;
  }catch{return false;}
