@@ -146,3 +146,71 @@ test('el contrato conserva MP, y el recibo cliente nunca confirma banca',()=>{
  assert.doesNotMatch(client,/\/admin\/api\/transfers\/approve/);
  assert.doesNotMatch(page,/\/admin\/api\/transfers\/approve/);
 });
+
+test('la bandeja automática compila dentro del HTML y está antes del tablero',()=>{
+ const a=source.indexOf('const secret=document.querySelector("#secret")');
+ const b=source.indexOf('</script></body></html>',a);
+ assert.ok(a>0&&b>a,'No se encontró JavaScript embebido en Central');
+ assert.doesNotThrow(()=>new vm.Script(source.slice(a,b)),'JavaScript de Central inválido');
+ assert.ok(source.indexOf('id="bankTransfersArea"')<source.indexOf('id="productionBoardArea"'));
+ assert.match(source,/refreshTransfers\(\{silent:true\}\)/);
+ assert.match(source,/secret\.addEventListener\("change"/);
+ assert.match(source,/document\.addEventListener\("visibilitychange"/);
+ assert.match(source,/key!==transferVisibleKey/);
+});
+
+test('botón de acreditación: falta de referencia visible, confirmación explícita y paso a Nuevos',async()=>{
+ const begin=source.indexOf('let refreshingTransfers=false,transferVisibleKey=""');
+ const end=source.indexOf('document.querySelector("#refreshUnpaid").addEventListener',begin);
+ assert.ok(begin>0&&end>begin);
+ const controls={};let focused=null,waiting=true,calls=[],boardRefreshes=0,confirms=0;
+ const node=(tag,txt='')=>({
+  tag,textContent:String(txt),value:'',disabled:false,attributes:{},children:[],events:{},
+  append(...els){this.children.push(...els)},
+  replaceChildren(...els){this.children=els},
+  setAttribute(k,v){this.attributes[k]=v},
+  addEventListener(k,cb){this.events[k]=cb},
+  focus(){focused=this}
+ });
+ for(const id of ['#transferPanelStatus','#transferPending','#transferCount','#refreshTransfers'])controls[id]=node('div');
+ const operatorInput=node('input');
+ const secret=node('input');secret.value='test-key';
+ const status=node('p');
+ const context={
+  document:{querySelector:s=>controls[s]},
+  secret,status,operatorInput,node,money:n=>'$ '+n,
+  requestOperator:()=> 'Operador de prueba',
+  api:async()=>({orders:waiting?[{order_id:firstId,amount_ars:8332,
+   numero_orden:20,created_at:'2026-11-04 12:00:00'}]:[]}),
+  apiPost:async(path,payload)=>{
+   calls.push({path,payload});waiting=false;
+   return {ok:true,payment_confirmed:true,operator:payload.operator,recorded_at:'2026-11-04 12:01:00'}
+  },
+  confirm:()=>{confirms++;return true},
+  refresh:async()=>{boardRefreshes++}
+ };
+ vm.createContext(context);
+ vm.runInContext(source.slice(begin,end),context);
+ await context.refreshTransfers();
+ assert.equal(controls['#transferCount'].textContent,'1 pendiente(s)');
+ const item=controls['#transferPending'].children[0];
+ const input=item.children.find(x=>x.tag==='input');
+ const button=item.children.find(x=>x.tag==='button');
+ assert.ok(input&&button);
+ await button.events.click();
+ assert.equal(calls.length,0,'No aprobar sin referencia');
+ assert.equal(focused,input);
+ assert.match(controls['#transferPanelStatus'].textContent,/Falta la referencia bancaria/);
+ input.value='BANCO-PRUEBA-20';
+ await context.refreshTransfers({silent:true});
+ assert.equal(controls['#transferPending'].children[0],item,'Polling no destruye formulario en edición');
+ await button.events.click();
+ assert.equal(calls.length,1);
+ assert.equal(calls[0].path,'/admin/api/transfers/approve');
+ assert.equal(calls[0].payload.confirmed,true);
+ assert.equal(calls[0].payload.bank_reference,'BANCO-PRUEBA-20');
+ assert.equal(confirms,1);
+ assert.equal(boardRefreshes,1);
+ assert.equal(controls['#transferCount'].textContent,'0 pendiente(s)');
+ assert.match(controls['#transferPanelStatus'].textContent,/Ya debe figurar en/);
+});
