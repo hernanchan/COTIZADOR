@@ -57,6 +57,15 @@ jobs:
             -c "$tmp/cookies" --user "operador:$OPERATOR_PASSWORD" \
             "$root/prueba-v2/" || true)
           echo "PORTAL_CON_BASIC_HTTP=$htmlHttp"
+          if [ "$htmlHttp" != "200" ] || ! grep -Fq 'El estado se consulta automáticamente.' "$tmp/html"; then
+            echo 'RECIBO_CLIENTE_ESTADO_AUTOMATICO_DESPLEGADO=NO'
+            exit 1
+          fi
+          if grep -Fq 'Consultar confirmación' "$tmp/html"; then
+            echo 'RECIBO_CLIENTE_CON_BOTON_MANUAL=ERROR'
+            exit 1
+          fi
+          echo 'RECIBO_CLIENTE_ESTADO_AUTOMATICO_DESPLEGADO=SI'
           cookieHttp=$(curl -sS --max-time 35 -o "$tmp/cookiequote" -w '%{http_code}' \
             -b "$tmp/cookies" -X POST -H "Origin: $root" -H 'Sec-Fetch-Site: same-origin' \
             -H 'Content-Type: application/json' --data-binary "@$tmp/data" \
