@@ -354,3 +354,10 @@ Cada vez que surja una propuesta: agregar nueva entrada o actualizar la correspo
 ## 04/11/2026 — Anillado conjunto, rama privada
 
 Se conserva el cálculo existente de hojas físicas y tarifa única por grupo (sin fusionar originales). Se implementaron selección por PDF, hasta cinco grupos, orden editable, y visualización de integrantes/hojas/juegos en la ficha de Central y el PDF de instrucciones del ZIP. Test nuevo `tests/tus-anillado-conjunto-ui-zip.test.mjs`, junto al test TUS real que ya existía. Especificación en `docs/ANILLADO-CONJUNTO-20261104.md`. **Estado de este cambio: guardado en GitHub, pendiente de CI y despliegue privado verificado.** No cambiar `main`, web pública, pagos ni transporte TUS.
+
+### 04/11/2026 — Despliegues privados verificados
+- GitHub CI de implementación `41928147607` **SUCCESS**; CI del commit de activación `41928278372` **SUCCESS**.
+- Worker documental **`saber-documentos-pruebas`**: GitHub Actions `41928278441` **SUCCESS**. Versión nueva activa `a0b920e1-002e-4082-a318-a76e79da4c63` (antes `96263ed4-f42a-4caf-8a3d-7ca1b8525c62`). Comprobados portal privado HTTP 401 y precios D1 A4 B/N $100, póster recubierto 60 cm $18.700; cobros reales desactivados.
+- Worker Central **`saber-pagos-pruebas`**: GitHub Actions `41928278342` **SUCCESS**. Versión nueva activa `d06e4a9c-cbd2-4af9-b94b-d284fd76b910` (antes `9dc45162-5ef1-4d29-80c8-999aa887faaa`). Comprobados HTTP 401 administrativo, `/health` y `paymentsEnabled=false`.
+- No se cambió `main`, web pública, carga TUS, Mercado Pago real ni transferencias comerciales. PDF originales intactos.
+- **Aceptación humana pendiente:** ensayo privado con tres PDF reales y revisión en Central del ZIP/hoja de anillado conjunto; no crear pedido real ni gastar dinero.

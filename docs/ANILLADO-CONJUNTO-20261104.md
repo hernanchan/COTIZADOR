@@ -17,3 +17,10 @@ Estimación de tiempos de preparación según cola, complejidad y horario.
 
 ### Validación técnica
 GitHub Actions `41928147607` — SUCCESS (CI completa, compilación del Worker, pruebas de grupos y contrato existente). Se solicitaron despliegues aislados de Central y portal documental en esta rama; resultados se deben registrar por número de ejecución, sin inferir éxito por el push.
+
+### 04/11/2026 — Despliegues privados verificados
+- GitHub CI de implementación `41928147607` **SUCCESS**; CI del commit de activación `41928278372` **SUCCESS**.
+- Worker documental **`saber-documentos-pruebas`**: GitHub Actions `41928278441` **SUCCESS**. Versión nueva activa `a0b920e1-002e-4082-a318-a76e79da4c63` (antes `96263ed4-f42a-4caf-8a3d-7ca1b8525c62`). Comprobados portal privado HTTP 401 y precios D1 A4 B/N $100, póster recubierto 60 cm $18.700; cobros reales desactivados.
+- Worker Central **`saber-pagos-pruebas`**: GitHub Actions `41928278342` **SUCCESS**. Versión nueva activa `d06e4a9c-cbd2-4af9-b94b-d284fd76b910` (antes `9dc45162-5ef1-4d29-80c8-999aa887faaa`). Comprobados HTTP 401 administrativo, `/health` y `paymentsEnabled=false`.
+- No se cambió `main`, web pública, carga TUS, Mercado Pago real ni transferencias comerciales. PDF originales intactos.
+- **Aceptación humana pendiente:** ensayo privado con tres PDF reales y revisión en Central del ZIP/hoja de anillado conjunto; no crear pedido real ni gastar dinero.
