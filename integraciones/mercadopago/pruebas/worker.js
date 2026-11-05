@@ -1358,6 +1358,87 @@ async function centralUpdateProduction(req,env){
  return json({saved:true,production:current,productionAuthorized:false});
 }
 
+
+/** Plazo inicial: lo confirma un operador; jamás inventa tiempos a partir del precio.
+ * Los cambios quedan versionados y auditados en D1 privado.
+ */
+async function ensurePreparationEstimates(env){
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_preparation_estimates (order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE RESTRICT,ready_at TEXT,version INTEGER NOT NULL DEFAULT 0 CHECK(version>=0),operator TEXT,reason TEXT,updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_preparation_estimate_events (id INTEGER PRIMARY KEY AUTOINCREMENT,order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE RESTRICT,version INTEGER NOT NULL,previous_at TEXT,ready_at TEXT,operator TEXT NOT NULL,reason TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL DEFAULT (datetime('now')),UNIQUE(order_id,version))").run();
+}
+async function preparationEstimateDetail(env,id){
+ await ensurePreparationEstimates(env);
+ const row=await env.DB.prepare("SELECT ready_at,version,operator,reason,updated_at FROM central_preparation_estimates WHERE order_id=?").bind(id).first();
+ return {ready_at:row?.ready_at||null,version:row?.version||0,
+  operator:row?.operator||null,reason:row?.reason||"",updated_at:row?.updated_at||null,
+  provisional:true,source:"operador"};
+}
+async function updatePreparationEstimate(req,env){
+ if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+ if(env.CENTRAL_PRODUCTION_TRACKING_ENABLED!=="PRIVATE_TEST_ONLY")
+  return json({error:"Plazos privados deshabilitados"},503);
+ if(!/^application\/json(?:;|$)/i.test(req.headers.get("Content-Type")||""))
+  return json({error:"JSON requerido"},415);
+ const raw=await req.text();
+ if(raw.length>1200)return json({error:"Solicitud demasiado extensa"},413);
+ let d;try{d=JSON.parse(raw)}catch{return json({error:"Solicitud inválida"},400)}
+ if(!d||typeof d!=="object"||Array.isArray(d)||
+  Object.keys(d).sort().join(",")!=="confirmed,expected_version,operator,order_id,ready_at,reason"||
+  !CENTRAL_UUID.test(d.order_id||"")||d.confirmed!==true||
+  !Number.isSafeInteger(d.expected_version)||d.expected_version<0||
+  typeof d.operator!=="string"||d.operator.trim().length<2||d.operator.trim().length>60||
+  typeof d.reason!=="string"||d.reason.length>240||
+  !(d.ready_at===null||typeof d.ready_at==="string"))
+  return json({error:"Datos de plazo incorrectos"},400);
+ const ready=d.ready_at,operator=d.operator.trim(),reason=d.reason.trim();
+ if(ready!==null){
+  const when=Date.parse(ready),now=Date.now();
+  if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(ready)||
+   !Number.isFinite(when)||new Date(when).toISOString()!==ready||
+   when<now+5*60000||when>now+45*24*3600000)
+   return json({error:"Plazo fuera de rango: de 5 minutos a 45 días"},422);
+ }
+ await centralTables(env);await ensurePaymentReviews(env);await centralProductionTables(env);
+ const eligible=await env.DB.prepare(
+  "SELECT o.id,COALESCE(s.state,'pendiente') AS stage FROM orders o "+
+  "JOIN central_document_manifests m ON m.commercial_order_id=o.id "+
+  "LEFT JOIN central_production_status s ON s.order_id=o.id "+
+  "WHERE o.id=? AND o.status='paid' AND o.paid_at IS NOT NULL "+
+  "AND o.deposit_ars=o.amount_ars AND EXISTS (SELECT 1 FROM payment_reviews p "+
+  "WHERE p.order_id=o.id AND p.state='verified') LIMIT 1"
+ ).bind(d.order_id).first();
+ if(!eligible||["listo","entregado"].includes(eligible.stage))
+  return json({error:"Pedido documental sin pago verificado o ya terminado"},409);
+ await ensurePreparationEstimates(env);
+ await env.DB.prepare("INSERT OR IGNORE INTO central_preparation_estimates(order_id) VALUES(?)").bind(d.order_id).run();
+ const prior=await env.DB.prepare("SELECT ready_at,version FROM central_preparation_estimates WHERE order_id=?").bind(d.order_id).first();
+ if(!prior||prior.version!==d.expected_version)
+  return json({error:"El plazo cambió en otro puesto; actualizá el detalle"},409);
+ if(ready===prior.ready_at)return json({error:"No hay cambios que guardar"},409);
+ if(prior.ready_at&&(ready===null||Date.parse(ready)>Date.parse(prior.ready_at))&&reason.length<5)
+  return json({error:"Indicá el motivo del cambio de plazo"},422);
+ let res;
+ try{
+  res=await env.DB.batch([
+   env.DB.prepare("UPDATE central_preparation_estimates SET ready_at=?,version=version+1,operator=?,reason=?,updated_at=datetime('now') "+
+    "WHERE order_id=? AND version=? AND EXISTS (SELECT 1 FROM orders o "+
+    "WHERE o.id=central_preparation_estimates.order_id AND o.status='paid' "+
+    "AND o.deposit_ars=o.amount_ars AND EXISTS (SELECT 1 FROM payment_reviews p "+
+    "WHERE p.order_id=o.id AND p.state='verified'))")
+    .bind(ready,operator,reason,d.order_id,d.expected_version),
+   env.DB.prepare("INSERT INTO central_preparation_estimate_events(order_id,version,previous_at,ready_at,operator,reason) "+
+    "SELECT ?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM central_preparation_estimates "+
+    "WHERE order_id=? AND version=? AND ready_at IS ?)")
+    .bind(d.order_id,d.expected_version+1,prior.ready_at,ready,operator,reason,
+     d.order_id,d.expected_version+1,ready)
+  ]);
+ }catch(_){return json({error:"No se guardó el cambio; actualizá el detalle"},409)}
+ if(!Array.isArray(res)||res.length!==2||res.some(x=>Number(x?.meta?.changes)!==1))
+  return json({error:"No se confirmó el cambio de plazo"},409);
+ return json({saved:true,estimate:await preparationEstimateDetail(env,d.order_id),
+  productionAuthorized:false,paymentsEnabled:false});
+}
+
 async function centralAdminDetail(env,id){
  await centralTables(env);
  const row=await env.DB.prepare("SELECT m.web_order_id,m.manifest_json,m.created_at,m.amount_ars,m.file_count,c.phone AS telefonoContacto FROM central_document_manifests m LEFT JOIN central_order_contacts c ON c.order_id=m.commercial_order_id WHERE m.commercial_order_id=?").bind(id).first();
@@ -2913,6 +2994,8 @@ export default {
     return await priceAdminHandle(req,env,url.pathname);
    if(url.pathname==="/admin/api/central/production-status"&&req.method==="POST")
     return await centralUpdateProduction(req,env);
+   if(url.pathname==="/admin/api/central/preparation-estimate"&&req.method==="POST")
+    return await updatePreparationEstimate(req,env);
    if(url.pathname==="/admin/api/orders"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
     await ensurePaymentReviews(env);
