@@ -1642,6 +1642,70 @@ async function etaCalendarApi(req,env){
  return json({saved:true,calendar:await etaCalendar(env),paymentsEnabled:false,productionAuthorized:false});
 }
 
+
+/** Invitaciones móviles privadas: la contraseña Basic no se guarda ni se entrega.
+ * El titular se autoriza desde la Central; el portal consume una invitación una vez.
+ * En D1 se persiste únicamente SHA-256 del ticket (nunca el ticket completo).
+ */
+async function ensureMobileInvites(env){
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_mobile_invites (token_hash TEXT PRIMARY KEY CHECK(length(token_hash)=64),operator TEXT NOT NULL,issued_at TEXT NOT NULL DEFAULT (datetime('now')),expires_at TEXT NOT NULL,consumed_at TEXT)").run();
+ await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_central_mobile_invites_issued ON central_mobile_invites(issued_at)").run();
+}
+async function mobileInviteHash(raw){
+ const bytes=new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(raw)));
+ return Array.from(bytes,b=>b.toString(16).padStart(2,"0")).join("");
+}
+async function createMobileInvite(req,env){
+ if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+ if(env.CENTRAL_PRODUCTION_TRACKING_ENABLED!=="PRIVATE_TEST_ONLY"||
+    env.CENTRAL_BRIDGE_ENABLED!=="PRIVATE_TEST_ONLY"||
+    typeof env.CENTRAL_BRIDGE_KEY!=="string"||env.CENTRAL_BRIDGE_KEY.length<32)
+  return json({error:"Ingreso móvil privado no disponible"},503);
+ if(req.method!=="POST")return json({error:"Método no admitido"},405);
+ if(!/^application\/json(?:;|$)/i.test(req.headers.get("Content-Type")||""))
+  return json({error:"JSON requerido"},415);
+ const raw=await req.text();
+ if(raw.length>400)return json({error:"Datos demasiado extensos"},413);
+ let d;try{d=JSON.parse(raw)}catch{return json({error:"Datos inválidos"},400)}
+ if(!d||typeof d!=="object"||Array.isArray(d)||
+    Object.keys(d).sort().join(",")!=="confirmed,operator"||
+    d.confirmed!==true||typeof d.operator!=="string"||
+    d.operator.trim().length<2||d.operator.trim().length>60)
+  return json({error:"Indicá responsable y confirmá el acceso móvil"},400);
+ await ensureMobileInvites(env);
+ const count=await env.DB.prepare("SELECT COUNT(*) AS count FROM central_mobile_invites WHERE issued_at>=datetime('now','-10 minutes')").first();
+ if(Number(count?.count)>9)return json({error:"Demasiados enlaces; intentá más tarde"},429);
+ const ticket=crypto.randomUUID()+"."+crypto.randomUUID();
+ const digest=await mobileInviteHash(ticket);
+ const saved=await env.DB.prepare("INSERT INTO central_mobile_invites(token_hash,operator,expires_at) VALUES(?,?,datetime('now','+3 minutes'))").bind(digest,d.operator.trim()).run();
+ if(Number(saved?.meta?.changes)!==1)return json({error:"No se pudo habilitar el acceso"},503);
+ const url="https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/ingresar#ticket="+ticket;
+ return new Response(JSON.stringify({ok:true,url,expiresInSeconds:180,oneUse:true}),{
+  headers:{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store, private",
+   "Referrer-Policy":"no-referrer","X-Robots-Tag":"noindex,nofollow"}});
+}
+async function redeemMobileInvite(req,env){
+ const signed=await centralReadSigned(req,env);
+ if(signed.error)return json({ok:false,error:"Invitación no autorizada"},signed.status);
+ const d=signed.payload;
+ if(!d||typeof d!=="object"||Array.isArray(d)||
+    Object.keys(d).sort().join(",")!=="schema,tokenHash"||
+    d.schema!=="saber-private-mobile-redeem-v1"||
+    typeof d.tokenHash!=="string"||!/^[a-f0-9]{64}$/.test(d.tokenHash))
+  return json({ok:false,error:"Invitación inválida"},400);
+ if(env.CENTRAL_PRODUCTION_TRACKING_ENABLED!=="PRIVATE_TEST_ONLY")
+  return json({ok:false,error:"Ingreso privado no habilitado"},503);
+ await ensureMobileInvites(env);
+ const updated=await env.DB.prepare(
+  "UPDATE central_mobile_invites SET consumed_at=datetime('now') "+
+  "WHERE token_hash=? AND consumed_at IS NULL AND expires_at>datetime('now')"
+ ).bind(d.tokenHash).run();
+ if(Number(updated?.meta?.changes)!==1)
+  return json({ok:false,error:"Invitación vencida o utilizada"},409);
+ return new Response(JSON.stringify({ok:true,consumed:true}),{
+  headers:{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store, private"}});
+}
+
 async function trackingMac(env,id){
  if(!CENTRAL_UUID.test(id)||typeof env.CENTRAL_BRIDGE_KEY!=="string"||
     env.CENTRAL_BRIDGE_KEY.length<32||env.CENTRAL_BRIDGE_KEY===env.DEMO_ADMIN_KEY)return null;
@@ -3433,7 +3497,8 @@ export default {
    if(url.pathname==="/internal/central/prepare-order")return await centralPrepareDraft(req,env);
    if(url.pathname==="/internal/central/payment-sandbox-client")
     return await centralClientSandboxPayment(req,env,(internal)=>this.fetch(internal,env));
-   if(url.pathname==="/internal/central/pricing-snapshot")
+   if(url.pathname==="/internal/central/mobile-invite-redeem")return await redeemMobileInvite(req,env);
+    if(url.pathname==="/internal/central/pricing-snapshot")
     return await priceAdminApprovedSnapshot(req,env);
    if(url.pathname.startsWith("/checkout/"))return await customerCheckout(req,env,this);
    // Solo un operador que conoce DEMO_ADMIN_KEY puede preparar un pedido ficticio.
@@ -3466,6 +3531,7 @@ export default {
     return await updatePreparationEstimate(req,env);
    if(url.pathname==="/admin/api/central/eta-settings")return await etaAdminApi(req,env);
     if(url.pathname==="/admin/api/central/eta-calendar")return await etaCalendarApi(req,env);
+    if(url.pathname==="/admin/api/central/mobile-invite")return await createMobileInvite(req,env);
    if(url.pathname==="/admin/api/orders"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
     await ensurePaymentReviews(env);
