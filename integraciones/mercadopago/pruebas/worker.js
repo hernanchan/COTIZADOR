@@ -2052,6 +2052,12 @@ button:disabled{opacity:.5;cursor:default}.outline{color:#174b8f;background:whit
 .board-card .actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
 .board-card button{font-size:.88rem;padding:8px 10px}
 .board-card .primary-next{flex:1 0 100%;font-weight:650}
+.delivery-editor{margin-top:12px;padding:12px;border:1px solid #b9ccdf;border-radius:8px;background:#f7faff}
+.delivery-editor[hidden]{display:none}
+.delivery-editor label{display:block;margin:6px 0 4px;font-size:.9rem;font-weight:650}
+.delivery-editor input{width:100%;max-width:370px;padding:10px;border:1px solid #a8b7c9;border-radius:6px;font:inherit}
+.delivery-editor .delivery-feedback{font-weight:650;white-space:pre-wrap}
+.delivery-editor .delivery-save{margin-top:10px}
 .board-feedback{font-size:.87rem;font-weight:600;min-height:0;color:#93410b;white-space:pre-wrap;margin:7px 0 0}
 .board-feedback:empty{display:none}
 .transfer-feedback{color:#85510d;font-weight:650;white-space:pre-wrap;margin:8px 0}.transfer-feedback:empty{display:none}#bankTransfersArea li{padding:12px 6px}#bankTransfersArea label{display:block;margin:10px 0 5px;font-weight:650}#bankTransfersArea input{min-width:min(100%,330px)}#bankTransfersArea button{display:block;margin-top:9px}#bankTransfersArea strong{color:#174b8f}
@@ -2689,7 +2695,7 @@ if(x.produccion?.polaroidsExpress){
   });
   details.append(button);
  }else details.append(node("p","PDF en Drive privado. Descarga administrativa pendiente de habilitación."));
-}status.textContent=""}catch(e){status.textContent=e.message}}
+}status.textContent="";details.scrollIntoView?.({behavior:"smooth",block:"start"})}catch(e){status.textContent=e.message}}
 function agregarFichaDeImpresion(area,t,{pagado=false,trabajos=[]}={}){
  // La ficha proviene del manifiesto privado de D1, NUNCA de parámetros URL
  // ni del PDF original. Los datos ausentes se señalan: no inventar instrucciones.
@@ -2898,6 +2904,61 @@ operatorInput.addEventListener("change",()=>{
 });
 const lanes=["pendiente","en_preparacion","listo","en_espera","entregado"];
 let refreshingBoard=false;
+/** Edición operativa junto a la tarjeta. Nunca depender de un detalle lejano. */
+function inlineDeliveryEditor(card,order){
+ const panel=node("section",""),toggle=node("button",order.estimated_ready_at?
+  "Modificar hora de entrega":"Definir hora de entrega");
+ panel.className="delivery-editor";panel.hidden=true;
+ toggle.type="button";toggle.className="outline";
+ const label=node("label","Fecha y hora estimada para retirar (Córdoba)");
+ const input=node("input","");input.type="datetime-local";input.step="60";
+ input.setAttribute("aria-label","Fecha y hora estimada de retiro, Córdoba");
+ const old=Date.parse(order.estimated_ready_at||"");
+ if(Number.isFinite(old))
+  input.value=new Date(old-3*60*60*1000).toISOString().slice(0,16);
+ const reasonLabel=node("label","Motivo del cambio (solo si se posterga la hora)");
+ const reason=node("input","");reason.type="text";reason.maxLength=240;
+ reason.setAttribute("aria-label","Motivo si la entrega se posterga");
+ const save=node("button","Guardar hora estimada");save.type="button";
+ save.className="delivery-save";
+ const feedback=node("p","");feedback.className="delivery-feedback";
+ feedback.setAttribute("role","status");feedback.setAttribute("aria-live","polite");
+ label.append(input);reasonLabel.append(reason);
+ panel.append(node("p","Ingresá una hora que puedas cumplir. El cliente la verá en «Mi pedido»."),label,
+  reasonLabel,save,feedback);
+ card.append(panel);
+ toggle.addEventListener("click",()=>{
+  panel.hidden=!panel.hidden;
+  if(!panel.hidden){feedback.textContent="";input.focus?.()}
+ });
+ save.addEventListener("click",async()=>{
+  if(!input.value){feedback.textContent="Elegí fecha y hora de entrega.";return}
+  const date=new Date(input.value+":00-03:00"),when=date.getTime();
+  if(!Number.isFinite(when)||when<Date.now()+5*60000||when>Date.now()+45*24*3600000){
+   feedback.textContent="La hora debe ser futura: entre 5 minutos y 45 días.";return;
+  }
+  const explanation=reason.value.trim();
+  if(Number.isFinite(old)&&when>old&&explanation.length<5){
+   feedback.textContent="Para postergar una entrega, indicá el motivo (mínimo 5 caracteres).";return;
+  }
+  const operator=requestOperator();
+  if(!operator){feedback.textContent="Ingresá el responsable de este trabajo.";return}
+  if(!confirm("¿Informar al cliente esta hora estimada de retiro?"))return;
+  save.disabled=true;feedback.textContent="Guardando hora…";
+  try{
+   const response=await apiPost("/admin/api/central/preparation-estimate",{
+    order_id:order.id,expected_version:Number(order.estimated_ready_version)||0,
+    ready_at:date.toISOString(),operator,reason:explanation,confirmed:true
+   });
+   if(response.saved!==true)throw Error("No se confirmó el horario");
+   status.textContent="Orden "+String(order.work_number||"")+" · hora estimada guardada y disponible en «Mi pedido».";
+   await refresh({silent:true,force:true});
+  }catch(e){feedback.textContent="No se pudo guardar: "+String(e.message||e)}
+  finally{save.disabled=false}
+ });
+ return toggle;
+}
+
 function boardCard(order){
  const card=node("article","");card.className="board-card";
  const num=order.work_number?String(order.work_number).padStart(3,"0"):"Sin número";
@@ -2930,7 +2991,8 @@ function boardCard(order){
    document.body.append(link);link.click();link.remove();
   });controls.append(zip);
  }
- const detail=node("button",current==="en_preparacion"?"Definir hora de entrega":"Detalle");detail.className="outline";
+ if(current==="en_preparacion")controls.append(inlineDeliveryEditor(card,order));
+ const detail=node("button","Detalle");detail.className="outline";
  detail.addEventListener("click",()=>showOrder(order.id));
  controls.append(detail);card.append(controls);
  const feedback=node("p","");feedback.className="board-feedback";
@@ -4013,7 +4075,7 @@ export default {
      "CASE WHEN m.commercial_order_id IS NULL THEN NULL ELSE COALESCE(s.state,'pendiente') END AS production_state,"+
      "n.number AS work_number,m.file_count AS file_count,m.web_order_id AS web_order_id,"+
      "c.phone AS customer_phone,COALESCE(s.version,0) AS production_version,"+
-     "e.ready_at AS estimated_ready_at FROM orders o "+
+     "e.ready_at AS estimated_ready_at,COALESCE(e.version,0) AS estimated_ready_version FROM orders o "+
      "LEFT JOIN central_document_manifests m ON m.commercial_order_id=o.id "+
      "LEFT JOIN central_production_status s ON s.order_id=o.id "+
      "LEFT JOIN central_preparation_estimates e ON e.order_id=o.id "+
