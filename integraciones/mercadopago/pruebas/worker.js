@@ -1632,10 +1632,86 @@ function renderProductionTracking(orderId,track){
  }
  details.append(area);
 }
+
+function preparationTimeLocal(utc){
+ const date=new Date(utc);
+ if(!Number.isFinite(date.getTime()))return "fecha inválida";
+ return new Intl.DateTimeFormat("es-AR",{timeZone:"America/Argentina/Cordoba",
+  day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}).format(date)+" hs";
+}
+function renderPreparationEstimate(orderId,track,estimate){
+ const area=node("section","");
+ area.append(node("h4","Preparación estimada · hora de Córdoba"));
+ area.append(node("p",estimate.ready_at?
+  "Horario provisional: "+preparationTimeLocal(estimate.ready_at):
+  "Todavía no se comunicó una hora estimada. No prometer plazos sin verificar."));
+ if(estimate.operator)area.append(node("p","Último responsable: "+estimate.operator+
+  " · "+(estimate.updated_at||"sin fecha")+
+  (estimate.reason?" · Motivo: "+estimate.reason:"")));
+ if(["listo","entregado"].includes(track.state)){
+  area.append(node("p","Pedido terminado: no se pueden establecer nuevos plazos."));
+  details.append(area);return;
+ }
+ const row=node("div",""),input=node("input",""),reason=node("input",""),
+  save=node("button","Guardar estimación");
+ row.className="toolbar";
+ input.type="datetime-local";input.step="60";
+ input.setAttribute("aria-label","Fecha y hora estimada de preparación, hora de Córdoba");
+ if(estimate.ready_at){
+  const milliseconds=Date.parse(estimate.ready_at)-3*60*60*1000;
+  input.value=new Date(milliseconds).toISOString().slice(0,16);
+ }
+ reason.type="text";reason.maxLength=240;
+ reason.placeholder="Motivo si postergás o retirás el plazo";
+ reason.setAttribute("aria-label","Motivo del cambio de fecha estimada");
+ save.type="button";
+ row.append(input,reason,save);
+ area.append(row);
+ area.append(node("p","El plazo es provisional. Para quitarlo, borrá la fecha y guardá con un motivo. Solo se informa al cliente tras pago verificado."));
+ const feedback=node("p","");
+ feedback.setAttribute("role","status");feedback.setAttribute("aria-live","polite");
+ area.append(feedback);
+ save.addEventListener("click",async()=>{
+  const operator=requestOperator();
+  if(!operator){feedback.textContent="Indicá el responsable en el encabezado.";return}
+  let ready_at=null;
+  if(input.value){
+   const when=new Date(input.value+":00-03:00");
+   if(!Number.isFinite(when.getTime())){
+    feedback.textContent="Fecha u hora inválida.";return;
+   }
+   ready_at=when.toISOString();
+  }
+  if(ready_at===estimate.ready_at){
+   feedback.textContent="La fecha no cambió.";return;
+  }
+  if(!estimate.ready_at&&!ready_at){
+   feedback.textContent="Indicá una fecha para comenzar.";return;
+  }
+  const why=reason.value.trim();
+  if(estimate.ready_at&&(ready_at===null||
+     Date.parse(ready_at)>Date.parse(estimate.ready_at))&&why.length<5){
+   feedback.textContent="Indicá el motivo de la postergación (mínimo 5 caracteres).";return;
+  }
+  if(!confirm(ready_at?"¿Guardar fecha provisional de preparación para el cliente?":
+   "¿Retirar la estimación anterior y avisar que está pendiente?"))return;
+  save.disabled=true;feedback.textContent="Guardando horario…";
+  try{
+   await apiPost("/admin/api/central/preparation-estimate",{
+    order_id:orderId,expected_version:estimate.version,ready_at,
+    operator,reason:why,confirmed:true});
+   await refresh({silent:true,force:true});
+   await showOrder(orderId);
+  }catch(e){feedback.textContent="No se pudo guardar: "+String(e.message||e)}
+  finally{save.disabled=false}
+ });
+ details.append(area);
+}
+
 async function showOrder(id){try{status.textContent="Consultando detalle...";const x=await api("/admin/api/order?id="+encodeURIComponent(id));details.replaceChildren();details.append(node("h3","Pedido "+x.order.id));details.append(node("p","Total: "+money(x.order.amount_ars)+" · Aprobado: "+(x.order.paid_at||"sin fecha")));if(x.bankAccreditation){
  details.append(node("p","Acreditación bancaria verificada por "+x.bankAccreditation.operator+
   " · "+x.bankAccreditation.recorded_at+" · Ref.: "+x.bankAccreditation.bank_reference));
-}if(x.produccion?.seguimiento)renderProductionTracking(id,x.produccion.seguimiento);if(x.produccion){const pr=x.produccion;details.append(node("h4","Estado operativo: "+pr.estado.replaceAll("_"," ")));details.append(node("p",pr.mensaje));for(const t of pr.trabajos){const area=node("section","");area.append(node("h4",t.linea+". "+t.cantidad+" × "+t.descripcion+" — "+money(t.subtotal)));area.append(node("p","Estado: "+t.etapa.replaceAll("_"," ")+" · "+t.instruccion));const valores=Object.entries(t.especificaciones||{}).map(a=>a[0]+": "+a[1]).join(" · ");if(valores)area.append(node("p","Ficha técnica: "+valores));if(t.referencias?.length)area.append(node("p","Referencias privadas: "+t.referencias.join(", ")));details.append(area)}}else details.append(node("p","La ficha de producción no está disponible."));if(x.produccion?.documentosVerificados){
+}if(x.produccion?.seguimiento)renderProductionTracking(id,x.produccion.seguimiento);if(x.produccion?.seguimiento&&x.produccion?.preparacionEstimada)renderPreparationEstimate(id,x.produccion.seguimiento,x.produccion.preparacionEstimada);if(x.produccion){const pr=x.produccion;details.append(node("h4","Estado operativo: "+pr.estado.replaceAll("_"," ")));details.append(node("p",pr.mensaje));for(const t of pr.trabajos){const area=node("section","");area.append(node("h4",t.linea+". "+t.cantidad+" × "+t.descripcion+" — "+money(t.subtotal)));area.append(node("p","Estado: "+t.etapa.replaceAll("_"," ")+" · "+t.instruccion));const valores=Object.entries(t.especificaciones||{}).map(a=>a[0]+": "+a[1]).join(" · ");if(valores)area.append(node("p","Ficha técnica: "+valores));if(t.referencias?.length)area.append(node("p","Referencias privadas: "+t.referencias.join(", ")));details.append(area)}}else details.append(node("p","La ficha de producción no está disponible."));if(x.produccion?.documentosVerificados){
  const d=x.produccion.documentosVerificados;
  details.append(node("h4",(d.numeroOrden?"Orden de trabajo N.º "+d.numeroOrden+" · ":"")+
   "PDF originales verificados · "+d.archivos+" archivo(s)"));
@@ -1934,6 +2010,8 @@ function boardCard(order){
  const totals=node("p",money(order.amount_ars)+" · "+(order.file_count||0)+" PDF · Pago verificado");
  totals.className="money";card.append(totals);
  if(order.customer_phone)card.append(node("p","Teléfono: "+order.customer_phone));
+  if(order.estimated_ready_at&&["pendiente","en_preparacion","en_espera"].includes(order.production_state))
+   card.append(node("p","Preparación estimada: "+preparationTimeLocal(order.estimated_ready_at)+" · provisional"));
  const controls=node("div","");controls.className="actions";
  const current=order.production_state;
  const next=({pendiente:"en_preparacion",en_preparacion:"listo",en_espera:"en_preparacion",listo:"entregado"})[current];
