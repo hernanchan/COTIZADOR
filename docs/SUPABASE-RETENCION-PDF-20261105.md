@@ -22,3 +22,20 @@
 - https://supabase.com/docs/guides/storage/uploads/file-limits
 - https://supabase.com/docs/guides/storage/management/delete-objects
 - https://supabase.com/docs/guides/platform/manage-your-usage/storage-size
+
+## 05/11/2026 — DECISIÓN NUEVA Y EXPRESA DEL TITULAR: NO CONSERVAR PEDIDOS PARA REIMPRESIÓN
+
+**Esto reemplaza la propuesta anterior de guardar PDFs durante 7 o 30 días tras la entrega.**
+
+El propietario instruyó: **«no quiero guardar pedidos, si quieren reimprimir q lo hagan de nuevo»**.
+
+Criterio funcional acordado para el diseño, pendiente de implementación y pruebas:
+1. Al **confirmar «Entregado»** en la Central, desencadenar una operación privada segura que elimine **inmediatamente** los archivos originales de ese pedido en Supabase Storage, sin retención para reimpresión ni copia ZIP operativa en otro almacén.
+2. El pedido desaparece del listado operativo o pasa a un estado terminal sin archivos ni función «Reimprimir». No se ofrecerá opción de repetir pedidos recuperando PDFs borrados.
+3. Si el cliente quiere otra impresión, inicia una **orden completamente nueva**, sube nuevamente los archivos, recibe una cotización vigente y realiza el pago correspondiente.
+4. Para evitar pérdidas por un clic equivocado, la eliminación debe pedir **confirmación explícita** antes de ejecutar, validar pedido y estado más reciente, comprobar que todos los PDFs pertenecen a esa orden, realizar el borrado solo vía API de Supabase Storage (irreversible), registrar resultado y no presentar falso éxito si falla parcial.
+5. **No borrar datos mínimos de transacción que deban mantenerse por obligaciones legales, fiscales, contables, conciliación de cobros o auditoría de seguridad.** La retención de estos registros comerciales es independiente de conservar el trabajo del cliente; no contienen PDFs.
+6. No confundir «pagado» o «en preparación» con «entregado»; nada se borra hasta la confirmación efectiva de entrega. Los archivos de pedidos abandonados e impagos tendrán una regla aparte, teniendo en cuenta pagos o transferencias pendientes.
+7. **Todavía NO se borró ningún PDF ni pedido ni se activó ninguna tarea automática.** Esta decisión debe implementarse y probarse en el próximo chat, antes de producción. Mantener intactos main, web pública y pagos reales.
+
+El código antiguo `integraciones/autocotizador/retencion/` se diseñó para Drive y en modo simulación; NO utilizar para limpiar Supabase ni activar la regla 30+7 anterior.
