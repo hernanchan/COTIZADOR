@@ -50,3 +50,10 @@ Archivo: `vidriera/index.html`.
 5. Integración visual final, revisión completa de accesibilidad y ensayos humanos. Nada se publica comercialmente sin aprobación explícita.
 
 **Próximo paso único:** verificar resultado del CI de rama, obtener una vista de navegador privada de la portada y corregir exclusivamente presentación antes de intervenir cotizador o Central.
+
+## 6. Vista previa protegida (código)
+- Se añadió ruta `/prueba-v2/diseno-saber-directo` y `/prueba-v2/diseno-saber-directo/ofertas.html` dentro del Worker documental privado existente, mediante `prepararVistaDisenoPrivada`.
+- Ambas rutas pasan por `v2PrivateBrowserResponse`: compuerta `DOCS_V2_PRIVATE_UI_ENABLED` + Basic operador, con sesión móvil ya permitida en esta interfaz. Anonymous 401; flag apagado 503.
+- Importa el HTML de portada y ofertas del repositorio, sin copiar una segunda versión divergiendo.
+- Sustituye enlaces locales a cotizador por `/prueba-v2/` (ensayo protegido), y al catálogo de ofertas por ruta protegida de pruebas. Bloquea clics hacia envío WhatsApp y consultas externas desde las vistas de diseño; no toca motor de cotización ni datos de pedidos. Muestra banner de «Vista previa privada». Mantiene la carga CSV pública de productos como en portada histórica.
+- Estado: **código**, pendiente de CI, despliegue privado y verificación real por HTTP. No confundir con disponibilidad pública.

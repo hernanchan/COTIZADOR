@@ -116,5 +116,7 @@ jobs:
           NODE
       - name: Contrato estático de portada Saber Directo
         run: node --test tests/saber-directo-portada.test.mjs
+      - name: Proteger rutas de vista previa Saber Directo
+        run: node --test tests/saber-directo-preview.test.mjs
       - name: Confirmación SIN despliegues
         run: echo 'PRUEBA_TUS_PRIVADA_OK - SIN DESPLIEGUE - SIN PAGOS - WEB COMERCIAL INTACTA'

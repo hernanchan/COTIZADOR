@@ -26,6 +26,9 @@ import {guardarPdfCompuestoPrivado} from './guardar-pdf-compuesto-privado.mjs';
 import {registrarPdfCompuestoCentralFirmado} from './registrar-pdf-compuesto-central.mjs';
 import {verificarVinculoCotizadorV2} from './verificar-vinculo-cotizador-v2.mjs';
 import {paginaCotizadorV2PruebaPrivada} from './pantalla-cotizador-v2-prueba-privada.mjs';
+import portadaSaberDirectoHtml from '../../../vidriera/index.html';
+import ofertasSaberDirectoHtml from '../../../vidriera/ofertas.html';
+import {prepararVistaDisenoPrivada} from './saber-directo-vista-previa.mjs';
 import {pagoTUSSandboxCliente} from './tus-pago-sandbox-cliente.mjs';
 import {paginaDescargaTUSPersonal} from './pantalla-descarga-tus-personal.mjs';
 import {paginaPaqueteTUSPersonal} from './pantalla-paquete-tus-personal.mjs';
@@ -1882,6 +1885,15 @@ async function v2PrivateBrowserResponse(request,env,path){
     'X-Content-Type-Options':'nosniff',
     'Referrer-Policy':'no-referrer',
     'X-Frame-Options':'SAMEORIGIN'};
+  if(path==='/prueba-v2/diseno-saber-directo'||path==='/prueba-v2/diseno-saber-directo/ofertas.html'){
+   const ofertas=path.endsWith('/ofertas.html');
+   return new Response(prepararVistaDisenoPrivada(ofertas?ofertasSaberDirectoHtml:portadaSaberDirectoHtml,{ofertas}),{
+    status:200,headers:{
+     ...headers,'Content-Type':'text/html; charset=utf-8',
+     'Content-Security-Policy':"default-src 'self' https: data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    }
+   });
+  }
   if(path==='/prueba-v2/orden-paquete'){
    if(!tusPrivadoConfigurado(env))
     return testResponse({ok:false,error:'ZIP privado deshabilitado',paymentAuthorized:false},503);
@@ -2004,6 +2016,8 @@ async function v2PrivateBrowserResponse(request,env,path){
 export default {
   async fetch(request, env, ctx) {
     const page=new URL(request.url).pathname;
+    if(page==='/prueba-v2/diseno-saber-directo'||page==='/prueba-v2/diseno-saber-directo/ofertas.html')
+      return v2PrivateBrowserResponse(request,env,page);
     if(page==='/prueba-v2/ingresar')return v2MobileInviteExchange(request,env);
     if(page==='/prueba-v2/admin-tarifario-ensayo')
       return probeTarifarioD1SoloOperador(request,env);
