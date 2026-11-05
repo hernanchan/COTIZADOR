@@ -85,6 +85,15 @@ export async function pagoTUSSandboxCliente(request,env,{authorized=false,subtle
     return reply({ok:false,error:'Instrucciones bancarias inválidas'},502);
    instructions={alias:result.alias,amountArs:result.amountArs};
   }
-  return reply({ok:true,estado:result.estado,...instructions,orderId:data.commercialOrderId});
+  // Plazo informativo, solamente desde Central firmada y con pago aprobado.
+  let preparacionEstimada;
+  if(result.estado==='pagado'&&result.preparacionEstimada){
+   const eta=result.preparacionEstimada,parsed=Date.parse(eta.readyAt);
+   if(eta.provisional===true&&typeof eta.readyAt==='string'&&
+      Number.isFinite(parsed)&&new Date(parsed).toISOString()===eta.readyAt)
+    preparacionEstimada={readyAt:eta.readyAt,provisional:true};
+  }
+  return reply({ok:true,estado:result.estado,...instructions,
+   ...(preparacionEstimada?{preparacionEstimada}:{}),orderId:data.commercialOrderId});
  }catch{return reply({ok:false,error:'No se pudo contactar la Central privada'},502)}
 }

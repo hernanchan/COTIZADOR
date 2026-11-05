@@ -153,11 +153,12 @@ function mostrarEstadoCliente(estado,titulo,detalle,numeroOrden=null){
 function pagoSandboxEnRecibo(){
  const wrap=document.createElement('section'),mensaje=document.createElement('p'),
   boton=document.createElement('button'),transferButton=document.createElement('button'),
-   transferInfo=document.createElement('p'),estado=document.createElement('p'),
+   transferInfo=document.createElement('p'),estado=document.createElement('p'),plazo=document.createElement('p'),
   total=document.createElement('p'),nota=document.createElement('p');
  wrap.className='estado-pago-sandbox';
  mensaje.setAttribute('role','status');mensaje.setAttribute('aria-live','polite');
  estado.className='pago-estado';estado.textContent='Estado del pago: pendiente';
+  plazo.className='pago-nota';plazo.textContent='Preparación: plazo a confirmar después del pago.';
  total.className='pago-total';
  total.textContent=Number.isSafeInteger(ultimoTotalServidor)&&ultimoTotalServidor>0?
   'Total del pedido: '+new Intl.NumberFormat('es-AR',{
@@ -190,6 +191,15 @@ function pagoSandboxEnRecibo(){
     pagado=true;revocado=false;
     estado.textContent='Estado del pago: confirmado';
     mensaje.textContent='Pago recibido. Tu pedido ya figura como pagado en la Central.';
+     if(result.preparacionEstimada?.provisional===true&&
+        typeof result.preparacionEstimada.readyAt==='string'){
+      const fecha=new Date(result.preparacionEstimada.readyAt);
+      plazo.textContent=Number.isFinite(fecha.getTime())?
+       'Preparación estimada (provisional): '+new Intl.DateTimeFormat('es-AR',{
+        timeZone:'America/Argentina/Cordoba',day:'2-digit',month:'2-digit',year:'numeric',
+        hour:'2-digit',minute:'2-digit'}).format(fecha)+' hs. Te avisaremos si cambia.':
+       'Preparación: todavía sin horario confirmado.';
+     }else plazo.textContent='Preparación: todavía sin horario confirmado.';
     boton.disabled=true;boton.textContent='Pago confirmado';
      transferButton.disabled=true;
     document.getElementById('precio-smart').textContent='Orden N.º '+
@@ -200,6 +210,7 @@ function pagoSandboxEnRecibo(){
     pagado=false;revocado=true;
     estado.textContent='Estado del pago: requiere revisión';
     mensaje.textContent='El pago fue revertido. El pedido no debe prepararse.';
+     plazo.textContent='Preparación: suspendida hasta aclarar el pago.';
     boton.disabled=true;boton.textContent='Pago revertido';
      transferButton.disabled=true;
     return;
@@ -278,7 +289,7 @@ function pagoSandboxEnRecibo(){
     if(!transferenciaPendiente){transferButton.disabled=false;mensaje.textContent=String(e.message||e);}
    }finally{preparandoTransferencia=false}
   });
-  wrap.append(total,estado,boton,transferButton,transferInfo,mensaje,nota);
+  wrap.append(total,estado,plazo,boton,transferButton,transferInfo,mensaje,nota);
  return wrap;
 }
 let batchSending=false,smartReady=false,smartBlockedReason='',handoffInProgress=false,handoffResolve=null;
