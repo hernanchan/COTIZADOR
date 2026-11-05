@@ -546,3 +546,8 @@ Se conserva el cálculo existente de hojas físicas y tarifa única por grupo (s
 - **Deploy exclusivo de Central `saber-pagos-pruebas`**: trigger commit `ae9196e840244f68dd589f43c59d6aadf1339d25`, workflow `42045057812` SUCCESS; reemplazó `2bd60c66-cd55-4cf6-8a2b-4c6eb564da78` por **`edadd3f8-c090-49fb-aed6-047de5beee9d`**. Smoke: `CENTRAL_PROTECTED_HTTP401_AND_HEALTH_OK; PAGOS_DESACTIVADOS`. CI del trigger `42045057599` SUCCESS.
 - **Pendiente de verificación visual humana:** abrir la Central privada y actualizar página para cargar nueva versión, ir a una tarjeta «En preparación», pulsar «Definir hora de entrega», establecer fecha/hora y guardar. Comprobar actualización en «Mi pedido» sin repetir pruebas antiguas de TUS/pagos. No se accedió a pedidos reales ni se escribió ninguna hora en D1 durante desarrollo.
 - `main`, web pública, Worker de documentos, precios, Polaroids y pagos reales permanecen intactos.
+
+## 2026-11-05 — VALIDACIÓN MANUAL DEL TITULAR: HORA DE ENTREGA DESDE LA TARJETA
+- El titular confirmó después del despliegue de la corrección del botón: «YES TODO EN RIELES»; se considera **aprobada la prueba visual del flujo de hora de entrega desde la Central privada y seguimiento del cliente**.
+- Revisión desplegada de Central: `edadd3f8-c090-49fb-aed6-047de5beee9d`; CI y smoke del despliegue aprobados en workflow 42045057812. Corrección documentada en commit `248d13d9556d4fb0f82527228bb9ed04fb80a0cf`.
+- **No reabrir ni repetir** este circuito ya validado salvo que aparezca un error nuevo. Mantener `main`, web pública y cobros reales intactos. Continuar sobre `integracion/tus-pedido-privado-20261101`, con pruebas focalizadas para nuevas funcionalidades.
