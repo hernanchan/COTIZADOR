@@ -1530,6 +1530,118 @@ async function etaAdminApi(req,env){
 }
 
 
+/** Agenda privada de preparación; sin horario configurado NO se calcula un retiro. */
+const ETA_DAYS=["mon","tue","wed","thu","fri","sat","sun"];
+const ETA_EMPTY={mon:"",tue:"",wed:"",thu:"",fri:"",sat:"",sun:""};
+function etaParseSlots(value){
+ if(typeof value!=="string"||value.length>120)return null;
+ if(!value.trim())return [];
+ const out=[];let last=0;
+ const parts=value.split(",");if(parts.length>4)return null;
+ for(const p of parts){
+  const m=p.trim().match(/^([01]\d|2[0-3]):([0-5]\d)-([01]\d|2[0-3]|24):([0-5]\d)$/);
+  if(!m||m[3]==="24"&&m[4]!=="00")return null;
+  const a=Number(m[1])*60+Number(m[2]),b=Number(m[3])*60+Number(m[4]);
+  if(a>=b||b-a<15||a<last||b>1440)return null;
+  out.push([a,b]);last=b;
+ }
+ return out;
+}
+function etaNormalizeCalendar(weekly,closedDates){
+ if(!weekly||typeof weekly!=="object"||Array.isArray(weekly)||
+    Object.keys(weekly).sort().join(",")!==[...ETA_DAYS].sort().join(",")||
+    !Array.isArray(closedDates)||closedDates.length>180)return null;
+ const normalized={};
+ for(const day of ETA_DAYS){
+  const slots=etaParseSlots(weekly[day]);if(slots===null)return null;
+  normalized[day]=slots.map(([a,b])=>[a,b].map(n=>String(Math.floor(n/60)).padStart(2,"0")+":"+String(n%60).padStart(2,"0")).join("-")).join(",");
+ }
+ if(closedDates.some(date=>{
+  if(typeof date!=="string"||!/^(20\d\d|2100)-\d{2}-\d{2}$/.test(date))return true;
+  const d=new Date(date+"T00:00:00Z");
+  return !Number.isFinite(d.getTime())||d.toISOString().slice(0,10)!==date;
+ })||new Set(closedDates).size!==closedDates.length)return null;
+ return {weekly:normalized,closedDates:[...closedDates].sort()};
+}
+async function ensureEtaCalendar(env){
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_eta_calendar (id INTEGER PRIMARY KEY CHECK(id=1),weekly_json TEXT NOT NULL,closed_json TEXT NOT NULL,revision INTEGER NOT NULL DEFAULT 1,operator TEXT NOT NULL,updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_eta_calendar_events (id INTEGER PRIMARY KEY AUTOINCREMENT,revision INTEGER NOT NULL UNIQUE,weekly_json TEXT NOT NULL,closed_json TEXT NOT NULL,operator TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+}
+async function etaCalendar(env){
+ await ensureEtaCalendar(env);
+ const row=await env.DB.prepare("SELECT weekly_json,closed_json,revision,operator,updated_at FROM central_eta_calendar WHERE id=1").first();
+ if(!row)return {weekly:{...ETA_EMPTY},closedDates:[],configured:false,revision:0,operator:null,updated_at:null};
+ const data=etaNormalizeCalendar(JSON.parse(row.weekly_json),JSON.parse(row.closed_json));
+ if(!data)throw Error("Agenda inválida");
+ return {...data,configured:ETA_DAYS.some(day=>Boolean(data.weekly[day])),
+  revision:row.revision,operator:row.operator,updated_at:row.updated_at};
+}
+/** Computar tiempo de atención real en Córdoba. La hora de pago es un ancla fija,
+ * no Date.now(): refrescar la página no desplaza el compromiso.
+ */
+function etaOperatingFinish(calendar,anchorUtc,minutes){
+ if(!calendar?.configured||!Number.isSafeInteger(minutes)||minutes<1)return null;
+ const raw=String(anchorUtc||"");
+ const start=Date.parse(/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/.test(raw)?raw.replace(" ","T")+"Z":raw);
+ if(!Number.isFinite(start))return null;
+ let local=start-3*3600000,remaining=minutes;
+ const closed=new Set(calendar.closedDates);
+ for(let n=0;n<370;n++){
+  const midnight=Math.floor(local/86400000)*86400000;
+  const day=new Date(midnight),key=day.toISOString().slice(0,10);
+  const wd=ETA_DAYS[(day.getUTCDay()+6)%7];
+  if(!closed.has(key)){
+   for(const [a,b] of etaParseSlots(calendar.weekly[wd])||[]){
+    const from=Math.max(local,midnight+a*60000),end=midnight+b*60000;
+    if(from>=end)continue;
+    const available=(end-from)/60000;
+    if(remaining<=available)return new Date(from+remaining*60000+3*3600000).toISOString();
+    remaining-=available;
+   }
+  }
+  local=midnight+86400000;
+ }
+ return null;
+}
+async function etaCalendarApi(req,env){
+ if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+ if(env.CENTRAL_PRODUCTION_TRACKING_ENABLED!=="PRIVATE_TEST_ONLY")
+  return json({error:"Agenda privada deshabilitada"},503);
+ if(req.method==="GET")return json({calendar:await etaCalendar(env),paymentsEnabled:false});
+ if(req.method!=="POST")return json({error:"Método no admitido"},405);
+ if(!/^application\/json(?:;|$)/i.test(req.headers.get("Content-Type")||""))
+  return json({error:"JSON requerido"},415);
+ const raw=await req.text();if(raw.length>6500)return json({error:"Agenda demasiado larga"},413);
+ let d;try{d=JSON.parse(raw)}catch{return json({error:"JSON inválido"},400)}
+ if(!d||typeof d!=="object"||Array.isArray(d)||
+   Object.keys(d).sort().join(",")!=="closedDates,confirmed,expectedRevision,operator,weekly"||
+   !Number.isSafeInteger(d.expectedRevision)||d.expectedRevision<0||d.confirmed!==true||
+   typeof d.operator!=="string"||d.operator.trim().length<2||d.operator.trim().length>60)
+  return json({error:"Campos de agenda inválidos"},400);
+ const normalized=etaNormalizeCalendar(d.weekly,d.closedDates);
+ if(!normalized)return json({error:"Horarios o fechas inválidos o superpuestos"},422);
+ const current=await etaCalendar(env);
+ if(d.expectedRevision!==current.revision)return json({error:"La agenda cambió en otra pestaña"},409);
+ if(JSON.stringify(normalized.weekly)===JSON.stringify(current.weekly)&&
+   JSON.stringify(normalized.closedDates)===JSON.stringify(current.closedDates))
+  return json({error:"No hay cambios"},409);
+ const w=JSON.stringify(normalized.weekly),c=JSON.stringify(normalized.closedDates),o=d.operator.trim();
+ let result;
+ try{
+  if(current.revision===0)result=await env.DB.batch([
+   env.DB.prepare("INSERT OR IGNORE INTO central_eta_calendar(id,weekly_json,closed_json,revision,operator) VALUES(1,?,?,1,?)").bind(w,c,o),
+   env.DB.prepare("INSERT INTO central_eta_calendar_events(revision,weekly_json,closed_json,operator) SELECT 1,?,?,? WHERE EXISTS (SELECT 1 FROM central_eta_calendar WHERE id=1 AND revision=1)").bind(w,c,o)
+  ]);
+  else result=await env.DB.batch([
+   env.DB.prepare("UPDATE central_eta_calendar SET weekly_json=?,closed_json=?,revision=revision+1,operator=?,updated_at=datetime('now') WHERE id=1 AND revision=?").bind(w,c,o,current.revision),
+   env.DB.prepare("INSERT INTO central_eta_calendar_events(revision,weekly_json,closed_json,operator) SELECT ?,?,?,? WHERE EXISTS (SELECT 1 FROM central_eta_calendar WHERE id=1 AND revision=?)").bind(current.revision+1,w,c,o,current.revision+1)
+  ]);
+ }catch{return json({error:"Conflicto al guardar; recargá agenda"},409)}
+ if(!Array.isArray(result)||result.some(x=>Number(x?.meta?.changes)!==1))
+  return json({error:"No se confirmó el cambio de agenda"},409);
+ return json({saved:true,calendar:await etaCalendar(env),paymentsEnabled:false,productionAuthorized:false});
+}
+
 async function trackingMac(env,id){
  if(!CENTRAL_UUID.test(id)||typeof env.CENTRAL_BRIDGE_KEY!=="string"||
     env.CENTRAL_BRIDGE_KEY.length<32||env.CENTRAL_BRIDGE_KEY===env.DEMO_ADMIN_KEY)return null;
@@ -1577,7 +1689,14 @@ async function trackingCustomerStatus(req,env){
     "AND COALESCE(s.state,'pendiente') IN ('pendiente','en_preparacion') "+
     "AND EXISTS (SELECT 1 FROM payment_reviews p WHERE p.order_id=o.id AND p.state='verified') "+
     "AND (o.paid_at<? OR (o.paid_at=? AND o.id<?))").bind(x.paid_at,x.paid_at,x.id).first();
-   estimate={type:"habitual",provisional:true,...etaForQueue(setting,Number(q?.ahead)||0)};
+   const base=etaForQueue(setting,Number(q?.ahead)||0);
+    const calendar=await etaCalendar(env);
+    const operatingReadyAt=base.queueCalibrated&&!base.requiresReview&&calendar.configured?
+      etaOperatingFinish(calendar,x.paid_at,base.minutes):null;
+    const overdue=Boolean(operatingReadyAt&&Date.parse(operatingReadyAt)<Date.now());
+    estimate={type:"habitual",provisional:true,...base,
+      requiresReview:base.requiresReview||overdue,calendarConfigured:calendar.configured,
+      ...(operatingReadyAt&&!overdue?{operatingReadyAt}:{})};
   }
  }
  return new Response(JSON.stringify({ok:true,orderNumber:shortWorkNumber(x.number),
@@ -3291,6 +3410,7 @@ export default {
    if(url.pathname==="/admin/api/central/preparation-estimate"&&req.method==="POST")
     return await updatePreparationEstimate(req,env);
    if(url.pathname==="/admin/api/central/eta-settings")return await etaAdminApi(req,env);
+    if(url.pathname==="/admin/api/central/eta-calendar")return await etaCalendarApi(req,env);
    if(url.pathname==="/admin/api/orders"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
     await ensurePaymentReviews(env);
