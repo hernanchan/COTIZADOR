@@ -154,8 +154,11 @@ function pagoSandboxEnRecibo(){
  const wrap=document.createElement('section'),mensaje=document.createElement('p'),
   boton=document.createElement('button'),transferButton=document.createElement('button'),
    transferInfo=document.createElement('p'),estado=document.createElement('p'),plazo=document.createElement('p'),
-  total=document.createElement('p'),nota=document.createElement('p');
+  total=document.createElement('p'),nota=document.createElement('p'),seguimiento=document.createElement('a');
  wrap.className='estado-pago-sandbox';
+ seguimiento.hidden=true;seguimiento.target='_blank';seguimiento.rel='noopener noreferrer';
+ seguimiento.textContent='Seguir mi pedido · estado y demora';
+ seguimiento.style.cssText='display:inline-block;margin:9px 0;padding:11px;border-radius:8px;color:white;background:#185a8b';
  mensaje.setAttribute('role','status');mensaje.setAttribute('aria-live','polite');
  estado.className='pago-estado';estado.textContent='Estado del pago: pendiente';
   plazo.className='pago-nota';plazo.textContent='Preparación: plazo a confirmar después del pago.';
@@ -187,6 +190,16 @@ function pagoSandboxEnRecibo(){
   consultando=true;
   try{
    const result=await api('status');
+   if(typeof result.seguimientoUrl==='string'){
+    try{
+     const url=new URL(result.seguimientoUrl);
+     if(url.protocol==='https:'&&
+       /^saber-pagos-pruebas\\.[a-z0-9-]+\\.workers\\.dev$/.test(url.hostname)&&
+       url.pathname==='/seguimiento'&&url.searchParams.size===1){
+      seguimiento.href=url.href;seguimiento.hidden=false;
+     }
+    }catch{}
+   }
    if(result.estado==='pagado'){
     pagado=true;revocado=false;
     estado.textContent='Estado del pago: confirmado';
@@ -289,7 +302,7 @@ function pagoSandboxEnRecibo(){
     if(!transferenciaPendiente){transferButton.disabled=false;mensaje.textContent=String(e.message||e);}
    }finally{preparandoTransferencia=false}
   });
-  wrap.append(total,estado,plazo,boton,transferButton,transferInfo,mensaje,nota);
+  wrap.append(total,estado,plazo,seguimiento,boton,transferButton,transferInfo,mensaje,nota);
  return wrap;
 }
 let batchSending=false,smartReady=false,smartBlockedReason='',handoffInProgress=false,handoffResolve=null;
