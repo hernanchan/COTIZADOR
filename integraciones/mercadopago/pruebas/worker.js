@@ -1439,6 +1439,95 @@ async function updatePreparationEstimate(req,env){
   productionAuthorized:false,paymentsEnabled:false});
 }
 
+/** Ajuste global de demora: criterio comercial del operador, no duración por orden.
+ * Sin capacidad simultánea calibrada, no sumar pedidos linealmente.
+ */
+async function ensureEtaSettings(env){
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_eta_settings (id INTEGER PRIMARY KEY CHECK(id=1),base_minutes INTEGER NOT NULL CHECK(base_minutes BETWEEN 30 AND 1440),parallel_orders INTEGER NOT NULL DEFAULT 0 CHECK(parallel_orders BETWEEN 0 AND 30),revision INTEGER NOT NULL DEFAULT 1,operator TEXT NOT NULL,updated_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_eta_settings_events (id INTEGER PRIMARY KEY AUTOINCREMENT,revision INTEGER NOT NULL UNIQUE,base_minutes INTEGER NOT NULL,parallel_orders INTEGER NOT NULL,operator TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
+}
+async function etaSettings(env){
+ await ensureEtaSettings(env);
+ const row=await env.DB.prepare("SELECT base_minutes,parallel_orders,revision,operator,updated_at FROM central_eta_settings WHERE id=1").first();
+ return row||{base_minutes:180,parallel_orders:0,revision:0,operator:null,updated_at:null};
+}
+async function etaQueue(env){
+ await centralTables(env);await centralProductionTables(env);await ensurePaymentReviews(env);
+ const row=await env.DB.prepare("SELECT COUNT(*) AS active FROM orders o "+
+  "JOIN central_document_manifests m ON m.commercial_order_id=o.id "+
+  "LEFT JOIN central_production_status s ON s.order_id=o.id "+
+  "WHERE o.status='paid' AND o.paid_at IS NOT NULL AND o.deposit_ars=o.amount_ars "+
+  "AND COALESCE(s.state,'pendiente') IN ('pendiente','en_preparacion') "+
+  "AND EXISTS (SELECT 1 FROM payment_reviews p WHERE p.order_id=o.id AND p.state='verified')").first();
+ return Number(row?.active)||0;
+}
+function etaForQueue(settings,activeAhead){
+ const cap=settings.parallel_orders;
+ const added=cap>0?Math.floor(Math.max(0,activeAhead)/cap)*settings.base_minutes:0;
+ return {minutes:Math.min(10080,settings.base_minutes+added),
+  queueCalibrated:cap>0,baseMinutes:settings.base_minutes,
+  activeAhead,parallelOrders:cap};
+}
+function standardPrintJob(manifest){
+ let docs;
+ try{docs=JSON.parse(manifest)}catch{return false}
+ if(!Array.isArray(docs?.trabajos)||docs.trabajos.length<1)return false;
+ let pages=0;
+ for(const t of docs.trabajos){
+  if(t.servicio!=="documentos"||!Number.isSafeInteger(t.copias)||t.copias<1||
+     !Array.isArray(t.paginasElegidas)||t.paginasElegidas.length<1)return false;
+  pages+=t.paginasElegidas.length*t.copias;
+  if(pages>400)return false;
+ }
+ return pages>0;
+}
+async function etaAdminApi(req,env){
+ if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+ if(env.CENTRAL_PRODUCTION_TRACKING_ENABLED!=="PRIVATE_TEST_ONLY")
+  return json({error:"Configuración privada deshabilitada"},503);
+ if(req.method==="GET"){
+  const [settings,active]=await Promise.all([etaSettings(env),etaQueue(env)]);
+  return json({settings,activePaidOrders:active,queueCalibrated:settings.parallel_orders>0,
+   note:"La demora es aproximada; 0 capacidad significa que no se agrega cola sin calibración."});
+ }
+ if(req.method!=="POST")return json({error:"Método no admitido"},405);
+ if(!/^application\/json(?:;|$)/i.test(req.headers.get("Content-Type")||""))
+  return json({error:"JSON requerido"},415);
+ const raw=await req.text();if(raw.length>900)return json({error:"Solicitud demasiado larga"},413);
+ let d;try{d=JSON.parse(raw)}catch{return json({error:"JSON inválido"},400)}
+ if(!d||typeof d!=="object"||Array.isArray(d)||
+   Object.keys(d).sort().join(",")!=="baseMinutes,confirmed,expectedRevision,operator,parallelOrders"||
+   !Number.isSafeInteger(d.baseMinutes)||d.baseMinutes<30||d.baseMinutes>1440||
+   !Number.isSafeInteger(d.parallelOrders)||d.parallelOrders<0||d.parallelOrders>30||
+   !Number.isSafeInteger(d.expectedRevision)||d.expectedRevision<0||d.confirmed!==true||
+   typeof d.operator!=="string"||d.operator.trim().length<2||d.operator.trim().length>60)
+  return json({error:"Configuración de demora inválida"},400);
+ const current=await etaSettings(env);
+ if(d.expectedRevision!==current.revision)return json({error:"La configuración fue modificada en otra pestaña"},409);
+ if(d.baseMinutes===current.base_minutes&&d.parallelOrders===current.parallel_orders)
+  return json({error:"No hay cambios"},409);
+ let result;
+ try{
+  if(current.revision===0){
+   result=await env.DB.batch([
+    env.DB.prepare("INSERT OR IGNORE INTO central_eta_settings(id,base_minutes,parallel_orders,revision,operator) VALUES(1,?,?,1,?)").bind(d.baseMinutes,d.parallelOrders,d.operator.trim()),
+    env.DB.prepare("INSERT INTO central_eta_settings_events(revision,base_minutes,parallel_orders,operator) "+
+      "SELECT 1,?,?,? WHERE EXISTS (SELECT 1 FROM central_eta_settings WHERE id=1 AND revision=1)").bind(d.baseMinutes,d.parallelOrders,d.operator.trim())
+   ]);
+  }else{
+   result=await env.DB.batch([
+    env.DB.prepare("UPDATE central_eta_settings SET base_minutes=?,parallel_orders=?,revision=revision+1,operator=?,updated_at=datetime('now') WHERE id=1 AND revision=?").bind(d.baseMinutes,d.parallelOrders,d.operator.trim(),d.expectedRevision),
+    env.DB.prepare("INSERT INTO central_eta_settings_events(revision,base_minutes,parallel_orders,operator) "+
+      "SELECT ?,?,?,? WHERE EXISTS (SELECT 1 FROM central_eta_settings WHERE id=1 AND revision=?)").bind(d.expectedRevision+1,d.baseMinutes,d.parallelOrders,d.operator.trim(),d.expectedRevision+1)
+   ]);
+  }
+ }catch{return json({error:"Conflicto de actualización; recargá configuración"},409)}
+ if(!Array.isArray(result)||result.some(x=>Number(x?.meta?.changes)!==1))
+  return json({error:"No se confirmó el ajuste"},409);
+ return json({saved:true,settings:await etaSettings(env),activePaidOrders:await etaQueue(env),
+  productionAuthorized:false,paymentsEnabled:false});
+}
+
 async function centralAdminDetail(env,id){
  await centralTables(env);
  const row=await env.DB.prepare("SELECT m.web_order_id,m.manifest_json,m.created_at,m.amount_ars,m.file_count,c.phone AS telefonoContacto FROM central_document_manifests m LEFT JOIN central_order_contacts c ON c.order_id=m.commercial_order_id WHERE m.commercial_order_id=?").bind(id).first();
@@ -3085,6 +3174,7 @@ export default {
     return await centralUpdateProduction(req,env);
    if(url.pathname==="/admin/api/central/preparation-estimate"&&req.method==="POST")
     return await updatePreparationEstimate(req,env);
+   if(url.pathname==="/admin/api/central/eta-settings")return await etaAdminApi(req,env);
    if(url.pathname==="/admin/api/orders"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
     await ensurePaymentReviews(env);
