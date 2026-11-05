@@ -1614,6 +1614,16 @@ body.price-only #priceAdminFieldset summary{font-size:1.3rem}
 <button id="refresh">Consultar pedidos</button><button id="sync" class="outline">Verificar pagos pendientes</button><button id="openPricing" class="outline" type="button">Editar precios y promociones</button>
 </div><p id="status" role="status" aria-live="polite"></p><p id="cronState" class="note">Conciliación automática: sin consultar.</p></fieldset>
 <fieldset id="bankTransfersArea"><legend>Transferencias por verificar · <strong id="transferCount">0 pendientes</strong></legend><p class="note">Los pendientes se cargan solos y se actualizan cada 30 segundos. Comprobar el ingreso en el banco: un comprobante del cliente no acredita el pago. Operación limitada al ENSAYO privado.</p><p id="transferPanelStatus" class="transfer-feedback" role="status" aria-live="polite">Ingresá la clave privada para consultar las transferencias.</p><ol id="transferPending"></ol><button id="refreshTransfers" class="outline" type="button">Actualizar ahora</button></fieldset>
+<fieldset id="etaAdminArea"><legend>Demora orientativa · configuración</legend>
+<p class="note">Referencia inicial: 3 horas para impresiones habituales de hasta 400 páginas. No se suman pedidos linealmente; configurá la cantidad de trabajos simultáneos para calcular aumentos por cola.</p>
+<div class="toolbar">
+<label>Demora habitual (horas) <input id="etaHours" type="number" step="0.5" min="0.5" max="24" value="3" style="width:90px"></label>
+<label>Pedidos simultáneos <input id="etaCapacity" type="number" step="1" min="0" max="30" value="0" style="width:80px" title="0: sin cálculo adicional de cola"></label>
+<button id="etaLoad" class="outline" type="button">Consultar demora</button>
+<button id="etaSave" type="button" disabled>Guardar demora</button>
+</div>
+<p id="etaStatus" class="note" role="status" aria-live="polite">Ingresá primero la clave privada del panel.</p>
+</fieldset>
 <fieldset id="productionBoardArea"><legend>Tablero de producción · pedidos pagos</legend>
 <p class="note">Cada pedido avanza de columna al registrar su estado. Descargar el ZIP no cambia el seguimiento. Actualización automática cada 30 segundos mientras el panel esté abierto.</p>
 <div class="board" id="productionBoard">
@@ -1654,6 +1664,43 @@ body.price-only #priceAdminFieldset summary{font-size:1.3rem}
 
 <script>
 const secret=document.querySelector("#secret"),status=document.querySelector("#status"),orders=document.querySelector("#orders"),details=document.querySelector("#details");
+let etaAdminSnapshot=null;
+const etaInfo=document.querySelector("#etaStatus");
+const etaHours=document.querySelector("#etaHours"),etaCapacity=document.querySelector("#etaCapacity");
+const etaSave=document.querySelector("#etaSave");
+async function loadEtaAdmin(){
+ try{
+  const data=await api("/admin/api/central/eta-settings");
+  etaAdminSnapshot=data.settings;
+  etaHours.value=String(data.settings.base_minutes/60);
+  etaCapacity.value=String(data.settings.parallel_orders);
+  etaSave.disabled=false;
+  etaInfo.textContent="Demora habitual: "+etaHours.value+" h · "+data.activePaidOrders+
+   " pedido(s) pagados en cola · "+
+   (data.settings.parallel_orders>0?"Se consideran "+data.settings.parallel_orders+" pedidos simultáneos":
+   "Ajuste de cola pendiente de configurar.");
+ }catch(e){etaAdminSnapshot=null;etaSave.disabled=true;etaInfo.textContent="No se pudo consultar la demora: "+String(e.message||e)}
+}
+document.querySelector("#etaLoad").addEventListener("click",loadEtaAdmin);
+etaSave.addEventListener("click",async()=>{
+ if(!etaAdminSnapshot)return;
+ const operator=requestOperator();
+ if(!operator){etaInfo.textContent="Indicá el responsable del cambio.";return}
+ const hours=Number(etaHours.value),capacity=Number(etaCapacity.value);
+ if(!Number.isFinite(hours)||hours<0.5||hours>24||
+    !Number.isSafeInteger(hours*60)||!Number.isSafeInteger(capacity)||capacity<0||capacity>30){
+  etaInfo.textContent="Elegí horas válidas y entre 0 y 30 pedidos simultáneos.";return;
+ }
+ if(!confirm("¿Guardar la demora de referencia y la capacidad para el seguimiento del cliente?"))return;
+ etaSave.disabled=true;
+ try{
+  await apiPost("/admin/api/central/eta-settings",{
+   baseMinutes:hours*60,parallelOrders:capacity,
+   expectedRevision:etaAdminSnapshot.revision,operator,confirmed:true
+  });
+  await loadEtaAdmin();await refresh({silent:true,force:true});
+ }catch(e){etaInfo.textContent=String(e.message||e);etaSave.disabled=false}
+});
 function money(n){return new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0}).format(Number(n)||0)}
 async function apiPost(path,data){
  const r=await fetch(path,{method:"POST",headers:{"Authorization":"Bearer "+secret.value,
@@ -2566,10 +2613,10 @@ document.querySelector("#openPricing").addEventListener("click",()=>{
 });
 
 document.querySelector("#refresh").addEventListener("click",async()=>{
- await Promise.all([refresh(),refreshTransfers({force:true})]);
+ await Promise.all([refresh(),refreshTransfers({force:true}),loadEtaAdmin()]);
 });
 secret.addEventListener("change",()=>{
- if(secret.value.trim()){refresh({silent:true});refreshTransfers({silent:true})}
+ if(secret.value.trim()){refresh({silent:true});refreshTransfers({silent:true});loadEtaAdmin()}
 });
 document.addEventListener("visibilitychange",()=>{
  if(!document.hidden&&secret.value.trim()){
