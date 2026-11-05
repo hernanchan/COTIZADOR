@@ -95,7 +95,7 @@ export function prepararVistaDisenoAbierta(html,{ofertas=false}={}){
    for(const id of Object.keys(sampleCards)){
      page=page.replace('id="'+id+'"></div>','id="'+id+'">'+sampleMarkup(id)+'</div>');
    }
-   page=page.replace('</style>',String.raw\`
+   page=page.replace('</style>',String.raw`
     .preview-product-list{display:grid;grid-template-columns:1fr 1fr;gap:14px;grid-column:1/-1}
     .preview-product{border:1px solid #dbe2e5;background:#fff;min-width:0;display:grid;grid-template-columns:43% 57%;min-height:175px}
     .preview-product-image{position:relative;overflow:hidden;background:#e7ded0}
@@ -113,7 +113,7 @@ export function prepararVistaDisenoAbierta(html,{ofertas=false}={}){
     .preview-product-copy strong{font:800 clamp(14px,1.7vw,20px)/1.13 Manrope,sans-serif;letter-spacing:-.04em;color:#103554}
     .preview-product-copy small{font-size:10px;color:#72808b}
     @media(max-width:650px){.preview-product-list{grid-template-columns:1fr;gap:9px}.preview-product{min-height:146px}.preview-product-copy{padding:14px}.preview-product-copy strong{font-size:17px}}
-   \`+'</style>');
+   `+'</style>');
    page=page.replace('<h2 id="promoTitle">Promoción semanal</h2>','<h2 id="promoTitle">Promociones a primera vista</h2>');
    page=page.replace('<p id="promoText">El cotizador aplica automáticamente el beneficio vigente.</p>','<p id="promoText">Aquí aparecerá la promoción vigente del día al conectar el nuevo diseño con el cotizador.</p>');
  }
