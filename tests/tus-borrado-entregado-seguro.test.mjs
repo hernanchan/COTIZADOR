@@ -73,3 +73,15 @@ test('Ejecutor aislado: envía SOLO los archivos recibidos, exige confirmación 
  await assert.rejects(()=>borrarPDFTUSEntregados(p,env,{mode:'execute',confirmed:true,approved:true,
   fetcher:async()=>new Response('[]',{status:200}),audit:async()=>{}}),/No se confirmó/);
 });
+
+test('No se aceptan rutas ficticias o repetidas ni en el ejecutor aislado',async()=>{
+ const p=planDeBorradoEntregado(plan(),webOrderId);
+ const env={DOCS_TUS_PURGE_ENABLED:'PRIVATE_TEST_ONLY',DOCS_TUS_SUPABASE_SERVICE_KEY:'x'.repeat(40)};
+ let called=0;
+ for(const paths of [['v2/'+webOrderId+'/../../../secreto.pdf'],[p.paths[0],p.paths[0]]]){
+  await assert.rejects(()=>borrarPDFTUSEntregados({...p,paths,count:paths.length},env,{
+   mode:'execute',confirmed:true,approved:true,
+   fetcher:async()=>{called++;return new Response('[]')},audit:async()=>{}}),/Plan no validado/);
+ }
+ assert.equal(called,0);
+});

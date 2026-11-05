@@ -114,8 +114,12 @@ export async function borrarPDFTUSEntregados(plan,env,{
  confirmed=false,approved=false,mode='simulacion',fetcher=fetch,audit
 }={}){
  if(!plan?.confirmedDelivered||!plan?.paymentVerified||
-    !Array.isArray(plan.paths)||!plan.paths.length||
-    plan.paths.some(p=>!p.startsWith('v2/'+plan.webOrderId+'/'))||
+    !WEB.test(plan.webOrderId||'')||!UUID.test(plan.commercialOrderId||'')||
+    !Number.isSafeInteger(plan.version)||plan.version<1||
+    !Array.isArray(plan.paths)||!plan.paths.length||plan.paths.length>10||
+    plan.count!==plan.paths.length||new Set(plan.paths).size!==plan.paths.length||
+    plan.paths.some(p=>!/^v2\/WEB-ENSAYO-[A-F0-9]{32}\/[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}\.pdf$/i.test(p)||
+      !p.startsWith('v2/'+plan.webOrderId+'/'))||
     plan.bucket!==BUCKET)
   return fail('Plan no validado');
  if(mode!=='execute'||confirmed!==true||approved!==true||
