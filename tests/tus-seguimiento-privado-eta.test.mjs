@@ -23,10 +23,11 @@ const env={DB:{prepare(sql){let args=[];return{
  async first(){reads++;
   if(sql.includes('p.state AS review_state'))return {id:order,status:'paid',paid_at:'2026-11-04 12:00:00',
    amount_ars:600,deposit_ars:600,number:25,stage:'pendiente',review_state:'verified',
-   manifest_json:JSON.stringify({trabajos:[{servicio:'documentos',copias:1,paginasElegidas:[1,2,3]}]})};
+   manifest_json:JSON.stringify({trabajos:[{servicio:'documentos',tipoAnillado:'ninguno',copias:1,paginasElegidas:[1,2,3]}]})};
   if(sql.includes('FROM central_preparation_estimates WHERE order_id=?'))return null;
   if(sql.includes('FROM central_eta_settings WHERE id=1'))return {base_minutes:60,parallel_orders:3,revision:1};
   if(sql.includes('FROM central_eta_calendar WHERE id=1'))return null;
+  if(sql.includes('FROM central_eta_resources WHERE id=1'))return null;
   if(sql.includes('SELECT COUNT(*) AS ahead'))return {ahead:7};
   throw Error(sql);
  }}}},
