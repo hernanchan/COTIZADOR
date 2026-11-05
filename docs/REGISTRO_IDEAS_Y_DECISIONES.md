@@ -483,3 +483,11 @@ Se conserva el cálculo existente de hojas físicas y tarifa única por grupo (s
 - **Importante:** la agenda guardada y las capacidades no se modificaron desde aquí; no se han confirmado días de atención, sábados, feriados ni número de trabajos efectivamente paralelos, ni se han registrado mediciones reales. Mantener en 0 capacidades desconocidas. La nueva tabla solo se crea al usar su API privada; no se alteraron pedidos históricos ni tiempos ETA existentes.
 - Worker documental `saber-documentos-pruebas` conserva versión `0062c11f-8ddc-4d35-9b44-54d75f41c219`. `main`, web pública, promociones, cotización y cobros comerciales intactos.
 - **Próximo paso único**: confirmar con el titular días y tramos laborales reales (especialmente sábado y cierres) y cupos efectivos simultáneos de documentos, anillado y ploteo. Registrar esos valores desde el panel de Central, luego medir tiempos de producción con muestras representativas antes de programar estimaciones de trabajos especiales o saturación. No inventar rendimientos, ni equiparar cupos con cantidad de impresoras nominales.
+
+
+## 05/11/2026 — HORARIO CONFIRMADO POR EL TITULAR
+- **Lunes a viernes:** 07:00–13:30 y 16:30–20:00 (zona horaria Córdoba, UTC-03). Dato confirmado; reemplaza la referencia anterior 07:00–14:00.
+- **Feriados y cierres especiales:** fechas editables manualmente (agregar, quitar o corregir en el panel), sin precarga automática de feriados nacionales ni cierre inferido por calendario.
+- **Sábado y domingo:** no informados todavía. Los campos siguen editables, marcados como pendientes y, si están vacíos, se exige confirmación explícita antes de guardar, porque un día vacío equivale a cerrado.
+- El botón «Completar lunes a viernes (borrador)» incorpora las franjas confirmadas, **sin guardar en D1 automáticamente**. Para persistir calendario real se exige sesión administrativa, responsable y confirmación. No declarar horarios escritos en D1 sin la aceptación pertinente.
+- Estos cambios son para Central privada y tests, no alteran las ETA vigentes ni cupos de recursos. No tocan `main`, portal público ni pagos reales.
