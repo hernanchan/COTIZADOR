@@ -106,40 +106,281 @@ a:focus-visible,button:focus-visible{outline:3px solid #a65f00;outline-offset:3p
   .contact-card{padding:22px}
 }
 
+
+/* SABER DIRECTO V2 — edición comercial editorial (NO PUBLICADO EN MAIN).
+   Menos tarjetas, mayor peso tipográfico y papelería ilustrada propia mediante CSS. */
+:root{
+  --editorial-blue:#103554; --editorial-dark:#10263b;
+  --editorial-orange:#f18b24; --editorial-cream:#f9f5ed;
+  --editorial-ink:#162b40; --editorial-line:#d9e1e5;
+}
+body{background:#fff;color:var(--editorial-ink)}
+.topbar{background:var(--editorial-blue);color:#f2f5f6}
+.topbar .container{min-height:31px;font-size:11px}
+header{background:#fff;border-bottom:1px solid #e4e8eb;backdrop-filter:none}
+.head{min-height:81px}
+.brand strong{font-size:21px;font-weight:800;letter-spacing:-.065em;color:var(--editorial-dark)}
+.brand small{letter-spacing:.08em;font-size:10px}
+.nav .quote{background:var(--editorial-orange);color:var(--editorial-dark);font-weight:800;border-radius:6px;padding:13px 18px}
+.nav .quote:hover{background:#f8a44f}
+.nav .cart-open{border-radius:6px;background:#edf2f4;color:var(--editorial-dark)}
+.nav a:hover{background:#f5f4f1}
+.hero.hero-direct{background:var(--editorial-cream);padding:28px 0 0;border-bottom:1px solid #e4dfd6}
+.hero-editorial .hero-grid{grid-template-columns:minmax(0,1.09fr) minmax(0,.91fr);gap:22px;align-items:stretch}
+.hero-editorial .hero-copy{
+  background:transparent;min-height:476px;border:0;border-radius:0;
+  padding:clamp(22px,3vw,40px) clamp(8px,2.2vw,25px) clamp(26px,3vw,38px) 3px;
+}
+.hero-editorial .kicker{font-weight:800;color:#496275;letter-spacing:.14em;display:flex;align-items:center;gap:13px;font-size:10px}
+.hero-editorial .kicker-line{background:var(--editorial-orange);width:33px;height:3px;flex:none}
+.hero-editorial h1{
+  font-family:Manrope,system-ui,sans-serif;font-weight:800;
+  font-size:clamp(45px,5.3vw,80px);line-height:1.03;letter-spacing:-.078em;
+  color:var(--editorial-dark);margin:21px 0 18px;
+}
+.hero-editorial h1 span{
+  color:var(--editorial-dark);text-decoration:none;position:relative;
+  box-shadow:inset 0 -0.13em var(--editorial-orange);
+}
+.hero-editorial h1 em{font-style:normal;color:var(--editorial-orange)}
+.hero-editorial .hero-copy>p{font-size:16px;line-height:1.63;color:#405668;max-width:510px}
+.hero-editorial .hero-actions{margin-top:26px;gap:10px}
+.hero-editorial .btn{border-radius:7px;min-height:52px;font-size:13px;padding:13px 19px}
+.hero-editorial .btn span{font-size:18px;margin-left:15px;line-height:1;font-weight:400}
+.hero-editorial .btn.primary{background:var(--editorial-blue);color:#fff}
+.hero-editorial .btn.secondary{border:1px solid #b9c5cb;background:transparent;color:var(--editorial-blue)}
+.hero-editorial .hero-note{color:#596c78;font-size:12px;margin-top:24px;display:flex;gap:9px;align-items:center}
+.hero-note-mark{width:7px;height:7px;display:inline-block;border-radius:100%;background:var(--editorial-orange)}
+/* El collage es geometría local CSS, no fotos de un local que no fueron aportadas. */
+.hero-studio{
+  background:#e9e2d5;position:relative;overflow:hidden;isolation:isolate;
+  min-height:475px;border-radius:3px;color:var(--editorial-blue);
+  box-shadow:inset 0 0 0 1px #e0d8cc;
+}
+.hero-studio:before{
+  content:"";position:absolute;inset:0;z-index:-1;opacity:.26;
+  background-image:repeating-linear-gradient(0deg,transparent 0 24px,#aaacaa33 25px),
+    repeating-linear-gradient(90deg,transparent 0 24px,#aaacaa33 25px);
+}
+.studio-topline,.studio-bottomline{position:absolute;left:25px;right:25px;z-index:3;display:flex;justify-content:space-between;gap:10px;font:800 9px/1.3 "DM Sans",sans-serif;letter-spacing:.12em}
+.studio-topline{top:20px}.studio-bottomline{bottom:22px}
+.studio-papers{position:absolute;inset:59px 29px 57px}
+.studio-grid-sheet{
+  position:absolute;width:64%;height:78%;top:7%;left:3%;transform:rotate(-12deg);
+  background:#fff;border:1px solid #cdd7da;box-shadow:10px 13px 20px #10263b18;
+  background-image:linear-gradient(#b4d0e570 1px,transparent 1px),
+    linear-gradient(90deg,#b4d0e570 1px,transparent 1px);
+  background-size:18px 18px;
+}
+.studio-print{
+  position:absolute;top:6%;right:8%;width:58%;height:79%;
+  transform:rotate(8deg);background:#fdfbf7;box-shadow:10px 14px 23px #10263b33;
+  padding:17px;display:flex;flex-direction:column;justify-content:space-between;
+  border:1px solid #e4e1d8;
+}
+.studio-print-top{font-size:8px;letter-spacing:.15em;font-weight:900;color:#4b6370}
+.studio-print-art{
+  width:100%;height:43%;position:relative;overflow:hidden;background:var(--editorial-blue)
+}
+.studio-print-art i{display:block;position:absolute;width:76%;height:72%;border-radius:50%;background:#f4a03d}
+.studio-print-art i:first-child{top:-39%;right:-29%;background:#f1a046}
+.studio-print-art i:nth-child(2){bottom:-38%;left:-37%;background:#c7d4cf}
+.studio-print-art i:last-child{top:21%;left:42%;width:47%;height:75%;background:#e77842}
+.studio-print strong{
+  display:block;font:800 clamp(21px,2.7vw,37px)/1.02 Manrope,sans-serif;
+  letter-spacing:-.065em;color:var(--editorial-blue);
+}
+.studio-print-footer{color:#7f8b92;font:800 7px Manrope,sans-serif;letter-spacing:.12em}
+.studio-notebook{
+  position:absolute;left:6%;bottom:6%;width:46%;height:38%;background:#f5a035;
+  transform:rotate(-13deg);box-shadow:8px 12px 20px #10263b2d;border-radius:1px 5px 5px 1px;
+  padding:25px 19px;display:flex;flex-direction:column;justify-content:space-between;
+}
+.notebook-spine{position:absolute;left:10px;top:0;bottom:0;width:2px;background:#bf661d77}
+.notebook-title{font:800 clamp(19px,2.4vw,35px)/.94 Manrope,sans-serif;letter-spacing:-.09em;color:#103554}
+.notebook-line{height:3px;width:55%;background:#103554}
+.studio-pencil{
+  position:absolute;right:2%;bottom:4%;height:13px;width:45%;background:#1f4768;
+  transform:rotate(-28deg);box-shadow:0 4px 9px #10263b44;border-radius:1px;
+}
+.studio-pencil:before{content:"";position:absolute;left:-19px;top:0;border-right:19px solid #dbc092;border-top:6.5px solid transparent;border-bottom:6.5px solid transparent}
+.studio-pencil:after{content:"";position:absolute;right:0;top:0;height:100%;width:13px;background:#ef7d50;border-left:3px solid #d9bd8f}
+.studio-disc{
+ position:absolute;right:0;top:51%;transform:rotate(12deg);display:grid;place-items:center;
+ width:76px;height:76px;background:var(--editorial-orange);border-radius:100%;
+ border:3px solid #f7e2c1;box-shadow:5px 7px 10px #10263b2e;
+}
+.studio-disc span{font:900 9px/.82 Manrope,sans-serif;letter-spacing:.08em;color:#1b425a}
+.hero-editorial .hero-promo{
+ margin:18px 0 0;background:var(--editorial-blue);border:0;border-radius:3px;
+ box-shadow:none;display:grid;grid-template-columns:auto minmax(0,1fr) auto;
+ align-items:center;gap:26px;padding:19px 24px;min-height:120px;color:#fff;
+}
+.hero-editorial .promo-overline{align-self:center;min-width:128px;display:flex;flex-direction:column;gap:7px;align-items:flex-start}
+.hero-editorial .promo-overline small{color:#fff;letter-spacing:.09em;font-size:10px;text-transform:uppercase}
+.hero-editorial .promo-symbol{width:34px;height:34px;border-radius:3px;background:var(--editorial-orange);color:var(--editorial-dark)}
+.hero-editorial .hero-promo h2{font:800 clamp(21px,2.4vw,32px)/1.15 Manrope,sans-serif;color:#fff;margin:0 0 5px}
+.hero-editorial .hero-promo .promo-main p{color:#d0dfe6;font-size:13px;line-height:1.3}
+.hero-editorial .hero-promo>a{margin:0;border-radius:4px;background:var(--editorial-orange);color:#182f42;min-height:46px;padding:12px 18px;display:flex;align-items:center;gap:12px}
+.hero-editorial .hero-promo>a span{font-size:18px}
+.hero-editorial .hero-promo .promo-note{display:none}
+.hero-editorial .hero-services{
+ display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;
+ margin-top:21px;padding-bottom:27px;background:transparent;
+}
+.hero-editorial .service-link{
+ min-height:94px;background:transparent;border:0;border-right:1px solid #d7d4cc;
+ border-radius:0;box-shadow:none;display:grid;align-content:center;
+ grid-template-columns:minmax(0,1fr) auto;grid-template-rows:13px auto auto;gap:3px 8px;padding:10px 18px;
+}
+.hero-editorial .service-link:first-child{padding-left:2px}
+.hero-editorial .service-link:last-child{border-right:0}
+.hero-editorial .service-number{font:800 10px Manrope,sans-serif;color:#b46c28;grid-column:1/3}
+.hero-editorial .service-link strong{color:var(--editorial-blue);grid-column:1;font-size:16px;letter-spacing:-.035em;white-space:nowrap}
+.hero-editorial .service-link small{color:#6b7a83;grid-column:1;font-size:11px}
+.hero-editorial .service-arrow{grid-column:2;grid-row:2;color:#b46c28;font-size:17px;align-self:center}
+.hero-editorial .service-link:hover{background:#f2ebdf}
+.quick{padding:55px 0 64px;background:#fff}
+.quick-head{align-items:end;margin-bottom:27px;gap:24px}
+.section-eyebrow{display:block;color:#b46c28;font-weight:800;letter-spacing:.18em;font-size:10px;margin-bottom:13px}
+.quick-head h2{
+ font-size:clamp(35px,4vw,53px);line-height:1.07;letter-spacing:-.07em;font-weight:800;
+ color:var(--editorial-blue);
+}
+.quick-head h2 em{color:#dc7d26;font-style:normal}
+.quick-head p{font-size:14px;line-height:1.55;max-width:320px;color:#60727d}
+.category-tabs{
+ display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;
+ border:1px solid var(--editorial-line);margin-bottom:0;
+}
+.catbtn{
+ border:0;border-right:1px solid var(--editorial-line);background:#fff;border-radius:0;
+ padding:22px 20px;min-height:108px;transition:background .15s
+}
+.catbtn:last-child{border-right:0}
+.catbtn:hover,.catbtn.active{transform:none;box-shadow:none;background:var(--editorial-blue);border-color:var(--editorial-line)}
+.catbtn small{color:#c2742e;font-size:9px;letter-spacing:.09em}
+.catbtn b{font-size:20px;font-weight:800;letter-spacing:-.045em;margin-top:5px;color:var(--editorial-blue)}
+.catbtn span{font-size:12px;margin-top:3px;color:#647585}
+.catbtn.active small{color:#f6a958}.catbtn.active span{color:#dbe7ed}
+.panel{background:#f7f8f8;border:1px solid var(--editorial-line);border-top:0;border-radius:0;padding:26px 25px 30px}
+.panel-head h3{font-weight:800;font-size:26px}
+.panel-head p{font-size:13px}
+.product{border-radius:5px}
+.product-status{border-radius:5px}
+.see-all a{border-radius:5px;box-shadow:none}
+.contact-card{background:var(--editorial-blue);border-radius:4px;padding:34px}
+.contact-card h3{font-size:30px}
+.bottom{padding:0 0 50px}
+footer{background:var(--editorial-dark)}
+@media(max-width:960px){
+ .hero-editorial .hero-grid{grid-template-columns:1fr 1fr;gap:15px}
+ .hero-editorial .hero-copy{min-height:410px;padding:15px 10px 20px 0}
+ .hero-editorial h1{font-size:clamp(34px,5.2vw,56px)}
+ .hero-studio{min-height:410px}
+ .hero-editorial .hero-services{grid-template-columns:repeat(4,minmax(0,1fr))}
+ .hero-editorial .service-link{padding:10px 12px}
+ .hero-editorial .service-link strong{font-size:13px;white-space:normal}
+}
+@media(max-width:680px){
+ .head{min-height:65px}
+ .topbar .container{min-height:29px}
+ .hero.hero-direct{padding-top:15px}
+ .hero-editorial .hero-grid{grid-template-columns:1fr;gap:8px}
+ .hero-editorial .hero-copy{padding:18px 4px 20px;min-height:0}
+ .hero-editorial h1{font-size:clamp(43px,10.7vw,67px);line-height:1.05;margin:17px 0 15px}
+ .hero-editorial .hero-copy>p{font-size:15px;max-width:480px}
+ .hero-editorial .hero-actions{grid-template-columns:1fr;gap:8px;margin-top:22px}
+ .hero-editorial .btn{min-height:50px}
+ .hero-editorial .hero-note{margin-top:17px;font-size:11px}
+ .hero-studio{min-height:345px;margin-top:0}
+ .studio-papers{inset:48px 18px 39px}
+ .studio-topline,.studio-bottomline{left:18px;right:18px;font-size:8px}
+ .studio-topline{top:15px}.studio-bottomline{bottom:13px}
+ .studio-print{padding:12px}
+ .studio-print strong{font-size:clamp(22px,6.1vw,30px)}
+ .studio-notebook{padding:17px}
+ .notebook-title{font-size:clamp(22px,6vw,30px)}
+ .studio-disc{height:62px;width:62px}
+ .hero-editorial .hero-promo{display:grid;grid-template-columns:auto 1fr;gap:12px;min-height:0;padding:18px;margin-top:12px}
+ .hero-editorial .promo-overline{min-width:40px;justify-content:center;align-items:center}
+ .hero-editorial .promo-overline small{display:none}
+ .hero-editorial .hero-promo h2{font-size:22px}
+ .hero-editorial .hero-promo>a{grid-column:1/3;justify-content:center;min-height:43px}
+ .hero-editorial .hero-services{grid-template-columns:repeat(2,minmax(0,1fr));gap:0;margin-top:15px;padding-bottom:14px}
+ .hero-editorial .service-link{min-height:88px;padding:10px 8px 10px 12px}
+ .hero-editorial .service-link:nth-child(odd){border-right:1px solid #d7d4cc;padding-left:3px}
+ .hero-editorial .service-link:nth-child(-n+2){border-bottom:1px solid #d7d4cc}
+ .hero-editorial .service-link:nth-child(even){border-right:0}
+ .hero-editorial .service-link strong{font-size:14px}
+ .hero-editorial .service-link small{font-size:11px}
+ .quick{padding:36px 0 43px}
+ .quick-head{margin-bottom:20px}
+ .quick-head h2{font-size:38px;line-height:1.07}
+ .quick-head p{font-size:13px}
+ .category-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .catbtn{min-height:80px;padding:13px 12px;border-right:1px solid var(--editorial-line);border-bottom:1px solid var(--editorial-line)}
+ .catbtn:nth-child(even){border-right:0}
+ .catbtn:nth-child(n+3){border-bottom:0}
+ .catbtn b{font-size:17px}
+ .catbtn small{display:block;font-size:9px;white-space:nowrap}
+ .catbtn span{display:none}
+ .panel{padding:14px}
+ .contact-card{padding:25px;border-radius:3px}
+}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+
 </style>
 </head>
 <body>
 <div class="topbar"><div class="container"><div class="topinfo"><span><b>35 años junto a vos</b></span><span>Poeta Lugones · Córdoba</span><span>Lunes a viernes · 7:00 a 13:30 y 16:30 a 20:00</span></div><span>WhatsApp 351 311-0130</span></div></div>
 <header><div class="container head"><a class="brand" href="#inicio"><img src="https://cdn.jsdelivr.net/gh/hernanchan/COTIZADOR@50b47daecfd3b1490bab03c235d47b7285f9f49e/assets/logo-sbr.png" alt="Logo Librería Saber"><span><strong>LIBRERÍA SABER</strong><small>Escolar · Oficina · Impresiones</small></span></a><nav class="nav"><a href="#categorias">Categorías</a><a href="#beneficio">Beneficio de hoy</a><a href="#contacto">Contacto</a><button class="cart-open" type="button" onclick="openCart()">Carrito <span class="cart-badge" id="cartBadge">0</span></button><a class="quote" href="cotizar.html">Cotizar impresiones</a></nav></div></header>
 <main>
-<section class="hero hero-direct" id="inicio" aria-labelledby="titulo-inicio">
+<section class="hero hero-direct hero-editorial" id="inicio" aria-labelledby="titulo-inicio">
   <div class="container hero-grid">
     <div class="hero-copy">
-      <div class="kicker">Escolar · Oficina · Gráfica</div>
-      <h1 id="titulo-inicio">Todo para estudiar, trabajar e <span>imprimir.</span></h1>
-      <p>Elegí productos para tu día a día y cotizá tus impresiones desde el celular, sin vueltas.</p>
+      <div class="kicker"><span class="kicker-line" aria-hidden="true"></span> LIBRERÍA + GRÁFICA · CÓRDOBA</div>
+      <h1 id="titulo-inicio">Todo para <span>hacer.</span><br>Todo para <em>aprender.</em></h1>
+      <p>Imprimí tus apuntes, prepará tus trabajos y encontrá lo que necesitás para estudiar, crear o trabajar.</p>
       <div class="hero-actions">
-        <a class="btn primary" href="cotizar.html">Cotizar impresiones</a>
-        <a class="btn secondary" href="#categorias">Ver productos y servicios</a>
+        <a class="btn primary" href="cotizar.html">Cotizar mis impresiones <span aria-hidden="true">↗</span></a>
+        <a class="btn secondary" href="#categorias">Explorar la librería <span aria-hidden="true">↓</span></a>
       </div>
-      <div class="hero-note">Librería y gráfica en Poeta Lugones · Córdoba</div>
+      <div class="hero-note"><span class="hero-note-mark" aria-hidden="true"></span> Tu librería de Poeta Lugones, todos los días.</div>
     </div>
+    <div class="hero-studio" aria-label="Ilustración de cuadernos, papeles y material gráfico">
+      <div class="studio-topline"><span>EL MUNDO SABER</span><span>01 / 04</span></div>
+      <div class="studio-papers" aria-hidden="true">
+        <div class="studio-grid-sheet"></div>
+        <div class="studio-print">
+          <span class="studio-print-top">LIBRERÍA SABER / GRÁFICA</span>
+          <div class="studio-print-art"><i></i><i></i><i></i></div>
+          <strong>Ideas que<br>toman forma.</strong>
+          <span class="studio-print-footer">PAPEL · DISEÑO · IMPRESIÓN</span>
+        </div>
+        <div class="studio-notebook"><span class="notebook-spine"></span><span class="notebook-title">NOTAS<br>DE HOY.</span><span class="notebook-line"></span></div>
+        <div class="studio-pencil"></div>
+        <div class="studio-disc"><span>S<br>A<br>B<br>E<br>R</span></div>
+      </div>
+      <div class="studio-bottomline"><span>ESTUDIO / OFICINA / IMPRESIONES</span><span>DESDE CÓRDOBA</span></div>
+    </div>
+  </div>
+  <div class="container">
     <article class="promo-now hero-promo" id="beneficio" aria-labelledby="promoTitle">
       <div class="promo-overline"><span aria-hidden="true" class="promo-symbol">%</span><small id="promoDay">Beneficio de hoy</small></div>
-      <h2 id="promoTitle">Promoción semanal</h2>
-      <p id="promoText">El cotizador aplica automáticamente el beneficio vigente.</p>
-      <a href="cotizar.html">Cotizar con el beneficio</a>
-      <p class="promo-note">El descuento y sus condiciones se muestran en el presupuesto cuando corresponda.</p>
+      <div class="promo-main"><h2 id="promoTitle">Promoción semanal</h2><p id="promoText">El cotizador aplica automáticamente el beneficio vigente.</p></div>
+      <a href="cotizar.html">Ver beneficio <span aria-hidden="true">↗</span></a>
+      <p class="promo-note">Condiciones en el presupuesto.</p>
     </article>
   </div>
   <nav class="container hero-services" aria-label="Servicios principales">
-    <a class="service-link" href="cotizar.html"><strong>Documentos</strong><small>Impresiones y anillados</small></a>
-    <a class="service-link" href="cotizar.html"><strong>Ploteos</strong><small>Planos y pósters</small></a>
-    <a class="service-link" href="cotizar.html"><strong>Fotos y stickers</strong><small>Gráfica personalizada</small></a>
-    <a class="service-link" href="#categorias"><strong>Escolar y oficina</strong><small>Productos y ofertas</small></a>
+    <a class="service-link" href="cotizar.html"><span class="service-number">01</span><strong>Impresiones</strong><small>Apuntes y anillados</small><span class="service-arrow" aria-hidden="true">↗</span></a>
+    <a class="service-link" href="cotizar.html"><span class="service-number">02</span><strong>Ploteos</strong><small>Planos y pósters</small><span class="service-arrow" aria-hidden="true">↗</span></a>
+    <a class="service-link" href="cotizar.html"><span class="service-number">03</span><strong>Fotos y stickers</strong><small>Ideas personalizadas</small><span class="service-arrow" aria-hidden="true">↗</span></a>
+    <a class="service-link" href="#categorias"><span class="service-number">04</span><strong>Escolar y oficina</strong><small>Para todos los días</small><span class="service-arrow" aria-hidden="true">↘</span></a>
   </nav>
 </section>
-<section class="quick" id="categorias"><div class="container"><div class="quick-head"><h2>Elegí una categoría</h2><p>Productos destacados, ofertas y novedades para encontrar rápido lo que necesitás.</p></div><div class="category-tabs"><button class="catbtn active" data-panel="escolar"><small>Productos y oportunidades</small><b>Escolar</b><span>Dos destacados y acceso a todas las ofertas.</span></button><button class="catbtn" data-panel="oficina"><small>Trabajo y organización</small><b>Oficina</b><span>Dos destacados y acceso a todas las ofertas.</span></button><button class="catbtn" data-panel="novedades"><small>Regalos y hallazgos</small><b>Novedades</b><span>Regalitos, curiosidades y productos distintos para sumar al pedido.</span></button><button class="catbtn" data-panel="impresion"><small>Cálculo automático</small><b>Impresión y gráfica</b><span>Documentos, fotos, stickers, ploteos y gráfica comercial.</span></button></div>
+<section class="quick" id="categorias"><div class="container"><div class="quick-head"><div><span class="section-eyebrow">ENCONTRÁ TU PRÓXIMA IDEA</span><h2>Un poco de todo.<br><em>Mucho para vos.</em></h2></div><p>Lo esencial para la escuela, el trabajo y esas ideas que merecen pasar al papel.</p></div><div class="category-tabs"><button class="catbtn active" data-panel="escolar"><small>01 / PARA APRENDER</small><b>Escolar</b><span>Todo para la mochila</span></button><button class="catbtn" data-panel="oficina"><small>02 / PARA TRABAJAR</small><b>Oficina</b><span>Organizá tus ideas</span></button><button class="catbtn" data-panel="novedades"><small>03 / PARA DESCUBRIR</small><b>Novedades</b><span>Eso que te sorprende</span></button><button class="catbtn" data-panel="impresion"><small>04 / PARA CREAR</small><b>Impresión y gráfica</b><span>Del archivo al papel</span></button></div>
 <article class="panel" data-content="escolar"><div class="panel-head"><div><h3>Escolar</h3><p>Productos destacados del momento.</p></div></div><div class="product-grid" id="gridEscolar"></div><div class="see-all"><a href="ofertas.html?categoria=Escolar">Ver todas las ofertas escolares</a></div></article>
 <article class="panel" data-content="oficina" hidden><div class="panel-head"><div><h3>Oficina</h3><p>Productos destacados del momento.</p></div></div><div class="product-grid" id="gridOficina"></div><div class="see-all"><a href="ofertas.html?categoria=Oficina">Ver todas las ofertas de oficina</a></div></article>
 <article class="panel" data-content="novedades" hidden><div class="panel-head"><div><h3>Novedades</h3><p>Regalitos, curiosidades y productos distintos para descubrir y sumar al pedido.</p></div></div><div class="product-grid" id="gridNovedades"></div><div class="see-all"><a href="ofertas.html?categoria=Novedades">Ver todas las novedades</a></div></article>
