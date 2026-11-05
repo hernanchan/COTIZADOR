@@ -2120,15 +2120,17 @@ body.price-only #priceAdminFieldset summary{font-size:1.3rem}
 <p id="deliveryPlanStatus" role="status" aria-live="polite" class="note">Consultá primero la previsión guardada.</p>
 </fieldset>
 <fieldset id="bankTransfersArea"><legend>Transferencias por verificar · <strong id="transferCount">0 pendientes</strong></legend><p class="note">Los pendientes se cargan solos y se actualizan cada 30 segundos. Comprobar el ingreso en el banco: un comprobante del cliente no acredita el pago. Operación limitada al ENSAYO privado.</p><p id="transferPanelStatus" class="transfer-feedback" role="status" aria-live="polite">Ingresá la clave privada para consultar las transferencias.</p><ol id="transferPending"></ol><button id="refreshTransfers" class="outline" type="button">Actualizar ahora</button></fieldset>
-<fieldset id="etaAdminArea"><legend>Demora orientativa · configuración</legend>
-<p class="note">Referencia inicial: 3 horas para impresiones habituales de hasta 400 páginas. La demora habitual no es el tiempo por pedido. Si la capacidad está ocupada, el plazo requiere revisión; no se agregan horas de manera artificial.</p>
+<fieldset id="etaAdminArea"><legend>Información histórica de producción y horarios</legend>
+<p class="note">La entrega que se comunica al cliente se elige únicamente en «Entrega general» y, al iniciar, en «Definir hora de entrega». Los tiempos anteriores de tres horas y cupos no se utilizan para prometer retiros.</p>
+<details id="etaLegacyPanel"><summary>Configuración anterior de demora · no utilizada para entregar</summary>
 <div class="toolbar">
 <label>Demora habitual (horas) <input id="etaHours" type="number" step="0.5" min="0.5" max="24" value="3" style="width:90px"></label>
 <label>Pedidos simultáneos <input id="etaCapacity" type="number" step="1" min="0" max="30" value="0" style="width:80px" title="0: sin cálculo adicional de cola"></label>
 <button id="etaLoad" class="outline" type="button">Consultar demora</button>
 <button id="etaSave" type="button" disabled>Guardar demora</button>
 </div>
-<p id="etaStatus" class="note" role="status" aria-live="polite">Ingresá primero la clave privada del panel.</p>
+<p id="etaStatus" class="note" role="status" aria-live="polite">Configuración histórica para diagnóstico, sin efecto en la previsión del cliente.</p>
+</details>
 <details id="etaCalendarPanel"><summary>Horarios de atención, feriados y cierres</summary>
 <p class="note">Horario confirmado para lunes a viernes: 07:00-13:30 y 16:30-20:00. Sábados y domingos: CERRADO (confirmado). Un día vacío se considera cerrado al guardar. Los feriados y cierres excepcionales se pueden agregar, modificar o borrar como fechas AAAA-MM-DD. Sin agenda guardada no se anuncia una hora calculada.</p>
 <div class="eta-week">
@@ -2279,7 +2281,7 @@ etaSave.addEventListener("click",async()=>{
     !Number.isSafeInteger(hours*60)||!Number.isSafeInteger(capacity)||capacity<0||capacity>30){
   etaInfo.textContent="Elegí horas válidas y entre 0 y 30 pedidos simultáneos.";return;
  }
- if(!confirm("¿Guardar la demora de referencia y la capacidad para el seguimiento del cliente?"))return;
+ if(!confirm("¿Guardar configuración histórica para diagnóstico? No afecta el mensaje ni la hora de entrega del cliente."))return;
  etaSave.disabled=true;
  try{
   await apiPost("/admin/api/central/eta-settings",{
