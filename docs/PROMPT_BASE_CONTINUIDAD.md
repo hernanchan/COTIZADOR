@@ -357,3 +357,10 @@ Al concluir Etapa 1, crear `docs/ETAPA2-...-ESTADO.md`, actualizar aquí cuál e
 - Añadido test estático `tests/saber-directo-portada.test.mjs` al workflow CI privado, **sin despliegue**. Este test no demuestra visual ni navegación; queda pendiente evidencia real en navegador. La portada de rama todavía integra el carrito comercial **histórico** de seña, no el nuevo checkout privado.
 - **No** se tocaron `main`, páginas públicas, Cloudflare, Supabase, Central ni pagos reales.
 - **Próximo paso:** comprobar CI y revisar portada en móvil/escritorio en entorno privado, después adaptar de a una pantalla: cotizador, seguimiento y Central. No comenzar por motor de documentos ni modificar estados aprobados.
+
+## 05/11/2026 — VISTA PREVIA SABER DIRECTO DESPLEGADA PRIVADA (CONTINUIDAD)
+- Vista protegida publicada en **Worker de documentos de pruebas**, nunca web pública: `/prueba-v2/diseno-saber-directo` y `/prueba-v2/diseno-saber-directo/ofertas.html` en `https://saber-documentos-pruebas.libreriasaber.workers.dev`.
+- GitHub Actions `42066320074` **SUCCESS**, versión activa `c3502246-9f53-48b3-8995-09928637f87c`. Se comprobaron HTTP 401 anónimos, HTTP 200 autenticados, HTML con hero/promos y conservación del cotizador existente; bindings tipo/nombre intactos.
+- Incidencia previa: `42065328939` y `42065675363` abortaron/restauraron Worker por verificación demasiado precoz de rutas recién introducidas; el Worker antiguo devuelve 503 a rutas desconocidas. Última prueba registró 503 inicial seguido de 401/200 al propagar la versión; workflow ahora reintenta hasta 15 veces y revierte al fallar. No repetir deploy a ciegas.
+- Código: `integraciones/autocotizador/recepcion/saber-directo-vista-previa.mjs`, imports protegidos en `worker-fase4-cotizador-unificado.mjs`, `tests/saber-directo-preview.test.mjs`, `tests/saber-directo-compiled-get.test.mjs`; origen visual `vidriera/index.html`.
+- **Próxima tarea:** validación visual en móvil y PC del titular; el ensayo HTTP no es captura visual. No alterar `main`, web pública, Central, pagos reales ni precios. Registro extendido en `docs/DISENO-SABER-DIRECTO-V1-20261105.md`.

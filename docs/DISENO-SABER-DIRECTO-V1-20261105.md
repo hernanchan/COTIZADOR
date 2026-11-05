@@ -62,9 +62,20 @@ Archivo: `vidriera/index.html`.
 - Workflow exclusivo `.github/workflows/saber-directo-preview-privado.yml`, disparado sólo por `docs/ACTIVAR-SABER-DIRECTO-VISTA-PRIVADA.trigger`. Compila el Worker documental existente, hereda estrictamente sus configuraciones, instala únicamente nueva versión de ensayo, verifica antes/después y revierte ante fallos. No crea Worker ni altera `main`.
 - Rutas: `https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/diseno-saber-directo` y `.../ofertas.html`. Requiere Basic privado o sesión móvil V2. El diseño es solo demostración: consulta de productos pública, sin pedidos ni mensajes enviados desde el prototipo.
 - En este paso se corrigió CSP para permitir estilos y scripts inline heredados del HTML, preservando `object-src 'none'`, `form-action 'none'`, `base-uri 'none'`.
-- **Estado de despliegue:** pendiente de inspeccionar resultado específico del workflow; la existencia de este archivo no prueba éxito.
+- **Estado de despliegue:** ACTIVADO SOLO EN WORKER DE PRUEBAS, ver sección 9 para versión y pruebas.
 
 ## 8. Verificación de despliegue y rollback (registro de incidencia)
 - Ejecución privada `42065123949`: compiló y superó pruebas estáticas, pero un marcador Unicode no era idéntico en JS minificado; **no llegó a desplegar**.
 - Ejecución privada `42065328939`: compilación, pruebas y comprobación anónima 401 correctas; la autenticación de la ruta nueva devolvió **HTTP 503**. El workflow activó el **rollback automático**, y Cloudflare aceptó el retorno a versión previa. No afirmar que esté visible.
 - Causa del 503 aún no identificada. Antes de nuevo despliegue se añade un test que importa **el Worker compilado** con una clave sintética y llama por GET las dos rutas con/sin autenticación, incluyendo comprobación del HTML y CSP. Solo si pasa se permite nueva activación.
+
+## 9. Despliegue privado APROBADO — 05/11/2026
+- **GitHub Actions:** `42066320074` SUCCESS. Trabajo `127381258117`, prueba de regressión y compilación completas, despliegue con comprobación HTTP GET de ambos HTML y del cotizador existente.
+- **Versión Cloudflare activa:** `c3502246-9f53-48b3-8995-09928637f87c` en Worker exclusivo `saber-documentos-pruebas` (sin tocar el Worker de pagos). Se heredaron los bindings, sin crear servicios, modificar precios ni habilitar cobros.
+- **Ruta portada:** `https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/diseno-saber-directo`.
+- **Ruta catálogo:** `https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/diseno-saber-directo/ofertas.html`.
+- **Pruebas HTTP reales:** portada, ofertas y cotizador `/prueba-v2/` devuelven HTTP 401 anónimo; portada y ofertas devuelven HTTP 200 autenticados con el HTML y los marcadores esperados; `/prueba-v2/` autenticado 200 conserva `id="smart"` y `send-all-pdf`. Firma de bindings `nombre + tipo` idéntica antes/después.
+- Se encontró evidencia de **propagación diferida del edge**: primer GET de la ruta nueva devuelve 503 porque aún la atiende la versión anterior (su fallback `closed()` responde 503); en el siguiente intento respondió 401, y el GET autenticado también pasó de 503 a 200. Se agregó máximo 15 reintentos con 2 segundos entre intentos y rollback si no convergen.
+- Los clics comerciales de envío WhatsApp desde la vista previa se bloquean en JavaScript de la página; las rutas originales y el carrito histórico no se modificaron. El cotizador de pruebas es accesible desde la portada a través de enlace interno protegido. No significa que esté integrada la pasarela de cobros reales.
+- **Pendiente:** inspección humana de portada y ofertas en navegador real, especialmente móvil: verificar que no haya desbordes, que imágenes de productos carguen y que el beneficio vigente sea el que corresponde. Estas comprobaciones **no están demostradas por el smoke GET**.
+- **Siguiente paso:** recibir opinión sobre el diseño de portada y ajustar solo presentación; después extender sistema Saber Directo al cotizador V2 y a seguimiento/Central, sin cambiar estados, cálculos ni pagos.
