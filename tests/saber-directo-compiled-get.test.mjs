@@ -36,7 +36,8 @@ for(const [path,marker] of [
   const html=await response.text();
   assert.equal(response.status,200,'HTTP '+response.status+': '+html.slice(0,300));
   assert.ok(html.includes(marker),'Aviso de demostración ausente');
-  assert.match(response.headers.get('Content-Security-Policy')||'',/connect-src 'none'/);
+  assert.match(response.headers.get('Content-Security-Policy')||'',/connect-src 'self'/);
+  assert.match(response.headers.get('Content-Security-Policy')||'',/form-action 'none'/);
   assert.equal(response.headers.get('Set-Cookie'),null);
   assert.match(response.headers.get('X-Robots-Tag')||'',/noindex/);
   for(const forbidden of ['localStorage','sendWhatsApp','productsCsvUrl','libreriasaber.mp','20-22792046'])
@@ -46,4 +47,10 @@ for(const [path,marker] of [
 test('Worker compilado: cotizador continúa protegido',async()=>{
  const r=await worker.fetch(new Request(origin+'/prueba-v2/'),env,{});
  assert.equal(r.status,401);
+});
+
+test('Worker compilado: el catálogo de Google Sheets solo permite GET',async()=>{
+ const response=await worker.fetch(new Request(origin+'/prueba-v2/diseno-sin-clave/catalogo.json',{method:'POST'}),{},{});
+ assert.equal(response.status,405);
+ assert.match(response.headers.get('Allow')||'',/GET/);
 });
