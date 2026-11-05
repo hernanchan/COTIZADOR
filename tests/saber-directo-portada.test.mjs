@@ -12,7 +12,7 @@ test('Saber Directo tiene identidad, estructura responsive y sin imagen decorati
   assert.match(html,/DM Sans/);
   assert.match(html,/Manrope/);
   assert.match(html,/class="hero hero-direct"/);
-  assert.match(html,/class="container hero-services"/);
+  assert.match(html,/class="hero-services v3-service-strip"/);
   assert.match(html,/@media\(max-width:650px\)/);
   assert.doesNotMatch(html,/images\.unsplash\.com\/photo-1455390582262/);
 });
