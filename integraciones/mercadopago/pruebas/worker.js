@@ -1800,6 +1800,51 @@ async function etaResourcesApi(req,env){
 }
 
 
+
+/** Mediciones verificadas manualmente del proceso real; NO son una fórmula de ETA.
+ * Solo datos agregados por tipo de trabajo, sin archivos, contactos ni pedidos.
+ * Una impresión usa hojas; un anillado usa unidades; un ploteo mide centímetros de rollo.
+ */
+const ETA_SAMPLE_RESOURCES=["docs_bn","docs_color","anillados","cad","poster"];
+async function ensureEtaSamples(env){
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_eta_productivity_samples (id INTEGER PRIMARY KEY AUTOINCREMENT,resource TEXT NOT NULL CHECK(resource IN ('docs_bn','docs_color','anillados','cad','poster')),quantity INTEGER NOT NULL CHECK(quantity BETWEEN 1 AND 25000),duration_seconds INTEGER NOT NULL CHECK(duration_seconds BETWEEN 1 AND 28800),operator TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT(datetime('now')))").run();
+ await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_central_eta_samples_resource ON central_eta_productivity_samples(resource,id)").run();
+}
+async function etaSamplesApi(req,env){
+ if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+ if(env.CENTRAL_PRODUCTION_TRACKING_ENABLED!=="PRIVATE_TEST_ONLY")
+  return json({error:"Calibración privada deshabilitada"},503);
+ if(req.method!=="GET"&&req.method!=="POST")return json({error:"Método no admitido"},405);
+ if(req.method==="POST"){
+  if(!/^application\\/json(?:;|$)/i.test(req.headers.get("Content-Type")||""))
+   return json({error:"JSON requerido"},415);
+  const raw=await req.text();if(raw.length>480)return json({error:"Datos demasiado extensos"},413);
+  let d;try{d=JSON.parse(raw)}catch{return json({error:"JSON inválido"},400)}
+  if(!d||typeof d!=="object"||Array.isArray(d)||
+     Object.keys(d).sort().join(",")!=="confirmed,durationSeconds,operator,quantity,resource"||
+     !ETA_SAMPLE_RESOURCES.includes(d.resource)||
+     !Number.isSafeInteger(d.quantity)||d.quantity<1||d.quantity>25000||
+     !Number.isSafeInteger(d.durationSeconds)||d.durationSeconds<1||d.durationSeconds>28800||
+     d.confirmed!==true||typeof d.operator!=="string"||
+     d.operator.trim().length<2||d.operator.trim().length>60)
+   return json({error:"Medición inválida: ingresá cantidad y tiempo realmente medidos"},400);
+  await ensureEtaSamples(env);
+  const inserted=await env.DB.prepare(
+   "INSERT INTO central_eta_productivity_samples(resource,quantity,duration_seconds,operator) VALUES(?,?,?,?)"
+  ).bind(d.resource,d.quantity,d.durationSeconds,d.operator.trim()).run();
+  if(Number(inserted?.meta?.changes)!==1)return json({error:"No se guardó la medición"},503);
+  return json({saved:true,etaApplied:false,paymentsEnabled:false});
+ }
+ await ensureEtaSamples(env);
+ const rows=(await env.DB.prepare(
+  "SELECT resource,quantity,duration_seconds,created_at FROM central_eta_productivity_samples ORDER BY id DESC LIMIT 40"
+ ).all()).results||[];
+ const count=Object.fromEntries(ETA_SAMPLE_RESOURCES.map(k=>[k,0]));
+ for(const x of rows)if(Object.prototype.hasOwnProperty.call(count,x.resource))count[x.resource]++;
+ return json({samples:rows,countLast40:count,limit:40,etaApplied:false,
+  notice:"Mediciones reales registradas, todavía sin cálculo automático de plazos."});
+}
+
 /** Recursos productivos por pedido, no horas ficticias por tanda.
  * CAD y póster ocupan la misma capacidad de ploteos por pedido.
  * Un dato faltante o una cola demasiado grande exige revisión humana.
@@ -2040,12 +2085,12 @@ body.price-only #priceAdminFieldset summary{font-size:1.3rem}
 </div>
 <label for="etaClosed">Feriados y cierres (AAAA-MM-DD, una fecha por línea)</label>
 <textarea id="etaClosed" rows="3" placeholder="2026-12-25" style="display:block;width:min(100%,400px);font:inherit;padding:10px"></textarea>
-<div class="toolbar"><button id="etaCalendarLoad" class="outline" type="button">Consultar agenda</button><button id="etaCalendarSave" type="button" disabled>Guardar agenda</button></div>
+<div class="toolbar"><button id="etaCalendarLoad" class="outline" type="button">Consultar agenda</button><button id="etaCalendarWeekdayDraft" class="outline" type="button">Completar lunes a viernes (borrador)</button><button id="etaCalendarSave" type="button" disabled>Guardar agenda</button></div>
 <p id="etaCalendarStatus" class="note" role="status" aria-live="polite">Agenda aún sin consultar.</p>
 </details>
 
 <details id="etaResourcesPanel"><summary>Carga y capacidad por recursos de trabajo</summary>
-<p class="note">Solo pedidos pagados y verificados aún en producción; un mismo pedido puede requerir impresión y anillado. Los valores 0 significan capacidad sin calibrar. No se utilizan para prometer fechas de retiro.</p>
+<p class="note">Los cupos representan <strong>trabajos que realmente pueden prepararse en paralelo</strong>, no cantidad nominal de máquinas. 0 = sin calibrar. Un recurso sin cupo libre bloquea una fecha automática, pero estos cupos NO estiman cuánto dura cada trabajo.</p>
 <div class="toolbar">
 <label>Documentos simultáneos <input id="etaPrintParallel" type="number" min="0" max="30" step="1" value="0" style="width:75px"></label>
 <label>Anillados simultáneos <input id="etaBindingParallel" type="number" min="0" max="30" step="1" value="0" style="width:75px"></label>
@@ -2055,6 +2100,25 @@ body.price-only #priceAdminFieldset summary{font-size:1.3rem}
 </div>
 <p id="etaResourcesStatus" class="note" role="status" aria-live="polite">Carga pendiente de consultar.</p>
 <p id="etaResourcesLoadResult" class="note" aria-live="polite"></p>
+</details>
+
+<details id="etaSamplesPanel"><summary>Medir tiempos reales · impresiones, anillados y ploteos</summary>
+<p class="note">Anotá una medición <strong>cuando el trabajo termine</strong>. Usá hojas físicas impresas (no páginas PDF), anillados terminados o centímetros realmente avanzados del rollo. Medí el tiempo transcurrido del trabajo; no incluyas esperas ajenas a ese recurso. Estos datos son internos y no cambian la ETA del cliente.</p>
+<div class="toolbar">
+<label>Recurso <select id="etaSampleType">
+<option value="docs_bn">Impresión B/N · hojas</option>
+<option value="docs_color">Impresión color · hojas</option>
+<option value="anillados">Anillado · unidades</option>
+<option value="cad">CAD · cm de rollo</option>
+<option value="poster">Póster · cm de rollo</option>
+</select></label>
+<label>Cantidad real <input id="etaSampleQuantity" type="number" min="1" max="25000" step="1" placeholder="Cantidad" style="width:100px"></label>
+<label>Duración medida (min) <input id="etaSampleMinutes" type="number" min="0.1" max="480" step="0.1" placeholder="Minutos" style="width:105px"></label>
+<button id="etaSamplesLoad" class="outline" type="button">Ver mediciones</button>
+<button id="etaSamplesSave" type="button">Registrar medición</button>
+</div>
+<p id="etaSamplesStatus" class="note" role="status" aria-live="polite">Todavía no se consultaron las mediciones.</p>
+<div id="etaSamplesHistory" class="note" aria-live="polite"></div>
 </details>
 </fieldset>
 <fieldset id="productionBoardArea"><legend>Tablero de producción · pedidos pagos</legend>
@@ -2154,6 +2218,13 @@ async function loadEtaCalendar(){
  }catch(e){etaCalendarSnapshot=null;etaCalendarSave.disabled=true;etaCalendarInfo.textContent="No se pudo consultar agenda: "+String(e.message||e)}
 }
 document.querySelector("#etaCalendarLoad").addEventListener("click",loadEtaCalendar);
+document.querySelector("#etaCalendarWeekdayDraft").addEventListener("click",()=>{
+ if(!etaCalendarSnapshot){etaCalendarInfo.textContent="Primero consultá la agenda guardada.";return}
+ if(!confirm("¿Copiar 07:00-14:00 y 16:30-20:00 a lunes a viernes? Solo modifica el borrador de esta pantalla; verificá días y sábados antes de guardar."))return;
+ for(const day of ["Mon","Tue","Wed","Thu","Fri"])
+  document.querySelector("#etaDay"+day).value="07:00-14:00,16:30-20:00";
+ etaCalendarInfo.textContent="Borrador sin guardar: confirmá que los días y tramos reflejan la atención real; luego guardá con responsable.";
+});
 etaCalendarSave.addEventListener("click",async()=>{
  if(!etaCalendarSnapshot)return;
  const operator=requestOperator();
@@ -2234,13 +2305,64 @@ etaResourcesSave.addEventListener("click",async()=>{
  if(Object.values(values).some(n=>!Number.isSafeInteger(n)||n<0||n>30)){
   etaResourceStatus.textContent="La capacidad simultánea debe ser de 0 a 30.";return;
  }
- if(!confirm("¿Guardar capacidad por recurso en el piloto? Aún NO modifica el plazo mostrado al cliente."))return;
+ if(!confirm("¿Guardar cupos por recurso en el piloto? Estos valores afectan si se puede mostrar una ETA automática, pero no calculan minutos de producción."))return;
  etaResourcesSave.disabled=true;
  try{
   await apiPost("/admin/api/central/resource-capacity",{...values,
    expectedRevision:etaResourcesSnapshot.revision,operator,confirmed:true});
   await loadEtaResources();
  }catch(e){etaResourceStatus.textContent=e.message||"No se pudo guardar.";etaResourcesSave.disabled=false}
+});
+
+const etaSamplesStatus=document.querySelector("#etaSamplesStatus");
+const etaSamplesHistory=document.querySelector("#etaSamplesHistory");
+const sampleLabels={docs_bn:"B/N · hojas",docs_color:"Color · hojas",
+ anillados:"Anillados · unidades",cad:"CAD · cm",poster:"Póster · cm"};
+async function loadEtaSamples(){
+ try{
+  const data=await api("/admin/api/central/productivity-samples");
+  etaSamplesHistory.replaceChildren();
+  const samples=data.samples||[];
+  if(!samples.length)etaSamplesHistory.textContent="Sin mediciones reales registradas.";
+  else{
+   const list=document.createElement("ol");
+   for(const x of samples.slice(0,20)){
+    const item=document.createElement("li");
+    item.textContent=(sampleLabels[x.resource]||x.resource)+": "+x.quantity+
+     " en "+(x.duration_seconds/60).toLocaleString("es-AR",{maximumFractionDigits:2})+
+     " min · "+x.created_at;
+    list.append(item);
+   }
+   etaSamplesHistory.append(list);
+  }
+  etaSamplesStatus.textContent=samples.length+" mediciones recientes (máximo 40 consultadas). Sin ETA automática basada en mediciones.";
+ }catch(e){etaSamplesStatus.textContent="No se pudieron leer mediciones: "+(e.message||e)}
+}
+document.querySelector("#etaSamplesLoad").addEventListener("click",loadEtaSamples);
+document.querySelector("#etaSamplesSave").addEventListener("click",async()=>{
+ const operator=requestOperator();
+ if(!operator){etaSamplesStatus.textContent="Indicá el responsable.";return}
+ const quantity=Number(document.querySelector("#etaSampleQuantity").value);
+ const minutes=Number(document.querySelector("#etaSampleMinutes").value);
+ const durationSeconds=Math.round(minutes*60);
+ const resource=document.querySelector("#etaSampleType").value;
+ if(!Number.isSafeInteger(quantity)||quantity<1||quantity>25000||
+    !Number.isFinite(minutes)||minutes<=0||!Number.isSafeInteger(durationSeconds)||
+    durationSeconds<1||durationSeconds>28800){
+  etaSamplesStatus.textContent="Ingresá una cantidad real y una duración medida entre 1 segundo y 8 horas.";return;
+ }
+ if(!confirm("¿Registrar esta medición realizada, no estimada? No cambiará los plazos del cliente."))return;
+ const btn=document.querySelector("#etaSamplesSave");btn.disabled=true;
+ try{
+  await apiPost("/admin/api/central/productivity-samples",{
+   resource,quantity,durationSeconds,operator,confirmed:true
+  });
+  etaSamplesStatus.textContent="Medición registrada.";
+  document.querySelector("#etaSampleQuantity").value="";
+  document.querySelector("#etaSampleMinutes").value="";
+  await loadEtaSamples();
+ }catch(e){etaSamplesStatus.textContent=e.message||"No se pudo registrar."}
+ finally{btn.disabled=false}
 });
 function money(n){return new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0}).format(Number(n)||0)}
 async function apiPost(path,data){
@@ -3775,6 +3897,7 @@ export default {
     if(url.pathname==="/admin/api/central/eta-calendar")return await etaCalendarApi(req,env);
     if(url.pathname==="/admin/api/central/mobile-invite")return await createMobileInvite(req,env);
     if(url.pathname==="/admin/api/central/resource-capacity")return await etaResourcesApi(req,env);
+    if(url.pathname==="/admin/api/central/productivity-samples")return await etaSamplesApi(req,env);
    if(url.pathname==="/admin/api/orders"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
     await ensurePaymentReviews(env);
