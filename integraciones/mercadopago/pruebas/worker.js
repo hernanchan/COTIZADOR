@@ -1462,11 +1462,12 @@ async function etaQueue(env){
  return Number(row?.active)||0;
 }
 function etaForQueue(settings,activeAhead){
+ // El tiempo habitual NO mide duración de cada trabajo. No sumarlo por tandas.
+ // Si hay saturación, pedir revisión humana en vez de prometer horas ficticias.
  const cap=settings.parallel_orders;
- const added=cap>0?Math.floor(Math.max(0,activeAhead)/cap)*settings.base_minutes:0;
- return {minutes:Math.min(10080,settings.base_minutes+added),
-  queueCalibrated:cap>0,baseMinutes:settings.base_minutes,
-  activeAhead,parallelOrders:cap};
+ return {minutes:settings.base_minutes,queueCalibrated:cap>0,
+  requiresReview:cap>0&&activeAhead>=cap,
+  baseMinutes:settings.base_minutes,activeAhead,parallelOrders:cap};
 }
 function standardPrintJob(manifest){
  let docs;
