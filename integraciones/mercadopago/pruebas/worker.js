@@ -1799,6 +1799,58 @@ async function etaResourcesApi(req,env){
  return json({saved:true,settings:await etaResourceSettings(env),productionAuthorized:false,paymentsEnabled:false});
 }
 
+
+/** Recursos productivos por pedido, no horas ficticias por tanda.
+ * CAD y póster ocupan la misma capacidad de ploteos por pedido.
+ * Un dato faltante o una cola demasiado grande exige revisión humana.
+ */
+function etaResourceQueueDecision(current,rows,settings,partial=false){
+ const need=etaResourceTags(current),cap={
+  documents:Number(settings?.print_parallel)||0,
+  binding:Number(settings?.binding_parallel)||0,
+  plotter:Number(settings?.plotter_parallel)||0
+ };
+ const required=["documents","binding","plotter"].filter(k=>
+  k==="plotter"?(need.cad||need.poster):need[k]);
+ if(need.review||required.length===0)
+  return {calibrated:false,requiresReview:true,status:"incomplete"};
+ if(partial)return {calibrated:false,requiresReview:true,status:"unknown_queue"};
+ if(required.some(k=>cap[k]<=0))
+  return {calibrated:false,requiresReview:false,status:"unconfigured"};
+ const busy={documents:0,binding:0,plotter:0};
+ for(const row of rows){
+  const used=etaResourceTags(row.manifest_json);
+  if(used.review)return {calibrated:true,requiresReview:true,status:"unknown_queue"};
+  if(used.documents)busy.documents++;
+  if(used.binding)busy.binding++;
+  if(used.cad||used.poster)busy.plotter++;
+ }
+ if(required.some(k=>busy[k]>=cap[k]))
+  return {calibrated:true,requiresReview:true,status:"saturated"};
+ return {calibrated:true,requiresReview:false,status:"available"};
+}
+async function etaResourceQueueForOrder(env,order){
+ const settings=await etaResourceSettings(env);
+ // Revisión cero: el titular aún no configuró capacidades por recurso.
+ if(!settings.revision)return null;
+ await centralTables(env);await centralProductionTables(env);await ensurePaymentReviews(env);
+ const result=await env.DB.prepare(
+  "SELECT m.manifest_json FROM orders o "+
+  "JOIN central_document_manifests m ON m.commercial_order_id=o.id "+
+  "LEFT JOIN central_production_status s ON s.order_id=o.id "+
+  "WHERE o.id<>? AND o.status='paid' AND o.paid_at IS NOT NULL "+
+  "AND o.deposit_ars=o.amount_ars "+
+  "AND EXISTS(SELECT 1 FROM payment_reviews p WHERE p.order_id=o.id AND p.state='verified') "+
+  "AND (COALESCE(s.state,'pendiente')='en_preparacion' OR "+
+  "(COALESCE(s.state,'pendiente')='pendiente' AND "+
+  "(o.paid_at<? OR (o.paid_at=? AND o.id<?)))) "+
+  "ORDER BY CASE WHEN COALESCE(s.state,'pendiente')='en_preparacion' THEN 0 ELSE 1 END,"+
+  "o.paid_at ASC,o.id ASC LIMIT 501"
+ ).bind(order.id,order.paid_at,order.paid_at,order.id).all();
+ const rows=result.results||[];
+ return etaResourceQueueDecision(order.manifest_json,rows.slice(0,500),settings,rows.length>500);
+}
+
 async function trackingMac(env,id){
  if(!CENTRAL_UUID.test(id)||typeof env.CENTRAL_BRIDGE_KEY!=="string"||
     env.CENTRAL_BRIDGE_KEY.length<32||env.CENTRAL_BRIDGE_KEY===env.DEMO_ADMIN_KEY)return null;
@@ -1847,9 +1899,16 @@ async function trackingCustomerStatus(req,env){
     "AND EXISTS (SELECT 1 FROM payment_reviews p WHERE p.order_id=o.id AND p.state='verified') "+
     "AND (o.paid_at<? OR (o.paid_at=? AND o.id<?))").bind(x.paid_at,x.paid_at,x.id).first();
    const base=etaForQueue(setting,Number(q?.ahead)||0);
-    const calendar=await etaCalendar(env);
-    const operatingReadyAt=base.queueCalibrated&&!base.requiresReview&&calendar.configured?
-      etaOperatingFinish(calendar,x.paid_at,base.minutes):null;
+   // La capacidad por recurso reemplaza el contador general sólo si se configuró.
+   const resources=await etaResourceQueueForOrder(env,x);
+   if(resources){
+    base.queueCalibrated=resources.calibrated;
+    base.requiresReview=resources.requiresReview;
+    base.resourceStatus=resources.status;
+   }
+   const calendar=await etaCalendar(env);
+   const operatingReadyAt=base.queueCalibrated&&!base.requiresReview&&calendar.configured?
+     etaOperatingFinish(calendar,x.paid_at,base.minutes):null;
     const overdue=Boolean(operatingReadyAt&&Date.parse(operatingReadyAt)<Date.now());
     estimate={type:"habitual",provisional:true,...base,
       requiresReview:base.requiresReview||overdue,calendarConfigured:calendar.configured,
