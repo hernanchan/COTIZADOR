@@ -40,6 +40,7 @@ jobs:
           for marker in 'diseno-saber-directo' 'send-all-pdf' 'ensayo-tus-iniciar'; do
             grep -Fq "$marker" dist/saber-documentos-cotizador-fase4.mjs || { echo "FALTA_MARCADOR_COMPILADO: $marker"; exit 1; }
           done
+          node --test ../../../tests/saber-directo-compiled-get.test.mjs
           echo "VISTA_PRIVADA_COMPILADA_CON_RUTAS_ANTERIORES"
       - name: Desplegar solo Worker de DOCUMENTOS PRUEBAS, con rollback automático
         shell: bash

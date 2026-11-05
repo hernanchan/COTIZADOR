@@ -63,3 +63,8 @@ Archivo: `vidriera/index.html`.
 - Rutas: `https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/diseno-saber-directo` y `.../ofertas.html`. Requiere Basic privado o sesión móvil V2. El diseño es solo demostración: consulta de productos pública, sin pedidos ni mensajes enviados desde el prototipo.
 - En este paso se corrigió CSP para permitir estilos y scripts inline heredados del HTML, preservando `object-src 'none'`, `form-action 'none'`, `base-uri 'none'`.
 - **Estado de despliegue:** pendiente de inspeccionar resultado específico del workflow; la existencia de este archivo no prueba éxito.
+
+## 8. Verificación de despliegue y rollback (registro de incidencia)
+- Ejecución privada `42065123949`: compiló y superó pruebas estáticas, pero un marcador Unicode no era idéntico en JS minificado; **no llegó a desplegar**.
+- Ejecución privada `42065328939`: compilación, pruebas y comprobación anónima 401 correctas; la autenticación de la ruta nueva devolvió **HTTP 503**. El workflow activó el **rollback automático**, y Cloudflare aceptó el retorno a versión previa. No afirmar que esté visible.
+- Causa del 503 aún no identificada. Antes de nuevo despliegue se añade un test que importa **el Worker compilado** con una clave sintética y llama por GET las dos rutas con/sin autenticación, incluyendo comprobación del HTML y CSP. Solo si pasa se permite nueva activación.
