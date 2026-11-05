@@ -212,7 +212,16 @@ function pagoSandboxEnRecibo(){
         timeZone:'America/Argentina/Cordoba',day:'2-digit',month:'2-digit',year:'numeric',
         hour:'2-digit',minute:'2-digit'}).format(fecha)+' hs. Te avisaremos si cambia.':
        'Preparación: todavía sin horario confirmado.';
-     }else plazo.textContent='Preparación: todavía sin horario confirmado.';
+     }else{
+      const textos={
+       hoy:'Prevemos que tu trabajo estará listo durante el día de hoy.',
+       hoy_tarde:'Prevemos que estará listo hoy por la tarde.',
+       proximo_dia:'Prevemos que estará listo el próximo día de atención.',
+       por_confirmar:'Estamos organizando las entregas; confirmaremos cuándo estará listo.'
+      };
+      plazo.textContent=(textos[result.deliveryPlan]||textos.por_confirmar)+
+       ' Es orientativo. Seguí tu pedido: cuando empecemos, indicaremos la hora estimada.';
+     }
     boton.disabled=true;boton.textContent='Pago confirmado';
      transferButton.disabled=true;
     document.getElementById('precio-smart').textContent='Orden N.º '+

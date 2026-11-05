@@ -85,6 +85,11 @@ export async function pagoTUSSandboxCliente(request,env,{authorized=false,subtle
     return reply({ok:false,error:'Instrucciones bancarias inválidas'},502);
    instructions={alias:result.alias,amountArs:result.amountArs};
   }
+  // Franja comercial sólo desde la Central privada y para pago verificado.
+  let deliveryPlan;
+  if(result.estado==='pagado'&&
+     ['por_confirmar','hoy','hoy_tarde','proximo_dia'].includes(result.deliveryPlan))
+   deliveryPlan=result.deliveryPlan;
   // Plazo informativo, solamente desde Central firmada y con pago aprobado.
   let preparacionEstimada;
   if(result.estado==='pagado'&&result.preparacionEstimada){
@@ -108,6 +113,7 @@ export async function pagoTUSSandboxCliente(request,env,{authorized=false,subtle
   }
   return reply({ok:true,estado:result.estado,...instructions,
    ...(preparacionEstimada?{preparacionEstimada}:{}),
+   ...(deliveryPlan?{deliveryPlan}:{}),
    ...(seguimientoUrl?{seguimientoUrl}:{}),orderId:data.commercialOrderId});
  }catch{return reply({ok:false,error:'No se pudo contactar la Central privada'},502)}
 }
