@@ -7,7 +7,7 @@ import {webcrypto} from 'node:crypto';
 const centralSource=readFileSync(new URL('../integraciones/mercadopago/pruebas/worker.js',import.meta.url),'utf8');
 const docsSource=readFileSync(new URL('../integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs',import.meta.url),'utf8');
 
-const base={Request,Response,URL,URLSearchParams,TextEncoder,crypto:webcrypto,console,AbortSignal};
+const base={Request,Response,Headers,URL,URLSearchParams,TextEncoder,crypto:webcrypto,console,AbortSignal};
 const central=vm.createContext({...base});central.globalThis=central;
 vm.runInContext(centralSource.replace('export default {','globalThis.worker = {'),central);
 
