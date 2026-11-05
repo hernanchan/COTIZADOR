@@ -1910,7 +1910,7 @@ async function loadEtaCalendar(){
   etaCalendarDays.forEach((day,i)=>{
    document.querySelector("#etaDay"+etaCalendarFields[i]).value=r.calendar.weekly[day]||"";
   });
-  document.querySelector("#etaClosed").value=r.calendar.closedDates.join("\n");
+  document.querySelector("#etaClosed").value=r.calendar.closedDates.join("\\n");
   etaCalendarSave.disabled=false;
   etaCalendarInfo.textContent=r.calendar.configured?
    "Agenda cargada · revisión "+r.calendar.revision+" · zona Córdoba.":
@@ -1924,8 +1924,8 @@ etaCalendarSave.addEventListener("click",async()=>{
  if(!operator){etaCalendarInfo.textContent="Indicá el responsable del cambio.";return}
  const weekly={};
  etaCalendarDays.forEach((day,i)=>weekly[day]=document.querySelector("#etaDay"+etaCalendarFields[i]).value.trim());
- const closedDates=document.querySelector("#etaClosed").value.split(/[\n,;]/).map(x=>x.trim()).filter(Boolean);
- if(closedDates.some(d=>!/^\d{4}-\d\d-\d\d$/.test(d))){
+ const closedDates=document.querySelector("#etaClosed").value.split(/[\\n,;]/).map(x=>x.trim()).filter(Boolean);
+ if(closedDates.some(d=>!/^\\d{4}-\\d\\d-\\d\\d$/.test(d))){
   etaCalendarInfo.textContent="Revisá las fechas: AAAA-MM-DD, una por línea.";return;
  }
  if(!confirm("¿Guardar estos horarios y cierres para el piloto privado?"))return;
