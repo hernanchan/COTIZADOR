@@ -34,6 +34,7 @@ import {pagoTUSSandboxCliente} from './tus-pago-sandbox-cliente.mjs';
 import {paginaDescargaTUSPersonal} from './pantalla-descarga-tus-personal.mjs';
 import {paginaPaqueteTUSPersonal} from './pantalla-paquete-tus-personal.mjs';
 import {consultarPaqueteTUSPersonal} from './tus-paquete-personal.mjs';
+import {simularLimpiezaTUS} from './borrado-tus-entregado.mjs';
 import cotizadorV2OriginalHtml from '../../../cotizador-web-v2.html';
 import v2ReaderClientJs from './cotizador-v2-ensayo-archivos.txt';
 import v2UploadClientJs from './subir-vincular-pdf-v2-privado.txt';
@@ -2091,6 +2092,11 @@ export default {
       return pagoTUSSandboxCliente(request,env,{
        authorized:v2PrivateBrowserAuthorized(request,env)==='allow'||
         (await v2SessionAuthorized(request,env))
+      });
+    // Retención de PDF: SOLO simulación, protegida con Basic; sin DELETE real.
+    if(page==='/prueba-v2/api/ensayo-tus-retencion')
+      return simularLimpiezaTUS(request,env,{
+       authorized:v2PrivateBrowserAuthorized(request,env)==='allow'
       });
     if(page==='/prueba-v2/api/ensayo-tus-paquete-manifiesto')
       return consultarPaqueteTUSPersonal(request,env,{
