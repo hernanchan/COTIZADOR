@@ -1706,6 +1706,99 @@ async function redeemMobileInvite(req,env){
   headers:{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store, private"}});
 }
 
+
+/** Instrumentación de recursos: cuenta pedidos, nunca minutos ficticios ni
+ * movimientos de máquina. Un pedido mixto puede ocupar más de una categoría.
+ */
+function etaResourceTags(manifest){
+ let m;
+ try{m=typeof manifest==="string"?JSON.parse(manifest):manifest}catch{return {review:true}}
+ if(!m||!Array.isArray(m.trabajos)||!m.trabajos.length)return {review:true};
+ const tags={documents:false,binding:false,cad:false,poster:false,review:false};
+ for(const t of m.trabajos){
+  if(t?.servicio==="documentos"){
+   tags.documents=true;
+   if(t.tipoAnillado==="individual"||t.tipoAnillado==="grupo")tags.binding=true;
+   else if(t.tipoAnillado!=="ninguno")tags.review=true;
+  }else if(t?.servicio==="ploteos"){
+   if(!Array.isArray(t.planoPorPagina)||!t.planoPorPagina.length)tags.review=true;
+   else for(const page of t.planoPorPagina){
+    if(page?.modo==="cad")tags.cad=true;
+    else if(page?.modo==="poster")tags.poster=true;
+    else tags.review=true;
+   }
+  }else tags.review=true;
+ }
+ return tags;
+}
+async function etaResourceLoad(env){
+ await centralTables(env);await centralProductionTables(env);await ensurePaymentReviews(env);
+ const response=await env.DB.prepare(
+  "SELECT m.manifest_json FROM orders o JOIN central_document_manifests m ON m.commercial_order_id=o.id "+
+  "LEFT JOIN central_production_status s ON s.order_id=o.id "+
+  "WHERE o.status='paid' AND o.paid_at IS NOT NULL AND o.deposit_ars=o.amount_ars "+
+  "AND COALESCE(s.state,'pendiente') IN ('pendiente','en_preparacion') "+
+  "AND EXISTS (SELECT 1 FROM payment_reviews p WHERE p.order_id=o.id AND p.state='verified') "+
+  "ORDER BY o.paid_at ASC,o.id ASC LIMIT 501"
+ ).all();
+ const rows=response.results||[],out={paidActive:Math.min(rows.length,500),
+  documents:0,binding:0,cad:0,poster:0,review:0,partial:rows.length>500};
+ for(const row of rows.slice(0,500)){
+  const tags=etaResourceTags(row.manifest_json);
+  for(const key of ["documents","binding","cad","poster","review"])if(tags[key])out[key]++;
+ }
+ return out;
+}
+async function ensureEtaResourceSettings(env){
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_eta_resources (id INTEGER PRIMARY KEY CHECK(id=1),print_parallel INTEGER NOT NULL CHECK(print_parallel BETWEEN 0 AND 30),binding_parallel INTEGER NOT NULL CHECK(binding_parallel BETWEEN 0 AND 30),plotter_parallel INTEGER NOT NULL CHECK(plotter_parallel BETWEEN 0 AND 30),revision INTEGER NOT NULL,operator TEXT NOT NULL,updated_at TEXT NOT NULL DEFAULT(datetime('now')))").run();
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_eta_resource_events (id INTEGER PRIMARY KEY AUTOINCREMENT,revision INTEGER NOT NULL UNIQUE,print_parallel INTEGER NOT NULL,binding_parallel INTEGER NOT NULL,plotter_parallel INTEGER NOT NULL,operator TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT(datetime('now')))").run();
+}
+async function etaResourceSettings(env){
+ await ensureEtaResourceSettings(env);
+ const row=await env.DB.prepare("SELECT print_parallel,binding_parallel,plotter_parallel,revision,operator,updated_at FROM central_eta_resources WHERE id=1").first();
+ return row||{print_parallel:0,binding_parallel:0,plotter_parallel:0,revision:0,operator:null,updated_at:null};
+}
+async function etaResourcesApi(req,env){
+ if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+ if(env.CENTRAL_PRODUCTION_TRACKING_ENABLED!=="PRIVATE_TEST_ONLY")
+  return json({error:"Capacidad privada deshabilitada"},503);
+ if(req.method==="GET"){
+  const [settings,load]=await Promise.all([etaResourceSettings(env),etaResourceLoad(env)]);
+  return json({settings,load,notice:"Conteo orientativo por pedido pagado; no calcula duración ni promete retiro."});
+ }
+ if(req.method!=="POST")return json({error:"Método no admitido"},405);
+ if(!/^application\/json(?:;|$)/i.test(req.headers.get("Content-Type")||""))
+  return json({error:"JSON requerido"},415);
+ const raw=await req.text();if(raw.length>500)return json({error:"Datos demasiado extensos"},413);
+ let d;try{d=JSON.parse(raw)}catch{return json({error:"Solicitud inválida"},400)}
+ if(!d||typeof d!=="object"||Array.isArray(d)||
+   Object.keys(d).sort().join(",")!=="bindingParallel,confirmed,expectedRevision,operator,plotterParallel,printParallel"||
+   [d.bindingParallel,d.plotterParallel,d.printParallel].some(n=>!Number.isSafeInteger(n)||n<0||n>30)||
+   !Number.isSafeInteger(d.expectedRevision)||d.expectedRevision<0||
+   d.confirmed!==true||typeof d.operator!=="string"||
+   d.operator.trim().length<2||d.operator.trim().length>60)
+  return json({error:"Capacidad de recursos inválida"},400);
+ const current=await etaResourceSettings(env);
+ if(current.revision!==d.expectedRevision)return json({error:"Configuración modificada en otro puesto"},409);
+ if(current.print_parallel===d.printParallel&&current.binding_parallel===d.bindingParallel&&
+    current.plotter_parallel===d.plotterParallel)return json({error:"No hay cambios"},409);
+ const values=[d.printParallel,d.bindingParallel,d.plotterParallel,d.operator.trim()];
+ let result;
+ try{
+  if(current.revision===0)result=await env.DB.batch([
+   env.DB.prepare("INSERT OR IGNORE INTO central_eta_resources(id,print_parallel,binding_parallel,plotter_parallel,revision,operator) VALUES(1,?,?,?,1,?)").bind(...values),
+   env.DB.prepare("INSERT INTO central_eta_resource_events(revision,print_parallel,binding_parallel,plotter_parallel,operator) SELECT 1,?,?,?,? WHERE EXISTS(SELECT 1 FROM central_eta_resources WHERE id=1 AND revision=1)").bind(...values)
+  ]);
+  else result=await env.DB.batch([
+   env.DB.prepare("UPDATE central_eta_resources SET print_parallel=?,binding_parallel=?,plotter_parallel=?,operator=?,revision=revision+1,updated_at=datetime('now') WHERE id=1 AND revision=?").bind(...values,current.revision),
+   env.DB.prepare("INSERT INTO central_eta_resource_events(revision,print_parallel,binding_parallel,plotter_parallel,operator) SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM central_eta_resources WHERE id=1 AND revision=?)").bind(current.revision+1,...values,current.revision+1)
+  ]);
+ }catch{return json({error:"Conflicto al guardar capacidades"},409)}
+ if(!Array.isArray(result)||result.some(x=>Number(x?.meta?.changes)!==1))
+  return json({error:"No se confirmó el ajuste de capacidades"},409);
+ return json({saved:true,settings:await etaResourceSettings(env),productionAuthorized:false,paymentsEnabled:false});
+}
+
 async function trackingMac(env,id){
  if(!CENTRAL_UUID.test(id)||typeof env.CENTRAL_BRIDGE_KEY!=="string"||
     env.CENTRAL_BRIDGE_KEY.length<32||env.CENTRAL_BRIDGE_KEY===env.DEMO_ADMIN_KEY)return null;
@@ -3566,6 +3659,7 @@ export default {
    if(url.pathname==="/admin/api/central/eta-settings")return await etaAdminApi(req,env);
     if(url.pathname==="/admin/api/central/eta-calendar")return await etaCalendarApi(req,env);
     if(url.pathname==="/admin/api/central/mobile-invite")return await createMobileInvite(req,env);
+    if(url.pathname==="/admin/api/central/resource-capacity")return await etaResourcesApi(req,env);
    if(url.pathname==="/admin/api/orders"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
     await ensurePaymentReviews(env);
