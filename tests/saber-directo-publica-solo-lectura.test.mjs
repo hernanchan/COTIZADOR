@@ -32,6 +32,7 @@ test('Solo dos rutas públicas y CSP impide lecturas a APIs',()=>{
  assert.match(workerSrc,/if\(page==='\/prueba-v2\/diseno-sin-clave'\|\|page==='\/prueba-v2\/diseno-sin-clave\/ofertas.html'\)/);
  assert.match(workerSrc,/connect-src 'none'/);
  assert.match(workerSrc,/form-action 'none'/);
+ assert.match(workerSrc,/img-src https:\/\/cdn\.jsdelivr\.net https:\/\/drive\.google\.com https:\/\/\*\.googleusercontent\.com https:\/\/images\.unsplash\.com data:/);
  assert.match(workerSrc,/page==='\/prueba-v2\/'\|\|page==='\/prueba-v2\/orden-paquete'/);
 });
 

@@ -30,6 +30,26 @@ jobs:
           set -euo pipefail
           npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.25.12
           node --test tests/saber-directo-portada.test.mjs tests/saber-directo-preview.test.mjs tests/saber-directo-publica-solo-lectura.test.mjs tests/tus-pagos-prepublicacion-bloqueados.test.mjs tests/tus-carga-recursos-privados.test.mjs tests/tus-central-tablero-click-real.test.mjs tests/tus-pago-estado-automatico-ui.test.mjs
+      - name: Validar fotos públicas Google Drive desde fuera de la cuenta
+        shell: bash
+        run: |
+          set -euo pipefail
+          ids=(
+            1h1LuTjbxOHLBz5LjwRnedTDGu7xSt8Ew
+            1NAzMD691MCl7EVd8ezeEMu0Higk1INn7
+            1_j9dvL-8db2nJ01xKmjlZO3gbY1qrXOH
+            1XvxoMqFsU7FvgL6u3KZ_KZgeI04e6dlc
+          )
+          for id in "${ids[@]}"; do
+            url="https://drive.google.com/thumbnail?id=$id&sz=w1200"
+            status=$(curl -L -sS --max-time 35 -o "/tmp/saber-foto-$id" -w '%{http_code}|%{content_type}|%{url_effective}' "$url")
+            IFS='|' read -r http mime final <<< "$status"
+            echo "IMAGEN id=$id HTTP=$http TYPE=$mime FINAL_HOST=$(echo "$final"|cut -d/ -f3)"
+            [ "$http" = 200 ] || { echo "FOTO_NO_200 $id"; exit 1; }
+            [[ "$mime" == image/* ]] || { echo "FOTO_NO_IMAGEN $id"; exit 1; }
+            [ "$(wc -c < "/tmp/saber-foto-$id")" -gt 800 ] || { echo "FOTO_VACIA $id"; exit 1; }
+          done
+          echo "CATALOGO_FOTOS_DRIVE_HTTP_200_OK"
       - name: Compilar Worker documental que ya está operativo
         working-directory: integraciones/autocotizador/recepcion
         run: |
