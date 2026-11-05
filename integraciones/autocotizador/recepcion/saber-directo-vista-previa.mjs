@@ -14,7 +14,7 @@ export function prepararVistaDisenoPrivada(html,{ofertas=false}={}){
   .replaceAll('href="ofertas.html','href="'+OFFERS)
   .replaceAll('href="index.html#','href="'+HOME+'#')
   .replaceAll('href="index.html"','href="'+HOME+'"')
-  .replace('(<title>','(<title>');
+  .replace(/<meta name="referrer"[^>]*>/i,'<meta name="referrer" content="no-referrer">');
  // El aviso no tapa el menú y evita confundir el catálogo histórico con cobro operativo.
  const notice='<div id="saber-preview-banner" role="status" style="position:relative;z-index:99;background:#0A3158;color:#fff;padding:11px 15px;text-align:center;font:700 13px/1.4 system-ui,sans-serif">VISTA PREVIA PRIVADA DE DISEÑO · Los pedidos y mensajes están desactivados.</div>';
  const clickGuard=`<script>

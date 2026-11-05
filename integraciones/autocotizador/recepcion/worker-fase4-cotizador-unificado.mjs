@@ -1890,7 +1890,7 @@ async function v2PrivateBrowserResponse(request,env,path){
    return new Response(prepararVistaDisenoPrivada(ofertas?ofertasSaberDirectoHtml:portadaSaberDirectoHtml,{ofertas}),{
     status:200,headers:{
      ...headers,'Content-Type':'text/html; charset=utf-8',
-     'Content-Security-Policy':"default-src 'self' https: data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+     'Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src https: data:; connect-src 'self' https:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
     }
    });
   }

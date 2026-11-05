@@ -36,4 +36,6 @@ test('las dos rutas dependen de la compuerta Basic o sesión privada existente',
  assert.match(worker,/if\(status==='off'\)return testResponse/);
  assert.match(worker,/prepararVistaDisenoPrivada\(ofertas\?ofertasSaberDirectoHtml:portadaSaberDirectoHtml/);
  assert.match(worker,/Content-Security-Policy/);
+ assert.match(worker,/style-src 'unsafe-inline'/);
+ assert.match(worker,/form-action 'none'/);
 });

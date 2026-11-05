@@ -1,0 +1,6 @@
+SABER_DIRECTO_PREVIEW_V1_2026_11_05
+SOURCE_COMMIT=2311d69484a1b5339a39a9b1b8f21fc2d96ba8fb
+TARGET=existing-worker-saber-documentos-pruebas
+PATH=/prueba-v2/diseno-saber-directo
+ROLLBACK=automatic
+PAYMENTS=disabled-commercial

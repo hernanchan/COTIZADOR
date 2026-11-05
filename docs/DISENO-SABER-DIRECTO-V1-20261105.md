@@ -57,3 +57,9 @@ Archivo: `vidriera/index.html`.
 - Importa el HTML de portada y ofertas del repositorio, sin copiar una segunda versión divergiendo.
 - Sustituye enlaces locales a cotizador por `/prueba-v2/` (ensayo protegido), y al catálogo de ofertas por ruta protegida de pruebas. Bloquea clics hacia envío WhatsApp y consultas externas desde las vistas de diseño; no toca motor de cotización ni datos de pedidos. Muestra banner de «Vista previa privada». Mantiene la carga CSV pública de productos como en portada histórica.
 - Estado: **código**, pendiente de CI, despliegue privado y verificación real por HTTP. No confundir con disponibilidad pública.
+
+## 7. Activación de la vista protegida solicitada por el titular
+- Workflow exclusivo `.github/workflows/saber-directo-preview-privado.yml`, disparado sólo por `docs/ACTIVAR-SABER-DIRECTO-VISTA-PRIVADA.trigger`. Compila el Worker documental existente, hereda estrictamente sus configuraciones, instala únicamente nueva versión de ensayo, verifica antes/después y revierte ante fallos. No crea Worker ni altera `main`.
+- Rutas: `https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/diseno-saber-directo` y `.../ofertas.html`. Requiere Basic privado o sesión móvil V2. El diseño es solo demostración: consulta de productos pública, sin pedidos ni mensajes enviados desde el prototipo.
+- En este paso se corrigió CSP para permitir estilos y scripts inline heredados del HTML, preservando `object-src 'none'`, `form-action 'none'`, `base-uri 'none'`.
+- **Estado de despliegue:** pendiente de inspeccionar resultado específico del workflow; la existencia de este archivo no prueba éxito.

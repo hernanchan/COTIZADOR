@@ -1,0 +1,121 @@
+name: Saber Directo - activar portada privada sin tocar web pública
+on:
+  push:
+    branches:
+      - integracion/tus-pedido-privado-20261101
+    paths:
+      - docs/ACTIVAR-SABER-DIRECTO-VISTA-PRIVADA.trigger
+
+permissions:
+  contents: read
+
+concurrency:
+  group: saber-documentos-pruebas-deploy-vista-20261105
+  cancel-in-progress: false
+
+jobs:
+  activar-vista:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Pruebas de regresión y visuales estáticas
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.25.12
+          node --test tests/saber-directo-portada.test.mjs tests/saber-directo-preview.test.mjs tests/tus-pagos-prepublicacion-bloqueados.test.mjs tests/tus-carga-recursos-privados.test.mjs tests/tus-central-tablero-click-real.test.mjs tests/tus-pago-estado-automatico-ui.test.mjs
+      - name: Compilar Worker documental que ya está operativo
+        working-directory: integraciones/autocotizador/recepcion
+        run: |
+          set -euo pipefail
+          npm install --no-audit --no-fund
+          npm run build:unificado
+          node --check dist/saber-documentos-cotizador-fase4.mjs
+          for marker in 'VISTA PREVIA PRIVADA DE DISEÑO' '/prueba-v2/diseno-saber-directo' 'id="smart"' 'send-all-pdf' 'ensayo-tus-iniciar'; do
+            grep -Fq "$marker" dist/saber-documentos-cotizador-fase4.mjs || { echo "FALTA_CÓDIGO_PROTEGIDO"; exit 1; }
+          done
+          echo "VISTA_PRIVADA_COMPILADA_CON_RUTAS_ANTERIORES"
+      - name: Desplegar solo Worker de DOCUMENTOS PRUEBAS, con rollback automático
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+          PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN" && test -n "$PASSWORD"
+          worker=saber-documentos-pruebas
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/$worker"
+          origin="https://saber-documentos-pruebas.libreriasaber.workers.dev"
+          auth="Authorization: Bearer $TOKEN"
+          workdir=$(mktemp -d)
+          activated=0
+          finished=0
+          previous=""
+          rollback() {
+            if [ "$activated" = 1 ] && [ "$finished" != 1 ] && [ -n "$previous" ]; then
+              echo "ROLLBACK_REQUIRED"
+              jq -n --arg v "$previous" '{strategy:"percentage",versions:[{percentage:100,version_id:$v}],annotations:{"workers/message":"Saber Directo: reversión automática por falla de verificación de portada privada"}}' > "$workdir/rollback.json"
+              curl --silent --show-error --max-time 55 -H "$auth" -H 'Content-Type: application/json' --data-binary "@$workdir/rollback.json" "$root/deployments" > "$workdir/rollback-response.json" || true
+              jq -e '.success==true' "$workdir/rollback-response.json" >/dev/null 2>&1 && echo "ROLLBACK_ACCEPTED" || echo "ROLLBACK_FAILED_REVIEW_REQUIRED"
+            fi
+          }
+          cleanup(){ code=$?; if [ "$code" != 0 ]; then rollback; fi; rm -rf "$workdir"; }
+          trap cleanup EXIT
+          curl --fail --silent --show-error --max-time 30 -H "$auth" "$root/settings" > "$workdir/settings.json"
+          jq -e '.success == true and (.result.bindings|type=="array")' "$workdir/settings.json" >/dev/null
+          for name in SABER_CENTRAL DOCS_V2_PRIVATE_UI_SECRET CENTRAL_BRIDGE_KEY DOCS_RELAY_KEY; do
+            jq -e --arg name "$name" '.result.bindings|any(.name==$name)' "$workdir/settings.json" >/dev/null
+          done
+          jq -e '.result.bindings|any(.name=="DOCS_V2_PRIVATE_UI_ENABLED" and .type=="plain_text" and .text=="PRIVATE_TEST_ONLY")' "$workdir/settings.json" >/dev/null
+          curl --fail --silent --show-error --max-time 30 -H "$auth" "$root/deployments" > "$workdir/before.json"
+          jq -e '.success==true' "$workdir/before.json" >/dev/null
+          previous=$(jq -r '.result.deployments[0].versions[]?|select(.percentage==100)|.version_id' "$workdir/before.json")
+          [[ "$previous" =~ ^[0-9a-f-]{36}$ ]] || { echo 'NO_BASELINE_UNAMBIGUOUS'; exit 1; }
+          # Mantener íntegros flags, secretos, service bindings y precios existentes.
+          jq -n --slurpfile settings "$workdir/settings.json" --arg sha "$GITHUB_SHA" '{main_module:"index.mjs",annotations:{"workers/message":"Saber Directo solo vista protegida, sin cambios de precios, pagos o D1","workers/commit_sha":$sha},bindings:[$settings[0].result.bindings[]|{name,type:"inherit"}]}' > "$workdir/metadata.json"
+          curl --fail --silent --show-error --max-time 90 -H "$auth" -F "metadata=@$workdir/metadata.json;type=application/json" -F "index.mjs=@integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs;filename=index.mjs;type=application/javascript+module" "$root/versions?bindings_inherit=strict" > "$workdir/version.json"
+          jq -e '.success==true and (.result.id|type=="string")' "$workdir/version.json" >/dev/null
+          target=$(jq -r '.result.id' "$workdir/version.json")
+          jq -n --arg v "$target" '{strategy:"percentage",versions:[{percentage:100,version_id:$v}],annotations:{"workers/message":"Saber Directo: vista previa privada solamente"}}' > "$workdir/deploy.json"
+          curl --fail --silent --show-error --max-time 60 -H "$auth" -H 'Content-Type: application/json' --data-binary "@$workdir/deploy.json" "$root/deployments" > "$workdir/deploy-result.json"
+          activated=1
+          jq -e '.success==true' "$workdir/deploy-result.json" >/dev/null
+          active=""
+          for attempt in 1 2 3 4 5 6 7 8; do
+            curl --fail --silent --show-error --max-time 20 -H "$auth" "$root/deployments" > "$workdir/after.json"
+            active=$(jq -r '.result.deployments[0].versions[]?|select(.percentage==100)|.version_id' "$workdir/after.json" | head -n1)
+            [ "$active" = "$target" ] && break
+            sleep 2
+          done
+          [ "$active" = "$target" ] || { echo "DEPLOY_ACTIVE_VERSION_UNVERIFIED"; exit 1; }
+          for route in /prueba-v2/ /prueba-v2/diseno-saber-directo /prueba-v2/diseno-saber-directo/ofertas.html; do
+            code=$(curl --silent --show-error --max-time 25 -o "$workdir/anon" -w '%{http_code}' "$origin$route")
+            [ "$code" = 401 ] || { echo "PRIVATE_ROUTE_ANON_ACCESS_NOT_401 $route $code"; exit 1; }
+          done
+          echo "BASIC_GUARD_ALL_THREE_ROUTES_401"
+          code=$(curl --silent --show-error --max-time 30 --user "operador:$PASSWORD" -o "$workdir/preview.html" -w '%{http_code}' "$origin/prueba-v2/diseno-saber-directo")
+          [ "$code" = 200 ] || { echo "PREVIEW_AUTH_FAILED $code"; exit 1; }
+          for marker in 'VISTA PREVIA PRIVADA DE DISEÑO' 'class="hero hero-direct"' 'id="promoTitle"' 'href="/prueba-v2/"'; do
+            grep -Fq "$marker" "$workdir/preview.html" || { echo "PREVIEW_MARKER_MISSING"; exit 1; }
+          done
+          grep -Fq "style-src 'unsafe-inline'" "$workdir/preview.html" && { echo "CSP_EXPOSED_IN_HTML"; exit 1; } || true
+          code=$(curl --silent --show-error --max-time 30 --user "operador:$PASSWORD" -o "$workdir/offers.html" -w '%{http_code}' "$origin/prueba-v2/diseno-saber-directo/ofertas.html")
+          [ "$code" = 200 ] && grep -Fq 'VISTA PREVIA PRIVADA DE DISEÑO' "$workdir/offers.html" || { echo "OFFERS_VIEW_FAILED"; exit 1; }
+          code=$(curl --silent --show-error --max-time 30 --user "operador:$PASSWORD" -o "$workdir/cotizador.html" -w '%{http_code}' "$origin/prueba-v2/")
+          [ "$code" = 200 ] && grep -Fq 'id="smart"' "$workdir/cotizador.html" && grep -Fq 'send-all-pdf' "$workdir/cotizador.html" || { echo "COTIZADOR_REGRESSION"; exit 1; }
+          # Verificación final sin escribir pedidos, PDFs, precios ni datos.
+          curl --fail --silent --show-error --max-time 30 -H "$auth" "$root/settings" > "$workdir/settings-after.json"
+          jq -r '.result.bindings[]|[.name,.type]|@tsv' "$workdir/settings.json" | sort > "$workdir/before-bindings.txt"
+          jq -r '.result.bindings[]|[.name,.type]|@tsv' "$workdir/settings-after.json" | sort > "$workdir/after-bindings.txt"
+          diff -q "$workdir/before-bindings.txt" "$workdir/after-bindings.txt" >/dev/null || { echo "BINDINGS_CHANGED_UNEXPECTEDLY"; exit 1; }
+          finished=1
+          echo "SABER_DIRECTO_PREVIEW_PROTECTED_LIVE_OK"
+          echo "ACTIVE_VERSION=$target"
+          echo "NO_MAIN_NO_PAGOS_NO_D1_WRITES_NO_PUBLIC_SITE_NO_NEW_SERVICE"
