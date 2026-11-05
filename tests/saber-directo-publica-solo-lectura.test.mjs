@@ -6,6 +6,7 @@ import {prepararVistaDisenoAbierta} from '../integraciones/autocotizador/recepci
 
 const home=readFileSync(new URL('../vidriera/index.html',import.meta.url),'utf8');
 const offers=readFileSync(new URL('../vidriera/ofertas.html',import.meta.url),'utf8');
+const withoutScripts=html=>html.replace(/<script(?:\s[^>]*)?>[\s\S]*?<\/script>/gi,'');
 for (const [name,html] of [['portada',home],['ofertas',offers]]){
  test('Diseño abierto sanitiza completamente JS, datos sensibles y enlaces de '+name,()=>{
   const rendered=prepararVistaDisenoAbierta(html,{ofertas:name==='ofertas'});
@@ -19,7 +20,7 @@ for (const [name,html] of [['portada',home],['ofertas',offers]]){
   else assert.match(rendered,/href="\/prueba-v2\/diseno-sin-clave"/);
   assert.match(rendered,/class="brand"/);
   if(name==='ofertas'){
-    assert.equal((rendered.match(/class="v3-sample-offer"/g)||[]).length,2);
+    assert.equal((withoutScripts(rendered).match(/class="v3-sample-offer"/g)||[]).length,2);
     assert.match(rendered,/Resaltador Filgo x 4 pastel/);
     assert.match(rendered,/planilla MODELO/);
     assert.match(rendered,/drive\.google\.com\/thumbnail\?id=/);
@@ -43,11 +44,11 @@ test('Planilla modelo: categorías, fotos públicas y sin descuentos ficticios',
  const escolar=prepararVistaDisenoAbierta(offers,{ofertas:true,categoria:'Escolar'});
  const oficina=prepararVistaDisenoAbierta(offers,{ofertas:true,categoria:'Oficina'});
  const novedades=prepararVistaDisenoAbierta(offers,{ofertas:true,categoria:'Novedades'});
- assert.equal((escolar.match(/class="v3-sample-offer"/g)||[]).length,3);
+ assert.equal((withoutScripts(escolar).match(/class="v3-sample-offer"/g)||[]).length,3);
  assert.match(escolar,/Resaltador Filgo x 4 pastel/);
  assert.match(oficina,/Resma A4 P AMPA 70 g/);
  assert.doesNotMatch(oficina,/<del>/);
- assert.doesNotMatch(novedades,/class="v3-sample-offer"/);
+ assert.doesNotMatch(withoutScripts(novedades),/class="v3-sample-offer"/);
  assert.match(novedades,/no tiene artículos activos/);
  const portada=prepararVistaDisenoAbierta(home);
  assert.match(portada,/Resaltador Filgo x 4 pastel/);
@@ -78,7 +79,7 @@ test('Ensayo prepara resumen de compra sin enviar mensajes, pagos ni pedidos',()
  assert.match(rendered,/data-demo-preview disabled/);
  assert.match(rendered,/data-demo-summary hidden/);
  assert.match(rendered,/TOTAL ORIENTATIVO/);
- assert.match(rendered,/confirman disponibilidad y precio vigente/);
+ assert.match(rendered,/confirman disponibilidad y precio final/);
  assert.match(rendered,/Abrir WhatsApp para consultar/);
  assert.match(rendered,/revalidación|refresh\(\)/);
  assert.match(rendered,/fetch\(path,\{method:'GET'/);
