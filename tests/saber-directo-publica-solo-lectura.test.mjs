@@ -18,9 +18,10 @@ for (const [name,html] of [['portada',home],['ofertas',offers]]){
   else assert.match(rendered,/href="\/prueba-v2\/diseno-sin-clave"/);
   assert.match(rendered,/class="brand"/);
   if(name==='ofertas'){
-    assert.equal((rendered.match(/class="v3-sample-offer"/g)||[]).length,3);
-    assert.match(rendered,/FOTO ILUSTRATIVA · SIN PRECIO/);
-    assert.match(rendered,/src="https:\/\/images\.unsplash\.com\/photo-/);
+    assert.equal((rendered.match(/class="v3-sample-offer"/g)||[]).length,2);
+    assert.match(rendered,/Resaltador Filgo x 4 pastel/);
+    assert.match(rendered,/planilla MODELO/);
+    assert.match(rendered,/drive\.google\.com\/thumbnail\?id=/);
   }
   if(name==='portada')assert.match(rendered,/href="\/prueba-v2\/diseno-sin-clave\/ofertas\.html\?categoria=/);
   else assert.match(rendered,/href="\/prueba-v2\/diseno-sin-clave#categorias"/);
@@ -32,4 +33,21 @@ test('Solo dos rutas públicas y CSP impide lecturas a APIs',()=>{
  assert.match(workerSrc,/connect-src 'none'/);
  assert.match(workerSrc,/form-action 'none'/);
  assert.match(workerSrc,/page==='\/prueba-v2\/'\|\|page==='\/prueba-v2\/orden-paquete'/);
+});
+
+test('Planilla modelo: categorías, fotos públicas y sin descuentos ficticios',()=>{
+ const escolar=prepararVistaDisenoAbierta(offers,{ofertas:true,categoria:'Escolar'});
+ const oficina=prepararVistaDisenoAbierta(offers,{ofertas:true,categoria:'Oficina'});
+ const novedades=prepararVistaDisenoAbierta(offers,{ofertas:true,categoria:'Novedades'});
+ assert.equal((escolar.match(/class="v3-sample-offer"/g)||[]).length,3);
+ assert.match(escolar,/Resaltador Filgo x 4 pastel/);
+ assert.match(oficina,/Resma A4 P AMPA 70 g/);
+ assert.doesNotMatch(oficina,/<del>/);
+ assert.doesNotMatch(novedades,/class="v3-sample-offer"/);
+ assert.match(novedades,/no tiene artículos activos/);
+ const portada=prepararVistaDisenoAbierta(home);
+ assert.match(portada,/Resaltador Filgo x 4 pastel/);
+ assert.match(portada,/Resma A4 P AMPA 70 g/);
+ assert.doesNotMatch(portada,/Kit Sharpie Lettering/);
+ assert.doesNotMatch(portada,/sendWhatsApp|productsCsvUrl|libreriasaber\.mp/);
 });

@@ -2023,7 +2023,7 @@ export default {
       if(request.method!=='GET')return new Response('Solo consulta',{status:405,headers:{'Allow':'GET','Cache-Control':'no-store'}});
       const ofertas=page.endsWith('/ofertas.html');
       try{
-        const html=prepararVistaDisenoAbierta(ofertas?ofertasSaberDirectoHtml:portadaSaberDirectoHtml,{ofertas});
+        const html=prepararVistaDisenoAbierta(ofertas?ofertasSaberDirectoHtml:portadaSaberDirectoHtml,{ofertas,categoria:new URL(request.url).searchParams.get('categoria')||''});
         return new Response(html,{status:200,headers:{
           'Content-Type':'text/html; charset=utf-8',
           'Cache-Control':'no-store, max-age=0',
