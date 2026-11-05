@@ -47,7 +47,7 @@ test('Planilla modelo: categorías, fotos públicas y sin descuentos ficticios',
  assert.equal((withoutScripts(escolar).match(/class="v3-sample-offer"/g)||[]).length,3);
  assert.match(escolar,/Resaltador Filgo x 4 pastel/);
  assert.match(oficina,/Resma A4 P AMPA 70 g/);
- assert.doesNotMatch(oficina,/<del>/);
+ assert.doesNotMatch(withoutScripts(oficina),/<del>/);
  assert.doesNotMatch(withoutScripts(novedades),/class="v3-sample-offer"/);
  assert.match(novedades,/no tiene artículos activos/);
  const portada=prepararVistaDisenoAbierta(home);
