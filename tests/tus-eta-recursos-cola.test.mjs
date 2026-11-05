@@ -83,9 +83,9 @@ test('no se inventan minutos por orden o recurso; fecha solo con agenda',()=>{
  assert.doesNotMatch(customer,/etaOperatingFinish/);
  assert.match(customer,/deliveryPlanForCustomer/);
  assert.match(source,/if\(manual\.ready_at\)estimate=\{type:"manual"/);
- const customer=vm.runInContext('clientTrackingHtml',ctx);
- assert.doesNotMatch(customer,/DEMO_ADMIN_KEY|manifest_json|telefonoContacto|CENTRAL_BRIDGE_KEY/);
- const script=customer.slice(customer.indexOf('<script>')+8,customer.indexOf('</script>'));
+ const customerHtml=vm.runInContext('clientTrackingHtml',ctx);
+ assert.doesNotMatch(customerHtml,/DEMO_ADMIN_KEY|manifest_json|telefonoContacto|CENTRAL_BRIDGE_KEY/);
+ const script=customerHtml.slice(customerHtml.indexOf('<script>')+8,customerHtml.indexOf('</script>'));
  new vm.Script(script);
- assert.match(script,/resourceStatus/);
+ assert.match(script,/deliveryPlan/);
 });
