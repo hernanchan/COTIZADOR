@@ -1739,7 +1739,7 @@ async function v2SessionMac(secret,timestamp){
 }
 async function v2SessionCookie(env,path='/api/ensayo-preparar-documentos-v2-lote'){
  if(!['/api/ensayo-preparar-documentos-v2-lote','/api/ensayo-tus-',
-  '/prueba-v2/api/','/api/ensayo-materiales-rapido','/api/ensayo-carga-unica'].includes(path))
+  '/prueba-v2/api/','/prueba-v2/','/api/ensayo-materiales-rapido','/api/ensayo-carga-unica'].includes(path))
   throw Error('Ruta de cookie privada no autorizada.');
  const timestamp=Math.floor(Date.now()/1000);
  return V2_SESSION_COOKIE+'='+timestamp+'.'+
@@ -1787,11 +1787,91 @@ async function probeTarifarioD1SoloOperador(request,env){
    privateProbe:true,paymentAuthorized:false,commercialPublication:false},503);
  }
 }
+
+/** Ingreso desde la Central: no se transmite la clave Basic ni se revela el ticket
+ * en una URL HTTP. El fragmento se borra antes del intercambio POST mismo origen.
+ * El uso único se consume mediante un Service Binding y firma HMAC entre Workers.
+ */
+const v2MobileInviteHtml=String.raw`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow"><title>Ingreso privado móvil · Librería Saber</title><style>body{font:16px system-ui;background:#f3f6fa;color:#173d62;padding:24px;margin:0}main{max-width:440px;margin:10vh auto;background:white;border-radius:16px;padding:25px;box-shadow:0 6px 22px #163d6220}h1{font-size:1.4rem}p{line-height:1.5}</style></head><body><main><h1>Librería Saber</h1><p id="status" role="status">Validando acceso privado…</p><p>Esta autorización permite ingresar al cotizador de pruebas durante una sesión corta. No habilita cobros reales.</p></main><script>
+(async()=>{
+ const status=document.getElementById("status");
+ const params=new URLSearchParams(location.hash.slice(1));
+ const ticket=params.get("ticket")||"";
+ history.replaceState(null,"","/prueba-v2/ingresar");
+ if(!/^[a-f0-9-]{36}\.[a-f0-9-]{36}$/i.test(ticket)){
+  status.textContent="El enlace está incompleto. Generá otro desde la Central.";return;
+ }
+ try{
+  const r=await fetch("/prueba-v2/ingresar",{method:"POST",headers:{"Content-Type":"application/json"},
+   credentials:"same-origin",cache:"no-store",body:JSON.stringify({ticket})});
+  const d=await r.json();
+  if(!r.ok||d.ok!==true)throw Error("El enlace ya fue utilizado o venció. Generá uno nuevo desde la Central.");
+  status.textContent="Ingreso autorizado. Abriendo cotizador…";
+  location.replace("/prueba-v2/");
+ }catch(e){status.textContent=e.message||"No se pudo validar el acceso."}
+})();
+</script></body></html>`;
+async function v2MobileInviteExchange(request,env){
+ if(env?.DOCS_V2_PRIVATE_UI_ENABLED!=='PRIVATE_TEST_ONLY'||
+    typeof env.DOCS_V2_PRIVATE_UI_SECRET!=='string'||
+    !/^[A-Za-z0-9_-]{32,128}$/.test(env.DOCS_V2_PRIVATE_UI_SECRET)||
+    typeof env.CENTRAL_BRIDGE_KEY!=='string'||env.CENTRAL_BRIDGE_KEY.length<32||
+    typeof env.SABER_CENTRAL?.fetch!=='function')
+  return testResponse({ok:false,error:'Acceso privado no disponible'},503);
+ if(request.method==='GET')
+  return new Response(v2MobileInviteHtml,{status:200,headers:{
+   'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store, private',
+   'Referrer-Policy':'no-referrer','X-Robots-Tag':'noindex,nofollow',
+   'Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+  }});
+ if(request.method!=='POST')return closed();
+ const origin=new URL(request.url).origin;
+ if(request.headers.get('Origin')!==origin||
+    request.headers.get('Sec-Fetch-Site')&&!['same-origin','none'].includes(request.headers.get('Sec-Fetch-Site'))||
+    !/^application\/json(?:;|$)/i.test(request.headers.get('Content-Type')||''))
+  return testResponse({ok:false,error:'Origen o formato no admitido'},403);
+ const raw=await request.text();if(raw.length>180)return closed();
+ let payload;try{payload=JSON.parse(raw)}catch{return closed()}
+ if(!payload||typeof payload!=='object'||Array.isArray(payload)||
+    Object.keys(payload).join(',')!=='ticket'||
+    typeof payload.ticket!=='string'||
+    !/^[a-f0-9-]{36}\.[a-f0-9-]{36}$/i.test(payload.ticket))
+  return testResponse({ok:false,error:'Enlace no válido'},400);
+ const bytes=new Uint8Array(await crypto.subtle.digest('SHA-256',
+  new TextEncoder().encode(payload.ticket)));
+ const digest=Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
+ const content=JSON.stringify({schema:'saber-private-mobile-redeem-v1',tokenHash:digest});
+ const ts=String(Math.floor(Date.now()/1000)),id=crypto.randomUUID();
+ const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(env.CENTRAL_BRIDGE_KEY),
+  {name:'HMAC',hash:'SHA-256'},false,['sign']);
+ const signature=Array.from(new Uint8Array(await crypto.subtle.sign('HMAC',key,
+  new TextEncoder().encode(ts+'\n'+id+'\n'+content))),
+  b=>b.toString(16).padStart(2,'0')).join('');
+ let r;
+ try{
+  r=await env.SABER_CENTRAL.fetch(new Request(
+   'https://saber-pagos-pruebas.libreriasaber.workers.dev/internal/central/mobile-invite-redeem',{
+   method:'POST',headers:{'Content-Type':'application/json','x-saber-ts':ts,
+    'x-saber-request-id':id,'x-saber-signature':signature},body:content
+  }));
+ }catch{return testResponse({ok:false,error:'La Central no pudo validar el acceso'},503)}
+ if(!r.ok)return testResponse({ok:false,error:'Enlace vencido o ya utilizado'},403);
+ let confirmation;try{confirmation=await r.json()}catch{return closed()}
+ if(confirmation?.ok!==true||confirmation?.consumed!==true)return closed();
+ const headers=new Headers({'Content-Type':'application/json; charset=utf-8',
+  'Cache-Control':'no-store, private','Referrer-Policy':'no-referrer'});
+ headers.append('Set-Cookie',await v2SessionCookie(env,'/prueba-v2/'));
+ return new Response(JSON.stringify({ok:true,expiresInSeconds:1800}),{headers});
+}
+
 async function v2PrivateBrowserResponse(request,env,path){
  if(request.method!=='GET')return closed();
  const status=v2PrivateBrowserAuthorized(request,env);
  if(status==='off')return testResponse({ok:false,error:'Ensayo privado deshabilitado'},503);
- if(status==='deny')return new Response('Autenticación privada requerida',{
+ const allowMobile=path!=='/prueba-v2/orden-paquete'&&
+  path!=='/prueba-v2/personal-descargar'&&
+  status==='deny'&&await v2SessionAuthorized(request,env);
+ if(status==='deny'&&!allowMobile)return new Response('Autenticación privada requerida',{
   status:401,headers:{'WWW-Authenticate':'Basic realm="Saber V2 Ensayo Privado", charset="UTF-8"',
    'Cache-Control':'no-store,private','X-Robots-Tag':'noindex,nofollow',
    'X-Content-Type-Options':'nosniff'}
@@ -1924,6 +2004,7 @@ async function v2PrivateBrowserResponse(request,env,path){
 export default {
   async fetch(request, env, ctx) {
     const page=new URL(request.url).pathname;
+    if(page==='/prueba-v2/ingresar')return v2MobileInviteExchange(request,env);
     if(page==='/prueba-v2/admin-tarifario-ensayo')
       return probeTarifarioD1SoloOperador(request,env);
     if(page==='/prueba-v2/'||page==='/prueba-v2/orden-paquete'||page==='/prueba-v2/personal-descargar'||page==='/prueba-v2/cotizador'||
