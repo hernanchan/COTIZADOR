@@ -2026,7 +2026,7 @@ async function centralAdminDetail(env,id){
   trabajos:document.trabajos,pdfFinalVerificado:false,listoParaProducir:false};
 }
 
-const clientTrackingHtml = "<!doctype html><html lang=\"es\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta name=\"robots\" content=\"noindex,nofollow\"><meta name=\"referrer\" content=\"no-referrer\"><title>Mi pedido | Librería Saber</title><style>body{font:16px system-ui;color:#163d62;background:#f4f7fa;margin:0 auto;padding:clamp(12px,3vw,24px);max-width:560px;box-sizing:border-box}main{padding:22px;background:white;border-radius:12px}h1{font-size:1.4rem}li{padding:8px}li.active{color:#175ba4;font-weight:700}p{line-height:1.5}#eta{background:#edf5fc;padding:15px;border-radius:9px}</style></head><body><main><h1>Librería Saber · Mi pedido</h1><p id=\"order\">Consultando…</p><h2 id=\"stage\">Cargando estado…</h2><ol id=\"steps\"></ol><p id=\"eta\">Demora por confirmar.</p><p id=\"message\">Actualización automática cada 30 segundos.</p><small>Ensayo privado. El tiempo es orientativo y corresponde a preparación, no a envío a domicilio.</small></main><script>\nconst token=new URLSearchParams(location.search).get(\"token\")||\"\",el=id=>document.getElementById(id);\nconst labels=[\"Pedido recibido\",\"Pago confirmado\",\"En preparación\",\"Listo para retirar\",\"Entregado\"];\nfunction render(d){\n el(\"order\").textContent=d.orderNumber?\"Orden N.º \"+d.orderNumber:\"Orden en consulta\";\n el(\"stage\").textContent=d.phase||\"Sin estado\";\n const progress=d.payment!==\"pagado\"?0:({pendiente:1,en_preparacion:2,en_espera:2,listo:3,entregado:4})[d.stage]||1;\n el(\"steps\").replaceChildren();\n labels.forEach((txt,i)=>{const li=document.createElement(\"li\");li.textContent=txt;if(i===progress)li.className=\"active\";el(\"steps\").append(li)});\n if(d.payment!==\"pagado\"){el(\"eta\").textContent=\"Esperando pago verificado. La producción aún no comienza.\";return}\n if(d.stage===\"listo\"||d.stage===\"entregado\"){el(\"eta\").textContent=\"Pedido \"+(d.stage===\"listo\"?\"listo para retirar.\":\"entregado.\");return}\n if(d.stage===\"en_espera\"){el(\"eta\").textContent=\"Trabajo en espera. El plazo puede cambiar.\";return}\n const x=d.estimate;if(x?.type===\"manual\"){\n const fecha=new Intl.DateTimeFormat(\"es-AR\",{timeZone:\"America/Argentina/Cordoba\",day:\"2-digit\",month:\"2-digit\",hour:\"2-digit\",minute:\"2-digit\"}).format(new Date(x.readyAt));\n el(\"eta\").textContent=\"Preparación estimada: \"+fecha+\" hs (provisional).\";\n }else if(x?.type===\"habitual\"){if(x.requiresReview){el(\"eta\").textContent=x.resourceStatus===\"incomplete\"?\"La orden necesita revisión de las instrucciones antes de estimar el retiro.\":x.resourceStatus===\"unknown_queue\"?\"La Central debe revisar la carga de trabajos antes de confirmar el retiro.\":\"Hay trabajos en cola o el plazo orientativo ya pasó. La Central confirmará el retiro.\";}else if(x.operatingReadyAt){const fecha=new Intl.DateTimeFormat(\"es-AR\",{timeZone:\"America/Argentina/Cordoba\",day:\"2-digit\",month:\"2-digit\",hour:\"2-digit\",minute:\"2-digit\"}).format(new Date(x.operatingReadyAt));el(\"eta\").textContent=\"Preparación orientativa según horario: \"+fecha+\" hs. A confirmar por el local.\";}else{el(\"eta\").textContent=\"Demora habitual: \"+String(x.minutes/60).replace(\".\",\",\")+\" horas, retiro a confirmar. \"+(x.resourceStatus===\"unconfigured\"?\"Capacidad de impresión/anillado sin calibrar.\":x.calendarConfigured?\"Capacidad aún no comprobada.\":\"Horarios aún no configurados.\");}}\n else el(\"eta\").textContent=\"Plazo a confirmar según el trabajo.\";\n}\nlet busy=false;async function update(){\n if(busy)return;busy=true;try{\n if(!/^[a-f0-9-]{36}\\.[a-f0-9]{64}$/.test(token))throw Error(\"Enlace incompleto\");\n const r=await fetch(\"/seguimiento/api/estado?token=\"+encodeURIComponent(token),{cache:\"no-store\"});\n const d=await r.json();if(!r.ok||d.ok!==true)throw Error(\"Enlace no válido\");\n render(d);el(\"message\").textContent=\"Última actualización: \"+new Date().toLocaleTimeString(\"es-AR\");\n }catch(e){el(\"stage\").textContent=\"Seguimiento no disponible\";el(\"message\").textContent=e.message}finally{busy=false}}\nvoid update();setInterval(()=>{if(!document.hidden)void update()},30000);\ndocument.addEventListener(\"visibilitychange\",()=>{if(!document.hidden)void update()});\n</script></body></html>";
+const clientTrackingHtml = "<!doctype html><html lang=\"es\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta name=\"robots\" content=\"noindex,nofollow\"><meta name=\"referrer\" content=\"no-referrer\"><title>Mi pedido | Librería Saber</title><style>body{font:16px system-ui;color:#163d62;background:#f4f7fa;margin:0 auto;padding:clamp(12px,3vw,24px);max-width:560px;box-sizing:border-box}main{padding:22px;background:white;border-radius:12px}h1{font-size:1.4rem}li{padding:8px}li.active{color:#175ba4;font-weight:700}p{line-height:1.5}#eta{background:#edf5fc;padding:15px;border-radius:9px}</style></head><body><main><h1>Librería Saber · Mi pedido</h1><p id=\"order\">Consultando…</p><h2 id=\"stage\">Cargando estado…</h2><ol id=\"steps\"></ol><p id=\"eta\">Demora por confirmar.</p><p id=\"message\">Actualización automática cada 30 segundos.</p><small>Ensayo privado. El tiempo es orientativo y corresponde a preparación, no a envío a domicilio.</small></main><script>\nconst token=new URLSearchParams(location.search).get(\"token\")||\"\",el=id=>document.getElementById(id);\nconst labels=[\"Pedido recibido\",\"Pago confirmado\",\"En preparación\",\"Listo para retirar\",\"Entregado\"];\nfunction render(d){\n el(\"order\").textContent=d.orderNumber?\"Orden N.º \"+d.orderNumber:\"Orden en consulta\";\n el(\"stage\").textContent=d.phase||\"Sin estado\";\n const progress=d.payment!==\"pagado\"?0:({pendiente:1,en_preparacion:2,en_espera:2,listo:3,entregado:4})[d.stage]||1;\n el(\"steps\").replaceChildren();\n labels.forEach((txt,i)=>{const li=document.createElement(\"li\");li.textContent=txt;if(i===progress)li.className=\"active\";el(\"steps\").append(li)});\n if(d.payment!==\"pagado\"){el(\"eta\").textContent=\"Esperando pago verificado. La producción aún no comienza.\";return}\n if(d.stage===\"listo\"||d.stage===\"entregado\"){el(\"eta\").textContent=\"Pedido \"+(d.stage===\"listo\"?\"listo para retirar.\":\"entregado.\");return}\n if(d.stage===\"en_espera\"){el(\"eta\").textContent=\"Trabajo en espera. El plazo puede cambiar.\";return}\n const x=d.estimate;if(x?.type===\"manual\"){\n const fecha=new Intl.DateTimeFormat(\"es-AR\",{timeZone:\"America/Argentina/Cordoba\",day:\"2-digit\",month:\"2-digit\",hour:\"2-digit\",minute:\"2-digit\"}).format(new Date(x.readyAt));\n el(\"eta\").textContent=\"Preparación estimada: \"+fecha+\" hs (provisional).\";\n }else if(d.stage===\"en_preparacion\"){el(\"eta\").textContent=\"Ya empezamos tu trabajo. En breve verás acá la hora estimada de retiro.\";}\n else if(d.stage===\"pendiente\"){\n  const planes={hoy:\"Prevemos que tu trabajo estará listo durante el día de hoy.\",hoy_tarde:\"Prevemos que estará listo hoy por la tarde.\",proximo_dia:\"Prevemos que estará listo el próximo día de atención.\",por_confirmar:\"Estamos organizando las entregas; pronto confirmaremos cuándo estará listo.\"};\n  el(\"eta\").textContent=(planes[d.deliveryPlan]||planes.por_confirmar)+\" Es orientativo. Seguí este pedido: cuando empecemos, indicaremos una hora estimada.\";\n }\n else el(\"eta\").textContent=\"Entrega a confirmar por la Central.\";\n}\nlet busy=false;async function update(){\n if(busy)return;busy=true;try{\n if(!/^[a-f0-9-]{36}\\.[a-f0-9]{64}$/.test(token))throw Error(\"Enlace incompleto\");\n const r=await fetch(\"/seguimiento/api/estado?token=\"+encodeURIComponent(token),{cache:\"no-store\"});\n const d=await r.json();if(!r.ok||d.ok!==true)throw Error(\"Enlace no válido\");\n render(d);el(\"message\").textContent=\"Última actualización: \"+new Date().toLocaleTimeString(\"es-AR\");\n }catch(e){el(\"stage\").textContent=\"Seguimiento no disponible\";el(\"message\").textContent=e.message}finally{busy=false}}\nvoid update();setInterval(()=>{if(!document.hidden)void update()},30000);\ndocument.addEventListener(\"visibilitychange\",()=>{if(!document.hidden)void update()});\n</script></body></html>";
 const adminHtml = `<!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title>Centro de Pedidos | Librería Saber · Pruebas</title>
@@ -2106,6 +2106,19 @@ body.price-only #priceAdminFieldset summary{font-size:1.3rem}
 <button id="mobileInviteCopy" class="outline" type="button">Copiar enlace</button></div></div>
 <p id="mobileInviteStatus" role="status" class="note" aria-live="polite"></p>
 <p id="cronState" class="note">Conciliación automática: sin consultar.</p></fieldset>
+<fieldset id="deliveryPlanPanel"><legend>Entrega general · mensaje al cliente después del pago</legend>
+<p class="note">Elegí la previsión vigente según los pedidos acumulados. Se comunica a pedidos pagos todavía pendientes y sin hora propia. Cambiarla actualiza su seguimiento; no modifica las órdenes ya listas. Una previsión de "hoy" deja de anunciarse después del cierre.</p>
+<div class="toolbar"><label>Previsión general
+<select id="deliveryPlanMode">
+<option value="por_confirmar">Entrega a confirmar</option>
+<option value="hoy">En el día de hoy</option>
+<option value="hoy_tarde">Hoy por la tarde</option>
+<option value="proximo_dia">Próximo día de atención</option>
+</select></label>
+<button id="deliveryPlanLoad" type="button" class="outline">Consultar previsión</button>
+<button id="deliveryPlanSave" type="button" disabled>Guardar previsión</button></div>
+<p id="deliveryPlanStatus" role="status" aria-live="polite" class="note">Consultá primero la previsión guardada.</p>
+</fieldset>
 <fieldset id="bankTransfersArea"><legend>Transferencias por verificar · <strong id="transferCount">0 pendientes</strong></legend><p class="note">Los pendientes se cargan solos y se actualizan cada 30 segundos. Comprobar el ingreso en el banco: un comprobante del cliente no acredita el pago. Operación limitada al ENSAYO privado.</p><p id="transferPanelStatus" class="transfer-feedback" role="status" aria-live="polite">Ingresá la clave privada para consultar las transferencias.</p><ol id="transferPending"></ol><button id="refreshTransfers" class="outline" type="button">Actualizar ahora</button></fieldset>
 <fieldset id="etaAdminArea"><legend>Demora orientativa · configuración</legend>
 <p class="note">Referencia inicial: 3 horas para impresiones habituales de hasta 400 páginas. La demora habitual no es el tiempo por pedido. Si la capacidad está ocupada, el plazo requiere revisión; no se agregan horas de manera artificial.</p>
@@ -2206,6 +2219,39 @@ body.price-only #priceAdminFieldset summary{font-size:1.3rem}
 
 <script>
 const secret=document.querySelector("#secret"),status=document.querySelector("#status"),orders=document.querySelector("#orders"),details=document.querySelector("#details");
+let deliveryPlanSnapshot=null;
+const deliveryPlanMode=document.querySelector("#deliveryPlanMode");
+const deliveryPlanSave=document.querySelector("#deliveryPlanSave");
+const deliveryPlanInfo=document.querySelector("#deliveryPlanStatus");
+async function loadDeliveryPlan(){
+ try{
+  const data=await api("/admin/api/central/delivery-plan");
+  deliveryPlanSnapshot=data.settings;
+  deliveryPlanMode.value=data.settings.mode;
+  deliveryPlanSave.disabled=false;
+  deliveryPlanInfo.textContent="Previsión vigente: "+deliveryPlanMode.selectedOptions[0].textContent+
+   " · revisión "+data.settings.revision+". Sin horario garantizado.";
+ }catch(e){deliveryPlanSnapshot=null;deliveryPlanSave.disabled=true;
+  deliveryPlanInfo.textContent="No se pudo consultar: "+String(e.message||e)}
+}
+document.querySelector("#deliveryPlanLoad").addEventListener("click",loadDeliveryPlan);
+deliveryPlanSave.addEventListener("click",async()=>{
+ if(!deliveryPlanSnapshot)return;
+ const operator=requestOperator();
+ if(!operator){deliveryPlanInfo.textContent="Indicá un responsable.";return}
+ if(deliveryPlanMode.value===deliveryPlanSnapshot.mode){
+  deliveryPlanInfo.textContent="La previsión no cambió.";return;
+ }
+ if(!confirm("¿Actualizar la previsión general? Cambiará el mensaje de los pedidos pagos que aún estén pendientes y no tengan hora individual."))return;
+ deliveryPlanSave.disabled=true;
+ try{
+  await apiPost("/admin/api/central/delivery-plan",{mode:deliveryPlanMode.value,
+   expectedRevision:deliveryPlanSnapshot.revision,operator,confirmed:true});
+  await loadDeliveryPlan();await refresh({silent:true,force:true});
+ }catch(e){deliveryPlanInfo.textContent="No se pudo guardar: "+String(e.message||e);
+  deliveryPlanSave.disabled=false}
+});
+
 let etaAdminSnapshot=null;
 const etaInfo=document.querySelector("#etaStatus");
 const etaHours=document.querySelector("#etaHours"),etaCapacity=document.querySelector("#etaCapacity");
@@ -2489,10 +2535,10 @@ function preparationTimeLocal(utc){
 }
 function renderPreparationEstimate(orderId,track,estimate){
  const area=node("section","");
- area.append(node("h4","Preparación estimada · hora de Córdoba"));
+ area.append(node("h4","Hora estimada para el cliente · Córdoba"));
  area.append(node("p",estimate.ready_at?
   "Horario provisional: "+preparationTimeLocal(estimate.ready_at):
-  "Todavía no se comunicó una hora estimada. No prometer plazos sin verificar."));
+  "Cuando comiences a preparar esta orden, indicá aquí la hora de retiro que considerás viable. El seguimiento se actualizará automáticamente."));
  if(estimate.operator)area.append(node("p","Último responsable: "+estimate.operator+
   " · "+(estimate.updated_at||"sin fecha")+
   (estimate.reason?" · Motivo: "+estimate.reason:"")));
@@ -2916,6 +2962,7 @@ async function moveCard(order,next,button){
   });
   await refresh({silent:true,force:true});
   status.textContent="Orden "+(order.work_number||"")+" → "+productionLabel(next)+" · cambio registrado.";
+  if(next==="en_preparacion")await showOrder(order.id);
  }catch(e){
   inform("No se pudo cambiar el estado: "+String(e.message||e));
  }finally{button.disabled=false}
