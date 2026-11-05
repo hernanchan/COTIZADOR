@@ -29,6 +29,7 @@ function scene({promptValue='Responsable del mostrador',failCode=null}={}){
  for(const id of ['secret','productionOperator','status','details','orders',
   'refreshExpress','refreshReceipts','refreshTransfers','refreshUnpaid','refresh',
   'etaStatus','etaHours','etaCapacity','etaLoad','etaSave',
+  'deliveryPlanMode','deliveryPlanSave','deliveryPlanLoad','deliveryPlanStatus',
   'etaCalendarStatus','etaCalendarLoad','etaCalendarSave','etaCalendarWeekdayDraft',
   'etaSamplesStatus','etaSamplesHistory','etaSampleType','etaSampleQuantity','etaSampleMinutes','etaSamplesLoad','etaSamplesSave',
   'mobileInviteCreate','mobileInviteCopy','mobileInviteArea','mobileInviteLink','mobileInviteStatus',

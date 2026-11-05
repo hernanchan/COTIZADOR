@@ -130,8 +130,8 @@ test('panel actualizado compila; sólo la cola calibrada puede habilitar fecha c
  assert.match(html,/cupo conjunto anterior/);
  assert.match(script,/expectedRevision:etaResourcesSnapshot.revision/);
  const customer=src.slice(src.indexOf('async function trackingCustomerStatus'),src.indexOf('async function centralAdminDetail'));
- assert.match(customer,/etaResourceQueueForOrder/);
- assert.match(customer,/base\.queueCalibrated=resources\.calibrated/);
- assert.match(customer,/operatingReadyAt=base\.queueCalibrated&&!base\.requiresReview&&calendar\.configured/);
+ assert.doesNotMatch(customer,/etaResourceQueueForOrder/);
+ assert.match(customer,/deliveryPlanForCustomer/);
+ assert.doesNotMatch(customer,/etaOperatingFinish/);
  assert.doesNotMatch(customer,/etaResourceLoad/);
 });

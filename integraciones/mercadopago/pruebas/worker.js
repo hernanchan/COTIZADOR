@@ -2928,7 +2928,7 @@ function boardCard(order){
    document.body.append(link);link.click();link.remove();
   });controls.append(zip);
  }
- const detail=node("button","Detalle");detail.className="outline";
+ const detail=node("button",current==="en_preparacion"?"Definir hora de entrega":"Detalle");detail.className="outline";
  detail.addEventListener("click",()=>showOrder(order.id));
  controls.append(detail);card.append(controls);
  const feedback=node("p","");feedback.className="board-feedback";
@@ -2962,7 +2962,7 @@ async function moveCard(order,next,button){
   });
   await refresh({silent:true,force:true});
   status.textContent="Orden "+(order.work_number||"")+" → "+productionLabel(next)+" · cambio registrado.";
-  if(next==="en_preparacion")await showOrder(order.id);
+  if(next==="en_preparacion")status.textContent+=" · Definí la hora de retiro desde el detalle del pedido.";
  }catch(e){
   inform("No se pudo cambiar el estado: "+String(e.message||e));
  }finally{button.disabled=false}

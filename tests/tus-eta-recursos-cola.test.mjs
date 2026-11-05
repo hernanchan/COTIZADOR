@@ -76,10 +76,12 @@ test('no se inventan minutos por orden o recurso; fecha solo con agenda',()=>{
  const calculate=vm.runInContext('etaForQueue',ctx);
  assert.equal(calculate({base_minutes:180,parallel_orders:4},0).minutes,180);
  assert.equal(calculate({base_minutes:180,parallel_orders:4},14).minutes,180);
- assert.match(source,/resources=await etaResourceQueueForOrder\(env,x\)/);
- assert.match(source,/base\.requiresReview=resources\.requiresReview/);
- assert.match(source,/base\.queueCalibrated=resources\.calibrated/);
- assert.match(source,/operatingReadyAt=base\.queueCalibrated&&!base\.requiresReview&&calendar\.configured/);
+ const customer=source.slice(source.indexOf('async function trackingCustomerStatus'),
+  source.indexOf('async function centralAdminDetail'));
+ assert.doesNotMatch(customer,/etaResourceQueueForOrder/);
+ assert.doesNotMatch(customer,/etaForQueue/);
+ assert.doesNotMatch(customer,/etaOperatingFinish/);
+ assert.match(customer,/deliveryPlanForCustomer/);
  assert.match(source,/if\(manual\.ready_at\)estimate=\{type:"manual"/);
  const customer=vm.runInContext('clientTrackingHtml',ctx);
  assert.doesNotMatch(customer,/DEMO_ADMIN_KEY|manifest_json|telefonoContacto|CENTRAL_BRIDGE_KEY/);

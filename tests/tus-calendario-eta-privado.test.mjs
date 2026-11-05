@@ -105,7 +105,7 @@ test('panel y vista móvil compilan con protección privada y sin datos sensible
  new vm.Script(script);new vm.Script(client);
  assert.match(html,/etaCalendarPanel/);assert.match(script,/etaCalendarLoad/);
  assert.match(script,/expectedRevision:etaCalendarSnapshot.revision/);
- assert.match(tracking,/name="viewport"/);assert.match(client,/x.requiresReview/);
+ assert.match(tracking,/name="viewport"/);assert.match(client,/d.deliveryPlan/);
  assert.match(script,/07:00-13:30,16:30-20:00/);
  assert.doesNotMatch(script,/07:00-14:00,16:30-20:00/);
  assert.match(html,/Sábados y domingos: CERRADO \(confirmado\)/);

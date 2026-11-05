@@ -26,6 +26,7 @@ const env={DB:{prepare(sql){let args=[];return{
    manifest_json:JSON.stringify({trabajos:[{servicio:'documentos',tipoAnillado:'ninguno',copias:1,paginasElegidas:[1,2,3]}]})};
   if(sql.includes('FROM central_preparation_estimates WHERE order_id=?'))return null;
   if(sql.includes('FROM central_eta_settings WHERE id=1'))return {base_minutes:60,parallel_orders:3,revision:1};
+  if(sql.includes('FROM central_delivery_plan WHERE id=1'))return null;
   if(sql.includes('FROM central_eta_calendar WHERE id=1'))return null;
   if(sql.includes('FROM central_eta_resources WHERE id=1'))return null;
   if(sql.includes('SELECT COUNT(*) AS ahead'))return {ahead:7};
@@ -50,7 +51,7 @@ test('sin token válido no lee la base D1',async()=>{
  assert.equal((await request('/seguimiento/api/estado?token='+order+'.'+'0'.repeat(64))).status,404);
  assert.equal(reads,0);
 });
-test('enlace firmado muestra estado y cola configurable, sin datos privados',async()=>{
+test('enlace firmado confirma pago sin prometer horario automático, sin datos privados',async()=>{
  const tok=await token();assert.match(tok,/^[a-f0-9-]{36}\.[a-f0-9]{64}$/);
  const link=await vm.runInContext('trackingUrl',ctx)(env,order,origin+'/internal/central/payment-sandbox-client');
  assert.equal(new URL(link).searchParams.get('token'),tok);
@@ -58,10 +59,9 @@ test('enlace firmado muestra estado y cola configurable, sin datos privados',asy
  assert.equal(res.status,200);
  const d=await res.json();
  assert.equal(d.orderNumber,'025');assert.equal(d.payment,'pagado');
- assert.equal(d.estimate.minutes,60);assert.equal(d.estimate.parallelOrders,3);
- assert.equal(d.estimate.requiresReview,true);
- assert.equal(d.estimate.operatingReadyAt,undefined);
- assert.deepEqual(Object.keys(d).sort(),['ok','orderNumber','payment','stage','phase','estimate'].sort());
+ assert.equal(d.estimate,null);
+ assert.equal(d.deliveryPlan,'por_confirmar');
+ assert.deepEqual(Object.keys(d).sort(),['ok','orderNumber','payment','stage','phase','estimate','deliveryPlan'].sort());
 });
 test('API de ajuste de demora no es accesible sin clave de operador',async()=>{
  assert.equal((await request('/admin/api/central/eta-settings')).status,401);
