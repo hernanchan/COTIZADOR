@@ -105,3 +105,5 @@ ENABLE_PRIVATE_SANDBOX_CLIENT_PAYMENT_2026_11_03
 2026-11-04 — Habilitar SOLO el módulo de preparación estimada en pruebas privadas, luego de CI 41941608715 SUCCESS. Preservar flujo de pagos, tarifas D1, acceso Basic y controles de rollback. Sin publicar main o web comercial.
 
 2026-11-04: activacion aislada de seguimiento HMAC y demora global configurable con CI 41955189605 aprobado. Mantener seguridad y rollback, cobros reales desactivados y main intacto.
+
+2026-11-05 — DESPLEGAR SOLO saber-documentos-pruebas: ingreso móvil alternativo desde invitación autorizada de Central privada, token en fragmento borrado antes de POST, canje HMAC contra D1 de un uso, sesión HttpOnly 30 min. Mantener HTTP Basic operador y obligatoriedad Basic en descarga de personal. Central emitió invitaciones en Worker activo 03e9d447-8562-49de-9e64-063ebc19aedc; CI 42012738267 y CI de activación Central 42012918701 SUCCESS. No alterar pagos reales, tarifas, main, web comercial ni otros Workers. Rollback por salud, 401 y paridad tarifaria.
