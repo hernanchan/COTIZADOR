@@ -1816,7 +1816,7 @@ async function etaSamplesApi(req,env){
   return json({error:"Calibración privada deshabilitada"},503);
  if(req.method!=="GET"&&req.method!=="POST")return json({error:"Método no admitido"},405);
  if(req.method==="POST"){
-  if(!/^application\\/json(?:;|$)/i.test(req.headers.get("Content-Type")||""))
+  if(!/^application\/json(?:;|$)/i.test(req.headers.get("Content-Type")||""))
    return json({error:"JSON requerido"},415);
   const raw=await req.text();if(raw.length>480)return json({error:"Datos demasiado extensos"},413);
   let d;try{d=JSON.parse(raw)}catch{return json({error:"JSON inválido"},400)}
