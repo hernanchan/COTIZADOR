@@ -1,0 +1,71 @@
+name: Saber - verificar CSV publico de Google Sheets (sin despliegue)
+on:
+  push:
+    branches:
+      - integracion/tus-pedido-privado-20261101
+    paths:
+      - docs/VERIFICAR-CATALOGO-GOOGLE.trigger
+
+permissions:
+  contents: read
+
+jobs:
+  validar-catalogo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validar enlace publicado, columnas, activos y acceso del navegador
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          const url='https://docs.google.com/spreadsheets/d/e/2PACX-1vQx2zW0YP23ZjZMvLwkX_mkbPQgVPL_aUUtcI_n1ApZ6P9F4fBuKFOl-jB4qFmxwoeYsszAZSKbaUVn/pub?gid=419356696&single=true&output=csv';
+          const response=await fetch(url,{signal:AbortSignal.timeout(22000),redirect:'follow'});
+          console.log('HTTP_STATUS',response.status);
+          console.log('FINAL_DOMAIN',new URL(response.url).hostname);
+          console.log('CONTENT_TYPE',response.headers.get('content-type'));
+          const cors=response.headers.get('access-control-allow-origin')||'';
+          console.log('CORS_ALLOW_ORIGIN',cors||'AUSENTE');
+          if(!response.ok)throw Error('No se puede acceder al CSV publicado: '+response.status);
+          const csv=await response.text();
+          if(csv.length>1_000_000)throw Error('CSV demasiado grande para la tienda');
+          function parseCsv(s){
+            const rows=[];let row=[],field='',quoted=false;
+            for(let i=0;i<s.length;i++){
+              const c=s[i],next=s[i+1];
+              if(c==='"'&&quoted&&next==='"'){field+='"';i++}
+              else if(c==='"'){quoted=!quoted}
+              else if(c===','&&!quoted){row.push(field);field=''}
+              else if((c==='\n'||c==='\r')&&!quoted){
+                if(c==='\r'&&next==='\n')i++;
+                row.push(field);
+                if(row.some(v=>String(v).trim()!==''))rows.push(row);
+                row=[];field='';
+              }else field+=c;
+            }
+            row.push(field);
+            if(row.some(v=>String(v).trim()!==''))rows.push(row);
+            if(quoted)throw Error('CSV con comillas sin cerrar');
+            return rows;
+          }
+          const data=parseCsv(csv);
+          if(data.length<2)throw Error('CSV sin productos');
+          const norm=x=>String(x||'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+          const fields=data[0].map(norm);
+          for(const header of ['ACTIVO','CATEGORIA','PRODUCTO','DESCRIPCION','PRECIO','OFERTA','FOTO','CODIGO'])
+            if(!fields.includes(header))throw Error('Falta columna '+header);
+          const active=data.slice(1).filter(r=>['SI','TRUE','1','X'].includes(norm(r[fields.indexOf('ACTIVO')])));
+          console.log('PRODUCTOS_ACTIVOS',active.length);
+          console.log('CSV_ROW_COUNT',data.length-1);
+          if(active.length<1)throw Error('Sin artículos activos');
+          const offerAt=fields.indexOf('OFERTA'),priceAt=fields.indexOf('PRECIO');
+          const money=v=>Number(String(v||'').replace(/[^0-9-]/g,''))||0;
+          const discounts=active.filter(r=>money(r[offerAt])>0&&money(r[offerAt])<money(r[priceAt]));
+          console.log('DESCUENTOS_REALES',discounts.length);
+          if(cors!=='*'&&cors!=='https://libreriasaber.com.ar'&&cors!=='https://www.libreriasaber.com.ar')
+            throw Error('CORS no autoriza al navegador de Librería Saber. Corregir acceso al CSV o usar un proxy controlado.');
+          console.log('CSV_SHEETS_REAL_HTTP_OK_AND_BROWSER_CORS_OK');
+          NODE
