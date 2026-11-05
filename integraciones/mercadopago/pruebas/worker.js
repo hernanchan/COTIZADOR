@@ -1439,6 +1439,68 @@ async function updatePreparationEstimate(req,env){
   productionAuthorized:false,paymentsEnabled:false});
 }
 
+
+/** Mensaje de entrega configurable por la Central: jamás calcula tiempos de producción. */
+const DELIVERY_MODES=["por_confirmar","hoy","hoy_tarde","proximo_dia"];
+async function ensureDeliveryPlan(env){
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_delivery_plan (id INTEGER PRIMARY KEY CHECK(id=1),mode TEXT NOT NULL CHECK(mode IN ('por_confirmar','hoy','hoy_tarde','proximo_dia')),revision INTEGER NOT NULL,operator TEXT NOT NULL,updated_at TEXT NOT NULL DEFAULT(datetime('now')))").run();
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_delivery_plan_events (id INTEGER PRIMARY KEY AUTOINCREMENT,revision INTEGER NOT NULL UNIQUE,mode TEXT NOT NULL,operator TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT(datetime('now')))").run();
+}
+async function deliveryPlanSetting(env){
+ await ensureDeliveryPlan(env);
+ const row=await env.DB.prepare("SELECT mode,revision,operator,updated_at FROM central_delivery_plan WHERE id=1").first();
+ return row||{mode:"por_confirmar",revision:0,operator:null,updated_at:null};
+}
+function deliveryPlanForCustomer(mode,paidAt,stage,now=Date.now()){
+ if(stage!=="pendiente"||!DELIVERY_MODES.includes(mode))return "por_confirmar";
+ if(mode!=="hoy"&&mode!=="hoy_tarde")return mode;
+ const paid=typeof paidAt==="string"?Date.parse(paidAt.includes("T")?paidAt:paidAt.replace(" ","T")+"Z"):NaN;
+ if(!Number.isFinite(paid))return "por_confirmar";
+ const parts=ms=>Object.fromEntries(new Intl.DateTimeFormat("en-US",{
+  timeZone:"America/Argentina/Cordoba",year:"numeric",month:"2-digit",day:"2-digit",
+  weekday:"short",hour:"2-digit",hourCycle:"h23"
+ }).formatToParts(new Date(ms)).filter(p=>p.type!=="literal").map(p=>[p.type,p.value]));
+ const p=parts(paid),n=parts(now);
+ if(n.weekday==="Sat"||n.weekday==="Sun"||Number(n.hour)>=20||
+    [p.year,p.month,p.day].join("-")!==[n.year,n.month,n.day].join("-"))return "por_confirmar";
+ return mode;
+}
+async function deliveryPlanApi(req,env){
+ if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+ if(env.CENTRAL_PRODUCTION_TRACKING_ENABLED!=="PRIVATE_TEST_ONLY")
+  return json({error:"Previsión privada deshabilitada"},503);
+ if(req.method==="GET")return json({settings:await deliveryPlanSetting(env),paymentsEnabled:false});
+ if(req.method!=="POST")return json({error:"Método no admitido"},405);
+ if(!/^application\/json(?:;|$)/i.test(req.headers.get("Content-Type")||""))
+  return json({error:"JSON requerido"},415);
+ const raw=await req.text();if(raw.length>600)return json({error:"Solicitud demasiado extensa"},413);
+ let d;try{d=JSON.parse(raw)}catch{return json({error:"Solicitud inválida"},400)}
+ if(!d||typeof d!=="object"||Array.isArray(d)||
+    Object.keys(d).sort().join(",")!=="confirmed,expectedRevision,mode,operator"||
+    !DELIVERY_MODES.includes(d.mode)||d.confirmed!==true||
+    !Number.isSafeInteger(d.expectedRevision)||d.expectedRevision<0||
+    typeof d.operator!=="string"||d.operator.trim().length<2||d.operator.trim().length>60)
+  return json({error:"Previsión de entrega inválida"},400);
+ const prior=await deliveryPlanSetting(env);
+ if(prior.revision!==d.expectedRevision)return json({error:"La previsión cambió en otro puesto"},409);
+ if(prior.mode===d.mode)return json({error:"No hay cambios"},409);
+ const operator=d.operator.trim();
+ let result;
+ try{
+  if(prior.revision===0)result=await env.DB.batch([
+   env.DB.prepare("INSERT OR IGNORE INTO central_delivery_plan(id,mode,revision,operator) VALUES(1,?,1,?)").bind(d.mode,operator),
+   env.DB.prepare("INSERT INTO central_delivery_plan_events(revision,mode,operator) SELECT 1,?,? WHERE EXISTS(SELECT 1 FROM central_delivery_plan WHERE id=1 AND revision=1)").bind(d.mode,operator)
+  ]);
+  else result=await env.DB.batch([
+   env.DB.prepare("UPDATE central_delivery_plan SET mode=?,revision=revision+1,operator=?,updated_at=datetime('now') WHERE id=1 AND revision=?").bind(d.mode,operator,prior.revision),
+   env.DB.prepare("INSERT INTO central_delivery_plan_events(revision,mode,operator) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM central_delivery_plan WHERE id=1 AND revision=?)").bind(prior.revision+1,d.mode,operator,prior.revision+1)
+  ]);
+ }catch{return json({error:"No se pudo confirmar el cambio"},409)}
+ if(!Array.isArray(result)||result.length!==2||result.some(x=>Number(x?.meta?.changes)!==1))
+  return json({error:"Cambio no confirmado"},409);
+ return json({saved:true,settings:await deliveryPlanSetting(env),productionAuthorized:false,paymentsEnabled:false});
+}
+
 /** Ajuste global de demora: criterio comercial del operador, no duración por orden.
  * Sin capacidad simultánea calibrada, no sumar pedidos linealmente.
  */
@@ -3902,6 +3964,7 @@ export default {
    if(url.pathname==="/admin/api/central/preparation-estimate"&&req.method==="POST")
     return await updatePreparationEstimate(req,env);
    if(url.pathname==="/admin/api/central/eta-settings")return await etaAdminApi(req,env);
+   if(url.pathname==="/admin/api/central/delivery-plan")return await deliveryPlanApi(req,env);
     if(url.pathname==="/admin/api/central/eta-calendar")return await etaCalendarApi(req,env);
     if(url.pathname==="/admin/api/central/mobile-invite")return await createMobileInvite(req,env);
     if(url.pathname==="/admin/api/central/resource-capacity")return await etaResourcesApi(req,env);
