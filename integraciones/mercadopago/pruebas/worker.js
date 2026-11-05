@@ -1999,36 +1999,15 @@ async function trackingCustomerStatus(req,env){
  if(paid&&!["listo","entregado"].includes(stage)){
   const manual=await preparationEstimateDetail(env,x.id);
   if(manual.ready_at)estimate={type:"manual",readyAt:manual.ready_at,provisional:true};
-  else if(standardPrintJob(x.manifest_json)&&stage!=="en_espera"){
-   const setting=await etaSettings(env);
-   const q=await env.DB.prepare("SELECT COUNT(*) AS ahead FROM orders o "+
-    "JOIN central_document_manifests m ON m.commercial_order_id=o.id "+
-    "LEFT JOIN central_production_status s ON s.order_id=o.id "+
-    "WHERE o.status='paid' AND o.paid_at IS NOT NULL AND o.deposit_ars=o.amount_ars "+
-    "AND COALESCE(s.state,'pendiente') IN ('pendiente','en_preparacion') "+
-    "AND EXISTS (SELECT 1 FROM payment_reviews p WHERE p.order_id=o.id AND p.state='verified') "+
-    "AND (o.paid_at<? OR (o.paid_at=? AND o.id<?))").bind(x.paid_at,x.paid_at,x.id).first();
-   const base=etaForQueue(setting,Number(q?.ahead)||0);
-   // La capacidad por recurso reemplaza el contador general sólo si se configuró.
-   const resources=await etaResourceQueueForOrder(env,x);
-   if(resources){
-    base.queueCalibrated=resources.calibrated;
-    base.requiresReview=resources.requiresReview;
-    base.resourceStatus=resources.status;
-   }
-   const calendar=await etaCalendar(env);
-   const operatingReadyAt=base.queueCalibrated&&!base.requiresReview&&calendar.configured?
-     etaOperatingFinish(calendar,x.paid_at,base.minutes):null;
-    const overdue=Boolean(operatingReadyAt&&Date.parse(operatingReadyAt)<Date.now());
-    estimate={type:"habitual",provisional:true,...base,
-      requiresReview:base.requiresReview||overdue,calendarConfigured:calendar.configured,
-      ...(operatingReadyAt&&!overdue?{operatingReadyAt}:{})};
-  }
  }
+ // Mostrar una franja general sólo al pedido pagado que todavía no se inició.
+ // El operador asigna la hora individual cuando comienza la preparación.
+ const deliveryPlan=paid&&stage==="pendiente"&&!estimate?
+  deliveryPlanForCustomer((await deliveryPlanSetting(env)).mode,x.paid_at,stage):null;
  return new Response(JSON.stringify({ok:true,orderNumber:shortWorkNumber(x.number),
   payment:review?"requiere_revision":paid?"pagado":"pendiente",stage,
   phase:review?"Pago en revisión":paid?phases[stage]||"Pago confirmado":"Esperando pago",
-  estimate}),{headers:{"content-type":"application/json; charset=utf-8",
+  estimate,deliveryPlan}),{headers:{"content-type":"application/json; charset=utf-8",
    "cache-control":"no-store, private","referrer-policy":"no-referrer",
    "x-robots-tag":"noindex,nofollow","x-content-type-options":"nosniff"}});
 }
@@ -3801,19 +3780,23 @@ async function centralClientSandboxPayment(req,env,dispatch){
    Number.isSafeInteger(transfer?.amount_ars)&&
    transfer.amount_ars===belongs.amount_ars&&transfer.amount_ars>0?
    {alias,amountArs:transfer.amount_ars}:{};
-  let preparacionEstimada=null;
+  let preparacionEstimada=null,deliveryPlan=null;
   if(estado==="pagado"&&env.CENTRAL_PRODUCTION_TRACKING_ENABLED==="PRIVATE_TEST_ONLY"){
    const estimate=await preparationEstimateDetail(env,belongs.id);
-   if(estimate.ready_at){
-    await centralProductionTables(env);
-    const stage=await env.DB.prepare("SELECT state FROM central_production_status WHERE order_id=?").bind(belongs.id).first();
-    if(!["listo","entregado"].includes(stage?.state))
-     preparacionEstimada={readyAt:estimate.ready_at,provisional:true};
+   await centralProductionTables(env);
+   const stage=await env.DB.prepare("SELECT state FROM central_production_status WHERE order_id=?").bind(belongs.id).first();
+   if(estimate.ready_at&&!["listo","entregado"].includes(stage?.state))
+    preparacionEstimada={readyAt:estimate.ready_at,provisional:true};
+   else if(!estimate.ready_at&&(!stage||stage.state==="pendiente")){
+    const timing=await env.DB.prepare("SELECT paid_at FROM orders WHERE id=?").bind(belongs.id).first();
+    deliveryPlan=deliveryPlanForCustomer((await deliveryPlanSetting(env)).mode,
+     timing?.paid_at,"pendiente");
    }
   }
   const seguimientoUrl=await trackingUrl(env,belongs.id,req.url);
   return json({ok:true,commercialOrderId:belongs.id,estado,
    ...instrucciones,...(preparacionEstimada?{preparacionEstimada}:{}),
+   ...(deliveryPlan?{deliveryPlan}:{}),
    ...(seguimientoUrl?{seguimientoUrl}:{}),paymentAuthorized:estado==="pagado"});
  }
  if(typeof dispatch!=="function"||typeof env.DEMO_ADMIN_KEY!=="string"||!env.DEMO_ADMIN_KEY)
