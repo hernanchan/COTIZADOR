@@ -1721,7 +1721,7 @@ async function centralAdminDetail(env,id){
   trabajos:document.trabajos,pdfFinalVerificado:false,listoParaProducir:false};
 }
 
-const clientTrackingHtml = "<!doctype html><html lang=\"es\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta name=\"robots\" content=\"noindex,nofollow\"><meta name=\"referrer\" content=\"no-referrer\"><title>Mi pedido | Librería Saber</title><style>body{font:16px system-ui;color:#163d62;background:#f4f7fa;margin:20px auto;padding:15px;max-width:560px}main{padding:22px;background:white;border-radius:12px}h1{font-size:1.4rem}li{padding:8px}li.active{color:#175ba4;font-weight:700}p{line-height:1.5}#eta{background:#edf5fc;padding:15px;border-radius:9px}</style></head><body><main><h1>Librería Saber · Mi pedido</h1><p id=\"order\">Consultando…</p><h2 id=\"stage\">Cargando estado…</h2><ol id=\"steps\"></ol><p id=\"eta\">Demora por confirmar.</p><p id=\"message\">Actualización automática cada 30 segundos.</p><small>Ensayo privado. El tiempo es orientativo y corresponde a preparación, no a envío a domicilio.</small></main><script>\nconst token=new URLSearchParams(location.search).get(\"token\")||\"\",el=id=>document.getElementById(id);\nconst labels=[\"Pedido recibido\",\"Pago confirmado\",\"En preparación\",\"Listo para retirar\",\"Entregado\"];\nfunction render(d){\n el(\"order\").textContent=d.orderNumber?\"Orden N.º \"+d.orderNumber:\"Orden en consulta\";\n el(\"stage\").textContent=d.phase||\"Sin estado\";\n const progress=d.payment!==\"pagado\"?0:({pendiente:1,en_preparacion:2,en_espera:2,listo:3,entregado:4})[d.stage]||1;\n el(\"steps\").replaceChildren();\n labels.forEach((txt,i)=>{const li=document.createElement(\"li\");li.textContent=txt;if(i===progress)li.className=\"active\";el(\"steps\").append(li)});\n if(d.payment!==\"pagado\"){el(\"eta\").textContent=\"Esperando pago verificado. La producción aún no comienza.\";return}\n if(d.stage===\"listo\"||d.stage===\"entregado\"){el(\"eta\").textContent=\"Pedido \"+(d.stage===\"listo\"?\"listo para retirar.\":\"entregado.\");return}\n if(d.stage===\"en_espera\"){el(\"eta\").textContent=\"Trabajo en espera. El plazo puede cambiar.\";return}\n const x=d.estimate;if(x?.type===\"manual\"){\n const fecha=new Intl.DateTimeFormat(\"es-AR\",{timeZone:\"America/Argentina/Cordoba\",day:\"2-digit\",month:\"2-digit\",hour:\"2-digit\",minute:\"2-digit\"}).format(new Date(x.readyAt));\n el(\"eta\").textContent=\"Preparación estimada: \"+fecha+\" hs (provisional).\";\n }else if(x?.type===\"habitual\"){el(\"eta\").textContent=\"Demora orientativa: \"+String(x.minutes/60).replace(\".\",\",\")+\" horas. \"+(x.queueCalibrated?\"Con cola de pedidos.\":\"Sin calibración de capacidad.\");}\n else el(\"eta\").textContent=\"Plazo a confirmar según el trabajo.\";\n}\nlet busy=false;async function update(){\n if(busy)return;busy=true;try{\n if(!/^[a-f0-9-]{36}\\.[a-f0-9]{64}$/.test(token))throw Error(\"Enlace incompleto\");\n const r=await fetch(\"/seguimiento/api/estado?token=\"+encodeURIComponent(token),{cache:\"no-store\"});\n const d=await r.json();if(!r.ok||d.ok!==true)throw Error(\"Enlace no válido\");\n render(d);el(\"message\").textContent=\"Última actualización: \"+new Date().toLocaleTimeString(\"es-AR\");\n }catch(e){el(\"stage\").textContent=\"Seguimiento no disponible\";el(\"message\").textContent=e.message}finally{busy=false}}\nvoid update();setInterval(()=>{if(!document.hidden)void update()},30000);\ndocument.addEventListener(\"visibilitychange\",()=>{if(!document.hidden)void update()});\n</script></body></html>";
+const clientTrackingHtml = "<!doctype html><html lang=\"es\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta name=\"robots\" content=\"noindex,nofollow\"><meta name=\"referrer\" content=\"no-referrer\"><title>Mi pedido | Librería Saber</title><style>body{font:16px system-ui;color:#163d62;background:#f4f7fa;margin:0 auto;padding:clamp(12px,3vw,24px);max-width:560px;box-sizing:border-box}main{padding:22px;background:white;border-radius:12px}h1{font-size:1.4rem}li{padding:8px}li.active{color:#175ba4;font-weight:700}p{line-height:1.5}#eta{background:#edf5fc;padding:15px;border-radius:9px}</style></head><body><main><h1>Librería Saber · Mi pedido</h1><p id=\"order\">Consultando…</p><h2 id=\"stage\">Cargando estado…</h2><ol id=\"steps\"></ol><p id=\"eta\">Demora por confirmar.</p><p id=\"message\">Actualización automática cada 30 segundos.</p><small>Ensayo privado. El tiempo es orientativo y corresponde a preparación, no a envío a domicilio.</small></main><script>\nconst token=new URLSearchParams(location.search).get(\"token\")||\"\",el=id=>document.getElementById(id);\nconst labels=[\"Pedido recibido\",\"Pago confirmado\",\"En preparación\",\"Listo para retirar\",\"Entregado\"];\nfunction render(d){\n el(\"order\").textContent=d.orderNumber?\"Orden N.º \"+d.orderNumber:\"Orden en consulta\";\n el(\"stage\").textContent=d.phase||\"Sin estado\";\n const progress=d.payment!==\"pagado\"?0:({pendiente:1,en_preparacion:2,en_espera:2,listo:3,entregado:4})[d.stage]||1;\n el(\"steps\").replaceChildren();\n labels.forEach((txt,i)=>{const li=document.createElement(\"li\");li.textContent=txt;if(i===progress)li.className=\"active\";el(\"steps\").append(li)});\n if(d.payment!==\"pagado\"){el(\"eta\").textContent=\"Esperando pago verificado. La producción aún no comienza.\";return}\n if(d.stage===\"listo\"||d.stage===\"entregado\"){el(\"eta\").textContent=\"Pedido \"+(d.stage===\"listo\"?\"listo para retirar.\":\"entregado.\");return}\n if(d.stage===\"en_espera\"){el(\"eta\").textContent=\"Trabajo en espera. El plazo puede cambiar.\";return}\n const x=d.estimate;if(x?.type===\"manual\"){\n const fecha=new Intl.DateTimeFormat(\"es-AR\",{timeZone:\"America/Argentina/Cordoba\",day:\"2-digit\",month:\"2-digit\",hour:\"2-digit\",minute:\"2-digit\"}).format(new Date(x.readyAt));\n el(\"eta\").textContent=\"Preparación estimada: \"+fecha+\" hs (provisional).\";\n }else if(x?.type===\"habitual\"){if(x.requiresReview){el(\"eta\").textContent=\"Hay trabajos en cola o el plazo orientativo ya pasó. La Central confirmará el retiro.\";}else if(x.operatingReadyAt){const fecha=new Intl.DateTimeFormat(\"es-AR\",{timeZone:\"America/Argentina/Cordoba\",day:\"2-digit\",month:\"2-digit\",hour:\"2-digit\",minute:\"2-digit\"}).format(new Date(x.operatingReadyAt));el(\"eta\").textContent=\"Preparación orientativa según horario: \"+fecha+\" hs. A confirmar por el local.\";}else{el(\"eta\").textContent=\"Demora habitual: \"+String(x.minutes/60).replace(\".\",\",\")+\" horas, retiro a confirmar. \"+(x.calendarConfigured?\"Capacidad aún no comprobada.\":\"Horarios aún no configurados.\");}}\n else el(\"eta\").textContent=\"Plazo a confirmar según el trabajo.\";\n}\nlet busy=false;async function update(){\n if(busy)return;busy=true;try{\n if(!/^[a-f0-9-]{36}\\.[a-f0-9]{64}$/.test(token))throw Error(\"Enlace incompleto\");\n const r=await fetch(\"/seguimiento/api/estado?token=\"+encodeURIComponent(token),{cache:\"no-store\"});\n const d=await r.json();if(!r.ok||d.ok!==true)throw Error(\"Enlace no válido\");\n render(d);el(\"message\").textContent=\"Última actualización: \"+new Date().toLocaleTimeString(\"es-AR\");\n }catch(e){el(\"stage\").textContent=\"Seguimiento no disponible\";el(\"message\").textContent=e.message}finally{busy=false}}\nvoid update();setInterval(()=>{if(!document.hidden)void update()},30000);\ndocument.addEventListener(\"visibilitychange\",()=>{if(!document.hidden)void update()});\n</script></body></html>";
 const adminHtml = `<!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title>Centro de Pedidos | Librería Saber · Pruebas</title>
@@ -1786,6 +1786,7 @@ body.price-only #privateAccess #refresh,body.price-only #privateAccess #sync{dis
 body.price-only #openPricing{display:none}
 body.price-only #priceAdminFieldset{margin-top:9px}
 body.price-only #priceAdminFieldset summary{font-size:1.3rem}
+.eta-week{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:14px 0}.eta-week label{font-weight:600}.eta-week input{display:block;width:100%;margin-top:4px}#etaCalendarPanel{margin-top:14px}#etaCalendarPanel summary{cursor:pointer;font-weight:700;color:#174b8f}
 </style></head><body>
 <header><div><h1>Centro de Pedidos · Pruebas</h1><div class="note">Solo pagos completos aprobados · No está conectado al sitio público</div></div></header>
 <fieldset id="privateAccess"><legend>Acceso privado</legend><div class="toolbar">
@@ -1795,7 +1796,7 @@ body.price-only #priceAdminFieldset summary{font-size:1.3rem}
 </div><p id="status" role="status" aria-live="polite"></p><p id="cronState" class="note">Conciliación automática: sin consultar.</p></fieldset>
 <fieldset id="bankTransfersArea"><legend>Transferencias por verificar · <strong id="transferCount">0 pendientes</strong></legend><p class="note">Los pendientes se cargan solos y se actualizan cada 30 segundos. Comprobar el ingreso en el banco: un comprobante del cliente no acredita el pago. Operación limitada al ENSAYO privado.</p><p id="transferPanelStatus" class="transfer-feedback" role="status" aria-live="polite">Ingresá la clave privada para consultar las transferencias.</p><ol id="transferPending"></ol><button id="refreshTransfers" class="outline" type="button">Actualizar ahora</button></fieldset>
 <fieldset id="etaAdminArea"><legend>Demora orientativa · configuración</legend>
-<p class="note">Referencia inicial: 3 horas para impresiones habituales de hasta 400 páginas. No se suman pedidos linealmente; configurá la cantidad de trabajos simultáneos para calcular aumentos por cola.</p>
+<p class="note">Referencia inicial: 3 horas para impresiones habituales de hasta 400 páginas. La demora habitual no es el tiempo por pedido. Si la capacidad está ocupada, el plazo requiere revisión; no se agregan horas de manera artificial.</p>
 <div class="toolbar">
 <label>Demora habitual (horas) <input id="etaHours" type="number" step="0.5" min="0.5" max="24" value="3" style="width:90px"></label>
 <label>Pedidos simultáneos <input id="etaCapacity" type="number" step="1" min="0" max="30" value="0" style="width:80px" title="0: sin cálculo adicional de cola"></label>
@@ -1803,6 +1804,22 @@ body.price-only #priceAdminFieldset summary{font-size:1.3rem}
 <button id="etaSave" type="button" disabled>Guardar demora</button>
 </div>
 <p id="etaStatus" class="note" role="status" aria-live="polite">Ingresá primero la clave privada del panel.</p>
+<details id="etaCalendarPanel"><summary>Horarios de atención, feriados y cierres</summary>
+<p class="note">Cargá los horarios reales. Un día vacío se considera cerrado; podés usar pausas: 07:00-14:00,16:30-20:00. Los feriados se anotan como fechas de cierre. Sin agenda validada no se comunica una hora calculada.</p>
+<div class="eta-week">
+<label>Lunes<input id="etaDayMon" placeholder="07:00-14:00,16:30-20:00" autocomplete="off"></label>
+<label>Martes<input id="etaDayTue" placeholder="07:00-14:00,16:30-20:00" autocomplete="off"></label>
+<label>Miércoles<input id="etaDayWed" placeholder="07:00-14:00,16:30-20:00" autocomplete="off"></label>
+<label>Jueves<input id="etaDayThu" placeholder="07:00-14:00,16:30-20:00" autocomplete="off"></label>
+<label>Viernes<input id="etaDayFri" placeholder="07:00-14:00,16:30-20:00" autocomplete="off"></label>
+<label>Sábado<input id="etaDaySat" placeholder="Cerrado" autocomplete="off"></label>
+<label>Domingo<input id="etaDaySun" placeholder="Cerrado" autocomplete="off"></label>
+</div>
+<label for="etaClosed">Feriados y cierres (AAAA-MM-DD, una fecha por línea)</label>
+<textarea id="etaClosed" rows="3" placeholder="2026-12-25" style="display:block;width:min(100%,400px);font:inherit;padding:10px"></textarea>
+<div class="toolbar"><button id="etaCalendarLoad" class="outline" type="button">Consultar agenda</button><button id="etaCalendarSave" type="button" disabled>Guardar agenda</button></div>
+<p id="etaCalendarStatus" class="note" role="status" aria-live="polite">Agenda aún sin consultar.</p>
+</details>
 </fieldset>
 <fieldset id="productionBoardArea"><legend>Tablero de producción · pedidos pagos</legend>
 <p class="note">Cada pedido avanza de columna al registrar su estado. Descargar el ZIP no cambia el seguimiento. Actualización automática cada 30 segundos mientras el panel esté abierto.</p>
@@ -1880,6 +1897,44 @@ etaSave.addEventListener("click",async()=>{
   });
   await loadEtaAdmin();await refresh({silent:true,force:true});
  }catch(e){etaInfo.textContent=String(e.message||e);etaSave.disabled=false}
+});
+let etaCalendarSnapshot=null;
+const etaCalendarDays=["mon","tue","wed","thu","fri","sat","sun"];
+const etaCalendarFields=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const etaCalendarInfo=document.querySelector("#etaCalendarStatus");
+const etaCalendarSave=document.querySelector("#etaCalendarSave");
+async function loadEtaCalendar(){
+ try{
+  const r=await api("/admin/api/central/eta-calendar");
+  etaCalendarSnapshot=r.calendar;
+  etaCalendarDays.forEach((day,i)=>{
+   document.querySelector("#etaDay"+etaCalendarFields[i]).value=r.calendar.weekly[day]||"";
+  });
+  document.querySelector("#etaClosed").value=r.calendar.closedDates.join("\n");
+  etaCalendarSave.disabled=false;
+  etaCalendarInfo.textContent=r.calendar.configured?
+   "Agenda cargada · revisión "+r.calendar.revision+" · zona Córdoba.":
+   "Sin horarios configurados. No se anuncia fecha de retiro automática.";
+ }catch(e){etaCalendarSnapshot=null;etaCalendarSave.disabled=true;etaCalendarInfo.textContent="No se pudo consultar agenda: "+String(e.message||e)}
+}
+document.querySelector("#etaCalendarLoad").addEventListener("click",loadEtaCalendar);
+etaCalendarSave.addEventListener("click",async()=>{
+ if(!etaCalendarSnapshot)return;
+ const operator=requestOperator();
+ if(!operator){etaCalendarInfo.textContent="Indicá el responsable del cambio.";return}
+ const weekly={};
+ etaCalendarDays.forEach((day,i)=>weekly[day]=document.querySelector("#etaDay"+etaCalendarFields[i]).value.trim());
+ const closedDates=document.querySelector("#etaClosed").value.split(/[\n,;]/).map(x=>x.trim()).filter(Boolean);
+ if(closedDates.some(d=>!/^\d{4}-\d\d-\d\d$/.test(d))){
+  etaCalendarInfo.textContent="Revisá las fechas: AAAA-MM-DD, una por línea.";return;
+ }
+ if(!confirm("¿Guardar estos horarios y cierres para el piloto privado?"))return;
+ etaCalendarSave.disabled=true;
+ try{
+  await apiPost("/admin/api/central/eta-calendar",{weekly,closedDates,
+   expectedRevision:etaCalendarSnapshot.revision,operator,confirmed:true});
+  await loadEtaCalendar();await refresh({silent:true,force:true});
+ }catch(e){etaCalendarInfo.textContent=String(e.message||e);etaCalendarSave.disabled=false}
 });
 function money(n){return new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0}).format(Number(n)||0)}
 async function apiPost(path,data){
