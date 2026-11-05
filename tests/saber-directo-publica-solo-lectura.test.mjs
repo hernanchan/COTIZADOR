@@ -17,6 +17,11 @@ for (const [name,html] of [['portada',home],['ofertas',offers]]){
   if(name==='portada')assert.match(rendered,/href="#preview-aviso"/);
   else assert.match(rendered,/href="\/prueba-v2\/diseno-sin-clave"/);
   assert.match(rendered,/class="brand"/);
+  if(name==='ofertas'){
+    assert.equal((rendered.match(/class="v3-sample-offer"/g)||[]).length,3);
+    assert.match(rendered,/FOTO ILUSTRATIVA · SIN PRECIO/);
+    assert.match(rendered,/src="https:\/\/images\.unsplash\.com\/photo-/);
+  }
   if(name==='portada')assert.match(rendered,/href="\/prueba-v2\/diseno-sin-clave\/ofertas\.html\?categoria=/);
   else assert.match(rendered,/href="\/prueba-v2\/diseno-sin-clave#categorias"/);
  });
