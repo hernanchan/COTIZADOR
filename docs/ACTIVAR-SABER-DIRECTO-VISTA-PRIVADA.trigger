@@ -4,3 +4,4 @@ TARGET=existing-worker-saber-documentos-pruebas
 PATH=/prueba-v2/diseno-saber-directo
 ROLLBACK=automatic
 PAYMENTS=disabled-commercial
+RETRY_CI_MARKERS_ASCII_FIXED=6f373ae883923561da241549d5f27af6ae2ce18c
