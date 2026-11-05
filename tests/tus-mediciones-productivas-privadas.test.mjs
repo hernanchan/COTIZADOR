@@ -9,6 +9,7 @@ ctx.globalThis=ctx;vm.createContext(ctx);
 vm.runInContext(source.replace('export default {','globalThis.worker = {'),ctx);
 const records=[];let reads=0;
 const env={DEMO_ADMIN_KEY:'PRIVADO',CENTRAL_PRODUCTION_TRACKING_ENABLED:'PRIVATE_TEST_ONLY',
+ MP_TEST_ACCESS_TOKEN:'TEST',MP_TEST_SELLER_ID:'seller',TEST_WEBHOOK_URL:'https://test.invalid/webhook',MP_WEBHOOK_SECRET:'webhook',
  DB:{prepare(sql){
   let args=[];return {
    bind(...v){args=v;return this},
