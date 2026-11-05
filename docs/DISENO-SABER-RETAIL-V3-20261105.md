@@ -21,3 +21,11 @@ Objetivo acordado: presentación comercial tipo retail con productos visuales y 
 ## Página de ofertas V3
 - `vidriera/ofertas.html` actualizada a encabezado fotográfico y catálogo con tarjetas visuales mejor proporcionadas; conserva lógica comercial previa.
 - Preview anónimo de ofertas: tres fotografías de ambientación identificadas como ilustrativas, sin precios ni pedido. La ruta sigue siendo visual, no transaccional.
+
+## Verificación de despliegue V3
+- Workflows de CI sobre rama: `42096840791` (home) y `42097343151` (ofertas), ambos SUCCESS.
+- Deploy final únicamente al Worker documental de pruebas: GitHub Actions `42097428602` SUCCESS, versión activa `3a2d7ed6-7467-4431-b7c5-8ca450f4ef8a`.
+- URL de portada **sin contraseña** `https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/diseno-sin-clave`.
+- URL de ofertas **sin contraseña** `https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/diseno-sin-clave/ofertas.html`.
+- Verificación HTTP: portada y ofertas 200 anónimas, el cotizador privado `/prueba-v2/` devuelve 401 anónimo; referencias privadas y bindings existentes conservados.
+- Sin fotos reales de Saber todavía: imágenes Unsplash solo de ambientación. No se han autorizado compras ni habilitado producción.
