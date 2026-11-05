@@ -21,13 +21,51 @@ header{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.96);backdro
 footer{background:#071f36;color:#fff;padding:24px 0}.footerrow{display:flex;justify-content:space-between;gap:20px}.footerrow small{color:#b2c3d1}
 @media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:620px){.container{width:min(100% - 22px,1180px)}.topbar .container span:last-child{display:none}.head{min-height:68px}.brand small{display:none}.back{display:none}.hero{padding-top:28px}.grid{grid-template-columns:1fr}.product{min-height:0}.product img{width:100%;aspect-ratio:4/3;height:auto;object-fit:contain;object-position:center;padding:8px}.footerrow{display:block}.footerrow small{display:block;margin-top:6px}}
+
+/* SABER RETAIL V3: catálogo fotográfico, conservando origen público de productos y carrito histórico. */
+body{background:#fff}
+.topbar{background:#0b3151}
+header{background:#fff;backdrop-filter:none}
+.brand strong{font-size:21px;letter-spacing:-.045em}
+.hero{background:#fffaf4;padding:28px 0}
+.v3-offers-head{display:grid;grid-template-columns:1.03fr .97fr;gap:28px;align-items:stretch}
+.v3-offers-text{min-height:285px;padding:29px 12px 26px 0;display:flex;flex-direction:column;justify-content:center}
+.hero small{color:#ca7229;font-size:10px;letter-spacing:.13em}
+.hero h1{font-size:clamp(34px,4.3vw,54px);line-height:1.08;letter-spacing:-.068em;max-width:480px}
+.hero p{font-size:15px;line-height:1.55}
+.v3-offers-image{display:block;width:100%;height:100%;max-height:360px;object-fit:cover;border-radius:12px}
+.v3-return-link{display:inline-flex;align-self:start;gap:10px;margin-top:20px;background:#0a3158;color:#fff;padding:12px 16px;font-size:13px;font-weight:800;text-decoration:none;border-radius:7px}
+.catalog{padding:30px 0 70px}
+.grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.product{border:1px solid #e4e9ed;border-radius:12px;box-shadow:0 5px 22px #183c550d;min-height:385px}
+.product img{object-fit:contain;background:#f8f9fa;aspect-ratio:4/3}
+.body{padding:17px}
+.product h2{font-size:19px;letter-spacing:-.035em}
+.price strong{font-size:23px}
+.product-actions .add{background:#0a3158}
+.product-actions .ask{background:#f4a23d;color:#102f48}
+.empty{border-radius:10px}
+footer{background:#0c2942}
+@media(max-width:900px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){
+ .hero{padding:14px 0 22px}
+ .v3-offers-head{grid-template-columns:1fr;gap:14px}
+ .v3-offers-text{min-height:0;padding:15px 0 6px}
+ .hero h1{font-size:37px}
+ .hero p{font-size:14px}
+ .v3-offers-image{height:218px}
+ .v3-return-link{margin-top:16px}
+ .grid{grid-template-columns:1fr}
+ .catalog{padding:20px 0 50px}
+}
+
 </style>
 </head>
 <body>
 <div class="topbar"><div class="container"><span><b>35 años junto a vos</b> · Poeta Lugones · Córdoba</span><span>Lunes a viernes · 7:00 a 13:30 y 16:30 a 20:00</span></div></div>
 <header><div class="container head"><a class="brand" href="index.html"><img src="https://cdn.jsdelivr.net/gh/hernanchan/COTIZADOR@50b47daecfd3b1490bab03c235d47b7285f9f49e/assets/logo-sbr.png" alt="Logo Librería Saber"><span><strong>LIBRERÍA SABER</strong><small>Productos y novedades</small></span></a><div class="actions"><a class="back" href="index.html#categorias">← Volver</a><button class="cart-open" type="button" onclick="openCart()">Carrito <span class="badge" id="cartBadge">0</span></button></div></div></header>
 <main>
-<section class="hero"><div class="container"><small id="eyebrow">Ofertas</small><h1 id="pageTitle">Todas las ofertas</h1><p id="pageText">Productos publicados desde la misma planilla de Librería Saber. Podés agregarlos al carrito y combinarlos con trabajos de impresión.</p></div></section>
+<section class="hero"><div class="container v3-offers-head"><div class="v3-offers-text"><small id="eyebrow">DESCUBRÍ LO QUE HAY EN SABER</small><h1 id="pageTitle">Todas las ofertas</h1><p id="pageText">Productos publicados desde la misma planilla de Librería Saber. Podés agregarlos al carrito y combinarlos con trabajos de impresión.</p><a class="v3-return-link" href="index.html#categorias">Seguir explorando ↗</a></div><img class="v3-offers-image" src="https://images.unsplash.com/photo-1654931800100-2ecf6eee7c64?auto=format&fit=crop&w=1100&q=80" alt="Papelería, útiles y materiales escolares de colores" loading="eager" decoding="async"></div></section>
 <section class="catalog"><div class="container"><div class="grid" id="grid"><div class="empty">Cargando productos…</div></div></div></section>
 </main>
 <footer><div class="container footerrow"><b>LIBRERÍA SABER</b><small>35 años junto a vos · Córdoba Capital</small></div></footer>

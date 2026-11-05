@@ -17,3 +17,7 @@ Objetivo acordado: presentación comercial tipo retail con productos visuales y 
 2. Revisar y conectar de forma coherente catálogo/precios, promociones, carrito, checkout integral sin seña antigua; no publicar promesas de un carrito unificado que todavía no está implementado.
 3. Confirmar identidad de fotos de productos reales y disponibilidad, calidad de imágenes.
 4. Hacer lista de verificación prepublicación y acordar la puesta en producción. **No habilitar pagos reales por cambios cosméticos.**
+
+## Página de ofertas V3
+- `vidriera/ofertas.html` actualizada a encabezado fotográfico y catálogo con tarjetas visuales mejor proporcionadas; conserva lógica comercial previa.
+- Preview anónimo de ofertas: tres fotografías de ambientación identificadas como ilustrativas, sin precios ni pedido. La ruta sigue siendo visual, no transaccional.

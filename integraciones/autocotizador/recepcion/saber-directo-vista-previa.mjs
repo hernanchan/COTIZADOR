@@ -71,8 +71,26 @@ export function prepararVistaDisenoAbierta(html,{ofertas=false}={}){
   .replace(/<div class="overlay"[^>]*><\/div>/i,'');
  const aviso='<div id="preview-aviso" role="status" style="background:#0a3158;color:#fff;padding:11px 16px;text-align:center;font:700 13px/1.4 system-ui,sans-serif">VISTA DE DISEÑO · SIN CONTRASEÑA · No se realizan pedidos ni pagos.</div>';
  if(ofertas){
-   page=page.replace('Cargando productos…','Aquí se mostrarán las ofertas y novedades. En esta demostración no hay precios ni compras.');
-   page=page.replace('Productos publicados desde la misma planilla de Librería Saber. Podés agregarlos al carrito y combinarlos con trabajos de impresión.','Así se verá el catálogo de ofertas. No se muestran datos comerciales ni se realizan pedidos en esta vista.');
+   // La vista pública de diseño no consulta la planilla ni muestra precios.
+   const visualProducts=[
+    ['Escolar y papelería','https://images.unsplash.com/photo-1764818958942-f104ba6f8358?auto=format&fit=crop&w=680&q=76'],
+    ['Oficina y materiales','https://images.unsplash.com/photo-1625225231874-dc5df462f1ee?auto=format&fit=crop&w=680&q=76'],
+    ['Detalles para crear','https://images.unsplash.com/photo-1646809021377-6fe5ba140b4a?auto=format&fit=crop&w=680&q=76']
+   ];
+   page=page.replace('<div class="empty">Cargando productos…</div>',visualProducts.map(([name,src])=>
+      '<div class="v3-sample-offer"><img src="'+src+'" alt="'+name+'" loading="lazy" decoding="async"><div><small>FOTO ILUSTRATIVA · SIN PRECIO</small><strong>'+name+'</strong><p>En la tienda real aparecerán artículos de la planilla, con su fotografía y precio vigente.</p></div></div>'
+   ).join(''));
+   page=page.replace('Productos publicados desde la misma planilla de Librería Saber. Podés agregarlos al carrito y combinarlos con trabajos de impresión.','Explorá cómo se mostrarán los productos. Esta versión es una vista visual, no una tienda operativa.');
+   page=page.replace('</style>',String.raw`
+    .v3-sample-offer{background:#fff;border:1px solid #e4e9ed;border-radius:10px;overflow:hidden}
+    .v3-sample-offer img{display:block;width:100%;height:245px;object-fit:cover}
+    .v3-sample-offer>div{padding:17px}
+    .v3-sample-offer small{font-size:9px;color:#bd6c24;letter-spacing:.07em;font-weight:800}
+    .v3-sample-offer strong{display:block;font:800 20px Manrope,sans-serif;color:#0a3158;margin:9px 0}
+    .v3-sample-offer p{font-size:12px;line-height:1.45;color:#667789}
+    @media(max-width:620px){.v3-sample-offer img{height:185px}}
+   `+'</style>');
+
  }else{
 
    // Fotografías de ambientación con licencia Unsplash. Muestra sin stock ni precios.
