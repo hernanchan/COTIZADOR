@@ -24,7 +24,7 @@ class Element{
   }return null;
  }
 }
-function scene({promptValue='Responsable del mostrador',failCode=null}={}){
+function scene({promptValue='Responsable del mostrador',failCode=null,stage='pendiente',timeSaveError=null}={}){
  const elements=new Map();
  for(const id of ['secret','productionOperator','status','details','orders',
   'refreshExpress','refreshReceipts','refreshTransfers','refreshUnpaid','refresh',
@@ -40,11 +40,12 @@ function scene({promptValue='Responsable del mostrador',failCode=null}={}){
   elements.set('#'+id,new Element('div'));
  }
  elements.get('#secret').value='panel-key';
- const order={id:orderId,production_state:'pendiente',production_version:0,
+ const order={id:orderId,production_state:stage,production_version:stage==='pendiente'?0:1,
+  estimated_ready_at:null,estimated_ready_version:0,
   work_number:13,amount_ars:4730,file_count:3,
   web_order_id:'WEB-ENSAYO-12345678901234567890123456789012',
   description:'3 PDF recibidos',paid_at:'2026-11-02 15:28:27'};
- const calls=[];
+ const calls=[],deliveryCalls=[];
  const document={
   hidden:false,
   addEventListener(){},
@@ -59,6 +60,14 @@ function scene({promptValue='Responsable del mostrador',failCode=null}={}){
   async fetch(path,opts={}){
    if(path==='/admin/api/orders')
     return {ok:true,json:async()=>({orders:[{...order}]})};
+   if(path==='/admin/api/central/preparation-estimate'){
+    const input=JSON.parse(opts.body);deliveryCalls.push(input);
+    if(timeSaveError!==null)
+     return {ok:false,status:409,json:async()=>({error:timeSaveError})};
+    order.estimated_ready_at=input.ready_at;
+    order.estimated_ready_version=1;
+    return {ok:true,json:async()=>({saved:true})};
+   }
    if(path==='/admin/api/central/production-status'){
     const input=JSON.parse(opts.body);calls.push(input);
     if(failCode!==null)
@@ -74,7 +83,7 @@ function scene({promptValue='Responsable del mostrador',failCode=null}={}){
   }};
  vm.createContext(env);
  vm.runInContext(script,env);
- return {env,elements,order,calls};
+ return {env,elements,order,calls,deliveryCalls};
 }
 test('un clic en Iniciar pide responsable una sola vez y mueve de columna al guardar en D1',async()=>{
  const x=scene();
@@ -110,4 +119,68 @@ test('si D1 rechaza un cambio, se ve el error en la misma tarjeta',async()=>{
  assert.equal(x.calls.length,1);
  assert.equal(x.elements.get('#lane-pendiente').children[0],card);
  assert.match(card.querySelector('.board-feedback').textContent,/No se guardó/);
+});
+
+test('Definir hora abre formulario EN LA TARJETA sin navegar al detalle lejano',async()=>{
+ const x=scene({stage:'en_preparacion'});
+ await vm.runInContext('refresh({silent:true})',x.env);
+ const card=x.elements.get('#lane-en_preparacion').children[0];
+ const controls=card.children.find(e=>e.className==='actions');
+ const open=controls.children.find(e=>e.textContent==='Definir hora de entrega');
+ assert.ok(open,'el botón de hora debe estar disponible cuando se inició el pedido');
+ const editor=card.children.find(e=>e.className==='delivery-editor');
+ assert.ok(editor,'el formulario debe estar en la misma tarjeta');
+ assert.equal(editor.hidden,true);
+ assert.ok(card.children.indexOf(editor)>card.children.indexOf(controls),'el editor debe aparecer debajo de los controles');
+ await open.listeners.click();
+ assert.equal(editor.hidden,false,'clic revela de inmediato el formulario');
+ assert.equal(x.deliveryCalls.length,0,'abrir no guarda ni cambia horarios');
+ const input=editor.children.find(e=>e.tagName==='label').children.find(e=>e.tagName==='input');
+ assert.equal(input.type,'datetime-local');
+ assert.equal(input.focused,true);
+ await open.listeners.click();
+ assert.equal(editor.hidden,true,'otro clic cierra el editor');
+});
+test('guardar hora desde la tarjeta actualiza D1 y aparece en el tablero',async()=>{
+ const x=scene({stage:'en_preparacion'});
+ await vm.runInContext('refresh({silent:true})',x.env);
+ const card=x.elements.get('#lane-en_preparacion').children[0];
+ const open=card.children.find(e=>e.className==='actions').children.find(e=>e.textContent==='Definir hora de entrega');
+ await open.listeners.click();
+ const editor=card.children.find(e=>e.className==='delivery-editor');
+ const input=editor.children.find(e=>e.tagName==='label').children.find(e=>e.tagName==='input');
+ const local=new Date(Date.now()-3*3600000+2*3600000).toISOString().slice(0,16);
+ input.value=local;
+ const save=editor.children.find(e=>e.textContent==='Guardar hora estimada');
+ assert.ok(save?.listeners.click);
+ await save.listeners.click();
+ assert.equal(x.deliveryCalls.length,1);
+ assert.equal(x.deliveryCalls[0].order_id,orderId);
+ assert.equal(x.deliveryCalls[0].expected_version,0);
+ assert.equal(x.deliveryCalls[0].operator,'Responsable del mostrador');
+ assert.equal(x.deliveryCalls[0].confirmed,true);
+ assert.ok(Date.parse(x.deliveryCalls[0].ready_at)>Date.now());
+ assert.equal(x.order.estimated_ready_at,x.deliveryCalls[0].ready_at);
+ const updated=x.elements.get('#lane-en_preparacion').children[0];
+ assert.ok(updated.children.some(e=>String(e.textContent).includes('Preparación estimada')),'el nuevo horario aparece después de guardar');
+});
+test('hora vacía y errores de D1 se muestran junto al botón',async()=>{
+ const x=scene({stage:'en_preparacion',timeSaveError:'La estimación cambió en otro puesto'});
+ await vm.runInContext('refresh({silent:true})',x.env);
+ const card=x.elements.get('#lane-en_preparacion').children[0];
+ const open=card.children.find(e=>e.className==='actions').children.find(e=>e.textContent==='Definir hora de entrega');
+ await open.listeners.click();
+ const editor=card.children.find(e=>e.className==='delivery-editor');
+ const save=editor.children.find(e=>e.textContent==='Guardar hora estimada');
+ const input=editor.children.find(e=>e.tagName==='label').children.find(e=>e.tagName==='input');
+ const feedback=editor.children.find(e=>e.className==='delivery-feedback');
+ await save.listeners.click();
+ assert.match(feedback.textContent,/Elegí fecha y hora/);
+ assert.equal(x.deliveryCalls.length,0);
+ input.value=new Date(Date.now()-3*3600000+2*3600000).toISOString().slice(0,16);
+ await save.listeners.click();
+ assert.equal(x.deliveryCalls.length,1);
+ assert.match(feedback.textContent,/La estimación cambió en otro puesto/);
+ assert.equal(editor.hidden,false,'ante error, el editor permanece abierto');
+ assert.equal(save.disabled,false);
 });

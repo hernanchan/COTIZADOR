@@ -2905,7 +2905,7 @@ operatorInput.addEventListener("change",()=>{
 const lanes=["pendiente","en_preparacion","listo","en_espera","entregado"];
 let refreshingBoard=false;
 /** Edición operativa junto a la tarjeta. Nunca depender de un detalle lejano. */
-function inlineDeliveryEditor(card,order){
+function inlineDeliveryEditor(order){
  const panel=node("section",""),toggle=node("button",order.estimated_ready_at?
   "Modificar hora de entrega":"Definir hora de entrega");
  panel.className="delivery-editor";panel.hidden=true;
@@ -2926,7 +2926,6 @@ function inlineDeliveryEditor(card,order){
  label.append(input);reasonLabel.append(reason);
  panel.append(node("p","Ingresá una hora que puedas cumplir. El cliente la verá en «Mi pedido»."),label,
   reasonLabel,save,feedback);
- card.append(panel);
  toggle.addEventListener("click",()=>{
   panel.hidden=!panel.hidden;
   if(!panel.hidden){feedback.textContent="";input.focus?.()}
@@ -2956,7 +2955,7 @@ function inlineDeliveryEditor(card,order){
   }catch(e){feedback.textContent="No se pudo guardar: "+String(e.message||e)}
   finally{save.disabled=false}
  });
- return toggle;
+ return {toggle,panel};
 }
 
 function boardCard(order){
@@ -2991,10 +2990,12 @@ function boardCard(order){
    document.body.append(link);link.click();link.remove();
   });controls.append(zip);
  }
- if(current==="en_preparacion")controls.append(inlineDeliveryEditor(card,order));
+ const deliveryEditor=current==="en_preparacion"?inlineDeliveryEditor(order):null;
+ if(deliveryEditor)controls.append(deliveryEditor.toggle);
  const detail=node("button","Detalle");detail.className="outline";
  detail.addEventListener("click",()=>showOrder(order.id));
  controls.append(detail);card.append(controls);
+ if(deliveryEditor)card.append(deliveryEditor.panel);
  const feedback=node("p","");feedback.className="board-feedback";
  feedback.setAttribute("role","status");feedback.setAttribute("aria-live","polite");
  card.append(feedback);
