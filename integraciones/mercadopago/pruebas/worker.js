@@ -2854,8 +2854,19 @@ async function centralClientSandboxPayment(req,env,dispatch){
    Number.isSafeInteger(transfer?.amount_ars)&&
    transfer.amount_ars===belongs.amount_ars&&transfer.amount_ars>0?
    {alias,amountArs:transfer.amount_ars}:{};
+  let preparacionEstimada=null;
+  if(estado==="pagado"&&env.CENTRAL_PRODUCTION_TRACKING_ENABLED==="PRIVATE_TEST_ONLY"){
+   const estimate=await preparationEstimateDetail(env,belongs.id);
+   if(estimate.ready_at){
+    await centralProductionTables(env);
+    const stage=await env.DB.prepare("SELECT state FROM central_production_status WHERE order_id=?").bind(belongs.id).first();
+    if(!["listo","entregado"].includes(stage?.state))
+     preparacionEstimada={readyAt:estimate.ready_at,provisional:true};
+   }
+  }
   return json({ok:true,commercialOrderId:belongs.id,estado,
-   ...instrucciones,paymentAuthorized:estado==="pagado"});
+   ...instrucciones,...(preparacionEstimada?{preparacionEstimada}:{}),
+   paymentAuthorized:estado==="pagado"});
  }
  if(typeof dispatch!=="function"||typeof env.DEMO_ADMIN_KEY!=="string"||!env.DEMO_ADMIN_KEY)
   return json({ok:false,error:"Pasarela privada no disponible"},503);
@@ -3003,13 +3014,15 @@ export default {
      const previous=await env.DB.prepare("SELECT id,description,amount_ars,status,paid_at,created_at FROM orders WHERE status='paid' AND deposit_ars=amount_ars AND EXISTS (SELECT 1 FROM payment_reviews WHERE order_id=orders.id AND state='verified') ORDER BY paid_at DESC LIMIT 100").all();
      return json({orders:previous.results});
     }
-    await centralTables(env);await centralProductionTables(env);
+    await centralTables(env);await centralProductionTables(env);await ensurePreparationEstimates(env);
     const rows=await env.DB.prepare("SELECT o.id,o.description,o.amount_ars,o.status,o.paid_at,o.created_at,"+
      "CASE WHEN m.commercial_order_id IS NULL THEN NULL ELSE COALESCE(s.state,'pendiente') END AS production_state,"+
      "n.number AS work_number,m.file_count AS file_count,m.web_order_id AS web_order_id,"+
-     "c.phone AS customer_phone,COALESCE(s.version,0) AS production_version FROM orders o "+
+     "c.phone AS customer_phone,COALESCE(s.version,0) AS production_version,"+
+     "e.ready_at AS estimated_ready_at FROM orders o "+
      "LEFT JOIN central_document_manifests m ON m.commercial_order_id=o.id "+
      "LEFT JOIN central_production_status s ON s.order_id=o.id "+
+     "LEFT JOIN central_preparation_estimates e ON e.order_id=o.id "+
      "LEFT JOIN central_work_order_numbers n ON n.commercial_order_id=o.id "+
      "LEFT JOIN central_order_contacts c ON c.order_id=o.id "+
      "WHERE o.status='paid' AND o.deposit_ars=o.amount_ars AND EXISTS ("+
@@ -3093,8 +3106,10 @@ export default {
     const produccion=estadoProduccionPrivado(order,rows.results);
     if(central){
      produccion.documentosVerificados=central;
-     if(env.CENTRAL_PRODUCTION_TRACKING_ENABLED==="PRIVATE_TEST_ONLY")
-      produccion.seguimiento=await centralProductionDetail(env,id);
+     if(env.CENTRAL_PRODUCTION_TRACKING_ENABLED==="PRIVATE_TEST_ONLY"){
+       produccion.seguimiento=await centralProductionDetail(env,id);
+       produccion.preparacionEstimada=await preparationEstimateDetail(env,id);
+      }
     }
     const express=await centralPolaroidDetail(env,id);
     if(express){
