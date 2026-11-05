@@ -2027,7 +2027,7 @@ export default {
       const headers={'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store, max-age=0',
        'X-Content-Type-Options':'nosniff','X-Robots-Tag':'noindex,nofollow,noarchive','Referrer-Policy':'no-referrer'};
       try{return new Response(JSON.stringify(await consultarCatalogoPublicado()),{status:200,headers})}
-      catch{return new Response(JSON.stringify({ok:false,products:[],error:'Catálogo temporalmente no disponible. No se pueden confirmar precios.'}),{status:503,headers})}
+      catch(error){return new Response(JSON.stringify({ok:false,products:[],error:'Catálogo temporalmente no disponible. No se pueden confirmar precios.',diagnostic:(String(error?.name||'Error')+': '+String(error?.message||'unknown')).slice(0,140)}),{status:503,headers})}
     }
     if(page==='/prueba-v2/diseno-sin-clave'||page==='/prueba-v2/diseno-sin-clave/ofertas.html'){
       if(request.method!=='GET')return new Response('Solo consulta',{status:405,headers:{'Allow':'GET','Cache-Control':'no-store'}});

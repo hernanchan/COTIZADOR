@@ -66,10 +66,10 @@ export function productosDesdeCsv(csv){
 }
 export async function consultarCatalogoPublicado(fetcher=fetch){
  const response=await fetcher(URL_CATALOGO_PUBLICADO,{
-  method:'GET',redirect:'follow',cache:'no-store',
-  headers:{Accept:'text/csv'},signal:AbortSignal.timeout(11000)
+  method:'GET',redirect:'follow',
+  headers:{Accept:'text/csv','Cache-Control':'no-cache'},signal:AbortSignal.timeout(11000)
  });
- if(!response.ok)throw Error('CSV no disponible');
+ if(!response.ok)throw Error('CSV HTTP '+response.status);
  const len=Number(response.headers.get('content-length')||0);
  if(len>450000)throw Error('CSV excede límite');
  const content=await response.text();

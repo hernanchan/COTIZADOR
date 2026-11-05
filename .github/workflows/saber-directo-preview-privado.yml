@@ -157,7 +157,7 @@ jobs:
           grep -Fq 'SIN CONTRASEÑA' "$workdir/libre-offers.html" || { echo "OPEN_OFFERS_BANNER_MISSING"; exit 1; }
           # Revisión real de la fuente pública: permitir publicación solo si el
           # Worker puede leer Google Sheets y devolver precios, sin datos privados.
-          verify_get 200 "$workdir/catalogo.json" "$origin/prueba-v2/diseno-sin-clave/catalogo.json" || { echo "CATALOGO_DINAMICO_NO_DISPONIBLE"; exit 1; }
+          verify_get 200 "$workdir/catalogo.json" "$origin/prueba-v2/diseno-sin-clave/catalogo.json" || { echo "CATALOGO_DINAMICO_NO_DISPONIBLE"; jq -r '.diagnostic // .error // "Sin detalle"' "$workdir/catalogo.json" || true; exit 1; }
           jq -e '.ok==true and (.products|type=="array") and (.products|length>0) and (.paymentsEnabled==false) and (.ordersEnabled==false) and all(.products[]; .finalPrice>0 and .price>0)' "$workdir/catalogo.json" >/dev/null || { echo "CATALOGO_PUBLICO_INVALIDO"; exit 1; }
           grep -Fq '/prueba-v2/diseno-sin-clave/catalogo.json' "$workdir/libre.html" || { echo "FALTA_RUTA_CATALOGO_EN_VISTA"; exit 1; }
           echo "SHEETS_CATALOGO_PUBLICO_ACTUAL_200_SIN_PAGOS"
