@@ -11,3 +11,9 @@ Se implementa el siguiente paso **únicamente en la vista de diseño sin contras
 - Quedan sin modificar precios reales, Google Sheets, cotizador TUS, Central, D1, pagos y web pública.
 
 **Para habilitar compras:** validar el catálogo productivo y el circuito de WhatsApp con precios actuales, sin presentar esta simulación como venta.
+
+## Verificación final
+- Confirmado por el usuario: «sí, sí, todo ok» en prueba previa del carrito (agregar, cantidades, quitar y total).
+- Nuevo resumen de compra ensayado con JS compilado y sintaxis de scripts emitidos verificada en CI `42107414732` (SUCCESS).
+- Deployment del Worker exclusivo de pruebas `42107487850` (SUCCESS), versión `fa88182c-beb3-4858-8e90-5a58c30e4dea`; portada/ofertas 200 anon y cotizador privado 401 anon. Foto catálogo 200.
+- Botón de enviar sigue deshabilitado, sin transacciones, WhatsApp ni cambios a `main`.

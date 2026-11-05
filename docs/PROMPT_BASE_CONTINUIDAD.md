@@ -391,3 +391,9 @@ URL: `https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/disen
 - Corregida oferta ficticia cuando precio promocional == normal en ambas páginas de la rama.
 - CI `42100108202` SUCCESS, deploy sólo Worker de pruebas `42100286530` SUCCESS versión `3120bd0a-a698-4893-9efa-1883476ad9e1`. GET 200 para previews anónimas, 401 cotizador privado. Test externo de Google Sheets `42100525880` SUCCESS: HTTP 200 CSV, CORS `*`, 4 productos activos, 2 descuentos; sin deploy ni cambios de base de datos.
 - V3 sigue privada/de muestra, `main` y dominio público no cambiados. **Siguientes pasos:** depurar la hoja MODELO de cara a venta real; preparar fase 1 de catálogo solicitando artículos por WhatsApp, cotizador TUS público y pagos habilitados únicamente después de prepublicación y autorización; no dar por hecho carrito único.
+
+## 05/11/2026 — CARRITO V3 VALIDADO Y PREPARAR PEDIDO ENSAYO
+- Usuario aprobó prueba del carrito V3 con «sí sí todo ok».
+- Se añadió botón «Preparar pedido para WhatsApp (prueba)» que muestra resumen de cantidades, códigos, subtotales y total en carrito; NO genera mensajes ni pedidos. Botón «Enviar pedido» deshabilitado. Guardado por sesión. Precios siguen siendo muestra MODELO fechada.
+- CI `42107414732` SUCCESS, añadió prueba de sintaxis del JavaScript efectivamente emitido; despliegue `42107487850` SUCCESS versión Worker `fa88182c-beb3-4858-8e90-5a58c30e4dea`. Preview en `https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/diseno-sin-clave`.
+- Antes de publicar: confirmar hoja de productos reales y precios, revalidación al enviar, acordar envío WhatsApp real o finalizar carrito mixto; no cambiar `main`, DNS, pagos, Central, D1 ni cotizador privado hasta verificación y autorización.
