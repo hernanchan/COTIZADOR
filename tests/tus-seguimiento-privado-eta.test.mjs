@@ -28,7 +28,7 @@ const env={DB:{prepare(sql){let args=[];return{
   if(sql.includes('FROM central_eta_settings WHERE id=1'))return {base_minutes:60,parallel_orders:3,revision:1};
   if(sql.includes('SELECT COUNT(*) AS ahead'))return {ahead:7};
   throw Error(sql);
- }}}}},
+ }}}},
  CENTRAL_BRIDGE_KEY:'long-test-only-bridge-key-not-for-production-12345',
  DEMO_ADMIN_KEY:'PANEL_TEST',MP_TEST_ACCESS_TOKEN:'FAKE',
  MP_TEST_SELLER_ID:'test',TEST_WEBHOOK_URL:'https://test.invalid/webhook',
