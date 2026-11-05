@@ -10,9 +10,9 @@ vm.runInContext(src.replace('export default {','globalThis.worker = {'),ctx);
 const classify=vm.runInContext('etaResourceTags',ctx);
 function row(trabajos){return {manifest_json:JSON.stringify({trabajos})};}
 const jobs=[
- row([{servicio:'documentos',tipoAnillado:'ninguno'}]),
- row([{servicio:'documentos',tipoAnillado:'grupo',grupoAnillado:'1'},
-  {servicio:'documentos',tipoAnillado:'grupo',grupoAnillado:'1'}]),
+ row([{servicio:'documentos',tipoAnillado:'ninguno',modo:'bn'}]),
+ row([{servicio:'documentos',tipoAnillado:'grupo',grupoAnillado:'1',modo:'color'},
+  {servicio:'documentos',tipoAnillado:'grupo',grupoAnillado:'1',modo:'b/n'}]),
  row([{servicio:'ploteos',planoPorPagina:[{modo:'cad'},{modo:'poster'}]}]),
  row([{servicio:'documentos'}])
 ];
@@ -64,13 +64,15 @@ const draft=(revision=0)=>({printParallel:2,bindingParallel:1,plotterParallel:1,
  expectedRevision:revision,operator:'Operador de turno',confirmed:true});
 test('clasifica pedidos por impresiones, anillado, CAD y póster sin duplicar grupo',()=>{
  const a=classify(jobs[0].manifest_json);
- assert.equal(a.documents,true);assert.equal(a.binding,false);
+ assert.equal(a.documents,true);assert.equal(a.binding,false);assert.equal(a.bn,true);assert.equal(a.color,false);
  const b=classify(jobs[1].manifest_json);
- assert.equal(b.documents,true);assert.equal(b.binding,true);
+ assert.equal(b.documents,true);assert.equal(b.binding,true);assert.equal(b.bn,true);assert.equal(b.color,true);
  const c=classify(jobs[2].manifest_json);
  assert.equal(c.cad,true);assert.equal(c.poster,true);
  assert.equal(c.documents,false);
  assert.equal(classify(jobs[3].manifest_json).review,true);
+ assert.equal(classify(jobs[3].manifest_json).unknownPrint,true);
+ assert.equal(classify(row([{servicio:'documentos',tipoAnillado:'ninguno',modo:'color'}]).manifest_json).color,true);
  assert.equal(classify('not-json').review,true);
 });
 test('sin clave y flag privado no filtra la carga ni escribe D1',async()=>{
@@ -90,6 +92,9 @@ test('GET muestra conteo de pedidos verificados, no PDF ni datos personales',asy
  assert.equal(body.settings.print_parallel,0);
  assert.equal(body.load.paidActive,4);
  assert.equal(body.load.documents,3);
+ assert.equal(body.load.bn,2);
+ assert.equal(body.load.color,1);
+ assert.equal(body.load.unknownPrint,1);
  assert.equal(body.load.binding,1);
  assert.equal(body.load.cad,1);
  assert.equal(body.load.poster,1);
@@ -121,6 +126,8 @@ test('panel actualizado compila; sólo la cola calibrada puede habilitar fecha c
  new vm.Script(script);
  assert.match(html,/etaResourcesPanel/);
  assert.match(script,/etaResourcesLoad/);
+ assert.match(script,/modo sin especificar/);
+ assert.match(html,/cupo conjunto anterior/);
  assert.match(script,/expectedRevision:etaResourcesSnapshot.revision/);
  const customer=src.slice(src.indexOf('async function trackingCustomerStatus'),src.indexOf('async function centralAdminDetail'));
  assert.match(customer,/etaResourceQueueForOrder/);

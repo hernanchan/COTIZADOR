@@ -1714,10 +1714,13 @@ function etaResourceTags(manifest){
  let m;
  try{m=typeof manifest==="string"?JSON.parse(manifest):manifest}catch{return {review:true}}
  if(!m||!Array.isArray(m.trabajos)||!m.trabajos.length)return {review:true};
- const tags={documents:false,binding:false,cad:false,poster:false,review:false};
+ const tags={documents:false,bn:false,color:false,unknownPrint:false,binding:false,cad:false,poster:false,review:false};
  for(const t of m.trabajos){
   if(t?.servicio==="documentos"){
    tags.documents=true;
+   if(t.modo==="bn"||t.modo==="b/n")tags.bn=true;
+   else if(t.modo==="color")tags.color=true;
+   else tags.unknownPrint=true; // Solo lectura; no inferir B/N ni color.
    if(t.tipoAnillado==="individual"||t.tipoAnillado==="grupo")tags.binding=true;
    else if(t.tipoAnillado!=="ninguno")tags.review=true;
   }else if(t?.servicio==="ploteos"){
@@ -1742,10 +1745,10 @@ async function etaResourceLoad(env){
   "ORDER BY o.paid_at ASC,o.id ASC LIMIT 501"
  ).all();
  const rows=response.results||[],out={paidActive:Math.min(rows.length,500),
-  documents:0,binding:0,cad:0,poster:0,review:0,partial:rows.length>500};
+  documents:0,bn:0,color:0,unknownPrint:0,binding:0,cad:0,poster:0,review:0,partial:rows.length>500};
  for(const row of rows.slice(0,500)){
   const tags=etaResourceTags(row.manifest_json);
-  for(const key of ["documents","binding","cad","poster","review"])if(tags[key])out[key]++;
+  for(const key of ["documents","bn","color","unknownPrint","binding","cad","poster","review"])if(tags[key])out[key]++;
  }
  return out;
 }
@@ -2091,9 +2094,9 @@ body.price-only #priceAdminFieldset summary{font-size:1.3rem}
 </details>
 
 <details id="etaResourcesPanel"><summary>Carga y capacidad por recursos de trabajo</summary>
-<p class="note">Los cupos representan <strong>trabajos que realmente pueden prepararse en paralelo</strong>, no cantidad nominal de máquinas. 0 = sin calibrar. Un recurso sin cupo libre bloquea una fecha automática, pero estos cupos NO estiman cuánto dura cada trabajo.</p>
+<p class="note">Los cupos representan <strong>trabajos que realmente pueden prepararse en paralelo</strong>, no cantidad nominal de máquinas. La impresión B/N tiene 1 equipo rápido confirmado; el número de equipos color sigue pendiente. Por ahora, el control de documentos es CONJUNTO: no ingresar 1 suponiendo que representa también las impresoras color. 0 = sin calibrar. Un cupo sin configurar no inventa duración.</p>
 <div class="toolbar">
-<label>Documentos simultáneos <input id="etaPrintParallel" type="number" min="0" max="30" step="1" value="0" style="width:75px"></label>
+<label>Documentos simultáneos (cupo conjunto anterior) <input id="etaPrintParallel" type="number" min="0" max="30" step="1" value="0" style="width:75px"></label>
 <label>Anillados simultáneos <input id="etaBindingParallel" type="number" min="0" max="30" step="1" value="0" style="width:75px"></label>
 <label>Ploteos simultáneos <input id="etaPlotterParallel" type="number" min="0" max="30" step="1" value="0" style="width:75px"></label>
 <button id="etaResourcesLoad" class="outline" type="button">Ver carga actual</button>
@@ -2294,6 +2297,7 @@ async function loadEtaResources(){
   const d=data.load;
   document.querySelector("#etaResourcesLoadResult").textContent=
    "Pedidos activos verificados: "+d.paidActive+" · con documentos: "+d.documents+
+   " (B/N: "+d.bn+", color: "+d.color+", modo sin especificar: "+d.unknownPrint+")"+
    " · con anillado: "+d.binding+" · con CAD: "+d.cad+" · con póster: "+d.poster+
    " · requieren revisión de ficha: "+d.review+(d.partial?" · listado parcial (más de 500)":"")+".";
   etaResourceStatus.textContent="Configuración de recursos · revisión "+data.settings.revision+".";
