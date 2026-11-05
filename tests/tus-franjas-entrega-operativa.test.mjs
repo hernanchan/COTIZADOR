@@ -13,6 +13,7 @@ vm.runInContext(src.replace('export default {','globalThis.worker = {'),ctx);
 const plan=vm.runInContext('deliveryPlanForCustomer',ctx);
 let saved=null,history=[],writes=0;
 const env={DEMO_ADMIN_KEY:'PANEL_TEST',CENTRAL_PRODUCTION_TRACKING_ENABLED:'PRIVATE_TEST_ONLY',
+ MP_TEST_ACCESS_TOKEN:'FAKE',MP_TEST_SELLER_ID:'seller',TEST_WEBHOOK_URL:'https://test.invalid/webhook',MP_WEBHOOK_SECRET:'test',
  DB:{prepare(sql){
   let args=[];return {
    get sql(){return sql},get args(){return args},
