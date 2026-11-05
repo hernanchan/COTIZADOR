@@ -1984,6 +1984,19 @@ body.price-only #priceAdminFieldset summary{font-size:1.3rem}
 <div class="toolbar"><button id="etaCalendarLoad" class="outline" type="button">Consultar agenda</button><button id="etaCalendarSave" type="button" disabled>Guardar agenda</button></div>
 <p id="etaCalendarStatus" class="note" role="status" aria-live="polite">Agenda aún sin consultar.</p>
 </details>
+
+<details id="etaResourcesPanel"><summary>Carga y capacidad por recursos de trabajo</summary>
+<p class="note">Solo pedidos pagados y verificados aún en producción; un mismo pedido puede requerir impresión y anillado. Los valores 0 significan capacidad sin calibrar. No se utilizan para prometer fechas de retiro.</p>
+<div class="toolbar">
+<label>Documentos simultáneos <input id="etaPrintParallel" type="number" min="0" max="30" step="1" value="0" style="width:75px"></label>
+<label>Anillados simultáneos <input id="etaBindingParallel" type="number" min="0" max="30" step="1" value="0" style="width:75px"></label>
+<label>Ploteos simultáneos <input id="etaPlotterParallel" type="number" min="0" max="30" step="1" value="0" style="width:75px"></label>
+<button id="etaResourcesLoad" class="outline" type="button">Ver carga actual</button>
+<button id="etaResourcesSave" type="button" disabled>Guardar capacidad</button>
+</div>
+<p id="etaResourcesStatus" class="note" role="status" aria-live="polite">Carga pendiente de consultar.</p>
+<p id="etaResourcesLoadResult" class="note" aria-live="polite"></p>
+</details>
 </fieldset>
 <fieldset id="productionBoardArea"><legend>Tablero de producción · pedidos pagos</legend>
 <p class="note">Cada pedido avanza de columna al registrar su estado. Descargar el ZIP no cambia el seguimiento. Actualización automática cada 30 segundos mientras el panel esté abierto.</p>
@@ -2126,6 +2139,49 @@ mobileInviteCopy.addEventListener("click",async()=>{
  try{await navigator.clipboard.writeText(mobileInviteLink.value);
   mobileInviteStatus.textContent="Enlace copiado. Pegalo en tu celular.";
  }catch{mobileInviteLink.select();mobileInviteStatus.textContent="Seleccioná y copiá el enlace."; }
+});
+
+let etaResourcesSnapshot=null;
+const etaResourceStatus=document.querySelector("#etaResourcesStatus");
+const etaResourcesSave=document.querySelector("#etaResourcesSave");
+const etaResourceInputs={
+ printParallel:document.querySelector("#etaPrintParallel"),
+ bindingParallel:document.querySelector("#etaBindingParallel"),
+ plotterParallel:document.querySelector("#etaPlotterParallel")
+};
+async function loadEtaResources(){
+ try{
+  const data=await api("/admin/api/central/resource-capacity");
+  etaResourcesSnapshot=data.settings;
+  etaResourceInputs.printParallel.value=data.settings.print_parallel;
+  etaResourceInputs.bindingParallel.value=data.settings.binding_parallel;
+  etaResourceInputs.plotterParallel.value=data.settings.plotter_parallel;
+  etaResourcesSave.disabled=false;
+  const d=data.load;
+  document.querySelector("#etaResourcesLoadResult").textContent=
+   "Pedidos activos verificados: "+d.paidActive+" · con documentos: "+d.documents+
+   " · con anillado: "+d.binding+" · con CAD: "+d.cad+" · con póster: "+d.poster+
+   " · requieren revisión de ficha: "+d.review+(d.partial?" · listado parcial (más de 500)":"")+".";
+  etaResourceStatus.textContent="Configuración de recursos · revisión "+data.settings.revision+".";
+ }catch(e){etaResourcesSnapshot=null;etaResourcesSave.disabled=true;
+  etaResourceStatus.textContent="No se pudo cargar recursos: "+(e.message||e)}
+}
+document.querySelector("#etaResourcesLoad").addEventListener("click",loadEtaResources);
+etaResourcesSave.addEventListener("click",async()=>{
+ if(!etaResourcesSnapshot)return;
+ const operator=requestOperator();
+ if(!operator){etaResourceStatus.textContent="Indicá el responsable.";return}
+ const values=Object.fromEntries(Object.entries(etaResourceInputs).map(([key,el])=>[key,Number(el.value)]));
+ if(Object.values(values).some(n=>!Number.isSafeInteger(n)||n<0||n>30)){
+  etaResourceStatus.textContent="La capacidad simultánea debe ser de 0 a 30.";return;
+ }
+ if(!confirm("¿Guardar capacidad por recurso en el piloto? Aún NO modifica el plazo mostrado al cliente."))return;
+ etaResourcesSave.disabled=true;
+ try{
+  await apiPost("/admin/api/central/resource-capacity",{...values,
+   expectedRevision:etaResourcesSnapshot.revision,operator,confirmed:true});
+  await loadEtaResources();
+ }catch(e){etaResourceStatus.textContent=e.message||"No se pudo guardar.";etaResourcesSave.disabled=false}
 });
 function money(n){return new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0}).format(Number(n)||0)}
 async function apiPost(path,data){
