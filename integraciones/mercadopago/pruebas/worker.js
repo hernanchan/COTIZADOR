@@ -290,6 +290,69 @@ async function centralTUSReceiptLookup(req,env){
  * Protegida por el mismo HMAC que D1 receipt-check; nunca incluye bytes,
  * enlaces de Storage, claves de Supabase, autorización de pago o producción.
  */
+
+/**
+ * Plan firmado de eliminación de originales TUS: lectura de D1 solamente.
+ * ÚNICAMENTE para otro Worker con HMAC; no borra archivos ni expone contenido.
+ * La orden debe estar entregada, totalmente pagada y verificada.
+ */
+async function centralTUSDeliveryPurgePlan(req,env){
+ const signed=await centralReadSigned(req,env);
+ if(signed.error)return json({ok:false,error:"Acceso privado no autorizado"},signed.status);
+ const p=signed.payload;
+ if(!p||typeof p!=="object"||Array.isArray(p)||
+    Object.keys(p).sort().join(",")!=="schema,webOrderId"||
+    p.schema!=="saber-central-tus-purge-plan-v1"||
+    !/^WEB-ENSAYO-[A-F0-9]{32}$/.test(p.webOrderId||""))
+  return json({ok:false,error:"Pedido TUS inválido"},422);
+ await centralTables(env);
+ await centralProductionTables(env);
+ await ensurePaymentReviews(env);
+ const row=await env.DB.prepare(
+  "SELECT m.web_order_id,m.commercial_order_id,m.manifest_json,m.file_count,"+
+  "o.status AS payment_status,o.paid_at,o.amount_ars,o.deposit_ars,"+
+  "p.state AS production_state,p.version AS production_version,p.updated_at AS delivered_at "+
+  "FROM central_document_manifests m JOIN orders o ON o.id=m.commercial_order_id "+
+  "JOIN central_production_status p ON p.order_id=o.id "+
+  "WHERE m.web_order_id=? AND o.status='paid' AND o.paid_at IS NOT NULL "+
+  "AND o.deposit_ars=o.amount_ars AND p.state='entregado' "+
+  "AND EXISTS (SELECT 1 FROM payment_reviews r WHERE r.order_id=o.id AND r.state='verified') LIMIT 1"
+ ).bind(p.webOrderId).first();
+ if(!row||!Number.isSafeInteger(row.production_version)||row.production_version<1)
+  return json({ok:false,error:"Pedido no entregado o pago sin verificar"},409);
+ const receipts=await env.DB.prepare(
+  "SELECT r.receipt_id,r.file_id,r.sha256 FROM central_document_receipts r "+
+  "WHERE r.web_order_id=? ORDER BY r.receipt_id"
+ ).bind(p.webOrderId).all();
+ const list=receipts.results||[];
+ let manifest;
+ try{manifest=JSON.parse(row.manifest_json)}catch{return json({ok:false,error:"Manifiesto ilegible"},409)}
+ if(manifest?.schema!=="saber-central-documentos-d1-v1"||
+   manifest.webOrderId!==row.web_order_id||!Array.isArray(manifest.trabajos)||
+   manifest.trabajos.length!==row.file_count||list.length!==row.file_count||
+   row.file_count<1||row.file_count>10)
+  return json({ok:false,error:"Manifiesto de archivos incompatible"},409);
+ const byReceipt=new Map(manifest.trabajos.map(t=>[t.reciboPrivado,t]));
+ const used=new Set(),files=[];
+ for(const r of list){
+  const t=byReceipt.get(r.receipt_id);
+  if(!CENTRAL_RECEIPT.test(r.receipt_id||"")||
+     !CENTRAL_FILE.test(r.file_id||"")||!CENTRAL_HEX.test(r.sha256||"")||
+     used.has(r.receipt_id)||!t||t.fileId!==r.file_id||t.sha256!==r.sha256||
+     !Number.isSafeInteger(t.bytes)||t.bytes<5||t.bytes>20*1024*1024)
+   return json({ok:false,error:"Archivos no coinciden con el pedido"},409);
+  used.add(r.receipt_id);
+  files.push({receiptId:r.receipt_id,fileId:r.file_id,sha256:r.sha256,bytes:t.bytes});
+ }
+ if(used.size!==manifest.trabajos.length)
+  return json({ok:false,error:"Recibos incompletos"},409);
+ return json({ok:true,schema:"saber-central-tus-purge-plan-v1",
+   webOrderId:row.web_order_id,commercialOrderId:row.commercial_order_id,
+   productionState:row.production_state,productionVersion:row.production_version,
+   deliveredAt:row.delivered_at,paymentVerified:true,files,
+   deletionExecuted:false,retentionDays:0},200);
+}
+
 async function centralTUSPackageManifest(req,env){
  const signed=await centralReadSigned(req,env);
  if(signed.error)return json({ok:false,error:"Acceso privado no autorizado"},signed.status);
@@ -4021,7 +4084,8 @@ export default {
    if(url.pathname==="/internal/central/bridge-probe")return await centralBridgeProbe(req,env);
    if(url.pathname==="/internal/central/stage")return await centralStage(req,env);
    if(url.pathname==="/internal/central/receipt-check")return await centralTUSReceiptLookup(req,env);
-   if(url.pathname==="/internal/central/tus-package")return await centralTUSPackageManifest(req,env);
+   if(url.pathname==="/internal/central/tus-purge-plan")return await centralTUSDeliveryPurgePlan(req,env);
+    if(url.pathname==="/internal/central/tus-package")return await centralTUSPackageManifest(req,env);
    if(url.pathname==="/internal/central/link")return await centralLink(req,env);
    if(url.pathname==="/internal/central/prepare-order")return await centralPrepareDraft(req,env);
    if(url.pathname==="/internal/central/payment-sandbox-client")
