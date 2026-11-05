@@ -1,0 +1,52 @@
+name: Verificar ingreso móvil privado LIVE (sin generar invitaciones)
+on:
+  push:
+    branches:
+      - integracion/tus-pedido-privado-20261101
+    paths:
+      - docs/VERIFICAR-INGRESO-MOVIL-PRIVADO.trigger
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verificar página de entrada sin debilitar HTTP Basic
+        shell: bash
+        run: |
+          set -euo pipefail
+          origin="https://saber-documentos-pruebas.libreriasaber.workers.dev"
+          tmp=$(mktemp -d)
+          trap 'rm -rf "$tmp"' EXIT
+          code=$(curl -sS --max-time 20 -D "$tmp/headers" -o "$tmp/page" -w '%{http_code}' "$origin/prueba-v2/ingresar")
+          test "$code" = "200"
+          grep -Fq 'Validando acceso privado' "$tmp/page"
+          grep -iq 'Cache-Control: no-store' "$tmp/headers"
+          grep -iq 'Referrer-Policy: no-referrer' "$tmp/headers"
+          echo 'INGRESO_MOVIL_PAGINA_200_SIN_CREDENCIALES_ENTREGADAS'
+          code=$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$origin/prueba-v2/")
+          test "$code" = "401"
+          echo 'BASIC_OPERADOR_SIGUE_EXIGIENDO_HTTP_401'
+          code=$(curl -sS --max-time 20 -o "$tmp/invalid" -w '%{http_code}' \
+            -H "Origin: $origin" -H 'Content-Type: application/json' \
+            --data-binary '{"ticket":"invalido"}' "$origin/prueba-v2/ingresar")
+          test "$code" = "400"
+          echo 'TICKET_INVALIDO_RECHAZADO_SIN_SESSION'
+          code=$(curl -sS --max-time 20 -o "$tmp/origin" -w '%{http_code}' \
+            -H 'Origin: https://otro-sitio.invalid' -H 'Content-Type: application/json' \
+            --data-binary '{"ticket":"invalido"}' "$origin/prueba-v2/ingresar")
+          test "$code" = "403"
+          echo 'ORIGEN_EXTERNO_RECHAZADO'
+      - name: Verificar Central privada sin crear acceso ni cobrar
+        shell: bash
+        run: |
+          set -euo pipefail
+          origin="https://saber-pagos-pruebas.libreriasaber.workers.dev"
+          status=$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$origin/admin/api/central/mobile-invite")
+          test "$status" = "401"
+          health=$(curl -fsS --max-time 20 "$origin/health")
+          jq -e '.ok == true and .databaseReady == true and .paymentsEnabled == false' <<< "$health" >/dev/null
+          echo 'CENTRAL_MOVIL_AUTH_401_HEALTH_OK_PAGOS_REALES_OFF'
