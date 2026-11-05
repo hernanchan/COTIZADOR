@@ -2031,7 +2031,7 @@ export default {
           'X-Content-Type-Options':'nosniff',
           'Referrer-Policy':'no-referrer',
           'X-Frame-Options':'DENY',
-          'Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src https://cdn.jsdelivr.net https://drive.google.com data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+          'Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src https://cdn.jsdelivr.net https://drive.google.com https://images.unsplash.com data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
         }});
       }catch{return new Response('Vista no disponible',{status:503,headers:{'Cache-Control':'no-store'}})}
     }

@@ -37,3 +37,14 @@ test('Conserva catálogo, carrito, consulta WhatsApp y puertas comerciales exist
   assert.match(html,/href="cotizar\.html"/);
   assert.match(html,/class="mobilebar"/);
 });
+
+test('V3 hero tiene fotografía comercial y los dos caminos de compra',()=>{
+ assert.match(html,/SABER RETAIL V3/);
+ assert.match(html,/src="https:\/\/images\.unsplash\.com\/photo-/);
+ assert.match(html,/v3-tile-products/);
+ assert.match(html,/v3-tile-print/);
+ assert.match(html,/Descubrir productos/);
+ assert.match(html,/Cotizar impresiones/);
+ assert.match(html,/class="v3-category-photo"/);
+ assert.equal((html.match(/id="promoTitle"/g)||[]).length,1);
+});
