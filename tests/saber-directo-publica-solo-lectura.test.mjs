@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {Script} from 'node:vm';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {prepararVistaDisenoAbierta} from '../integraciones/autocotizador/recepcion/saber-directo-vista-previa.mjs';
@@ -76,4 +77,13 @@ test('Ensayo prepara resumen de compra sin enviar mensajes, pagos ni pedidos',()
  assert.match(rendered,/confirman disponibilidad y precio vigente/);
  assert.match(rendered,/Enviar pedido \(desactivado\)/);
  assert.doesNotMatch(rendered,/https:\/\/wa\.me\/|sendWhatsApp|MercadoPago|fetch\(|XMLHttpRequest/);
+});
+
+test('El JavaScript efectivamente emitido a la vista no tiene errores de sintaxis',()=>{
+ for(const [html,opts] of [[home,{}],[offers,{ofertas:true,categoria:'Escolar'}]]){
+  const rendered=prepararVistaDisenoAbierta(html,opts);
+  const scripts=[...rendered.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]);
+  assert.ok(scripts.length>0,'La maqueta debe incluir el script de carrito');
+  for(const source of scripts)assert.doesNotThrow(()=>new Script(source));
+ }
 });
