@@ -28,7 +28,7 @@ import {verificarVinculoCotizadorV2} from './verificar-vinculo-cotizador-v2.mjs'
 import {paginaCotizadorV2PruebaPrivada} from './pantalla-cotizador-v2-prueba-privada.mjs';
 import portadaSaberDirectoHtml from '../../../vidriera/index.html';
 import ofertasSaberDirectoHtml from '../../../vidriera/ofertas.html';
-import {prepararVistaDisenoPrivada} from './saber-directo-vista-previa.mjs';
+import {prepararVistaDisenoPrivada,prepararVistaDisenoAbierta} from './saber-directo-vista-previa.mjs';
 import {pagoTUSSandboxCliente} from './tus-pago-sandbox-cliente.mjs';
 import {paginaDescargaTUSPersonal} from './pantalla-descarga-tus-personal.mjs';
 import {paginaPaqueteTUSPersonal} from './pantalla-paquete-tus-personal.mjs';
@@ -2016,6 +2016,25 @@ async function v2PrivateBrowserResponse(request,env,path){
 export default {
   async fetch(request, env, ctx) {
     const page=new URL(request.url).pathname;
+    // DEMOSTRACIÓN VISUAL ANÓNIMA, SEPARADA DEL PORTAL PRIVADO.
+    // Solo HTML saneado: sin JS comercial, sin fetch, sin carrito operativo.
+    // El cotizador, precios D1, pedidos y Central conservan autenticación.
+    if(page==='/prueba-v2/diseno-sin-clave'||page==='/prueba-v2/diseno-sin-clave/ofertas.html'){
+      if(request.method!=='GET')return new Response('Solo consulta',{status:405,headers:{'Allow':'GET','Cache-Control':'no-store'}});
+      const ofertas=page.endsWith('/ofertas.html');
+      try{
+        const html=prepararVistaDisenoAbierta(ofertas?ofertasSaberDirectoHtml:portadaSaberDirectoHtml,{ofertas});
+        return new Response(html,{status:200,headers:{
+          'Content-Type':'text/html; charset=utf-8',
+          'Cache-Control':'no-store, max-age=0',
+          'X-Robots-Tag':'noindex,nofollow,noarchive',
+          'X-Content-Type-Options':'nosniff',
+          'Referrer-Policy':'no-referrer',
+          'X-Frame-Options':'DENY',
+          'Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src https://cdn.jsdelivr.net https://drive.google.com data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+        }});
+      }catch{return new Response('Vista no disponible',{status:503,headers:{'Cache-Control':'no-store'}})}
+    }
     if(page==='/prueba-v2/diseno-saber-directo'||page==='/prueba-v2/diseno-saber-directo/ofertas.html')
       return v2PrivateBrowserResponse(request,env,page);
     if(page==='/prueba-v2/ingresar')return v2MobileInviteExchange(request,env);
