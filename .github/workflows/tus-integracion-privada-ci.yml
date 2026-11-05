@@ -114,5 +114,7 @@ jobs:
           if(blockedNoD1.status!==503)throw Error('D1 caído debe impedir devolver valores de catálogo anterior.');
           console.info('CATALOGO_D1_ON_PROTEGIDO_401_AUTENTICADO_200_FALLA_503_SIN_FALLBACK');
           NODE
+      - name: Contrato estático de portada Saber Directo
+        run: node --test tests/saber-directo-portada.test.mjs
       - name: Confirmación SIN despliegues
         run: echo 'PRUEBA_TUS_PRIVADA_OK - SIN DESPLIEGUE - SIN PAGOS - WEB COMERCIAL INTACTA'
