@@ -1366,6 +1366,44 @@ async function centralProductionDetail(env,id){
   operator:current?.operator||null,updated_at:current?.updated_at||null,
   history:rows.results||[],allowed:PRODUCTION_NEXT[current?.state||"pendiente"],productionAuthorized:false};
 }
+
+/**
+ * Cola durable de eliminación de PDF al entregar (aún sin ejecución en Storage).
+ * La compuerta de ensayo está APAGADA por defecto; al encenderse solo encola
+ * originales TUS, nunca borra bytes ni modifica registros de pago.
+ * La ejecución futura verificará nuevamente la Central antes de borrar.
+ */
+async function centralQueueDeliveryCleanup(env,orderId,version,operator){
+ if(env.CENTRAL_TUS_PURGE_QUEUE_ENABLED!=="PRIVATE_TEST_ONLY")
+  return {state:"desactivado",filesDeleted:0};
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_tus_purge_queue ("+
+  "order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE RESTRICT,"+
+  "web_order_id TEXT NOT NULL UNIQUE REFERENCES central_document_manifests(web_order_id) ON DELETE RESTRICT,"+
+  "production_version INTEGER NOT NULL CHECK(production_version>=1),"+
+  "state TEXT NOT NULL DEFAULT 'pending' CHECK(state IN ('pending','completed','error')),"+
+  "operator TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT (datetime('now')),"+
+  "completed_at TEXT)").run();
+ const row=await env.DB.prepare(
+  "SELECT m.web_order_id,m.file_count FROM central_document_manifests m "+
+  "JOIN orders o ON o.id=m.commercial_order_id "+
+  "JOIN central_production_status p ON p.order_id=o.id "+
+  "WHERE o.id=? AND o.status='paid' AND o.paid_at IS NOT NULL "+
+  "AND o.deposit_ars=o.amount_ars AND p.state='entregado' AND p.version=? "+
+  "AND EXISTS (SELECT 1 FROM payment_reviews r WHERE r.order_id=o.id AND r.state='verified') "+
+  "LIMIT 1").bind(orderId,version).first();
+ if(!row||!/^WEB-ENSAYO-[A-F0-9]{32}$/.test(row.web_order_id||"")||
+    !Number.isSafeInteger(row.file_count)||row.file_count<1||row.file_count>10)
+  return {state:"no_elegible",filesDeleted:0};
+ await env.DB.prepare(
+  "INSERT OR IGNORE INTO central_tus_purge_queue "+
+  "(order_id,web_order_id,production_version,operator) VALUES(?,?,?,?)"
+ ).bind(orderId,row.web_order_id,version,operator).run();
+ const job=await env.DB.prepare(
+  "SELECT state FROM central_tus_purge_queue WHERE order_id=? AND web_order_id=? "+
+  "AND production_version=?").bind(orderId,row.web_order_id,version).first();
+ return {state:job?.state||"error",filesDeleted:0};
+}
+
 async function centralUpdateProduction(req,env){
  if(!tokenOK(req,env))return json({error:"No autorizado"},401);
  if(env.CENTRAL_PRODUCTION_TRACKING_ENABLED!=="PRIVATE_TEST_ONLY")
@@ -1417,8 +1455,13 @@ async function centralUpdateProduction(req,env){
  ]);
  if(Number(results?.[0]?.meta?.changes)!==1||Number(results?.[1]?.meta?.changes)!==1)
   return json({error:"Cambio no confirmado; actualizá el pedido"},409);
+ let cleanup=null;
+ if(d.to==='entregado'){
+  try{cleanup=await centralQueueDeliveryCleanup(env,d.order_id,d.version+1,operator)}
+  catch{cleanup={state:'error',filesDeleted:0}}
+ }
  const current=await centralProductionDetail(env,d.order_id);
- return json({saved:true,production:current,productionAuthorized:false});
+ return json({saved:true,production:current,cleanup,productionAuthorized:false});
 }
 
 
@@ -2583,7 +2626,7 @@ function renderProductionTracking(orderId,track){
   });
   area.append(btn);
  }
- if(track.state==="entregado")area.append(node("p","Pedido entregado · historial conservado."));
+ if(track.state==="entregado")area.append(node("p","Pedido entregado. Archivos sin servicio de reimpresión. La limpieza automática de PDF se habilitará después de completar la verificación de seguridad."));
  if(track.history?.length){
   const log=node("details","");
   const summary=node("summary","Ver historial de movimientos");
