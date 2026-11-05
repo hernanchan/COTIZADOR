@@ -1,0 +1,1 @@
+2026-11-05 — Smoke externo de SOLO lectura: GET ingreso móvil, Basic 401, rechazo POST ticket inválido / origen externo, admin 401 y health pagos OFF. No generar invitaciones, no consumir tokens válidos, no D1, no pagos, sin publicación. Central versión 03e9d447-8562-49de-9e64-063ebc19aedc; Documentos versión 0062c11f-8ddc-4d35-9b44-54d75f41c219.
