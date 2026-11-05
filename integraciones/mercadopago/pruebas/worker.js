@@ -2073,17 +2073,18 @@ body.price-only #priceAdminFieldset summary{font-size:1.3rem}
 </div>
 <p id="etaStatus" class="note" role="status" aria-live="polite">Ingresá primero la clave privada del panel.</p>
 <details id="etaCalendarPanel"><summary>Horarios de atención, feriados y cierres</summary>
-<p class="note">Horario confirmado para lunes a viernes: 07:00-13:30 y 16:30-20:00. Sábados y domingos están pendientes de confirmar. Un día vacío se considera cerrado al guardar. Los feriados y cierres excepcionales se pueden agregar, modificar o borrar como fechas AAAA-MM-DD. Sin agenda guardada no se anuncia una hora calculada.</p>
+<p class="note">Horario confirmado para lunes a viernes: 07:00-13:30 y 16:30-20:00. Sábados y domingos: CERRADO (confirmado). Un día vacío se considera cerrado al guardar. Los feriados y cierres excepcionales se pueden agregar, modificar o borrar como fechas AAAA-MM-DD. Sin agenda guardada no se anuncia una hora calculada.</p>
 <div class="eta-week">
 <label>Lunes<input id="etaDayMon" placeholder="07:00-13:30,16:30-20:00" autocomplete="off"></label>
 <label>Martes<input id="etaDayTue" placeholder="07:00-13:30,16:30-20:00" autocomplete="off"></label>
 <label>Miércoles<input id="etaDayWed" placeholder="07:00-13:30,16:30-20:00" autocomplete="off"></label>
 <label>Jueves<input id="etaDayThu" placeholder="07:00-13:30,16:30-20:00" autocomplete="off"></label>
 <label>Viernes<input id="etaDayFri" placeholder="07:00-13:30,16:30-20:00" autocomplete="off"></label>
-<label>Sábado<input id="etaDaySat" placeholder="Pendiente de confirmar" autocomplete="off"></label>
-<label>Domingo<input id="etaDaySun" placeholder="Pendiente de confirmar" autocomplete="off"></label>
+<label>Sábado<input id="etaDaySat" placeholder="Cerrado (confirmado)" autocomplete="off"></label>
+<label>Domingo<input id="etaDaySun" placeholder="Cerrado (confirmado)" autocomplete="off"></label>
 </div>
-<label for="etaClosed">Feriados y cierres (AAAA-MM-DD, una fecha por línea)</label>
+<label for="etaClosed">Feriados sin atención y cierres especiales (AAAA-MM-DD, una fecha por línea)</label>
+<p class="note">La mayoría de los feriados no trabajan, pero algunos sí: cada fecha se decide manualmente. Agregá los feriados en que el local cerrará; si trabajan, borrá la fecha o no la agregues. Nada se cierra automáticamente por ser feriado. Podés editar la lista cuando cambie el calendario.</p>
 <textarea id="etaClosed" rows="3" placeholder="2026-12-25" style="display:block;width:min(100%,400px);font:inherit;padding:10px"></textarea>
 <div class="toolbar"><button id="etaCalendarLoad" class="outline" type="button">Consultar agenda</button><button id="etaCalendarWeekdayDraft" class="outline" type="button">Completar lunes a viernes (borrador)</button><button id="etaCalendarSave" type="button" disabled>Guardar agenda</button></div>
 <p id="etaCalendarStatus" class="note" role="status" aria-live="polite">Agenda aún sin consultar.</p>
@@ -2220,10 +2221,12 @@ async function loadEtaCalendar(){
 document.querySelector("#etaCalendarLoad").addEventListener("click",loadEtaCalendar);
 document.querySelector("#etaCalendarWeekdayDraft").addEventListener("click",()=>{
  if(!etaCalendarSnapshot){etaCalendarInfo.textContent="Primero consultá la agenda guardada.";return}
- if(!confirm("¿Copiar el horario confirmado 07:00-13:30 y 16:30-20:00 de lunes a viernes? Solo modifica el borrador; sábado y domingo no se modifican."))return;
+ if(!confirm("¿Completar el horario confirmado de lunes a viernes 07:00-13:30 y 16:30-20:00 y marcar sábados y domingos cerrados? Solo prepara un borrador: no guarda nada todavía."))return;
  for(const day of ["Mon","Tue","Wed","Thu","Fri"])
   document.querySelector("#etaDay"+day).value="07:00-13:30,16:30-20:00";
- etaCalendarInfo.textContent="Borrador sin guardar: confirmá que los días y tramos reflejan la atención real; luego guardá con responsable.";
+ document.querySelector("#etaDaySat").value="";
+ document.querySelector("#etaDaySun").value="";
+ etaCalendarInfo.textContent="Borrador sin guardar: lunes a viernes y fin de semana cerrado. Revisá feriados y guardá con responsable.";
 });
 etaCalendarSave.addEventListener("click",async()=>{
  if(!etaCalendarSnapshot)return;
@@ -2235,7 +2238,7 @@ etaCalendarSave.addEventListener("click",async()=>{
  if(closedDates.some(d=>!/^\\d{4}-\\d\\d-\\d\\d$/.test(d))){
   etaCalendarInfo.textContent="Revisá las fechas: AAAA-MM-DD, una por línea.";return;
  }
- if(!weekly.sat&&!weekly.sun&&!confirm("Sábado y domingo están vacíos y serán considerados CERRADOS si guardás. ¿Confirmás que ambos días no tienen atención?"))return;
+ if((weekly.sat||weekly.sun)&&!confirm("El horario informado es sábados y domingos CERRADO. ¿Confirmás que querés abrir alguno de esos días en esta agenda?"))return;
  if(!confirm("¿Guardar estos horarios y cierres para el piloto privado? Los feriados se podrán editar después."))return;
  etaCalendarSave.disabled=true;
  try{

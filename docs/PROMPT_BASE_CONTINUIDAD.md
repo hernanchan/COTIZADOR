@@ -295,3 +295,11 @@ Al concluir Etapa 1, crear `docs/ETAPA2-...-ESTADO.md`, actualizar aquí cuál e
 - **Sábado y domingo:** no informados todavía. Los campos siguen editables, marcados como pendientes y, si están vacíos, se exige confirmación explícita antes de guardar, porque un día vacío equivale a cerrado.
 - El botón «Completar lunes a viernes (borrador)» incorpora las franjas confirmadas, **sin guardar en D1 automáticamente**. Para persistir calendario real se exige sesión administrativa, responsable y confirmación. No declarar horarios escritos en D1 sin la aceptación pertinente.
 - Estos cambios son para Central privada y tests, no alteran las ETA vigentes ni cupos de recursos. No tocan `main`, portal público ni pagos reales.
+
+
+## 05/11/2026 — SÁBADOS Y DOMINGOS CERRADOS; FERIADOS CASO POR CASO (confirmación del titular)
+- Se confirmó que **sábado y domingo el negocio permanece cerrado**, sin excepciones habituales indicadas. Horario semanal vigente: lunes a viernes 07:00–13:30 y 16:30–20:00 (hora Córdoba).
+- **Feriados:** el comercio cierra la mayoría, pero trabaja algunos. NO preasignar automáticamente feriados nacionales como cerrados ni abiertos sin decisión por fecha: el editor privado permite añadir o quitar fechas específicas de `closedDates`. Los feriados laborables se dejan fuera de esa lista.
+- En el panel de Central la plantilla de horarios ya completa el fin de semana con franjas vacías (cerrado) y el servidor valida fechas. Un día con franja en sábado o domingo exige confirmación expresa antes de guardarse para evitar cambios accidentales.
+- **Estado técnico:** solo ajuste de código del editor y pruebas, con registro de la decisión. Las fechas y los horarios en D1 no se cambiaron automáticamente: la API de agenda requiere clave administrativa y registro auditado del operador.
+- **Próximo paso:** obtener capacidad efectivamente simultánea de impresión, terminación/anillado y ploteos; luego cargar calendario confirmado y los cierres por fecha desde el panel, sin inventar productividad ni modificar ETA de cliente antes de las pruebas operativas.

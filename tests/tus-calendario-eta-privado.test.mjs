@@ -108,8 +108,12 @@ test('panel y vista móvil compilan con protección privada y sin datos sensible
  assert.match(tracking,/name="viewport"/);assert.match(client,/x.requiresReview/);
  assert.match(script,/07:00-13:30,16:30-20:00/);
  assert.doesNotMatch(script,/07:00-14:00,16:30-20:00/);
- assert.match(html,/Sábados y domingos están pendientes de confirmar/);
- assert.match(script,/Sábado y domingo están vacíos y serán considerados CERRADOS/);
+ assert.match(html,/Sábados y domingos: CERRADO \(confirmado\)/);
+ assert.match(html,/Feriados sin atención y cierres especiales/);
+ assert.match(html,/Nada se cierra automáticamente por ser feriado/);
+ assert.match(script,/document\.querySelector\("#etaDaySat"\)\.value=""/);
+ assert.match(script,/document\.querySelector\("#etaDaySun"\)\.value=""/);
+ assert.match(script,/El horario informado es sábados y domingos CERRADO/);
  assert.match(html,/feriados y cierres excepcionales se pueden agregar, modificar o borrar/);
  assert.match(source,/\/admin\/api\/central\/eta-calendar/);
  assert.doesNotMatch(tracking,/customer_phone|bank_reference|DEMO_ADMIN_KEY/);
