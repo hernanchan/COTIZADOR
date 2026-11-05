@@ -158,7 +158,7 @@ function pagoSandboxEnRecibo(){
  wrap.className='estado-pago-sandbox';
  seguimiento.hidden=true;seguimiento.target='_blank';seguimiento.rel='noopener noreferrer';
  seguimiento.textContent='Seguir mi pedido · estado y demora';
- seguimiento.style.cssText='display:inline-block;margin:9px 0;padding:11px;border-radius:8px;color:white;background:#185a8b';
+ seguimiento.style.cssText='display:none;margin:9px 0;padding:11px;border-radius:8px;color:white;background:#185a8b';
  mensaje.setAttribute('role','status');mensaje.setAttribute('aria-live','polite');
  estado.className='pago-estado';estado.textContent='Estado del pago: pendiente';
   plazo.className='pago-nota';plazo.textContent='Preparación: plazo a confirmar después del pago.';
@@ -194,9 +194,9 @@ function pagoSandboxEnRecibo(){
     try{
      const url=new URL(result.seguimientoUrl);
      if(url.protocol==='https:'&&
-       /^saber-pagos-pruebas\\.[a-z0-9-]+\\.workers\\.dev$/.test(url.hostname)&&
+       /^saber-pagos-pruebas\.[a-z0-9-]+\.workers\.dev$/.test(url.hostname)&&
        url.pathname==='/seguimiento'&&url.searchParams.size===1){
-      seguimiento.href=url.href;seguimiento.hidden=false;
+      seguimiento.href=url.href;seguimiento.hidden=false;seguimiento.style.display='inline-block';
      }
     }catch{}
    }

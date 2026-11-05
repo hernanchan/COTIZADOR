@@ -102,7 +102,7 @@ export async function pagoTUSSandboxCliente(request,env,{authorized=false,subtle
     if(tracking.protocol==='https:'&&tracking.hostname===central.hostname&&
        tracking.pathname==='/seguimiento'&&!tracking.port&&!tracking.username&&!tracking.password&&
        !tracking.hash&&tracking.searchParams.size===1&&
-       /^[a-f0-9-]{36}\\.[a-f0-9]{64}$/.test(token))
+       /^[a-f0-9-]{36}\.[a-f0-9]{64}$/.test(token))
      seguimientoUrl=tracking.href;
    }catch{}
   }
