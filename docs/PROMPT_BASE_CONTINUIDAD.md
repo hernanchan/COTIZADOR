@@ -176,3 +176,8 @@ Al concluir Etapa 1, crear `docs/ETAPA2-...-ESTADO.md`, actualizar aquí cuál e
 - Implementación `e5fe5ce1`: referencia con espacios conservados en la ficha y protegidos contra duplicados con guiones históricos.
 - CI integral `41931816288` **SUCCESS**. Activación exclusiva Central `41931953195` **SUCCESS**; nueva versión `saber-pagos-pruebas` `309d2794-f642-4594-a524-6c7cac93de76` (anterior `d06e4a9c-cbd2-4af9-b94b-d284fd76b910`). Verificaciones: HTTP 401, health OK y `paymentsEnabled=false`. CI de activación `41931953071` **SUCCESS**.
 - Usuario confirmó recepción automática de transferencia de prueba y aprobó las demás funciones; **la preservación de espacios en una nueva acreditación no tiene aún aceptación manual posterior al deploy**. No repetir pedidos 018 y 020. `main` y web pública sin cambios.
+
+### 04/11/2026 — Demora estimada: desarrollo fase 1 desde la Central privada
+- Prioridad retomada tras validación de MP, transferencias y anillado; prueba de nuevo pedido desde Android aplazada por contraseña HTTP Basic desconocida (usuario fijo `operador`, clave privada separada). No bloquear desarrollo ni guardar claves en repositorio.
+- Fase 1: **plazo provisional establecido por el operador después de verificar el pago**; Central puede editar fecha/hora, con registro D1 y motivo para postergación. El cliente lo ve en recibo autenticado al confirmar pago; pedidos sin pago no reciben plazo. Fase 2 automatizará contra cola, capacidad y horario reales, pendientes de calibración. Especificación en `docs/ETA-PREPARACION-ENSAYO-20261104.md`.
+- No se modificaron cobros, precios, cálculo, carga TUS, `main`, web pública ni credenciales.

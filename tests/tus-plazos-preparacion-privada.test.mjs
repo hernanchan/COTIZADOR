@@ -139,7 +139,7 @@ test('nunca inventa un plazo por carga ni lo filtra a pagos pendientes',()=>{
  assert.match(status,/estado==="pagado"/);
  assert.match(status,/preparationEstimateDetail\(env,belongs\.id\)/);
  assert.match(status,/preparacionEstimada/);
- assert.match(status,/!["listo","entregado"].includes/);
+ assert.ok(status.includes('!["listo","entregado"].includes'));
  assert.match(proxy,/result.estado==='pagado'&&result.preparacionEstimada/);
  assert.match(proxy,/new Date\(parsed\).toISOString\(\)===eta.readyAt/);
  assert.match(page,/Preparación estimada \(provisional\)/);
