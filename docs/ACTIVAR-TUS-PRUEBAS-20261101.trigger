@@ -103,3 +103,5 @@ ENABLE_PRIVATE_SANDBOX_CLIENT_PAYMENT_2026_11_03
 2026-11-04 — DESPLEGAR SOLO saber-documentos-pruebas: anillado conjunto UX y orden editable de originales; ZIP con hoja de armado y cantidad. CI 41928147607 SUCCESS; preservar TUS, Basic 401, precios D1, transferencias ficticias y MP sandbox; no modificar main ni activar cobros. Rollback ante fallo.
 
 2026-11-04 — Habilitar SOLO el módulo de preparación estimada en pruebas privadas, luego de CI 41941608715 SUCCESS. Preservar flujo de pagos, tarifas D1, acceso Basic y controles de rollback. Sin publicar main o web comercial.
+
+2026-11-04: activacion aislada de seguimiento HMAC y demora global configurable con CI 41955189605 aprobado. Mantener seguridad y rollback, cobros reales desactivados y main intacto.

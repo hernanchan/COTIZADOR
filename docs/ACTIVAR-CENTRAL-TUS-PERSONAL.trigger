@@ -48,3 +48,5 @@ Activar Central versión de pedido corto visible también en respuesta de prepar
 2026-11-04 — Actualización de interfaz de referencias bancarias, solo Central de ensayos. CI 41931816288 SUCCESS. Conserva configuración y reversión.
 
 2026-11-04 — Habilitar SOLO el módulo de preparación estimada en pruebas privadas, luego de CI 41941608715 SUCCESS. Preservar flujo de pagos, tarifas D1, acceso Basic y controles de rollback. Sin publicar main o web comercial.
+
+2026-11-04: activacion aislada de seguimiento HMAC y demora global configurable con CI 41955189605 aprobado. Mantener seguridad y rollback, cobros reales desactivados y main intacto.
