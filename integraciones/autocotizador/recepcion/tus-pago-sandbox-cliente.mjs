@@ -93,7 +93,21 @@ export async function pagoTUSSandboxCliente(request,env,{authorized=false,subtle
       Number.isFinite(parsed)&&new Date(parsed).toISOString()===eta.readyAt)
     preparacionEstimada={readyAt:eta.readyAt,provisional:true};
   }
+  // Solo el estado firmado de la Central puede entregar un enlace de seguimiento.
+  let seguimientoUrl;
+  if(typeof result.seguimientoUrl==='string'){
+   try{
+    const tracking=new URL(result.seguimientoUrl),central=new URL(env.CENTRAL_TEST_URL);
+    const token=tracking.searchParams.get('token')||'';
+    if(tracking.protocol==='https:'&&tracking.hostname===central.hostname&&
+       tracking.pathname==='/seguimiento'&&!tracking.port&&!tracking.username&&!tracking.password&&
+       !tracking.hash&&tracking.searchParams.size===1&&
+       /^[a-f0-9-]{36}\\.[a-f0-9]{64}$/.test(token))
+     seguimientoUrl=tracking.href;
+   }catch{}
+  }
   return reply({ok:true,estado:result.estado,...instructions,
-   ...(preparacionEstimada?{preparacionEstimada}:{}),orderId:data.commercialOrderId});
+   ...(preparacionEstimada?{preparacionEstimada}:{}),
+   ...(seguimientoUrl?{seguimientoUrl}:{}),orderId:data.commercialOrderId});
  }catch{return reply({ok:false,error:'No se pudo contactar la Central privada'},502)}
 }
