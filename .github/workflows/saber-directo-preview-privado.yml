@@ -29,7 +29,7 @@ jobs:
         run: |
           set -euo pipefail
           npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.25.12
-          node --test tests/saber-directo-portada.test.mjs tests/saber-directo-preview.test.mjs tests/tus-pagos-prepublicacion-bloqueados.test.mjs tests/tus-carga-recursos-privados.test.mjs tests/tus-central-tablero-click-real.test.mjs tests/tus-pago-estado-automatico-ui.test.mjs
+          node --test tests/saber-directo-portada.test.mjs tests/saber-directo-preview.test.mjs tests/saber-directo-publica-solo-lectura.test.mjs tests/tus-pagos-prepublicacion-bloqueados.test.mjs tests/tus-carga-recursos-privados.test.mjs tests/tus-central-tablero-click-real.test.mjs tests/tus-pago-estado-automatico-ui.test.mjs
       - name: Compilar Worker documental que ya está operativo
         working-directory: integraciones/autocotizador/recepcion
         run: |
@@ -126,6 +126,18 @@ jobs:
           grep -Fq 'VISTA PREVIA PRIVADA DE DISEÑO' "$workdir/offers.html" || { echo "OFFERS_VIEW_MARKER_MISSING"; exit 1; }
           verify_get 200 "$workdir/cotizador.html" "$origin/prueba-v2/" --user "operador:$PASSWORD" || { echo "COTIZADOR_AUTH_FAILED"; exit 1; }
           grep -Fq 'id="smart"' "$workdir/cotizador.html" && grep -Fq 'send-all-pdf' "$workdir/cotizador.html" || { echo "COTIZADOR_REGRESSION"; exit 1; }
+          # Nueva vista de sólo lectura: 200 sin clave; sin cookies ni scripts de venta.
+          verify_get 200 "$workdir/libre.html" "$origin/prueba-v2/diseno-sin-clave" || { echo "OPEN_PREVIEW_NOT_200"; exit 1; }
+          grep -Fq 'VISTA DE DISEÑO · SIN CONTRASEÑA' "$workdir/libre.html" || { echo "OPEN_PREVIEW_BANNER_MISSING"; exit 1; }
+          grep -Fq 'class="hero hero-direct"' "$workdir/libre.html" || { echo "OPEN_PREVIEW_VISUAL_MISSING"; exit 1; }
+          for forbidden in 'localStorage' 'sendWhatsApp' 'libreriasaber.mp' '20-22792046' 'productsCsvUrl'; do
+            if grep -Fq "$forbidden" "$workdir/libre.html"; then echo "PUBLIC_PREVIEW_SENSITIVE_MARKER=$forbidden"; exit 1; fi
+          done
+          verify_get 200 "$workdir/libre-offers.html" "$origin/prueba-v2/diseno-sin-clave/ofertas.html" || { echo "OPEN_OFFERS_NOT_200"; exit 1; }
+          grep -Fq 'SIN CONTRASEÑA' "$workdir/libre-offers.html" || { echo "OPEN_OFFERS_BANNER_MISSING"; exit 1; }
+          # Privacidad: API y cotizador siguen protegidos, incluso si la portada es abierta.
+          verify_get 401 "$workdir/no-cotizador" "$origin/prueba-v2/" || { echo "COTIZADOR_ANONYMOUS_EXPOSED"; exit 1; }
+          echo "OPEN_VISUAL_ONLY_HTTP_200_NO_AUTH_NO_PAYMENT_PRIVATE_COTIZADOR_401"
           # Verificación final sin escribir pedidos, PDFs, precios ni datos.
           curl --fail --silent --show-error --max-time 30 -H "$auth" "$root/settings" > "$workdir/settings-after.json"
           jq -r '.result.bindings[]|[.name,.type]|@tsv' "$workdir/settings.json" | sort > "$workdir/before-bindings.txt"

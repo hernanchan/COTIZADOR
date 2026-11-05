@@ -26,3 +26,24 @@ for(const [path,marker] of [
   assert.equal(response.status,401);
  });
 }
+
+for(const [path,marker] of [
+ ['/prueba-v2/diseno-sin-clave','VISTA DE DISEÑO · SIN CONTRASEÑA'],
+ ['/prueba-v2/diseno-sin-clave/ofertas.html','VISTA DE DISEÑO · SIN CONTRASEÑA']
+]){
+ test('Worker compilado: vista libre sin datos privados '+path,async()=>{
+  const response=await worker.fetch(new Request(origin+path),{},{});
+  const html=await response.text();
+  assert.equal(response.status,200,'HTTP '+response.status+': '+html.slice(0,300));
+  assert.ok(html.includes(marker),'Aviso de demostración ausente');
+  assert.match(response.headers.get('Content-Security-Policy')||'',/connect-src 'none'/);
+  assert.equal(response.headers.get('Set-Cookie'),null);
+  assert.match(response.headers.get('X-Robots-Tag')||'',/noindex/);
+  for(const forbidden of ['localStorage','sendWhatsApp','productsCsvUrl','libreriasaber.mp','20-22792046'])
+   assert.ok(!html.includes(forbidden),'Información de compra expuesta: '+forbidden);
+ });
+}
+test('Worker compilado: cotizador continúa protegido',async()=>{
+ const r=await worker.fetch(new Request(origin+'/prueba-v2/'),env,{});
+ assert.equal(r.status,401);
+});

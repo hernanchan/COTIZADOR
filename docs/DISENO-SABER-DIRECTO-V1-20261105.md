@@ -79,3 +79,11 @@ Archivo: `vidriera/index.html`.
 - Los clics comerciales de envío WhatsApp desde la vista previa se bloquean en JavaScript de la página; las rutas originales y el carrito histórico no se modificaron. El cotizador de pruebas es accesible desde la portada a través de enlace interno protegido. No significa que esté integrada la pasarela de cobros reales.
 - **Pendiente:** inspección humana de portada y ofertas en navegador real, especialmente móvil: verificar que no haya desbordes, que imágenes de productos carguen y que el beneficio vigente sea el que corresponde. Estas comprobaciones **no están demostradas por el smoke GET**.
 - **Siguiente paso:** recibir opinión sobre el diseño de portada y ajustar solo presentación; después extender sistema Saber Directo al cotizador V2 y a seguimiento/Central, sin cambiar estados, cálculos ni pagos.
+
+## 10. Ajuste solicitado: vista visual SIN CONTRASEÑA
+- El titular detectó que la vista anterior seguía solicitando Basic; se corrigió el enfoque: nuevo enlace `/prueba-v2/diseno-sin-clave` y catálogo `/prueba-v2/diseno-sin-clave/ofertas.html`.
+- **Estas dos rutas son públicas por diseño, pero solo muestran una maqueta visual estática.** No contienen autenticación, datos privados, pedidos ni API de pagos. Las rutas reales `/prueba-v2/`, Central y D1 continúan protegidas.
+- Sanitización de la maqueta: elimina por completo el `<script>` histórico (que incluía carrito, datos de transferencias y WhatsApp), elimina atributos `on*`, neutraliza enlaces de cotización/WhatsApp/contacto, elimina carrito histórico, desactiva la conexión al catálogo; permite únicamente cambio visual de pestañas de categorías.
+- Seguridad del Worker: `connect-src 'none'`, `form-action 'none'`, no cookies, `noindex`, `no-store` y bloqueo de métodos distintos a GET. Se mantienen los archivos originales y la vista previa protegida anterior para evitar romper funcionalidades.
+- Incluye pruebas de sanitización y un ensayo real con el Worker **compilado**, más pruebas HTTP GET anónimas con cabeceras seguras y comprobación 401 de cotizador. No implica publicación de la web pública.
+- **Estado al generar el código:** pendiente del workflow específico y de las comprobaciones HTTP antes de entregar enlace funcional.
