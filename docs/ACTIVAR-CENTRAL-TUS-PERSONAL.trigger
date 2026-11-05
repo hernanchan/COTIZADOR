@@ -50,3 +50,5 @@ Activar Central versión de pedido corto visible también en respuesta de prepar
 2026-11-04 — Habilitar SOLO el módulo de preparación estimada en pruebas privadas, luego de CI 41941608715 SUCCESS. Preservar flujo de pagos, tarifas D1, acceso Basic y controles de rollback. Sin publicar main o web comercial.
 
 2026-11-04: activacion aislada de seguimiento HMAC y demora global configurable con CI 41955189605 aprobado. Mantener seguridad y rollback, cobros reales desactivados y main intacto.
+
+2026-11-05 — ACTIVAR SOLO saber-pagos-pruebas: calendario laboral manual por día, feriados/cierres con revisión y auditoría D1, cálculo ETA sin acumular horas por orden, mensajes prudentes de seguimiento móvil. Código ya aprobado CI 42010358018 (203 pruebas), SHA d8e6e204. Mantener HTTP401 admin, health paymentsEnabled=false, rollback automático. NO cambiar portal documental Basic, main, web pública ni cobros comerciales. Horarios quedan sin configurar hasta verificación humana.
