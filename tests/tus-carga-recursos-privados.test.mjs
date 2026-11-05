@@ -115,7 +115,7 @@ test('guarda capacidad en D1 con revisión; 0 significa sin calibrar',async()=>{
  assert.equal(saved.revision,2);
  assert.equal(events.length,2);
 });
-test('panel actualizado compila y la capacidad no se emplea para calcular fechas',()=>{
+test('panel actualizado compila; sólo la cola calibrada puede habilitar fecha con agenda',()=>{
  const html=vm.runInContext('adminHtml',ctx);
  const script=html.slice(html.indexOf('<script>')+8,html.indexOf('</script>'));
  new vm.Script(script);
@@ -123,5 +123,8 @@ test('panel actualizado compila y la capacidad no se emplea para calcular fechas
  assert.match(script,/etaResourcesLoad/);
  assert.match(script,/expectedRevision:etaResourcesSnapshot.revision/);
  const customer=src.slice(src.indexOf('async function trackingCustomerStatus'),src.indexOf('async function centralAdminDetail'));
- assert.doesNotMatch(customer,/etaResourceSettings|etaResourceLoad/);
+ assert.match(customer,/etaResourceQueueForOrder/);
+ assert.match(customer,/base\.queueCalibrated=resources\.calibrated/);
+ assert.match(customer,/operatingReadyAt=base\.queueCalibrated&&!base\.requiresReview&&calendar\.configured/);
+ assert.doesNotMatch(customer,/etaResourceLoad/);
 });
