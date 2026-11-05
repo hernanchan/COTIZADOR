@@ -372,3 +372,10 @@ Al concluir Etapa 1, crear `docs/ETAPA2-...-ESTADO.md`, actualizar aquí cuál e
 - Workflow `42070767609` SUCCESS, versión Worker documentos pruebas `2d863bac-18c4-4273-bcd5-834381076d27`. HTTP GET 200 anónimo confirmado para ambas vistas; el cotizador privado devuelve HTTP 401 anónimo. Tests `tests/saber-directo-publica-solo-lectura.test.mjs` + pruebas en el Worker compilado.
 - La rama sigue `integracion/tus-pedido-privado-20261101`. `main`, web comercial, Central, D1 y pagos reales no modificados.
 - **Siguiente paso:** recibir validación visual del diseño en celular y ajustar estética sin cambiar los circuitos aprobados.
+
+## 05/11/2026 — SABER DIRECTO V2 DESPLEGADO EN VISTA SIN CONTRASEÑA
+- El titular indicó que lo insatisfactorio de V1 era la **estética general**. Se hizo rediseño editorial V2: titulares Manrope muy grandes, crema/azul/naranja, collage geométrico de papelería sin fotos falsas, promoción en franja azul, accesos como lista, categorías cuadradas y muestras gráficas sin precios.
+- Código `vidriera/index.html` y helper `integraciones/autocotizador/recepcion/saber-directo-vista-previa.mjs` en rama `integracion/tus-pedido-privado-20261101`.
+- CI `42074377032` SUCCESS; deploy `42074482001` SUCCESS, versión Worker de pruebas `2e8d1085-d277-4797-b549-c17cc94927ef`.
+- URL **sin contraseña**: `https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/diseno-sin-clave`. La anterior vista protegida sigue sin cambios de autenticación. La vista abierta es maqueta estática sin compras, cargas ni transferencias.
+- `main`, web comercial, pedidos TUS, D1, Central y pagos reales intactos. Pendiente juicio visual del titular; no proclamar diseño aprobado.

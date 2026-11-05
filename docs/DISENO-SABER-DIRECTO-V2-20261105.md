@@ -14,3 +14,10 @@ El titular evaluó la primera versión como «más o menos», precisando que el 
 
 ## Estado
 Código V2 en rama `integracion/tus-pedido-privado-20261101`. **Pendiente CI y despliegue en la misma ruta pública de solo diseño**. El titular debe aprobar por criterio visual luego de revisarla.
+
+## Activación privada verificada
+- CI específico de rama `42074377032` SUCCESS tras corregir selector de cabecera para preservar el contrato `class="hero hero-direct"`.
+- Despliegue en Worker documental de pruebas: ejecución `42074482001` SUCCESS, versión activa `2e8d1085-d277-4797-b549-c17cc94927ef`.
+- Nueva portada estética accesible sin contraseña en `https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/diseno-sin-clave`. La página de ofertas del prototipo sigue en `.../diseno-sin-clave/ofertas.html`.
+- HTTP real de ambos prototipos devuelve 200 sin credenciales; `/prueba-v2/` continúa 401 anónimo; HTML saneado sin funciones de compra ni datos privados.
+- Para la revisión del titular: mirar especialmente el titular, composición de papeles, barra de ofertas, accesos de servicio y tarjetas ilustrativas. Una vez recibido feedback, ajustar estética sin cambios operativos.
