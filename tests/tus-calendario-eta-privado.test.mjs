@@ -49,6 +49,7 @@ test('capacidad ocupada solicita revisión en vez de sumar tandas ficticias',()=
 test('API de agenda requiere clave, guarda revisión e historial, rechaza conflictos',async()=>{
  let stored=null,events=0;
  const env={DEMO_ADMIN_KEY:'PANEL_TEST',CENTRAL_PRODUCTION_TRACKING_ENABLED:'PRIVATE_TEST_ONLY',
+ MP_TEST_ACCESS_TOKEN:'FAKE',MP_TEST_SELLER_ID:'test',TEST_WEBHOOK_URL:'https://test.invalid/webhook',MP_WEBHOOK_SECRET:'FAKE',
  DB:{
   prepare(sql){
    let args=[];return{
