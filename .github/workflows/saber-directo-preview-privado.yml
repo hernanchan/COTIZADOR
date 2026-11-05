@@ -29,7 +29,7 @@ jobs:
         run: |
           set -euo pipefail
           npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.25.12
-          node --test tests/saber-directo-portada.test.mjs tests/saber-directo-preview.test.mjs tests/saber-directo-publica-solo-lectura.test.mjs tests/tus-pagos-prepublicacion-bloqueados.test.mjs tests/tus-carga-recursos-privados.test.mjs tests/tus-central-tablero-click-real.test.mjs tests/tus-pago-estado-automatico-ui.test.mjs
+          node --test tests/saber-directo-catalogo-publico.test.mjs tests/saber-directo-portada.test.mjs tests/saber-directo-preview.test.mjs tests/saber-directo-publica-solo-lectura.test.mjs tests/tus-pagos-prepublicacion-bloqueados.test.mjs tests/tus-carga-recursos-privados.test.mjs tests/tus-central-tablero-click-real.test.mjs tests/tus-pago-estado-automatico-ui.test.mjs
       - name: Validar fotos públicas Google Drive desde fuera de la cuenta
         shell: bash
         run: |

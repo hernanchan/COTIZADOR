@@ -29,6 +29,7 @@ import {paginaCotizadorV2PruebaPrivada} from './pantalla-cotizador-v2-prueba-pri
 import portadaSaberDirectoHtml from '../../../vidriera/index.html';
 import ofertasSaberDirectoHtml from '../../../vidriera/ofertas.html';
 import {prepararVistaDisenoPrivada,prepararVistaDisenoAbierta} from './saber-directo-vista-previa.mjs';
+import {consultarCatalogoPublicado} from './catalogo-productos-publicos.mjs';
 import {pagoTUSSandboxCliente} from './tus-pago-sandbox-cliente.mjs';
 import {paginaDescargaTUSPersonal} from './pantalla-descarga-tus-personal.mjs';
 import {paginaPaqueteTUSPersonal} from './pantalla-paquete-tus-personal.mjs';
@@ -2019,6 +2020,15 @@ export default {
     // DEMOSTRACIÓN VISUAL ANÓNIMA, SEPARADA DEL PORTAL PRIVADO.
     // Solo HTML saneado: sin JS comercial, sin fetch, sin carrito operativo.
     // El cotizador, precios D1, pedidos y Central conservan autenticación.
+    // API de lectura sobre CSV publicado: precios verificados antes de consultar.
+    // No se accede a D1, pagos, TUS ni datos privados; sin rutas de escritura.
+    if(page==='/prueba-v2/diseno-sin-clave/catalogo.json'){
+      if(request.method!=='GET')return new Response('Solo lectura',{status:405,headers:{'Allow':'GET','Cache-Control':'no-store'}});
+      const headers={'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store, max-age=0',
+       'X-Content-Type-Options':'nosniff','X-Robots-Tag':'noindex,nofollow,noarchive','Referrer-Policy':'no-referrer'};
+      try{return new Response(JSON.stringify(await consultarCatalogoPublicado()),{status:200,headers})}
+      catch{return new Response(JSON.stringify({ok:false,products:[],error:'Catálogo temporalmente no disponible. No se pueden confirmar precios.'}),{status:503,headers})}
+    }
     if(page==='/prueba-v2/diseno-sin-clave'||page==='/prueba-v2/diseno-sin-clave/ofertas.html'){
       if(request.method!=='GET')return new Response('Solo consulta',{status:405,headers:{'Allow':'GET','Cache-Control':'no-store'}});
       const ofertas=page.endsWith('/ofertas.html');
@@ -2031,7 +2041,7 @@ export default {
           'X-Content-Type-Options':'nosniff',
           'Referrer-Policy':'no-referrer',
           'X-Frame-Options':'DENY',
-          'Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src https://cdn.jsdelivr.net https://drive.google.com https://*.googleusercontent.com https://images.unsplash.com data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+          'Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src https://cdn.jsdelivr.net https://drive.google.com https://*.googleusercontent.com https://images.unsplash.com data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
         }});
       }catch{return new Response('Vista no disponible',{status:503,headers:{'Cache-Control':'no-store'}})}
     }
