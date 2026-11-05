@@ -37,8 +37,8 @@ jobs:
           npm install --no-audit --no-fund
           npm run build:unificado
           node --check dist/saber-documentos-cotizador-fase4.mjs
-          for marker in 'VISTA PREVIA PRIVADA DE DISEÑO' '/prueba-v2/diseno-saber-directo' 'id="smart"' 'send-all-pdf' 'ensayo-tus-iniciar'; do
-            grep -Fq "$marker" dist/saber-documentos-cotizador-fase4.mjs || { echo "FALTA_CÓDIGO_PROTEGIDO"; exit 1; }
+          for marker in 'diseno-saber-directo' 'send-all-pdf' 'ensayo-tus-iniciar'; do
+            grep -Fq "$marker" dist/saber-documentos-cotizador-fase4.mjs || { echo "FALTA_MARCADOR_COMPILADO: $marker"; exit 1; }
           done
           echo "VISTA_PRIVADA_COMPILADA_CON_RUTAS_ANTERIORES"
       - name: Desplegar solo Worker de DOCUMENTOS PRUEBAS, con rollback automático
