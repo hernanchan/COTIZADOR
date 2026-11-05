@@ -26,20 +26,126 @@ footer{background:#071f36;color:#fff;padding:25px 0}.footerrow{display:flex;alig
 @media(max-width:960px){.nav a:not(.quote),.nav .cart-open{display:none}.hero-grid,.bottom-grid,.print-panel{grid-template-columns:1fr}.category-tabs{grid-template-columns:1fr 1fr}.product-grid{grid-template-columns:1fr}}
 @media(max-width:650px){.container{width:min(100% - 22px,1220px)}.topbar .container{padding:8px 0}.topinfo{gap:8px}.topinfo span:nth-child(2){display:none}.head{min-height:68px}.brand img{width:46px;height:46px}.brand small{display:none}.nav .quote{padding:11px 13px;font-size:11px}.hero{padding-top:12px}.hero-copy{padding:38px 27px;min-height:420px;border-radius:24px}.hero h1{font-size:45px}.hero p{font-size:15px}.hero-actions .btn{width:100%}.hero-visual{min-height:350px;border-radius:24px}.visual-card{left:14px;right:14px;bottom:14px;padding:15px}.visual-card b{font-size:17px}.visual-card a{display:none}.quick{padding:18px 0 52px}.quick-head{display:block}.quick-head p{margin-top:8px}.category-tabs{grid-template-columns:1fr}.catbtn{padding:16px}.panel{padding:12px;border-radius:22px}.panel-head{display:block}.panel-head p{margin-top:7px}.product{grid-template-columns:110px 1fr}.product-body{padding:14px}.bottom{padding-bottom:18px}.promo-now,.contact-card{padding:25px;border-radius:22px}.footerrow{display:block}.footerrow small{display:block;margin-top:7px}.mobilebar{display:grid}body{padding-bottom:78px}}
 [hidden]{display:none!important}
+
+/* SABER DIRECTO V1 — diseño aprobado 05/11/2026; sólo rama privada. */
+:root{--brand-blue:#0a3158;--brand-orange:#f7931e;--bg-soft:#f7f8fa;--border-soft:#e1e7ed;--radius-ui:12px;--shadow-ui:0 3px 14px rgba(10,49,88,.055);--cream:#f7f8fa;--line:#e1e7ed;--shadow:var(--shadow-ui)}
+body{background:#fff;font-size:16px}
+a:focus-visible,button:focus-visible{outline:3px solid #a65f00;outline-offset:3px}
+.nav .quote{background:var(--brand-blue);color:#fff;box-shadow:none}
+.nav .quote:hover{background:#164876}
+.cart-badge{color:#0a3158}
+.hero.hero-direct{background:#fff;padding:23px 0 20px}
+.hero-direct .hero-grid{grid-template-columns:minmax(0,1.12fr) minmax(300px,.88fr);min-height:0;gap:15px;align-items:stretch}
+.hero-direct .hero-copy{min-height:338px;overflow:visible;background:#f4f7f9;color:#172230;padding:clamp(24px,3.1vw,43px);border:1px solid var(--border-soft);border-radius:18px}
+.hero-direct .hero-copy:before,.hero-direct .hero-copy:after{display:none}
+.hero-direct .kicker{color:#0a3158;font-size:12px;letter-spacing:.07em}
+.hero-direct h1{font-size:clamp(32px,3.8vw,54px);line-height:1.12;letter-spacing:-.046em;color:var(--brand-blue);margin:12px 0 14px}
+.hero-direct h1 span{color:var(--brand-blue);text-decoration:underline;text-decoration-color:var(--brand-orange);text-decoration-thickness:4px;text-underline-offset:5px}
+.hero-direct .hero-copy>p{font-size:16px;line-height:1.5;color:#45596b;max-width:580px}
+.hero-direct .hero-actions{margin-top:19px;gap:10px}
+.hero-direct .btn{min-height:48px;font-size:14px;font-weight:700;border-radius:10px;padding:12px 17px}
+.hero-direct .btn.primary{background:var(--brand-blue);color:#fff}
+.hero-direct .btn.secondary{background:#fff;color:var(--brand-blue);border:1px solid #cbd8e2}
+.hero-direct .hero-note{color:#526579;font-size:12px;margin-top:18px}
+.hero-direct .hero-promo{background:#fff;border:1px solid var(--border-soft);border-top:5px solid var(--brand-orange);border-radius:18px;box-shadow:none;color:#172230;padding:clamp(22px,2.8vw,32px);display:flex;flex-direction:column;justify-content:center}
+.hero-direct .promo-overline{display:flex;align-items:center;gap:11px}
+.hero-direct .promo-overline small{color:#4b5d6e;font-size:12px;font-weight:800;letter-spacing:.03em;text-transform:none}
+.hero-direct .promo-symbol{display:grid;place-items:center;width:36px;height:36px;border-radius:10px;background:#fff2df;color:#6c3f00;font-size:20px;font-weight:800}
+.hero-direct .hero-promo h2{font-family:Manrope,system-ui,sans-serif;color:var(--brand-blue);font-size:clamp(25px,2.4vw,34px);line-height:1.15;letter-spacing:-.035em;margin:16px 0 10px}
+.hero-direct .hero-promo p{color:#49596a;font-size:14px;line-height:1.52;margin:0}
+.hero-direct .hero-promo a{align-self:flex-start;margin-top:19px;background:var(--brand-blue);color:#fff;text-decoration:none;border-radius:10px;font-weight:800;font-size:13px;padding:13px 16px;min-height:45px}
+.hero-direct .hero-promo .promo-note{font-size:11px;color:#657381;margin-top:14px}
+.hero-services{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px;margin-top:14px}
+.service-link{display:flex;flex-direction:column;justify-content:center;gap:5px;text-decoration:none;background:#fff;border:1px solid var(--border-soft);border-radius:12px;padding:14px 17px;min-height:76px;box-shadow:var(--shadow-ui);transition:border-color .15s}
+.service-link:hover{border-color:#9bb2c4}
+.service-link strong{font-family:Manrope,system-ui,sans-serif;color:var(--brand-blue);font-size:15px}
+.service-link small{font-size:12px;color:#586879}
+.quick{padding:24px 0 40px}
+.quick-head h2{font-size:clamp(25px,2.7vw,34px);letter-spacing:-.03em}
+.quick-head p{font-size:14px}
+.category-tabs{gap:9px}
+.catbtn{border-radius:12px;padding:15px;transition:border-color .15s}
+.catbtn:hover,.catbtn.active{transform:none;box-shadow:none;border-color:#8babc2}
+.catbtn b{font-size:17px;margin-top:3px}
+.catbtn small{font-size:10px}
+.catbtn span{font-size:12px}
+.panel{border-radius:14px}
+.panel-head h3{font-size:25px}
+.product{border-radius:12px}
+.product h4{font-size:17px}
+.bottom-grid{grid-template-columns:1fr}
+.contact-card{border-radius:15px;padding:25px}
+.contact-card h3{font-size:24px}
+.contact-actions a:first-child{background:#fff;color:var(--brand-blue)}
+.mobilebar .mcart{color:var(--brand-blue)}
+@media(max-width:960px){
+  .hero-direct .hero-grid{grid-template-columns:1fr}
+  .hero-direct .hero-copy{min-height:0}
+  .hero-direct .hero-promo{min-height:0}
+  .hero-services{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:650px){
+  .hero.hero-direct{padding-top:12px}
+  .hero-direct .hero-copy{padding:25px 20px;border-radius:13px}
+  .hero-direct h1{font-size:clamp(30px,8.3vw,39px);line-height:1.13}
+  .hero-direct .hero-copy>p{font-size:15px}
+  .hero-direct .hero-actions{display:grid;grid-template-columns:1fr}
+  .hero-direct .hero-promo{padding:20px;border-radius:13px}
+  .hero-direct .hero-promo h2{font-size:26px}
+  .hero-direct .hero-promo a{align-self:stretch;text-align:center}
+  .hero-services{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+  .service-link{min-height:78px;padding:12px 11px}
+  .service-link strong{font-size:13px;line-height:1.25}
+  .service-link small{font-size:11px;line-height:1.3}
+  .quick{padding:13px 0 31px}
+  .quick-head h2{font-size:27px}
+  .category-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .catbtn{padding:12px;min-height:67px}
+  .catbtn b{font-size:16px}
+  .catbtn small,.catbtn span{display:none}
+  .contact-card{padding:22px}
+}
+
 </style>
 </head>
 <body>
 <div class="topbar"><div class="container"><div class="topinfo"><span><b>35 años junto a vos</b></span><span>Poeta Lugones · Córdoba</span><span>Lunes a viernes · 7:00 a 13:30 y 16:30 a 20:00</span></div><span>WhatsApp 351 311-0130</span></div></div>
 <header><div class="container head"><a class="brand" href="#inicio"><img src="https://cdn.jsdelivr.net/gh/hernanchan/COTIZADOR@50b47daecfd3b1490bab03c235d47b7285f9f49e/assets/logo-sbr.png" alt="Logo Librería Saber"><span><strong>LIBRERÍA SABER</strong><small>Escolar · Oficina · Impresiones</small></span></a><nav class="nav"><a href="#categorias">Categorías</a><a href="#beneficio">Beneficio de hoy</a><a href="#contacto">Contacto</a><button class="cart-open" type="button" onclick="openCart()">Carrito <span class="cart-badge" id="cartBadge">0</span></button><a class="quote" href="cotizar.html">Cotizar impresiones</a></nav></div></header>
 <main>
-<section class="hero" id="inicio"><div class="container hero-grid"><div class="hero-copy"><div class="kicker">Tu librería del barrio</div><h1>Todo lo que necesitás, <span>más cerca.</span></h1><p>Escolar, oficina, impresiones y gráfica. Encontrá productos, mirá oportunidades y cotizá tus trabajos online.</p><div class="hero-actions"><a class="btn primary" href="cotizar.html">Cotizar impresiones</a><a class="btn secondary" href="#categorias">Ver categorías</a></div><div class="hero-meta"><span><i></i>Atención personalizada</span><span><i></i>Horario extendido</span><span><i></i>Pedidos por WhatsApp</span></div></div><div class="hero-visual"><img src="https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=1500&q=88" alt="Productos de librería y escritura"><div class="visual-card"><div><b>Escolar, oficina e impresiones</b><span>Productos y trabajos en un mismo pedido.</span></div><a href="#categorias">Explorar</a></div></div></div></section>
+<section class="hero hero-direct" id="inicio" aria-labelledby="titulo-inicio">
+  <div class="container hero-grid">
+    <div class="hero-copy">
+      <div class="kicker">Escolar · Oficina · Gráfica</div>
+      <h1 id="titulo-inicio">Todo para estudiar, trabajar e <span>imprimir.</span></h1>
+      <p>Elegí productos para tu día a día y cotizá tus impresiones desde el celular, sin vueltas.</p>
+      <div class="hero-actions">
+        <a class="btn primary" href="cotizar.html">Cotizar impresiones</a>
+        <a class="btn secondary" href="#categorias">Ver productos y servicios</a>
+      </div>
+      <div class="hero-note">Librería y gráfica en Poeta Lugones · Córdoba</div>
+    </div>
+    <article class="promo-now hero-promo" id="beneficio" aria-labelledby="promoTitle">
+      <div class="promo-overline"><span aria-hidden="true" class="promo-symbol">%</span><small id="promoDay">Beneficio de hoy</small></div>
+      <h2 id="promoTitle">Promoción semanal</h2>
+      <p id="promoText">El cotizador aplica automáticamente el beneficio vigente.</p>
+      <a href="cotizar.html">Cotizar con el beneficio</a>
+      <p class="promo-note">El descuento y sus condiciones se muestran en el presupuesto cuando corresponda.</p>
+    </article>
+  </div>
+  <nav class="container hero-services" aria-label="Servicios principales">
+    <a class="service-link" href="cotizar.html"><strong>Documentos</strong><small>Impresiones y anillados</small></a>
+    <a class="service-link" href="cotizar.html"><strong>Ploteos</strong><small>Planos y pósters</small></a>
+    <a class="service-link" href="cotizar.html"><strong>Fotos y stickers</strong><small>Gráfica personalizada</small></a>
+    <a class="service-link" href="#categorias"><strong>Escolar y oficina</strong><small>Productos y ofertas</small></a>
+  </nav>
+</section>
 <section class="quick" id="categorias"><div class="container"><div class="quick-head"><h2>Elegí una categoría</h2><p>Productos destacados, ofertas y novedades para encontrar rápido lo que necesitás.</p></div><div class="category-tabs"><button class="catbtn active" data-panel="escolar"><small>Productos y oportunidades</small><b>Escolar</b><span>Dos destacados y acceso a todas las ofertas.</span></button><button class="catbtn" data-panel="oficina"><small>Trabajo y organización</small><b>Oficina</b><span>Dos destacados y acceso a todas las ofertas.</span></button><button class="catbtn" data-panel="novedades"><small>Regalos y hallazgos</small><b>Novedades</b><span>Regalitos, curiosidades y productos distintos para sumar al pedido.</span></button><button class="catbtn" data-panel="impresion"><small>Cálculo automático</small><b>Impresión y gráfica</b><span>Documentos, fotos, stickers, ploteos y gráfica comercial.</span></button></div>
 <article class="panel" data-content="escolar"><div class="panel-head"><div><h3>Escolar</h3><p>Productos destacados del momento.</p></div></div><div class="product-grid" id="gridEscolar"></div><div class="see-all"><a href="ofertas.html?categoria=Escolar">Ver todas las ofertas escolares</a></div></article>
 <article class="panel" data-content="oficina" hidden><div class="panel-head"><div><h3>Oficina</h3><p>Productos destacados del momento.</p></div></div><div class="product-grid" id="gridOficina"></div><div class="see-all"><a href="ofertas.html?categoria=Oficina">Ver todas las ofertas de oficina</a></div></article>
 <article class="panel" data-content="novedades" hidden><div class="panel-head"><div><h3>Novedades</h3><p>Regalitos, curiosidades y productos distintos para descubrir y sumar al pedido.</p></div></div><div class="product-grid" id="gridNovedades"></div><div class="see-all"><a href="ofertas.html?categoria=Novedades">Ver todas las novedades</a></div></article>
 <article class="panel" data-content="impresion" hidden><div class="print-panel"><div class="print-info"><h3>Impresión y gráfica</h3><p>Entrás al cotizador, calculás el trabajo y al final elegís <strong>Agregar al pedido general</strong>. El trabajo vuelve automáticamente a este carrito junto con los artículos.</p><div class="print-actions"><a href="cotizar.html">Ir al cotizador</a><a href="polaroids/editor.html" id="polaroidsShopLink" hidden>Preparar Polaroids</a></div></div><div class="print-demo"><small>Un solo pedido</small><b>Artículos + impresión</b><p>1. Agregás los productos que quieras.<br>2. Cotizás impresiones, fotos, stickers, ploteos o gráfica.<br>3. Volvés al carrito con todo integrado y enviás un único pedido por WhatsApp.</p></div></div></article>
 </div></section>
-<section class="bottom" id="beneficio"><div class="container bottom-grid"><article class="promo-now"><small id="promoDay">Beneficio de hoy</small><h3 id="promoTitle">Promoción semanal</h3><p id="promoText">El cotizador aplica automáticamente el beneficio correspondiente al día.</p><a href="cotizar.html">Cotizar con el beneficio</a></article><article class="contact-card" id="contacto"><h3>Estamos en el barrio</h3><p>Más de 35 años acompañando a estudiantes, familias, comercios y profesionales.</p><div class="contact-line"><div>Javier Lascano Colodrero · Poeta Lugones</div><div>Lunes a viernes · 7:00 a 13:30 y 16:30 a 20:00</div></div><div class="contact-actions"><a href="https://wa.me/5493513110130" target="_blank" rel="noopener">WhatsApp</a><a href="https://maps.app.goo.gl/xZTZycc15UEd1TJB8" target="_blank" rel="noopener">Cómo llegar</a><a href="mailto:libreriasaber@gmail.com">Correo</a></div></article></div></section>
+<section class="bottom"><div class="container bottom-grid"><article class="contact-card" id="contacto"><h3>Estamos en el barrio</h3><p>Más de 35 años acompañando a estudiantes, familias, comercios y profesionales.</p><div class="contact-line"><div>Javier Lascano Colodrero · Poeta Lugones</div><div>Lunes a viernes · 7:00 a 13:30 y 16:30 a 20:00</div></div><div class="contact-actions"><a href="https://wa.me/5493513110130" target="_blank" rel="noopener">WhatsApp</a><a href="https://maps.app.goo.gl/xZTZycc15UEd1TJB8" target="_blank" rel="noopener">Cómo llegar</a><a href="mailto:libreriasaber@gmail.com">Correo</a></div></article></div></section>
 </main>
 <footer><div class="container footerrow"><b>LIBRERÍA SABER</b><small>35 años junto a vos · Córdoba Capital</small></div></footer>
 <div class="overlay" id="overlay" onclick="closeCart()"></div><aside class="cart" id="cart"><div class="cart-head"><h3>Tu pedido</h3><button class="close" onclick="closeCart()">×</button></div><div class="cart-body" id="cartBody"></div><div class="cart-footer"><div class="subtotal"><span>Artículos</span><b id="productsSubtotal">$ 0</b></div><div class="subtotal"><span>Impresión y gráfica</span><b id="printsSubtotal">$ 0</b></div><div class="deposit"><span>Seña trabajos de producción</span><span id="depositSubtotal">$ 0</span></div><div class="total"><span>Total pedido</span><span id="grandTotal">$ 0</span></div><button class="checkout" onclick="sendWhatsApp()">Encargar todo por WhatsApp</button><div class="cart-hint">La seña indicada corresponde únicamente a los trabajos de impresión y gráfica. Los artículos de librería no se incluyen en ese 50%.</div></div></aside>
