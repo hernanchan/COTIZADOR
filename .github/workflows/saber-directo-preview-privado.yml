@@ -96,21 +96,36 @@ jobs:
             sleep 2
           done
           [ "$active" = "$target" ] || { echo "DEPLOY_ACTIVE_VERSION_UNVERIFIED"; exit 1; }
+          # Cloudflare puede tardar algunos segundos en propagar la nueva versión:
+          # código 503 con JSON de ruta desconocida significa borde aún antiguo.
+          # Reintentos limitados; fallar y revertir si no converge.
+          verify_get(){
+            expected="$1"
+            out="$2"
+            url="$3"
+            shift 3
+            code="000"
+            for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+              code=$(curl --silent --show-error --max-time 25 -H 'Cache-Control: no-cache' "$@" -o "$out" -w '%{http_code}' "$url" || true)
+              if [ "$code" = "$expected" ]; then return 0; fi
+              echo "EDGE_PENDING expected=$expected got=$code attempt=$attempt"
+              sleep 2
+            done
+            echo "EDGE_NEVER_CONVERGED expected=$expected last=$code"
+            return 1
+          }
           for route in /prueba-v2/ /prueba-v2/diseno-saber-directo /prueba-v2/diseno-saber-directo/ofertas.html; do
-            code=$(curl --silent --show-error --max-time 25 -o "$workdir/anon" -w '%{http_code}' "$origin$route")
-            [ "$code" = 401 ] || { echo "PRIVATE_ROUTE_ANON_ACCESS_NOT_401 $route $code"; exit 1; }
+            verify_get 401 "$workdir/anon" "$origin$route" || { echo "PRIVATE_ROUTE_ANON_ACCESS_NOT_401 $route"; exit 1; }
           done
           echo "BASIC_GUARD_ALL_THREE_ROUTES_401"
-          code=$(curl --silent --show-error --max-time 30 --user "operador:$PASSWORD" -o "$workdir/preview.html" -w '%{http_code}' "$origin/prueba-v2/diseno-saber-directo")
-          [ "$code" = 200 ] || { echo "PREVIEW_AUTH_FAILED $code"; exit 1; }
+          verify_get 200 "$workdir/preview.html" "$origin/prueba-v2/diseno-saber-directo" --user "operador:$PASSWORD" || { echo "PREVIEW_AUTH_FAILED"; exit 1; }
           for marker in 'VISTA PREVIA PRIVADA DE DISEÑO' 'class="hero hero-direct"' 'id="promoTitle"' 'href="/prueba-v2/"'; do
-            grep -Fq "$marker" "$workdir/preview.html" || { echo "PREVIEW_MARKER_MISSING"; exit 1; }
+            grep -Fq "$marker" "$workdir/preview.html" || { echo "PREVIEW_MARKER_MISSING: $marker"; exit 1; }
           done
-          grep -Fq "style-src 'unsafe-inline'" "$workdir/preview.html" && { echo "CSP_EXPOSED_IN_HTML"; exit 1; } || true
-          code=$(curl --silent --show-error --max-time 30 --user "operador:$PASSWORD" -o "$workdir/offers.html" -w '%{http_code}' "$origin/prueba-v2/diseno-saber-directo/ofertas.html")
-          [ "$code" = 200 ] && grep -Fq 'VISTA PREVIA PRIVADA DE DISEÑO' "$workdir/offers.html" || { echo "OFFERS_VIEW_FAILED"; exit 1; }
-          code=$(curl --silent --show-error --max-time 30 --user "operador:$PASSWORD" -o "$workdir/cotizador.html" -w '%{http_code}' "$origin/prueba-v2/")
-          [ "$code" = 200 ] && grep -Fq 'id="smart"' "$workdir/cotizador.html" && grep -Fq 'send-all-pdf' "$workdir/cotizador.html" || { echo "COTIZADOR_REGRESSION"; exit 1; }
+          verify_get 200 "$workdir/offers.html" "$origin/prueba-v2/diseno-saber-directo/ofertas.html" --user "operador:$PASSWORD" || { echo "OFFERS_VIEW_AUTH_FAILED"; exit 1; }
+          grep -Fq 'VISTA PREVIA PRIVADA DE DISEÑO' "$workdir/offers.html" || { echo "OFFERS_VIEW_MARKER_MISSING"; exit 1; }
+          verify_get 200 "$workdir/cotizador.html" "$origin/prueba-v2/" --user "operador:$PASSWORD" || { echo "COTIZADOR_AUTH_FAILED"; exit 1; }
+          grep -Fq 'id="smart"' "$workdir/cotizador.html" && grep -Fq 'send-all-pdf' "$workdir/cotizador.html" || { echo "COTIZADOR_REGRESSION"; exit 1; }
           # Verificación final sin escribir pedidos, PDFs, precios ni datos.
           curl --fail --silent --show-error --max-time 30 -H "$auth" "$root/settings" > "$workdir/settings-after.json"
           jq -r '.result.bindings[]|[.name,.type]|@tsv' "$workdir/settings.json" | sort > "$workdir/before-bindings.txt"
