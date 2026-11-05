@@ -62,7 +62,7 @@ test('Carrito visible en la muestra, independiente de compras y pedidos reales',
   assert.match(rendered,/data-demo-total/);
   assert.match(rendered,/data-demo-step/);
   assert.match(rendered,/sessionStorage/);
-  assert.match(rendered,/Enviar pedido \(próximamente\)<\/button>/);
+  assert.match(rendered,/Enviar pedido \(desactivado\)<\/button>/);
   assert.doesNotMatch(rendered,/fetch\(|XMLHttpRequest|sendWhatsApp|https:\/\/wa\.me\/|payments\/|MercadoPago|localStorage/);
  }
 });
@@ -73,7 +73,7 @@ test('Ensayo prepara resumen de compra sin enviar mensajes, pagos ni pedidos',()
  assert.match(rendered,/data-demo-preview disabled/);
  assert.match(rendered,/data-demo-summary hidden/);
  assert.match(rendered,/TOTAL ORIENTATIVO/);
- assert.match(rendered,/confirmar disponibilidad y precio vigente/);
+ assert.match(rendered,/confirman disponibilidad y precio vigente/);
  assert.match(rendered,/Enviar pedido \(desactivado\)/);
  assert.doesNotMatch(rendered,/https:\/\/wa\.me\/|sendWhatsApp|MercadoPago|fetch\(|XMLHttpRequest/);
 });
