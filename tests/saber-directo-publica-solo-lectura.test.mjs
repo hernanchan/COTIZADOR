@@ -52,3 +52,17 @@ test('Planilla modelo: categorías, fotos públicas y sin descuentos ficticios',
  assert.doesNotMatch(portada,/Kit Sharpie Lettering/);
  assert.doesNotMatch(portada,/sendWhatsApp|productsCsvUrl|libreriasaber\.mp/);
 });
+
+test('Carrito visible en la muestra, independiente de compras y pedidos reales',()=>{
+ for(const [html,opts] of [[home,{}],[offers,{ofertas:true,categoria:'Escolar'}]]){
+  const rendered=prepararVistaDisenoAbierta(html,opts);
+  assert.match(rendered,/data-demo-open/);
+  assert.match(rendered,/data-demo-drawer/);
+  assert.match(rendered,/data-demo-add="ESC001"/);
+  assert.match(rendered,/data-demo-total/);
+  assert.match(rendered,/data-demo-step/);
+  assert.match(rendered,/sessionStorage/);
+  assert.match(rendered,/Enviar pedido \(próximamente\)<\/button>/);
+  assert.doesNotMatch(rendered,/fetch\(|XMLHttpRequest|sendWhatsApp|https:\/\/wa\.me\/|payments\/|MercadoPago|localStorage/);
+ }
+});
