@@ -1528,6 +1528,65 @@ async function etaAdminApi(req,env){
   productionAuthorized:false,paymentsEnabled:false});
 }
 
+
+async function trackingMac(env,id){
+ if(!CENTRAL_UUID.test(id)||typeof env.CENTRAL_BRIDGE_KEY!=="string"||
+    env.CENTRAL_BRIDGE_KEY.length<32||env.CENTRAL_BRIDGE_KEY===env.DEMO_ADMIN_KEY)return null;
+ const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(env.CENTRAL_BRIDGE_KEY),{name:"HMAC",hash:"SHA-256"},false,["sign"]);
+ const bytes=new Uint8Array(await crypto.subtle.sign("HMAC",key,new TextEncoder().encode("saber-tracking-client-v1\n"+id.toLowerCase())));
+ return Array.from(bytes,b=>b.toString(16).padStart(2,"0")).join("");
+}
+async function trackingUrl(env,id,requestUrl){
+ const mac=await trackingMac(env,id);if(!mac)return null;
+ const out=new URL("/seguimiento",requestUrl);
+ out.searchParams.set("token",id.toLowerCase()+"."+mac);return out.href;
+}
+async function trackingCustomerStatus(req,env){
+ if(env.CENTRAL_PRODUCTION_TRACKING_ENABLED!=="PRIVATE_TEST_ONLY"||
+   env.CENTRAL_PREPARE_ENABLED!=="PRIVATE_TEST_ONLY")return json({error:"Seguimiento no habilitado"},503);
+ const token=new URL(req.url).searchParams.get("token")||"";
+ const match=token.match(/^([a-f0-9-]{36})\.([a-f0-9]{64})$/);
+ if(!match||!CENTRAL_UUID.test(match[1]))return json({error:"Enlace inválido"},404);
+ const expected=await trackingMac(env,match[1]);
+ if(!expected)return json({error:"Seguimiento no disponible"},503);
+ let bad=0;for(let i=0;i<64;i++)bad|=expected.charCodeAt(i)^match[2].charCodeAt(i);
+ if(bad!==0)return json({error:"Enlace inválido"},404);
+ await centralTables(env);await ensurePaymentReviews(env);await centralProductionTables(env);
+ const x=await env.DB.prepare("SELECT o.id,o.status,o.paid_at,o.deposit_ars,o.amount_ars,"+
+  "n.number,m.manifest_json,COALESCE(s.state,'pendiente') AS stage,p.state AS review_state "+
+  "FROM orders o JOIN central_document_manifests m ON m.commercial_order_id=o.id "+
+  "LEFT JOIN central_work_order_numbers n ON n.commercial_order_id=o.id "+
+  "LEFT JOIN central_production_status s ON s.order_id=o.id "+
+  "LEFT JOIN payment_reviews p ON p.order_id=o.id WHERE o.id=? LIMIT 1").bind(match[1]).first();
+ if(!x)return json({error:"Enlace inválido"},404);
+ const paid=x.status==="paid"&&Boolean(x.paid_at)&&x.deposit_ars===x.amount_ars&&x.review_state==="verified";
+ const review=x.review_state==="revoked",stage=paid?x.stage:null;
+ const phases={pendiente:"Pago confirmado",en_preparacion:"En preparación",en_espera:"En espera",
+  listo:"Listo para retirar",entregado:"Entregado"};
+ let estimate=null;
+ if(paid&&!["listo","entregado"].includes(stage)){
+  const manual=await preparationEstimateDetail(env,x.id);
+  if(manual.ready_at)estimate={type:"manual",readyAt:manual.ready_at,provisional:true};
+  else if(standardPrintJob(x.manifest_json)&&stage!=="en_espera"){
+   const setting=await etaSettings(env);
+   const q=await env.DB.prepare("SELECT COUNT(*) AS ahead FROM orders o "+
+    "JOIN central_document_manifests m ON m.commercial_order_id=o.id "+
+    "LEFT JOIN central_production_status s ON s.order_id=o.id "+
+    "WHERE o.status='paid' AND o.paid_at IS NOT NULL AND o.deposit_ars=o.amount_ars "+
+    "AND COALESCE(s.state,'pendiente') IN ('pendiente','en_preparacion') "+
+    "AND EXISTS (SELECT 1 FROM payment_reviews p WHERE p.order_id=o.id AND p.state='verified') "+
+    "AND (o.paid_at<? OR (o.paid_at=? AND o.id<?))").bind(x.paid_at,x.paid_at,x.id).first();
+   estimate={type:"habitual",provisional:true,...etaForQueue(setting,Number(q?.ahead)||0)};
+  }
+ }
+ return new Response(JSON.stringify({ok:true,orderNumber:shortWorkNumber(x.number),
+  payment:review?"requiere_revision":paid?"pagado":"pendiente",stage,
+  phase:review?"Pago en revisión":paid?phases[stage]||"Pago confirmado":"Esperando pago",
+  estimate}),{headers:{"content-type":"application/json; charset=utf-8",
+   "cache-control":"no-store, private","referrer-policy":"no-referrer",
+   "x-robots-tag":"noindex,nofollow","x-content-type-options":"nosniff"}});
+}
+
 async function centralAdminDetail(env,id){
  await centralTables(env);
  const row=await env.DB.prepare("SELECT m.web_order_id,m.manifest_json,m.created_at,m.amount_ars,m.file_count,c.phone AS telefonoContacto FROM central_document_manifests m LEFT JOIN central_order_contacts c ON c.order_id=m.commercial_order_id WHERE m.commercial_order_id=?").bind(id).first();
@@ -3078,9 +3137,10 @@ async function centralClientSandboxPayment(req,env,dispatch){
      preparacionEstimada={readyAt:estimate.ready_at,provisional:true};
    }
   }
+  const seguimientoUrl=await trackingUrl(env,belongs.id,req.url);
   return json({ok:true,commercialOrderId:belongs.id,estado,
    ...instrucciones,...(preparacionEstimada?{preparacionEstimada}:{}),
-   paymentAuthorized:estado==="pagado"});
+   ...(seguimientoUrl?{seguimientoUrl}:{}),paymentAuthorized:estado==="pagado"});
  }
  if(typeof dispatch!=="function"||typeof env.DEMO_ADMIN_KEY!=="string"||!env.DEMO_ADMIN_KEY)
   return json({ok:false,error:"Pasarela privada no disponible"},503);
@@ -3145,6 +3205,7 @@ export default {
    if(env.DB){try{const r=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='orders'").first();databaseReady=r?.name==="orders"}catch{}}
    return json({ok:true,environment:"test",configured,databaseReady,paymentsEnabled:false});
   }
+  if(url.pathname==="/seguimiento/api/estado"&&req.method==="GET")return await trackingCustomerStatus(req,env);
   if(url.pathname==="/demo/crypto-test"&&req.method==="GET"){
    if(!tokenOK(req,env))return json({error:"No autorizado"},401);
    if(!env.MP_WEBHOOK_SECRET)return json({cryptoSelfTest:false,reason:"Secret no configurado"},503);
