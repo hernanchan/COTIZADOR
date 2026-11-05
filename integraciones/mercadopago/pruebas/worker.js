@@ -1857,7 +1857,14 @@ body.price-only #priceAdminFieldset summary{font-size:1.3rem}
 <input type="password" autocomplete="off" id="secret" placeholder="Clave privada del panel" aria-label="Clave privada">
 <input type="text" id="productionOperator" maxlength="60" placeholder="Responsable del cambio" aria-label="Nombre de responsable" autocomplete="off">
 <button id="refresh">Consultar pedidos</button><button id="sync" class="outline">Verificar pagos pendientes</button><button id="openPricing" class="outline" type="button">Editar precios y promociones</button>
-</div><p id="status" role="status" aria-live="polite"></p><p id="cronState" class="note">Conciliación automática: sin consultar.</p></fieldset>
+<button id="mobileInviteCreate" class="outline" type="button">Acceso temporal al celular</button>
+</div><p id="status" role="status" aria-live="polite"></p>
+<div id="mobileInviteArea" hidden>
+<p class="note">Enlace privado de un solo uso. Vence en 3 minutos. Copialo y abrilo en tu celular; no lo compartas con terceros.</p>
+<div class="toolbar"><input id="mobileInviteLink" type="text" readonly autocomplete="off" aria-label="Enlace temporal de ingreso" style="flex:1;min-width:230px">
+<button id="mobileInviteCopy" class="outline" type="button">Copiar enlace</button></div></div>
+<p id="mobileInviteStatus" role="status" class="note" aria-live="polite"></p>
+<p id="cronState" class="note">Conciliación automática: sin consultar.</p></fieldset>
 <fieldset id="bankTransfersArea"><legend>Transferencias por verificar · <strong id="transferCount">0 pendientes</strong></legend><p class="note">Los pendientes se cargan solos y se actualizan cada 30 segundos. Comprobar el ingreso en el banco: un comprobante del cliente no acredita el pago. Operación limitada al ENSAYO privado.</p><p id="transferPanelStatus" class="transfer-feedback" role="status" aria-live="polite">Ingresá la clave privada para consultar las transferencias.</p><ol id="transferPending"></ol><button id="refreshTransfers" class="outline" type="button">Actualizar ahora</button></fieldset>
 <fieldset id="etaAdminArea"><legend>Demora orientativa · configuración</legend>
 <p class="note">Referencia inicial: 3 horas para impresiones habituales de hasta 400 páginas. La demora habitual no es el tiempo por pedido. Si la capacidad está ocupada, el plazo requiere revisión; no se agregan horas de manera artificial.</p>
@@ -1999,6 +2006,33 @@ etaCalendarSave.addEventListener("click",async()=>{
    expectedRevision:etaCalendarSnapshot.revision,operator,confirmed:true});
   await loadEtaCalendar();await refresh({silent:true,force:true});
  }catch(e){etaCalendarInfo.textContent=String(e.message||e);etaCalendarSave.disabled=false}
+});
+
+const mobileInviteCreate=document.querySelector("#mobileInviteCreate");
+const mobileInviteCopy=document.querySelector("#mobileInviteCopy");
+const mobileInviteArea=document.querySelector("#mobileInviteArea");
+const mobileInviteLink=document.querySelector("#mobileInviteLink");
+const mobileInviteStatus=document.querySelector("#mobileInviteStatus");
+mobileInviteCreate.addEventListener("click",async()=>{
+ const operator=requestOperator();
+ if(!operator){mobileInviteStatus.textContent="Indicá el responsable.";return}
+ if(!secret.value.trim()){mobileInviteStatus.textContent="Ingresá la clave de la Central.";return}
+ if(!confirm("¿Generar un enlace de ingreso al cotizador de pruebas? Dura tres minutos y se utiliza una sola vez."))return;
+ mobileInviteArea.hidden=true;mobileInviteLink.value="";mobileInviteCreate.disabled=true;
+ mobileInviteStatus.textContent="Generando acceso temporal…";
+ try{
+  const result=await apiPost("/admin/api/central/mobile-invite",{operator,confirmed:true});
+  if(result.ok!==true||typeof result.url!=="string")throw Error("No se pudo generar el acceso.");
+  mobileInviteLink.value=result.url;mobileInviteArea.hidden=false;
+  mobileInviteStatus.textContent="Enlace listo. Abrilo desde el celular antes de 3 minutos.";
+ }catch(e){mobileInviteStatus.textContent=e.message||"Acceso no disponible"}
+ finally{mobileInviteCreate.disabled=false}
+});
+mobileInviteCopy.addEventListener("click",async()=>{
+ if(!mobileInviteLink.value)return;
+ try{await navigator.clipboard.writeText(mobileInviteLink.value);
+  mobileInviteStatus.textContent="Enlace copiado. Pegalo en tu celular.";
+ }catch{mobileInviteLink.select();mobileInviteStatus.textContent="Seleccioná y copiá el enlace."; }
 });
 function money(n){return new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0}).format(Number(n)||0)}
 async function apiPost(path,data){
