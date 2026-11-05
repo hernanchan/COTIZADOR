@@ -14,7 +14,8 @@ for (const [name,html] of [['portada',home],['ofertas',offers]]){
   assert.doesNotMatch(rendered,/https:\/\/wa\.me\//);
   assert.doesNotMatch(rendered,/onclick=|onerror=/i);
   assert.doesNotMatch(rendered,/href="cotizar\.html"/);
-  assert.match(rendered,/href="#preview-aviso"/);
+  if(name==='portada')assert.match(rendered,/href="#preview-aviso"/);
+  else assert.match(rendered,/href="\/prueba-v2\/diseno-sin-clave"/);
   assert.match(rendered,/class="brand"/);
   if(name==='portada')assert.match(rendered,/href="\/prueba-v2\/diseno-sin-clave\/ofertas\.html\?categoria=/);
   else assert.match(rendered,/href="\/prueba-v2\/diseno-sin-clave#categorias"/);
