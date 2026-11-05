@@ -66,3 +66,14 @@ test('Carrito visible en la muestra, independiente de compras y pedidos reales',
   assert.doesNotMatch(rendered,/fetch\(|XMLHttpRequest|sendWhatsApp|https:\/\/wa\.me\/|payments\/|MercadoPago|localStorage/);
  }
 });
+
+test('Ensayo prepara resumen de compra sin enviar mensajes, pagos ni pedidos',()=>{
+ const rendered=prepararVistaDisenoAbierta(home);
+ assert.match(rendered,/Preparar pedido para WhatsApp \(prueba\)/);
+ assert.match(rendered,/data-demo-preview disabled/);
+ assert.match(rendered,/data-demo-summary hidden/);
+ assert.match(rendered,/TOTAL ORIENTATIVO/);
+ assert.match(rendered,/confirmar disponibilidad y precio vigente/);
+ assert.match(rendered,/Enviar pedido \(desactivado\)/);
+ assert.doesNotMatch(rendered,/https:\/\/wa\.me\/|sendWhatsApp|MercadoPago|fetch\(|XMLHttpRequest/);
+});

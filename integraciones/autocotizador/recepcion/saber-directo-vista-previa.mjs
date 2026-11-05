@@ -148,7 +148,7 @@ export function prepararVistaDisenoAbierta(html,{ofertas=false,categoria=''}={})
  .demo-cart-foot{border-top:1px solid #e3e8ec;padding:20px}
  .demo-cart-total{display:flex;justify-content:space-between;gap:10px;font:800 20px Manrope,sans-serif;color:#0a3158}
  .demo-cart-disabled{width:100%;padding:15px;margin-top:15px;background:#d9e1e7;color:#5e6c78;border:0;border-radius:8px;font-weight:900;cursor:not-allowed}
- .demo-cart-caption{color:#647888;font-size:12px;line-height:1.5;margin:10px 0 0}
+ .demo-cart-summary-button{width:100%;padding:14px 12px;margin-top:15px;background:#f7942e;color:#16354a;border:0;border-radius:8px;font-weight:900;cursor:pointer}.demo-cart-summary-button:disabled{background:#d9e1e7;color:#5e6c78;cursor:not-allowed}.demo-cart-summary[hidden]{display:none!important}.demo-cart-summary{white-space:pre-wrap;overflow-wrap:anywhere;background:#f4f7fa;border:1px solid #dce5eb;border-radius:8px;padding:14px;margin:14px 0 2px;color:#173851;font:13px/1.55 system-ui,sans-serif}.demo-cart-caption{color:#647888;font-size:12px;line-height:1.5;margin:10px 0 0}
  .demo-cart-float{position:fixed;bottom:19px;right:20px;z-index:70;background:#f7942e;border:none;color:#12314a;border-radius:100px;box-shadow:0 7px 28px #0e304b40;padding:13px 16px;font-size:14px;font-weight:900;cursor:pointer}
  @media(max-width:650px){.demo-cart-float{right:12px;bottom:73px;padding:12px 15px}.demo-cart-head h2{font-size:23px}}
  `;
@@ -158,7 +158,7 @@ export function prepararVistaDisenoAbierta(html,{ofertas=false,categoria=''}={})
   '<div class="demo-cart-head"><h2>Tu carrito</h2><button type="button" class="demo-cart-close" data-demo-close aria-label="Cerrar carrito">×</button></div>'+
   '<div class="demo-cart-body" data-demo-lines></div><div class="demo-cart-foot">'+
   '<div class="demo-cart-total"><span>Total de productos</span><strong data-demo-total>$ 0</strong></div>'+
-  '<button class="demo-cart-disabled" type="button" disabled>Enviar pedido (próximamente)</button>'+
+  '<button class="demo-cart-summary-button" type="button" data-demo-preview disabled>Preparar pedido para WhatsApp (prueba)</button><pre class="demo-cart-summary" data-demo-summary hidden></pre><button class="demo-cart-disabled" type="button" disabled>Enviar pedido (desactivado)</button>'+
   '<p class="demo-cart-caption">Modo prueba: podés agregar y quitar productos, pero no se envían pedidos, archivos ni pagos. Los precios pertenecen a la planilla MODELO al 05/11/2026.</p>'+
   '</div></aside>'+
   '<button type="button" class="demo-cart-float" data-demo-open>Carrito <span data-demo-badge>0</span></button>';
@@ -175,12 +175,12 @@ export function prepararVistaDisenoAbierta(html,{ofertas=false,categoria=''}={})
   "function render(){let count=0,total=0;const lines=[];for(const [code,qty] of Object.entries(cart)){const product=byCode[code];if(!product)continue;count+=qty;total+=qty*product.price;"+
   "lines.push('<div class=\"demo-cart-item\"><strong>'+product.name+'</strong><small>'+money(product.price)+' c/u · '+money(product.price*qty)+'</small><div class=\"demo-cart-qty\"><button type=\"button\" data-demo-step=\"-1\" data-demo-code=\"'+code+'\" aria-label=\"Quitar uno\">−</button><b>'+qty+'</b><button type=\"button\" data-demo-step=\"1\" data-demo-code=\"'+code+'\" aria-label=\"Agregar uno\">+</button><button type=\"button\" class=\"demo-remove\" data-demo-remove=\"'+code+'\">Eliminar</button></div></div>');}"+
   "document.querySelector('[data-demo-lines]').innerHTML=lines.join('')||'<p>Tu carrito todavía está vacío. Elegí un producto y agregalo.</p>';"+
-  "document.querySelector('[data-demo-total]').textContent=money(total);document.querySelectorAll('[data-demo-badge]').forEach(el=>el.textContent=count);}"+
+  "document.querySelector('[data-demo-total]').textContent=money(total);document.querySelectorAll('[data-demo-badge]').forEach(el=>el.textContent=count);document.querySelector('[data-demo-preview]').disabled=count===0;document.querySelector('[data-demo-summary]').hidden=true;}"+
   "function open(){previousFocus=document.activeElement;drawer.hidden=false;curtain.hidden=false;drawer.querySelector('[data-demo-close]').focus()}"+
   "function close(){drawer.hidden=true;curtain.hidden=true;if(previousFocus&&typeof previousFocus.focus==='function')previousFocus.focus()}"+
   "document.addEventListener('click',event=>{const target=event.target;if(!(target instanceof Element))return;const add=target.closest('[data-demo-add]');if(add){const code=add.getAttribute('data-demo-add');if(byCode[code]){cart[code]=Math.min(99,(cart[code]||0)+1);store();render();open()}return}"+
   "const step=target.closest('[data-demo-step]');if(step){const code=step.getAttribute('data-demo-code');const delta=Number(step.getAttribute('data-demo-step'));if(byCode[code]&&[-1,1].includes(delta)){const qty=(cart[code]||0)+delta;if(qty<=0)delete cart[code];else cart[code]=Math.min(99,qty);store();render()}return}"+
-  "const remove=target.closest('[data-demo-remove]');if(remove){delete cart[remove.getAttribute('data-demo-remove')];store();render();return}"+
+  "const summary=target.closest('[data-demo-preview]');if(summary){const entries=Object.entries(cart).filter(([code,qty])=>byCode[code]&&Number.isSafeInteger(qty)&&qty>0);if(!entries.length)return;let total=0;const lines=['Hola, Librería Saber. Quisiera consultar por estos artículos:','','PRODUCTOS'];for(const [code,qty] of entries){const p=byCode[code];const subtotal=p.price*qty;total+=subtotal;lines.push(qty+' × '+p.name+' ('+code+') — '+money(subtotal));}lines.push('', 'TOTAL ORIENTATIVO: '+money(total),'', '¿Me confirman disponibilidad y precio vigente antes de finalizar?');const el=document.querySelector('[data-demo-summary]');el.textContent=lines.join('\n');el.hidden=false;el.scrollIntoView({block:'nearest',behavior:'smooth'});return}const remove=target.closest('[data-demo-remove]');if(remove){delete cart[remove.getAttribute('data-demo-remove')];store();render();return}"+
   "if(target.closest('[data-demo-open],.cart-open,.mcart')){open();return}if(target.closest('[data-demo-close],[data-demo-curtain]')){close();return}});"+
   "document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!drawer.hidden)close()});render();"+
   '})();</script>';
