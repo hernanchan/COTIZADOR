@@ -98,7 +98,7 @@ function scenario({paid=true,delivered=true,canary=webOrder,storageFailure=false
     throw Error('SQL lectura no simulada: '+sql.slice(0,110))
    },
    async all(){
-    if(sql.startsWith('SELECT order_id,web_order_id,production_version FROM central_tus_purge_queue'))
+    if(sql.startsWith('SELECT q.order_id,q.web_order_id,q.production_version,m.created_at AS manifest_created_at FROM central_tus_purge_queue q'))
      return {results:state.queue&&['pending','error'].includes(state.queue.state)?[{
       order_id:order,web_order_id:webOrder,production_version:state.productionVersion}]:[]};
     if(sql.startsWith('SELECT r.receipt_id,r.file_id,r.sha256 FROM central_document_receipts'))
