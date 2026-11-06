@@ -117,3 +117,15 @@ test('la cookie de presupuesto nunca es sesión de pedidos y ZIP/download sigue 
  assert.match(worker,/autorizadoPedidoClienteVinculado/);
  assert.match(worker,/if\(page==='\/prueba-v2\/api\/ensayo-tus-canaria-checkout'\)/);
 });
+
+
+test('el tarifario D1 del comprador se usa también al confirmar el pedido TUS; no se omite el vínculo',()=>{
+ const worker=readFileSync(new URL('../integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs',import.meta.url),'utf8');
+ const priceSection=worker.slice(worker.indexOf('async function preciosPrivados('),worker.indexOf('const INTERNAL_ALLOW_UPLOADS'));
+ assert.match(priceSection,/quotePath==='\/prueba-v2\/api\/ensayo-tus-registrar'/);
+ assert.match(priceSection,/precioComprador&&await autorizadoPedidoCliente/);
+ const tus=worker.slice(worker.indexOf("if(page==='/api/ensayo-tus-iniciar'"),worker.indexOf("if(page==='/api/ensayo-preparar-documentos-lote'"));
+ assert.match(tus,/autorizadoPedidoClienteVinculado\(request,env,data\?\.orderId\)/);
+ assert.match(tus,/preciosServidor:authorized\?await preciosPrivados\(env,request\):null/);
+ assert.match(tus,/const link=await cookiePedidoClienteVinculado\(request,env,data\?\.orderId\)/);
+});
