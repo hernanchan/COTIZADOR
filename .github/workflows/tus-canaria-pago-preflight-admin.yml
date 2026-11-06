@@ -1,0 +1,41 @@
+name: Diagnosticar acceso a pago canario 024 (solo preflight, no checkout)
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [docs/DIAGNOSTICAR-ACCESO-PAGO-CANARIA-024.trigger]
+permissions:
+  contents: read
+jobs:
+  read-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Consultar exclusivamente preflight del pedido canario
+        shell: bash
+        env:
+          DOCS_ADMIN: ${{ secrets.SABER_DOCS_CENTRAL_ADMIN_KEY }}
+          CENTRAL_ADMIN: ${{ secrets.SABER_CENTRAL_ADMIN_KEY }}
+          DEMO_ADMIN: ${{ secrets.DEMO_ADMIN_KEY }}
+          CENTRAL_DEMO: ${{ secrets.SABER_CENTRAL_DEMO_ADMIN_KEY }}
+        run: |
+          set -euo pipefail
+          url='https://saber-pagos-pruebas.libreriasaber.workers.dev/admin/api/central/payment-preflight'
+          id='f5bddab7-6078-4f00-9fba-61f2210b0b20'
+          for key in DOCS_ADMIN CENTRAL_ADMIN DEMO_ADMIN CENTRAL_DEMO; do
+            token="${!key}"
+            if [ -z "$token" ]; then echo "PRUEBA_CREDENCIAL_${key}=NO_CONFIGURADA";continue; fi
+            out=$(mktemp)
+            code=$(curl -sS --max-time 20 -o "$out" -w '%{http_code}' -X POST -H 'Content-Type: application/json' -H "Authorization: Bearer $token" --data '{"order_id":"f5bddab7-6078-4f00-9fba-61f2210b0b20"}' "$url")
+            echo "PRUEBA_CREDENCIAL_${key}_HTTP=$code"
+            if [ "$code" = 200 ]; then
+              jq -c '{ready_for_sandbox_test,reason,amount_ars,documents_ars,paymentAuthorized,productionAuthorized}' "$out"
+              echo "PRECHECK_SANDBOX_ADMIN_AUTHORIZED=${key}"
+              rm -f "$out"
+              exit 0
+            fi
+            rm -f "$out"
+          done
+          echo 'PRECHECK_SANDBOX_ADMIN_NOT_AVAILABLE'
