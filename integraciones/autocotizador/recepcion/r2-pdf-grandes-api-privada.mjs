@@ -5,7 +5,7 @@
  * de cada recibo. Una firma R2 NO sirve por si sola como permiso de acceso.
  */
 import {iniciarR2Grande,subirParteR2Grande,completarR2Grande,
- leerReciboR2} from './r2-pdf-grandes-privado.mjs';
+ leerReciboR2,validarMetaR2} from './r2-pdf-grandes-privado.mjs';
 import {verificarIntegridadR2Grande} from './r2-pdf-integridad-stream.mjs';
 import {reservarR2GrandeAntesDeSubir} from './r2-grandes-reserva-central.mjs';
 import {enviarPreRecepcionR2Central} from './r2-grandes-enviar-central.mjs';
@@ -76,6 +76,7 @@ export async function manejarR2GrandePrivado(request,env,{
     return reply({ok:false,error:'Datos de inicio incorrectos'},422);
    if(!await autorizadoIniciar(data.orderId))
     return reply({ok:false,error:'Sesion de comprador no autorizada'},403);
+   validarMetaR2(data.meta);
    // Primero reservar espacio global y del pedido en la Central con SQL atómico.
    // Una cuenta con R2 habilitado pero sin cuota NO puede crear uploads.
    const objectUUID=uuid();
@@ -121,6 +122,6 @@ export async function manejarR2GrandePrivado(request,env,{
   const code=typeof error?.message==='string'&&/^R2_[A-Z0-9_]{3,60}$/.test(error.message)
    ?error.message:'R2_OPERACION_NO_COMPLETADA';
   console.warn('saber_r2_big_rejected',code);
-  return reply({ok:false,error:code},422);
+  return reply({ok:false,error:code},code==='R2_CUPO_AGOTADO'?429:422);
  }
 }
