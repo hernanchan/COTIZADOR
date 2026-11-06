@@ -1373,16 +1373,27 @@ async function centralProductionDetail(env,id){
  * originales TUS, nunca borra bytes ni modifica registros de pago.
  * La ejecución futura verificará nuevamente la Central antes de borrar.
  */
-async function centralQueueDeliveryCleanup(env,orderId,version,operator){
- if(env.CENTRAL_TUS_PURGE_QUEUE_ENABLED!=="PRIVATE_TEST_ONLY")
-  return {state:"desactivado",filesDeleted:0};
+
+/* Entrega de PDF: cola reintentable, auditoría durable y comunicación firmada.
+   Ambas compuertas quedan OFF en entorno real y pruebas hasta autorización. */
+async function centralEnsureTUSPurgeTables(env){
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_tus_purge_queue ("+
   "order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE RESTRICT,"+
   "web_order_id TEXT NOT NULL UNIQUE REFERENCES central_document_manifests(web_order_id) ON DELETE RESTRICT,"+
   "production_version INTEGER NOT NULL CHECK(production_version>=1),"+
-  "state TEXT NOT NULL DEFAULT 'pending' CHECK(state IN ('pending','completed','error')),"+
-  "operator TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT (datetime('now')),"+
-  "completed_at TEXT)").run();
+  "state TEXT NOT NULL DEFAULT 'pending' CHECK(state IN ('pending','processing','completed','error')),"+
+  "attempts INTEGER NOT NULL DEFAULT 0,operator TEXT NOT NULL,"+
+  "created_at TEXT NOT NULL DEFAULT (datetime('now')),"+
+  "locked_at TEXT,last_try_at TEXT,completed_at TEXT)").run();
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_tus_purge_audit ("+
+  "id INTEGER PRIMARY KEY AUTOINCREMENT,order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE RESTRICT,"+
+  "production_version INTEGER NOT NULL,phase TEXT NOT NULL CHECK(phase IN ('queued','attempt','error','completed')),"+
+  "file_count INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL DEFAULT(datetime('now')))").run();
+}
+async function centralQueueDeliveryCleanup(env,orderId,version,operator){
+ if(env.CENTRAL_TUS_PURGE_QUEUE_ENABLED!=="PRIVATE_TEST_ONLY")
+  return {state:"desactivado",filesDeleted:0};
+ await centralEnsureTUSPurgeTables(env);
  const row=await env.DB.prepare(
   "SELECT m.web_order_id,m.file_count FROM central_document_manifests m "+
   "JOIN orders o ON o.id=m.commercial_order_id "+
@@ -1394,17 +1405,127 @@ async function centralQueueDeliveryCleanup(env,orderId,version,operator){
  if(!row||!/^WEB-ENSAYO-[A-F0-9]{32}$/.test(row.web_order_id||"")||
     !Number.isSafeInteger(row.file_count)||row.file_count<1||row.file_count>10)
   return {state:"no_elegible",filesDeleted:0};
- await env.DB.prepare(
+ const inserted=await env.DB.prepare(
   "INSERT OR IGNORE INTO central_tus_purge_queue "+
   "(order_id,web_order_id,production_version,operator) VALUES(?,?,?,?)"
  ).bind(orderId,row.web_order_id,version,operator).run();
+ if(Number(inserted?.meta?.changes)===1)
+  await env.DB.prepare("INSERT INTO central_tus_purge_audit "+
+   "(order_id,production_version,phase,file_count) VALUES(?,?,'queued',?)")
+   .bind(orderId,version,row.file_count).run();
  const job=await env.DB.prepare(
   "SELECT state FROM central_tus_purge_queue WHERE order_id=? AND web_order_id=? "+
   "AND production_version=?").bind(orderId,row.web_order_id,version).first();
  return {state:job?.state||"error",filesDeleted:0};
 }
+async function centralTUSPurgeComplete(req,env){
+ const signed=await centralReadSigned(req,env);
+ if(signed.error)return json({ok:false,error:'Acceso privado no autorizado'},signed.status);
+ const p=signed.payload;
+ if(!p||typeof p!=='object'||Array.isArray(p)||
+   Object.keys(p).sort().join(',')!=='deletedCount,productionVersion,schema,webOrderId'||
+   p.schema!=='saber-central-tus-purge-complete-v1'||
+   !/^WEB-ENSAYO-[A-F0-9]{32}$/.test(p.webOrderId||'')||
+   !Number.isSafeInteger(p.deletedCount)||p.deletedCount<1||p.deletedCount>10||
+   !Number.isSafeInteger(p.productionVersion)||p.productionVersion<1)
+  return json({ok:false,error:'Acuse inválido'},422);
+ if(env.CENTRAL_TUS_PURGE_EXECUTE_ENABLED!=='PRIVATE_TEST_ONLY'||
+    env.CENTRAL_TUS_PURGE_QUEUE_ENABLED!=='PRIVATE_TEST_ONLY')
+  return json({ok:false,error:'Retención desactivada'},503);
+ await centralEnsureTUSPurgeTables(env);
+ const row=await env.DB.prepare(
+  "SELECT q.order_id,q.state,m.file_count FROM central_tus_purge_queue q "+
+  "JOIN central_document_manifests m ON m.web_order_id=q.web_order_id "+
+  "JOIN orders o ON o.id=q.order_id "+
+  "JOIN central_production_status p ON p.order_id=q.order_id "+
+  "WHERE q.web_order_id=? AND q.production_version=? AND p.state='entregado' "+
+  "AND p.version=q.production_version AND o.status='paid' AND o.paid_at IS NOT NULL "+
+  "AND o.deposit_ars=o.amount_ars AND EXISTS (SELECT 1 FROM payment_reviews r "+
+  "WHERE r.order_id=o.id AND r.state='verified') LIMIT 1"
+ ).bind(p.webOrderId,p.productionVersion).first();
+ if(!row||row.file_count!==p.deletedCount||!['processing','completed'].includes(row.state))
+  return json({ok:false,error:'Cola de eliminación incongruente'},409);
+ if(row.state==='completed')return json({ok:true,state:'completed',alreadyConfirmed:true},200);
+ const updated=await env.DB.prepare(
+  "UPDATE central_tus_purge_queue SET state='completed',completed_at=datetime('now'),locked_at=NULL "+
+  "WHERE web_order_id=? AND production_version=? AND state='processing'"
+ ).bind(p.webOrderId,p.productionVersion).run();
+ if(Number(updated?.meta?.changes)!==1)
+  return json({ok:false,error:'La orden cambió de estado'},409);
+ await env.DB.prepare("INSERT INTO central_tus_purge_audit "+
+  "(order_id,production_version,phase,file_count) VALUES(?,?,'completed',?)")
+  .bind(row.order_id,p.productionVersion,p.deletedCount).run();
+ return json({ok:true,state:'completed',filesDeleted:p.deletedCount},200);
+}
+async function centralSignPurgeRequest(env,webOrderId){
+ const bridge=env.SABER_DOCUMENTOS;
+ if(typeof bridge?.fetch!=='function')throw Error('Worker de documentos no vinculado');
+ if(typeof env.CENTRAL_BRIDGE_KEY!=='string'||env.CENTRAL_BRIDGE_KEY.length<32)
+  throw Error('Clave de puente privada no configurada');
+ const payload=JSON.stringify({schema:'saber-docs-tus-purge-delivered-v1',webOrderId});
+ const ts=String(Math.floor(Date.now()/1000)),id=crypto.randomUUID();
+ const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(env.CENTRAL_BRIDGE_KEY),
+  {name:'HMAC',hash:'SHA-256'},false,['sign']);
+ const signature=Array.from(new Uint8Array(await crypto.subtle.sign('HMAC',key,
+  new TextEncoder().encode(ts+'\n'+id+'\n'+payload))),b=>b.toString(16).padStart(2,'0')).join('');
+ const r=await bridge.fetch(new Request(
+  'https://saber-documentos-pruebas.libreriasaber.workers.dev/internal/tus-purge-delivered',{
+   method:'POST',headers:{'Content-Type':'application/json','x-saber-ts':ts,
+    'x-saber-request-id':id,'x-saber-signature':signature},body:payload
+  }));
+ if(r.status!==200)throw Error('El Worker de PDF no confirmó eliminación');
+ const raw=await r.text();
+ if(raw.length>2000)throw Error('Respuesta de limpieza inválida');
+ let data;try{data=JSON.parse(raw)}catch{throw Error('Respuesta de limpieza inválida')}
+ if(data?.ok!==true||data.mode!=='execute'||data.webOrderId!==webOrderId)
+  throw Error('No se verificó eliminación de Storage');
+ return data;
+}
+/**
+ * Reintentos: reclamar atómicamente una fila, encolar auditoría y transferir
+ * al Worker de documentos. Sin service binding / flags no modifica Storage.
+ */
+async function centralProcessTUSPurgeQueue(env,{orderId=null,limit=3}={}){
+ if(env.CENTRAL_TUS_PURGE_EXECUTE_ENABLED!=='PRIVATE_TEST_ONLY'||
+    env.CENTRAL_TUS_PURGE_QUEUE_ENABLED!=='PRIVATE_TEST_ONLY')return {enabled:false,processed:0};
+ await centralEnsureTUSPurgeTables(env);
+ const rows=await env.DB.prepare(
+  "SELECT order_id,web_order_id,production_version FROM central_tus_purge_queue "+
+  "WHERE (? IS NULL OR order_id=?) AND "+
+  "(state IN ('pending','error') OR (state='processing' AND locked_at<datetime('now','-3 minutes'))) "+
+  "ORDER BY created_at ASC LIMIT ?"
+ ).bind(orderId,orderId,Math.min(5,Math.max(1,limit))).all();
+ let processed=0,errors=0;
+ for(const job of rows.results||[]){
+  const claimed=await env.DB.prepare(
+   "UPDATE central_tus_purge_queue SET state='processing',locked_at=datetime('now'),"+
+   "last_try_at=datetime('now'),attempts=attempts+1 "+
+   "WHERE order_id=? AND web_order_id=? AND production_version=? AND "+
+   "(state IN ('pending','error') OR (state='processing' AND locked_at<datetime('now','-3 minutes')))"
+  ).bind(job.order_id,job.web_order_id,job.production_version).run();
+  if(Number(claimed?.meta?.changes)!==1)continue;
+  await env.DB.prepare("INSERT INTO central_tus_purge_audit "+
+   "(order_id,production_version,phase) VALUES(?,?,'attempt')")
+   .bind(job.order_id,job.production_version).run();
+  try{
+   await centralSignPurgeRequest(env,job.web_order_id);
+   // El Worker documental confirma D1 antes de responder: no marcar aquí.
+   processed++;
+  }catch{
+   await env.DB.prepare(
+    "UPDATE central_tus_purge_queue SET state='error',locked_at=NULL "+
+    "WHERE order_id=? AND production_version=? AND state='processing'"
+   ).bind(job.order_id,job.production_version).run();
+   await env.DB.prepare("INSERT INTO central_tus_purge_audit "+
+    "(order_id,production_version,phase) VALUES(?,?,'error')")
+    .bind(job.order_id,job.production_version).run();
+   errors++;
+  }
+ }
+ return {enabled:true,processed,errors};
+}
 
-async function centralUpdateProduction(req,env){
+async function centralUpdateProduction(req,env,ctx){
  if(!tokenOK(req,env))return json({error:"No autorizado"},401);
  if(env.CENTRAL_PRODUCTION_TRACKING_ENABLED!=="PRIVATE_TEST_ONLY")
   return json({error:"Seguimiento operativo no habilitado"},503);
@@ -1457,8 +1578,13 @@ async function centralUpdateProduction(req,env){
   return json({error:"Cambio no confirmado; actualizá el pedido"},409);
  let cleanup=null;
  if(d.to==='entregado'){
-  try{cleanup=await centralQueueDeliveryCleanup(env,d.order_id,d.version+1,operator)}
-  catch{cleanup={state:'error',filesDeleted:0}}
+  try{
+   cleanup=await centralQueueDeliveryCleanup(env,d.order_id,d.version+1,operator);
+   if(cleanup.state==='pending'&&ctx?.waitUntil&&
+      env.CENTRAL_TUS_PURGE_EXECUTE_ENABLED==='PRIVATE_TEST_ONLY')
+    ctx.waitUntil(centralProcessTUSPurgeQueue(env,{orderId:d.order_id,limit:1})
+     .catch(()=>{}));
+  }catch{cleanup={state:'error',filesDeleted:0}}
  }
  const current=await centralProductionDetail(env,d.order_id);
  return json({saved:true,production:current,cleanup,productionAuthorized:false});
@@ -4068,6 +4194,7 @@ async function documentSandboxEligibility(env,orderId,allowExistingPreference=fa
 export default {
  async scheduled(event,env,ctx){
   ctx.waitUntil(runScheduledReconciliation(env).catch(e=>console.error("Scheduled payment sync failed",String(e?.message||"unknown").slice(0,120))));
+  ctx.waitUntil(centralProcessTUSPurgeQueue(env).catch(()=>{}));
  },
  async fetch(req,env){
   const url=new URL(req.url);
@@ -4128,6 +4255,7 @@ export default {
    if(url.pathname==="/internal/central/stage")return await centralStage(req,env);
    if(url.pathname==="/internal/central/receipt-check")return await centralTUSReceiptLookup(req,env);
    if(url.pathname==="/internal/central/tus-purge-plan")return await centralTUSDeliveryPurgePlan(req,env);
+   if(url.pathname==="/internal/central/tus-purge-complete")return await centralTUSPurgeComplete(req,env);
     if(url.pathname==="/internal/central/tus-package")return await centralTUSPackageManifest(req,env);
    if(url.pathname==="/internal/central/link")return await centralLink(req,env);
    if(url.pathname==="/internal/central/prepare-order")return await centralPrepareDraft(req,env);
@@ -4162,7 +4290,7 @@ export default {
    if(url.pathname.startsWith("/admin/api/pricing"))
     return await priceAdminHandle(req,env,url.pathname);
    if(url.pathname==="/admin/api/central/production-status"&&req.method==="POST")
-    return await centralUpdateProduction(req,env);
+    return await centralUpdateProduction(req,env,arguments[2]);
    if(url.pathname==="/admin/api/central/preparation-estimate"&&req.method==="POST")
     return await updatePreparationEstimate(req,env);
    if(url.pathname==="/admin/api/central/eta-settings")return await etaAdminApi(req,env);
