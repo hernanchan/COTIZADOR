@@ -114,3 +114,26 @@ test('si D1 no concede cuota, nunca se llama a createMultipartUpload',async()=>{
  assert.equal(calls.start,0);
  assert.equal((await response.json()).paymentAuthorized,false);
 });
+
+test('metadatos de PDF inválidos no consumen cupo D1 ni crean multipart',async()=>{
+ const {calls,env}=fixtures();
+ let reservadas=0;
+ const r=await manejarR2GrandePrivado(jsonRequest('iniciar',{orderId,
+  meta:{...meta,name:'archivo.exe'}}),env,{
+  autorizadoIniciar:async()=>true,...options,
+  reserve:async()=>{reservadas++;return {reserved:true}}
+ });
+ assert.equal(r.status,422);
+ assert.equal(reservadas,0);
+ assert.equal(calls.start,0);
+});
+test('cupo de R2 agotado devuelve HTTP 429 y no crea multipart',async()=>{
+ const {calls,env}=fixtures();
+ const r=await manejarR2GrandePrivado(jsonRequest('iniciar',{orderId,meta}),env,{
+  autorizadoIniciar:async()=>true,...options,
+  reserve:async()=>{throw Error('R2_CUPO_AGOTADO')}
+ });
+ assert.equal(r.status,429);
+ assert.equal(calls.start,0);
+ assert.equal((await r.json()).paymentAuthorized,false);
+});
