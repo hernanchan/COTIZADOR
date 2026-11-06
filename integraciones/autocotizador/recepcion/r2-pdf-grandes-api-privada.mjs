@@ -7,6 +7,7 @@
 import {iniciarR2Grande,subirParteR2Grande,completarR2Grande,
  leerReciboR2} from './r2-pdf-grandes-privado.mjs';
 import {verificarIntegridadR2Grande} from './r2-pdf-integridad-stream.mjs';
+import {enviarPreRecepcionR2Central} from './r2-grandes-enviar-central.mjs';
 
 const FLAG='PRIVATE_TEST_ONLY';
 const ROOT='/prueba-v2/api/ensayo-r2/';
@@ -43,6 +44,7 @@ async function bodyJSON(request,maxBytes=12288){
 export async function manejarR2GrandePrivado(request,env,{
  autorizadoIniciar=async()=>false,autorizadoOrden=async()=>false,
  vincularOrden=async()=>null,now,subtle,digestFactory,
+ stage=enviarPreRecepcionR2Central,
 }={}){
  const url=new URL(request.url),route=url.pathname;
  if(!route.startsWith(ROOT))return reply({ok:false,error:'Ruta R2 inexistente'},404);
@@ -94,7 +96,11 @@ export async function manejarR2GrandePrivado(request,env,{
   if(action==='verificar'){
    const result=await verificarIntegridadR2Grande({...options,proof,
     ...(digestFactory?{digestFactory}:{})});
-   return reply({ok:true,result});
+   const pending=await stage({env,claim:c,verified:result,
+    ...(typeof now==='function'?{now}:{}),
+    ...(subtle?{subtle}:{})});
+   return reply({ok:true,result:{...result,
+    stagedForCentral:pending.stagedForCentral===true}});
   }
   const result=await completarR2Grande({...options,proof,uploadedParts:data.uploadedParts});
   return reply({ok:true,result});
