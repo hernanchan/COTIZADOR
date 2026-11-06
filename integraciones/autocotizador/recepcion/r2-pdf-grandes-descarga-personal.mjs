@@ -10,7 +10,7 @@ import {leerReciboR2} from './r2-pdf-grandes-privado.mjs';
 import {verificarIntegridadR2Grande} from './r2-pdf-integridad-stream.mjs';
 
 const FLAG='PRIVATE_TEST_ONLY';
-const URL='/prueba-v2/api/ensayo-r2-descargar-personal';
+const ROUTE='/prueba-v2/api/ensayo-r2-descargar-personal';
 const respond=(message,status)=>new Response(JSON.stringify({
  ok:false,error:message,checkoutEnabled:false,paymentAuthorized:false,
 }),{status,headers:{
@@ -36,7 +36,7 @@ export async function descargarR2GrandePersonal(request,env,{
  if(authorized!==true)return respond('Acceso restringido al personal.',403);
  if(!configurationReady(env))return respond('Descarga de PDF grandes no habilitada.',503);
  const url=new URL(request.url);
- if(request.method!=='POST'||url.protocol!=='https:'||url.pathname!==URL||
+ if(request.method!=='POST'||url.protocol!=='https:'||url.pathname!==ROUTE||
    url.search||url.hash||
    request.headers.get('Origin')!==url.origin||
    (request.headers.get('Sec-Fetch-Site')&&
