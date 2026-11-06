@@ -27,7 +27,7 @@ jobs:
         run: |
           set -euo pipefail
           npm install --no-save --no-audit --no-fund pdf-lib@1.17.1
-          node --test tests/tus-borrado-entregado-seguro.test.mjs tests/tus-borrado-plan-central-firmado.test.mjs tests/tus-cola-borrado-entregado.test.mjs tests/tus-borrado-pipeline-extremo-a-extremo.test.mjs tests/tus-canaria-checkout-privado.test.mjs
+          node --test tests/tus-borrado-entregado-seguro.test.mjs tests/tus-borrado-plan-central-firmado.test.mjs tests/tus-cola-borrado-entregado.test.mjs tests/tus-borrado-pipeline-extremo-a-extremo.test.mjs tests/tus-borrado-corte-pedidos-nuevos.test.mjs tests/tus-borrado-integral-aislado-sin-mp.test.mjs tests/tus-canaria-checkout-privado.test.mjs
           node --check integraciones/mercadopago/pruebas/worker.js
           cd integraciones/autocotizador/recepcion
           npm install --no-audit --no-fund
@@ -118,8 +118,9 @@ jobs:
           # Jamás heredar una compuerta de purga accidentalmente activada.
           jq -n --slurpfile s "$tmp/docs-settings.json" \
             '{main_module:"index.mjs",annotations:{"workers/message":"Preflight enlace TUS sin DELETE"},
-              bindings:([$s[0].result.bindings[]|select(.name!="DOCS_TUS_PURGE_ENABLED" and .name!="DOCS_TUS_PURGE_CANARY_ORDER")|{name,type:"inherit"}]+
+              bindings:([$s[0].result.bindings[]|select(.name!="DOCS_TUS_PURGE_ENABLED" and .name!="DOCS_TUS_PURGE_CANARY_ORDER" and .name!="DOCS_TUS_PURGE_SCOPE")|{name,type:"inherit"}]+
                 [{name:"DOCS_TUS_PURGE_ENABLED",type:"plain_text",text:"OFF"},
+                  {name:"DOCS_TUS_PURGE_SCOPE",type:"plain_text",text:"CANARY_ONLY"},
                  {name:"DOCS_TUS_PURGE_CANARY_ORDER",type:"plain_text",text:"WEB-ENSAYO-DA97408CCD06FFED80433A8E2A3B3FB4"}])}' > "$tmp/docs-metadata.json"
           upload_deploy saber-documentos-pruebas index.mjs integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs docs
           code=$(curl --silent --show-error --max-time 20 -o /dev/null -w '%{http_code}' \
@@ -133,20 +134,23 @@ jobs:
           jq -n --slurpfile s "$tmp/central-settings.json" \
             '{main_module:"worker.js",annotations:{"workers/message":"Conectar central a documentos para ensayo TUS; borrado OFF"},
               bindings:([$s[0].result.bindings[]|
-                select(.name!="SABER_DOCUMENTOS" and .name!="CENTRAL_TUS_PURGE_QUEUE_ENABLED" and .name!="CENTRAL_TUS_PURGE_EXECUTE_ENABLED" and .name!="CENTRAL_TUS_PURGE_CANARY_ORDER")|
+                select(.name!="SABER_DOCUMENTOS" and .name!="CENTRAL_TUS_PURGE_QUEUE_ENABLED" and .name!="CENTRAL_TUS_PURGE_EXECUTE_ENABLED" and .name!="CENTRAL_TUS_PURGE_CANARY_ORDER" and .name!="CENTRAL_TUS_PURGE_SCOPE")|
                 {name,type:"inherit"}]+
                 [{name:"SABER_DOCUMENTOS",type:"service",service:"saber-documentos-pruebas",environment:"production"},
                  {name:"CENTRAL_TUS_PURGE_QUEUE_ENABLED",type:"plain_text",text:"OFF"},
+                  {name:"CENTRAL_TUS_PURGE_SCOPE",type:"plain_text",text:"CANARY_ONLY"},
                  {name:"CENTRAL_TUS_PURGE_EXECUTE_ENABLED",type:"plain_text",text:"OFF"},
                  {name:"CENTRAL_TUS_PURGE_CANARY_ORDER",type:"plain_text",text:"WEB-ENSAYO-DA97408CCD06FFED80433A8E2A3B3FB4"}])}' > "$tmp/central-metadata.json"
           upload_deploy saber-pagos-pruebas worker.js integraciones/mercadopago/pruebas/worker.js central
           curl --fail --silent --show-error --max-time 25 -H "$auth" "$api/saber-pagos-pruebas/settings" > "$tmp/central-check.json"
           jq -e '.success==true and (.result.bindings|any(.name=="SABER_DOCUMENTOS" and .type=="service" and .service=="saber-documentos-pruebas"))' "$tmp/central-check.json" >/dev/null
           jq -e '.result.bindings|any(.name=="CENTRAL_TUS_PURGE_QUEUE_ENABLED" and .type=="plain_text" and .text=="OFF")' "$tmp/central-check.json" >/dev/null
+           jq -e '.result.bindings|any(.name=="CENTRAL_TUS_PURGE_SCOPE" and .text=="CANARY_ONLY")' "$tmp/central-check.json" >/dev/null
           jq -e '.result.bindings|any(.name=="CENTRAL_TUS_PURGE_EXECUTE_ENABLED" and .type=="plain_text" and .text=="OFF")' "$tmp/central-check.json" >/dev/null
           jq -e '.result.bindings|any(.name=="CENTRAL_TUS_PURGE_CANARY_ORDER" and .type=="plain_text" and .text=="WEB-ENSAYO-DA97408CCD06FFED80433A8E2A3B3FB4")' "$tmp/central-check.json" >/dev/null
           curl --fail --silent --show-error --max-time 25 -H "$auth" "$api/saber-documentos-pruebas/settings" > "$tmp/docs-check.json"
           jq -e '.result.bindings|any(.name=="DOCS_TUS_PURGE_ENABLED" and .type=="plain_text" and .text=="OFF")' "$tmp/docs-check.json" >/dev/null
+           jq -e '.result.bindings|any(.name=="DOCS_TUS_PURGE_SCOPE" and .text=="CANARY_ONLY")' "$tmp/docs-check.json" >/dev/null
           jq -e '.result.bindings|any(.name=="DOCS_TUS_PURGE_CANARY_ORDER" and .type=="plain_text" and .text=="WEB-ENSAYO-DA97408CCD06FFED80433A8E2A3B3FB4")' "$tmp/docs-check.json" >/dev/null
           code=$(curl --silent --show-error --max-time 25 -o /dev/null -w '%{http_code}' \
             'https://saber-pagos-pruebas.libreriasaber.workers.dev/admin/api/central/unpaid-detail?id=e2d76c8b-ce1c-4daf-9030-4bd402295a68' || true)
