@@ -1,0 +1,152 @@
+name: Preparar enlace de borrado TUS en Workers de PRUEBAS (sin eliminar)
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [docs/PREPARAR-BORRADO-WORKERS-PRUEBAS.trigger]
+permissions:
+  contents: read
+concurrency:
+  group: saber-purga-preparar-privado
+  cancel-in-progress: false
+jobs:
+  preparar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verificar contratos y compilar Worker documental
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund pdf-lib@1.17.1
+          node --test tests/tus-borrado-entregado-seguro.test.mjs tests/tus-borrado-plan-central-firmado.test.mjs tests/tus-cola-borrado-entregado.test.mjs tests/tus-borrado-pipeline-extremo-a-extremo.test.mjs
+          node --check integraciones/mercadopago/pruebas/worker.js
+          cd integraciones/autocotizador/recepcion
+          npm install --no-audit --no-fund
+          npm run build:unificado
+          node --check dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq '/internal/tus-purge-delivered' dist/saber-documentos-cotizador-fase4.mjs
+      - name: Desplegar únicamente Documentos y Central de pruebas, con compuertas OFF y reversión
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          api="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts"
+          auth="Authorization: Bearer $TOKEN"
+          tmp=$(mktemp -d)
+          docs_touched=0
+          central_touched=0
+          docs_before=''
+          central_before=''
+          rollback() {
+            code=$?
+            if [ "$code" -ne 0 ]; then
+              echo "FALLO; intentando volver a las versiones previas de prueba"
+              if [ "$central_touched" = 1 ] && [ -n "$central_before" ]; then
+                jq -n --arg v "$central_before" '{strategy:"percentage",versions:[{percentage:100,version_id:$v}]}' > "$tmp/revert-c.json"
+                curl --fail --silent --show-error --max-time 60 -H "$auth" -H 'Content-Type: application/json' --data-binary "@$tmp/revert-c.json" "$api/saber-pagos-pruebas/deployments" > "$tmp/reverted-c.json" || echo 'ROLLBACK_CENTRAL_HTTP_FALLO'
+                jq -e '.success == true' "$tmp/reverted-c.json" >/dev/null 2>&1 || echo 'ROLLBACK_CENTRAL_NO_CONFIRMADO'
+              fi
+              if [ "$docs_touched" = 1 ] && [ -n "$docs_before" ]; then
+                jq -n --arg v "$docs_before" '{strategy:"percentage",versions:[{percentage:100,version_id:$v}]}' > "$tmp/revert-d.json"
+                curl --fail --silent --show-error --max-time 60 -H "$auth" -H 'Content-Type: application/json' --data-binary "@$tmp/revert-d.json" "$api/saber-documentos-pruebas/deployments" > "$tmp/reverted-d.json" || echo 'ROLLBACK_DOCUMENTOS_HTTP_FALLO'
+                jq -e '.success == true' "$tmp/reverted-d.json" >/dev/null 2>&1 || echo 'ROLLBACK_DOCUMENTOS_NO_CONFIRMADO'
+              fi
+            fi
+            rm -rf "$tmp"
+          }
+          trap rollback EXIT
+          get_state() {
+            worker="$1"; label="$2"
+            curl --fail --silent --show-error --max-time 30 -H "$auth" "$api/$worker/settings" > "$tmp/$label-settings.json"
+            curl --fail --silent --show-error --max-time 30 -H "$auth" "$api/$worker/deployments" > "$tmp/$label-deployments.json"
+            jq -e '.success==true and (.result.bindings|type=="array")' "$tmp/$label-settings.json" >/dev/null
+            jq -e '.success==true' "$tmp/$label-deployments.json" >/dev/null
+            jq -er '.result.deployments[0].versions[]|select(.percentage==100)|.version_id' "$tmp/$label-deployments.json" | head -n 1
+          }
+          wait_active() {
+            worker="$1"; target="$2"; label="$3"
+            active=''
+            for i in 1 2 3 4 5 6 7 8; do
+              curl --fail --silent --show-error --max-time 25 -H "$auth" "$api/$worker/deployments" > "$tmp/$label-after.json"
+              active=$(jq -r '.result.deployments[0].versions[]?|select(.percentage==100)|.version_id' "$tmp/$label-after.json" | head -n 1)
+              if [ "$active" = "$target" ]; then return 0; fi
+              sleep 2
+            done
+            echo "VERSION_ACTIVA_NO_CONFIRMADA_$label"
+            return 1
+          }
+          upload_deploy() {
+            worker="$1"; module="$2"; file="$3"; label="$4"
+            curl --silent --show-error --max-time 95 -H "$auth" \
+              -F "metadata=@$tmp/$label-metadata.json;type=application/json" \
+              -F "$module=@$file;filename=$module;type=application/javascript+module" \
+              "$api/$worker/versions?bindings_inherit=strict" > "$tmp/$label-version.json"
+            if ! jq -e '.success==true and (.result.id|type=="string")' "$tmp/$label-version.json" >/dev/null; then
+              jq -c '{success,errors:[.errors[]?|{code,message}]}' "$tmp/$label-version.json"; return 1
+            fi
+            target=$(jq -r '.result.id' "$tmp/$label-version.json")
+            jq -n --arg v "$target" '{strategy:"percentage",versions:[{percentage:100,version_id:$v}],annotations:{"workers/message":"Preflight limpieza TUS: solo ensayos; todas las compuertas OFF"}}' > "$tmp/$label-deploy.json"
+            if [ "$label" = docs ]; then docs_touched=1; else central_touched=1; fi
+            curl --fail --silent --show-error --max-time 75 -H "$auth" -H 'Content-Type: application/json' \
+              --data-binary "@$tmp/$label-deploy.json" "$api/$worker/deployments" > "$tmp/$label-result.json"
+            jq -e '.success==true' "$tmp/$label-result.json" >/dev/null
+            wait_active "$worker" "$target" "$label"
+            echo "VERSION_PRIVADA_$label=$target"
+          }
+
+          docs_before=$(get_state saber-documentos-pruebas docs)
+          central_before=$(get_state saber-pagos-pruebas central)
+          # Los dos Workers deben conservar sus credenciales existentes.
+          jq -e '.result.bindings|any(.name=="SABER_CENTRAL" and .type=="service")' "$tmp/docs-settings.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="CENTRAL_BRIDGE_KEY" and .type=="secret_text")' "$tmp/docs-settings.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="DOCS_TUS_SUPABASE_SERVICE_KEY" and .type=="secret_text")' "$tmp/docs-settings.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="DB" and (.type=="d1" or .type=="d1_database"))' "$tmp/central-settings.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="CENTRAL_BRIDGE_KEY" and .type=="secret_text")' "$tmp/central-settings.json" >/dev/null
+          # Jamás heredar una compuerta de purga accidentalmente activada.
+          jq -n --slurpfile s "$tmp/docs-settings.json" \
+            '{main_module:"index.mjs",annotations:{"workers/message":"Preflight enlace TUS sin DELETE"},
+              bindings:([$s[0].result.bindings[]|select(.name!="DOCS_TUS_PURGE_ENABLED")|{name,type:"inherit"}]+
+                [{name:"DOCS_TUS_PURGE_ENABLED",type:"plain_text",text:"OFF"}])}' > "$tmp/docs-metadata.json"
+          upload_deploy saber-documentos-pruebas index.mjs integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs docs
+          code=$(curl --silent --show-error --max-time 20 -o /dev/null -w '%{http_code}' \
+            'https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/' || true)
+          test "$code" = 401 || { echo "PORTAL_DOCUMENTAL_SIN_401=$code"; exit 1; }
+          code=$(curl --silent --show-error --max-time 20 -o /dev/null -w '%{http_code}' -X POST \
+            -H 'Content-Type: application/json' -d '{}' \
+            'https://saber-documentos-pruebas.libreriasaber.workers.dev/internal/tus-purge-delivered' || true)
+          test "$code" = 503 || { echo "BORRADO_DOCS_NO_APAGADO=$code"; exit 1; }
+
+          jq -n --slurpfile s "$tmp/central-settings.json" \
+            '{main_module:"worker.js",annotations:{"workers/message":"Conectar central a documentos para ensayo TUS; borrado OFF"},
+              bindings:([$s[0].result.bindings[]|
+                select(.name!="SABER_DOCUMENTOS" and .name!="CENTRAL_TUS_PURGE_QUEUE_ENABLED" and .name!="CENTRAL_TUS_PURGE_EXECUTE_ENABLED")|
+                {name,type:"inherit"}]+
+                [{name:"SABER_DOCUMENTOS",type:"service",service:"saber-documentos-pruebas",environment:"production"},
+                 {name:"CENTRAL_TUS_PURGE_QUEUE_ENABLED",type:"plain_text",text:"OFF"},
+                 {name:"CENTRAL_TUS_PURGE_EXECUTE_ENABLED",type:"plain_text",text:"OFF"}])}' > "$tmp/central-metadata.json"
+          upload_deploy saber-pagos-pruebas worker.js integraciones/mercadopago/pruebas/worker.js central
+          curl --fail --silent --show-error --max-time 25 -H "$auth" "$api/saber-pagos-pruebas/settings" > "$tmp/central-check.json"
+          jq -e '.success==true and (.result.bindings|any(.name=="SABER_DOCUMENTOS" and .type=="service" and .service=="saber-documentos-pruebas"))' "$tmp/central-check.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="CENTRAL_TUS_PURGE_QUEUE_ENABLED" and .type=="plain_text" and .text=="OFF")' "$tmp/central-check.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="CENTRAL_TUS_PURGE_EXECUTE_ENABLED" and .type=="plain_text" and .text=="OFF")' "$tmp/central-check.json" >/dev/null
+          curl --fail --silent --show-error --max-time 25 -H "$auth" "$api/saber-documentos-pruebas/settings" > "$tmp/docs-check.json"
+          jq -e '.result.bindings|any(.name=="DOCS_TUS_PURGE_ENABLED" and .type=="plain_text" and .text=="OFF")' "$tmp/docs-check.json" >/dev/null
+          code=$(curl --silent --show-error --max-time 25 -o /dev/null -w '%{http_code}' \
+            'https://saber-pagos-pruebas.libreriasaber.workers.dev/admin/api/central/unpaid-detail?id=e2d76c8b-ce1c-4daf-9030-4bd402295a68' || true)
+          test "$code" = 401 || { echo "CENTRAL_ADMIN_SIN_401=$code"; exit 1; }
+          health=$(curl --fail --silent --show-error --max-time 25 \
+            'https://saber-pagos-pruebas.libreriasaber.workers.dev/health')
+          echo "$health" | jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' >/dev/null
+          echo 'SERVICE_BINDING_VERIFICADO_3_COMPUERTAS_OFF_SIN_DELETE_SIN_PAGOS_REALES'
