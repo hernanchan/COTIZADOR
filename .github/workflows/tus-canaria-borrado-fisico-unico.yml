@@ -1,8 +1,8 @@
-name: Borrar físicamente SOLO PDF sintético 024, con restauración del Worker de pruebas
+name: Diagnosticar respuesta Storage NoSuchKey del PDF eliminado 024 (SOLO LECTURA)
 on:
   push:
     branches: [integracion/tus-pedido-privado-20261101]
-    paths: [docs/EJECUTAR-BORRADO-FISICO-CANARIA-024.trigger]
+    paths: [docs/DIAGNOSTICAR-NOSUCHKEY-CANARIA-024.trigger]
 permissions:
   contents: read
 concurrency:
@@ -26,7 +26,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node --check integraciones/autocotizador/recepcion/ensayo-borrado-fisico-canaria-024.mjs
+          node --check integraciones/autocotizador/recepcion/diagnostico-head-nosuchkey-canaria-024.mjs
           node --test tests/tus-canaria-borrado-fisico-024.test.mjs
           cd integraciones/autocotizador/recepcion
           npm install --no-audit --no-fund
@@ -96,7 +96,7 @@ jobs:
           jq -e '.result.bindings|any(.name=="DOCS_TUS_SUPABASE_SERVICE_KEY" and .type=="secret_text")' "$dir/docs.json" >/dev/null
           jq -e '.result.bindings|any(.name=="DOCS_V2_PRIVATE_UI_SECRET" and .type=="secret_text")' "$dir/docs.json" >/dev/null
           jq -n --slurpfile s "$dir/docs.json" --arg nonce "$nonce" \
-            '{main_module:"index.mjs",annotations:{"workers/message":"Canario PDF único 024: versión temporal y reversión automática"},
+            '{main_module:"index.mjs",annotations:{"workers/message":"Sonda NoSuchKey canario 024: temporal de solo lectura"},
              bindings:([$s[0].result.bindings[]|
                select(.name!="DOCS_CANARY_DISPOSAL_ENABLED" and .name!="DOCS_CANARY_DISPOSAL_NONCE")|
                {name,type:"inherit"}]+
@@ -104,11 +104,11 @@ jobs:
                 {name:"DOCS_CANARY_DISPOSAL_NONCE",type:"plain_text",text:$nonce}])}' > "$dir/metadata.json"
           cat > "$dir/index.mjs" <<'JS'
           import original from './original.mjs';
-          import {borrarCanariaSinteticaUnica} from './canaria.mjs';
+          import {diagnosticarHEADCanaria} from './canaria.mjs';
           export default {
             async fetch(request,env,ctx) {
-              if(new URL(request.url).pathname==='/internal/ensayo-unico-borrar-canaria-024')
-                return borrarCanariaSinteticaUnica(request,env);
+              if(new URL(request.url).pathname==='/internal/ensayo-diagnosticar-head-canaria-024')
+                return diagnosticarHEADCanaria(request,env);
               return original.fetch(request,env,ctx);
             }
           };
@@ -118,14 +118,14 @@ jobs:
              -F "metadata=@$dir/metadata.json;type=application/json" \
              -F "index.mjs=@$dir/index.mjs;filename=index.mjs;type=application/javascript+module" \
              -F "original.mjs=@integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs;filename=original.mjs;type=application/javascript+module" \
-             -F "canaria.mjs=@integraciones/autocotizador/recepcion/ensayo-borrado-fisico-canaria-024.mjs;filename=canaria.mjs;type=application/javascript+module" \
+             -F "canaria.mjs=@integraciones/autocotizador/recepcion/diagnostico-head-nosuchkey-canaria-024.mjs;filename=canaria.mjs;type=application/javascript+module" \
              "$root/saber-documentos-pruebas/versions?bindings_inherit=strict" > "$dir/version.json"
           if ! jq -e '.success == true and (.result.id|type=="string")' "$dir/version.json" >/dev/null; then
             jq -c '{success,errors:[.errors[]?|{code,message}]}' "$dir/version.json"
             exit 1
           fi
           target=$(jq -r '.result.id' "$dir/version.json")
-          jq -n --arg v "$target" '{strategy:"percentage",versions:[{percentage:100,version_id:$v}],annotations:{"workers/message":"Ensayo físico único canario 024, revertir inmediatamente"}}' > "$dir/deploy.json"
+          jq -n --arg v "$target" '{strategy:"percentage",versions:[{percentage:100,version_id:$v}],annotations:{"workers/message":"Sonda read-only NoSuchKey canario 024, revertir inmediatamente"}}' > "$dir/deploy.json"
           deployed=1
           curl --fail --silent --show-error --max-time 75 -H "$auth" -H 'Content-Type: application/json' --data-binary "@$dir/deploy.json" "$root/saber-documentos-pruebas/deployments" > "$dir/deployed.json"
           jq -e '.success==true' "$dir/deployed.json" >/dev/null
@@ -143,18 +143,19 @@ jobs:
             -X POST -H "Origin: $host" \
             -H "x-saber-disposable-nonce: $nonce" \
             -H "Content-Type: application/json" \
-            --data "{\"webOrderId\":\"$canary\",\"operation\":\"delete-synthetic-canary-only\"}" \
-            -o "$dir/result.json" -w '%{http_code}' "$host/internal/ensayo-unico-borrar-canaria-024")
+            --data "{\"webOrderId\":\"$canary\",\"schema\":\"saber-test-only-absence-probe-v1\"}" \
+            -o "$dir/result.json" -w '%{http_code}' "$host/internal/ensayo-diagnosticar-head-canaria-024")
           if [ "$http" != "200" ]; then
             echo "BORRADO_CANARIO_HTTP=$http"
             jq -c '{ok,error}' "$dir/result.json" || true
             exit 1
           fi
           jq -e --arg id "$canary" --arg object "$object" \
-           '.ok==true and .webOrderId==$id and .removedObject==$object and
-            .deletedCount==1 and .verifiedAbsent==true and .sha256Verified==true and
-            .testOnly==true and .paymentVerified==false and .deliveryVerified==false' "$dir/result.json" >/dev/null
-          echo 'CANARIA_024_ELIMINADA_FISICAMENTE_EN_SUPABASE_VERIFICADO_HEAD404'
+           '.ok==true and .webOrderId==$id and .storageMutation==false and
+            .headStatus==400 and (.infoStatus==400 or .infoStatus==404) and
+            .paymentVerified==false and .deliveryVerified==false' "$dir/result.json" >/dev/null
+          echo 'SONDA_STORAGE_READONLY_024_COMPLETADA'
+          jq -c '{headStatus,infoStatus,notFoundError}' "$dir/result.json"
           echo 'LA_ORDEN_PERMANECE_NO_PAGADA_Y_NO_ENTREGADA'
           echo 'LOS_3_FLAGS_DE_PURGA_GENERAL_CONTINUARON_OFF'
           # trap EXIT restaura INCONDICIONALMENTE versión anterior.
