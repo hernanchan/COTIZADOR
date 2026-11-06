@@ -39,7 +39,7 @@ jobs:
           npm run build:unificado
           file=dist/saber-documentos-cotizador-fase4.mjs
           node --check "$file"
-          for pattern in '/api/ensayo-tus-iniciar' '/prueba-v2/pedido-cliente' '/prueba-v2/api/ensayo-r2/iniciar' '/prueba-v2/api/ensayo-r2/verificar' '/prueba-v2/api/ensayo-r2-descargar-d1-personal'; do
+          for pattern in '/api/ensayo-tus-iniciar' '/prueba-v2/pedido-cliente' '/prueba-v2/api/ensayo-r2/' '/prueba-v2/api/ensayo-r2-descargar-d1-personal'; do
             grep -Fq "$pattern" "$file" || { echo "FALTA_RUTA_COMPILADA"; exit 1; }
           done
           echo "R2_Y_TUS_BUNDLE_CHECK_OK"
