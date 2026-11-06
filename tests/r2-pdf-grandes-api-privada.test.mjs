@@ -10,7 +10,10 @@ const sec='clave-R2-unicamente-para-tests-clave-de-64-caracteres-falsa';
 const meta={fileId:'pdf200',name:'Plano 200 MiB.pdf',mode:'bn',
  bytes:200*1024*1024,pages:15,sha256:'f'.repeat(64)};
 const now=()=>1793970000;
-const options={now,subtle:webcrypto.subtle};
+const objectUUID='12345678-1234-4123-8123-123456789abc';
+const options={now,subtle:webcrypto.subtle,uuid:()=>objectUUID,
+ reserve:async({orderId:oid,meta:m,objectUUID:id})=>({reserved:true,
+  orderId:oid,bytes:m.bytes,objectUUID:id,paymentAuthorized:false})};
 function jsonRequest(action,data,{origin=ORIGIN,method='POST'}={}){
  return new Request(BASE+action,{method,
   headers:{Origin:origin,'Content-Type':'application/json'},
@@ -29,7 +32,8 @@ function fixtures(){
   }),
   head:async()=>({size:meta.bytes})
  };
- const env={DOCS_R2_BIG_ENABLED:'PRIVATE_TEST_ONLY',DOCS_R2_RECEIPT_KEY:sec,
+ const env={DOCS_R2_BIG_ENABLED:'PRIVATE_TEST_ONLY',
+  DOCS_R2_QUOTA_ENABLED:'PRIVATE_TEST_ONLY',DOCS_R2_RECEIPT_KEY:sec,
   SABER_R2_GRANDES:bucket};
  return {calls,env};
 }
@@ -87,4 +91,26 @@ test('R2 200 MiB: iniciar, vincular orden, impedir parte ajena y completar sin a
  assert.equal(final.result.sha256Verificado,false);
  assert.equal(final.result.contenidoPdfVerificado,false);
  assert.equal(calls.finish,1);
+});
+
+test('con bucket R2 activo pero cupo D1 apagado no se crea multipart',async()=>{
+ const {calls,env}=fixtures();
+ const result=await manejarR2GrandePrivado(jsonRequest('iniciar',{orderId,meta}),
+  {...env,DOCS_R2_QUOTA_ENABLED:'OFF'},{
+   autorizadoIniciar:async()=>true,...options,
+   reserve:async()=>{throw Error('No se consulta cupo cuando el flag está apagado')}
+  });
+ assert.equal(result.status,503);
+ assert.equal((await result.json()).paymentAuthorized,false);
+ assert.equal(calls.start,0);
+});
+test('si D1 no concede cuota, nunca se llama a createMultipartUpload',async()=>{
+ const {calls,env}=fixtures();
+ const response=await manejarR2GrandePrivado(jsonRequest('iniciar',{orderId,meta}),env,{
+  autorizadoIniciar:async()=>true,...options,
+  reserve:async()=>({reserved:false})
+ });
+ assert.equal(response.status,422);
+ assert.equal(calls.start,0);
+ assert.equal((await response.json()).paymentAuthorized,false);
 });
