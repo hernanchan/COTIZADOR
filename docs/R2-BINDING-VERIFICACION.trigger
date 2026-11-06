@@ -1,0 +1,1 @@
+2026-11-06 R2 binding en saber-documentos-pruebas confirmado por titular. Solo inspeccion API GET con SABER_CF_DEPLOY_TOKEN; no deploy, no subidas, sin alterar main.
