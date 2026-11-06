@@ -16,6 +16,7 @@ const DB={prepare(sql){
   bind(...args){this.params=args;return this},
   async run(){
    if(sql.startsWith('CREATE TABLE'))return {meta:{changes:0}};
+   if(sql.startsWith('INSERT INTO central_tus_purge_audit'))return {meta:{changes:1}};
    if(sql.startsWith('INSERT OR IGNORE INTO central_tus_purge_queue')){
     assert.deepEqual(this.params,[order,web,3,'Mostrador']);
     writes++;
