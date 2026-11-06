@@ -1,0 +1,45 @@
+name: R2 - verificar binding de Worker de ensayos (solo lectura)
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [docs/R2-BINDING-VERIFICACION.trigger]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verificar-r2:
+    runs-on: ubuntu-latest
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    timeout-minutes: 5
+    steps:
+      - name: Verificar bucket R2 asociado sin mostrar secretos ni escribir
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ACCOUNT:-}" ] || [ -z "${TOKEN:-}" ]; then
+            echo "R2_CHECK_UNAVAILABLE_NO_DEPLOY_CREDENTIALS"
+            exit 1
+          fi
+          api="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-documentos-pruebas/settings"
+          tmp=$(mktemp)
+          trap 'rm -f "$tmp"' EXIT
+          status=$(curl -sS --max-time 30 -o "$tmp" -w '%{http_code}' \
+            -H "Authorization: Bearer $TOKEN" "$api")
+          if [ "$status" != 200 ]; then
+            echo "R2_READONLY_SETTINGS_HTTP=$status"
+            exit 1
+          fi
+          jq -e '.success == true' "$tmp" >/dev/null
+          if jq -e '.result.bindings[]? | select(.name == "SABER_R2_GRANDES" and .type == "r2_bucket" and .bucket_name == "saber-documentos-grandes-ensayo-20261106")' "$tmp" >/dev/null; then
+            echo "R2_BINDING_VERIFIED_PRIVATE=saber-documentos-grandes-ensayo-20261106"
+            echo "NO_WORKER_DEPLOY_NO_R2_UPLOAD_NO_REAL_PAYMENTS"
+          else
+            echo "R2_BINDING_NOT_FOUND_OR_DIFFERENT"
+            jq -r '.result.bindings[]? | select(.type == "r2_bucket") | "R2_BINDING_PRESENT_NAME=" + .name' "$tmp"
+            exit 1
+          fi
