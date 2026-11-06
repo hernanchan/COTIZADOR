@@ -66,3 +66,12 @@ Implementado **API privada**, todavía sin interfaz Central ni despliegue, en:
 - Pruebas de verificación: URL central restringida, firma HMAC, orden ajena, ETag, SHA falso, recibo duplicado, reintento idempotente y límites. CI verde [42299145756](https://github.com/hernanchan/COTIZADOR/actions/runs/42299145756). Todo en rama privada, sin despliegue.
 
 **Pendiente:** parser de páginas y tamaños de 200 MiB sin exceder memoria del Worker; unificación de presupuesto y pedidos mixtos TUS/R2; promoción desde tabla preliminar R2 a manifiesto de orden real; descarga desde D1 después de 2h; ZIP por orden; limpieza segura y pruebas reales de velocidad. No activar banderas ni pagos hasta completar estos puntos.
+
+## Consulta persistente del PDF R2 tras vencer el proof — 06/11/2026
+
+- La Central tiene ahora `/internal/central/r2-pending-lookup`, con **firma HMAC Worker-Worker**, `CENTRAL_R2_STAGING_ENABLED=PRIVATE_TEST_ONLY`, validación completa de `webOrderId` + `receiptId`, lectura exclusivamente de `central_r2_large_pending` sin crear pedidos ni escribir D1.
+- Documentos consulta esa referencia mediante `r2-grandes-lookup-central.mjs` y el `SABER_CENTRAL` existente. No utiliza ni renueva el proof temporal de dos horas; no recibe rutas ni SHA suministrados por el comprador.
+- Ruta experimental de descarga `/prueba-v2/api/ensayo-r2-descargar-d1-personal`, **solamente Basic de personal**. Descarga tras verificar SHA-256 de R2 por streaming y comparar ETag contra D1; segunda lectura condicional `onlyIf.etagMatches`. No hay URL pública ni archivo completo en RAM.
+- Pruebas: lookup D1 con y sin registro, firma falsa, referencia ajena, orden cruzada, SHA/ETag incorrectos, descarga sintética de 45 MiB después de caducar la autorización de carga. CI completa en https://github.com/hernanchan/COTIZADOR/actions/runs/42301899955 **SUCCESS**.
+
+**Precisión:** la tabla es de archivos pendientes `awaiting_pdf_analysis`; este camino permite revisión privada del original pero NO es todavía un pedido pagable ni descarga del ZIP de órdenes comerciales. Faltan análisis servidor de páginas/medidas de PDF grandes, unificación TUS+R2 en un único pedido, cuota de subida con límites antia-buso, borrado post-entrega y pruebas reales del bucket. Ningún flag se activó ni hubo despliegue.
