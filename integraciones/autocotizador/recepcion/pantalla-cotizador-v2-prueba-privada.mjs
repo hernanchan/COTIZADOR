@@ -447,7 +447,7 @@ const newOrderId=()=>{
 };
 const safeRef=r=>r&&r.schema==='saber-pdf-local-pendiente-v1'&&
  /^[a-f0-9-]{36}$/i.test(r.localRef||'')&&/^[a-f0-9]{64}$/.test(r.sha256||'')&&
- Number.isSafeInteger(r.bytes)&&r.bytes>=5&&r.bytes<=20*1024*1024&&
+ Number.isSafeInteger(r.bytes)&&r.bytes>=5&&r.bytes<=40*1024*1024&&
  Number.isSafeInteger(r.paginas)&&r.paginas>=1&&r.paginas<=2000&&
  typeof r.nombre==='string'&&r.nombre.length<=120&&/\\.pdf$/i.test(r.nombre)&&
  r.estado==='PENDIENTE_DE_ENVIO'&&r.recibido===false&&r.verificadoServidor===false;
@@ -1233,7 +1233,7 @@ window.addEventListener('message',async event=>{
    return;
   }
   if(!(p.file instanceof File)||p.file.name!==p.nombre||
-     p.file.size<5||p.file.size>20*1024*1024||
+     p.file.size<5||p.file.size>40*1024*1024||
      !/\.pdf$/i.test(p.nombre)||!['bn','color'].includes(p.modo)||
      !Number.isSafeInteger(p.precioPreliminar)||p.precioPreliminar<1||
      batchSending||registering||registeredOrder||
@@ -1319,7 +1319,7 @@ window.addEventListener('message',async event=>{
    const drafts=[],refs=new Set();
    for(let i=0;i<payload.files.length;i++){
     const file=payload.files[i],opt=payload.options[i];
-    if(!(file instanceof File)||!opt||file.size<5||file.size>20*1024*1024||
+    if(!(file instanceof File)||!opt||file.size<5||file.size>40*1024*1024||
        file.name!==opt.nombre||file.name.length>120||!/\\.pdf$/i.test(file.name)||
        !Number.isSafeInteger(opt.paginas)||opt.paginas<1||opt.paginas>2000||
        !['personalizado_a4','a5','a4','a3'].includes(opt.formato)||
