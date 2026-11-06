@@ -19,6 +19,7 @@ for (const [name,html] of [['portada',home],['ofertas',offers]]){
   if(name==='portada'){
    assert.match(rendered,/href="https:\/\/libreriasaber\.com\.ar\/cotizar"/);
    assert.match(rendered,/Probar cotizador nuevo \(acceso privado\)/);
+   assert.match(rendered,/href="\/prueba-v2\/cotizar-cliente"/);
    assert.match(rendered,/los artículos y los trabajos de impresión se consultan por separado/);
    assert.doesNotMatch(rendered,/El trabajo vuelve automáticamente a este carrito/);
   }
