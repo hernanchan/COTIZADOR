@@ -4092,6 +4092,10 @@ async function centralCanarySandboxPrivate(req,env,dispatch){
     !/^WEB-ENSAYO-[A-F0-9]{32}$/.test(p.webOrderId||"")||
     env.CENTRAL_TUS_PURGE_CANARY_ORDER!==p.webOrderId)
   return json({ok:false,error:"Orden fuera de ensayo autorizado"},403);
+ // La canaria 024 ya se eliminó físicamente en el ensayo 06/11/2026.
+ // Prohibir nuevos Checkout: esta orden no tiene PDF y NO debe pagarse.
+ if(p.action==="start")
+  return json({ok:false,error:"Orden canaria 024 cerrada: el PDF sintético ya fue eliminado"},410);
  await centralTables(env);await ensurePaymentReviews(env);
  const order=await env.DB.prepare(
   "SELECT o.id,o.status,o.amount_ars,o.preference_id FROM orders o "+
