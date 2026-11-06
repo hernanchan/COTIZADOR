@@ -6,6 +6,7 @@ import {paginaCotizadorRapido} from './cotizador-rapido-pagina.mjs';
 import {paginaPloteosRapido} from './ploteos-rapido-pagina.mjs';
 import {paginaCotizadorConjunto} from './cotizador-conjunto-pagina.mjs';
 import {paginaCargaUnica} from './carga-unica-pagina.mjs';
+import {manejarCotizadorCliente,autorizadoCotizadorCliente} from './cotizador-cliente-publico.mjs';
 import {cotizarCargaUnica} from './cotizar-carga-unica.mjs';
 import {cotizarNupReciboVerificado} from './cotizar-nup-recibo-verificado.mjs';
 import {cotizarPloteoReciboVerificado} from './cotizar-ploteo-recibo-verificado.mjs';
@@ -84,8 +85,12 @@ async function preciosPrivados(env,request){
    staff=difference===0;
   }
  }
+ const quotePath=new URL(request.url).pathname;
+ const soloPresupuesto=quotePath==='/api/ensayo-materiales-rapido'||
+   quotePath==='/api/ensayo-carga-unica';
  if(!staff&&v2PrivateBrowserAuthorized(request,env)!=='allow'&&
-    !(await v2SessionAuthorized(request,env)))
+    !(await v2SessionAuthorized(request,env))&&
+    !(soloPresupuesto&&await autorizadoCotizadorCliente(request,env)))
   throw Error('La versión de precios privada requiere sesión autorizada.');
  return (await obtenerTarifarioD1Privado(env)).prices;
 }
@@ -2021,6 +2026,10 @@ export default {
     const page=new URL(request.url).pathname;
     if(page==='/internal/tus-purge-delivered')
       return recibirLimpiezaEntregadaInterna(request,env);
+    // Cotización pública SOLO PRELIMINAR. Jamás usar cookie de cliente para
+    // autorizar TUS, pagos, descarga, Central ni acceso administrativo.
+    if(page==='/prueba-v2/cotizar-cliente')
+      return manejarCotizadorCliente(request,env,{paginaCotizacion:paginaCargaUnica()});
     // DEMOSTRACIÓN VISUAL ANÓNIMA, SEPARADA DEL PORTAL PRIVADO.
     // Solo HTML saneado: sin JS comercial, sin fetch, sin carrito operativo.
     // El cotizador, precios D1, pedidos y Central conservan autenticación.
