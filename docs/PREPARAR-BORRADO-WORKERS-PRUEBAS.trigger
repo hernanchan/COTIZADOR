@@ -25,3 +25,7 @@ DEPLOY_RETIRED_CANARY_024_CHECKOUT_BLOCKED_20261106
 
 # Instalar corte 07/11/26 para nuevos pedidos. En Workers dejar CANARY_ONLY y 3 flags OFF.
 DEPLOY_SAFE_CUTOFF_NEW_ORDERS_20261106
+
+# Portada V3: CTA de impresiones al cotizador público existente, enlace a nuevo privado y texto sin carrito mixto ficticio.
+# Desplegar únicamente Workers de pruebas conservando 3 flags de purga OFF.
+DEPLOY_RETAIL_PREVIEW_COTIZAR_LINK_20261106
