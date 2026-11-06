@@ -142,3 +142,12 @@ Comprobación independiente de solo lectura preparada en `.github/workflows/r2-v
 - Próximo objetivo: ensayo autorizado con PDF sintético y tráfico realmente aislado; medir 80/200 MiB y reanudación sin activar el cotizador comercial R2. La URL de versión inactiva no estuvo disponible para GET (**404** [42312185758](https://github.com/hernanchan/COTIZADOR/actions/runs/42312185758)); no se modificó la opción de preview ni se abrió acceso público.
 
 **Rollback manual si hiciera falta:** volver a promover `82ded703-0b3b-4e4b-ac7f-b312a78f78ea` en `saber-documentos-pruebas`; con comprobaciones y permisos, nunca editar `main`.
+
+
+### Smoke autenticado post-despliegue — aprobado
+- [GitHub Actions 42312640247](https://github.com/hernanchan/COTIZADOR/actions/runs/42312640247), **SUCCESS** después de promover `67f61c11`. Se usó el secreto existente de operador en GitHub Actions, sin imprimirlo.
+- **Sin autenticación:** Documentos y Central rechazaron todas las rutas privadas muestreadas con HTTP 401.
+- **Con Basic autorizado:** `/prueba-v2/`, `/prueba-v2/carga-inteligente`, `/prueba-v2/carga-inteligente.js` devolvieron HTTP 200; marcadores UI de configuración común e individual presentes.
+- **Central** `/health` confirmó `ok=true`, `databaseReady=true`, `paymentsEnabled=false`.
+- Solo solicitudes GET; sin crear pedidos, subir archivos o efectuar pagos.
+- **No confundir el smoke GET y las simulaciones del CI con una subida real TUS o R2 posterior al despliegue.** Primer ensayo de 80/200 MiB R2 continúa pendiente.
