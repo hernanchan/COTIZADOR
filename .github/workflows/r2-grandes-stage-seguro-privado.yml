@@ -1,0 +1,100 @@
+name: R2 grandes - auditar y preparar version INACTIVA de Documentos pruebas
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/r2-grandes-stage-seguro-privado.yml]
+permissions:
+  contents: read
+concurrency:
+  group: saber-documentos-private-deploy
+  cancel-in-progress: false
+jobs:
+  stage-r2-inactivo:
+    if: github.ref == 'refs/heads/integracion/tus-pedido-privado-20261101'
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Revalidar R2, controles de cobro y regresion TUS (sin red)
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.25.12
+          node --test tests/r2-pdf-grandes-privado.test.mjs tests/r2-pdf-grandes-cliente.test.mjs tests/r2-pdf-grandes-api-privada.test.mjs tests/r2-pdf-integridad-stream.test.mjs tests/r2-pdf-grandes-descarga-personal.test.mjs tests/r2-grandes-cuotas-central.test.mjs tests/r2-lectura-parcial-segura.test.mjs tests/r2-grandes-d1-descarga-personal.test.mjs tests/r2-grandes-central-pendientes.test.mjs
+          node --test tests/tus-pedido-privado.test.mjs tests/tus-portal-comprador.test.mjs tests/tus-pago-cliente-sandbox.test.mjs tests/tus-zip-orden-privada.test.mjs tests/tus-central-staff-download.test.mjs tests/tus-borrado-entregado-seguro.test.mjs
+      - name: Construir exactamente el Worker privado y proteger rutas antiguas
+        working-directory: integraciones/autocotizador/recepcion
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-audit --no-fund
+          npm run build:unificado
+          file=dist/saber-documentos-cotizador-fase4.mjs
+          node --check "$file"
+          for pattern in '/api/ensayo-tus-iniciar' '/prueba-v2/pedido-cliente' '/prueba-v2/api/ensayo-r2/iniciar' '/prueba-v2/api/ensayo-r2/verificar' '/prueba-v2/api/ensayo-r2-descargar-d1-personal'; do
+            grep -Fq "$pattern" "$file" || { echo "FALTA_RUTA_COMPILADA"; exit 1; }
+          done
+          echo "R2_Y_TUS_BUNDLE_CHECK_OK"
+      - name: Auditar Cloudflare, heredar TODO y subir version INACTIVA
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-documentos-pruebas"
+          auth="Authorization: Bearer $TOKEN"
+          tmp=$(mktemp -d)
+          trap 'rm -rf "$tmp"' EXIT
+          curl -fsS --max-time 30 -H "$auth" "$root/settings" > "$tmp/settings.json"
+          curl -fsS --max-time 30 -H "$auth" "$root/deployments" > "$tmp/deployments.json"
+          jq -e '.success==true and (.result.bindings|type=="array")' "$tmp/settings.json" >/dev/null
+          jq -e '.success==true and (.result.deployments|type=="array") and (.result.deployments|length>0)' "$tmp/deployments.json" >/dev/null
+          old=$(jq -er '.result.deployments[0].versions | if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/deployments.json")
+          test -n "$old"
+          for name in SABER_R2_GRANDES SABER_CENTRAL CENTRAL_BRIDGE_KEY DOCS_V2_PRIVATE_UI_SECRET DOCS_TUS_PRIVATE_ENABLED DOCS_TUS_RECEIPT_KEY DOCS_TUS_SUPABASE_SERVICE_KEY DOCS_CLIENT_SANDBOX_CHECKOUT_ENABLED; do
+            jq -e --arg n "$name" '.result.bindings|any(.name==$n)' "$tmp/settings.json" >/dev/null || { echo "BINDING_ESENCIAL_AUSENTE_$name"; exit 1; }
+          done
+          jq -e '.result.bindings|any(.name=="SABER_R2_GRANDES" and .type=="r2_bucket" and .bucket_name=="saber-documentos-grandes-ensayo-20261106")' "$tmp/settings.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="SABER_CENTRAL" and .type=="service" and .service=="saber-pagos-pruebas")' "$tmp/settings.json" >/dev/null
+          for name in DOCS_R2_BIG_ENABLED DOCS_R2_QUOTA_ENABLED DOCS_R2_STAGING_ENABLED; do
+            jq -e --arg n "$name" '.result.bindings|all(.[]|select(.name==$n); .type=="plain_text" and .text=="OFF")' "$tmp/settings.json" >/dev/null || { echo "R2_FLAG_NO_ESTA_APAGADO_$name"; exit 1; }
+          done
+          jq -e '.result.bindings|all(.[]|select(.name=="DOCS_PUBLIC_ORDER_GATE_ENABLED"); .type=="plain_text" and (.text=="OFF" or .text=="PRIVATE_TEST_ONLY"))' "$tmp/settings.json" >/dev/null
+          jq -e '.result.bindings|all(.[]|select(.name=="DOCS_CLIENT_SANDBOX_CHECKOUT_ENABLED"); .type=="plain_text" and (.text=="OFF" or .text=="PRIVATE_TEST_ONLY"))' "$tmp/settings.json" >/dev/null
+          echo "PREFLIGHT_OK_BINDINGS_R2_Y_TUS_R2_OFF_PAGOS_REALES_NO_ACTIVADOS"
+          # Comprobacion de privacidad de portal antes de modificar versiones inactivas.
+          portal='https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/'
+          before_http=$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$portal")
+          test "$before_http" = 401 || { echo "PORTAL_PRIVADO_NO_ES_401"; exit 1; }
+          # Herencia estricta, sin leer ni mostrar valores de secretos.
+          jq -n --arg commit "$GITHUB_SHA" --slurpfile s "$tmp/settings.json" '{main_module:"index.mjs",annotations:{"workers/message":"R2 40-256MiB, SOLO version inactiva; flags OFF; TUS y MP Sandbox sin cambios","workers/commit_sha":$commit},bindings:[$s[0].result.bindings[]|{name,type:"inherit"}]}' > "$tmp/metadata.json"
+          status=$(curl -sS --max-time 100 -o "$tmp/upload.json" -w '%{http_code}' -H "$auth" -F "metadata=@$tmp/metadata.json;type=application/json" -F "index.mjs=@integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs;filename=index.mjs;type=application/javascript+module" "$root/versions?bindings_inherit=strict")
+          if [ "$status" != 200 ] || ! jq -e '.success==true and (.result.id|type=="string")' "$tmp/upload.json" >/dev/null; then
+            echo "R2_STAGE_FAILED_HTTP_$status"
+            jq -c '{error_codes:[.errors[]?|.code]}' "$tmp/upload.json"
+            exit 1
+          fi
+          candidate=$(jq -r '.result.id' "$tmp/upload.json")
+          test "$candidate" != "$old" || exit 1
+          curl -fsS --max-time 30 -H "$auth" "$root/deployments" > "$tmp/deployments-after.json"
+          after=$(jq -er '.result.deployments[0].versions | if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/deployments-after.json")
+          test "$old" = "$after" || { echo "ALERTA_VERSION_ACTIVA_CAMBIO"; exit 1; }
+          curl -fsS --max-time 30 -H "$auth" "$root/settings" > "$tmp/settings-after.json"
+          jq -S '[.result.bindings[]|{name,type}]|sort_by(.name)' "$tmp/settings.json" > "$tmp/names-before.json"
+          jq -S '[.result.bindings[]|{name,type}]|sort_by(.name)' "$tmp/settings-after.json" > "$tmp/names-after.json"
+          cmp -s "$tmp/names-before.json" "$tmp/names-after.json" || { echo "BINDINGS_ACTIVOS_CAMBIARON"; exit 1; }
+          after_http=$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$portal")
+          test "$after_http" = 401 || { echo "ALERTA_PORTAL_PRIVADO_CAMBIO"; exit 1; }
+          echo "R2_VERSION_INACTIVA=$candidate"
+          echo "WORKER_ACTIVO_SIN_CAMBIOS=$old"
+          echo "PORTAL_401_BINDINGS_INTACTOS_R2_OFF_NO_DEPLOY_NO_PAYMENT"
