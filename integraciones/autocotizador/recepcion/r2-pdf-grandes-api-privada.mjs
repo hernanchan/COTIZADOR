@@ -7,6 +7,7 @@
 import {iniciarR2Grande,subirParteR2Grande,completarR2Grande,
  leerReciboR2} from './r2-pdf-grandes-privado.mjs';
 import {verificarIntegridadR2Grande} from './r2-pdf-integridad-stream.mjs';
+import {reservarR2GrandeAntesDeSubir} from './r2-grandes-reserva-central.mjs';
 import {enviarPreRecepcionR2Central} from './r2-grandes-enviar-central.mjs';
 
 const FLAG='PRIVATE_TEST_ONLY';
@@ -45,6 +46,7 @@ export async function manejarR2GrandePrivado(request,env,{
  autorizadoIniciar=async()=>false,autorizadoOrden=async()=>false,
  vincularOrden=async()=>null,now,subtle,digestFactory,
  stage=enviarPreRecepcionR2Central,
+ reserve=reservarR2GrandeAntesDeSubir,uuid=()=>crypto.randomUUID(),
 }={}){
  const url=new URL(request.url),route=url.pathname;
  if(!route.startsWith(ROOT))return reply({ok:false,error:'Ruta R2 inexistente'},404);
@@ -67,12 +69,23 @@ export async function manejarR2GrandePrivado(request,env,{
    ...(typeof now==='function'?{now}:{}),
    ...(subtle?{subtle}:{})};
   if(action==='iniciar'){
+   if(env.DOCS_R2_QUOTA_ENABLED!==FLAG)
+    return reply({ok:false,error:'Recepción R2 bloqueada: cupo sin habilitar'},503);
    const data=await bodyJSON(request);
    if(!data||Object.keys(data).sort().join(',')!=='meta,orderId')
     return reply({ok:false,error:'Datos de inicio incorrectos'},422);
    if(!await autorizadoIniciar(data.orderId))
     return reply({ok:false,error:'Sesion de comprador no autorizada'},403);
-   const session=await iniciarR2Grande({...options,orderId:data.orderId,meta:data.meta});
+   // Primero reservar espacio global y del pedido en la Central con SQL atómico.
+   // Una cuenta con R2 habilitado pero sin cuota NO puede crear uploads.
+   const objectUUID=uuid();
+   const reserved=await reserve({env,orderId:data.orderId,meta:data.meta,objectUUID});
+   if(reserved?.reserved!==true||reserved.objectUUID!==objectUUID||
+      reserved.orderId!==data.orderId||reserved.bytes!==data.meta?.bytes||
+      reserved.paymentAuthorized!==false)
+    throw Error('R2_CUPO_NO_CONFIRMADO');
+   const session=await iniciarR2Grande({...options,orderId:data.orderId,
+    meta:data.meta,uuid:()=>objectUUID});
    // Solo la autorizacion de inicio emite enlace de cookie comprador->orden.
    const link=await vincularOrden(data.orderId);
    return reply({ok:true,session},200,link?{'Set-Cookie':link}:{});
