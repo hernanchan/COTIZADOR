@@ -22,3 +22,6 @@ DEPLOY_NO_SUCH_KEY_CONFIRMED_PATCH_FLAGS_OFF_20261106
 # Canario 024 eliminado, no permitir iniciar otra preferencia MP.
 # Guardar 3 flags de eliminación en OFF al desplegar el bloqueo 410.
 DEPLOY_RETIRED_CANARY_024_CHECKOUT_BLOCKED_20261106
+
+# Instalar corte 07/11/26 para nuevos pedidos. En Workers dejar CANARY_ONLY y 3 flags OFF.
+DEPLOY_SAFE_CUTOFF_NEW_ORDERS_20261106
