@@ -111,3 +111,56 @@ test('Prohibir cualquier DELETE y consulta Central si la orden no es la canaria 
  assert.equal(res.status,403);
  assert.equal(centralLookups,0);
 });
+
+
+test('En Storage real HEAD 400 requiere confirmación NoSuchKey por endpoint info antes de cerrar D1',async()=>{
+ const p=plan(),calls=[];
+ const fetcher=async (url,opt)=>{
+  calls.push(opt.method);
+  assert.equal(opt.headers.Authorization,'Bearer '+env.DOCS_TUS_SUPABASE_SERVICE_KEY);
+  if(opt.method==='HEAD')return new Response(null,{status:400});
+  if(opt.method==='GET'){
+   assert.match(url,/\/object\/info\/saber-tus-lab\/v2\//);
+   return new Response(JSON.stringify({statusCode:'404',error:'not_found',message:'Object not found'}),{status:400});
+  }
+  throw Error('DELETE no debe ocurrir si el objeto ya fue eliminado');
+ };
+ const result=await eliminarYConfirmarObjetos(p,env,{fetcher});
+ assert.deepEqual(result,{verifiedAbsent:true,deletedCount:1});
+ assert.deepEqual(calls,['HEAD','GET','HEAD','GET']);
+});
+test('HEAD 400 de Storage por permiso/credencial desconocida nunca equivale a borrado',async()=>{
+ const p=plan(),calls=[];
+ const fetcher=async (_url,opt)=>{
+  calls.push(opt.method);
+  if(opt.method==='HEAD')return new Response(null,{status:400});
+  if(opt.method==='GET')return new Response(JSON.stringify({
+   statusCode:'400',error:'invalid_credentials',message:'Forbidden'
+  }),{status:400});
+  throw Error('Nunca se puede borrar tras un error ambiguo');
+ };
+ await assert.rejects(eliminarYConfirmarObjetos(p,env,{fetcher}),
+  /eliminación no verificada/);
+ assert.deepEqual(calls,['HEAD','GET']);
+});
+test('Después de DELETE auténtico, HTTP 400 NoSuchKey no bloquea auditoría D1',async()=>{
+ const p=plan(),calls=[];
+ let present=true;
+ const fetcher=async (_url,opt)=>{
+  calls.push(opt.method);
+  if(opt.method==='HEAD')return present
+   ?new Response(null,{status:200,headers:{'Content-Length':'4552'}})
+   :new Response(null,{status:400});
+  if(opt.method==='DELETE'){
+   assert.deepEqual(JSON.parse(opt.body).prefixes,p.paths);
+   present=false;return Response.json([{name:p.paths[0]}]);
+  }
+  if(opt.method==='GET')return Response.json({
+   statusCode:404,error:'not_found',message:'Object not found',code:'NoSuchKey'
+  },{status:400});
+  throw Error('Operación inesperada');
+ };
+ const result=await eliminarYConfirmarObjetos(p,env,{fetcher});
+ assert.deepEqual(result,{verifiedAbsent:true,deletedCount:1});
+ assert.deepEqual(calls,['HEAD','DELETE','HEAD','GET']);
+});
