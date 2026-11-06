@@ -102,3 +102,26 @@ La Central verifica obligatoriamente pago auténtico completo, `payment_reviews=
 - Inventario Supabase tras el despliegue: **41 objetos = 40 históricos + 1 canario**, total 211.852.378 bytes.
 - Estado del canario: \`pending payment\`, no entregado. Mientras falta pago Sandbox real, **no habilitar la cola ni el ejecutor**. No marcar artificialmente \`paid\` ni \`verified\` en D1.
 - El siguiente paso requiere completar compra de prueba de la orden 024 con un comprador Sandbox y verificar webhook/conciliación auténtica; sólo entonces activar temporalmente 3 compuertas de prueba, pulsar \`Entregado\`, verificar borrado exacto en Storage y auditoría D1. Apagar compuertas al final.
+
+
+## 06/11 — Ensayo físico real de eliminación y diagnóstico definitivo NoSuchKey
+
+**Alcance:** SOLO archivo sintético de la orden 024, NO es una prueba de pago verificado + Entregado + D1.
+
+- Única ruta en Storage: v2/WEB-ENSAYO-DA97408CCD06FFED80433A8E2A3B3FB4/3c98ffd9-ab0a-47ae-ad92-125dd7c9a2a5.pdf; SHA256 5d28e8b1a783c8dc4d0b038db26f497498e29b88ea9f5d8042c4e92e81dd7ac6; tamaño 1.102 bytes.
+- GitHub Actions 42213781426: resultado FAILURE por una **comprobación de ausencia demasiado estricta**, no por el DELETE: logs de Supabase Storage muestran GET 200 del PDF, DELETE 200 y evento ObjectRemoved:Delete con bytesChanged=-1102 el 06/11/2026 11:55:42 UTC.
+- El HEAD posterior a DELETE dio HTTP 400 y NoSuchKey (objeto inexistente), no HTTP 404. Este era un bug reproducible que también habría impedido cerrar la cola de borrado al pulsar Entregado.
+- El Worker temporal se restauró a la versión anterior mediante trap, confirmado en logs. Los tres switches de purga general se mantuvieron OFF.
+- La consulta SQL solo lectura confirmó que la canaria desapareció, dejando **exactamente los 40 archivos históricos**, con 211.851.276 bytes.
+- Se corrigió integraciones/autocotizador/recepcion/borrado-tus-entregado.mjs: ante HEAD 400, se consulta por canal autenticado GET /storage/v1/object/info/bucket/ruta-exacta y SOLO se acepta ausencia si la respuesta certifica NoSuchKey o el triple conjunto not_found + Object not found + statusCode 404. Otros HTTP 400 se rechazan.
+- Tests nuevos cubren HEAD 400 legítimo después de DELETE y descartan errores ambiguos de credenciales. GitHub CI 42214354942 SUCCESS.
+- Corrección instalada en Workers de pruebas con las 3 compuertas OFF, GitHub Actions 42214459367 SUCCESS.
+- Sondeo posterior de SOLO LECTURA GitHub Actions 42214857830 SUCCESS, realizado con Worker temporal luego restaurado. Respuesta REAL de Supabase: HEAD=400 y GET metadata=400, con code=NoSuchKey, error=not_found, message=Object not found, statusCode=404. Es exactamente el contrato que acepta la corrección.
+- Inventario SQL final: 40 archivos, 211.851.276 bytes, PDF canario 024 ausente.
+
+### Límites y próximos pasos
+- La orden 024 sigue **PENDIENTE, NO PAGADA, NO ENTREGADA** en D1. No pagarla: su PDF sintético fue eliminado. La preferencia Sandbox generada anteriormente es improcedente para continuar.
+- El borrado de esta canaria fue directo y excepcional, **NO** disparado por Entregado, por lo que NO afirmar que está validada la operación comercial completa.
+- Se desarmó el workflow de DELETE único: su invocación actual es SOLO LECTURA mediante el trigger DIAGNOSTICAR-NOSUCHKEY-CANARIA-024.
+- Próxima validación integral: nueva canaria con pago Sandbox genuinamente conciliado, o prueba de flujo con D1/proveedor enteramente simulados y expresamente etiquetados como simulación. No escribir un pago ficticio en el D1 compartido.
+- Antes de producción reemplazar el guard de orden canaria única por alcance de pedidos nuevos, asegurando que la activación jamás borre los 40 históricos.
