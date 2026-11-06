@@ -224,3 +224,30 @@ test('la tarjeta del archivo no admitido lleva borde y aviso rojos incluso con l
  const c=source.indexOf("if(abierto!==i){bloque.append(card);continue}",b);
  assert.ok(b>=0&&c>b,'La advertencia debe estar fuera del panel colapsado');
 });
+
+
+test('PDF demasiado grande conserva contacto comercial sin simular pedido ni subir originales',()=>{
+ const start=source.indexOf('const tamanoPdfMiB=');
+ const end=source.indexOf('\nlet leyendo=',start);
+ assert.ok(start>=0&&end>start,'Falta el mensaje comercial del PDF grande');
+ const FileMock=class{
+  constructor(name,size){this.name=name;this.size=size}
+ };
+ const crearURL=new Function('e','File',source.slice(start,end)+'\nreturn enlaceConsultaArchivoGrande(e);');
+ const e={name:'Planos grandes & apuntes.pdf',archivoOriginal:new FileMock('Planos grandes & apuntes.pdf',90*1024*1024)};
+ const u=new URL(crearURL(e,FileMock));
+ assert.equal(u.origin,'https://wa.me');
+ const cart=readFileSync(new URL('./saber-carrito-v3-script.mjs',import.meta.url),'utf8');
+ assert.ok(cart.includes(u.pathname.slice(1)),'Utilizar el contacto WhatsApp existente de Saber');
+ const message=u.searchParams.get('text');
+ assert.match(message,/Planos grandes & apuntes\.pdf/);
+ assert.match(message,/90,0 MiB/);
+ assert.match(message,/no genera un pedido ni autoriza un pago/);
+ assert.doesNotMatch(message,/https?:\/\/.*storage|SERVICE_ROLE|api[-_]?key/i);
+ assert.match(source,/contacto\.target='_blank'/);
+ assert.match(source,/contacto\.rel='noopener noreferrer'/);
+ assert.match(source,/No se registra pedido ni se habilita cobro/);
+ assert.match(source,/if\(advertenciaRecepcion\)/);
+ const page=readFileSync(new URL('./carga-unica-pagina.mjs',import.meta.url),'utf8');
+ assert.match(page,/\.archivo \.consulta-archivo-grande/);
+});
