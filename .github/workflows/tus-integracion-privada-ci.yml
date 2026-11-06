@@ -32,6 +32,9 @@ jobs:
           node --check integraciones/autocotizador/recepcion/r2-pdf-grandes-descarga-personal.mjs
           node --check integraciones/autocotizador/recepcion/r2-grandes-enviar-central.mjs
           node --check integraciones/mercadopago/pruebas/r2-grandes-central-pendientes.mjs
+          node --check integraciones/autocotizador/recepcion/r2-grandes-lookup-central.mjs
+          node --check integraciones/autocotizador/recepcion/r2-pdf-descarga-d1-personal.mjs
+          node --test tests/r2-grandes-d1-descarga-personal.test.mjs
           node --test tests/r2-grandes-central-pendientes.test.mjs
           node --test tests/r2-pdf-grandes-privado.test.mjs tests/r2-pdf-grandes-cliente.test.mjs tests/r2-pdf-grandes-api-privada.test.mjs tests/r2-pdf-integridad-stream.test.mjs tests/r2-pdf-grandes-descarga-personal.test.mjs
       - name: Sintaxis de módulos integrados
