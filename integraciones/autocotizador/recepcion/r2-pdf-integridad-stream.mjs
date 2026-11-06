@@ -50,6 +50,9 @@ export async function verificarIntegridadR2Grande({
  }catch{throw Error('R2_DIGEST_NO_DISPONIBLE')}
  if(sha!==c.sha256)throw Error('R2_SHA256_NO_COINCIDE');
  return Object.freeze({objectKey:c.key,bytes,sha256:sha,
+  // ETag del OBJETO leído, para bloquear cambios entre SHA y descarga.
+  etag:typeof obj.etag==='string'&&obj.etag.length>=8&&obj.etag.length<=256
+   ?obj.etag:null,
   storageReady:true,sha256Verificado:true,contenidoPdfVerificado:false,
   registeredInD1:false,listoParaProducir:false,checkoutEnabled:false,
   paymentAuthorized:false});
