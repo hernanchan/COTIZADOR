@@ -12,8 +12,8 @@ function fakeStorage(){
   removeItem:k=>memory.delete(k),get length(){return memory.size}};
 }
 function response(v,status=200){return {ok:status===200,status,json:async()=>v}}
-function mock({failOnceAt=0}={}){
- const calls={starts:0,parts:[],completes:0};
+function mock({failOnceAt=0,failVerifyOnce=false}={}){
+ const calls={starts:0,parts:[],completes:0,verifies:0};
  let failed=false;
  const fetcher=async(url,options)=>{
   if(url.endsWith('/iniciar')){
@@ -32,6 +32,14 @@ function mock({failOnceAt=0}={}){
    assert.equal(options.body.start,(n-1)*8*1024*1024);
    if(n===failOnceAt&&!failed){failed=true;return response({error:'corte simulado'},503)}
    return response({ok:true,partNumber:n,etag:'etag-'+n});
+  }
+  if(url.endsWith('/verificar')){
+   calls.verifies++;
+   if(failVerifyOnce&&calls.verifies===1)
+    return response({ok:false,error:'verificacion interrumpida'},503);
+   return response({ok:true,result:{bytes:size,storageReady:true,
+    sha256:meta.sha256,sha256Verificado:true,contenidoPdfVerificado:false,
+    registeredInD1:false,paymentAuthorized:false}});
   }
   if(url.endsWith('/completar')){
    calls.completes++;
@@ -55,7 +63,8 @@ test('cliente R2 200 MiB: envía 25 partes sin convertir todo a ArrayBuffer',asy
  assert.equal(new Set(calls.parts).size,25);
  assert.equal(calls.completes,1);
  assert.equal(result.paymentAuthorized,false);
- assert.equal(result.sha256Verificado,false);
+ assert.equal(result.sha256Verificado,true);
+ assert.equal(calls.verifies,1);
  assert.equal(events.at(-1).percent,100);
  assert.equal(storage.length,0);
 });
@@ -70,6 +79,19 @@ test('cliente reanuda desde partes confirmadas sin reiniciar carga',async()=>{
  assert.equal(calls.starts,1);
  assert.equal(calls.parts.filter(n=>n===1).length,1);
  assert.equal(calls.completes,1);
+ assert.equal(calls.verifies,1);
+ assert.equal(storage.length,0);
+});
+test('si falla la verificación no vuelve a completar multipart ya cerrado',async()=>{
+ const {fetcher,calls}=mock({failVerifyOnce:true}),storage=fakeStorage();
+ await assert.rejects(enviarArchivoR2Grande({file,orderId,meta,fetcher,storage}),/verificacion interrumpida/);
+ assert.equal(calls.completes,1);
+ assert.equal(storage.length,1);
+ const result=await enviarArchivoR2Grande({file,orderId,meta,fetcher,storage});
+ assert.equal(result.sha256Verificado,true);
+ assert.equal(calls.starts,1);
+ assert.equal(calls.completes,1);
+ assert.equal(calls.verifies,2);
  assert.equal(storage.length,0);
 });
 test('el cliente rechaza un archivo fuera del máximo de pruebas',async()=>{
