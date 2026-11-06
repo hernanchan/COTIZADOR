@@ -5,7 +5,7 @@
  *
  * Importar dinámicamente por el Worker cuando el flag de ensayo esté activo.
  */
-const LIMIT=20*1024*1024;
+const LIMIT=40*1024*1024;
 const SHA=/^[a-f0-9]{64}$/;
 const PDF=/\.pdf$/i;
 const WEB=/^WEB-[A-Za-z0-9_-]{5,80}$/;
