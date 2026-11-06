@@ -49,3 +49,9 @@ Se buscó en el Google Drive conectado por «productos», «precios», «inventa
 - **No es pedido comercial:** la cotización es preliminar; el visitante no puede subir, reservar, enviar ni pagar documentos. Falta ensayar Turnstile con interacción humana en navegador real y validar cotización con PDFs de distintas categorías, antes de afirmar acceso end-to-end.
 - El workflow habitual de enlace TUS fue corregido para PRESERVAR la bandera quote-only de cara a futuros despliegues, sin alterar los tres interruptores de eliminación OFF.
 - **Bloqueos siguientes para publicación:** conectar la sesión de comprador a TUS con límites y antispam sin abrir privilegios del operador, incorporar compra con pago real/transferencia verificada, integrar productos Sheets con el mismo pedido y terminar catálogo comercial (la fuente actual sigue siendo MODELO).
+
+### Enlace desde la portada V3 a la nueva cotización preliminar
+- La portada de diseño sin clave incluye un acceso directo «Probar cotización nueva sin clave» a /prueba-v2/cotizar-cliente, junto al acceso privado del operador. El CTA comercial de cotización sigue abriendo el cotizador público anterior para no ofrecer compras imposibles.
+- Pruebas automáticas de navegación aprobadas en CI de rama.
+- Deploy de portada y nuevas rutas en los Workers de ensayos [42223975540](https://github.com/hernanchan/COTIZADOR/actions/runs/42223975540) **SUCCESS**. Documentos versión dd504ef1-cb8e-44b2-9bdc-7e8ef07ec266. La verificación del deploy comprobó que se preservó la bandera previa del portal cliente quote-only y que los tres flags de borrado siguen OFF. Main y web pública no afectados.
+- Pendiente: sesión de cliente con capacidad de recibir PDFs/TUS, ordenar, pagar con verificación y seguimiento; conectar con carrito de productos. No asumir por esta pantalla que ya se pueden enviar pedidos.
