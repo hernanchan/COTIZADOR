@@ -32,7 +32,7 @@ jobs:
           npm install --no-audit --no-fund
           npm run build:unificado
           node --check dist/saber-documentos-cotizador-fase4.mjs
-      - name: Desplegar temporalmente, borrar exclusivamente canaria y restaurar versión original
+      - name: Sondear ausencia exclusivamente con GET/HEAD y restaurar Worker original
         shell: bash
         env:
           ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
@@ -137,8 +137,8 @@ jobs:
             sleep 2
           done
           test "$active" = "$target"
-          # El endpoint existe sólo en la versión TEMPORAL. Nunca hay una
-          # versión estable ni una ruta pública de borrado de canarios.
+          # Sonda de lectura temporal para una ruta sintética ya eliminada.
+          # Ninguna llamada DELETE y ninguna ruta estable de diagnóstico.
           http=$(curl --silent --show-error --max-time 45 -u "operador:$OPERATOR" \
             -X POST -H "Origin: $host" \
             -H "x-saber-disposable-nonce: $nonce" \
