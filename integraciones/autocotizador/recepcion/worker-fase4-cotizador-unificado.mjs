@@ -31,6 +31,7 @@ import ofertasSaberDirectoHtml from '../../../vidriera/ofertas.html';
 import {prepararVistaDisenoPrivada,prepararVistaDisenoAbierta} from './saber-directo-vista-previa.mjs';
 import {consultarCatalogoPublicado} from './catalogo-productos-publicos.mjs';
 import {pagoTUSSandboxCliente} from './tus-pago-sandbox-cliente.mjs';
+import {checkoutCanarioTUSPersonal} from './tus-canaria-checkout-privado.mjs';
 import {paginaDescargaTUSPersonal} from './pantalla-descarga-tus-personal.mjs';
 import {paginaPaqueteTUSPersonal} from './pantalla-paquete-tus-personal.mjs';
 import {consultarPaqueteTUSPersonal} from './tus-paquete-personal.mjs';
@@ -2090,6 +2091,11 @@ export default {
     if(page==='/api/ensayo-preparar-documentos-v2-lote')return apiPrepararDocumentosV2Lote(request,env);
     // V1 TUS: solo entorno privado y autorizado, nunca comercial ni pagos.
     // Ficha D1 para el ZIP, estrictamente Basic del operador.
+    // Canario 024: Basic de operador + HMAC interno; sin credenciales en navegador.
+    if(page==='/prueba-v2/api/ensayo-tus-canaria-checkout')
+      return checkoutCanarioTUSPersonal(request,env,{
+       authorized:v2PrivateBrowserAuthorized(request,env)==='allow'
+      });
     if(page==='/prueba-v2/api/ensayo-tus-pago-sandbox')
       return pagoTUSSandboxCliente(request,env,{
        authorized:v2PrivateBrowserAuthorized(request,env)==='allow'||
