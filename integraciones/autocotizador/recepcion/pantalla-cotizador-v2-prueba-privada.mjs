@@ -32,7 +32,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .contacto-ayuda,.contacto-error{flex-basis:100%;font-size:12px;line-height:1.2;margin:0}
 .contacto-ayuda{color:#52677a}.contacto-error{color:#a12828;font-weight:700}
 .contacto-error:empty{display:none}
-#acciones-pedido{position:sticky;top:0;z-index:30;background:#eaf3fa;border-bottom:2px solid #aecce5;padding:8px max(15px,calc((100vw - 1110px)/2));box-shadow:0 3px 9px #0a315812;display:flex;align-items:center;gap:12px;flex-wrap:wrap}#precio-smart{flex:1;font-size:16px;font-weight:750;color:#0a3158}#send-all-pdf{font-weight:750;background:#095985;white-space:nowrap;min-height:43px}#batch-progress{flex-basis:100%;margin:0;font-size:12px;line-height:1.2}#recepcion-avanzada>summary{font-size:13px!important;color:#536475}#seguridad-privada{max-width:1110px;margin:7px auto 0;padding:0 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}#seguridad-privada .cf-turnstile{margin:0} @media(max-width:600px){#acciones-pedido{padding:8px 12px}#send-all-pdf{width:100%}}
+#acciones-pedido{position:sticky;top:0;z-index:30;background:#eaf3fa;border-bottom:2px solid #aecce5;padding:8px max(15px,calc((100vw - 1110px)/2));box-shadow:0 3px 9px #0a315812;display:flex;align-items:center;gap:12px;flex-wrap:wrap}#precio-smart{flex:1;font-size:16px;font-weight:750;color:#0a3158}#send-all-pdf{font-weight:750;background:#095985;white-space:nowrap;min-height:43px}#batch-progress{flex-basis:100%;margin:0;font-size:12px;line-height:1.2}#batch-progress.error-recepcion{background:#fee8e6;border-left:4px solid #b42318;border-radius:6px;color:#8f1d1d;padding:9px 12px;font-weight:750}#recepcion-avanzada>summary{font-size:13px!important;color:#536475}#seguridad-privada{max-width:1110px;margin:7px auto 0;padding:0 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}#seguridad-privada .cf-turnstile{margin:0} @media(max-width:600px){#acciones-pedido{padding:8px 12px}#send-all-pdf{width:100%}}
 .cf-turnstile{margin:15px 0}
 #vista-estado-pedido{background:#fff;border-radius:12px;padding:24px;margin:12px 0;border:1px solid #bad2e7}
 #vista-estado-pedido strong{display:block;font-size:21px;margin-bottom:8px}
@@ -1283,6 +1283,7 @@ window.addEventListener('message',async event=>{
   const price=event.data.total;
   smartReady=status==='listo'&&Number.isSafeInteger(price)&&price>0&&event.data.sendable===true;
   smartBlockedReason=typeof event.data.blockReason==='string'?event.data.blockReason:'';
+   batchProgress.classList.toggle('error-recepcion',Boolean(smartBlockedReason)&&event.data.sendable===false);
   if(smartBlockedReason)batchProgress.textContent=smartBlockedReason;
   else if(all.length===0)batchProgress.textContent=smartReady?'Presupuesto listo. Pulsá «Enviar mi pedido».':'Revisá los archivos para continuar.';
   updateSummary();
