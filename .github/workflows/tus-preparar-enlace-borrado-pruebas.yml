@@ -27,13 +27,14 @@ jobs:
         run: |
           set -euo pipefail
           npm install --no-save --no-audit --no-fund pdf-lib@1.17.1
-          node --test tests/tus-borrado-entregado-seguro.test.mjs tests/tus-borrado-plan-central-firmado.test.mjs tests/tus-cola-borrado-entregado.test.mjs tests/tus-borrado-pipeline-extremo-a-extremo.test.mjs
+          node --test tests/tus-borrado-entregado-seguro.test.mjs tests/tus-borrado-plan-central-firmado.test.mjs tests/tus-cola-borrado-entregado.test.mjs tests/tus-borrado-pipeline-extremo-a-extremo.test.mjs tests/tus-canaria-checkout-privado.test.mjs
           node --check integraciones/mercadopago/pruebas/worker.js
           cd integraciones/autocotizador/recepcion
           npm install --no-audit --no-fund
           npm run build:unificado
           node --check dist/saber-documentos-cotizador-fase4.mjs
           grep -Fq '/internal/tus-purge-delivered' dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq '/prueba-v2/api/ensayo-tus-canaria-checkout' dist/saber-documentos-cotizador-fase4.mjs
       - name: Desplegar únicamente Documentos y Central de pruebas, con compuertas OFF y reversión
         shell: bash
         env:
