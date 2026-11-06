@@ -18,7 +18,7 @@ for (const [name,html] of [['portada',home],['ofertas',offers]]){
   assert.doesNotMatch(rendered,/href="cotizar\.html"/);
   if(name==='portada'){
    assert.match(rendered,/href="https:\/\/libreriasaber\.com\.ar\/cotizar"/);
-   assert.match(rendered,/Probar cotizador nuevo \(acceso privado\)/);
+   assert.match(rendered,/Acceso del personal/);
    assert.match(rendered,/href="\/prueba-v2\/cotizar-cliente"/);
    assert.match(rendered,/los artículos y los trabajos de impresión se consultan por separado/);
    assert.doesNotMatch(rendered,/El trabajo vuelve automáticamente a este carrito/);
@@ -111,4 +111,18 @@ test('El usuario debe consultar precios nuevos antes de abrir WhatsApp (sin pago
  assert.match(r,/https:\/\/wa\.me\/5493513110130/);
  assert.match(r,/Date\.now\(\)-validatedAt>60000/);
  assert.doesNotMatch(r,/form action=|enviarPago|createPreference|MP_TEST_ACCESS_TOKEN/);
+});
+
+
+test('V3 enlaza el mismo TUS sólo si el portal comprador está habilitado',()=>{
+ const enabled=prepararVistaDisenoAbierta(home,{pedidoTUS:true});
+ const disabled=prepararVistaDisenoAbierta(home,{pedidoTUS:false});
+ assert.match(enabled,/href="\/prueba-v2\/pedido-cliente"/);
+ assert.match(enabled,/Probar envío completo de PDF/);
+ assert.match(enabled,/impresiones con pedido, pago Sandbox y seguimiento/);
+ assert.doesNotMatch(enabled,/href="https:\/\/libreriasaber\.com\.ar\/cotizar"/);
+ assert.match(disabled,/href="https:\/\/libreriasaber\.com\.ar\/cotizar"/);
+ assert.doesNotMatch(disabled,/href="\/prueba-v2\/pedido-cliente"/);
+ assert.match(enabled,/data-demo-drawer/);
+ assert.match(enabled,/\/prueba-v2\/diseno-sin-clave\/catalogo\.json/);
 });
