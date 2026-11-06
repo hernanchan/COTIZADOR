@@ -118,9 +118,8 @@ jobs:
           # Jamás heredar una compuerta de purga accidentalmente activada.
           jq -n --slurpfile s "$tmp/docs-settings.json" \
             '{main_module:"index.mjs",annotations:{"workers/message":"Preflight enlace TUS sin DELETE"},
-              bindings:([$s[0].result.bindings[]|select(.name!="DOCS_TUS_PURGE_ENABLED" and .name!="DOCS_TUS_PURGE_CANARY_ORDER" and .name!="DOCS_TUS_PURGE_SCOPE" and .name!="DOCS_PUBLIC_QUOTE_GATE_ENABLED")|{name,type:"inherit"}]+
+              bindings:([$s[0].result.bindings[]|select(.name!="DOCS_TUS_PURGE_ENABLED" and .name!="DOCS_TUS_PURGE_CANARY_ORDER" and .name!="DOCS_TUS_PURGE_SCOPE")|{name,type:"inherit"}]+
                 [{name:"DOCS_TUS_PURGE_ENABLED",type:"plain_text",text:"OFF"},
-                  {name:"DOCS_PUBLIC_QUOTE_GATE_ENABLED",type:"plain_text",text:"OFF"},
                   {name:"DOCS_TUS_PURGE_SCOPE",type:"plain_text",text:"CANARY_ONLY"},
                  {name:"DOCS_TUS_PURGE_CANARY_ORDER",type:"plain_text",text:"WEB-ENSAYO-DA97408CCD06FFED80433A8E2A3B3FB4"}])}' > "$tmp/docs-metadata.json"
           upload_deploy saber-documentos-pruebas index.mjs integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs docs
@@ -152,7 +151,10 @@ jobs:
           curl --fail --silent --show-error --max-time 25 -H "$auth" "$api/saber-documentos-pruebas/settings" > "$tmp/docs-check.json"
           jq -e '.result.bindings|any(.name=="DOCS_TUS_PURGE_ENABLED" and .type=="plain_text" and .text=="OFF")' "$tmp/docs-check.json" >/dev/null
            jq -e '.result.bindings|any(.name=="DOCS_TUS_PURGE_SCOPE" and .text=="CANARY_ONLY")' "$tmp/docs-check.json" >/dev/null
-           jq -e '.result.bindings|any(.name=="DOCS_PUBLIC_QUOTE_GATE_ENABLED" and .type=="plain_text" and .text=="OFF")' "$tmp/docs-check.json" >/dev/null
+           gate_before=$(jq -r '[.result.bindings[]|select(.name=="DOCS_PUBLIC_QUOTE_GATE_ENABLED")|.text][0]//"OFF"' "$tmp/docs-settings.json")
+           gate_after=$(jq -r '[.result.bindings[]|select(.name=="DOCS_PUBLIC_QUOTE_GATE_ENABLED")|.text][0]//"OFF"' "$tmp/docs-check.json")
+           test "$gate_before" = "$gate_after"
+           test "$gate_after" = "OFF" || test "$gate_after" = "PRIVATE_TEST_ONLY"
           jq -e '.result.bindings|any(.name=="DOCS_TUS_PURGE_CANARY_ORDER" and .type=="plain_text" and .text=="WEB-ENSAYO-DA97408CCD06FFED80433A8E2A3B3FB4")' "$tmp/docs-check.json" >/dev/null
           code=$(curl --silent --show-error --max-time 25 -o /dev/null -w '%{http_code}' \
             'https://saber-pagos-pruebas.libreriasaber.workers.dev/admin/api/central/unpaid-detail?id=e2d76c8b-ce1c-4daf-9030-4bd402295a68' || true)
