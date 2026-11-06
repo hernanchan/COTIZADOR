@@ -372,6 +372,8 @@ async function centralTUSPackageManifest(req,env){
     p.schema!=="saber-central-tus-package-v1"||
     !/^WEB-ENSAYO-[A-F0-9]{32}$/.test(p.webOrderId||""))
   return json({ok:false,error:"Pedido TUS inválido"},422);
+ if(await centralTUSFilesPurged(env,p.webOrderId))
+  return json({ok:false,error:"Los archivos se eliminaron al entregar",paymentAuthorized:false},410);
  await centralTables(env);
  const row=await env.DB.prepare(
   "SELECT m.web_order_id,m.commercial_order_id,m.manifest_json,m.amount_ars,m.file_count,o.status,n.number "+
