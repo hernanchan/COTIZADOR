@@ -64,13 +64,62 @@ function entryPage(siteKey){
  return page.join('');
 }
 function quotePage(page){
- return page.replace('<strong>Prueba privada de clasificación.</strong>',
-    '<strong>Cotización preliminar.</strong>')
-  .replace('Sin envío de originales, pedidos ni pagos.',
-    'Tus PDF se analizan localmente; no se suben, no se almacenan y no generan pedidos ni cobros.')
-  .replace('Volver a los presupuestos de prueba','Volver a la tienda')
-  .replace('href="/prueba-cotizador-conjunto"','href="/prueba-v2/diseno-sin-clave"')
-  .replace('Una sola carga · Tamaño final','Cotizá tus archivos');
+ const original='<h2>Resumen del presupuesto</h2><section class="archivo" id="presupuesto" aria-live="polite">Esperando archivos…</section>';
+ const entry='<section id="modoConfiguracion"';
+ if(!page.includes(original)||!page.includes(entry))throw Error('Cotizador de clientes: estructura inesperada');
+ // Únicamente cambia la PRESENTACIÓN de la cotización; no altera eventos, precios ni el motor.
+ page=page.replace(original,'').replace(entry,
+  '<div class="saber-quote-total"><span class="saber-quote-kicker">Tu presupuesto estimado</span><section class="archivo" id="presupuesto" aria-live="polite">Esperando archivos…</section></div>'+entry);
+ page=page.replace(/<p class="nota">[\s\S]*?<\/p>/,
+  '<p class="nota"><strong>Presupuesto preliminar.</strong> Tus PDF se analizan en tu dispositivo: no se suben, no se almacenan ni generan un pedido. Elegí cómo querés imprimir y mirá el precio arriba.</p>');
+ page=page.replace('<h1>Una sola carga · Tamaño final</h1>',
+  '<h1>Cotizá tus archivos</h1><p class="saber-quote-intro">1. Elegí la configuración · 2. Agregá tus PDF · 3. Mirá el total.</p>');
+ page=page.replace('Seleccioná cómo querés trabajar para habilitar la carga.',
+  'Elegí cómo configurar los documentos antes de agregarlos.');
+ page=page.replace('Resumen del presupuesto','Presupuesto');
+ page=page.replace('Volver a los presupuestos de prueba','Volver a la tienda')
+   .replace('href="/prueba-cotizador-conjunto"','href="/prueba-v2/diseno-sin-clave"');
+ const css=[
+  'body{background:#edf2f6;font-size:18px;line-height:1.5}',
+  'main{width:min(1220px,calc(100% - 36px));padding:clamp(20px,3vw,36px);margin:24px auto 50px}',
+  'main>h1{font-size:clamp(29px,3vw,39px);margin-bottom:4px}',
+  '.saber-quote-intro{font-size:16px;color:#4c6476;margin:5px 0 17px}',
+  '.nota{margin:0 0 15px;padding:12px 16px;font-size:15px;line-height:1.55}',
+  '.saber-quote-total{position:sticky;top:0;z-index:20;background:#edf2f6;padding:9px 0 10px;margin-bottom:12px}',
+  '.saber-quote-kicker{display:block;font-size:13px;color:#315a77;font-weight:800;text-transform:uppercase;letter-spacing:.05em;padding:0 2px 5px}',
+  '#presupuesto{position:static;max-height:none;overflow:visible;background:#e9f4fb;border:2px solid #a4c9e4;border-radius:10px;box-shadow:0 5px 15px #163a5510;padding:13px 18px}',
+  '#presupuesto strong{font-size:clamp(23px,2.4vw,31px);line-height:1.25}',
+  '#presupuesto p{font-size:14px;line-height:1.45}',
+  '#modoConfiguracion{padding:14px 17px;margin:10px 0}',
+  '#modoConfiguracion h2{font-size:20px}',
+  '.modo-tarjeta{padding:13px 15px}',
+  '.modo-tarjeta strong{font-size:17px}',
+  '.modo-tarjeta small{font-size:14px}',
+  '#zonaArchivos{padding:19px;margin:13px 0}',
+  '#zonaArchivos p{font-size:16px}',
+  '#estado{font-size:15px}',
+  '.fila .nombre{font-size:17px}',
+  '.resumen-archivo{font-size:15px}',
+  '.editar{font-size:15px;min-height:42px}',
+  '#prepararPedido,#resumenPedido{display:none!important}',
+  '#configComunGlobal.saber-quote-single{display:none!important}',
+  '.opciones-comunes label{font-size:14px}',
+  '.opciones-comunes input,.opciones-comunes select{font-size:15px;min-height:42px}',
+  '@media(max-width:720px){main{width:100%;margin:0;padding:16px 12px 38px;border-radius:0}.saber-quote-total{top:0;margin-left:-4px;margin-right:-4px}.saber-quote-intro{font-size:14px}.nota{font-size:14px}.modo-tarjeta{padding:12px}.saber-quote-kicker{font-size:12px}}'
+ ].join('');
+ // El renderer de lote puede volver a pintar las opciones compartidas.
+ // Si hay un único PDF, se editan sus opciones desde 'Personalizar este PDF'.
+ const enhance=[
+  '<script>(function(){',
+  'function adapt(){const holder=document.getElementById("configComunGlobal");if(!holder)return;',
+  'const title=holder.querySelector(".opciones-comunes strong");',
+  'holder.classList.toggle("saber-quote-single",!!title&&/·\\s*1\\s+documentos?\\b/.test(title.textContent||""));}',
+  'document.addEventListener("DOMContentLoaded",function(){const holder=document.getElementById("configComunGlobal");',
+  'if(!holder)return;new MutationObserver(adapt).observe(holder,{childList:true,subtree:true,characterData:true});adapt();});',
+  '})();</script>'
+ ].join('');
+ return page.replace('</style>','\n/* Vista cliente exclusiva, sin cambios a la lógica */\n'+css+'</style>')
+  .replace('</body>',enhance+'</body>');
 }
 export async function manejarCotizadorCliente(request,env,{
  fetcher=fetch,now=Date.now(),random=()=>crypto.getRandomValues(new Uint8Array(16)),
