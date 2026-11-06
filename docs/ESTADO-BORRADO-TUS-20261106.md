@@ -134,3 +134,13 @@ La Central verifica obligatoriamente pago auténtico completo, `payment_reviews=
 - Verificación HTTP real protegida del endpoint de Checkout canario: GitHub Actions 42215757422 SUCCESS, HTTP 410 confirmado.
 - La canaria 024 se conserva solo como registro de ensayo en D1 pendiente, sin PDF. Nunca tratarla como trabajo operativo.
 - Todo en rama integracion/tus-pedido-privado-20261101. Ningún cambio a main, sitio público ni pagos reales.
+
+
+## 06/11 — Ensayo integral de flujo de borrado en memoria, SIN comprador Mercado Pago
+- Se agregó tests/tus-borrado-integral-aislado-sin-mp.test.mjs y el workflow .github/workflows/tus-borrado-integral-aislado-ci.yml, que se dispara con cambios al test o al archivo docs/ENSAYAR-INTEGRAL-AISLADO-TUS.trigger.
+- No utiliza red, no escribe en D1 real, no crea un pago Mercado Pago ni llama a Supabase Storage real. Emplea las funciones reales centralQueueDeliveryCleanup, centralProcessTUSPurgeQueue, centralTUSDeliveryPurgePlan, centralTUSPurgeComplete y recibirLimpiezaEntregadaInterna/eliminarYConfirmarObjetos, con transportes y tablas simulados en memoria. La acreditación "paid + verified" es un dato deliberadamente SIMULADO, no una conciliación auténtica.
+- Caso positivo: pedido elegible ya pagado y entregado EN MEMORIA -> fila de cola -> auditoría queued/attempt -> firma HMAC Central a Documentos -> lectura de plan firmado -> DELETE exacto de su archivo simulado -> confirmación NoSuchKey de Storage -> acuse firmado -> fila completed y evento completed. La segunda ejecución no vuelve a borrar (idempotencia); el archivo del otro pedido sigue intacto.
+- Casos negativos: sin pago verificado, sin entrega, bandera OFF y canaria distinta no borran; error temporal de Storage deja fila error y auditoría, sin perder archivos, y la siguiente ejecución recupera el trabajo de forma idempotente.
+- GitHub Actions [42218548352](https://github.com/hernanchan/COTIZADOR/actions/runs/42218548352) **SUCCESS, 19/19 pruebas aprobadas, cero errores**, incluyendo las suites existentes de cola y pipeline. Commit relevante 69374c56492087be05840cdc0d62d093f239d517.
+- La web pública, pagos reales, Worker y bucket Supabase no se modificaron en esta prueba. Los tres flags de borrado real siguen OFF en las versiones privadas desplegadas anteriormente.
+- Pendiente todavía: ensayo completo CON pago realmente conciliado, cambio de estado a Entregado en D1 real, reintento de cola y acuse real en D1. La simulación no sustituye esa validación antes de habilitar borrado productivo.
