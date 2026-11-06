@@ -230,9 +230,29 @@ export async function eliminarYConfirmarObjetos(plan,env,{fetcher=fetch}={}){
   Authorization:'Bearer '+env.DOCS_TUS_SUPABASE_SERVICE_KEY};
  const prefix='https://'+PROJECT+'.storage.supabase.co/storage/v1/object/'+BUCKET+'/';
  const exists=async(path,bytes,after=false)=>{
-  const url=prefix+path.split('/').map(encodeURIComponent).join('/');
-  const r=await fetcher(url,{method:'HEAD',redirect:'manual',headers});
+  const encoded=path.split('/').map(encodeURIComponent).join('/');
+  const r=await fetcher(prefix+encoded,{method:'HEAD',redirect:'manual',headers});
   if(r.status===404)return false;
+  if(r.status===400){
+   // Supabase real 06/11/2026: HEAD del objeto eliminado fue HTTP 400,
+   // error interno NoSuchKey. HEAD carece de cuerpo, por lo que hay que
+   // verificar vía /object/info antes de concluir ausencia.
+   // Nunca convertir un HTTP 400 genérico en una prueba de eliminación.
+   const info=await fetcher(
+    'https://'+PROJECT+'.storage.supabase.co/storage/v1/object/info/'+BUCKET+'/'+encoded,
+    {method:'GET',redirect:'manual',headers:{...headers,'Cache-Control':'no-cache'}});
+   if(info.status===404)return false;
+   if(info.status!==400)throw Error('No se pudo confirmar ausencia en Storage');
+   const raw=await info.text();
+   if(raw.length>1500)throw Error('Respuesta de ausencia demasiado extensa');
+   let d;try{d=JSON.parse(raw)}catch{throw Error('Respuesta de ausencia ilegible')}
+   const notFound=d&&typeof d==='object'&&!Array.isArray(d)&&
+    (d.code==='NoSuchKey'||
+     (d.error==='not_found'&&d.message==='Object not found'&&
+      [404,'404'].includes(d.statusCode)));
+   if(notFound)return false;
+   throw Error('Storage rechazó consulta; eliminación no verificada');
+  }
   if(r.status!==200)throw Error('No se pudo verificar el PDF en Storage');
   if(after)throw Error('El archivo sigue presente después del borrado');
   const reported=r.headers.get('Content-Length');
@@ -251,7 +271,7 @@ export async function eliminarYConfirmarObjetos(plan,env,{fetcher=fetch}={}){
   if(!r.ok)throw Error('Storage no pudo eliminar todos los PDF');
  }
  // Incluso en reintentos después de un borrado parcial o pérdida de respuesta,
- // SOLO HEAD 404 de cada ruta exacta confirma eliminación completa.
+ // Confirmar ausencia: 404 o 400 con NoSuchKey ratificado por API de metadata.
  for(let i=0;i<plan.paths.length;i++)await exists(plan.paths[i],plan.sizes[i],true);
  return {verifiedAbsent:true,deletedCount:plan.paths.length};
 }
