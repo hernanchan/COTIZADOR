@@ -56,6 +56,8 @@ export async function checkoutCanarioTUSPersonal(req,env,{
   const raw=await r.text();
   if(raw.length>4000)throw Error('Respuesta demasiado extensa');
   const result=JSON.parse(raw);
+  if(r.status===410)
+   return reply({ok:false,error:'La orden de prueba 024 fue cerrada; su PDF ya no existe'},410);
   if(r.status!==200||result?.ok!==true)
    return reply({ok:false,error:String(result?.error||'El pago todavía no está disponible').slice(0,140)},r.status===409?409:503);
   if(result.webOrderId!==d.webOrderId||!Number.isSafeInteger(result.amountArs)||result.amountArs<1||
