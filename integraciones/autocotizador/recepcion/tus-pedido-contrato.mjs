@@ -10,7 +10,7 @@ const FILE=/^[A-Za-z0-9_-]{1,80}$/;
 const SHA=/^[a-f0-9]{64}$/;
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 const RECEIPT=/^DOC-[a-f0-9-]{36}$/i;
-const MAX_FILE=20*1024*1024;
+const MAX_FILE=40*1024*1024;
 const MAX_BATCH=60*1024*1024;
 export const TUS_LIMITS=Object.freeze({maxFileBytes:MAX_FILE,maxBatchBytes:MAX_BATCH,maxFiles:10});
 const b64url=u8=>{
