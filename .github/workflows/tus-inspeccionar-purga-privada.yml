@@ -1,0 +1,37 @@
+name: Verificar conexión y compuertas de eliminación PDF (SOLO LECTURA)
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [docs/INSPECCIONAR-RETENCION-PRIVADA.trigger]
+permissions:
+  contents: read
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Inspeccionar configuración sin activar ni borrar archivos
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          temp=$(mktemp -d)
+          trap 'rm -rf "$temp"' EXIT
+          for worker in saber-pagos-pruebas saber-documentos-pruebas; do
+            url="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/$worker/settings"
+            curl --fail --silent --show-error --max-time 25 -H "Authorization: Bearer $TOKEN" "$url" > "$temp/$worker.json"
+            jq -e '.success==true and (.result.bindings|type=="array")' "$temp/$worker.json" >/dev/null
+          done
+          jq -r '[.result.bindings[] | select(.name=="SABER_DOCUMENTOS" and .type=="service")] | if length>0 then "CENTRAL_DOCS_SERVICE_BINDING=PRESENTE" else "CENTRAL_DOCS_SERVICE_BINDING=AUSENTE" end' "$temp/saber-pagos-pruebas.json"
+          for pair in 'saber-pagos-pruebas CENTRAL_TUS_PURGE_QUEUE_ENABLED' 'saber-pagos-pruebas CENTRAL_TUS_PURGE_EXECUTE_ENABLED' 'saber-documentos-pruebas DOCS_TUS_PURGE_ENABLED'; do
+            set -- $pair
+            worker="$1"; flag="$2"
+            jq -r --arg flag "$flag" '[.result.bindings[] | select(.name==$flag and .type=="plain_text" and .text=="PRIVATE_TEST_ONLY")] | if length>0 then $flag+"=ACTIVA" else $flag+"=APAGADA" end' "$temp/$worker.json"
+          done
+          echo 'SOLO_INSPECCION_SIN_DEPLOY_SIN_BORRADO'
