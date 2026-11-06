@@ -45,7 +45,7 @@ jobs:
            throw Error('CHECKOUT_IDENTIDAD_O_MONTO_INCORRECTOS');
           const url=new URL(body.checkoutUrl);
           if(url.protocol!=='https:'||
-             !/(^|\\.)mercadopago\\.com(\\.ar)?$/.test(url.hostname)||
+             !/(^|\.)mercadopago\.com(\.ar)?$/.test(url.hostname)||
              url.hash||url.password||url.username)
            throw Error('CHECKOUT_URL_NO_AUTORIZADA');
           console.log('CANARY_024_SANDBOX_CHECKOUT_READY');
