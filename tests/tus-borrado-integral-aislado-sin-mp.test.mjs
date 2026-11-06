@@ -77,7 +77,7 @@ function scenario({paid=true,delivered=true,canary=webOrder,storageFailure=false
    },
    async first(){
     const args=this.args;
-    if(sql.startsWith('SELECT m.web_order_id,m.file_count FROM central_document_manifests')){
+    if(sql.startsWith('SELECT m.web_order_id,m.file_count,m.created_at AS manifest_created_at FROM central_document_manifests')){
      return state.paid&&state.verified&&state.delivered&&args[1]===state.productionVersion?
       {web_order_id:webOrder,file_count:1}:null;
     }
