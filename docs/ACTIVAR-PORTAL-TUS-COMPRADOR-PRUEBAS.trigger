@@ -1,0 +1,8 @@
+ENABLE_CUSTOMER_TUS_PORTAL_ON_PRIVATE_WORKER_ONLY
+Fecha: 2026-11-06
+Branch: integracion/tus-pedido-privado-20261101
+Contrato: V3 => comprador Turnstile => TUS existente => D1 => Mercado Pago Sandbox => Central/seguimiento.
+Última CI comprobada: https://github.com/hernanchan/COTIZADOR/actions/runs/42233639179 (SUCCESS).
+Cambios permitidos: SOLO saber-documentos-pruebas; nueva variable DOCS_PUBLIC_ORDER_GATE_ENABLED=PRIVATE_TEST_ONLY.
+Main, web pública, MP real y todos los interruptores de borrado: SIN CAMBIOS (OFF).
+Control: rollback del Worker si el smoke de acceso, V3 o privacidad falla.
