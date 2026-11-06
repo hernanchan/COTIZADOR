@@ -94,3 +94,11 @@ Captura del Dashboard Cloudflare recibida: bucket `saber-documentos-grandes-ensa
 Se relanzó verificación idempotente desde GitHub Actions: https://github.com/hernanchan/COTIZADOR/actions/runs/42307358868. Bloqueo **R2_BLOCKED: falta secreto `SABER_CF_R2_ADMIN_TOKEN`**. No se intentó alterar ni recrear un bucket por falta de credenciales. No volver a pedir creación del bucket.
 
 **Próximo paso mínimo:** vincular directamente el bucket al Worker **de pruebas** `saber-documentos-pruebas` con nombre de binding **`SABER_R2_GRANDES`** en Cloudflare Dashboard (sin generar token S3 ni hacer bucket público). No habilitar banderas, no desplegar Workers ni hacer uploads hasta completar parser autoritativo y verificar el enlace. En paralelo decidir método seguro de actualización Worker para no interferir con TUS vigente.
+
+## VINCULACIÓN R2 CONFIRMADA POR EL TITULAR — 06/11/2026
+El titular confirmó que en **Workers → saber-documentos-pruebas → Configuración → Vinculaciones** aparece el enlace:
+- Variable: `SABER_R2_GRANDES`
+- Bucket privado: `saber-documentos-grandes-ensayo-20261106`
+- Asociación hecha desde Dashboard de Cloudflare. No se habilitaron flags de subida, no se desplegó código ni se cobró nada en esta etapa.
+
+Comprobación independiente de solo lectura preparada en `.github/workflows/r2-verificar-binding-privado.yml`, utilizando el permiso de despliegue existente de GitHub para **GET** de ajustes sin mostrar secretos. La existencia de la vinculación no acredita todavía transferencia real ni presupuesto de PDFs grandes. Nunca publicar la web ni activar pagos reales en la verificación.
