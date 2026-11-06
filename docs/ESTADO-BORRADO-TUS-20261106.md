@@ -125,3 +125,12 @@ La Central verifica obligatoriamente pago auténtico completo, `payment_reviews=
 - Se desarmó el workflow de DELETE único: su invocación actual es SOLO LECTURA mediante el trigger DIAGNOSTICAR-NOSUCHKEY-CANARIA-024.
 - Próxima validación integral: nueva canaria con pago Sandbox genuinamente conciliado, o prueba de flujo con D1/proveedor enteramente simulados y expresamente etiquetados como simulación. No escribir un pago ficticio en el D1 compartido.
 - Antes de producción reemplazar el guard de orden canaria única por alcance de pedidos nuevos, asegurando que la activación jamás borre los 40 históricos.
+
+
+### 06/11 — cierre definitivo de la canaria 024 sin cobros
+- Se retiró el inicio de Checkout de la orden 024, cuyo PDF sintético ya no existe, desde la Central y el proxy documental: cualquier nuevo intento de start devuelve HTTP 410, sin crear otra preferencia.
+- El workflow de preparación original de la orden 024 fue reemplazado por un no-op preventivo. Esto no cancela necesariamente una preferencia externa de MP ya creada: **no abrir ni pagar el link anterior**.
+- Tests de regresión GitHub Actions 42215534526 SUCCESS, deploy seguro Workers privados 42215626271 SUCCESS con las tres compuertas de purga OFF.
+- Verificación HTTP real protegida del endpoint de Checkout canario: GitHub Actions 42215757422 SUCCESS, HTTP 410 confirmado.
+- La canaria 024 se conserva solo como registro de ensayo en D1 pendiente, sin PDF. Nunca tratarla como trabajo operativo.
+- Todo en rama integracion/tus-pedido-privado-20261101. Ningún cambio a main, sitio público ni pagos reales.
