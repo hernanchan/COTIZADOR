@@ -6,6 +6,7 @@
  */
 import {iniciarR2Grande,subirParteR2Grande,completarR2Grande,
  leerReciboR2} from './r2-pdf-grandes-privado.mjs';
+import {verificarIntegridadR2Grande} from './r2-pdf-integridad-stream.mjs';
 
 const FLAG='PRIVATE_TEST_ONLY';
 const ROOT='/prueba-v2/api/ensayo-r2/';
@@ -46,7 +47,7 @@ export async function manejarR2GrandePrivado(request,env,{
  const url=new URL(request.url),route=url.pathname;
  if(!route.startsWith(ROOT))return reply({ok:false,error:'Ruta R2 inexistente'},404);
  const action=route.slice(ROOT.length);
- if(!['iniciar','parte','completar'].includes(action))
+ if(!['iniciar','parte','completar','verificar'].includes(action))
   return reply({ok:false,error:'Ruta R2 inexistente'},404);
  // 503 antes de cualquier escritura: no cargar nada cuando no esta el bucket.
  if(!validarEntorno(env))
@@ -76,8 +77,8 @@ export async function manejarR2GrandePrivado(request,env,{
   }
   // Validar firma y ORDEN antes de tocar el bucket. Evita usar sesiones
   // robadas desde otro navegador aunque conozcan uploadId, HMAC y la ruta.
-  const data=action==='completar'?await bodyJSON(request):null;
-  if(data&&Object.keys(data).sort().join(',')!=='proof,uploadedParts')
+  const data=action==='completar'||action==='verificar'?await bodyJSON(request):null;
+  if(data&&Object.keys(data).sort().join(',')!==(action==='verificar'?'proof':'proof,uploadedParts'))
    return reply({ok:false,error:'Datos de cierre incorrectos'},422);
   const proof=action==='parte'?request.headers.get('X-Saber-R2-Proof'):data?.proof;
   const c=await leerReciboR2(proof,options);
@@ -89,6 +90,10 @@ export async function manejarR2GrandePrivado(request,env,{
     return reply({ok:false,error:'Numero de parte incorrecto'},400);
    const part=await subirParteR2Grande({...options,proof,partNumber:Number(n),request});
    return reply({ok:true,...part});
+  }
+  if(action==='verificar'){
+   const result=await verificarIntegridadR2Grande({...options,proof});
+   return reply({ok:true,result});
   }
   const result=await completarR2Grande({...options,proof,uploadedParts:data.uploadedParts});
   return reply({ok:true,result});
