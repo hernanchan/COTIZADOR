@@ -84,3 +84,18 @@ test('la Central reusa exactamente preflight Sandbox y guarda identidad de canar
  assert.match(src,/\/internal\/central\/canary-checkout/);
  assert.doesNotMatch(src,/async function centralCanarySandboxPrivate[\s\S]*?async function centralClientSandboxPayment[\s\S]*?DIRECT_STORAGE_DELETE/);
 });
+
+
+test('canaria eliminada: Central prohíbe generar otro Checkout y el proxy devuelve 410',async()=>{
+ const source=readFileSync(new URL('../integraciones/mercadopago/pruebas/worker.js',import.meta.url),'utf8');
+ const block=source.slice(source.indexOf('async function centralCanarySandboxPrivate('),source.indexOf('async function centralClientSandboxPayment('));
+ assert.match(block,/if\(p\.action==="start"\)/);
+ assert.match(block,/Orden canaria 024 cerrada/);
+ const response=await checkoutCanarioTUSPersonal(req(),env(async()=>Response.json({
+  ok:false,error:'Orden canaria 024 cerrada'
+ },{status:410})),opt());
+ assert.equal(response.status,410);
+ const body=await response.json();
+ assert.equal(body.ok,false);
+ assert.match(body.error,/cerrada/);
+});
