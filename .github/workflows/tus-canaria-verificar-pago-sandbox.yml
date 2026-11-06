@@ -1,0 +1,43 @@
+name: Comprobar pago real Sandbox de orden canaria 024 (sin entrega)
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [docs/VERIFICAR-PAGO-CANARIA-024.trigger]
+permissions:
+  contents: read
+jobs:
+  pago:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Consultar pago a la Central mediante HMAC y conciliación MP
+        env:
+          SABER_V2_OPERATOR_PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          const pass=process.env.SABER_V2_OPERATOR_PASSWORD;
+          if(typeof pass!=='string'||pass.length<16)throw Error('OPERADOR_PRIVADO_AUSENTE');
+          const host='https://saber-documentos-pruebas.libreriasaber.workers.dev';
+          const id='WEB-ENSAYO-DA97408CCD06FFED80433A8E2A3B3FB4';
+          const r=await fetch(host+'/prueba-v2/api/ensayo-tus-canaria-checkout',{
+            method:'POST',redirect:'manual',signal:AbortSignal.timeout(40000),
+            headers:{Origin:host,'Content-Type':'application/json',Authorization:'Basic '+Buffer.from('operador:'+pass).toString('base64')},
+            body:JSON.stringify({action:'status',webOrderId:id})
+          });
+          let d;try{d=await r.json()}catch{throw Error('ESTADO_PAGO_NO_ES_JSON')}
+          if(r.status!==200||d?.ok!==true)throw Error('CONSULTA_PAGO_HTTP_'+r.status);
+          if(d.webOrderId!==id||d.commercialOrderId!=='f5bddab7-6078-4f00-9fba-61f2210b0b20'||
+             d.amountArs!==100||!['pendiente','pagado','revocado'].includes(d.estado))
+           throw Error('PAGO_IDENTIDAD_O_IMPORTE_INCOMPATIBLE');
+          console.log('PAGO_CANARIO_024_ESTADO='+d.estado.toUpperCase());
+          console.log('PAGO_CANARIO_024_VERIFICADO_POR_MP='+String(d.estado==='pagado'));
+          console.log('PURGA_SIGUE_DESACTIVADA_HASTA_ENSAYO_ENTREGADO');
+          NODE
