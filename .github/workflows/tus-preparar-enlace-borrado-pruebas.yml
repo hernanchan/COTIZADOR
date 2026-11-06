@@ -117,8 +117,9 @@ jobs:
           # Jamás heredar una compuerta de purga accidentalmente activada.
           jq -n --slurpfile s "$tmp/docs-settings.json" \
             '{main_module:"index.mjs",annotations:{"workers/message":"Preflight enlace TUS sin DELETE"},
-              bindings:([$s[0].result.bindings[]|select(.name!="DOCS_TUS_PURGE_ENABLED")|{name,type:"inherit"}]+
-                [{name:"DOCS_TUS_PURGE_ENABLED",type:"plain_text",text:"OFF"}])}' > "$tmp/docs-metadata.json"
+              bindings:([$s[0].result.bindings[]|select(.name!="DOCS_TUS_PURGE_ENABLED" and .name!="DOCS_TUS_PURGE_CANARY_ORDER")|{name,type:"inherit"}]+
+                [{name:"DOCS_TUS_PURGE_ENABLED",type:"plain_text",text:"OFF"},
+                 {name:"DOCS_TUS_PURGE_CANARY_ORDER",type:"plain_text",text:"WEB-ENSAYO-DA97408CCD06FFED80433A8E2A3B3FB4"}])}' > "$tmp/docs-metadata.json"
           upload_deploy saber-documentos-pruebas index.mjs integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs docs
           code=$(curl --silent --show-error --max-time 20 -o /dev/null -w '%{http_code}' \
             'https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/' || true)
@@ -131,22 +132,25 @@ jobs:
           jq -n --slurpfile s "$tmp/central-settings.json" \
             '{main_module:"worker.js",annotations:{"workers/message":"Conectar central a documentos para ensayo TUS; borrado OFF"},
               bindings:([$s[0].result.bindings[]|
-                select(.name!="SABER_DOCUMENTOS" and .name!="CENTRAL_TUS_PURGE_QUEUE_ENABLED" and .name!="CENTRAL_TUS_PURGE_EXECUTE_ENABLED")|
+                select(.name!="SABER_DOCUMENTOS" and .name!="CENTRAL_TUS_PURGE_QUEUE_ENABLED" and .name!="CENTRAL_TUS_PURGE_EXECUTE_ENABLED" and .name!="CENTRAL_TUS_PURGE_CANARY_ORDER")|
                 {name,type:"inherit"}]+
                 [{name:"SABER_DOCUMENTOS",type:"service",service:"saber-documentos-pruebas",environment:"production"},
                  {name:"CENTRAL_TUS_PURGE_QUEUE_ENABLED",type:"plain_text",text:"OFF"},
-                 {name:"CENTRAL_TUS_PURGE_EXECUTE_ENABLED",type:"plain_text",text:"OFF"}])}' > "$tmp/central-metadata.json"
+                 {name:"CENTRAL_TUS_PURGE_EXECUTE_ENABLED",type:"plain_text",text:"OFF"},
+                 {name:"CENTRAL_TUS_PURGE_CANARY_ORDER",type:"plain_text",text:"WEB-ENSAYO-DA97408CCD06FFED80433A8E2A3B3FB4"}])}' > "$tmp/central-metadata.json"
           upload_deploy saber-pagos-pruebas worker.js integraciones/mercadopago/pruebas/worker.js central
           curl --fail --silent --show-error --max-time 25 -H "$auth" "$api/saber-pagos-pruebas/settings" > "$tmp/central-check.json"
           jq -e '.success==true and (.result.bindings|any(.name=="SABER_DOCUMENTOS" and .type=="service" and .service=="saber-documentos-pruebas"))' "$tmp/central-check.json" >/dev/null
           jq -e '.result.bindings|any(.name=="CENTRAL_TUS_PURGE_QUEUE_ENABLED" and .type=="plain_text" and .text=="OFF")' "$tmp/central-check.json" >/dev/null
           jq -e '.result.bindings|any(.name=="CENTRAL_TUS_PURGE_EXECUTE_ENABLED" and .type=="plain_text" and .text=="OFF")' "$tmp/central-check.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="CENTRAL_TUS_PURGE_CANARY_ORDER" and .type=="plain_text" and .text=="WEB-ENSAYO-DA97408CCD06FFED80433A8E2A3B3FB4")' "$tmp/central-check.json" >/dev/null
           curl --fail --silent --show-error --max-time 25 -H "$auth" "$api/saber-documentos-pruebas/settings" > "$tmp/docs-check.json"
           jq -e '.result.bindings|any(.name=="DOCS_TUS_PURGE_ENABLED" and .type=="plain_text" and .text=="OFF")' "$tmp/docs-check.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="DOCS_TUS_PURGE_CANARY_ORDER" and .type=="plain_text" and .text=="WEB-ENSAYO-DA97408CCD06FFED80433A8E2A3B3FB4")' "$tmp/docs-check.json" >/dev/null
           code=$(curl --silent --show-error --max-time 25 -o /dev/null -w '%{http_code}' \
             'https://saber-pagos-pruebas.libreriasaber.workers.dev/admin/api/central/unpaid-detail?id=e2d76c8b-ce1c-4daf-9030-4bd402295a68' || true)
           test "$code" = 401 || { echo "CENTRAL_ADMIN_SIN_401=$code"; exit 1; }
           health=$(curl --fail --silent --show-error --max-time 25 \
             'https://saber-pagos-pruebas.libreriasaber.workers.dev/health')
           echo "$health" | jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' >/dev/null
-          echo 'SERVICE_BINDING_VERIFICADO_3_COMPUERTAS_OFF_SIN_DELETE_SIN_PAGOS_REALES'
+          echo 'SERVICE_BINDING_Y_CANARIA_024_VERIFICADOS_3_COMPUERTAS_OFF_SIN_DELETE_SIN_PAGOS_REALES'
