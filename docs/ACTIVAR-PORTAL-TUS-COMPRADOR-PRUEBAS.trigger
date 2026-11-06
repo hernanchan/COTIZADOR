@@ -6,3 +6,4 @@ Contrato: V3 => comprador Turnstile => TUS existente => D1 => Mercado Pago Sandb
 Cambios permitidos: SOLO saber-documentos-pruebas; nueva variable DOCS_PUBLIC_ORDER_GATE_ENABLED=PRIVATE_TEST_ONLY.
 Main, web pública, MP real y todos los interruptores de borrado: SIN CAMBIOS (OFF).
 Control: rollback del Worker si el smoke de acceso, V3 o privacidad falla.
+Reintento controlado 2: dependencias de test instaladas, deploy anterior no ejecutado (fallo antes de tocar Cloudflare).
