@@ -1,0 +1,38 @@
+name: Crear un único PDF canario y pedido TUS sin pago (PRUEBAS)
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [docs/CREAR-ORDEN-CANARIA-20261106.trigger]
+permissions:
+  contents: read
+concurrency:
+  group: saber-tus-canaria-20261106
+  cancel-in-progress: false
+jobs:
+  canaria:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar librerías de prueba con versión fija
+        run: npm install --no-save --no-audit --no-fund --ignore-scripts --package-lock=false pdf-lib@1.17.1 tus-js-client@4.3.1
+      - name: Verificar sintaxis antes de crear PDF
+        run: |
+          node --check integraciones/autocotizador/recepcion/ensayo-canario-pdf-tus.mjs
+          node --test tests/tus-borrado-entregado-seguro.test.mjs tests/tus-borrado-pipeline-extremo-a-extremo.test.mjs
+      - name: Crear sólo una orden pendiente con PDF sintético nuevo
+        env:
+          SABER_V2_OPERATOR_PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+        run: |
+          set -euo pipefail
+          node integraciones/autocotizador/recepcion/ensayo-canario-pdf-tus.mjs
+      - name: Declarar expresamente que NO se habilitó borrado ni pago
+        run: echo "CANARY_PENDING_ONLY - NO_PAYMENT_NO_PURGE_NO_CUSTOMER_DOCUMENT"
