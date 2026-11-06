@@ -29,7 +29,7 @@ jobs:
           node --check integraciones/mercadopago/pruebas/worker.js
           test "$(grep -c 'bytes>40\*1024\*1024' integraciones/mercadopago/pruebas/worker.js)" -eq 4
           grep -Fq 'function centralSafeManifest' integraciones/mercadopago/pruebas/worker.js
-          grep -Fq 'centralTUSReceiptCheck' integraciones/mercadopago/pruebas/worker.js
+          grep -Fq 'centralTUSReceiptLookup' integraciones/mercadopago/pruebas/worker.js
       - name: Actualizar solo Worker Central de ensayos heredando bindings, con rollback
         shell: bash
         env:
