@@ -8,7 +8,8 @@ const begin=source.indexOf(start);
 const end=source.indexOf('\n };\n bridgeButton.hidden=true',begin);
 assert.ok(begin>=0&&end>begin,'Falta transferencia del cliente');
 const handoff=new Function('leyendo','ultimoPresupuesto','entries','window','location','info','MAX_PDF_CARGA','paginasElegidas',
- source.slice(begin+start.length,end));
+ `const MAX_PDF_TUS_BYTES=40*1024*1024;const MAX_LOTE_TUS_BYTES=60*1024*1024;const tamanoPdfMiB=f=>(f.size/(1024*1024)).toFixed(1).replace('.',',')+' MiB';
+`+source.slice(begin+start.length,end));
 
 function ensayo(grupo2='1'){
  const archivo=i=>new File([new Uint8Array(128)],'PDF_'+i+'.pdf',{type:'application/pdf'});
