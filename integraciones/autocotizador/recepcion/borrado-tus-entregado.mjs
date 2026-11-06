@@ -222,6 +222,7 @@ export async function eliminarYConfirmarObjetos(plan,env,{fetcher=fetch}={}){
       !p.startsWith('v2/'+plan.webOrderId+'/'))||
     plan.sizes.some(size=>!Number.isSafeInteger(size)||size<5||size>20*1024*1024)||
     plan.bucket!==BUCKET||env?.DOCS_TUS_PURGE_ENABLED!=='PRIVATE_TEST_ONLY'||
+    env?.DOCS_TUS_PURGE_CANARY_ORDER!==plan.webOrderId||
     typeof env?.DOCS_TUS_SUPABASE_SERVICE_KEY!=='string'||
     env.DOCS_TUS_SUPABASE_SERVICE_KEY.length<32)
    throw Error('Ejecución de limpieza no habilitada o plan inseguro');
@@ -266,6 +267,8 @@ export async function recibirLimpiezaEntregadaInterna(request,env,{
   return response({ok:false,error:'Limpieza todavía desactivada'},503);
  let info;
  try{info=await verify(request,env)}catch{return response({ok:false,error:'Firma privada inválida'},401)}
+ if(env?.DOCS_TUS_PURGE_CANARY_ORDER!==info.webOrderId)
+  return response({ok:false,error:'Pedido fuera del ensayo de limpieza'},403);
  try{
   const plan=await central(env,info.webOrderId);
   if(plan.webOrderId!==info.webOrderId||plan.confirmedDelivered!==true||
