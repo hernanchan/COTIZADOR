@@ -1459,7 +1459,8 @@ async function centralTUSPurgeComplete(req,env){
  if(env.CENTRAL_TUS_PURGE_EXECUTE_ENABLED!=='PRIVATE_TEST_ONLY'||
     env.CENTRAL_TUS_PURGE_QUEUE_ENABLED!=='PRIVATE_TEST_ONLY')
   return json({ok:false,error:'Retención desactivada'},503);
- if(!centralPurgeCanaryAllowed(env,p.webOrderId))
+ if(env.CENTRAL_TUS_PURGE_SCOPE!=='NEW_ORDERS_ONLY'&&
+     !centralPurgeCanaryAllowed(env,p.webOrderId))
   return json({ok:false,error:'Orden fuera del ensayo autorizado'},403);
  await centralEnsureTUSPurgeTables(env);
  const row=await env.DB.prepare(
