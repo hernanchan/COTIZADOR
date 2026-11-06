@@ -15,9 +15,9 @@ test('el cliente generado es JavaScript sintacticamente valido',()=>{
  assert.doesNotThrow(()=>new Script(built,{filename:'carga-inteligente.js'}));
 });
 
-test('ambas validaciones aceptan MUEBLES.pdf de 2.35 MB y rechazan extensiones ajenas',()=>{
+test('cuatro validaciones PDF incluyen alerta anticipada, carga, ploteos y envío',()=>{
  const patterns=[...source.matchAll(/\/([^\n/]*pdf\$)\/i\.test\((file\.name|e\.name)\)/g)];
- assert.equal(patterns.length,3,'Deben validarse PDF en carga, ploteos y transferencia privada');
+ assert.equal(patterns.length,4,'Se suma validación visual previa sin quitar las del envío');
  for(const [,pattern] of patterns){
   assert.equal(pattern,String.raw`\.pdf$`,'Expresión de extensión inesperada');
   const rx=new RegExp(pattern,'i');
