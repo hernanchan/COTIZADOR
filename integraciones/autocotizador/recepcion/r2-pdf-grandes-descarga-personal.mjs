@@ -64,8 +64,12 @@ export async function descargarR2GrandePersonal(request,env,{
   if(checked?.sha256Verificado!==true||checked?.bytes!==claim.bytes||
      checked?.sha256!==claim.sha256||checked?.objectKey!==claim.key)
    return respond('No se pudo comprobar la integridad del original.',409);
-  const object=await env.SABER_R2_GRANDES.get(claim.key);
-  if(!object||object.size!==claim.bytes||
+  if(typeof checked.etag!=='string'||checked.etag.length<8)
+   return respond('No se pudo fijar la versión del archivo comprobado.',409);
+  const object=await env.SABER_R2_GRANDES.get(claim.key,{
+   onlyIf:{etagMatches:checked.etag}
+  });
+  if(!object||object.etag!==checked.etag||object.size!==claim.bytes||
     !(object.body instanceof ReadableStream))
    return respond('PDF privado incompleto.',409);
   // Nombre creado desde UUID validado por la firma. No usar nombre subido
