@@ -36,13 +36,17 @@ function alertasRecepcionPDF(){
  for(const e of entries){
   const file=e.archivoOriginal;
   if(!(file instanceof File))continue;
-  acumulado+=file.size;
-  if(file.size>MAX_PDF_TUS_BYTES)
+  if(file.size>MAX_PDF_TUS_BYTES){
    alertas.set(e,'No se admite este archivo: pesa '+tamanoPdfMiB(file)+
     ' y el máximo actual es 40 MiB por PDF. Los demás archivos siguen cargados.');
-  else if(file.size<5||file.name.length>120||!/\.pdf$/i.test(file.name))
+   continue;
+  }
+  if(file.size<5||file.name.length>120||!/\.pdf$/i.test(file.name)){
    alertas.set(e,'No se admite este archivo: debe ser un PDF válido, con nombre de hasta 120 caracteres.');
-  else if(acumulado>MAX_LOTE_TUS_BYTES)
+   continue;
+  }
+  acumulado+=file.size;
+  if(acumulado>MAX_LOTE_TUS_BYTES)
    alertas.set(e,'Este PDF lleva el pedido a '+(acumulado/(1024*1024)).toFixed(1).replace('.',',')+
     ' MiB; el máximo combinado es 60 MiB. Quitalo o dividí el pedido.');
  }
