@@ -74,7 +74,7 @@ test('no permite sobrescribir objeto, orden ajena ni saltar validación del PDF'
  assert.equal(f.writes,1);
  for(const b of [
   {...p,orderId:'WEB-OTRA-12345'},
-  {...p,receiptId:'DOC-'+UUID.replace('8abc','9abc')},
+  {...p,receiptId:'DOC-12345678-1234-4123-8123-223456789abc'},
   {...p,sha256Verificado:false},
   {...p,contenidoPdfVerificado:true},
   {...p,registeredInD1:true},
