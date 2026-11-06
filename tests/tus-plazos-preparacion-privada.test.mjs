@@ -135,7 +135,8 @@ test('postergar o retirar requiere motivo y conserva auditoría',async()=>{
  assert.equal(events.length,3);
 });
 test('nunca inventa un plazo por carga ni lo filtra a pagos pendientes',()=>{
- const status=src.slice(src.indexOf('if(p.action==="status")'),src.indexOf('if(typeof dispatch!=="function"',src.indexOf('if(p.action==="status")')));
+ const checkout=src.slice(src.indexOf('async function centralClientSandboxPayment('),src.indexOf('async function documentSandboxEligibility('));
+ const status=checkout.slice(checkout.indexOf('if(p.action==="status")'),checkout.indexOf('if(typeof dispatch!=="function"',checkout.indexOf('if(p.action==="status")')));
  assert.match(status,/estado==="pagado"/);
  assert.match(status,/preparationEstimateDetail\(env,belongs\.id\)/);
  assert.match(status,/preparacionEstimada/);
