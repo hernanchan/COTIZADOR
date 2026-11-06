@@ -262,3 +262,38 @@ export async function manejarPortalPedidosCliente(request,env,{
    '; Secure; HttpOnly; SameSite=Strict'
  });
 }
+
+
+// El permiso de comprador se vincula al ID de pedido asignado durante
+// /ensayo-tus-iniciar. Una sesión anónima NO puede recuperar, registrar
+// ni consultar el pago de otra orden aunque conozca sus identificadores.
+const ORDER_BIND_COOKIE='saber_pedido_orden_v1';
+const ORDER_ID=/^WEB-ENSAYO-[A-F0-9]{32}$/;
+async function bindingMac(env,orderId,buyerSession,subtle){
+ const k=await subtle.importKey('raw',new TextEncoder().encode(env.DOCS_TURNSTILE_SECRET),
+  {name:'HMAC',hash:'SHA-256'},false,['sign']);
+ const data=await subtle.sign('HMAC',k,
+  new TextEncoder().encode('saber-cliente-vinculo-orden-v1\n'+orderId+'\n'+buyerSession));
+ return hex(new Uint8Array(data));
+}
+export async function cookiePedidoClienteVinculado(request,env,orderId,options={}){
+ if(!ORDER_ID.test(orderId||'')||!await autorizadoPedidoCliente(request,env,options))
+  return null;
+ const buyer=(request.headers.get('Cookie')||'').match(
+  /(?:^|;\s*)(saber_pedido_client_v1=\d{10}\.[a-f0-9]{32}\.[a-f0-9]{64})(?=;|$)/);
+ if(!buyer)return null;
+ const signature=await bindingMac(env,orderId,buyer[1],options.subtle||crypto.subtle);
+ return ORDER_BIND_COOKIE+'='+orderId+'.'+signature+
+  '; Path=/; Max-Age='+ORDER_AGE+'; Secure; HttpOnly; SameSite=Strict';
+}
+export async function autorizadoPedidoClienteVinculado(request,env,orderId,options={}){
+ if(!ORDER_ID.test(orderId||'')||!await autorizadoPedidoCliente(request,env,options))
+  return false;
+ const cookies=request.headers.get('Cookie')||'';
+ const buyer=cookies.match(
+  /(?:^|;\s*)(saber_pedido_client_v1=\d{10}\.[a-f0-9]{32}\.[a-f0-9]{64})(?=;|$)/);
+ const order=cookies.match(
+  /(?:^|;\s*)saber_pedido_orden_v1=(WEB-ENSAYO-[A-F0-9]{32})\.([a-f0-9]{64})(?=;|$)/);
+ if(!buyer||!order||order[1]!==orderId)return false;
+ return equal(order[2],await bindingMac(env,orderId,buyer[1],options.subtle||crypto.subtle));
+}
