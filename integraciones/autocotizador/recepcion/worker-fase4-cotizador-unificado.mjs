@@ -6,7 +6,7 @@ import {paginaCotizadorRapido} from './cotizador-rapido-pagina.mjs';
 import {paginaPloteosRapido} from './ploteos-rapido-pagina.mjs';
 import {paginaCotizadorConjunto} from './cotizador-conjunto-pagina.mjs';
 import {paginaCargaUnica} from './carga-unica-pagina.mjs';
-import {manejarCotizadorCliente,autorizadoCotizadorCliente} from './cotizador-cliente-publico.mjs';
+import {manejarCotizadorCliente,autorizadoCotizadorCliente,manejarPortalPedidosCliente,autorizadoPedidoCliente} from './cotizador-cliente-publico.mjs';
 import {cotizarCargaUnica} from './cotizar-carga-unica.mjs';
 import {cotizarNupReciboVerificado} from './cotizar-nup-recibo-verificado.mjs';
 import {cotizarPloteoReciboVerificado} from './cotizar-ploteo-recibo-verificado.mjs';
@@ -26,7 +26,7 @@ import {componerDesdeReciboVerificado} from './componer-desde-recibo-verificado.
 import {guardarPdfCompuestoPrivado} from './guardar-pdf-compuesto-privado.mjs';
 import {registrarPdfCompuestoCentralFirmado} from './registrar-pdf-compuesto-central.mjs';
 import {verificarVinculoCotizadorV2} from './verificar-vinculo-cotizador-v2.mjs';
-import {paginaCotizadorV2PruebaPrivada} from './pantalla-cotizador-v2-prueba-privada.mjs';
+import {paginaCotizadorV2PruebaPrivada,paginaCotizadorTUSClientePruebas} from './pantalla-cotizador-v2-prueba-privada.mjs';
 import portadaSaberDirectoHtml from '../../../vidriera/index.html';
 import ofertasSaberDirectoHtml from '../../../vidriera/ofertas.html';
 import {prepararVistaDisenoPrivada,prepararVistaDisenoAbierta} from './saber-directo-vista-previa.mjs';
@@ -88,9 +88,11 @@ async function preciosPrivados(env,request){
  const quotePath=new URL(request.url).pathname;
  const soloPresupuesto=quotePath==='/api/ensayo-materiales-rapido'||
    quotePath==='/api/ensayo-carga-unica';
+ const precioComprador=soloPresupuesto||quotePath==='/prueba-v2/precios-web.json';
  if(!staff&&v2PrivateBrowserAuthorized(request,env)!=='allow'&&
     !(await v2SessionAuthorized(request,env))&&
-    !(soloPresupuesto&&await autorizadoCotizadorCliente(request,env)))
+    !(soloPresupuesto&&await autorizadoCotizadorCliente(request,env))&&
+    !(precioComprador&&await autorizadoPedidoCliente(request,env)))
   throw Error('La versión de precios privada requiere sesión autorizada.');
  return (await obtenerTarifarioD1Privado(env)).prices;
 }
@@ -1875,14 +1877,23 @@ async function v2MobileInviteExchange(request,env){
  return new Response(JSON.stringify({ok:true,expiresInSeconds:1800}),{headers});
 }
 
-async function v2PrivateBrowserResponse(request,env,path){
+const V2_BUYER_PUBLIC_ASSETS=new Set([
+ '/prueba-v2/carga-inteligente','/prueba-v2/carga-inteligente.js',
+ '/prueba-v2/precios-web.json','/prueba-v2/tus-directo.mjs',
+ '/prueba-v2/subir-vincular-pdf.mjs','/prueba-v2/preparar-manifiesto.mjs',
+ '/prueba-v2/cotizador-v2-ensayo-archivos.mjs'
+]);
+async function v2PrivateBrowserResponse(request,env,path,{buyer=false}={}){
  if(request.method!=='GET')return closed();
+ // Sólo activos de cotización y envío. Nunca concede la cookie de operador.
+ const buyerOK=buyer&&V2_BUYER_PUBLIC_ASSETS.has(path)&&
+  await autorizadoPedidoCliente(request,env);
  const status=v2PrivateBrowserAuthorized(request,env);
- if(status==='off')return testResponse({ok:false,error:'Ensayo privado deshabilitado'},503);
+ if(status==='off'&&!buyerOK)return testResponse({ok:false,error:'Ensayo privado deshabilitado'},503);
  const allowMobile=path!=='/prueba-v2/orden-paquete'&&
   path!=='/prueba-v2/personal-descargar'&&
   status==='deny'&&await v2SessionAuthorized(request,env);
- if(status==='deny'&&!allowMobile)return new Response('Autenticación privada requerida',{
+ if(status==='deny'&&!allowMobile&&!buyerOK)return new Response('Autenticación privada requerida',{
   status:401,headers:{'WWW-Authenticate':'Basic realm="Saber V2 Ensayo Privado", charset="UTF-8"',
    'Cache-Control':'no-store,private','X-Robots-Tag':'noindex,nofollow',
    'X-Content-Type-Options':'nosniff'}
@@ -2026,8 +2037,15 @@ export default {
     const page=new URL(request.url).pathname;
     if(page==='/internal/tus-purge-delivered')
       return recibirLimpiezaEntregadaInterna(request,env);
-    // Cotización pública SOLO PRELIMINAR. Jamás usar cookie de cliente para
-    // autorizar TUS, pagos, descarga, Central ni acceso administrativo.
+    // Comprador: pantalla TUS existente, sin contraseña de personal.
+    // El único privilegio nuevo permite enviar y pagar en Sandbox.
+    if(page==='/prueba-v2/pedido-cliente')
+      return manejarPortalPedidosCliente(request,env,{
+       paginaPedido:()=>tusPrivadoConfigurado(env)?paginaCotizadorTUSClientePruebas(
+        env.DOCS_TURNSTILE_SITE_KEY,true,diagnosticarTUSPrivado(env),
+        env.DOCS_CLIENT_SANDBOX_CHECKOUT_ENABLED==='PRIVATE_TEST_ONLY'):null
+      });
+    // Cotizador quote-only histórico: su cookie nunca autoriza TUS.
     if(page==='/prueba-v2/cotizar-cliente')
       return manejarCotizadorCliente(request,env,{paginaCotizacion:paginaCargaUnica()});
     // DEMOSTRACIÓN VISUAL ANÓNIMA, SEPARADA DEL PORTAL PRIVADO.
@@ -2046,7 +2064,7 @@ export default {
       if(request.method!=='GET')return new Response('Solo consulta',{status:405,headers:{'Allow':'GET','Cache-Control':'no-store'}});
       const ofertas=page.endsWith('/ofertas.html');
       try{
-        const html=prepararVistaDisenoAbierta(ofertas?ofertasSaberDirectoHtml:portadaSaberDirectoHtml,{ofertas,categoria:new URL(request.url).searchParams.get('categoria')||''});
+        const html=prepararVistaDisenoAbierta(ofertas?ofertasSaberDirectoHtml:portadaSaberDirectoHtml,{ofertas,categoria:new URL(request.url).searchParams.get('categoria')||'',pedidoTUS:env?.DOCS_PUBLIC_ORDER_GATE_ENABLED==='PRIVATE_TEST_ONLY'&&tusPrivadoConfigurado(env)});
         return new Response(html,{status:200,headers:{
           'Content-Type':'text/html; charset=utf-8',
           'Cache-Control':'no-store, max-age=0',
@@ -2071,8 +2089,10 @@ export default {
        page==='/prueba-v2/subir-vincular-pdf.mjs'||
        page==='/prueba-v2/tus-directo.mjs'||
        page==='/prueba-v2/preparar-manifiesto.mjs')
-      return v2PrivateBrowserResponse(request,env,page);
-    if(page==='/prueba-cotizador-pdf'&&request.method==='GET')return fase4Html(env);
+      return v2PrivateBrowserResponse(request,env,page,{
+        buyer:V2_BUYER_PUBLIC_ASSETS.has(page)&&await autorizadoPedidoCliente(request,env)
+       });
+     if(page==='/prueba-cotizador-pdf'&&request.method==='GET')return fase4Html(env);
     if(page==='/prueba-cotizador-lote'&&request.method==='GET')return pantallaLote(env);
     if(page==='/prueba-cotizador-lote-ampliado'&&request.method==='GET'){
       if(env?.DOCS_EXTENDED_RECEIVER_ENABLED!=='PRIVATE_TEST_ONLY')
@@ -2108,9 +2128,11 @@ export default {
     if(page==='/prueba-v2/api/ensayo-tus-pago-sandbox')
       return pagoTUSSandboxCliente(request,env,{
        authorized:v2PrivateBrowserAuthorized(request,env)==='allow'||
-        (await v2SessionAuthorized(request,env))
-      });
-    // Retención de PDF: SOLO simulación, protegida con Basic; sin DELETE real.
+         (await v2SessionAuthorized(request,env))||
+         (request.headers.get('Origin')===new URL(request.url).origin&&
+          await autorizadoPedidoCliente(request,env))
+       });
+     // Retención de PDF: SOLO simulación, protegida con Basic; sin DELETE real.
     if(page==='/prueba-v2/api/ensayo-tus-retencion')
       return simularLimpiezaTUS(request,env,{
        authorized:v2PrivateBrowserAuthorized(request,env)==='allow'
@@ -2131,7 +2153,8 @@ export default {
        page==='/prueba-v2/api/ensayo-tus-comprobar'||page==='/api/ensayo-tus-descargar'){
       const basic=v2PrivateBrowserAuthorized(request,env)==='allow';
       const authorized=page==='/api/ensayo-tus-descargar'?basic
-        :(basic||(await v2SessionAuthorized(request,env)));
+         :(basic||(await v2SessionAuthorized(request,env))||
+           (await autorizadoPedidoCliente(request,env)));
       if(page.endsWith('/ensayo-tus-comprobar'))
         return comprobarTUSAntesDeEnviar(request,env,{authorized});
       if(page.endsWith('/ensayo-tus-iniciar'))
