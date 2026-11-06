@@ -34,7 +34,7 @@ import {pagoTUSSandboxCliente} from './tus-pago-sandbox-cliente.mjs';
 import {paginaDescargaTUSPersonal} from './pantalla-descarga-tus-personal.mjs';
 import {paginaPaqueteTUSPersonal} from './pantalla-paquete-tus-personal.mjs';
 import {consultarPaqueteTUSPersonal} from './tus-paquete-personal.mjs';
-import {simularLimpiezaTUS} from './borrado-tus-entregado.mjs';
+import {simularLimpiezaTUS,recibirLimpiezaEntregadaInterna} from './borrado-tus-entregado.mjs';
 import cotizadorV2OriginalHtml from '../../../cotizador-web-v2.html';
 import v2ReaderClientJs from './cotizador-v2-ensayo-archivos.txt';
 import v2UploadClientJs from './subir-vincular-pdf-v2-privado.txt';
@@ -2018,6 +2018,8 @@ async function v2PrivateBrowserResponse(request,env,path){
 export default {
   async fetch(request, env, ctx) {
     const page=new URL(request.url).pathname;
+    if(page==='/internal/tus-purge-delivered')
+      return recibirLimpiezaEntregadaInterna(request,env);
     // DEMOSTRACIÓN VISUAL ANÓNIMA, SEPARADA DEL PORTAL PRIVADO.
     // Solo HTML saneado: sin JS comercial, sin fetch, sin carrito operativo.
     // El cotizador, precios D1, pedidos y Central conservan autenticación.
