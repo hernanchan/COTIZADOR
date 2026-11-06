@@ -63,6 +63,7 @@ export function prepararVistaDisenoAbierta(html,{ofertas=false,categoria=''}={})
   .replace(/<a\b([^>]*?)href="([^"]*)"/gi,(_,attrs,target)=>{
     let href='#preview-aviso';
     if(target.startsWith('#'))href=target;
+    else if(target==='cotizar.html')href='https://libreriasaber.com.ar/cotizar';
     else if(target.startsWith('ofertas.html'))href=PUBLIC_OFFERS+target.slice('ofertas.html'.length);
     else if(target.startsWith('index.html#'))href=PUBLIC_HOME+target.slice('index.html'.length);
     else if(target==='index.html')href=PUBLIC_HOME;
@@ -71,7 +72,7 @@ export function prepararVistaDisenoAbierta(html,{ofertas=false,categoria=''}={})
   .replace(/\s+target="_blank"/gi,'')
   .replace(/<aside class="cart"[\s\S]*?<\/aside>/i,'')
   .replace(/<div class="overlay"[^>]*><\/div>/i,'');
- const aviso='<div id="preview-aviso" role="status" style="background:#0a3158;color:#fff;padding:11px 16px;display:flex;align-items:center;justify-content:center;gap:15px;flex-wrap:wrap;text-align:center;font:700 13px/1.4 system-ui,sans-serif"><span>VISTA DE DISEÑO · SIN CONTRASEÑA · Carrito de productos en ensayo; sin cobros automáticos.</span><button type="button" class="demo-cart-trigger" data-demo-open>Ver carrito <span data-demo-badge>0</span></button></div>';
+ const aviso='<div id="preview-aviso" role="status" style="background:#0a3158;color:#fff;padding:11px 16px;display:flex;align-items:center;justify-content:center;gap:15px;flex-wrap:wrap;text-align:center;font:700 13px/1.4 system-ui,sans-serif"><span>VISTA DE DISEÑO · SIN CONTRASEÑA · Productos por WhatsApp; impresiones en el cotizador actual.</span><a href="/prueba-v2/" style="color:#fff;text-decoration:underline;text-underline-offset:3px">Probar cotizador nuevo (acceso privado)</a><button type="button" class="demo-cart-trigger" data-demo-open>Ver carrito <span data-demo-badge>0</span></button></div>';
 
  // Muestra estática y fechada de la hoja pública "Productos web (MODELO)".
  // Es independiente de la tienda: NO define stock ni precios operativos.
@@ -124,6 +125,17 @@ export function prepararVistaDisenoAbierta(html,{ofertas=false,categoria=''}={})
    }
    page=page.replace('<h2 id="promoTitle">Promoción semanal</h2>','<h2 id="promoTitle">Promoción del día</h2>');
    page=page.replace('<p id="promoText">El cotizador aplica automáticamente el beneficio vigente.</p>','<p id="promoText">Aquí aparecerá la promoción vigente cuando se habiliten los pedidos.</p>');
+ }
+ // La preview sin clave no tiene carrito mixto funcional: evitar una promesa
+ // de pedido único mientras los dos sistemas aún no se integraron.
+ if(!ofertas){
+   page=page.replace(
+    'Entrás al cotizador, calculás el trabajo y al final elegís <strong>Agregar al pedido general</strong>. El trabajo vuelve automáticamente a este carrito junto con los artículos.',
+    'Podés cotizar tus impresiones en el sitio actual. En esta etapa, los artículos y los trabajos de impresión se consultan por separado.'
+   ).replace(
+    '<small>Un solo pedido</small><b>Artículos + impresión</b><p>1. Agregás los productos que quieras.<br>2. Cotizás impresiones, fotos, stickers, ploteos o gráfica.<br>3. Volvés al carrito con todo integrado y enviás un único pedido por WhatsApp.</p>',
+    '<small>Dos servicios disponibles</small><b>Productos e impresiones</b><p>1. Consultás productos desde el carrito por WhatsApp.<br>2. Cotizás documentos, fotos o ploteos en el cotizador actual.<br>3. Estamos preparando la integración de ambos en una sola compra.</p>'
+   );
  }
  page=page.replace('</style>',styles+'</style>');
 
