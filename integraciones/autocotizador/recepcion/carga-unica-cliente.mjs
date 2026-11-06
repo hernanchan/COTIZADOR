@@ -823,10 +823,10 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
    }
    for(const trabajo of ploteosPendientes)
     window.parent.postMessage(trabajo,location.origin);
-   info.classList.remove('estado-recepcion-error');
+   info.classList?.remove?.('estado-recepcion-error');
    info.textContent='Pedido preparado. Ahora se reciben y verifican los PDF.';
    window.parent.postMessage({type:'SABER_SMART_HANDOFF_READY',cantidad:entries.length},location.origin);
-  }catch(error){info.textContent=String(error.message||error);info.classList.add('estado-recepcion-error');
+  }catch(error){info.textContent=String(error.message||error);info.classList?.add?.('estado-recepcion-error');
    window.parent.postMessage({type:'SABER_SMART_HANDOFF_ERROR',message:String(error.message||error)},location.origin);
   }
  };
