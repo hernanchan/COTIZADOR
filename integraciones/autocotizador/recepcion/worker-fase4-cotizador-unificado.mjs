@@ -54,6 +54,7 @@ import {obtenerTarifarioD1Privado} from './obtener-tarifario-d1-privado.mjs';
 import {verificarPdfAlmacenado} from './verificacion-pdf-drive-servidor.mjs';
 import {tusPrivadoConfigurado,diagnosticarTUSPrivado,comprobarTUSAntesDeEnviar,iniciarTandaTUSPrivada,finalizarPedidoTUSPrivado,recuperarPedidoTUSPrivado,descargarPdfTUSPersonal} from './tus-pedido-worker.mjs';
 import {manejarR2GrandePrivado} from './r2-pdf-grandes-api-privada.mjs';
+import {descargarR2GrandePersonal} from './r2-pdf-grandes-descarga-personal.mjs';
 /**
  * SABER — DOCUMENTOS — ARCHIVO ÚNICO LISTO PARA PEGAR EN CLOUDFLARE
  *
@@ -2125,6 +2126,12 @@ export default {
     if(page==='/api/ensayo-probar-puente-central')return diagnosticoPuenteCentral(request,env);
     if(page==='/api/ensayo-preparar-documentos-v2')return apiFichaCentralPrivada(request,env,false,false,false,true,false,true);
     if(page==='/api/ensayo-preparar-documentos-v2-lote')return apiPrepararDocumentosV2Lote(request,env);
+    // Originales grandes: descarga exclusiva del personal autorizado por Basic.
+    // Nunca basta la cookie del comprador, y no se publica URL directa de R2.
+    if(page==='/prueba-v2/api/ensayo-r2-descargar-personal')
+      return descargarR2GrandePersonal(request,env,{
+       authorized:v2PrivateBrowserAuthorized(request,env)==='allow'
+      });
     // R2 de PDF grandes: mismo acceso que TUS pero bandera independiente.
     // Sin bucket ni llave de firma, devuelve 503; nunca registra D1 o pagos.
     // El comprador solo sube partes para SU orden vinculada; el personal usa Basic.
