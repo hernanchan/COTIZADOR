@@ -74,6 +74,37 @@ jobs:
           const body=await response.json();
           if(body.paymentAuthorized!==false)throw new Error('Pagos deben quedar bloqueados.');
           console.info('COMPILADO_PRIVADO_CERRADO_'+response.status);
+          const r2url='https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/api/ensayo-r2/iniciar';
+          const noR2=await worker.fetch(new Request(r2url,{method:'POST',
+            headers:{Origin:new URL(r2url).origin,'Content-Type':'application/json'},
+            body:JSON.stringify({orderId:'WEB-ENSAYO-'+'A'.repeat(32),meta:{}})
+          }),{}, {});
+          if(noR2.status!==503||(await noR2.json()).paymentAuthorized!==false)
+            throw Error('R2 sin bucket debe permanecer apagado (503, no pagos).');
+          let multipartStarted=false;
+          const credentialR2='Basic '+Buffer.from('operador:'+'a'.repeat(32)).toString('base64');
+          const r2DisabledQuotaEnv={
+            DOCS_V2_PRIVATE_UI_ENABLED:'PRIVATE_TEST_ONLY',
+            DOCS_V2_PRIVATE_UI_SECRET:'a'.repeat(32),
+            DOCS_CENTRAL_ADMIN_KEY:'b'.repeat(32),
+            CENTRAL_BRIDGE_KEY:'c'.repeat(32),
+            DOCS_R2_BIG_ENABLED:'PRIVATE_TEST_ONLY',
+            DOCS_R2_RECEIPT_KEY:'d'.repeat(40),
+            DOCS_R2_QUOTA_ENABLED:'OFF',
+            SABER_R2_GRANDES:{
+              createMultipartUpload:async()=>{multipartStarted=true;throw Error('Costly R2 start');},
+              resumeMultipartUpload:()=>({})
+            }
+          };
+          const blockedR2=await worker.fetch(new Request(r2url,{method:'POST',
+            headers:{Origin:new URL(r2url).origin,Authorization:credentialR2,
+              'Content-Type':'application/json'},
+            body:JSON.stringify({orderId:'WEB-ENSAYO-'+'A'.repeat(32),meta:{}})
+          }),r2DisabledQuotaEnv,{});
+          if(blockedR2.status!==503||multipartStarted||
+             (await blockedR2.json()).paymentAuthorized!==false)
+            throw Error('R2 con bucket y SIN cuota D1 NO debe iniciar multipart.');
+          console.info('R2_CUPO_OFF_503_SIN_MULTIPART_SIN_PAGO');
           const quoteUrl='https://saber-documentos-pruebas.libreriasaber.workers.dev/api/ensayo-materiales-rapido';
           const disabled=await worker.fetch(new Request(quoteUrl),{}, {});
           if(disabled.status!==200)throw new Error('El catálogo piloto actual debe seguir funcionando con el flag apagado.');
