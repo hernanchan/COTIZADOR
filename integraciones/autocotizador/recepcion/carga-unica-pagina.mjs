@@ -19,6 +19,10 @@ h2{margin:30px 0 12px;font-size:22px;color:#123a5b}
 .archivo-no-admitido .nombre,.archivo-no-admitido .precio-archivo{color:#981b1b;white-space:normal}
 .archivo .advertencia-recepcion{display:block;margin:8px 0 0;background:#fee8e6;border-left:4px solid #b42318;border-radius:6px;padding:10px 12px;color:#8f1d1d;font-size:14px;line-height:1.45;font-weight:750}
 #estado.estado-recepcion-error,.pie.estado-recepcion-error{background:#fee8e6;border-left:4px solid #b42318;border-radius:6px;color:#8f1d1d;padding:10px 12px;font-weight:700}
+.archivo .consulta-archivo-grande{display:inline-flex;align-items:center;margin:9px 0 4px;padding:10px 13px;background:#0c527a;border-radius:8px;color:#fff;font-size:14px;font-weight:750;text-decoration:none}
+.archivo .consulta-archivo-grande:hover,.archivo .consulta-archivo-grande:focus-visible{background:#083c60;outline-offset:3px}
+.archivo .nota-consulta-grande{display:block;margin:4px 0 0;color:#70423c;font-size:12px;line-height:1.4}
+
 
 .controles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px 22px;margin:18px 0 8px}
 label{display:flex;flex-direction:column;gap:7px;font-weight:650;font-size:16px;min-width:0}
