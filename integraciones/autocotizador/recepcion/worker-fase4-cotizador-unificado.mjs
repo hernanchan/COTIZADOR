@@ -88,7 +88,8 @@ async function preciosPrivados(env,request){
  const quotePath=new URL(request.url).pathname;
  const soloPresupuesto=quotePath==='/api/ensayo-materiales-rapido'||
    quotePath==='/api/ensayo-carga-unica';
- const precioComprador=soloPresupuesto||quotePath==='/prueba-v2/precios-web.json';
+ const precioComprador=soloPresupuesto||quotePath==='/prueba-v2/precios-web.json'||
+   quotePath==='/prueba-v2/api/ensayo-tus-registrar'||quotePath==='/api/ensayo-tus-registrar';
  if(!staff&&v2PrivateBrowserAuthorized(request,env)!=='allow'&&
     !(await v2SessionAuthorized(request,env))&&
     !(soloPresupuesto&&await autorizadoCotizadorCliente(request,env))&&
@@ -2180,7 +2181,8 @@ export default {
         return result;
       }
       if(page.endsWith('/ensayo-tus-registrar'))
-        return finalizarPedidoTUSPrivado(request,env,{authorized,preciosServidor:await preciosPrivados(env,request)});
+        return finalizarPedidoTUSPrivado(request,env,{authorized,
+         preciosServidor:authorized?await preciosPrivados(env,request):null});
       if(page.endsWith('/ensayo-tus-recuperar'))
         return recuperarPedidoTUSPrivado(request,env,{authorized});
       return descargarPdfTUSPersonal(request,env,{authorized});
