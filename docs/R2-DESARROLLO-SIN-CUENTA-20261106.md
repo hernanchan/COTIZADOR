@@ -55,3 +55,14 @@ Implementado **API privada**, todavía sin interfaz Central ni despliegue, en:
 - Docs oficiales contrastados: https://developers.cloudflare.com/workers/runtime-apis/web-crypto/ y https://developers.cloudflare.com/r2/api/workers/workers-api-reference/
 
 **Limitación importante:** el proof R2 dura 2 horas. Esta API sirve para un ensayo inmediato, pero NO reemplaza la descarga permanente basada en pedido D1 ni el ZIP. Para explotación comercial habrá que guardar en D1 un registro R2 verificado, con autorización duradera por pedido, y resolver recálculo de páginas y tamaños desde el PDF grande antes de habilitar pagos. La lectura doble incrementa tráfico interno de R2 en esta etapa de seguridad y no tiene aún benchmark de rendimiento. **Ningún PDF grande se ha recibido ni descargado de una cuenta R2 real.**
+
+## Avance siguiente — pre-registro R2 en Central (06/11)
+
+- La Central de Pedidos actual `centralSafeManifest` restringe recibos individuales a **40 MiB** y exige cotización de páginas, medidas y precio realizada por el servidor. **No** se amplió el límite de TUS ni se relajó esta verificación.
+- Se añadió `integraciones/mercadopago/pruebas/r2-grandes-central-pendientes.mjs`: tabla D1 independiente `central_r2_large_pending`, registro de archivo R2 de >40 hasta 256 MiB con `receiptId` derivado de la clave, SHA, ETag, pedido y estado `awaiting_pdf_analysis`; idempotencia y rechazo de cambios de recibo.
+- Nueva ruta firmada `/internal/central/r2-pending-stage` en Worker de pagos, habilitada **solo** con `CENTRAL_R2_STAGING_ENABLED=PRIVATE_TEST_ONLY`. La ruta pre-registra **un archivo** y jamás crea orden comercial, cotización o pago. El archivo sigue pendiente de análisis de páginas.
+- `r2-grandes-enviar-central.mjs` firma el envío de SHA-256 y ETag ya verificados en R2 por HMAC al Service Binding existente (`SABER_CENTRAL`) contra la ruta fija de pruebas. Está apagado mientras `DOCS_R2_STAGING_ENABLED` no se active. No hay secretos en GitHub.
+- El endpoint `/prueba-v2/api/ensayo-r2/verificar` llama a la etapa de registro provisional solo tras SHA del original, devolviendo `stagedForCentral`; **no** devuelve `registeredInD1:true` ni habilita pago.
+- Pruebas de verificación: URL central restringida, firma HMAC, orden ajena, ETag, SHA falso, recibo duplicado, reintento idempotente y límites. CI verde [42299145756](https://github.com/hernanchan/COTIZADOR/actions/runs/42299145756). Todo en rama privada, sin despliegue.
+
+**Pendiente:** parser de páginas y tamaños de 200 MiB sin exceder memoria del Worker; unificación de presupuesto y pedidos mixtos TUS/R2; promoción desde tabla preliminar R2 a manifiesto de orden real; descarga desde D1 después de 2h; ZIP por orden; limpieza segura y pruebas reales de velocidad. No activar banderas ni pagos hasta completar estos puntos.
