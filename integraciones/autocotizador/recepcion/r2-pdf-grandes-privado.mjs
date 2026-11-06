@@ -36,7 +36,7 @@ async function hmac(text,secret,subtle){
   {name:'HMAC',hash:'SHA-256'},false,['sign']);
  return base64url(new Uint8Array(await subtle.sign('HMAC',key,new TextEncoder().encode(text))));
 }
-function validarMeta(m){
+export function validarMetaR2(m){
  if(!m||typeof m!=='object'||Object.keys(m).sort().join(',')!==
   ['fileId','name','mode','bytes','sha256','pages'].sort().join(',')||
   !FILE.test(m.fileId||'')||!validString(m.name,120)||!/\.pdf$/i.test(m.name)||
@@ -91,7 +91,7 @@ export function bytesParteR2(c,number){
 export async function iniciarR2Grande({bucket,orderId,meta,secret,uuid=()=>crypto.randomUUID(),
  now=()=>Math.floor(Date.now()/1000),subtle=crypto.subtle}={}){
  if(!ORDER.test(orderId||''))throw Error('R2_ORDEN_INCORRECTA');
- validarMeta(meta);
+ validarMetaR2(meta);
  if(!bucket||typeof bucket.createMultipartUpload!=='function')throw Error('R2_BUCKET_NO_CONECTADO');
  const id=uuid();
  if(!UUID.test(id))throw Error('R2_IDENTIFICADOR_INCORRECTO');
