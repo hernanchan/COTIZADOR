@@ -42,3 +42,16 @@ https://developers.cloudflare.com/r2/objects/upload-objects/
 3. Integrar ficha de PDF R2 con la **verificación de páginas y medidas y presupuesto del servidor**, sin que el Worker intente cargar todo el PDF de 200 MiB en RAM; después registrar D1/seguimiento y habilitar pago Sandbox bajo el contrato de pedido.
 4. Descarga del PDF grande para el operador/ZIP con acceso solo de personal; borrado específico al marcar Entregado.
 5. Cargar 80 y 200 MiB **reales** desde escritorio/celular; medir red y recálculo y contrastar tiempos con Supabase/TUS.
+
+## Avance posterior — descarga segura de originales R2 para personal (06/11)
+
+Implementado **API privada**, todavía sin interfaz Central ni despliegue, en:
+- `integraciones/autocotizador/recepcion/r2-pdf-grandes-descarga-personal.mjs`
+- `/prueba-v2/api/ensayo-r2-descargar-personal` del Worker, accesible **solo con Basic real de operador** (no con cookie de comprador, ni con proof aislado).
+- Requiere flag R2, bucket privado y clave HMAC específica. Solicita comprobante firmado por POST con Origin del mismo Worker y valida su caducidad.
+- Comprueba **SHA-256 íntegro** por streaming antes de entregar los bytes. En una segunda lectura `R2.get`, fija `onlyIf: {etagMatches: ...}` contra el ETag verificado: si el objeto cambia entre SHA y descarga, la respuesta no entrega el archivo. No se publica el bucket ni se carga el PDF entero en memoria.
+- Devuelve `application/pdf`, adjunto con nombre derivado de UUID, `Content-Length` y `private, no-store`. Se creó prueba de descarga sintética de **45 MiB**, rechazo de corrupción, archivo truncado, Origin ajeno, comprobante falso y ETag cambiado.
+- **CI final SUCCESS:** https://github.com/hernanchan/COTIZADOR/actions/runs/42293394411
+- Docs oficiales contrastados: https://developers.cloudflare.com/workers/runtime-apis/web-crypto/ y https://developers.cloudflare.com/r2/api/workers/workers-api-reference/
+
+**Limitación importante:** el proof R2 dura 2 horas. Esta API sirve para un ensayo inmediato, pero NO reemplaza la descarga permanente basada en pedido D1 ni el ZIP. Para explotación comercial habrá que guardar en D1 un registro R2 verificado, con autorización duradera por pedido, y resolver recálculo de páginas y tamaños desde el PDF grande antes de habilitar pagos. La lectura doble incrementa tráfico interno de R2 en esta etapa de seguridad y no tiene aún benchmark de rendimiento. **Ningún PDF grande se ha recibido ni descargado de una cuenta R2 real.**
