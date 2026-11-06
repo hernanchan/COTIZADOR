@@ -121,3 +121,10 @@ Comprobación independiente de solo lectura preparada en `.github/workflows/r2-v
 - **Siguiente decisión técnica:** preparar ensayo sintético de R2 (80 y 200 MiB en partes de 8 MiB) con autenticación, aislamiento y borrado de prueba; no activar las rutas comerciales R2 antes del parser autoritativo de páginas/medidas, integración D1/ZIP y purga post-entrega.
 
 **Estado exacto:** infraestructura y versión inactiva confirmadas en Cloudflare; todavía **NO** hay 80/200 MiB transferidos realmente, benchmark de R2, cotización de PDFs grandes ni integración comercial.
+
+
+### Auditoría adicional del objeto de versión R2 — aprobada
+- Cloudflare GET `/versions/67f61c11-fe13-4193-aa30-e76450ed8597` y GET `/settings` devolvieron HTTP 200.
+- [Actions 42312009205](https://github.com/hernanchan/COTIZADOR/actions/runs/42312009205) **SUCCESS**: lista de **nombres y tipos** de bindings de versión INACTIVA idéntica a los activos; R2 enlazado al bucket correcto y Central vinculada a pagos de pruebas; `DOCS_R2_BIG_ENABLED`, `DOCS_R2_QUOTA_ENABLED` y `DOCS_R2_STAGING_ENABLED` apagadas si existen.
+- La versión activa seguía `82ded703-0b3b-4e4b-ac7f-b312a78f78ea`. Auditoría solo GET, sin secretos expuestos.
+- Motivo de esta auditoría: el `bindings_inherit=strict` de la API hereda desde la **última versión subida**, no necesariamente desde la desplegada. Verificamos el resultado final, no solo la solicitud de herencia.
