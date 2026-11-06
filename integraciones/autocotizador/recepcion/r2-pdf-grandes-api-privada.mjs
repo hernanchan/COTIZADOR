@@ -42,7 +42,7 @@ async function bodyJSON(request,maxBytes=12288){
 }
 export async function manejarR2GrandePrivado(request,env,{
  autorizadoIniciar=async()=>false,autorizadoOrden=async()=>false,
- vincularOrden=async()=>null,now,subtle,
+ vincularOrden=async()=>null,now,subtle,digestFactory,
 }={}){
  const url=new URL(request.url),route=url.pathname;
  if(!route.startsWith(ROOT))return reply({ok:false,error:'Ruta R2 inexistente'},404);
@@ -92,7 +92,8 @@ export async function manejarR2GrandePrivado(request,env,{
    return reply({ok:true,...part});
   }
   if(action==='verificar'){
-   const result=await verificarIntegridadR2Grande({...options,proof});
+   const result=await verificarIntegridadR2Grande({...options,proof,
+    ...(digestFactory?{digestFactory}:{})});
    return reply({ok:true,result});
   }
   const result=await completarR2Grande({...options,proof,uploadedParts:data.uploadedParts});
