@@ -249,6 +249,12 @@ async function centralBridgeProbe(req,env){
 /** Consulta exclusiva entre Workers: recibo TUS perteneciente a un pedido D1.
  * Prohíbe descargar un archivo no registrado o con metadatos incompatibles.
  */
+async function centralTUSFilesPurged(env,webOrderId){
+ const exists=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='central_tus_purge_queue'").first();
+ if(!exists)return false;
+ const row=await env.DB.prepare("SELECT state FROM central_tus_purge_queue WHERE web_order_id=?").bind(webOrderId).first();
+ return row?.state==='completed';
+}
 async function centralTUSReceiptLookup(req,env){
  const signed=await centralReadSigned(req,env);
  if(signed.error)return json({ok:false,error:"Consulta privada no autorizada",paymentAuthorized:false},signed.status);
@@ -259,6 +265,8 @@ async function centralTUSReceiptLookup(req,env){
     !CENTRAL_WEB.test(p.webOrderId||"")||
     !CENTRAL_RECEIPT.test(p.receiptId||""))
   return json({ok:false,found:false,paymentAuthorized:false},422);
+ if(await centralTUSFilesPurged(env,p.webOrderId))
+  return json({ok:false,found:false,error:"Archivos eliminados al entregar",paymentAuthorized:false},410);
  await centralTables(env);
  const row=await env.DB.prepare(
   "SELECT r.file_id,r.sha256,m.manifest_json FROM central_document_receipts r "+
@@ -305,6 +313,8 @@ async function centralTUSDeliveryPurgePlan(req,env){
     p.schema!=="saber-central-tus-purge-plan-v1"||
     !/^WEB-ENSAYO-[A-F0-9]{32}$/.test(p.webOrderId||""))
   return json({ok:false,error:"Pedido TUS inválido"},422);
+ if(await centralTUSFilesPurged(env,p.webOrderId))
+  return json({ok:false,error:"Los PDF se eliminaron después de la entrega"},410);
  await centralTables(env);
  await centralProductionTables(env);
  await ensurePaymentReviews(env);
