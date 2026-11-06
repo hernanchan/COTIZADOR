@@ -4,6 +4,7 @@ on:
     branches: [integracion/tus-pedido-privado-20261101]
     paths:
       - tests/tus-borrado-integral-aislado-sin-mp.test.mjs
+      - tests/tus-borrado-corte-pedidos-nuevos.test.mjs
       - docs/ENSAYAR-INTEGRAL-AISLADO-TUS.trigger
 permissions:
   contents: read
@@ -21,6 +22,6 @@ jobs:
       - name: Simulación en memoria de D1, pago y Storage, usando funciones reales
         run: |
           set -euo pipefail
-          node --test tests/tus-borrado-integral-aislado-sin-mp.test.mjs tests/tus-borrado-pipeline-extremo-a-extremo.test.mjs tests/tus-cola-borrado-entregado.test.mjs
+          node --test tests/tus-borrado-integral-aislado-sin-mp.test.mjs tests/tus-borrado-pipeline-extremo-a-extremo.test.mjs tests/tus-cola-borrado-entregado.test.mjs tests/tus-borrado-corte-pedidos-nuevos.test.mjs
       - name: Garantía de no utilizar servicios externos
         run: echo 'TEST_ONLY_NO_DB_WRITE_NO_MP_NO_STORAGE_DELETE_NO_PRODUCTION'
