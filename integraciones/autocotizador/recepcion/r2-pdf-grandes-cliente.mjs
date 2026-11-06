@@ -117,12 +117,28 @@ export async function enviarArchivoR2Grande({
   throw Error('R2_PARTES_NO_CONFIRMADAS');
  onProgress({phase:'verificacion-almacenamiento',bytesUploaded:file.size,
   totalBytes:file.size,percent:100});
- const finalized=await post(fetcher,'/completar',{proof:session.proof,uploadedParts},signal);
- if(finalized.result?.storageReady!==true||
-  finalized.result.sha256Verificado!==false||
-  finalized.result.paymentAuthorized!==false||
-  finalized.result.bytes!==file.size)
-  throw Error('R2_RESPUESTA_INCONSISTENTE');
+ if(state.completed!==true){
+  const finalized=await post(fetcher,'/completar',{proof:session.proof,uploadedParts},signal);
+  if(finalized.result?.storageReady!==true||
+   finalized.result.sha256Verificado!==false||
+   finalized.result.paymentAuthorized!==false||
+   finalized.result.bytes!==file.size)
+   throw Error('R2_RESPUESTA_INCONSISTENTE');
+  // Completar multipart consume uploadId: guardar el estado antes de verificar.
+  // Si la verificación de bytes falla por red, no completar de nuevo.
+  state.completed=true;
+  store(storage,key,state);
+ }
+ onProgress({phase:'verificando-integridad',bytesUploaded:file.size,
+  totalBytes:file.size,percent:100});
+ const verified=await post(fetcher,'/verificar',{proof:session.proof},signal);
+ if(verified.result?.sha256Verificado!==true||
+  verified.result?.contenidoPdfVerificado!==false||
+  verified.result?.paymentAuthorized!==false||
+  verified.result?.registeredInD1!==false||
+  verified.result?.bytes!==file.size||
+  verified.result?.sha256!==meta.sha256)
+  throw Error('R2_SHA256_SIN_VERIFICAR');
  storage?.removeItem(key);
- return finalized.result;
+ return verified.result;
 }
