@@ -1,0 +1,126 @@
+name: Habilitar cotizador preliminar de clientes en Worker privado, sin TUS ni pagos
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [docs/HABILITAR-COTIZADOR-CLIENTE-PRUEBAS.trigger]
+permissions:
+  contents: read
+concurrency:
+  group: saber-documentos-private-deploy
+  cancel-in-progress: false
+jobs:
+  quote-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Suite cliente y compilación real del Worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test tests/tus-cotizador-cliente-publico-solo-precio.test.mjs tests/saber-directo-publica-solo-lectura.test.mjs
+          cd integraciones/autocotizador/recepcion
+          npm install --no-audit --no-fund
+          npm run build:unificado
+          node --check dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq '/prueba-v2/cotizar-cliente' dist/saber-documentos-cotizador-fase4.mjs
+      - name: Abrir SOLAMENTE cotización preliminar de cliente y verificar resguardo de funciones privadas
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          host='https://saber-documentos-pruebas.libreriasaber.workers.dev'
+          api="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-documentos-pruebas"
+          auth="Authorization: Bearer $TOKEN"
+          tmp=$(mktemp -d)
+          before=''
+          touched=0
+          finish(){
+            result=$?
+            trap - EXIT INT TERM
+            if [ "$result" -ne 0 ] && [ "$touched" = 1 ] && [ -n "$before" ]; then
+              jq -n --arg id "$before" '{strategy:"percentage",versions:[{percentage:100,version_id:$id}],annotations:{"workers/message":"Rollback quote gate: preflight o smoke fallaron"}}' > "$tmp/rollback.json"
+              curl --fail --silent --show-error --max-time 60 -H "$auth" -H 'Content-Type: application/json' --data-binary "@$tmp/rollback.json" "$api/deployments" > "$tmp/rollback-result.json"
+              if jq -e '.success==true' "$tmp/rollback-result.json" >/dev/null; then
+                echo 'QUOTE_GATE_ROLLBACK_SOLICITADO'
+              else
+                echo 'ERROR_GRAVE_QUOTE_GATE_ROLLBACK'
+              fi
+            fi
+            rm -rf "$tmp"
+            exit "$result"
+          }
+          trap finish EXIT INT TERM
+          curl --fail --silent --show-error --max-time 25 -H "$auth" "$api/settings" > "$tmp/settings.json"
+          curl --fail --silent --show-error --max-time 25 -H "$auth" "$api/deployments" > "$tmp/before.json"
+          jq -e '.success==true and (.result.bindings|type=="array")' "$tmp/settings.json" >/dev/null
+          jq -e '.success==true' "$tmp/before.json" >/dev/null
+          before=$(jq -r '.result.deployments[0].versions[]?|select(.percentage==100)|.version_id' "$tmp/before.json"|head -n1)
+          test -n "$before"
+          for item in DOCS_TURNSTILE_SITE_KEY DOCS_TURNSTILE_SECRET DOCS_V2_PRIVATE_UI_SECRET DOCS_V2_PRIVATE_UI_ENABLED DOCS_ALLOWED_ORIGIN; do
+            jq -e --arg k "$item" '.result.bindings|any(.name==$k)' "$tmp/settings.json" >/dev/null
+          done
+          jq -e '.result.bindings|any(.name=="DOCS_TUS_PURGE_ENABLED" and .text=="OFF")' "$tmp/settings.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="DOCS_V2_PRIVATE_UI_ENABLED" and .text=="PRIVATE_TEST_ONLY")' "$tmp/settings.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="DOCS_PRICE_ADMIN_D1_ENABLED" and .text=="PRIVATE_TEST_ONLY")' "$tmp/settings.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="DOCS_TURNSTILE_SECRET" and .type=="secret_text")' "$tmp/settings.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="DOCS_PUBLIC_QUOTE_GATE_ENABLED" and .text=="OFF")' "$tmp/settings.json" >/dev/null
+          jq -n --slurpfile s "$tmp/settings.json" \
+            '{main_module:"index.mjs",annotations:{"workers/message":"Cotización preliminar cliente Turnstile; sin TUS, Central ni pagos"},
+             bindings:([$s[0].result.bindings[]|select(.name!="DOCS_PUBLIC_QUOTE_GATE_ENABLED")|{name,type:"inherit"}]+
+             [{name:"DOCS_PUBLIC_QUOTE_GATE_ENABLED",type:"plain_text",text:"PRIVATE_TEST_ONLY"}])}' > "$tmp/metadata.json"
+          curl --silent --show-error --max-time 90 -H "$auth" \
+            -F "metadata=@$tmp/metadata.json;type=application/json" \
+            -F "index.mjs=@integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs;filename=index.mjs;type=application/javascript+module" \
+            "$api/versions?bindings_inherit=strict" > "$tmp/version.json"
+          if ! jq -e '.success==true and (.result.id|type=="string")' "$tmp/version.json" >/dev/null; then
+            jq -c '{success,errors:[.errors[]?|{code,message}]}' "$tmp/version.json"
+            exit 1
+          fi
+          id=$(jq -r '.result.id' "$tmp/version.json")
+          jq -n --arg id "$id" '{strategy:"percentage",versions:[{percentage:100,version_id:$id}],annotations:{"workers/message":"Cotizador preliminar de clientes, Turnstile; TUS y pagos protegidos"}}' > "$tmp/deploy.json"
+          touched=1
+          curl --fail --silent --show-error --max-time 60 -H "$auth" -H 'Content-Type: application/json' --data-binary "@$tmp/deploy.json" "$api/deployments" > "$tmp/response.json"
+          jq -e '.success==true' "$tmp/response.json" >/dev/null
+          active=''
+          for i in 1 2 3 4 5 6 7 8; do
+            curl --fail --silent --show-error --max-time 20 -H "$auth" "$api/deployments" > "$tmp/current.json"
+            active=$(jq -r '.result.deployments[0].versions[]?|select(.percentage==100)|.version_id' "$tmp/current.json"|head -n1)
+            if [ "$active" = "$id" ]; then break; fi
+            sleep 2
+          done
+          test "$active" = "$id"
+          code=''
+          for i in 1 2 3 4 5 6 7 8; do
+            code=$(curl --silent --show-error --max-time 20 -o "$tmp/public.html" -w '%{http_code}' "$host/prueba-v2/cotizar-cliente" || true)
+            if [ "$code" = 200 ] && grep -Fq 'cf-turnstile' "$tmp/public.html"; then break; fi
+            sleep 2
+          done
+          test "$code" = 200
+          grep -Fq 'data-action="saber_quote"' "$tmp/public.html"
+          if grep -Eq 'ensayo-tus-iniciar|DOCS_CENTRAL_ADMIN_KEY|saber_v2_session' "$tmp/public.html"; then
+            echo 'QUOTE_GATE_HTML_EXPOSES_INTERNAL_CONTENT';exit 1
+          fi
+          private=$(curl --silent --show-error --max-time 20 -o /dev/null -w '%{http_code}' "$host/prueba-v2/" || true)
+          zip=$(curl --silent --show-error --max-time 20 -o /dev/null -w '%{http_code}' "$host/prueba-v2/orden-paquete" || true)
+          purge=$(curl --silent --show-error --max-time 20 -o /dev/null -w '%{http_code}' -X POST "$host/internal/tus-purge-delivered" || true)
+          invalid=$(curl --silent --show-error --max-time 20 -o "$tmp/invalid.json" -w '%{http_code}' -X POST -H "Origin: $host" -H 'Content-Type: application/json' -d '{"token":"bad"}' "$host/prueba-v2/cotizar-cliente" || true)
+          if [ "$private" != 401 ] || [ "$zip" != 401 ] || [ "$purge" != 503 ] || [ "$invalid" != 422 ]; then
+            echo "QUOTE_GATE_UNSAFE_STATES:private=$private zip=$zip purge=$purge invalid=$invalid";exit 1
+          fi
+          curl --fail --silent --show-error --max-time 25 -H "$auth" "$api/settings" > "$tmp/after.json"
+          jq -e '.result.bindings|any(.name=="DOCS_PUBLIC_QUOTE_GATE_ENABLED" and .text=="PRIVATE_TEST_ONLY")' "$tmp/after.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="DOCS_TUS_PURGE_ENABLED" and .text=="OFF")' "$tmp/after.json" >/dev/null
+          echo 'COTIZADOR_CLIENTE_TURNSTILE_HTML200_QUOTE_ONLY_ADMIN401_ZIP401_PURGE503'
+          echo "WORKER_DOCUMENTOS_VERSION=$id"
