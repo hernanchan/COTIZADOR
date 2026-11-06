@@ -4113,7 +4113,7 @@ async function centralCanarySandboxPrivate(req,env,dispatch){
    amountArs:order.amount_ars,estado},200);
  }
  if(typeof dispatch!=="function"||typeof env.DEMO_ADMIN_KEY!=="string"||
-    env.DEMO_ADMIN_KEY.length<16)
+    !env.DEMO_ADMIN_KEY)
   return json({ok:false,error:"Checkout privado no disponible"},503);
  const preflight=await documentSandboxEligibility(env,order.id,true);
  if(preflight.reason)
