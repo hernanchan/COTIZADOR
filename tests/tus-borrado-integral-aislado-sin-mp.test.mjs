@@ -51,7 +51,7 @@ function scenario({paid=true,delivered=true,canary=webOrder,storageFailure=false
   const statement={args:[],bind(...args){this.args=args;return this},
    async run(){
     const args=this.args;
-    if(sql.startsWith('CREATE TABLE'))return {meta:{changes:0}};
+    if(sql.startsWith('CREATE TABLE')||sql.startsWith('CREATE INDEX'))return {meta:{changes:0}};
     if(sql.startsWith('INSERT OR IGNORE INTO central_tus_purge_queue')){
      if(!state.queue){state.queue={order_id:order,web_order_id:webOrder,production_version:args[2],state:'pending',
       attempts:0};return {meta:{changes:1}}}
