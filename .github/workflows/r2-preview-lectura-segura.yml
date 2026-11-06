@@ -1,0 +1,29 @@
+name: R2 - comprobar URL aislada de version inactiva sin writes
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/r2-preview-lectura-segura.yml]
+permissions:
+  contents: read
+jobs:
+  probar-version:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: GET de version inactiva sin credenciales
+        shell: bash
+        run: |
+          set -euo pipefail
+          active='https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/'
+          preview='https://67f61c11-saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/'
+          active_http=$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$active" || true)
+          preview_http=$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$preview" || true)
+          echo "ACTIVE_PRIVATE_GET_HTTP=$active_http"
+          echo "INACTIVE_VERSION_GET_HTTP=$preview_http"
+          test "$active_http" = 401 || { echo 'ACTIVE_UNEXPECTED_NO_ACTION'; exit 1; }
+          if [ "$preview_http" = 401 ]; then
+            echo 'VERSION_URL_ACCESSIBLE_AND_AUTH_REQUIRED'
+          else
+            echo 'VERSION_URL_NOT_READY_FOR_PRIVATE_TEST_NO_ACTION'
+          fi
+          echo 'READ_ONLY_NO_DEPLOY_NO_R2_WRITE_NO_PAYMENTS'
