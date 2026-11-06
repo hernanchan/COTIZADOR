@@ -317,7 +317,7 @@ async function centralTUSDeliveryPurgePlan(req,env){
  await centralProductionTables(env);
  await ensurePaymentReviews(env);
  const row=await env.DB.prepare(
-  "SELECT m.web_order_id,m.commercial_order_id,m.manifest_json,m.file_count,"+
+  "SELECT m.web_order_id,m.commercial_order_id,m.manifest_json,m.file_count,m.created_at AS manifest_created_at,"+
   "o.status AS payment_status,o.paid_at,o.amount_ars,o.deposit_ars,"+
   "p.state AS production_state,p.version AS production_version,p.updated_at AS delivered_at "+
   "FROM central_document_manifests m JOIN orders o ON o.id=m.commercial_order_id "+
@@ -326,7 +326,8 @@ async function centralTUSDeliveryPurgePlan(req,env){
   "AND o.deposit_ars=o.amount_ars AND p.state='entregado' "+
   "AND EXISTS (SELECT 1 FROM payment_reviews r WHERE r.order_id=o.id AND r.state='verified') LIMIT 1"
  ).bind(p.webOrderId).first();
- if(!row||!Number.isSafeInteger(row.production_version)||row.production_version<1)
+ if(!row||!centralPurgeCanaryAllowed(env,p.webOrderId,row.manifest_created_at)||
+     !Number.isSafeInteger(row.production_version)||row.production_version<1)
   return json({ok:false,error:"Pedido no entregado o pago sin verificar"},409);
  const receipts=await env.DB.prepare(
   "SELECT r.receipt_id,r.file_id,r.sha256 FROM central_document_receipts r "+
@@ -357,7 +358,7 @@ async function centralTUSDeliveryPurgePlan(req,env){
  return json({ok:true,schema:"saber-central-tus-purge-plan-v1",
    webOrderId:row.web_order_id,commercialOrderId:row.commercial_order_id,
    productionState:row.production_state,productionVersion:row.production_version,
-   deliveredAt:row.delivered_at,paymentVerified:true,files,
+   deliveredAt:row.delivered_at,manifestCreatedAt:row.manifest_created_at||null,paymentVerified:true,files,
    deletionExecuted:false,retentionDays:0},200);
 }
 
@@ -1400,8 +1401,18 @@ async function centralEnsureTUSPurgeTables(env){
   "production_version INTEGER NOT NULL,phase TEXT NOT NULL CHECK(phase IN ('queued','attempt','error','completed')),"+
   "file_count INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL DEFAULT(datetime('now')))").run();
 }
-/** El entorno de ensayos sólo puede purgar una orden canaria designada explícitamente. */
-function centralPurgeCanaryAllowed(env,webOrderId){
+/**
+ * Política de eliminación: por defecto SOLO la canaria explícita.
+ * Nueva fase exige un corte fijo posterior al inventario histórico y dos
+ * confirmaciones independientes (Central + Documentos) ANTES del DELETE.
+ * JAMÁS convertir una orden anterior al corte en elegible por cambiar flags.
+ */
+const TUS_PURGE_NEW_ORDERS_CUTOFF='2026-11-07 00:00:00';
+function centralPurgeCanaryAllowed(env,webOrderId,createdAt){
+ if(!/^WEB-ENSAYO-[A-F0-9]{32}$/.test(webOrderId||''))return false;
+ if(env?.CENTRAL_TUS_PURGE_SCOPE==='NEW_ORDERS_ONLY')
+  return typeof createdAt==='string'&&/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/.test(createdAt)&&
+   createdAt>=TUS_PURGE_NEW_ORDERS_CUTOFF;
  const canary=env?.CENTRAL_TUS_PURGE_CANARY_ORDER;
  return typeof canary==='string'&&/^WEB-ENSAYO-[A-F0-9]{32}$/.test(canary)&&canary===webOrderId;
 }
@@ -1410,7 +1421,7 @@ async function centralQueueDeliveryCleanup(env,orderId,version,operator){
   return {state:"desactivado",filesDeleted:0};
  await centralEnsureTUSPurgeTables(env);
  const row=await env.DB.prepare(
-  "SELECT m.web_order_id,m.file_count FROM central_document_manifests m "+
+  "SELECT m.web_order_id,m.file_count,m.created_at AS manifest_created_at FROM central_document_manifests m "+
   "JOIN orders o ON o.id=m.commercial_order_id "+
   "JOIN central_production_status p ON p.order_id=o.id "+
   "WHERE o.id=? AND o.status='paid' AND o.paid_at IS NOT NULL "+
@@ -1418,7 +1429,7 @@ async function centralQueueDeliveryCleanup(env,orderId,version,operator){
   "AND EXISTS (SELECT 1 FROM payment_reviews r WHERE r.order_id=o.id AND r.state='verified') "+
   "LIMIT 1").bind(orderId,version).first();
  if(!row||!/^WEB-ENSAYO-[A-F0-9]{32}$/.test(row.web_order_id||"")||
-    !centralPurgeCanaryAllowed(env,row.web_order_id)||
+    !centralPurgeCanaryAllowed(env,row.web_order_id,row.manifest_created_at)||
     !Number.isSafeInteger(row.file_count)||row.file_count<1||row.file_count>10)
   return {state:"no_elegible",filesDeleted:0};
  const inserted=await env.DB.prepare(
@@ -1452,7 +1463,7 @@ async function centralTUSPurgeComplete(req,env){
   return json({ok:false,error:'Orden fuera del ensayo autorizado'},403);
  await centralEnsureTUSPurgeTables(env);
  const row=await env.DB.prepare(
-  "SELECT q.order_id,q.state,m.file_count FROM central_tus_purge_queue q "+
+  "SELECT q.order_id,q.state,m.file_count,m.created_at AS manifest_created_at FROM central_tus_purge_queue q "+
   "JOIN central_document_manifests m ON m.web_order_id=q.web_order_id "+
   "JOIN orders o ON o.id=q.order_id "+
   "JOIN central_production_status p ON p.order_id=q.order_id "+
@@ -1461,7 +1472,8 @@ async function centralTUSPurgeComplete(req,env){
   "AND o.deposit_ars=o.amount_ars AND EXISTS (SELECT 1 FROM payment_reviews r "+
   "WHERE r.order_id=o.id AND r.state='verified') LIMIT 1"
  ).bind(p.webOrderId,p.productionVersion).first();
- if(!row||row.file_count!==p.deletedCount||!['processing','completed'].includes(row.state))
+ if(!row||!centralPurgeCanaryAllowed(env,p.webOrderId,row.manifest_created_at)||
+     row.file_count!==p.deletedCount||!['processing','completed'].includes(row.state))
   return json({ok:false,error:'Cola de eliminación incongruente'},409);
  if(row.state==='completed')return json({ok:true,state:'completed',alreadyConfirmed:true},200);
  const updated=await env.DB.prepare(
@@ -1508,14 +1520,15 @@ async function centralProcessTUSPurgeQueue(env,{orderId=null,limit=3}={}){
     env.CENTRAL_TUS_PURGE_QUEUE_ENABLED!=='PRIVATE_TEST_ONLY')return {enabled:false,processed:0};
  await centralEnsureTUSPurgeTables(env);
  const rows=await env.DB.prepare(
-  "SELECT order_id,web_order_id,production_version FROM central_tus_purge_queue "+
-  "WHERE (? IS NULL OR order_id=?) AND "+
+  "SELECT q.order_id,q.web_order_id,q.production_version,m.created_at AS manifest_created_at FROM central_tus_purge_queue q "+
+   "JOIN central_document_manifests m ON m.web_order_id=q.web_order_id "+
+  "WHERE (? IS NULL OR q.order_id=?) AND "+
   "(state IN ('pending','error') OR (state='processing' AND locked_at<datetime('now','-3 minutes'))) "+
-  "ORDER BY created_at ASC LIMIT ?"
+  "ORDER BY q.created_at ASC LIMIT ?"
  ).bind(orderId,orderId,Math.min(5,Math.max(1,limit))).all();
  let processed=0,errors=0;
  for(const job of rows.results||[]){
-  if(!centralPurgeCanaryAllowed(env,job.web_order_id))continue;
+  if(!centralPurgeCanaryAllowed(env,job.web_order_id,job.manifest_created_at))continue;
   const claimed=await env.DB.prepare(
    "UPDATE central_tus_purge_queue SET state='processing',locked_at=datetime('now'),"+
    "last_try_at=datetime('now'),attempts=attempts+1 "+
