@@ -21,6 +21,17 @@ const MAX_PDF_CARGA=location.pathname==='/prueba-v2/carga-inteligente'?10:30;
 const MAX_PDF_TUS_BYTES=40*1024*1024;
 const MAX_LOTE_TUS_BYTES=60*1024*1024;
 const tamanoPdfMiB=f=>(f.size/(1024*1024)).toFixed(1).replace('.',',')+' MiB';
+const WHATSAPP_CONSULTAS_SABER='5493513110130';
+function enlaceConsultaArchivoGrande(e){
+ const nombre=String(e.name||'documento.pdf').slice(0,120);
+ const file=e.archivoOriginal;
+ const tamano=file instanceof File?tamanoPdfMiB(file):'tamaño por confirmar';
+ const mensaje='Hola, Librería Saber. Necesito imprimir el archivo «'+nombre+
+  '» ('+tamano+'). El cotizador indica que supera el límite de carga automática. '+
+  '¿Puedo enviarlo por WhatsApp como documento o compartir un enlace privado? '+
+  'Entiendo que esta consulta no genera un pedido ni autoriza un pago.';
+ return 'https://wa.me/'+WHATSAPP_CONSULTAS_SABER+'?text='+encodeURIComponent(mensaje);
+}
 let leyendo=false;
 let version=0;
 let catalogo={a4:[],a3:[]};
@@ -403,6 +414,22 @@ function render(){
    aviso.className='advertencia-recepcion';
    aviso.setAttribute('role','alert');
    principal.append(aviso);
+   if(e.archivoOriginal instanceof File&&
+      (e.archivoOriginal.size>MAX_PDF_TUS_BYTES||
+       advertenciaRecepcion.includes('máximo combinado'))){
+    const contacto=document.createElement('a');
+    contacto.className='consulta-archivo-grande';
+    contacto.href=enlaceConsultaArchivoGrande(e);
+    contacto.target='_blank';
+    contacto.rel='noopener noreferrer';
+    contacto.textContent='Consultar envío especial por WhatsApp';
+    principal.append(contacto);
+    const aclaracion=texto('small',
+     'Se abre una consulta; el PDF no se adjunta automáticamente. '+
+     'No se registra pedido ni se habilita cobro hasta confirmar su recepción.');
+    aclaracion.className='nota-consulta-grande';
+    principal.append(aclaracion);
+   }
   }
   if(e.paginas&&e.servicio==='auto'){
    const elegidas=paginasElegidas(e)||e.paginas;
