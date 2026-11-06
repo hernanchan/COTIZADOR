@@ -14,3 +14,7 @@ DEPLOY_CANARY_024_CHECKOUT_PRIVATE_20261106
 
 # Compatibilidad con credencial DEMO_ADMIN_KEY ya existente: seguridad provista por HMAC privado.
 REDEPLOY_SANDBOX_CANARY_WITH_EXISTING_ADMIN_VALIDATOR
+
+# 06/11: Supabase Storage HEAD del PDF ya eliminado devuelve HTTP400 NoSuchKey.
+# Recompilar Documentos con confirmación adicional /object/info, sin habilitar la purga.
+DEPLOY_NO_SUCH_KEY_CONFIRMED_PATCH_FLAGS_OFF_20261106
