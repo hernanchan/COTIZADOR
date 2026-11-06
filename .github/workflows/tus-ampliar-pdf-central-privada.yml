@@ -1,0 +1,104 @@
+name: Extender cupo PDF TUS en Central de pruebas sin tocar pagos
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [docs/ACTIVAR-CUPO-PDF-CENTRAL.trigger]
+permissions:
+  contents: read
+concurrency:
+  group: saber-tus-central-personal-privado
+  cancel-in-progress: false
+jobs:
+  central-pdf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verificar únicamente reglas TUS y sintaxis
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check integraciones/mercadopago/pruebas/worker.js
+          test "$(grep -c 'bytes>40\*1024\*1024' integraciones/mercadopago/pruebas/worker.js)" -eq 4
+          grep -Fq 'function centralSafeManifest' integraciones/mercadopago/pruebas/worker.js
+          grep -Fq 'centralTUSReceiptCheck' integraciones/mercadopago/pruebas/worker.js
+      - name: Actualizar solo Worker Central de ensayos heredando bindings, con rollback
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          api="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-pagos-pruebas"
+          host='https://saber-pagos-pruebas.libreriasaber.workers.dev'
+          auth="Authorization: Bearer $TOKEN"
+          tmp=$(mktemp -d)
+          before=''
+          touched=0
+          finish(){
+            result=$?
+            trap - EXIT INT TERM
+            if [ "$result" -ne 0 ] && [ "$touched" = 1 ] && [ -n "$before" ]; then
+              jq -n --arg id "$before" '{strategy:"percentage",versions:[{percentage:100,version_id:$id}],annotations:{"workers/message":"Rollback Central TUS 40MiB: preflight o smoke fallaron"}}' > "$tmp/rollback.json"
+              if curl --fail --silent --show-error --max-time 60 -H "$auth" -H 'Content-Type: application/json' --data-binary "@$tmp/rollback.json" "$api/deployments" > "$tmp/rollback-response.json"; then
+                jq -e '.success==true' "$tmp/rollback-response.json" >/dev/null && echo 'CENTRAL_PDF_ROLLBACK_SOLICITADO'
+              else
+                echo 'CENTRAL_PDF_ROLLBACK_FALLO'
+              fi
+            fi
+            rm -rf "$tmp"
+            exit "$result"
+          }
+          trap finish EXIT INT TERM
+          curl --fail --silent --show-error --max-time 25 -H "$auth" "$api/settings" > "$tmp/settings.json"
+          curl --fail --silent --show-error --max-time 25 -H "$auth" "$api/deployments" > "$tmp/deployments.json"
+          jq -e '.success==true and (.result.bindings|type=="array")' "$tmp/settings.json" >/dev/null
+          jq -e '.success==true' "$tmp/deployments.json" >/dev/null
+          before=$(jq -r '.result.deployments[0].versions[]?|select(.percentage==100)|.version_id' "$tmp/deployments.json"|head -n1)
+          test -n "$before"
+          for key in DB CENTRAL_BRIDGE_KEY DEMO_ADMIN_KEY SABER_DOCUMENTOS MP_TEST_ACCESS_TOKEN; do
+            jq -e --arg k "$key" '.result.bindings|any(.name==$k)' "$tmp/settings.json" >/dev/null
+          done
+          jq -e '.result.bindings|any(.name=="DB" and (.type=="d1" or .type=="d1_database"))' "$tmp/settings.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="CENTRAL_TUS_PURGE_QUEUE_ENABLED" and .text=="OFF")' "$tmp/settings.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="CENTRAL_TUS_PURGE_EXECUTE_ENABLED" and .text=="OFF")' "$tmp/settings.json" >/dev/null
+          jq -n --slurpfile s "$tmp/settings.json" '{main_module:"worker.js",annotations:{"workers/message":"Central ensayo: ampliar PDF TUS a 40 MiB con total 60 MiB, todos los bindings y pagos intactos"},bindings:[$s[0].result.bindings[]|{name,type:"inherit"}]}' > "$tmp/metadata.json"
+          curl --silent --show-error --max-time 90 -H "$auth" \
+            -F "metadata=@$tmp/metadata.json;type=application/json" \
+            -F "worker.js=@integraciones/mercadopago/pruebas/worker.js;filename=worker.js;type=application/javascript+module" \
+            "$api/versions?bindings_inherit=strict" > "$tmp/version.json"
+          if ! jq -e '.success==true and (.result.id|type=="string")' "$tmp/version.json" >/dev/null; then
+            jq -c '{success,errors:[.errors[]?|{code,message}]}' "$tmp/version.json";exit 1
+          fi
+          id=$(jq -r '.result.id' "$tmp/version.json")
+          jq -n --arg id "$id" '{strategy:"percentage",versions:[{percentage:100,version_id:$id}],annotations:{"workers/message":"Central pruebas 40MiB por PDF TUS; sin pagos reales ni purga"}}' > "$tmp/deploy.json"
+          touched=1
+          curl --fail --silent --show-error --max-time 60 -H "$auth" -H 'Content-Type: application/json' --data-binary "@$tmp/deploy.json" "$api/deployments" > "$tmp/response.json"
+          jq -e '.success==true' "$tmp/response.json" >/dev/null
+          active=''
+          for i in 1 2 3 4 5 6 7 8; do
+            curl --fail --silent --show-error --max-time 20 -H "$auth" "$api/deployments" > "$tmp/current.json"
+            active=$(jq -r '.result.deployments[0].versions[]?|select(.percentage==100)|.version_id' "$tmp/current.json"|head -n1)
+            if [ "$active" = "$id" ]; then break; fi
+            sleep 2
+          done
+          test "$active" = "$id"
+          curl --fail --silent --show-error --max-time 25 "$host/health" > "$tmp/health.json"
+          jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$tmp/health.json" >/dev/null
+          admin=$(curl --silent --show-error --max-time 20 -o /dev/null -w '%{http_code}' "$host/admin/api/pricing" || true)
+          transfer=$(curl --silent --show-error --max-time 20 -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' "$host/admin/api/transfers/approve" || true)
+          if [ "$admin" != 401 ] || [ "$transfer" != 401 ]; then echo "SEGURIDAD_CENTRAL_FALLO admin=$admin transfer=$transfer";exit 1;fi
+          curl --fail --silent --show-error --max-time 25 -H "$auth" "$api/settings" > "$tmp/after.json"
+          jq -e '.result.bindings|any(.name=="CENTRAL_TUS_PURGE_QUEUE_ENABLED" and .text=="OFF")' "$tmp/after.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="CENTRAL_TUS_PURGE_EXECUTE_ENABLED" and .text=="OFF")' "$tmp/after.json" >/dev/null
+          echo 'CENTRAL_TUS_40_MIB_ACTIVA_BARRERAS_Y_PAGOS_OFF'
+          echo "VERSION_CENTRAL_40MIB=$id"
