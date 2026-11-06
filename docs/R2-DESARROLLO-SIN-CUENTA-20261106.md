@@ -128,3 +128,17 @@ Comprobación independiente de solo lectura preparada en `.github/workflows/r2-v
 - [Actions 42312009205](https://github.com/hernanchan/COTIZADOR/actions/runs/42312009205) **SUCCESS**: lista de **nombres y tipos** de bindings de versión INACTIVA idéntica a los activos; R2 enlazado al bucket correcto y Central vinculada a pagos de pruebas; `DOCS_R2_BIG_ENABLED`, `DOCS_R2_QUOTA_ENABLED` y `DOCS_R2_STAGING_ENABLED` apagadas si existen.
 - La versión activa seguía `82ded703-0b3b-4e4b-ac7f-b312a78f78ea`. Auditoría solo GET, sin secretos expuestos.
 - Motivo de esta auditoría: el `bindings_inherit=strict` de la API hereda desde la **última versión subida**, no necesariamente desde la desplegada. Verificamos el resultado final, no solo la solicitud de herencia.
+
+
+## PROMOCIÓN CONTROLADA DE CÓDIGO R2 APAGADO — 06/11/2026
+
+**Worker de PRUEBAS actualizado realmente**, pero los endpoints R2 permanecen apagados.
+- [Workflow de despliegue 42312455278](https://github.com/hernanchan/COTIZADOR/actions/runs/42312455278) **SUCCESS**; commit originador `5f410fc7acb66212b6d7d518f0219594debf2cf2`.
+- Código actual del Worker `saber-documentos-pruebas`: versión `67f61c11-fe13-4193-aa30-e76450ed8597` (antes `82ded703-0b3b-4e4b-ac7f-b312a78f78ea`).
+- Comprobación adicional previa [42312292318](https://github.com/hernanchan/COTIZADOR/actions/runs/42312292318) **SUCCESS**: coincidencia de los bindings **completos no secretos** y del runtime versionado con la versión anterior. Los secretos se heredaron por tipo/nombre, sin imprimirse.
+- Pre/postdeploy: portal privado respondió **401** sin autenticación, GET de precios conservó su estado HTTP, y POST de inicio R2 respondió **503**, con `paymentAuthorized=false` y `checkoutEnabled=false`. Compilación y pruebas R2/TUS ya exitosas.
+- El procedimiento está limitado al Worker de documentos de pruebas, utiliza solo POST `/deployments` para promover una versión auditada, y revierte a la versión anterior ante fallo de comprobaciones. No modificó `main`, la web comercial, ni el Worker de pagos.
+- **Aún no se verificó un envío TUS real después del despliegue**; la regresión automatizada y smoke de acceso/precios sí están aprobados. No declarar que existe transferencia R2 real: todavía **0 B de prueba transmitidos** por este procedimiento.
+- Próximo objetivo: ensayo autorizado con PDF sintético y tráfico realmente aislado; medir 80/200 MiB y reanudación sin activar el cotizador comercial R2. La URL de versión inactiva no estuvo disponible para GET (**404** [42312185758](https://github.com/hernanchan/COTIZADOR/actions/runs/42312185758)); no se modificó la opción de preview ni se abrió acceso público.
+
+**Rollback manual si hiciera falta:** volver a promover `82ded703-0b3b-4e4b-ac7f-b312a78f78ea` en `saber-documentos-pruebas`; con comprobaciones y permisos, nunca editar `main`.
