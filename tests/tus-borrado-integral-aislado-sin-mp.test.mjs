@@ -137,7 +137,7 @@ function scenario({paid=true,delivered=true,canary=webOrder,storageFailure=false
  centralEnv.SABER_DOCUMENTOS={fetch:async request=>{
   state.network++;
   return recibirLimpiezaEntregadaInterna(request,documentEnv,{
-   central:async web=>{
+   central:async (_env,web)=>{
     state.lastStage='plan';
     const response=await vm.runInContext('centralTUSDeliveryPurgePlan',context)(
      await sign('/internal/central/tus-purge-plan',{
