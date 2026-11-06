@@ -66,3 +66,26 @@ La Central verifica obligatoriamente pago auténtico completo, `payment_reviews=
 6. Preparar activación de producción SOLO tras resultado de servidor real completo, nunca durante el ensayo. Definir retención independiente de PDFs impagos/abandonados.
 
 **Conclusión al cierre del 06/11:** conexión y defensa canaria terminadas y realmente desplegadas; **el borrado automático NO está todavía operativo**, correctamente OFF, porque falta la prueba real de una orden sintética pagada/entregada.
+
+
+## Avance 06/11 — PRIMER PEDIDO CANARIO REAL CREADO SIN PAGAR
+- Nuevo script de prueba: \`integraciones/autocotizador/recepcion/ensayo-canario-pdf-tus.mjs\`.
+- Workflow aislado: \`.github/workflows/tus-crear-orden-canaria-pruebas.yml\`; trigger \`docs/CREAR-ORDEN-CANARIA-20261106.trigger\`.
+- Acción real [42205254413](https://github.com/hernanchan/COTIZADOR/actions/runs/42205254413): **SUCCESS**. Dependencias fijadas \`pdf-lib@1.17.1\`, \`tus-js-client@4.3.1\`.
+- El propio Worker documental generó firma TUS individual, recepción privada y verificó SHA/PDF/precio ANTES de crear la orden D1. Sin datos de clientes, sin pagos ni entrega.
+- N.º orden: **024**.
+- \`webOrderId\`: \`WEB-ENSAYO-DA97408CCD06FFED80433A8E2A3B3FB4\`.
+- \`commercialOrderId\`: \`f5bddab7-6078-4f00-9fba-61f2210b0b20\`.
+- PDF canario exclusivamente generado por la suite; ruta EXACTA: \`v2/WEB-ENSAYO-DA97408CCD06FFED80433A8E2A3B3FB4/3c98ffd9-ab0a-47ae-ad92-125dd7c9a2a5.pdf\`.
+- SHA256: \`5d28e8b1a783c8dc4d0b038db26f497498e29b88ea9f5d8042c4e92e81dd7ac6\`.
+- Tamaño **1.102 bytes**; 1 página A4 B/N, precio total $100.
+- Estado confirmado por respuesta interna: **pedido registrado en D1, PAGO PENDIENTE, NO ENTREGADO**.
+- Supabase SQL de solo lectura **posterior**: 41 objetos, 211.852.378 bytes. Sólo 1 objeto coincide con la ruta canaria y tiene 1.102 bytes. Excluyéndolo quedan **exactamente 40 objetos y 211.851.276 bytes**, idénticos a la línea base previa.
+- Los 3 flags de purga siguen OFF (no se habilitaron en este ensayo).
+- Este ejercicio confirma TUS real, recibo, PDF revalidado, cotización y D1; NO es prueba del borrado ni del disparador Entregado.
+
+### Siguiente paso crítico, sin simulaciones de pago
+1. Se debe completar y conciliar un pago genuino **exclusivamente Sandbox** de la orden 024, con registro \`payment_reviews=verified\`. No insertar ni falsear registros de pago en D1.
+2. Instalar \`CENTRAL_TUS_PURGE_CANARY_ORDER\` y \`DOCS_TUS_PURGE_CANARY_ORDER\` con el \`webOrderId\` exacto anterior y comprobar sus valores antes de habilitar las 3 compuertas de prueba. La protección canaria no se habilita automáticamente al crear un pedido.
+3. Usar secuencia real de la Central hasta \`Entregado\`, confirmar borrar esa única ruta; HEAD404, SQL inventario 40 originales intactos, D1 \`central_tus_purge_audit\`, acceso ZIP/descarga bloqueado.
+4. Reponer flags OFF al terminar y verificar. Los pedidos previos siguen protegidos.
