@@ -1,0 +1,97 @@
+name: R2 - promover codigo apagado SOLO Documentos pruebas con rollback
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/r2-grandes-promover-apagado-privado.yml]
+permissions:
+  contents: read
+concurrency:
+  group: saber-documentos-private-deploy
+  cancel-in-progress: false
+jobs:
+  activar-codigo-inerte:
+    if: github.ref == 'refs/heads/integracion/tus-pedido-privado-20261101'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Validar version inactiva, promocionar y revertir automaticamente si falla smoke
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-documentos-pruebas"
+          base='https://saber-documentos-pruebas.libreriasaber.workers.dev'
+          old='82ded703-0b3b-4e4b-ac7f-b312a78f78ea'
+          candidate='67f61c11-fe13-4193-aa30-e76450ed8597'
+          auth="Authorization: Bearer $TOKEN"
+          tmp=$(mktemp -d)
+          touched=0
+          cleanup(){
+            rc=$?
+            trap - EXIT
+            if [ "$rc" -ne 0 ] && [ "$touched" = 1 ]; then
+              echo "R2_PRIVATE_DEPLOY_FAILED_ROLLBACK_REQUESTED"
+              jq -n --arg id "$old" '{strategy:"percentage",versions:[{version_id:$id,percentage:100}],annotations:{"workers/message":"ROLLBACK R2 inerte: comprobacion de Worker pruebas fallida"}}' > "$tmp/rollback.json"
+              if curl -fsS --max-time 45 -H "$auth" -H 'Content-Type: application/json' --data-binary "@$tmp/rollback.json" "$root/deployments" > "$tmp/rollback-result.json" && jq -e '.success==true' "$tmp/rollback-result.json" >/dev/null; then
+                curl -fsS --max-time 25 -H "$auth" "$root/deployments" > "$tmp/rollback-check.json" || true
+                restored=$(jq -r '.result.deployments[0].versions[]?|select(.percentage==100)|.version_id' "$tmp/rollback-check.json" 2>/dev/null|head -n 1 || true)
+                if [ "$restored" = "$old" ]; then echo "R2_ROLLBACK_CONFIRMED_OLD_ACTIVE"; else echo "R2_ROLLBACK_ACCEPTED_BUT_NOT_CONFIRMED"; fi
+              else
+                echo "R2_ROLLBACK_NOT_CONFIRMED_CRITICAL_REVIEW_REQUIRED"
+              fi
+            fi
+            rm -rf "$tmp"
+            exit "$rc"
+          }
+          trap cleanup EXIT
+          for id in "$old" "$candidate"; do
+            curl -fsS --max-time 25 -H "$auth" "$root/versions/$id" > "$tmp/$id.json"
+            jq -e --arg id "$id" '.success==true and .result.id==$id and (.result.resources.bindings|type=="array")' "$tmp/$id.json" >/dev/null
+            jq -S '[.result.resources.bindings[]|if .type=="secret_text" then {name,type} else . end]|sort_by(.name)' "$tmp/$id.json" > "$tmp/$id-bindings"
+            jq -S '.result.resources.script_runtime|{compatibility_date,compatibility_flags,usage_model,limits,placement}' "$tmp/$id.json" > "$tmp/$id-runtime"
+          done
+          cmp -s "$tmp/$old-bindings" "$tmp/$candidate-bindings" || { echo "BLOCK_DIFFERENT_BINDINGS"; exit 1; }
+          cmp -s "$tmp/$old-runtime" "$tmp/$candidate-runtime" || { echo "BLOCK_DIFFERENT_RUNTIME"; exit 1; }
+          jq -e '.result.resources.bindings|any(.name=="SABER_R2_GRANDES" and .type=="r2_bucket" and .bucket_name=="saber-documentos-grandes-ensayo-20261106")' "$tmp/$candidate.json" >/dev/null
+          jq -e '.result.resources.bindings|all(.[]|select(.name=="DOCS_R2_BIG_ENABLED" or .name=="DOCS_R2_QUOTA_ENABLED" or .name=="DOCS_R2_STAGING_ENABLED");.type=="plain_text" and .text=="OFF")' "$tmp/$candidate.json" >/dev/null
+          curl -fsS --max-time 30 -H "$auth" "$root/deployments" > "$tmp/before.json"
+          current=$(jq -er '.result.deployments[0].versions | if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/before.json")
+          test "$current" = "$old" || { echo "BLOCK_CONCURRENT_WORKER_CHANGE"; exit 1; }
+          before_portal=$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$base/prueba-v2/")
+          before_prices=$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$base/prueba-v2/precios-web.json")
+          test "$before_portal" = 401 || { echo "BLOCK_PORTAL_NOT_PRIVATE"; exit 1; }
+          echo "PREDEPLOY_ACTIVE_PRIVATE_401"
+          jq -n --arg id "$candidate" '{strategy:"percentage",versions:[{version_id:$id,percentage:100}],annotations:{"workers/message":"Saber documentos PRUEBAS: codigo R2 instalado con flags OFF; TUS actual preservado; sin pagos reales"}}' > "$tmp/promote.json"
+          touched=1
+          curl -fsS --max-time 60 -H "$auth" -H 'Content-Type: application/json' --data-binary "@$tmp/promote.json" "$root/deployments" > "$tmp/promote-result.json"
+          jq -e '.success==true' "$tmp/promote-result.json" >/dev/null
+          verified=0
+          for i in 1 2 3 4 5 6; do
+            curl -fsS --max-time 20 -H "$auth" "$root/deployments" > "$tmp/after.json"
+            actual=$(jq -r '.result.deployments[0].versions[]?|select(.percentage==100)|.version_id' "$tmp/after.json"|head -n 1)
+            if [ "$actual" = "$candidate" ]; then verified=1; break; fi
+            sleep 2
+          done
+          test "$verified" = 1 || { echo "VERSION_NOT_CONFIRMED"; exit 1; }
+          curl -fsS --max-time 25 -H "$auth" "$root/settings" > "$tmp/settings-after.json"
+          jq -e '.result.bindings|any(.name=="SABER_R2_GRANDES" and .type=="r2_bucket" and .bucket_name=="saber-documentos-grandes-ensayo-20261106")' "$tmp/settings-after.json" >/dev/null
+          jq -e '.result.bindings|all(.[]|select(.name=="DOCS_R2_BIG_ENABLED" or .name=="DOCS_R2_QUOTA_ENABLED" or .name=="DOCS_R2_STAGING_ENABLED");.type=="plain_text" and .text=="OFF")' "$tmp/settings-after.json" >/dev/null
+          smoke=0
+          for i in 1 2 3 4 5 6; do
+            after_portal=$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$base/prueba-v2/" || true)
+            after_prices=$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$base/prueba-v2/precios-web.json" || true)
+            post_r2=$(curl -sS --max-time 25 -o "$tmp/r2-off.json" -w '%{http_code}' -X POST -H "Origin: $base" -H 'Content-Type: application/json' --data '{"orderId":"WEB-ENSAYO-CONTROL","meta":{}}' "$base/prueba-v2/api/ensayo-r2/iniciar" || true)
+            if [ "$after_portal" = 401 ] && [ "$after_prices" = "$before_prices" ] && [ "$post_r2" = 503 ] && jq -e '.paymentAuthorized==false and .checkoutEnabled==false' "$tmp/r2-off.json" >/dev/null 2>&1; then smoke=1; break; fi
+            sleep 2
+          done
+          if [ "$smoke" != 1 ]; then echo "POSTDEPLOY_SMOKE_FAILED_PORTAL_OR_PRICE_OR_R2_OFF"; exit 1; fi
+          echo "R2_WORKER_PRUEBAS_CODE_DEPLOYED=$candidate"
+          echo "ROLLBACK_READY_OLD_VERSION=$old"
+          echo "TUS_PORTAL_401_PRICES_STATUS_PRESERVED_R2_503_NO_CHECKOUT"
+          echo "REAL_PAYMENTS_NOT_TOUCHED_PUBLIC_MAIN_NOT_TOUCHED"
