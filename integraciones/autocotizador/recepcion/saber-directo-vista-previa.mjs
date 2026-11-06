@@ -50,7 +50,7 @@ export function prepararVistaDisenoPrivada(html,{ofertas=false}={}){
 const PUBLIC_HOME='/prueba-v2/diseno-sin-clave';
 const PUBLIC_OFFERS=PUBLIC_HOME+'/ofertas.html';
 
-export function prepararVistaDisenoAbierta(html,{ofertas=false,categoria=''}={}){
+export function prepararVistaDisenoAbierta(html,{ofertas=false,categoria='',pedidoTUS=false}={}){
  if(typeof html!=='string'||!html.includes('<body>')||!html.includes('</body>'))
   throw Error('Vista incompatible');
  let page=html
@@ -63,7 +63,7 @@ export function prepararVistaDisenoAbierta(html,{ofertas=false,categoria=''}={})
   .replace(/<a\b([^>]*?)href="([^"]*)"/gi,(_,attrs,target)=>{
     let href='#preview-aviso';
     if(target.startsWith('#'))href=target;
-    else if(target==='cotizar.html')href='https://libreriasaber.com.ar/cotizar';
+    else if(target==='cotizar.html')href=pedidoTUS?'/prueba-v2/pedido-cliente':'https://libreriasaber.com.ar/cotizar';
     else if(target.startsWith('ofertas.html'))href=PUBLIC_OFFERS+target.slice('ofertas.html'.length);
     else if(target.startsWith('index.html#'))href=PUBLIC_HOME+target.slice('index.html'.length);
     else if(target==='index.html')href=PUBLIC_HOME;
@@ -72,7 +72,12 @@ export function prepararVistaDisenoAbierta(html,{ofertas=false,categoria=''}={})
   .replace(/\s+target="_blank"/gi,'')
   .replace(/<aside class="cart"[\s\S]*?<\/aside>/i,'')
   .replace(/<div class="overlay"[^>]*><\/div>/i,'');
- const aviso='<div id="preview-aviso" role="status" style="background:#0a3158;color:#fff;padding:11px 16px;display:flex;align-items:center;justify-content:center;gap:15px;flex-wrap:wrap;text-align:center;font:700 13px/1.4 system-ui,sans-serif"><span>VISTA DE DISEÑO · SIN CONTRASEÑA · Productos por WhatsApp; impresiones en el cotizador actual.</span><a href="/prueba-v2/cotizar-cliente" style="color:#fff;text-decoration:underline;text-underline-offset:3px">Probar cotización nueva sin clave</a><a href="/prueba-v2/" style="color:#fff;text-decoration:underline;text-underline-offset:3px">Probar cotizador nuevo (acceso privado)</a><button type="button" class="demo-cart-trigger" data-demo-open>Ver carrito <span data-demo-badge>0</span></button></div>';
+ const aviso='<div id="preview-aviso" role="status" style="background:#0a3158;color:#fff;padding:11px 16px;display:flex;align-items:center;justify-content:center;gap:15px;flex-wrap:wrap;text-align:center;font:700 13px/1.4 system-ui,sans-serif"><span>'+
+ (pedidoTUS?'VISTA DE PRUEBAS · Productos por WhatsApp; impresiones con pedido, pago Sandbox y seguimiento.':'VISTA DE DISEÑO · SIN CONTRASEÑA · Productos por WhatsApp; impresiones en el cotizador actual.')+
+ '</span><a href="'+(pedidoTUS?'/prueba-v2/pedido-cliente':'/prueba-v2/cotizar-cliente')+'" style="color:#fff;text-decoration:underline;text-underline-offset:3px">'+
+ (pedidoTUS?'Probar envío completo de PDF':'Probar cotización nueva sin clave')+'</a>'+
+ '<a href="/prueba-v2/" style="color:#fff;text-decoration:underline;text-underline-offset:3px">Acceso del personal</a>'+
+ '<button type="button" class="demo-cart-trigger" data-demo-open>Ver carrito <span data-demo-badge>0</span></button></div>';
 
  // Muestra estática y fechada de la hoja pública "Productos web (MODELO)".
  // Es independiente de la tienda: NO define stock ni precios operativos.
@@ -131,10 +136,10 @@ export function prepararVistaDisenoAbierta(html,{ofertas=false,categoria=''}={})
  if(!ofertas){
    page=page.replace(
     'Entrás al cotizador, calculás el trabajo y al final elegís <strong>Agregar al pedido general</strong>. El trabajo vuelve automáticamente a este carrito junto con los artículos.',
-    'Podés cotizar tus impresiones en el sitio actual. En esta etapa, los artículos y los trabajos de impresión se consultan por separado.'
+    pedidoTUS?'Podés cotizar, enviar y pagar tu trabajo en el nuevo sistema de ensayo. Los productos se consultan por WhatsApp en un pedido aparte.':'Podés cotizar tus impresiones en el sitio actual. En esta etapa, los artículos y los trabajos de impresión se consultan por separado.'
    ).replace(
     '<small>Un solo pedido</small><b>Artículos + impresión</b><p>1. Agregás los productos que quieras.<br>2. Cotizás impresiones, fotos, stickers, ploteos o gráfica.<br>3. Volvés al carrito con todo integrado y enviás un único pedido por WhatsApp.</p>',
-    '<small>Dos servicios disponibles</small><b>Productos e impresiones</b><p>1. Consultás productos desde el carrito por WhatsApp.<br>2. Cotizás documentos, fotos o ploteos en el cotizador actual.<br>3. Estamos preparando la integración de ambos en una sola compra.</p>'
+    pedidoTUS?'<small>Dos servicios disponibles</small><b>Productos e impresiones</b><p>1. Consultás artículos por WhatsApp.<br>2. Cotizás, enviás y pagás impresiones en el nuevo sistema de ensayo.<br>3. Seguís la preparación desde el enlace de tu pedido.</p>':'<small>Dos servicios disponibles</small><b>Productos e impresiones</b><p>1. Consultás productos desde el carrito por WhatsApp.<br>2. Cotizás documentos, fotos o ploteos en el cotizador actual.<br>3. Estamos preparando la integración de ambos en una sola compra.</p>'
    );
  }
  page=page.replace('</style>',styles+'</style>');
