@@ -1,0 +1,58 @@
+name: R2 - auditoria prepromocion de runtime y configuracion efectiva (solo GET)
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/r2-grandes-prepromocion-audit.yml]
+permissions:
+  contents: read
+jobs:
+  prepromocion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Comparar runtime y recursos versionados sin secretos
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-documentos-pruebas"
+          old='82ded703-0b3b-4e4b-ac7f-b312a78f78ea'
+          candidate='67f61c11-fe13-4193-aa30-e76450ed8597'
+          auth="Authorization: Bearer $TOKEN"
+          tmp=$(mktemp -d)
+          trap 'rm -rf "$tmp"' EXIT
+          for id in "$old" "$candidate"; do
+            h=$(curl -sS --max-time 30 -o "$tmp/$id.json" -w '%{http_code}' -H "$auth" "$root/versions/$id")
+            test "$h" = 200 || { echo "VERSION_GET_HTTP_$h"; exit 1; }
+            jq -e --arg id "$id" '.success==true and .result.id==$id and (.result.resources.bindings|type=="array")' "$tmp/$id.json" >/dev/null
+          done
+          # Secrets are not printed; compare safe metadata of every other binding.
+          for id in "$old" "$candidate"; do
+            jq -S '[.result.resources.bindings[]|if .type=="secret_text" then {name,type} else . end]|sort_by(.name)' "$tmp/$id.json" > "$tmp/$id-bindings"
+            jq -S '.result.resources.script_runtime|{compatibility_date,compatibility_flags,usage_model,limits,placement}' "$tmp/$id.json" > "$tmp/$id-runtime"
+          done
+          if ! cmp -s "$tmp/$old-bindings" "$tmp/$candidate-bindings"; then
+            echo "PREPROMOTION_VERSION_BINDING_VALUES_DIFFER_REVIEW_REQUIRED"
+            exit 1
+          fi
+          echo "PREPROMOTION_BINDING_NONSECRET_VALUES_IDENTICAL"
+          if ! cmp -s "$tmp/$old-runtime" "$tmp/$candidate-runtime"; then
+            echo "PREPROMOTION_RUNTIME_CONFIG_DIFFERS_REVIEW_REQUIRED"
+            # Date/flag names only, no bindings or credentials.
+            for id in "$old" "$candidate"; do
+              jq -c '.result.resources.script_runtime|{compatibility_date,compatibility_flags}' "$tmp/$id.json"
+            done
+            exit 1
+          fi
+          echo "PREPROMOTION_RUNTIME_COMPATIBILITY_IDENTICAL"
+          curl -fsS --max-time 30 -H "$auth" "$root/deployments" > "$tmp/deployments.json"
+          active=$(jq -er '.result.deployments[0].versions | if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/deployments.json")
+          test "$active" = "$old" || { echo "ACTIVE_VERSION_MOVED_NO_DEPLOY"; exit 1; }
+          echo "R2_SAFE_TO_CONSIDER_PRIVATE_DEPLOY_FLAGS_STILL_OFF"
+          echo "AUDIT_ONLY_NO_DEPLOY_NO_PAYMENTS"
