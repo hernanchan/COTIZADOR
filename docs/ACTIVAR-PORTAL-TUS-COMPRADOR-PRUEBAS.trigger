@@ -7,3 +7,4 @@ Cambios permitidos: SOLO saber-documentos-pruebas; nueva variable DOCS_PUBLIC_OR
 Main, web pública, MP real y todos los interruptores de borrado: SIN CAMBIOS (OFF).
 Control: rollback del Worker si el smoke de acceso, V3 o privacidad falla.
 Reintento controlado 2: dependencias de test instaladas, deploy anterior no ejecutado (fallo antes de tocar Cloudflare).
+Reintento controlado 3: corregida la consulta jq sobre bindings de Cloudflare; anteriores ejecuciones no llegaron a desplegar.
