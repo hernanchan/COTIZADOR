@@ -11,7 +11,7 @@ const planBody=()=>({ok:true,schema:'saber-central-tus-purge-plan-v1',webOrderId
  productionState:'entregado',productionVersion:3,paymentVerified:true,
  deletionExecuted:false,retentionDays:0,files:[{receiptId:receipt,fileId:'PDF01',sha256:'a'.repeat(64),bytes:4552}]});
 const plan=()=>planDeBorradoEntregado(planBody(),webOrderId);
-const env={DOCS_TUS_PURGE_ENABLED:'PRIVATE_TEST_ONLY',DOCS_TUS_SUPABASE_SERVICE_KEY:'X'.repeat(48),
+const env={DOCS_TUS_PURGE_ENABLED:'PRIVATE_TEST_ONLY',DOCS_TUS_PURGE_CANARY_ORDER:webOrderId,DOCS_TUS_SUPABASE_SERVICE_KEY:'X'.repeat(48),
  CENTRAL_BRIDGE_KEY:'Y'.repeat(48)};
 function fakeStorage(initial=[]){
  const remaining=new Set(initial),calls=[],size=new Map(initial.map(x=>[x,4552]));
@@ -95,4 +95,19 @@ test('Entrega autorizada y verificación completa confirman la Central exactamen
  assert.equal(res.status,200);
  assert.equal((await res.json()).deletedCount,1);
  assert.equal(lookups,1);assert.equal(removals,1);assert.equal(acks,1);
+});
+
+test('Prohibir cualquier DELETE y consulta Central si la orden no es la canaria autorizada',async()=>{
+ const p=plan(),fake=fakeStorage([p.paths[0]]);
+ await assert.rejects(()=>eliminarYConfirmarObjetos(p,{
+  ...env,DOCS_TUS_PURGE_CANARY_ORDER:otherOrder
+ },{fetcher:fake.fetcher}),/no habilitada|inseguro/);
+ assert.equal(fake.calls.length,0);
+ let centralLookups=0;
+ const res=await recibirLimpiezaEntregadaInterna(await signed(),{
+  ...env,DOCS_TUS_PURGE_CANARY_ORDER:otherOrder},{
+  central:async()=>{centralLookups++;return p}
+ });
+ assert.equal(res.status,403);
+ assert.equal(centralLookups,0);
 });
