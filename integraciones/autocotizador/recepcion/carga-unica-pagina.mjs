@@ -14,6 +14,12 @@ h2{margin:30px 0 12px;font-size:22px;color:#123a5b}
 .archivo .origen{color:#4b6172;font-size:15px}
 .archivo .destino{font-weight:700;color:#0f5c85}
 .archivo .advertencia{background:#fff1da;border-radius:7px;padding:10px 12px;color:#654514;font-size:15px}
+/* Error bloqueante visible en la ficha SIN abrir «Más opciones». */
+.archivo.archivo-no-admitido{border:2px solid #b42318;background:#fff7f6;box-shadow:0 0 0 1px #f9c5c0}
+.archivo-no-admitido .nombre,.archivo-no-admitido .precio-archivo{color:#981b1b;white-space:normal}
+.archivo .advertencia-recepcion{display:block;margin:8px 0 0;background:#fee8e6;border-left:4px solid #b42318;border-radius:6px;padding:10px 12px;color:#8f1d1d;font-size:14px;line-height:1.45;font-weight:750}
+#estado.estado-recepcion-error,.pie.estado-recepcion-error{background:#fee8e6;border-left:4px solid #b42318;border-radius:6px;color:#8f1d1d;padding:10px 12px;font-weight:700}
+
 .controles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px 22px;margin:18px 0 8px}
 label{display:flex;flex-direction:column;gap:7px;font-weight:650;font-size:16px;min-width:0}
 input,select{font:inherit;font-weight:400;width:100%;min-width:0;padding:12px;border:1px solid #a1b3c3;border-radius:9px;background:#fff;color:#18334a;min-height:48px}
