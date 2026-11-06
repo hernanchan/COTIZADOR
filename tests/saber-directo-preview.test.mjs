@@ -32,7 +32,7 @@ test('ofertas de prueba vuelven a portada privada, sin enlace a web comercial',(
 test('las dos rutas dependen de la compuerta Basic o sesión privada existente',()=>{
  assert.match(worker,/if\(page==='\/prueba-v2\/diseno-saber-directo'/);
  assert.match(worker,/return v2PrivateBrowserResponse\(request,env,page\)/);
- assert.match(worker,/if\(status==='deny'&&!allowMobile\)return new Response\('Autenticación privada requerida'/);
+ assert.match(worker,/if\(status==='deny'&&!allowMobile&&!buyerOK\)return new Response\('Autenticación privada requerida'/);
  assert.match(worker,/if\(status==='off'\)return testResponse/);
  assert.match(worker,/prepararVistaDisenoPrivada\(ofertas\?ofertasSaberDirectoHtml:portadaSaberDirectoHtml/);
  assert.match(worker,/Content-Security-Policy/);
