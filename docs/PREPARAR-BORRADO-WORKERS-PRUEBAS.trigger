@@ -37,3 +37,6 @@ DEPLOY_CUSTOMER_QUOTE_GATE_DEFAULT_OFF_20261106
 # Enlazar directamente desde la tienda V3 al cotizador nuevo de presupuesto preliminar.
 # Preservar flag actual de acceso cliente quote-only y mantener 3 flags de purga OFF.
 DEPLOY_V3_LINK_CUSTOMER_QUOTE_GATE_PRESERVE_ENABLED_20261106
+
+# Vista preliminar de clientes mejorada: precio arriba, fuente legible, una sola configuración por PDF; preservar Turnstile y purga OFF.
+DEPLOY_CUSTOMER_QUOTE_UX_20261106_1041
