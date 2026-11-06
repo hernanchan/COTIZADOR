@@ -18,6 +18,9 @@ function actualizarModoLote(){
 }
 
 const MAX_PDF_CARGA=location.pathname==='/prueba-v2/carga-inteligente'?10:30;
+const MAX_PDF_TUS_BYTES=40*1024*1024;
+const MAX_LOTE_TUS_BYTES=60*1024*1024;
+const tamanoPdfMiB=f=>(f.size/(1024*1024)).toFixed(1).replace('.',',')+' MiB';
 let leyendo=false;
 let version=0;
 let catalogo={a4:[],a3:[]};
@@ -705,7 +708,7 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
  bridgeButton.textContent='Agregar PDF al envío privado';
  const info=document.createElement('p');
  info.className='pie';info.setAttribute('role','status');
- info.textContent='Recepción privada de hasta 10 PDF por pedido (máximo 20 MB por archivo y 60 MB en total). Impresiones y ploteos se verifican y registran en la Central. Las páginas elegidas se verifican sobre el PDF original antes de registrar la orden.';
+ info.textContent='Recepción privada de hasta 10 PDF por pedido (máximo 40 MiB por archivo y 60 MiB en total). Impresiones y ploteos se verifican y registran en la Central. Las páginas elegidas se verifican sobre el PDF original antes de registrar la orden.';
  const resumen=$('resumenPedido');
  resumen?.parentNode?.insertBefore(bridgeButton,resumen);
  bridgeButton.insertAdjacentElement('afterend',info);
@@ -722,11 +725,11 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
     if(!plan)throw Error('No se encontró la clasificación de este trabajo.');
     if(plan.destino==='ploteos'){
      if(!e.archivoOriginal||e.archivoOriginal.size<5||
-        e.archivoOriginal.size>20*1024*1024||!/\.pdf$/i.test(e.name)||
+        e.archivoOriginal.size>MAX_PDF_TUS_BYTES||!/\.pdf$/i.test(e.name)||
         e.name.length>120||e.anillado!=='ninguno'||
         !Array.isArray(e.paginas)||e.paginas.length<1||
         plan.paginasElegidas.length!==e.paginas.length)
-      throw Error('El ploteo privado requiere PDF completo de hasta 20 MB, sin anillado.');
+      throw Error('Revisá el PDF de ploteo «'+e.name+'»: requiere archivo completo de hasta 40 MiB, sin anillado.');
      const clasificacionCliente=e.paginas.map((p,j)=>({
       numero:j+1,anchoCm:p.anchoCm,altoCm:p.altoCm,modo:p.modo
      }));
@@ -743,10 +746,14 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
     }
     if(plan.destino!=='documentos')
      throw Error('Este servicio queda fuera de la primera etapa.');
-    if(!e.archivoOriginal||!Number.isSafeInteger(e.archivoOriginal.size)||
-       e.archivoOriginal.size<5||e.archivoOriginal.size>20*1024*1024||
+    if(!(e.archivoOriginal instanceof File))
+     throw Error('El PDF «'+e.name+'» ya no está disponible en esta pestaña. Volvé a seleccionarlo en su ficha.');
+    if(e.archivoOriginal.size>MAX_PDF_TUS_BYTES)
+     throw Error('«'+e.name+'» pesa '+tamanoPdfMiB(e.archivoOriginal)+
+      '. El límite de recepción es 40 MiB por PDF; los otros archivos siguen preparados.');
+    if(!Number.isSafeInteger(e.archivoOriginal.size)||e.archivoOriginal.size<5||
        e.name.length>120||!/\.pdf$/i.test(e.name))
-     throw Error('La recepción privada admite PDF de hasta 20 MB por archivo.');
+     throw Error('El PDF «'+e.name+'» tiene un formato o nombre no admitido.');
     if(!['ninguno','individual','grupo'].includes(e.anillado)||
        (e.anillado==='grupo'&&!/^[1-9][0-9]?$/.test(String(e.grupoAnillado||'')))||
        (e.anillado!=='grupo'&&e.grupoAnillado))
@@ -770,7 +777,12 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
      paginasSeleccionadas:e.paginasSeleccionadas||'',paginasPorHoja:e.paginasPorHoja??1,
      paginas:e.paginas.length,nombre:e.name});
    }
-   if(files.length){
+   const loteBytes=files.reduce((sum,f)=>sum+f.size,0)+
+     ploteosPendientes.reduce((sum,p)=>sum+p.file.size,0);
+    if(loteBytes>MAX_LOTE_TUS_BYTES)
+     throw Error('Los PDF suman '+(loteBytes/(1024*1024)).toFixed(1).replace('.',',')+
+      ' MiB. El pedido admite hasta 60 MiB totales; dividí la carga en dos pedidos.');
+    if(files.length){
     const totalDocumentos=ploteosPendientes.length?
      ultimoPresupuesto.subtotalImpresiones:ultimoPresupuesto.total;
     if(!Number.isSafeInteger(totalDocumentos)||totalDocumentos<1)
