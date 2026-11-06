@@ -46,3 +46,12 @@ La CI y el smoke verifican código, accesos públicos/privados y despliegue, **n
 - La prueba automatizada verifica que un PDF de 21 MiB ahora entra en el handoff y uno >40 MiB queda bloqueado con mensaje preciso; contrato TUS admite 30 MiB y rechaza >40 MiB. **No hubo una carga real desde el navegador del cliente ni pago real de ensayo en esta ejecución**. Falta la prueba de los dos archivos de la captura, con sus tamaños.
 - Acceso para repetir SOLO la validación corregida: https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/pedido-cliente . Recargar la página y volver a seleccionar los PDF (File no persiste tras recargar), después enviar. En caso de error registrar el mensaje exacto visible.
 - `main`, web comercial, dinero real y políticas de borrado sin cambios; no se solicitaron credenciales ni borraron históricos.
+
+## 06/11/2026 — Advertencia roja individual por archivo no admitido
+- Pedido de corrección del usuario tras probar envío: el límite de tamaño se informaba arriba, pero la ficha del PDF excedido quedaba visualmente normal.
+- Se agregó validación anticipada en `carga-unica-cliente.mjs` para la pantalla del comprador: borde rojo, texto `PDF NO ADMITIDO` y causa con nombre/tamaño del original en la tarjeta correspondiente, visible aun con detalles cerrados. Los archivos admisibles conservan su estado.
+- La pantalla superior también indica bloqueo en rojo; `SABER_SMART_PRICE_STATE.sendable` queda `false` mientras haya un PDF incompatible. No se necesitan nuevas cargas para los otros PDF.
+- No se alteran límites (10 PDF, 40 MiB/PDF, 60 MiB/pedido), tarifario, lógica TUS ni contratos de Central. Límites comerciales son configuraciones preventivas de ensayo, no una prohibición inherente al sistema.
+- CI integral **SUCCESS**: https://github.com/hernanchan/COTIZADOR/actions/runs/42241817416
+- Deploy en `saber-documentos-pruebas` **SUCCESS**: https://github.com/hernanchan/COTIZADOR/actions/runs/42241917866 ; versión `5c01c1d2-37eb-4975-b345-271f7939762f`. Smoke HTTP V3/comprador 200, staff/ZIP 401, inicio TUS sin cookie 403, purga 503, Sandbox único.
+- Falta la comprobación visual de usuario cargando PDF excedido junto a otro válido desde navegador. No declarar eso validado por CI.
