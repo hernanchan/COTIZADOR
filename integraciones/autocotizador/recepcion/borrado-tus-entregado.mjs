@@ -45,6 +45,7 @@ export function planDeBorradoEntregado(plan,webOrderId){
  if(bytes>60*1024*1024)return fail('Límite de lote excedido');
  return Object.freeze({webOrderId,commercialOrderId:plan.commercialOrderId,
   version:plan.productionVersion,paths:Object.freeze(paths),
+  sizes:Object.freeze(plan.files.map(f=>f.bytes)),
   count:paths.length,totalBytes:bytes,bucket:BUCKET,
   confirmedDelivered:true,paymentVerified:true});
 }
@@ -149,4 +150,130 @@ export async function borrarPDFTUSEntregados(plan,env,{
   return fail('No se confirmó el borrado de todos los archivos');
  await audit({phase:'after',orderId:plan.commercialOrderId,webOrderId:plan.webOrderId,version:plan.version,count:plan.count});
  return Object.freeze({mode:'execute',borrados:plan.paths.length,candidatos:plan.paths.length});
+}
+
+/** Llamada servidor-servidor con el mismo contrato HMAC verificado por D1. */
+async function centralPurgeAck(env,plan,{service=env?.SABER_CENTRAL,
+ subtle=crypto.subtle,uuid=()=>crypto.randomUUID(),now=()=>Math.floor(Date.now()/1000)}={}){
+ if(typeof service?.fetch!=='function'||typeof env?.CENTRAL_BRIDGE_KEY!=='string'||
+   env.CENTRAL_BRIDGE_KEY.length<32)throw Error('No se puede registrar auditoría en la Central');
+ const target=new URL(env.CENTRAL_TEST_URL);
+ if(target.protocol!=='https:'||
+   !/^saber-pagos-pruebas\.[a-z0-9-]+\.workers\.dev$/.test(target.hostname)||
+   target.pathname!=='/internal/central/stage'||target.search||target.hash||
+   target.port||target.username||target.password)
+  throw Error('La Central no está autorizada');
+ target.pathname='/internal/central/tus-purge-complete';
+ const body=JSON.stringify({schema:'saber-central-tus-purge-complete-v1',
+  webOrderId:plan.webOrderId,productionVersion:plan.version,deletedCount:plan.count});
+ const ts=now(),id=uuid();
+ if(!Number.isSafeInteger(ts)||!UUID.test(id))throw Error('Firma de confirmación inválida');
+ const key=await subtle.importKey('raw',new TextEncoder().encode(env.CENTRAL_BRIDGE_KEY),
+   {name:'HMAC',hash:'SHA-256'},false,['sign']);
+ const signature=Array.from(new Uint8Array(await subtle.sign('HMAC',key,
+    new TextEncoder().encode(ts+'\n'+id+'\n'+body))),
+    b=>b.toString(16).padStart(2,'0')).join('');
+ const r=await service.fetch(new Request(target.href,{method:'POST',headers:{
+   'Content-Type':'application/json','x-saber-ts':String(ts),
+   'x-saber-request-id':id,'x-saber-signature':signature},body}));
+ const raw=await r.text();
+ if(raw.length>3000)throw Error('Auditoría de Central inválida');
+ let data;
+ try{data=JSON.parse(raw)}catch{throw Error('Respuesta de auditoría inválida')}
+ if(r.status!==200||data?.ok!==true||data?.state!=='completed')
+   throw Error('La Central no confirmó la finalización');
+ return data;
+}
+async function verifyPrivateHmac(request,env,{now=()=>Math.floor(Date.now()/1000),
+ subtle=crypto.subtle}={}){
+ if(request.method!=='POST'||request.headers.has('Origin')||
+    !/^application\/json(?:;|$)/i.test(request.headers.get('Content-Type')||'')||
+    typeof env?.CENTRAL_BRIDGE_KEY!=='string'||env.CENTRAL_BRIDGE_KEY.length<32)
+  throw Error('La llamada entre Workers no está autorizada');
+ const ts=request.headers.get('x-saber-ts')||'';
+ const nonce=request.headers.get('x-saber-request-id')||'';
+ const signature=request.headers.get('x-saber-signature')||'';
+ if(!/^\d{10}$/.test(ts)||!UUID.test(nonce)||!SHA.test(signature)||
+   Math.abs(now()-Number(ts))>300)
+  throw Error('Firma de solicitud inválida');
+ const raw=await request.text();
+ if(raw.length<30||raw.length>700)throw Error('Manifiesto fuera de límite');
+ const key=await subtle.importKey('raw',new TextEncoder().encode(env.CENTRAL_BRIDGE_KEY),
+   {name:'HMAC',hash:'SHA-256'},false,['sign']);
+ const expected=Array.from(new Uint8Array(await subtle.sign('HMAC',key,
+   new TextEncoder().encode(ts+'\n'+nonce+'\n'+raw))),b=>b.toString(16).padStart(2,'0')).join('');
+ let mismatch=0;
+ for(let i=0;i<64;i++)mismatch|=expected.charCodeAt(i)^signature.charCodeAt(i);
+ if(mismatch)throw Error('Firma no coincide');
+ const p=JSON.parse(raw);
+ if(!p||typeof p!=='object'||Array.isArray(p)||
+  Object.keys(p).sort().join(',')!=='schema,webOrderId'||
+  p.schema!=='saber-docs-tus-purge-delivered-v1'||!WEB.test(p.webOrderId||''))
+  throw Error('Pedido inválido');
+ return p;
+}
+/** Verifica los PDFs EXACTOS en Storage con service_role antes y después de DELETE. */
+export async function eliminarYConfirmarObjetos(plan,env,{fetcher=fetch}={}){
+ if(!plan?.confirmedDelivered||!plan?.paymentVerified||!WEB.test(plan.webOrderId||'')||
+    !Array.isArray(plan.paths)||!Array.isArray(plan.sizes)||
+    plan.paths.length<1||plan.paths.length>10||plan.paths.length!==plan.sizes.length||
+    plan.count!==plan.paths.length||new Set(plan.paths).size!==plan.paths.length||
+    plan.paths.some(p=>!/^v2\/WEB-ENSAYO-[A-F0-9]{32}\/[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}\.pdf$/i.test(p)||
+      !p.startsWith('v2/'+plan.webOrderId+'/'))||
+    plan.sizes.some(size=>!Number.isSafeInteger(size)||size<5||size>20*1024*1024)||
+    plan.bucket!==BUCKET||env?.DOCS_TUS_PURGE_ENABLED!=='PRIVATE_TEST_ONLY'||
+    typeof env?.DOCS_TUS_SUPABASE_SERVICE_KEY!=='string'||
+    env.DOCS_TUS_SUPABASE_SERVICE_KEY.length<32)
+   throw Error('Ejecución de limpieza no habilitada o plan inseguro');
+ const headers={apikey:env.DOCS_TUS_SUPABASE_SERVICE_KEY,
+  Authorization:'Bearer '+env.DOCS_TUS_SUPABASE_SERVICE_KEY};
+ const prefix='https://'+PROJECT+'.storage.supabase.co/storage/v1/object/'+BUCKET+'/';
+ const exists=async(path,bytes,after=false)=>{
+  const url=prefix+path.split('/').map(encodeURIComponent).join('/');
+  const r=await fetcher(url,{method:'HEAD',redirect:'manual',headers});
+  if(r.status===404)return false;
+  if(r.status!==200)throw Error('No se pudo verificar el PDF en Storage');
+  if(after)throw Error('El archivo sigue presente después del borrado');
+  const reported=r.headers.get('Content-Length');
+  if(reported!==null&&Number(reported)!==bytes)throw Error('El tamaño del archivo cambió');
+  return true;
+ };
+ const toRemove=[];
+ for(let i=0;i<plan.paths.length;i++){
+  if(await exists(plan.paths[i],plan.sizes[i]))toRemove.push(plan.paths[i]);
+ }
+ if(toRemove.length){
+  const r=await fetcher('https://'+PROJECT+'.storage.supabase.co/storage/v1/object/'+BUCKET,{
+   method:'DELETE',redirect:'manual',headers:{...headers,'Content-Type':'application/json'},
+   body:JSON.stringify({prefixes:toRemove})
+  });
+  if(!r.ok)throw Error('Storage no pudo eliminar todos los PDF');
+ }
+ // Incluso en reintentos después de un borrado parcial o pérdida de respuesta,
+ // SOLO HEAD 404 de cada ruta exacta confirma eliminación completa.
+ for(let i=0;i<plan.paths.length;i++)await exists(plan.paths[i],plan.sizes[i],true);
+ return {verifiedAbsent:true,deletedCount:plan.paths.length};
+}
+/**
+ * Invocado exclusivamente por la Central con HMAC sobre un service binding.
+ * Revalida pago+entrega justo antes de tocar Storage y confirma D1 al terminar.
+ * OFF por defecto, no borrar archivos antiguos al instalar el código.
+ */
+export async function recibirLimpiezaEntregadaInterna(request,env,{
+ central=planCentralFirmado,remove=eliminarYConfirmarObjetos,ack=centralPurgeAck,
+ verify=verifyPrivateHmac}={}){
+ if(env?.DOCS_TUS_PURGE_ENABLED!=='PRIVATE_TEST_ONLY')
+  return response({ok:false,error:'Limpieza todavía desactivada'},503);
+ let info;
+ try{info=await verify(request,env)}catch{return response({ok:false,error:'Firma privada inválida'},401)}
+ try{
+  const plan=await central(env,info.webOrderId);
+  if(plan.webOrderId!==info.webOrderId||plan.confirmedDelivered!==true||
+    plan.paymentVerified!==true)throw Error('La Central no confirmó este pedido');
+  const result=await remove(plan,env);
+  if(result?.verifiedAbsent!==true||result.deletedCount!==plan.count)
+    throw Error('No todos los PDF se verificaron ausentes');
+  await ack(env,plan);
+  return response({ok:true,mode:'execute',deletedCount:plan.count,webOrderId:plan.webOrderId},200);
+ }catch{return response({ok:false,error:'Limpieza incompleta, será reintentada'},503)}
 }
