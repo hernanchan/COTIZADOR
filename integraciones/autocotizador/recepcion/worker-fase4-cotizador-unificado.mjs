@@ -6,7 +6,7 @@ import {paginaCotizadorRapido} from './cotizador-rapido-pagina.mjs';
 import {paginaPloteosRapido} from './ploteos-rapido-pagina.mjs';
 import {paginaCotizadorConjunto} from './cotizador-conjunto-pagina.mjs';
 import {paginaCargaUnica} from './carga-unica-pagina.mjs';
-import {manejarCotizadorCliente,autorizadoCotizadorCliente,manejarPortalPedidosCliente,autorizadoPedidoCliente} from './cotizador-cliente-publico.mjs';
+import {manejarCotizadorCliente,autorizadoCotizadorCliente,manejarPortalPedidosCliente,autorizadoPedidoCliente,cookiePedidoClienteVinculado,autorizadoPedidoClienteVinculado} from './cotizador-cliente-publico.mjs';
 import {cotizarCargaUnica} from './cotizar-carga-unica.mjs';
 import {cotizarNupReciboVerificado} from './cotizar-nup-recibo-verificado.mjs';
 import {cotizarPloteoReciboVerificado} from './cotizar-ploteo-recibo-verificado.mjs';
@@ -2125,13 +2125,16 @@ export default {
       return checkoutCanarioTUSPersonal(request,env,{
        authorized:v2PrivateBrowserAuthorized(request,env)==='allow'
       });
-    if(page==='/prueba-v2/api/ensayo-tus-pago-sandbox')
-      return pagoTUSSandboxCliente(request,env,{
-       authorized:v2PrivateBrowserAuthorized(request,env)==='allow'||
-         (await v2SessionAuthorized(request,env))||
-         (request.headers.get('Origin')===new URL(request.url).origin&&
-          await autorizadoPedidoCliente(request,env))
-       });
+    if(page==='/prueba-v2/api/ensayo-tus-pago-sandbox'){
+      const staff=v2PrivateBrowserAuthorized(request,env)==='allow'||
+       await v2SessionAuthorized(request,env);
+      const buyer=!staff&&await autorizadoPedidoCliente(request,env);
+      const data=buyer?await request.clone().json().catch(()=>null):null;
+      const compradorAutorizado=buyer&&
+       request.headers.get('Origin')===new URL(request.url).origin&&
+       await autorizadoPedidoClienteVinculado(request,env,data?.webOrderId);
+      return pagoTUSSandboxCliente(request,env,{authorized:staff||compradorAutorizado});
+    }
      // Retención de PDF: SOLO simulación, protegida con Basic; sin DELETE real.
     if(page==='/prueba-v2/api/ensayo-tus-retencion')
       return simularLimpiezaTUS(request,env,{
@@ -2152,13 +2155,30 @@ export default {
        page==='/prueba-v2/api/ensayo-tus-iniciar'||page==='/prueba-v2/api/ensayo-tus-registrar'||
        page==='/prueba-v2/api/ensayo-tus-comprobar'||page==='/api/ensayo-tus-descargar'){
       const basic=v2PrivateBrowserAuthorized(request,env)==='allow';
+      const staff=basic||await v2SessionAuthorized(request,env);
+      const buyer=page==='/api/ensayo-tus-descargar'?false:
+       (!staff&&await autorizadoPedidoCliente(request,env));
+      const inicio=page.endsWith('/ensayo-tus-iniciar');
+      const comprobar=page.endsWith('/ensayo-tus-comprobar');
+      const data=buyer&&!comprobar?await request.clone().json().catch(()=>null):null;
+      const compradorAutorizado=buyer&&(inicio||comprobar||
+       await autorizadoPedidoClienteVinculado(request,env,data?.orderId));
       const authorized=page==='/api/ensayo-tus-descargar'?basic
-         :(basic||(await v2SessionAuthorized(request,env))||
-           (await autorizadoPedidoCliente(request,env)));
-      if(page.endsWith('/ensayo-tus-comprobar'))
-        return comprobarTUSAntesDeEnviar(request,env,{authorized});
-      if(page.endsWith('/ensayo-tus-iniciar'))
-        return iniciarTandaTUSPrivada(request,env,{authorized});
+       :(staff||compradorAutorizado);
+      if(comprobar)return comprobarTUSAntesDeEnviar(request,env,{authorized});
+      if(inicio){
+        const result=await iniciarTandaTUSPrivada(request,env,{authorized});
+        // Sólo al inicio exitoso se emite el vínculo comprador-orden.
+        if(compradorAutorizado&&result.ok){
+          const link=await cookiePedidoClienteVinculado(request,env,data?.orderId);
+          if(link){
+            const headers=new Headers(result.headers);
+            headers.append('Set-Cookie',link);
+            return new Response(result.body,{status:result.status,headers});
+          }
+        }
+        return result;
+      }
       if(page.endsWith('/ensayo-tus-registrar'))
         return finalizarPedidoTUSPrivado(request,env,{authorized,preciosServidor:await preciosPrivados(env,request)});
       if(page.endsWith('/ensayo-tus-recuperar'))
