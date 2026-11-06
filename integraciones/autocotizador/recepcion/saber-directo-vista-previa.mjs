@@ -72,7 +72,7 @@ export function prepararVistaDisenoAbierta(html,{ofertas=false,categoria=''}={})
   .replace(/\s+target="_blank"/gi,'')
   .replace(/<aside class="cart"[\s\S]*?<\/aside>/i,'')
   .replace(/<div class="overlay"[^>]*><\/div>/i,'');
- const aviso='<div id="preview-aviso" role="status" style="background:#0a3158;color:#fff;padding:11px 16px;display:flex;align-items:center;justify-content:center;gap:15px;flex-wrap:wrap;text-align:center;font:700 13px/1.4 system-ui,sans-serif"><span>VISTA DE DISEÑO · SIN CONTRASEÑA · Productos por WhatsApp; impresiones en el cotizador actual.</span><a href="/prueba-v2/" style="color:#fff;text-decoration:underline;text-underline-offset:3px">Probar cotizador nuevo (acceso privado)</a><button type="button" class="demo-cart-trigger" data-demo-open>Ver carrito <span data-demo-badge>0</span></button></div>';
+ const aviso='<div id="preview-aviso" role="status" style="background:#0a3158;color:#fff;padding:11px 16px;display:flex;align-items:center;justify-content:center;gap:15px;flex-wrap:wrap;text-align:center;font:700 13px/1.4 system-ui,sans-serif"><span>VISTA DE DISEÑO · SIN CONTRASEÑA · Productos por WhatsApp; impresiones en el cotizador actual.</span><a href="/prueba-v2/cotizar-cliente" style="color:#fff;text-decoration:underline;text-underline-offset:3px">Probar cotización nueva sin clave</a><a href="/prueba-v2/" style="color:#fff;text-decoration:underline;text-underline-offset:3px">Probar cotizador nuevo (acceso privado)</a><button type="button" class="demo-cart-trigger" data-demo-open>Ver carrito <span data-demo-badge>0</span></button></div>';
 
  // Muestra estática y fechada de la hoja pública "Productos web (MODELO)".
  // Es independiente de la tienda: NO define stock ni precios operativos.
