@@ -89,3 +89,16 @@ La Central verifica obligatoriamente pago auténtico completo, `payment_reviews=
 2. Instalar \`CENTRAL_TUS_PURGE_CANARY_ORDER\` y \`DOCS_TUS_PURGE_CANARY_ORDER\` con el \`webOrderId\` exacto anterior y comprobar sus valores antes de habilitar las 3 compuertas de prueba. La protección canaria no se habilita automáticamente al crear un pedido.
 3. Usar secuencia real de la Central hasta \`Entregado\`, confirmar borrar esa única ruta; HEAD404, SQL inventario 40 originales intactos, D1 \`central_tus_purge_audit\`, acceso ZIP/descarga bloqueado.
 4. Reponer flags OFF al terminar y verificar. Los pedidos previos siguen protegidos.
+
+
+## 06/11 — Canario 024 fijado en Cloudflare y 3 interruptores todavía apagados
+- Workflow \`tus-preparar-enlace-borrado-pruebas.yml\` actualizado para instalar dos parámetros de coincidencia exacta:
+  - Central \`CENTRAL_TUS_PURGE_CANARY_ORDER = WEB-ENSAYO-DA97408CCD06FFED80433A8E2A3B3FB4\`.
+  - Documentos \`DOCS_TUS_PURGE_CANARY_ORDER = WEB-ENSAYO-DA97408CCD06FFED80433A8E2A3B3FB4\`.
+- La ejecución de Cloudflare [42205754837](https://github.com/hernanchan/COTIZADOR/actions/runs/42205754837) terminó **SUCCESS**, confirmó bindings + 3 flags **OFF**, acceso Basic protegido y health \`paymentsEnabled=false\`. **Ningún DELETE**.
+- Versiones verificadas desde GET deployments Cloudflare:
+  - Documentos \`992bee3f-0e4b-4710-b340-f8849e559733\`.
+  - Central \`fe2a6411-163a-4cf1-852b-fd92b4bd0d8d\`.
+- Inventario Supabase tras el despliegue: **41 objetos = 40 históricos + 1 canario**, total 211.852.378 bytes.
+- Estado del canario: \`pending payment\`, no entregado. Mientras falta pago Sandbox real, **no habilitar la cola ni el ejecutor**. No marcar artificialmente \`paid\` ni \`verified\` en D1.
+- El siguiente paso requiere completar compra de prueba de la orden 024 con un comprador Sandbox y verificar webhook/conciliación auténtica; sólo entonces activar temporalmente 3 compuertas de prueba, pulsar \`Entregado\`, verificar borrado exacto en Storage y auditoría D1. Apagar compuertas al final.
