@@ -23,7 +23,7 @@ jobs:
         shell: bash
         env:
           ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
-          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+          TOKEN: ${{ secrets.SABER_CF_EDITOR_TOKEN }}
         run: |
           set -euo pipefail
           if [ -z "$ACCOUNT" ] || [ -z "$TOKEN" ]; then
