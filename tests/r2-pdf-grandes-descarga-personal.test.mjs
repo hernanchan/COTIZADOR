@@ -41,7 +41,7 @@ function fingerprint(){
  }
  return hash.digest('hex');
 }
-async function ready({corrupt=false,short=false}={}){
+async function ready({corrupt=false,short=false,swap=false}={}){
  const sha256=fingerprint();
  const key='r2-v1/'+orderId+'/'+uuid+'.pdf';
  let reads=0;
@@ -50,9 +50,13 @@ async function ready({corrupt=false,short=false}={}){
   DOCS_R2_RECEIPT_KEY:secret,
   SABER_R2_GRANDES:{
    createMultipartUpload:async()=>({uploadId:'upload-prueba-personal-45'}),
-   get:async requested=>{
+   get:async (requested,options)=>{
     assert.equal(requested,key);reads++;
-    return {size:total,body:stream({corrupt,short})};
+    if(reads===2){
+     assert.equal(options?.onlyIf?.etagMatches,'etag-verified-original-45');
+     if(swap)return {size:total,etag:'etag-swapped-after-verify'};
+    }
+    return {size:total,etag:'etag-verified-original-45',body:stream({corrupt,short})};
    }
   }
  };
@@ -111,6 +115,14 @@ test('sin bandera, objeto alterado o incompleto jamás entrega el original',asyn
  });
  assert.equal(response.status,422);
  assert.equal(incomplete.reads,1);
+});
+test('un objeto sustituido tras el SHA no se entrega aunque el tamaño coincida',async()=>{
+ const f=await ready({swap:true});
+ const response=await descargarR2GrandePersonal(f.request(),f.env,{
+  authorized:true,now,subtle:webcrypto.subtle,digestFactory
+ });
+ assert.equal(response.status,409);
+ assert.equal(f.reads,2);
 });
 test('ni acceso con Origin cruzado ni comprobante cambiado',async()=>{
  const f=await ready();
