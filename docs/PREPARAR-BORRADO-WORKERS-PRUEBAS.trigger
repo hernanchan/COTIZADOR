@@ -4,3 +4,6 @@
 RUN_PRIVATE_WORKERS_PURGE_LINK_PREFLIGHT_2026_11_06
 # Actualización de seguridad: aplicar canaria obligatoria de pedido en ambos Workers.
 REDEPLOY_CANARY_GUARD_2026_11_06
+# Protección positiva: configurar sólo WEB-ENSAYO-DA97408CCD06FFED80433A8E2A3B3FB4 en Central y Documentos.
+# Las tres compuertas deben permanecer OFF.
+DEPLOY_CANARIA_024_FLAGS_OFF_2026_11_06
