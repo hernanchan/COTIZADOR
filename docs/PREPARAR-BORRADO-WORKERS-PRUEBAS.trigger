@@ -29,3 +29,7 @@ DEPLOY_SAFE_CUTOFF_NEW_ORDERS_20261106
 # Portada V3: CTA de impresiones al cotizador público existente, enlace a nuevo privado y texto sin carrito mixto ficticio.
 # Desplegar únicamente Workers de pruebas conservando 3 flags de purga OFF.
 DEPLOY_RETAIL_PREVIEW_COTIZAR_LINK_20261106
+
+# Nuevo acceso cliente quote-only con Turnstile. Desplegar en pruebas con bandera OFF,
+# sin permitir TUS ni pedidos ni pagos. Preservar los demás bindings.
+DEPLOY_CUSTOMER_QUOTE_GATE_DEFAULT_OFF_20261106
