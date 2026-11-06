@@ -115,10 +115,10 @@ export async function leerObjetoTUSPrivado(env,objectName,{fetcher=fetch}={}){
  const url=STORAGE+'/storage/v1/object/'+BUCKET+'/'+pathUrl(objectName);
  const r=await fetcher(url,{headers:privateHeaders(env),redirect:'manual'});
  if(r.status>=300&&r.status<400)throw Error('Redirección de Storage privada bloqueada.');
- if(!r.ok||Number(r.headers.get('Content-Length')||0)>20*1024*1024)
+ if(!r.ok||Number(r.headers.get('Content-Length')||0)>40*1024*1024)
   throw Error('No se pudo leer el PDF privado.');
  const bytes=new Uint8Array(await r.arrayBuffer());
- if(bytes.byteLength<5||bytes.byteLength>20*1024*1024)
+ if(bytes.byteLength<5||bytes.byteLength>40*1024*1024)
   throw Error('PDF ausente o fuera del límite autorizado.');
  return bytes;
 }
@@ -361,7 +361,7 @@ export async function consultarReciboTUSFirmadoD1(env,orderId,receiptId,{
     data.webOrderId!==orderId||data.receiptId!==receiptId||
     data.paymentAuthorized!==false||data.listoParaProducir!==false||
     !SHA.test(data.sha256||'')||
-    !Number.isSafeInteger(data.bytes)||data.bytes<5||data.bytes>20*1024*1024||
+    !Number.isSafeInteger(data.bytes)||data.bytes<5||data.bytes>40*1024*1024||
     !Number.isSafeInteger(data.pages)||data.pages<1||data.pages>2000)
   throw Error('D1 devolvió un recibo fuera del pedido.');
  return Object.freeze(data);
@@ -382,7 +382,7 @@ export async function descargarPdfTUSPersonal(request,env,{
   const entry=await revisarD1(env,input.orderId,input.receiptId);
   if(!entry||entry.receiptId!==input.receiptId||entry.webOrderId!==input.orderId||
     entry.found!==true||!SHA.test(entry.sha256||'')||
-    !Number.isSafeInteger(entry.bytes)||entry.bytes<5||entry.bytes>20*1024*1024)
+    !Number.isSafeInteger(entry.bytes)||entry.bytes<5||entry.bytes>40*1024*1024)
    throw Error('El archivo no pertenece al pedido registrado.');
   const path='v2/'+input.orderId+'/'+input.receiptId.slice(4)+'.pdf';
   const bytes=await leerObjetoTUSPrivado(env,path,{fetcher});
