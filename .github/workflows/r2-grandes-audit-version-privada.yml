@@ -1,0 +1,55 @@
+name: R2 - verificar recursos reales de version INACTIVA (solo GET)
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/r2-grandes-audit-version-privada.yml]
+permissions:
+  contents: read
+jobs:
+  auditar-version:
+    if: github.ref == 'refs/heads/integracion/tus-pedido-privado-20261101'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Comparar los bindings REALES de la version inactiva con el Worker activo
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-documentos-pruebas"
+          version='67f61c11-fe13-4193-aa30-e76450ed8597'
+          auth="Authorization: Bearer $TOKEN"
+          tmp=$(mktemp -d)
+          trap 'rm -rf "$tmp"' EXIT
+          h1=$(curl -sS --max-time 30 -H "$auth" -o "$tmp/live.json" -w '%{http_code}' "$root/settings")
+          h2=$(curl -sS --max-time 30 -H "$auth" -o "$tmp/version.json" -w '%{http_code}' "$root/versions/$version")
+          echo "READ_ONLY_HTTP_LIVE=$h1 READ_ONLY_HTTP_VERSION=$h2"
+          test "$h1" = 200 && test "$h2" = 200
+          jq -e '.success==true and (.result.bindings|type=="array")' "$tmp/live.json" >/dev/null
+          jq -e --arg v "$version" '.success==true and .result.id==$v' "$tmp/version.json" >/dev/null
+          btype=$(jq -r '.result.resources.bindings|type' "$tmp/version.json")
+          if [ "$btype" != array ]; then echo "CANDIDATE_BINDINGS_UNEXPECTED_TYPE=$btype"; exit 1; fi
+          jq -S '[.result.bindings[]|{name,type}]|sort_by(.name)' "$tmp/live.json" > "$tmp/live-signature"
+          jq -S '[.result.resources.bindings[]|{name,type}]|sort_by(.name)' "$tmp/version.json" > "$tmp/version-signature"
+          if ! cmp -s "$tmp/live-signature" "$tmp/version-signature"; then
+            echo "VERSION_BINDING_SET_DIFFERENT_NO_DEPLOY"
+            # Solo identificadores de bindings, sin valores ni secretos.
+            jq -r '[.result.bindings[]|.name]|sort|join(",")' "$tmp/live.json" | sed 's/^/ACTIVE_BINDING_NAMES=/'
+            jq -r '[.result.resources.bindings[]|.name]|sort|join(",")' "$tmp/version.json" | sed 's/^/STAGED_BINDING_NAMES=/'
+            exit 1
+          fi
+          jq -e '.result.resources.bindings|any(.name=="SABER_R2_GRANDES" and .type=="r2_bucket" and .bucket_name=="saber-documentos-grandes-ensayo-20261106")' "$tmp/version.json" >/dev/null
+          jq -e '.result.resources.bindings|any(.name=="SABER_CENTRAL" and .type=="service" and .service=="saber-pagos-pruebas")' "$tmp/version.json" >/dev/null
+          jq -e '.result.resources.bindings|all(.[]|select(.name=="DOCS_R2_BIG_ENABLED" or .name=="DOCS_R2_QUOTA_ENABLED" or .name=="DOCS_R2_STAGING_ENABLED");.type=="plain_text" and .text=="OFF")' "$tmp/version.json" >/dev/null
+          curl -fsS --max-time 30 -H "$auth" "$root/deployments" > "$tmp/deployments.json"
+          active=$(jq -er '.result.deployments[0].versions | if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/deployments.json")
+          test "$active" = '82ded703-0b3b-4e4b-ac7f-b312a78f78ea' || { echo "ACTIVE_VERSION_MOVED_NO_DEPLOY"; exit 1; }
+          echo "R2_STAGED_VERSION_BINDINGS_IDENTICAL_ACTIVE_R2_OFF"
+          echo "ACTIVE_VERSION_UNCHANGED=$active"
+          echo "READ_ONLY_NO_R2_UPLOAD_NO_PAYMENT_NO_DEPLOY"
