@@ -138,19 +138,20 @@ function scenario({paid=true,delivered=true,canary=webOrder,storageFailure=false
   state.network++;
   return recibirLimpiezaEntregadaInterna(request,documentEnv,{
    central:async web=>{
+    state.lastStage='plan';
     const response=await vm.runInContext('centralTUSDeliveryPurgePlan',context)(
      await sign('/internal/central/tus-purge-plan',{
       schema:'saber-central-tus-purge-plan-v1',webOrderId:web}),centralEnv);
-    if(response.status!==200)throw Error('Central denied plan');
+    if(response.status!==200){state.lastError='plan HTTP '+response.status+' '+await response.text();throw Error(state.lastError)}
     return planDeBorradoEntregado(await response.json(),web);
    },
-   remove:(plan,e)=>eliminarYConfirmarObjetos(plan,e,{fetcher:storage}),
+   remove:async(plan,e)=>{state.lastStage='storage';try{return await eliminarYConfirmarObjetos(plan,e,{fetcher:storage})}catch(error){state.lastError=String(error);throw error}},
    ack:async (_env,p)=>{
     const r=await receiveAck(await sign('/internal/central/tus-purge-complete',{
      schema:'saber-central-tus-purge-complete-v1',
      webOrderId:p.webOrderId,productionVersion:p.version,deletedCount:p.count
     }),centralEnv);
-    if(!r.ok)throw Error('Ack denied '+r.status);
+    if(!r.ok){state.lastError='ack denied '+r.status+' '+await r.text();throw Error(state.lastError)}
     return r.json();
    }
   });
@@ -162,7 +163,7 @@ test('Pago y Entregado verdaderos en D1 SIMULADO: encola, HMAC, borra, certifica
  const first=await queued(env,order,3,'Ensayo');
  assert.equal(first.state,'pending');
  const result=await processQueue(env,{orderId:order,limit:1});
- assert.equal(result.processed,1);
+ assert.equal(result.processed,1,JSON.stringify({lastStage:state.lastStage,lastError:state.lastError,queue:state.queue,events:state.audit.map(x=>x.phase),calls:state.calls.map(x=>x.method)}));
  assert.equal(result.errors,0);
  assert.equal(state.queue.state,'completed');
  assert.deepEqual(state.audit.map(x=>x.phase),['queued','attempt','completed']);
@@ -197,7 +198,7 @@ test('Si falla Storage, deja error auditable y conserva bytes para reintento',as
  assert.equal(state.storage.has(historicalPath),true);
  state.storageFailure=false;
  const next=await processQueue(env,{orderId:order,limit:1});
- assert.equal(next.processed,1);
+ assert.equal(next.processed,1,JSON.stringify({lastStage:state.lastStage,lastError:state.lastError,queue:state.queue,calls:state.calls.map(x=>x.method)}));
  assert.equal(state.queue.state,'completed');
  assert.equal(state.storage.has(originalPath),false);
  assert.equal(state.storage.has(historicalPath),true);
