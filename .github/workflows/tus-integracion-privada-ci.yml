@@ -26,7 +26,8 @@ jobs:
       - name: Contrato R2 multipart grande, sin cuenta ni despliegue
         run: |
           node --check integraciones/autocotizador/recepcion/r2-pdf-grandes-privado.mjs
-          node --test tests/r2-pdf-grandes-privado.test.mjs
+          node --check integraciones/autocotizador/recepcion/r2-pdf-grandes-cliente.mjs
+          node --test tests/r2-pdf-grandes-privado.test.mjs tests/r2-pdf-grandes-cliente.test.mjs
       - name: Sintaxis de módulos integrados
         run: |
           node --check integraciones/mercadopago/pruebas/worker.js
