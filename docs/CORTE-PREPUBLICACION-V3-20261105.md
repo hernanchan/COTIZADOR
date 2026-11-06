@@ -28,3 +28,12 @@ Se buscó en el Google Drive conectado por «productos», «precios», «inventa
 - No existe un carrito mixto V3 real que genere pago y orden única en D1; prohibido venderlo como integrado.
 
 **Conclusión:** diseño y carrito de productos V3 aprobados en pruebas. **No está autorizado/terminado el lanzamiento comercial.** Evitar rehacer o volver a probar funciones superadas; concentrarse en cerrar estos bloqueos para publicar.
+
+## 06/11 — Navegación comercial conectada en la vista V3 (sin publicar)
+- Se verificó la URL pública existente del cotizador actual: https://libreriasaber.com.ar/cotizar (el enlace cotizar.html redirige allí).
+- En la vista V3 sin contraseña, los CTA de «Cotizar impresiones» / «Ir al cotizador» dejaron de apuntar al aviso inerte y ahora llevan al **cotizador público ya operativo**. No se traslada el carrito de productos de la vista de ensayo: es un recorrido separado.
+- El aviso de la portada incluye «Probar cotizador nuevo (acceso privado)», que abre /prueba-v2/ con la autenticación vigente del operador. La nueva carga TUS sigue cerrada al público; no confundir este acceso con habilitación comercial.
+- La sección Impresión explica con claridad que en esta etapa los pedidos de artículos por WhatsApp y los trabajos de impresión se consultan por separado. Se retiró de la preview el texto que aseguraba un carrito mixto unificado todavía no implementado.
+- Rama de pruebas solamente. CI completa [42221676825](https://github.com/hernanchan/COTIZADOR/actions/runs/42221676825) SUCCESS. Deploy privado [42221785886](https://github.com/hernanchan/COTIZADOR/actions/runs/42221785886) SUCCESS. Worker Documentos versión e27d00f0-1a25-4c10-b09c-a33117a3f551.
+- Seguridad: tres flags de borrado siguen OFF, Mercado Pago real no habilitado, main y sitio público intactos.
+- **Prioridad siguiente:** habilitar el nuevo cotizador TUS para clientes SIN reutilizar cookies ni claves del operador y SIN abrir las rutas de descarga o administración. Requiere sesión pública independiente, verificación antiabuso y bloqueo de pedidos sin pago, y su posterior integración con el carrito comercial. No repetir las pruebas anteriores de tienda/Storage.
