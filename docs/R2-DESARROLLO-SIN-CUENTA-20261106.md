@@ -102,3 +102,5 @@ El titular confirmó que en **Workers → saber-documentos-pruebas → Configura
 - Asociación hecha desde Dashboard de Cloudflare. No se habilitaron flags de subida, no se desplegó código ni se cobró nada en esta etapa.
 
 Comprobación independiente de solo lectura preparada en `.github/workflows/r2-verificar-binding-privado.yml`, utilizando el permiso de despliegue existente de GitHub para **GET** de ajustes sin mostrar secretos. La existencia de la vinculación no acredita todavía transferencia real ni presupuesto de PDFs grandes. Nunca publicar la web ni activar pagos reales en la verificación.
+
+**Vinculación verificada de forma independiente:** GitHub Actions [42309493154](https://github.com/hernanchan/COTIZADOR/actions/runs/42309493154), SUCCESS, mediante GET de settings Cloudflare. Salida `R2_BINDING_VERIFIED_PRIVATE=saber-documentos-grandes-ensayo-20261106`. No se desplegó código, no se crearon objetos R2 ni se activaron pagos.
