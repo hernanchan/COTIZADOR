@@ -104,3 +104,20 @@ El titular confirmó que en **Workers → saber-documentos-pruebas → Configura
 Comprobación independiente de solo lectura preparada en `.github/workflows/r2-verificar-binding-privado.yml`, utilizando el permiso de despliegue existente de GitHub para **GET** de ajustes sin mostrar secretos. La existencia de la vinculación no acredita todavía transferencia real ni presupuesto de PDFs grandes. Nunca publicar la web ni activar pagos reales en la verificación.
 
 **Vinculación verificada de forma independiente:** GitHub Actions [42309493154](https://github.com/hernanchan/COTIZADOR/actions/runs/42309493154), SUCCESS, mediante GET de settings Cloudflare. Salida `R2_BINDING_VERIFIED_PRIVATE=saber-documentos-grandes-ensayo-20261106`. No se desplegó código, no se crearon objetos R2 ni se activaron pagos.
+
+
+## STAGE SEGURO CONFIRMADO — 06/11/2026
+
+- Workflow dedicado: `.github/workflows/r2-grandes-stage-seguro-privado.yml`; [ejecución 42311768698](https://github.com/hernanchan/COTIZADOR/actions/runs/42311768698), **SUCCESS**.
+- Commit que validó la etapa: `2dd57edb71e5e3d29544b2073546112c0e218723`.
+- Se recompiló el Worker completo y se aprobaron pruebas R2 y regresión TUS/portal/ZIP/pagos Sandbox.
+- Preflight Cloudflare con lectura de `settings` y `deployments`: binding `SABER_R2_GRANDES` apunta al bucket correcto; servicio `SABER_CENTRAL` sigue apuntando a `saber-pagos-pruebas`; las compuertas R2 siguen apagadas.
+- **Versión R2 preparada, INACTIVA:** `67f61c11-fe13-4193-aa30-e76450ed8597`.
+- **Versión activa anterior y posterior, sin cambios:** `82ded703-0b3b-4e4b-ac7f-b312a78f78ea`.
+- Alta de versión con `bindings_inherit=strict`: no se sustituyeron ni imprimieron secretos; antes y después se validó que la lista de nombres/tipos de bindings activos coincidiera.
+- Portal sin credenciales: **HTTP 401 antes y después**.
+- **Ninguna promoción/despliegue de versión, carga R2, activación de cobros reales, cambio de `main` o de web comercial**.
+- El punto de reversión conocido es la versión activa `82ded703-0b3b-4e4b-ac7f-b312a78f78ea`; no se necesita rollback ahora porque no se reemplazó.
+- **Siguiente decisión técnica:** preparar ensayo sintético de R2 (80 y 200 MiB en partes de 8 MiB) con autenticación, aislamiento y borrado de prueba; no activar las rutas comerciales R2 antes del parser autoritativo de páginas/medidas, integración D1/ZIP y purga post-entrega.
+
+**Estado exacto:** infraestructura y versión inactiva confirmadas en Cloudflare; todavía **NO** hay 80/200 MiB transferidos realmente, benchmark de R2, cotización de PDFs grandes ni integración comercial.
