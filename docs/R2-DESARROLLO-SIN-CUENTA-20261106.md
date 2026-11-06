@@ -25,3 +25,20 @@ No modificar main ni web pública; pagos reales deshabilitados; sin borrar los 4
 ## Documentación técnica
 https://developers.cloudflare.com/r2/api/workers/workers-api-reference/
 https://developers.cloudflare.com/r2/objects/upload-objects/
+
+## Avance de integración del 06/11 — API, hash y módulo comprador compilado
+
+- `r2-pdf-grandes-api-privada.mjs`: iniciar, PUT parte, completar y verificar; exige flag `DOCS_R2_BIG_ENABLED=PRIVATE_TEST_ONLY`, binding `SABER_R2_GRANDES`, HMAC independiente `DOCS_R2_RECEIPT_KEY`; si falta cualquiera, responde 503. La ruta exige **misma sesión de comprador** vinculada al identificador de pedido mediante las cookies ya existentes, o Basic de personal. Un proof R2 no da acceso por sí solo; ninguna ruta escribe D1 ni habilita cobros.
+- `worker-fase4-cotizador-unificado.mjs`: rutas `/prueba-v2/api/ensayo-r2/{iniciar,parte,completar,verificar}` montadas únicamente en rama privada; no hay despliegue nuevo. Se conserva TUS anterior.
+- `r2-pdf-integridad-stream.mjs`: usa `crypto.DigestStream('SHA-256')` de Cloudflare, lee R2 como flujo y confirma tamaño, cabecera `%PDF-` e identidad SHA-256 contra el recibo firmado **sin cargar en RAM el archivo completo**. Fuente oficial: https://developers.cloudflare.com/workers/runtime-apis/web-crypto/ . **Todavía no analiza/cotiza páginas**, por lo que siempre devuelve `contenidoPdfVerificado:false`, `registeredInD1:false`, `paymentAuthorized:false`.
+- `r2-pdf-grandes-cliente.mjs`: al completar R2 llama a la etapa adicional `verificar`. Si se interrumpe la respuesta, reintenta verificación **sin volver a cerrar** el multipart.
+- Se genera el activo `r2-pdf-grandes-cliente.txt` con esbuild (`build:v2-r2`) y se reserva `/prueba-v2/r2-grandes.mjs` para el comprador autorizado **solo si hay binding+flag**. El cotizador aún **no llama al módulo**; no hay pantalla nueva ni cargo nuevo.
+- Pruebas sin bucket real: `tests/r2-pdf-grandes-api-privada.test.mjs`, `tests/r2-pdf-integridad-stream.test.mjs` y las pruebas anteriores. Incluyen flujo de 200 MiB sintéticos, corrupción, truncamiento, verificación tras interrupción, origen cruzado y sesión ajena.
+- **CI exitoso**: https://github.com/hernanchan/COTIZADOR/actions/runs/42282983405 (compilación completa, contrato R2 y regresión TUS/portal). **No equivale a probar rendimiento real en R2.**
+
+### Bloqueos técnicos reales antes de habilitar subida del comprador
+1. Configurar R2 por el titular (plan y permisos) y vincular bucket privado; mantener flag R2 OFF hasta culminar pruebas reales.
+2. Limitar cuota mensual y cantidad de cargas simultáneas, bloquear abusos (el acceso comprador por sí solo no es control económico suficiente) y abortar sesiones multipart incompletas por regla de ciclo de vida.
+3. Integrar ficha de PDF R2 con la **verificación de páginas y medidas y presupuesto del servidor**, sin que el Worker intente cargar todo el PDF de 200 MiB en RAM; después registrar D1/seguimiento y habilitar pago Sandbox bajo el contrato de pedido.
+4. Descarga del PDF grande para el operador/ZIP con acceso solo de personal; borrado específico al marcar Entregado.
+5. Cargar 80 y 200 MiB **reales** desde escritorio/celular; medir red y recálculo y contrastar tiempos con Supabase/TUS.
