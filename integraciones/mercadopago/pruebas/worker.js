@@ -313,8 +313,6 @@ async function centralTUSDeliveryPurgePlan(req,env){
     p.schema!=="saber-central-tus-purge-plan-v1"||
     !/^WEB-ENSAYO-[A-F0-9]{32}$/.test(p.webOrderId||""))
   return json({ok:false,error:"Pedido TUS inválido"},422);
- if(await centralTUSFilesPurged(env,p.webOrderId))
-  return json({ok:false,error:"Los PDF se eliminaron después de la entrega"},410);
  await centralTables(env);
  await centralProductionTables(env);
  await ensurePaymentReviews(env);
