@@ -86,3 +86,11 @@ Implementado **API privada**, todavía sin interfaz Central ni despliegue, en:
 **Limitación deliberada:** las reservas quedan contabilizadas hasta que el borrado post-entrega esté probado y pueda liberar cupos. Es una política conservadora, no una promesa de ausencia de cargos: Cloudflare puede cobrar por consumo fuera de su franquicia. Tampoco está resuelto el análisis autoritativo de páginas y medidas para PDF de 200 MiB: `pdf-lib` actual necesita el archivo completo y el Worker tiene memoria limitada. No habilitar flags de R2 ni cobros reales.
 
 Referencias: https://developers.cloudflare.com/r2/api/workers/workers-api-reference/ (range y ETag condicional), https://mozilla.github.io/pdf.js/api/draft/module-pdfjsLib.html (PDF.js con transporte parcial; no se ha validado aptitud en Worker para 200 MiB).
+
+## R2 ACTIVADO POR EL TITULAR — 06/11/2026
+
+Captura del Dashboard Cloudflare recibida: bucket `saber-documentos-grandes-ensayo-20261106` creado en **Standard**, **Acceso público deshabilitado**, tamaño **0 B**. La activación R2 en la cuenta fue confirmada visualmente; ningún PDF de clientes está allí.
+
+Se relanzó verificación idempotente desde GitHub Actions: https://github.com/hernanchan/COTIZADOR/actions/runs/42307358868. Bloqueo **R2_BLOCKED: falta secreto `SABER_CF_R2_ADMIN_TOKEN`**. No se intentó alterar ni recrear un bucket por falta de credenciales. No volver a pedir creación del bucket.
+
+**Próximo paso mínimo:** vincular directamente el bucket al Worker **de pruebas** `saber-documentos-pruebas` con nombre de binding **`SABER_R2_GRANDES`** en Cloudflare Dashboard (sin generar token S3 ni hacer bucket público). No habilitar banderas, no desplegar Workers ni hacer uploads hasta completar parser autoritativo y verificar el enlace. En paralelo decidir método seguro de actualización Worker para no interferir con TUS vigente.
