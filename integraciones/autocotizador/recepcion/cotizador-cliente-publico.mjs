@@ -171,3 +171,94 @@ export async function manejarCotizadorCliente(request,env,{
   '; Secure; HttpOnly; SameSite=Strict'
  });
 }
+
+
+/**
+ * Compradores de prueba: permiso DISTINTO del presupuesto preliminar y
+ * de la cookie del operador. La autorización no habilita descargas ni
+ * modificaciones administrativas; los endpoints deben verificarla por ruta.
+ * OFF por defecto, exclusivamente en Worker de ensayo.
+ */
+const ORDER_PATH='/prueba-v2/pedido-cliente';
+const ORDER_COOKIE='saber_pedido_client_v1';
+const ORDER_AGE=3600;
+const orderOn=env=>on(env)&&env?.DOCS_PUBLIC_ORDER_GATE_ENABLED==='PRIVATE_TEST_ONLY';
+async function orderMac(env,ts,nonce,subtle){
+ const k=await subtle.importKey('raw',new TextEncoder().encode(env.DOCS_TURNSTILE_SECRET),
+  {name:'HMAC',hash:'SHA-256'},false,['sign']);
+ const signed=await subtle.sign('HMAC',k,
+  new TextEncoder().encode('saber-pedido-comprador-ensayo-v1\n'+ts+'\n'+nonce));
+ return hex(new Uint8Array(signed));
+}
+export async function autorizadoPedidoCliente(request,env,{now=Date.now(),subtle=crypto.subtle}={}){
+ if(!orderOn(env))return false;
+ const cookie=request.headers.get('Cookie')||'';
+ if(cookie.length>4096)return false;
+ const m=cookie.match(/(?:^|;\s*)saber_pedido_client_v1=(\d{10})\.([a-f0-9]{32})\.([a-f0-9]{64})(?=;|$)/);
+ if(!m)return false;
+ const issued=Number(m[1]),seconds=Math.floor(now/1000);
+ if(!Number.isSafeInteger(issued)||issued>seconds+30||seconds-issued>ORDER_AGE)return false;
+ return equal(await orderMac(env,m[1],m[2],subtle),m[3]);
+}
+function orderEntryPage(siteKey){
+ return entryPage(siteKey)
+  .replaceAll('/prueba-v2/cotizar-cliente',ORDER_PATH)
+  .replace('data-action="saber_quote"','data-action="saber_pedido"')
+  .replace('<title>Cotizar mis PDF · Librería Saber</title>','<title>Enviar mis PDF · Librería Saber</title>')
+  .replace('<h1>Cotizá tus PDF</h1>','<h1>Enviá tus PDF</h1>')
+  .replace('Calculá un presupuesto preliminar de impresión. Tus archivos se analizan en el navegador: no se envían al negocio ni se genera un pedido.',
+   'Accedé al cotizador completo: archivos, presupuesto, envío, pago de prueba y seguimiento. No se realizan cobros reales.')
+  .replace('No pudimos verificar el acceso.','No pudimos verificar el acceso de comprador.');
+}
+export async function manejarPortalPedidosCliente(request,env,{
+ fetcher=fetch,now=Date.now(),random=()=>crypto.getRandomValues(new Uint8Array(16)),
+ subtle=crypto.subtle,paginaPedido=null
+}={}){
+ if(!orderOn(env))return reply({ok:false,error:'Envío de pedidos todavía no habilitado'},503);
+ const url=new URL(request.url);
+ if(url.pathname!==ORDER_PATH||!['GET','POST'].includes(request.method))
+  return reply({ok:false,error:'Ruta no admitida'},405);
+ if(request.method==='GET'){
+  if(await autorizadoPedidoCliente(request,env,{now,subtle})){
+   const page=typeof paginaPedido==='function'?paginaPedido():null;
+   if(typeof page!=='string'||!page.includes('id="send-all-pdf"'))
+    return reply({ok:false,error:'Portal de pedidos no disponible'},503);
+   return new Response(page,{headers:htmlHeaders(
+    "default-src 'none'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://cdnjs.cloudflare.com https://releases.transloadit.com; style-src 'unsafe-inline'; frame-src 'self' https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com https://*.supabase.co https://releases.transloadit.com; img-src 'self' data:; worker-src 'self' blob: https://cdnjs.cloudflare.com; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+   )});
+  }
+  return new Response(orderEntryPage(env.DOCS_TURNSTILE_SITE_KEY),{headers:htmlHeaders(
+   "default-src 'none'; script-src 'unsafe-inline' https://challenges.cloudflare.com; style-src 'unsafe-inline'; frame-src https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+  )});
+ }
+ if(request.headers.get('Origin')!==url.origin||
+   (request.headers.get('Sec-Fetch-Site')&&!['same-origin','none'].includes(request.headers.get('Sec-Fetch-Site')))||
+   !/^application\/json(?:;|$)/i.test(request.headers.get('Content-Type')||''))
+  return reply({ok:false,error:'Origen no autorizado'},403);
+ let data;
+ try{
+  const raw=await request.text();if(raw.length>3200)throw Error('length');
+  data=JSON.parse(raw);
+  if(!data||typeof data!=='object'||Array.isArray(data)||
+   Object.keys(data).join(',')!=='token'||typeof data.token!=='string'||
+   data.token.length<10||data.token.length>2048)throw Error('token');
+ }catch{return reply({ok:false,error:'Verificación inválida'},422)}
+ let verified;
+ try{
+  const r=await fetcher('https://challenges.cloudflare.com/turnstile/v0/siteverify',{
+   method:'POST',redirect:'manual',signal:AbortSignal.timeout(10000),
+   body:new URLSearchParams({secret:env.DOCS_TURNSTILE_SECRET,response:data.token})
+  });
+  if(!r.ok)return reply({ok:false,error:'Verificación no disponible'},503);
+  verified=await r.json();
+ }catch{return reply({ok:false,error:'Verificación no disponible'},503)}
+ if(verified?.success!==true||verified?.hostname!==url.hostname||verified?.action!=='saber_pedido')
+  return reply({ok:false,error:'No se pudo verificar el acceso'},403);
+ const bytes=random();
+ if(!(bytes instanceof Uint8Array)||bytes.length!==16)return reply({ok:false,error:'Sesión no disponible'},503);
+ const ts=String(Math.floor(now/1000)),nonce=hex(bytes),signature=await orderMac(env,ts,nonce,subtle);
+ return reply({ok:true,mode:'pedido-prueba',payments:'sandbox-only'},200,{
+  'Set-Cookie':ORDER_COOKIE+'='+ts+'.'+nonce+'.'+signature+'; Path=/; Max-Age='+ORDER_AGE+
+   '; Secure; HttpOnly; SameSite=Strict'
+ });
+}
