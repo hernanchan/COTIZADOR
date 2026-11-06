@@ -80,7 +80,7 @@ jobs:
           for item in DOCS_TUS_PRIVATE_ENABLED DOCS_CENTRAL_SYNC_ENABLED DOCS_ORDER_PREPARE_ENABLED DOCS_CLIENT_SANDBOX_CHECKOUT_ENABLED; do
             jq -e --arg k "$item" '.result.bindings|any(.name==$k and .text=="PRIVATE_TEST_ONLY")' "$tmp/settings.json" >/dev/null
           done
-          jq -e '.result.bindings|all(select(.name=="DOCS_PUBLIC_ORDER_GATE_ENABLED"); .text=="OFF")' "$tmp/settings.json" >/dev/null
+          jq -e '.result.bindings|all(.[]|select(.name=="DOCS_PUBLIC_ORDER_GATE_ENABLED"); .text=="OFF")' "$tmp/settings.json" >/dev/null
           jq -n --slurpfile s "$tmp/settings.json" \
             '{main_module:"index.mjs",annotations:{"workers/message":"Comprador V3: TUS existente y Sandbox solamente; staff protegido"},
              bindings:([$s[0].result.bindings[]|select(.name!="DOCS_PUBLIC_ORDER_GATE_ENABLED")|{name,type:"inherit"}]+
