@@ -52,6 +52,7 @@ import preciosPiloto from '../../../precios-web.json';
 import {obtenerTarifarioD1Privado} from './obtener-tarifario-d1-privado.mjs';
 import {verificarPdfAlmacenado} from './verificacion-pdf-drive-servidor.mjs';
 import {tusPrivadoConfigurado,diagnosticarTUSPrivado,comprobarTUSAntesDeEnviar,iniciarTandaTUSPrivada,finalizarPedidoTUSPrivado,recuperarPedidoTUSPrivado,descargarPdfTUSPersonal} from './tus-pedido-worker.mjs';
+import {manejarR2GrandePrivado} from './r2-pdf-grandes-api-privada.mjs';
 /**
  * SABER — DOCUMENTOS — ARCHIVO ÚNICO LISTO PARA PEGAR EN CLOUDFLARE
  *
@@ -2119,6 +2120,21 @@ export default {
     if(page==='/api/ensayo-probar-puente-central')return diagnosticoPuenteCentral(request,env);
     if(page==='/api/ensayo-preparar-documentos-v2')return apiFichaCentralPrivada(request,env,false,false,false,true,false,true);
     if(page==='/api/ensayo-preparar-documentos-v2-lote')return apiPrepararDocumentosV2Lote(request,env);
+    // R2 de PDF grandes: mismo acceso que TUS pero bandera independiente.
+    // Sin bucket ni llave de firma, devuelve 503; nunca registra D1 o pagos.
+    // El comprador solo sube partes para SU orden vinculada; el personal usa Basic.
+    if(page.startsWith('/prueba-v2/api/ensayo-r2/')){
+      const basic=v2PrivateBrowserAuthorized(request,env)==='allow';
+      const staff=basic||await v2SessionAuthorized(request,env);
+      const buyer=!staff&&await autorizadoPedidoCliente(request,env);
+      return manejarR2GrandePrivado(request,env,{
+       autorizadoIniciar:async()=>staff||buyer,
+       autorizadoOrden:async orderId=>staff||
+        (buyer&&await autorizadoPedidoClienteVinculado(request,env,orderId)),
+       vincularOrden:async orderId=>buyer?
+        cookiePedidoClienteVinculado(request,env,orderId):null
+      });
+    }
     // V1 TUS: solo entorno privado y autorizado, nunca comercial ni pagos.
     // Ficha D1 para el ZIP, estrictamente Basic del operador.
     // Canario 024: Basic de operador + HMAC interno; sin credenciales en navegador.
