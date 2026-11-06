@@ -44,7 +44,6 @@ const allow=(req,env)=>{
  if(!authorization.startsWith('Basic ')||authorization.length>400)return false;
  let basic;try{basic=atob(authorization.slice(6))}catch{return false}
  return exact(basic,'operador:'+env.DOCS_V2_PRIVATE_UI_SECRET)&&
-  exact(req.headers.get('x-saber-disposable-nonce'),'012345678901234567890123456789012345678901234567')===false&&
   exact(req.headers.get('x-saber-disposable-nonce'),env.DOCS_CANARY_DISPOSAL_NONCE);
 };
 export async function borrarCanariaSinteticaUnica(request,env,{fetcher=fetch,subtle=crypto.subtle}={}){
