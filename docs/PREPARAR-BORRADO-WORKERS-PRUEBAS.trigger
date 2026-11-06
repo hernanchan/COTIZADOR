@@ -33,3 +33,7 @@ DEPLOY_RETAIL_PREVIEW_COTIZAR_LINK_20261106
 # Nuevo acceso cliente quote-only con Turnstile. Desplegar en pruebas con bandera OFF,
 # sin permitir TUS ni pedidos ni pagos. Preservar los demás bindings.
 DEPLOY_CUSTOMER_QUOTE_GATE_DEFAULT_OFF_20261106
+
+# Enlazar directamente desde la tienda V3 al cotizador nuevo de presupuesto preliminar.
+# Preservar flag actual de acceso cliente quote-only y mantener 3 flags de purga OFF.
+DEPLOY_V3_LINK_CUSTOMER_QUOTE_GATE_PRESERVE_ENABLED_20261106
