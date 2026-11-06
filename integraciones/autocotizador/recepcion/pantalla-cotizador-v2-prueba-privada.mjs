@@ -1423,3 +1423,31 @@ if(TUS_ENABLED){
 }
 </script></body></html>`;
 }
+
+
+/**
+ * Mismo cotizador TUS probado, con presentación de comprador.
+ * No inserta claves ni cookies del personal. El Worker decide qué rutas
+ * están autorizadas; ocultar controles en HTML NO equivale a autorizar APIs.
+ */
+export function paginaCotizadorTUSClientePruebas(sitekey,tusEnabled,tusDiagnostico,sandboxEnabled){
+ let html=paginaCotizadorV2PruebaPrivada(sitekey,tusEnabled,tusDiagnostico,sandboxEnabled);
+ html=html
+  .replace('<title>Librería Saber · Ensayo privado V2</title>',
+   '<title>Impresiones y ploteos · Librería Saber</title>')
+  .replace('LIBRERÍA SABER · Cotizador V2 en ensayo privado',
+   'LIBRERÍA SABER · Impresiones y ploteos')
+  .replace('Solo pagos con usuarios de prueba; sin cobros reales ni publicación comercial.',
+   'Entorno de ensayo · Los pagos usan Mercado Pago Sandbox, sin dinero real.')
+  .replace('Sin cobros, sin órdenes de producción y sin publicación comercial.',
+   'Entorno de ensayo · No se realizan cobros reales.')
+  .replace('Detalles de la recepción y verificación (ensayo privado)',
+   'Detalles técnicos de la carga')
+  .replace("location.assign('/prueba-v2/');",
+   "location.assign('/prueba-v2/pedido-cliente');")
+  .replace("const modoDiagnostico=new URLSearchParams(location.search).get('diagnostico')==='1';",
+   'const modoDiagnostico=false;')
+  .replace('src="/prueba-v2/cotizador?integrado=1&ensayoArchivos=1"',
+   'src="about:blank"');
+ return html;
+}
