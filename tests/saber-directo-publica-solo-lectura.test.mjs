@@ -16,6 +16,12 @@ for (const [name,html] of [['portada',home],['ofertas',offers]]){
   assert.doesNotMatch(rendered,/href="https:\/\/wa\.me\//);
   assert.doesNotMatch(rendered,/onclick=|onerror=/i);
   assert.doesNotMatch(rendered,/href="cotizar\.html"/);
+  if(name==='portada'){
+   assert.match(rendered,/href="https:\/\/libreriasaber\.com\.ar\/cotizar"/);
+   assert.match(rendered,/Probar cotizador nuevo \(acceso privado\)/);
+   assert.match(rendered,/los artículos y los trabajos de impresión se consultan por separado/);
+   assert.doesNotMatch(rendered,/El trabajo vuelve automáticamente a este carrito/);
+  }
   if(name==='portada')assert.match(rendered,/href="#preview-aviso"/);
   else assert.match(rendered,/href="\/prueba-v2\/diseno-sin-clave"/);
   assert.match(rendered,/class="brand"/);
