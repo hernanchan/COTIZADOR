@@ -58,6 +58,7 @@ const db={
  }
 };
 const env={DB:db,CENTRAL_BRIDGE_ENABLED:'PRIVATE_TEST_ONLY',CENTRAL_BRIDGE_KEY:secret,
+ CENTRAL_TUS_PURGE_CANARY_ORDER:webOrderId,
  DEMO_ADMIN_KEY:'DIFFERENT_SECRET',MP_WEBHOOK_SECRET:'DIFFERENT_WEBHOOK'};
 async function signed(body,override={}){
  const ts=String(Math.floor(Date.now()/1000));
