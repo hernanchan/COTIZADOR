@@ -23,11 +23,11 @@ jobs:
         shell: bash
         env:
           ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
-          TOKEN: ${{ secrets.SABER_CF_EDITOR_TOKEN }}
+          TOKEN: ${{ secrets.SABER_CF_R2_ADMIN_TOKEN }}
         run: |
           set -euo pipefail
           if [ -z "$ACCOUNT" ] || [ -z "$TOKEN" ]; then
-            echo "R2_BLOCKED: falta credencial de despliegue Cloudflare ya conectada"; exit 1
+            echo "R2_BLOCKED: falta secreto SABER_CF_R2_ADMIN_TOKEN con Workers R2 Storage Write"; exit 1
           fi
           api="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/r2/buckets"
           name="saber-documentos-grandes-ensayo-20261106"
