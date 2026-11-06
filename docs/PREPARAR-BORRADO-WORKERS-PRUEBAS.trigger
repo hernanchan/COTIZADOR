@@ -18,3 +18,7 @@ REDEPLOY_SANDBOX_CANARY_WITH_EXISTING_ADMIN_VALIDATOR
 # 06/11: Supabase Storage HEAD del PDF ya eliminado devuelve HTTP400 NoSuchKey.
 # Recompilar Documentos con confirmación adicional /object/info, sin habilitar la purga.
 DEPLOY_NO_SUCH_KEY_CONFIRMED_PATCH_FLAGS_OFF_20261106
+
+# Canario 024 eliminado, no permitir iniciar otra preferencia MP.
+# Guardar 3 flags de eliminación en OFF al desplegar el bloqueo 410.
+DEPLOY_RETIRED_CANARY_024_CHECKOUT_BLOCKED_20261106
