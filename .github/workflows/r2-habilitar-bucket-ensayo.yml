@@ -1,0 +1,64 @@
+name: R2 - crear bucket privado de PDF grandes SOLO ensayos
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [docs/HABILITAR-R2-ENSAYO.trigger]
+permissions:
+  contents: read
+concurrency:
+  group: saber-r2-activar-ensayo
+  cancel-in-progress: false
+jobs:
+  habilitar-r2:
+    runs-on: ubuntu-latest
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Consultar disponibilidad R2 y crear bucket privado Standard
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "$ACCOUNT" ] || [ -z "$TOKEN" ]; then
+            echo "R2_BLOCKED: falta credencial de despliegue Cloudflare ya conectada"; exit 1
+          fi
+          api="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/r2/buckets"
+          name="saber-documentos-grandes-ensayo-20261106"
+          work=$(mktemp -d)
+          trap 'rm -rf "$work"' EXIT
+          status=$(curl --silent --show-error --max-time 30 -o "$work/list.json" -w '%{http_code}' -H "Authorization: Bearer $TOKEN" "$api")
+          if [ "$status" != 200 ] || ! jq -e '.success==true' "$work/list.json" >/dev/null; then
+            echo "R2_NOT_AVAILABLE_HTTP=$status"
+            jq -c '{errors:[.errors[]?|{code,message}]}' "$work/list.json" 2>/dev/null || true
+            exit 1
+          fi
+          # Idempotente: nunca modificar ni borrar bucket existente.
+          if jq -e --arg name "$name" '.result.buckets[]?|select(.name==$name)' "$work/list.json" >/dev/null; then
+            echo "R2_BUCKET_ALREADY_EXISTS=$name"
+          else
+            printf '%s' '{"name":"saber-documentos-grandes-ensayo-20261106","storageClass":"Standard"}' > "$work/request.json"
+            status=$(curl --silent --show-error --max-time 30 -o "$work/create.json" -w '%{http_code}' -X POST \
+              -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+              --data-binary "@$work/request.json" "$api")
+            if [ "$status" != 200 ] && [ "$status" != 201 ]; then
+              echo "R2_CREATE_BLOCKED_HTTP=$status"
+              jq -c '{errors:[.errors[]?|{code,message}]}' "$work/create.json" 2>/dev/null || true
+              exit 1
+            fi
+            jq -e '.success==true' "$work/create.json" >/dev/null
+            echo "R2_BUCKET_CREATED=$name"
+          fi
+          status=$(curl --silent --show-error --max-time 30 -o "$work/get.json" -w '%{http_code}' \
+            -H "Authorization: Bearer $TOKEN" "$api/$name")
+          test "$status" = 200
+          jq -e --arg n "$name" '.success==true and .result.name==$n' "$work/get.json" >/dev/null
+          # No se habilita dominio público ni URL r2.dev; no hay originales de clientes.
+          echo "R2_PRIVATE_BUCKET_VERIFIED=$name"
+          echo "NO_PRODUCTION_DEPLOY_NO_CUSTOMER_UPLOAD_NO_REAL_PAYMENTS"
