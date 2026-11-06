@@ -26,6 +26,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.25.12
           node --test tests/tus-cotizador-cliente-publico-solo-precio.test.mjs tests/tus-portal-comprador.test.mjs tests/saber-directo-publica-solo-lectura.test.mjs tests/saber-directo-preview.test.mjs tests/tus-pedido-privado.test.mjs tests/tus-pago-cliente-sandbox.test.mjs
           cd integraciones/autocotizador/recepcion
           npm install --no-audit --no-fund
