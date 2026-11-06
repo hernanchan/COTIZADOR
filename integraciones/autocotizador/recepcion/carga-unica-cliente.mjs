@@ -29,13 +29,33 @@ let variantesCorte=[];
 let productosGrafica=[];
 let abierto=-1;
 let ultimoPresupuesto=null;
+function alertasRecepcionPDF(){
+ const alertas=new Map();
+ if(location.pathname!=='/prueba-v2/carga-inteligente'||window.parent===window)return alertas;
+ let acumulado=0;
+ for(const e of entries){
+  const file=e.archivoOriginal;
+  if(!(file instanceof File))continue;
+  acumulado+=file.size;
+  if(file.size>MAX_PDF_TUS_BYTES)
+   alertas.set(e,'No se admite este archivo: pesa '+tamanoPdfMiB(file)+
+    ' y el máximo actual es 40 MiB por PDF. Los demás archivos siguen cargados.');
+  else if(file.size<5||file.name.length>120||!/\.pdf$/i.test(file.name))
+   alertas.set(e,'No se admite este archivo: debe ser un PDF válido, con nombre de hasta 120 caracteres.');
+  else if(acumulado>MAX_LOTE_TUS_BYTES)
+   alertas.set(e,'Este PDF lleva el pedido a '+(acumulado/(1024*1024)).toFixed(1).replace('.',',')+
+    ' MiB; el máximo combinado es 60 MiB. Quitalo o dividí el pedido.');
+ }
+ return alertas;
+}
 const pesos=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(n);
 function informarPrecioPrivado(estado,total=null,motivo=''){
  if(window.parent===window)return;
- const sendable=estado==='listo'&&ultimoPresupuesto?.estado==='PRELIMINAR';
+ const bloqueoRecepcion=[...alertasRecepcionPDF().values()][0]||'';
+ const sendable=estado==='listo'&&ultimoPresupuesto?.estado==='PRELIMINAR'&&!bloqueoRecepcion;
  window.parent.postMessage({type:'SABER_SMART_PRICE_STATE',estado,
   total:Number.isSafeInteger(total)&&total>0?total:null,
-  sendable,blockReason:estado==='error'?String(motivo||'No se pudo verificar el precio.').slice(0,220):null},location.origin);
+  sendable,blockReason:bloqueoRecepcion||(estado==='error'?String(motivo||'No se pudo verificar el precio.').slice(0,220):null)},location.origin);
 }
 function importeArchivo(indice){
  if(!ultimoPresupuesto)return null;
@@ -330,6 +350,7 @@ function renderAnilladosConjuntos(){
 function render(){
  renderConfiguracionGlobal();
  renderAnilladosConjuntos();
+ const advertenciasRecepcion=alertasRecepcionPDF();
  const lista=$('lista');lista.replaceChildren();
  const grupos=new Map();
  entries.forEach((e,i)=>{
@@ -348,6 +369,8 @@ function render(){
   for(const i of grupo.indices){
   const e=entries[i];
   const card=texto('section','');card.className='archivo';
+  const advertenciaRecepcion=advertenciasRecepcion.get(e);
+  if(advertenciaRecepcion)card.classList.add('archivo-no-admitido');
   const fila=document.createElement('div');fila.className='fila';
   const principal=document.createElement('div');principal.className='fila-principal';
   const nombre=texto('strong',(i+1)+'. '+e.name);nombre.className='nombre';
@@ -371,6 +394,12 @@ function render(){
    resumen.textContent=(e.paginasSeleccionadas?(e.paginasSeleccionadas+' de '+e.paginas.length):(e.paginas.length+' pág.'))+' · '+tipo+(d.confirmado?' '+(d.tamanoFinal==='original'?'original':d.tamanoFinal.toUpperCase()):'')+' · '+e.copias+(e.servicio==='grafica'?' lote(s)':' copia(s)')+((d.confirmado||independiente)?extra+nup:'');
   }else resumen.textContent=e.error?'Error de lectura':'Analizando PDF…';
   principal.append(resumen);
+  if(advertenciaRecepcion){
+   const aviso=texto('p','PDF NO ADMITIDO · '+advertenciaRecepcion);
+   aviso.className='advertencia-recepcion';
+   aviso.setAttribute('role','alert');
+   principal.append(aviso);
+  }
   if(e.paginas&&e.servicio==='auto'){
    const elegidas=paginasElegidas(e)||e.paginas;
    const destino=clasificarDestino(elegidas,e.seleccion);
@@ -437,7 +466,7 @@ function render(){
    if(modoLote!=='comun'||pregunta)principal.append(filaTam);
   }
   fila.append(principal);
-  const importe=texto('span',importeArchivo(i)||(e.error?'Revisar':(e.seleccion==='sin-confirmar'&&!['fotos','corte','grafica'].includes(e.servicio))?'Pendiente':'Por calcular'));
+  const importe=texto('span',advertenciaRecepcion?'No admitido':(importeArchivo(i)||(e.error?'Revisar':(e.seleccion==='sin-confirmar'&&!['fotos','corte','grafica'].includes(e.servicio))?'Pendiente':'Por calcular')));
   importe.className='precio-archivo';fila.append(importe);
   const boton=texto('button',abierto===i?'Cerrar detalles':modoLote==='comun'?'Personalizar este PDF':'Más opciones');
   boton.className='editar';boton.type='button';boton.setAttribute('aria-expanded',String(abierto===i));
@@ -558,7 +587,9 @@ function render(){
  }
  const porConfirmar=entries.filter(x=>x.servicio==='auto'&&x.paginas&&x.seleccion==='sin-confirmar'&&
   decidirTamanoCliente(paginasElegidas(x)||x.paginas).requierePregunta).length;
- $('estado').textContent=leyendo?'Analizando archivos…':
+ $('estado').classList.toggle('estado-recepcion-error',advertenciasRecepcion.size>0);
+ $('estado').textContent=advertenciasRecepcion.size?advertenciasRecepcion.size+' PDF no admitido(s). Revisá la advertencia roja junto al archivo; los demás siguen cargados.':
+  leyendo?'Analizando archivos…':
   porConfirmar?'ATENCIÓN: '+porConfirmar+' PDF con tamaño diferente de A4. Respondé la pregunta de tamaño antes de enviar.':
   entries.length?'Identificados '+entries.length+' PDF. Cotización orientativa, sin subir originales.':
   'Seleccioná tus PDF para comenzar.';
@@ -792,9 +823,10 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
    }
    for(const trabajo of ploteosPendientes)
     window.parent.postMessage(trabajo,location.origin);
+   info.classList.remove('estado-recepcion-error');
    info.textContent='Pedido preparado. Ahora se reciben y verifican los PDF.';
    window.parent.postMessage({type:'SABER_SMART_HANDOFF_READY',cantidad:entries.length},location.origin);
-  }catch(error){info.textContent=String(error.message||error);
+  }catch(error){info.textContent=String(error.message||error);info.classList.add('estado-recepcion-error');
    window.parent.postMessage({type:'SABER_SMART_HANDOFF_ERROR',message:String(error.message||error)},location.origin);
   }
  };
