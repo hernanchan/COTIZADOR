@@ -55,6 +55,7 @@ import {verificarPdfAlmacenado} from './verificacion-pdf-drive-servidor.mjs';
 import {tusPrivadoConfigurado,diagnosticarTUSPrivado,comprobarTUSAntesDeEnviar,iniciarTandaTUSPrivada,finalizarPedidoTUSPrivado,recuperarPedidoTUSPrivado,descargarPdfTUSPersonal} from './tus-pedido-worker.mjs';
 import {manejarR2GrandePrivado} from './r2-pdf-grandes-api-privada.mjs';
 import {descargarR2GrandePersonal} from './r2-pdf-grandes-descarga-personal.mjs';
+import {descargarR2PendientePorD1Personal} from './r2-pdf-descarga-d1-personal.mjs';
 /**
  * SABER — DOCUMENTOS — ARCHIVO ÚNICO LISTO PARA PEGAR EN CLOUDFLARE
  *
@@ -2126,6 +2127,12 @@ export default {
     if(page==='/api/ensayo-probar-puente-central')return diagnosticoPuenteCentral(request,env);
     if(page==='/api/ensayo-preparar-documentos-v2')return apiFichaCentralPrivada(request,env,false,false,false,true,false,true);
     if(page==='/api/ensayo-preparar-documentos-v2-lote')return apiPrepararDocumentosV2Lote(request,env);
+    // Acceso permanente POR D1: recibo consultado por HMAC, sin proof de 2h.
+    // No revela objetos R2 a compradores ni genera pedido cobrable.
+    if(page==='/prueba-v2/api/ensayo-r2-descargar-d1-personal')
+      return descargarR2PendientePorD1Personal(request,env,{
+       authorized:v2PrivateBrowserAuthorized(request,env)==='allow'
+      });
     // Originales grandes: descarga exclusiva del personal autorizado por Basic.
     // Nunca basta la cookie del comprador, y no se publica URL directa de R2.
     if(page==='/prueba-v2/api/ensayo-r2-descargar-personal')
