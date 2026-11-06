@@ -49,7 +49,7 @@ test('Compuerta apagada: marcar entregado NO encola ni borra archivos',async()=>
 });
 test('Solo encola TUS entregado con pago verificado; idempotente',async()=>{
  pending=null;writes=0;queries=0;delivered=true;verified=true;
- const env={DB,CENTRAL_TUS_PURGE_QUEUE_ENABLED:'PRIVATE_TEST_ONLY'};
+ const env={DB,CENTRAL_TUS_PURGE_QUEUE_ENABLED:'PRIVATE_TEST_ONLY',CENTRAL_TUS_PURGE_CANARY_ORDER:web};
  const a=await queue(env,order,3,'Mostrador');
  assert.equal(a.state,'pending');
  assert.equal(a.filesDeleted,0);
@@ -60,7 +60,7 @@ test('Solo encola TUS entregado con pago verificado; idempotente',async()=>{
 });
 test('Bloquea pago sin verificar o trabajo que aún no está entregado',async()=>{
  pending=null;writes=0;
- const env={DB,CENTRAL_TUS_PURGE_QUEUE_ENABLED:'PRIVATE_TEST_ONLY'};
+ const env={DB,CENTRAL_TUS_PURGE_QUEUE_ENABLED:'PRIVATE_TEST_ONLY',CENTRAL_TUS_PURGE_CANARY_ORDER:web};
  delivered=false;
  let r=await queue(env,order,3,'Mostrador');
  assert.equal(r.state,'no_elegible');
@@ -76,4 +76,14 @@ test('El cambio a ENTREGADO mantiene la cola a resguardo y nunca llama Storage',
  assert.match(fn,/if\(d\.to==='entregado'\)/);
  assert.match(fn,/centralQueueDeliveryCleanup/);
  assert.doesNotMatch(fn,/storage\.supabase\.co|DELETE|remove\(/);
+});
+
+test('Ni otra orden ni una canaria sin configurar pueden ingresar a la cola',async()=>{
+ pending=null;writes=0;queries=0;delivered=true;verified=true;
+ const unset=await queue({DB,CENTRAL_TUS_PURGE_QUEUE_ENABLED:'PRIVATE_TEST_ONLY'},order,3,'Mostrador');
+ assert.equal(unset.state,'no_elegible');
+ const wrong=await queue({DB,CENTRAL_TUS_PURGE_QUEUE_ENABLED:'PRIVATE_TEST_ONLY',
+  CENTRAL_TUS_PURGE_CANARY_ORDER:'WEB-ENSAYO-'+'B'.repeat(32)},order,3,'Mostrador');
+ assert.equal(wrong.state,'no_elegible');
+ assert.equal(writes,0);
 });
