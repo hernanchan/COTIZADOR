@@ -164,3 +164,63 @@ test('envío inteligente preserva 1-3,5 de ocho páginas y rechaza plan desactua
  assert.deepEqual(sent.map(x=>x.type),['SABER_SMART_HANDOFF_ERROR']);
  assert.match(info.textContent,/no coincide con el presupuesto/);
 });
+
+
+test('límite TUS: marca en rojo sólo el PDF que excede 40 MiB, no los otros',()=>{
+ const start=source.indexOf('function alertasRecepcionPDF(){');
+ const end=source.indexOf('\nconst pesos=',start);
+ assert.ok(start>0&&end>start,'Falta el validador visual en el cotizador existente');
+ class FileSimulado{
+  constructor(name,size){this.name=name;this.size=size}
+ }
+ const visual=new Function('entries','File','window','location',
+  'const MAX_PDF_TUS_BYTES=40*1024*1024,MAX_LOTE_TUS_BYTES=60*1024*1024;'+
+  "const tamanoPdfMiB=f=>(f.size/(1024*1024)).toFixed(1).replace('.',',')+' MiB';\n"+
+  source.slice(start,end)+'\nreturn alertasRecepcionPDF();');
+ const a={name:'Grande.pdf',archivoOriginal:new FileSimulado('Grande.pdf',41*1024*1024)};
+ const b={name:'Correcto.pdf',archivoOriginal:new FileSimulado('Correcto.pdf',12*1024*1024)};
+ const window={parent:{}};
+ const origin={pathname:'/prueba-v2/carga-inteligente'};
+ const alertas=visual([a,b],FileSimulado,window,origin);
+ assert.equal(alertas.size,1);
+ assert.match(alertas.get(a),/Grande\.pdf.*41,0 MiB.*40 MiB/);
+ assert.equal(alertas.has(b),false,'El PDF permitido debe permanecer disponible');
+ const c={name:'Segundo.pdf',archivoOriginal:new FileSimulado('Segundo.pdf',31*1024*1024)};
+ const dos=visual([b,c],FileSimulado,window,origin);
+ assert.equal(dos.size,0);
+ const tres=visual([c,c===b?a:{name:'Primero.pdf',archivoOriginal:new FileSimulado('Primero.pdf',30*1024*1024)}],FileSimulado,window,origin);
+ assert.equal(tres.size,1);
+ assert.match([...tres.values()][0],/60 MiB/);
+ window.parent=window;
+ assert.equal(visual([a],FileSimulado,window,origin).size,0,'Fuera del portal TUS no aplicar esta compuerta');
+});
+
+test('el estado de envío rechaza preventivamente PDF demasiado grande y conserva el precio preliminar',()=>{
+ const start=source.indexOf('function alertasRecepcionPDF(){');
+ const end=source.indexOf('\nfunction importeArchivo(',start);
+ assert.ok(start>=0&&end>start);
+ class FileSimulado{constructor(name,size){this.name=name;this.size=size}}
+ const result=[];
+ const window={parent:{postMessage:message=>result.push(message)}};
+ const entries=[{name:'Muy grande.pdf',archivoOriginal:new FileSimulado('Muy grande.pdf',42*1024*1024)}];
+ const execute=new Function('entries','File','window','location','ultimoPresupuesto',
+   'const MAX_PDF_TUS_BYTES=40*1024*1024,MAX_LOTE_TUS_BYTES=60*1024*1024;'+
+   "const tamanoPdfMiB=f=>(f.size/(1024*1024)).toFixed(1).replace('.',',')+' MiB';\n"+
+   source.slice(start,end)+"\ninformarPrecioPrivado('listo',7220);");
+ execute(entries,FileSimulado,window,{pathname:'/prueba-v2/carga-inteligente',origin:'https://example.test'},{estado:'PRELIMINAR'});
+ assert.equal(result.length,1);
+ assert.equal(result[0].sendable,false);
+ assert.equal(result[0].total,7220);
+ assert.match(result[0].blockReason,/Muy grande\.pdf.*42,0 MiB/);
+});
+
+test('la tarjeta del archivo no admitido lleva borde y aviso rojos incluso con los detalles cerrados',()=>{
+ const page=readFileSync(new URL('./carga-unica-pagina.mjs',import.meta.url),'utf8');
+ assert.match(page,/\.archivo\.archivo-no-admitido\{border:2px solid #b42318/);
+ assert.match(page,/\.archivo \.advertencia-recepcion\{[^}]*color:#8f1d1d/);
+ assert.match(source,/if\(advertenciaRecepcion\)card\.classList\.add\('archivo-no-admitido'\)/);
+ assert.match(source,/aviso\.setAttribute\('role','alert'\)/);
+ const b=source.indexOf("if(advertenciaRecepcion){");
+ const c=source.indexOf("if(abierto!==i){bloque.append(card);continue}",b);
+ assert.ok(b>=0&&c>b,'La advertencia debe estar fuera del panel colapsado');
+});
