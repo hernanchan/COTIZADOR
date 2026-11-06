@@ -11,3 +11,6 @@ DEPLOY_CANARIA_024_FLAGS_OFF_2026_11_06
 # SOLO checkout de prueba canaria 024, sin cobros productivos.
 # Las 3 compuertas de purga permanecen OFF en ambos Workers.
 DEPLOY_CANARY_024_CHECKOUT_PRIVATE_20261106
+
+# Compatibilidad con credencial DEMO_ADMIN_KEY ya existente: seguridad provista por HMAC privado.
+REDEPLOY_SANDBOX_CANARY_WITH_EXISTING_ADMIN_VALIDATOR
