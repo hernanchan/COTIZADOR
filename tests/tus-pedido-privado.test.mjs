@@ -44,10 +44,12 @@ const env={
  DOCS_RELAY_KEY:'different_google_relay_key_cccccccccccccccccc',
 };
 test('metadatos estrictos y límites sin permitir archivos suplantados',()=>{
- assert.deepEqual(TUS_LIMITS,{maxFileBytes:20971520,maxBatchBytes:62914560,maxFiles:10});
+ assert.deepEqual(TUS_LIMITS,{maxFileBytes:41943040,maxBatchBytes:62914560,maxFiles:10});
  assert.equal(validarMetasTUS({orderId:ORDER,metas:[meta(1)]}).metas.length,1);
  assert.throws(()=>validarMetasTUS({orderId:ORDER,metas:[meta(1),meta(1)]}),/Metadatos/);
- assert.throws(()=>validarMetasTUS({orderId:ORDER,metas:[{...meta(1),bytes:20971521}]}),/Metadatos/);
+ assert.equal(validarMetasTUS({orderId:ORDER,metas:[{...meta(1),bytes:30*1024*1024}]}).metas[0].bytes,30*1024*1024,
+  'Un PDF entre 20 y 40 MiB debe poder iniciar TUS');
+ assert.throws(()=>validarMetasTUS({orderId:ORDER,metas:[{...meta(1),bytes:41943041}]}),/Metadatos/);
  assert.throws(()=>validarMetasTUS({orderId:ORDER,metas:[{...meta(1),mode:'exe'}]}),/Metadatos/);
  assert.throws(()=>validarMetasTUS({orderId:ORDER,metas:[{...meta(1),price:1}]}),/Metadatos/);
  assert.throws(()=>validarMetasTUS({orderId:ORDER,metas:[]}),/Tanda/);
