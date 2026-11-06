@@ -7,3 +7,7 @@ REDEPLOY_CANARY_GUARD_2026_11_06
 # Protección positiva: configurar sólo WEB-ENSAYO-DA97408CCD06FFED80433A8E2A3B3FB4 en Central y Documentos.
 # Las tres compuertas deben permanecer OFF.
 DEPLOY_CANARIA_024_FLAGS_OFF_2026_11_06
+
+# SOLO checkout de prueba canaria 024, sin cobros productivos.
+# Las 3 compuertas de purga permanecen OFF en ambos Workers.
+DEPLOY_CANARY_024_CHECKOUT_PRIVATE_20261106
