@@ -4196,7 +4196,7 @@ export default {
   ctx.waitUntil(runScheduledReconciliation(env).catch(e=>console.error("Scheduled payment sync failed",String(e?.message||"unknown").slice(0,120))));
   ctx.waitUntil(centralProcessTUSPurgeQueue(env).catch(()=>{}));
  },
- async fetch(req,env){
+ async fetch(req,env,ctx){
   const url=new URL(req.url);
   if(url.pathname==="/demo/polaroids"&&req.method==="GET")return new Response(polaroidDemoHtml,{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","referrer-policy":"no-referrer","x-robots-tag":"noindex,nofollow"}});
   if(url.pathname==="/demo"&&req.method==="GET")return new Response(demoHtml,{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store"}});
@@ -4290,7 +4290,7 @@ export default {
    if(url.pathname.startsWith("/admin/api/pricing"))
     return await priceAdminHandle(req,env,url.pathname);
    if(url.pathname==="/admin/api/central/production-status"&&req.method==="POST")
-    return await centralUpdateProduction(req,env,arguments[2]);
+    return await centralUpdateProduction(req,env,ctx);
    if(url.pathname==="/admin/api/central/preparation-estimate"&&req.method==="POST")
     return await updatePreparationEstimate(req,env);
    if(url.pathname==="/admin/api/central/eta-settings")return await etaAdminApi(req,env);
