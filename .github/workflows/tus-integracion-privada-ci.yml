@@ -27,7 +27,8 @@ jobs:
         run: |
           node --check integraciones/autocotizador/recepcion/r2-pdf-grandes-privado.mjs
           node --check integraciones/autocotizador/recepcion/r2-pdf-grandes-cliente.mjs
-          node --test tests/r2-pdf-grandes-privado.test.mjs tests/r2-pdf-grandes-cliente.test.mjs
+          node --check integraciones/autocotizador/recepcion/r2-pdf-grandes-api-privada.mjs
+          node --test tests/r2-pdf-grandes-privado.test.mjs tests/r2-pdf-grandes-cliente.test.mjs tests/r2-pdf-grandes-api-privada.test.mjs
       - name: Sintaxis de módulos integrados
         run: |
           node --check integraciones/mercadopago/pruebas/worker.js
