@@ -42,7 +42,8 @@ const begin=source.indexOf(marker);
 const finish=source.indexOf("\n };\n bridgeButton.hidden=true",begin);
 assert.ok(begin>=0&&finish>begin,'No se encontró el callback real del botón');
 const clickHandler=new Function('leyendo','ultimoPresupuesto','entries','window','location','info','MAX_PDF_CARGA','paginasElegidas',
- source.slice(begin+marker.length,finish));
+ `const MAX_PDF_TUS_BYTES=40*1024*1024;const MAX_LOTE_TUS_BYTES=60*1024*1024;const tamanoPdfMiB=f=>(f.size/(1024*1024)).toFixed(1).replace('.',',')+' MiB';
+`+source.slice(begin+marker.length,finish));
 
 function runPrivateHandoff(name='MUEBLES.pdf',size=2464154){
  const file=new File([new Uint8Array(size)],name,{type:'application/pdf'});
@@ -74,12 +75,18 @@ test('el callback real agrega MUEBLES.pdf de ocho paginas a la cola privada, sin
  assert.match(info.textContent,/Pedido preparado/);
 });
 
-test('el callback real rechaza nombres no PDF y archivos superiores a 20 MB',()=>{
- for(const [name,size] of [['MUEBLES.txt',2464154],['MUEBLES.pdf',20*1024*1024+1]]){
+test('el callback real admite PDF de 21 MiB y rechaza formato ajeno o PDF >40 MiB con el nombre',()=>{
+ const accepted=runPrivateHandoff('MUEBLES.pdf',21*1024*1024);
+ assert.deepEqual(accepted.sent.map(x=>x.payload.type),
+  ['SABER_SMART_DOCUMENTS_TO_PRIVATE','SABER_SMART_HANDOFF_READY'],accepted.info.textContent);
+ for(const [name,size,pattern] of [
+  ['MUEBLES.txt',2464154,/MUEBLES\.txt.*formato/i],
+  ['MUEBLES.pdf',40*1024*1024+1,/MUEBLES\.pdf.*40 MiB/]
+ ]){
   const {sent,info}=runPrivateHandoff(name,size);
   assert.equal(sent.length,1);
   assert.equal(sent[0].payload.type,'SABER_SMART_HANDOFF_ERROR');
-  assert.match(info.textContent,/20 MB/);
+  assert.match(info.textContent,pattern);
  }
 });
 
