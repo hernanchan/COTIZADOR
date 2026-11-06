@@ -4348,6 +4348,10 @@ export default {
    if(url.pathname==="/internal/central/prepare-mixed-order")return await centralPrepareMixedOrder(req,env);
    if(url.pathname==="/internal/central/stage-print-draft")return await centralStagePrintDraft(req,env);
    if(url.pathname==="/internal/central/bridge-probe")return await centralBridgeProbe(req,env);
+   if(url.pathname==="/internal/central/r2-reserve"){
+    const {reservarCupoR2Central}=await import("./r2-grandes-cuotas-central.mjs");
+    return await reservarCupoR2Central(req,env,{readSigned:centralReadSigned});
+   }
    if(url.pathname==="/internal/central/r2-pending-stage"){
     const {stageR2PendienteCentral}=await import("./r2-grandes-central-pendientes.mjs");
     return await stageR2PendienteCentral(req,env,{readSigned:centralReadSigned});
