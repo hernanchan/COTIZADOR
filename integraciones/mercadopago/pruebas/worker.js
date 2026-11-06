@@ -4077,6 +4077,65 @@ async function centralApproveBankTransfer(req,env){
   payment_confirmed:true,operator:audit.operator,recorded_at:audit.recorded_at,production_enabled:false});
 }
 
+/** Checkout de pruebas únicamente para orden canaria exacta. Comunicación privada HMAC. */
+async function centralCanarySandboxPrivate(req,env,dispatch){
+ const signed=await centralReadSigned(req,env);
+ if(signed.error)return json({ok:false,error:signed.error},signed.status);
+ if(env.DOCS_SANDBOX_CHECKOUT_ENABLED!=="PRIVATE_TEST_ONLY"||
+    env.CENTRAL_PREPARE_ENABLED!=="PRIVATE_TEST_ONLY")
+  return json({ok:false,error:"Sandbox documental no habilitado"},503);
+ const p=signed.payload;
+ if(!p||typeof p!=="object"||Array.isArray(p)||
+    Object.keys(p).sort().join(",")!=="action,schema,webOrderId"||
+    p.schema!=="saber-central-tus-canary-checkout-v1"||
+    !["start","status"].includes(p.action)||
+    !/^WEB-ENSAYO-[A-F0-9]{32}$/.test(p.webOrderId||"")||
+    env.CENTRAL_TUS_PURGE_CANARY_ORDER!==p.webOrderId)
+  return json({ok:false,error:"Orden fuera de ensayo autorizado"},403);
+ await centralTables(env);await ensurePaymentReviews(env);
+ const order=await env.DB.prepare(
+  "SELECT o.id,o.status,o.amount_ars,o.preference_id FROM orders o "+
+  "JOIN central_document_manifests m ON m.commercial_order_id=o.id "+
+  "WHERE m.web_order_id=? AND m.file_count=1 AND m.amount_ars=o.amount_ars "+
+  "AND o.deposit_ars=o.amount_ars LIMIT 1"
+ ).bind(p.webOrderId).first();
+ if(!order||!CENTRAL_UUID.test(order.id||"")||
+    !Number.isSafeInteger(order.amount_ars)||order.amount_ars<1)
+  return json({ok:false,error:"Orden documental canaria no conciliada"},409);
+ if(p.action==="status"){
+  if(order.status==="awaiting_payment"&&order.preference_id)
+   await reconcileCustomerPaymentIfDue(env,order.id);
+  const fresh=await env.DB.prepare("SELECT status FROM orders WHERE id=?").bind(order.id).first();
+  const rev=await env.DB.prepare("SELECT state FROM payment_reviews WHERE order_id=?").bind(order.id).first();
+  const estado=rev?.state==="revoked"?"revocado":
+   fresh?.status==="paid"&&rev?.state==="verified"?"pagado":"pendiente";
+  return json({ok:true,webOrderId:p.webOrderId,commercialOrderId:order.id,
+   amountArs:order.amount_ars,estado},200);
+ }
+ if(typeof dispatch!=="function"||typeof env.DEMO_ADMIN_KEY!=="string"||
+    env.DEMO_ADMIN_KEY.length<16)
+  return json({ok:false,error:"Checkout privado no disponible"},503);
+ const preflight=await documentSandboxEligibility(env,order.id,true);
+ if(preflight.reason)
+  return json({ok:false,error:"Preflight de ensayo: "+preflight.reason},409);
+ const call=await dispatch(new Request(new URL("/admin/api/central/payment-sandbox-prepare",req.url),{
+  method:"POST",headers:{Authorization:"Bearer "+env.DEMO_ADMIN_KEY,
+   "Content-Type":"application/json"},body:JSON.stringify({order_id:order.id})
+ }));
+ const raw=await call.text();
+ if(raw.length>4000)return json({ok:false,error:"Respuesta de checkout demasiado grande"},502);
+ let result;try{result=JSON.parse(raw)}catch{return json({ok:false,error:"Respuesta de checkout ilegible"},502)}
+ if(!call.ok||result?.order_id!==order.id||typeof result?.checkout_url!=="string")
+  return json({ok:false,error:String(result?.error||"Checkout Sandbox no autorizado").slice(0,140)},call.status===409?409:503);
+ let url;try{url=new URL(result.checkout_url)}catch{return json({ok:false,error:"Checkout inválido"},502)}
+ if(url.protocol!=="https:"||
+   !/(^|\.)mercadopago\.com(\.ar)?$/.test(url.hostname)||
+   url.username||url.password||url.hash)
+  return json({ok:false,error:"Destino de pago inválido"},502);
+ return json({ok:true,webOrderId:p.webOrderId,commercialOrderId:order.id,
+  amountArs:order.amount_ars,checkoutUrl:url.href},200);
+}
+
 async function centralClientSandboxPayment(req,env,dispatch){
  const signed=await centralReadSigned(req,env);
  if(signed.error)return json({ok:false,error:signed.error},signed.status);
@@ -4278,7 +4337,9 @@ export default {
     if(url.pathname==="/internal/central/tus-package")return await centralTUSPackageManifest(req,env);
    if(url.pathname==="/internal/central/link")return await centralLink(req,env);
    if(url.pathname==="/internal/central/prepare-order")return await centralPrepareDraft(req,env);
-   if(url.pathname==="/internal/central/payment-sandbox-client")
+   if(url.pathname==="/internal/central/canary-checkout")
+     return await centralCanarySandboxPrivate(req,env,(internal)=>this.fetch(internal,env));
+    if(url.pathname==="/internal/central/payment-sandbox-client")
     return await centralClientSandboxPayment(req,env,(internal)=>this.fetch(internal,env));
    if(url.pathname==="/internal/central/mobile-invite-redeem")return await redeemMobileInvite(req,env);
     if(url.pathname==="/internal/central/pricing-snapshot")
