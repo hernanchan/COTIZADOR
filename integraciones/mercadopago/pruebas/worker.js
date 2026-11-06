@@ -1400,6 +1400,11 @@ async function centralEnsureTUSPurgeTables(env){
   "production_version INTEGER NOT NULL,phase TEXT NOT NULL CHECK(phase IN ('queued','attempt','error','completed')),"+
   "file_count INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL DEFAULT(datetime('now')))").run();
 }
+/** El entorno de ensayos sólo puede purgar una orden canaria designada explícitamente. */
+function centralPurgeCanaryAllowed(env,webOrderId){
+ const canary=env?.CENTRAL_TUS_PURGE_CANARY_ORDER;
+ return typeof canary==='string'&&/^WEB-ENSAYO-[A-F0-9]{32}$/.test(canary)&&canary===webOrderId;
+}
 async function centralQueueDeliveryCleanup(env,orderId,version,operator){
  if(env.CENTRAL_TUS_PURGE_QUEUE_ENABLED!=="PRIVATE_TEST_ONLY")
   return {state:"desactivado",filesDeleted:0};
@@ -1413,6 +1418,7 @@ async function centralQueueDeliveryCleanup(env,orderId,version,operator){
   "AND EXISTS (SELECT 1 FROM payment_reviews r WHERE r.order_id=o.id AND r.state='verified') "+
   "LIMIT 1").bind(orderId,version).first();
  if(!row||!/^WEB-ENSAYO-[A-F0-9]{32}$/.test(row.web_order_id||"")||
+    !centralPurgeCanaryAllowed(env,row.web_order_id)||
     !Number.isSafeInteger(row.file_count)||row.file_count<1||row.file_count>10)
   return {state:"no_elegible",filesDeleted:0};
  const inserted=await env.DB.prepare(
@@ -1442,6 +1448,8 @@ async function centralTUSPurgeComplete(req,env){
  if(env.CENTRAL_TUS_PURGE_EXECUTE_ENABLED!=='PRIVATE_TEST_ONLY'||
     env.CENTRAL_TUS_PURGE_QUEUE_ENABLED!=='PRIVATE_TEST_ONLY')
   return json({ok:false,error:'Retención desactivada'},503);
+ if(!centralPurgeCanaryAllowed(env,p.webOrderId))
+  return json({ok:false,error:'Orden fuera del ensayo autorizado'},403);
  await centralEnsureTUSPurgeTables(env);
  const row=await env.DB.prepare(
   "SELECT q.order_id,q.state,m.file_count FROM central_tus_purge_queue q "+
@@ -1507,6 +1515,7 @@ async function centralProcessTUSPurgeQueue(env,{orderId=null,limit=3}={}){
  ).bind(orderId,orderId,Math.min(5,Math.max(1,limit))).all();
  let processed=0,errors=0;
  for(const job of rows.results||[]){
+  if(!centralPurgeCanaryAllowed(env,job.web_order_id))continue;
   const claimed=await env.DB.prepare(
    "UPDATE central_tus_purge_queue SET state='processing',locked_at=datetime('now'),"+
    "last_try_at=datetime('now'),attempts=attempts+1 "+
