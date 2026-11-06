@@ -85,6 +85,13 @@ test('verificación exitosa emite cookie independiente, temporal, HttpOnly y sol
  const html=await page.text();
  assert.match(html,/Cotización preliminar/);
  assert.match(html,/id="presupuesto"/);
+ assert.equal((html.match(/id="presupuesto"/g)||[]).length,1,'El presupuesto sigue siendo único');
+ assert.ok(html.indexOf('id="presupuesto"')<html.indexOf('id="modoConfiguracion"'),'Total al comienzo de la pantalla');
+ assert.match(html,/saber-quote-total/);
+ assert.match(html,/#prepararPedido,#resumenPedido\{display:none!important\}/);
+ assert.match(html,/saber-quote-single/);
+ assert.match(html,/MutationObserver\(adapt\)/);
+ assert.match(html,/Tus PDF se analizan en tu dispositivo/);
  assert.match(html,/no se suben, no se almacenan/);
  assert.doesNotMatch(html,/data-access-token|saber_v2_session/);
  assert.match(page.headers.get('Content-Security-Policy'),/connect-src 'self'/);
