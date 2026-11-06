@@ -83,7 +83,7 @@ test('verificación exitosa emite cookie independiente, temporal, HttpOnly y sol
  const page=await manejarCotizadorCliente(req('GET',cookieValue),env,opts);
  assert.equal(page.status,200);
  const html=await page.text();
- assert.match(html,/Cotización preliminar/);
+ assert.match(html,/Presupuesto preliminar/);
  assert.match(html,/id="presupuesto"/);
  assert.equal((html.match(/id="presupuesto"/g)||[]).length,1,'El presupuesto sigue siendo único');
  assert.ok(html.indexOf('id="presupuesto"')<html.indexOf('id="modoConfiguracion"'),'Total al comienzo de la pantalla');
