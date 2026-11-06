@@ -84,3 +84,57 @@ export async function stageR2PendienteCentral(request,env,{readSigned}={}){
  return response({ok:true,saved:true,idempotent:false,webOrderId:p.orderId,
   status:'awaiting_pdf_analysis',registeredInD1:false,paymentAuthorized:false},201);
 }
+
+/**
+ * Consulta interna SOLO Worker documentos ↔ Central, firmada como stage.
+ * No concede permiso de descarga; el Worker de documentos vuelve a exigir
+ * Basic del operador y verificar los bytes exactos almacenados en R2.
+ * Sin proof de 2 horas, para continuar verificaciones días después.
+ */
+export async function lookupR2PendienteCentral(request,env,{readSigned}={}){
+ if(env?.CENTRAL_R2_STAGING_ENABLED!=='PRIVATE_TEST_ONLY')
+  return response({ok:false,found:false,paymentAuthorized:false},503);
+ if(typeof readSigned!=='function'||!env?.DB?.prepare)
+  return response({ok:false,found:false,paymentAuthorized:false},503);
+ const signed=await readSigned(request,env);
+ if(signed?.error)return response({ok:false,found:false,paymentAuthorized:false},
+  signed.status||401);
+ const p=signed?.payload;
+ if(!shape(p,['schema','webOrderId','receiptId'])||
+   p.schema!=='saber-central-r2-pending-lookup-v1'||
+   !ORDER.test(p.webOrderId||'')||!DOC.test(p.receiptId||''))
+  return response({ok:false,found:false,paymentAuthorized:false},422);
+ // Lectura sin crear tablas ni cambiar pedidos. Ausencia = 404.
+ const table=await env.DB.prepare(
+  "SELECT name FROM sqlite_master WHERE type='table' AND name='central_r2_large_pending'"
+ ).first();
+ if(!table)return response({ok:false,found:false,paymentAuthorized:false},404);
+ const row=await env.DB.prepare(
+  'SELECT receipt_id,web_order_id,file_id,object_key,sha256,etag,bytes,name,'+
+  'pages_claimed,status FROM central_r2_large_pending '+
+  'WHERE receipt_id=? AND web_order_id=? LIMIT 1'
+ ).bind(p.receiptId,p.webOrderId).first();
+ if(!row)return response({ok:false,found:false,paymentAuthorized:false},404);
+ if(row.status!=='awaiting_pdf_analysis')
+  return response({ok:false,found:false,paymentAuthorized:false},409);
+ // Validación profunda: no confiar ciegamente en datos de D1 dañados.
+ try{
+  validarPreRecepcionR2({
+   schema:'saber-central-r2-grande-pendiente-v1',
+   orderId:row.web_order_id,fileId:row.file_id,receiptId:row.receipt_id,
+   objectKey:row.object_key,sha256:row.sha256,etag:row.etag,
+   bytes:row.bytes,name:row.name,pagesDeclaradas:row.pages_claimed,
+   sha256Verificado:true,contenidoPdfVerificado:false,
+   registeredInD1:false,paymentAuthorized:false,listoParaProducir:false
+  });
+ }catch{return response({ok:false,found:false,paymentAuthorized:false},409)}
+ return response({ok:true,found:true,
+  schema:'saber-central-r2-pending-lookup-v1',
+  webOrderId:row.web_order_id,receiptId:row.receipt_id,
+  fileId:row.file_id,objectKey:row.object_key,
+  sha256:row.sha256,etag:row.etag,bytes:row.bytes,
+  pagesDeclared:row.pages_claimed,name:row.name,
+  status:'awaiting_pdf_analysis',
+  contenidoPdfVerificado:false,registeredInD1:false,
+  paymentAuthorized:false,listoParaProducir:false});
+}
