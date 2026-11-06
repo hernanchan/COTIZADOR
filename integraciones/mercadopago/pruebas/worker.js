@@ -109,7 +109,7 @@ function centralSafeManifest(data){
   if(!r||!CENTRAL_FILE.test(r.fileId||"")||seenFiles.has(r.fileId)||
      !CENTRAL_RECEIPT.test(r.receiptId||"")||seenReceipts.has(r.receiptId)||
      !CENTRAL_HEX.test(r.sha256||"")||
-     !Number.isSafeInteger(r.bytes)||r.bytes<5||r.bytes>20*1024*1024||
+     !Number.isSafeInteger(r.bytes)||r.bytes<5||r.bytes>40*1024*1024||
      !Number.isSafeInteger(r.pages)||r.pages<1||r.pages>2000)
    throw Error("Recibo privado inválido");
   seenFiles.add(r.fileId);seenReceipts.add(r.receiptId);recibos.set(r.fileId,r);
@@ -281,7 +281,7 @@ async function centralTUSReceiptLookup(req,env){
    t.sha256===row.sha256):[];
  if(matches.length!==1)return json({ok:false,found:false,paymentAuthorized:false},409);
  const t=matches[0];
- if(!Number.isSafeInteger(t.bytes)||t.bytes<5||t.bytes>20*1024*1024||
+ if(!Number.isSafeInteger(t.bytes)||t.bytes<5||t.bytes>40*1024*1024||
     !Number.isSafeInteger(t.paginasOriginales)||t.paginasOriginales<1||t.paginasOriginales>2000||
     !CENTRAL_HEX.test(row.sha256)||typeof t.nombreOriginal!=="string"||
     t.nombreOriginal.length<1||t.nombreOriginal.length>180)
@@ -348,7 +348,7 @@ async function centralTUSDeliveryPurgePlan(req,env){
   if(!CENTRAL_RECEIPT.test(r.receipt_id||"")||
      !CENTRAL_FILE.test(r.file_id||"")||!CENTRAL_HEX.test(r.sha256||"")||
      used.has(r.receipt_id)||!t||t.fileId!==r.file_id||t.sha256!==r.sha256||
-     !Number.isSafeInteger(t.bytes)||t.bytes<5||t.bytes>20*1024*1024)
+     !Number.isSafeInteger(t.bytes)||t.bytes<5||t.bytes>40*1024*1024)
    return json({ok:false,error:"Archivos no coinciden con el pedido"},409);
   used.add(r.receipt_id);
   files.push({receiptId:r.receipt_id,fileId:r.file_id,sha256:r.sha256,bytes:t.bytes});
@@ -404,7 +404,7 @@ async function centralTUSPackageManifest(req,env){
  if(trabajos.some(t=>!CENTRAL_RECEIPT.test(t.reciboPrivado||"")||
     typeof t.nombreOriginal!=="string"||t.nombreOriginal.length>180||
     !Number.isSafeInteger(t.orden)||t.orden<1||
-    !Number.isSafeInteger(t.bytes)||t.bytes<5||t.bytes>20*1024*1024)||
+    !Number.isSafeInteger(t.bytes)||t.bytes<5||t.bytes>40*1024*1024)||
     new Set(trabajos.map(t=>t.reciboPrivado)).size!==trabajos.length)
   return json({ok:false,error:"Ficha incompleta"},409);
  // El ZIP usa únicamente originales verificados. El estado PAGADO
