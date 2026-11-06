@@ -24,7 +24,7 @@ function fixtures(){
   }})};
   if(sql.startsWith('INSERT INTO'))return {bind(...a)=>({run:async()=>{
    assert.match(sql,/INSERT INTO central_r2_large_reservations[\s\S]+SELECT[\s\S]+WHERE/);
-   assert.equal(a.length,12);
+   assert.equal(a.length,13);
    const [object_key,web_order_id,file_id,sha256,bytes,
      maxGlobalBefore,addGlobal,maxGlobal,oid,maxFiles,oid2,addOrder,maxOrder]=a;
    // SQL includes thirteen bindings; assert correct order.
