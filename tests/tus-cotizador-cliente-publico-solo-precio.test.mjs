@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {webcrypto} from 'node:crypto';
+import {Script} from 'node:vm';
 import {readFileSync} from 'node:fs';
 import {manejarCotizadorCliente,autorizadoCotizadorCliente}
  from '../integraciones/autocotizador/recepcion/cotizador-cliente-publico.mjs';
@@ -91,6 +92,8 @@ test('verificación exitosa emite cookie independiente, temporal, HttpOnly y sol
  assert.match(html,/#prepararPedido,#resumenPedido\{display:none!important\}/);
  assert.match(html,/saber-quote-single/);
  assert.match(html,/MutationObserver\(adapt\)/);
+ for(const match of html.matchAll(/<script>([\s\S]*?)<\/script>/g))
+  assert.doesNotThrow(()=>new Script(match[1]),'JS inline de la vista cliente debe compilar');
  assert.match(html,/Tus PDF se analizan en tu dispositivo/);
  assert.match(html,/no se suben, no se almacenan/);
  assert.doesNotMatch(html,/data-access-token|saber_v2_session/);
