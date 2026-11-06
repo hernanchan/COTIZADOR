@@ -60,7 +60,7 @@ test('el motor documental usa el mismo catálogo D1 para carga, presupuesto, TUS
  assert.match(docs,/async function preciosPrivados\(env,request\)/);
  assert.match(docs,/DOCS_PRICE_ADMIN_D1_ENABLED/);
  assert.match(docs,/obtenerTarifarioD1Privado\(env\)/);
- assert.match(docs,/preciosServidor:await preciosPrivados\(env,request\)/);
+ assert.match(docs,/preciosServidor:authorized\?await preciosPrivados\(env,request\):null/);
  assert.match(docs,/JSON\.stringify\(await preciosPrivados\(env,request\)\)/);
  assert.match(docs,/preciosActuales=await preciosPrivados\(env,request\)/);
  assert.match(docs,/La versión de precios privada requiere sesión autorizada/);
