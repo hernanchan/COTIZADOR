@@ -18,11 +18,11 @@ function fixtures(){
  const rows=[];let selects=0,inserts=0;
  const db={prepare(sql){
   if(sql.startsWith('CREATE TABLE'))return {run:async()=>({success:true})};
-  if(sql.startsWith('SELECT object_key'))return {bind(...a)=>({first:async()=>{
+  if(sql.startsWith('SELECT object_key'))return {bind:(...a)=>({first:async()=>{
    selects++;return rows.find(x=>x.web_order_id===a[0]&&x.file_id===a[1]||
     x.object_key===a[2])||null;
   }})};
-  if(sql.startsWith('INSERT INTO'))return {bind(...a)=>({run:async()=>{
+  if(sql.startsWith('INSERT INTO'))return {bind:(...a)=>({run:async()=>{
    assert.match(sql,/INSERT INTO central_r2_large_reservations[\s\S]+SELECT[\s\S]+WHERE/);
    assert.equal(a.length,13);
    const [object_key,web_order_id,file_id,sha256,bytes,
