@@ -143,7 +143,7 @@ function scenario({paid=true,delivered=true,canary=webOrder,storageFailure=false
      await sign('/internal/central/tus-purge-plan',{
       schema:'saber-central-tus-purge-plan-v1',webOrderId:web}),centralEnv);
     if(response.status!==200){state.lastError='plan HTTP '+response.status+' '+await response.text();throw Error(state.lastError)}
-    return planDeBorradoEntregado(await response.json(),web);
+    try{return planDeBorradoEntregado(await response.json(),web)}catch(error){state.lastError='parse plan: '+String(error);throw error}
    },
    remove:async(plan,e)=>{state.lastStage='storage';try{return await eliminarYConfirmarObjetos(plan,e,{fetcher:storage})}catch(error){state.lastError=String(error);throw error}},
    ack:async (_env,p)=>{
