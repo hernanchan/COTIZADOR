@@ -144,3 +144,14 @@ La Central verifica obligatoriamente pago auténtico completo, `payment_reviews=
 - GitHub Actions [42218548352](https://github.com/hernanchan/COTIZADOR/actions/runs/42218548352) **SUCCESS, 19/19 pruebas aprobadas, cero errores**, incluyendo las suites existentes de cola y pipeline. Commit relevante 69374c56492087be05840cdc0d62d093f239d517.
 - La web pública, pagos reales, Worker y bucket Supabase no se modificaron en esta prueba. Los tres flags de borrado real siguen OFF en las versiones privadas desplegadas anteriormente.
 - Pendiente todavía: ensayo completo CON pago realmente conciliado, cambio de estado a Entregado en D1 real, reintento de cola y acuse real en D1. La simulación no sustituye esa validación antes de habilitar borrado productivo.
+
+## 06/11 — Protección de pedidos nuevos desplegada
+
+- Fecha de corte inmutable en ambos Workers: **2026-11-07 00:00:00 UTC**. Los registros anteriores de D1 quedan excluidos.
+- Central compara la fecha de creación del manifiesto en el encolado, el procesamiento, el plan y la confirmación de la auditoría. Siguen siendo obligatorios el pago verificado y el estado Entregado.
+- Documentos aplica segunda barrera de fecha sobre el plan firmado antes de borrar. Los PDF históricos siguen protegidos aunque alguien encienda erróneamente un flag.
+- CI de integración aislada: [42220041843](https://github.com/hernanchan/COTIZADOR/actions/runs/42220041843), **23/23 pruebas aprobadas**.
+- CI general: [42220041834](https://github.com/hernanchan/COTIZADOR/actions/runs/42220041834), **SUCCESS**.
+- Despliegue únicamente privado: [42220239878](https://github.com/hernanchan/COTIZADOR/actions/runs/42220239878), **SUCCESS**. Documentos versión 256f43a5-1e34-43a5-8c05-727e2808b6bd; Central d3e165c0-020e-4256-a94c-a21ba65a9df8.
+- Verificación Cloudflare: service binding correcto, dos variables de alcance **CANARY_ONLY** y tres compuertas de eliminación **OFF**. Sin DELETE, sin pago real, sin publicar cambios en main.
+- **No está activo el borrado comercial.** Para encenderlo falta una validación de pago auténtico y Entregado con una orden posterior al corte. La orden 024 ya no es válida para ese ensayo porque se eliminó su PDF sintético.
