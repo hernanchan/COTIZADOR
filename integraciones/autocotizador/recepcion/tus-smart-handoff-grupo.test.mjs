@@ -48,7 +48,7 @@ test('presupuesto completo habilita el botón de un grupo; incompleto lo bloquea
  const end=source.indexOf('\nfunction importeArchivo(',begin);
  assert.ok(begin>=0&&end>begin);
  const fn=new Function('estado','total','entries','ultimoPresupuesto','window','location',
-  source.slice(begin,end)+'\nreturn informarPrecioPrivado(estado,total);');
+  'const alertasRecepcionPDF=()=>new Map();\n'+source.slice(begin,end)+'\nreturn informarPrecioPrivado(estado,total);');
  const messages=[];
  const win={parent:{postMessage:x=>messages.push(x)}};
  fn('listo',5750,[{anillado:'grupo',grupoAnillado:'1'}],
