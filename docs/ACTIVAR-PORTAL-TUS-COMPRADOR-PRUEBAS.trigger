@@ -8,3 +8,5 @@ Main, web pública, MP real y todos los interruptores de borrado: SIN CAMBIOS (O
 Control: rollback del Worker si el smoke de acceso, V3 o privacidad falla.
 Reintento controlado 2: dependencias de test instaladas, deploy anterior no ejecutado (fallo antes de tocar Cloudflare).
 Reintento controlado 3: corregida la consulta jq sobre bindings de Cloudflare; anteriores ejecuciones no llegaron a desplegar.
+
+2026-11-06: DOCS_TUS_PDF_MIB=40; CENTRAL_TUS_MIB_40_VERIFIED; ONLY_TEST_WORKER.
