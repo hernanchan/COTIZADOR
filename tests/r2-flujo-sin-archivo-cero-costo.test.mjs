@@ -99,7 +99,11 @@ function store(){
      schema:'saber-central-r2-payment-lookup-v1',orderId:WEB,
      fileId:FILE,bytes:BYTES,sha256:SHA
     })}),central,{readSigned:signed,now:()=>NOW});
-  if(!response.ok)return null;
+  if(!response.ok){
+   const error=await response.json();
+   console.log('R2_TEST_PAGO_CENTRAL_NEGADO',response.status,error.error);
+   return null;
+  }
   const data=await response.json();
   return data.receipt;
  };
