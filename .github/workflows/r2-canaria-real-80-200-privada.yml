@@ -175,6 +175,17 @@ jobs:
             "$origin/__saber-r2-canario/health" || true)
           test "$unauthorized" = 404 || { echo 'CANARY_EXPOSED_WITHOUT_AUTH'; exit 1; }
           echo 'CANARY_R2_BUCKET_BOUND_BEARER_REQUIRED'
+          diagnostic_status=$(curl -sS --max-time 35 -o "$tmp/diagnose.json" -w '%{http_code}' \
+            -X POST -H "Authorization: Bearer $CANARY_AUTH_SECRET" -H "Origin: $origin" \
+            -H 'Content-Type: application/json' --data '{}' "$origin/__saber-r2-canario/diagnose")
+          test "$diagnostic_status" = 200 || { echo "CANARY_DIAGNOSE_HTTP_$diagnostic_status"; exit 1; }
+          jq -e '.ok==true and .diagnostic.uuidV4==true and .diagnostic.keyMatches==true' "$tmp/diagnose.json" >/dev/null
+          jq -c '.diagnostic' "$tmp/diagnose.json"
+          if ! jq -e '.diagnostic.uploadIdAtMost256==true' "$tmp/diagnose.json" >/dev/null; then
+            echo 'R2_LIVE_UPLOAD_ID_EXCEEDS_EXISTING_VALIDATION'
+            exit 1
+          fi
+          echo 'CANARY_R2_REAL_MULTIPART_CREATE_AND_ABORT_OK'
           wrote=1
           for size in 80 200; do
             node integraciones/autocotizador/recepcion/r2-canaria-benchmark-actions.mjs first "$size"
