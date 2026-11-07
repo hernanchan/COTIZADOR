@@ -48,3 +48,31 @@ El propietario habilitó Cloudflare R2 con tarjeta, pero **no autoriza que el si
 - [GitHub Actions 42402034253](https://github.com/hernanchan/COTIZADOR/actions/runs/42402034253) **SUCCESS**: pruebas negativas sin orden, pago pendiente/revocado, intención inexistente, cambio de hash/tamaño, firma inválida/host ajeno, transferencia sin acreditación; positivas MP y transferencia sintéticas. No es prueba de dinero real ni de D1 real de producción.
 
 **Siguiente P0 sin vueltas:** crear el estado de *pedido presupuestado sin archivo* en D1, generar preferencia Mercado Pago sandbox por ese importe, enlazar el comprobante a `central_r2_prepaid_intents` sólo desde servidor y probar *cliente cotiza 150 MB local → paga sandbox → recibe permiso → carga R2 → verifica original → Central*. Diseñar cancelación/devolución si las páginas/tipo no coinciden luego. Sin este circuito no publicar ni activar los flags. **El cotizador gratis sigue sin tocar R2**.
+
+
+## 07/11/2026 — FASE PREPAGO SIN ARCHIVO: backend implementado, pruebas aprobadas
+
+**Paso 1: intención sin original**
+- `r2-prepago-documentos.mjs`: nueva ruta privada `/prueba-v2/api/ensayo-r2-prepago`, requiere sesión de comprador/operador, Same-Origin y `DOCS_R2_PREPAY_DRAFT_ENABLED`, D1 aprobado y puente privado habilitados. Recalcula el importe **en el servidor** mediante `cotizarCargaUnica` y `obtenerTarifarioD1Privado`; **no acepta importe del cliente**. Inicialmente **un único PDF grande (>40 MiB y ≤200 MiB), únicamente ploteo**, precio preliminar y clasificación CAD/Póster declarada por cliente.
+- `r2-prepago-intencion-central.mjs`: Central recibe **intención HMAC** y guarda en D1 `central_r2_prepaid_intents` y `orders` / `order_items` con SKU restringido `R2_PREPAID_PLOT`, **transacción DB.batch**, idempotencia por orden+archivo; **sin guardar bytes, sin crear bucket, sin Checkout MP en etapa de consulta**. No cobra ni imprime.
+- El servidor asigna cookie vinculada a `webOrderId` para el comprador cuando la intención se registra, evitando que otra sesión reutilice la orden.
+- Nuevo flag Central `CENTRAL_R2_PREPAY_DRAFT_ENABLED=PRIVATE_TEST_ONLY`, **OFF** por defecto.
+
+**Paso 2: pago sandbox únicamente después de la decisión del comprador**
+- `r2-prepago-checkout-sandbox-central.mjs` y `r2-prepago-checkout-documentos.mjs`: ruta `/prueba-v2/api/ensayo-r2-prepago-checkout`, sesión y orden vinculadas, HMAC entre Workers, orden y SKU exactos, importe íntegro registrado, 24 h de vigencia, sin transferencia pendiente. Reutiliza `/demo/checkout` existente que valida vendedor **test_user**; no habilita vendedor real.
+- Nuevo flag Central `CENTRAL_R2_PREPAY_CHECKOUT_ENABLED=PRIVATE_TEST_ONLY` y Documentos `DOCS_CLIENT_SANDBOX_CHECKOUT_ENABLED=PRIVATE_TEST_ONLY`, ambos **OFF**.
+- Al pedir `status`, D1 distingue `pendiente`, `pagado_esperando_archivo`, `revocado`. **Aún no se ha ejecutado un pago real de sandbox con esta nueva orden**, sólo simulación de respuesta de la pasarela.
+
+**Paso 3: no usar R2 antes de pago**
+- Permanece la ruta R2 con **`DOCS_R2_POSTPAY_REQUIRED`** y validación HMAC a `CENTRAL_R2_POSTPAY_ENABLED`; contra D1 exige misma orden, archivo, bytes, SHA-256, importe y pago verificado.
+- Prueba de contrato en [GitHub Actions 42413800991](https://github.com/hernanchan/COTIZADOR/actions/runs/42413800991): **SUCCESS**. Crea la intención simulada; dos intentos **sin pago** devuelven HTTP 402 y verifican **0 reservas, 0 objetos R2**; al simular pago conciliado en D1, inicia **1 multipart** R2 falso con cuota confirmada. No se enviaron PDFs ni se consumió almacenamiento R2 en esta prueba.
+- Pruebas de checkout sandbox / precio D1 / integridad, regresión general TUS, R2 y Workers aprobadas en la misma ejecución. No se modificaron Workers desplegados, web comercial, `main` ni valores reales de Cloudflare.
+
+**PENDIENTE P0 — NO PUBLICAR ESTO AÚN:**
+1. Conectar **interfaz** del comprador para generar hash del PDF grande **por fragmentos** (sin cargar 150 MiB a RAM), conservar archivo en dispositivo durante MP y reanudar después de confirmar pago; integración de botones con el carrito.
+2. Prueba de **pago sandbox real** creada desde intención sin archivo, conciliación webhook, luego carga **R2 real** desde móvil y verificación SHA de 100/150/200 MiB con orden en Central; actualmente se ensayó pago/R2 con mocks.
+3. Validación de páginas, medidas y CAD/Póster *después de la carga* para conciliar **precio preliminar vs archivo real**. Sin coincidencia: poner en revisión y gestionar diferencia/devolución; **no imprimir** ni pagar un saldo automático.
+4. Pedidos mixtos TUS+R2 y ZIP, hoja de trabajo, descarga, preprensa, borrado después de entrega y cuotas/aborto de multipart. Actualizar manifiesto Central hoy limitado a 40 MiB. No subir R2 para consultas ni adelantar cobros sin circuito de devolución.
+5. Probar protección de peticiones, costo R2 real y presupuesto de operaciones con límite. La cuenta R2 ya existe pero ninguna de estas banderas se activó.
+
+**Precisión económica:** no hubo despliegue ni uso de R2 en estos ensayos de lógica. GitHub Actions sí ejecuta minutos de CI sujetos al plan de GitHub; su eventual costo no fue verificado. Evitar ejecuciones redundantes.
