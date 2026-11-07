@@ -86,6 +86,15 @@ jobs:
           fi
           candidate=$(jq -r '.result.id' "$tmp/upload.json")
           test "$candidate" != "$old" || exit 1
+          for version in "$old" "$candidate"; do
+            curl -fsS --max-time 25 -H "$auth" "$root/versions/$version" > "$tmp/$version.json"
+            jq -e --arg v "$version" '.success==true and .result.id==$v and (.result.resources.bindings|type=="array")' "$tmp/$version.json" >/dev/null
+            jq -S '[.result.resources.bindings[]|if .type=="secret_text" then {name,type} else . end]|sort_by(.name)' "$tmp/$version.json" > "$tmp/$version-bindings"
+            jq -S '.result.resources.script_runtime|{compatibility_date,compatibility_flags,usage_model,limits,placement}' "$tmp/$version.json" > "$tmp/$version-runtime"
+          done
+          cmp -s "$tmp/$old-bindings" "$tmp/$candidate-bindings" || { echo "R2_VERSION_BINDING_VALUES_DIFFER_NO_DEPLOY"; exit 1; }
+          cmp -s "$tmp/$old-runtime" "$tmp/$candidate-runtime" || { echo "R2_VERSION_RUNTIME_DIFFERS_NO_DEPLOY"; exit 1; }
+          echo "R2_STAGED_CANDIDATE_BINDINGS_AND_RUNTIME_MATCH_ACTIVE"
           curl -fsS --max-time 30 -H "$auth" "$root/deployments" > "$tmp/deployments-after.json"
           after=$(jq -er '.result.deployments[0].versions | if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/deployments-after.json")
           test "$old" = "$after" || { echo "ALERTA_VERSION_ACTIVA_CAMBIO"; exit 1; }
