@@ -83,7 +83,7 @@ export async function manejarR2GrandePrivado(request,env,{
    if(!await autorizadoIniciar(data.orderId))
     return reply({ok:false,error:'Sesion de comprador no autorizada'},403);
    // IMPRESCINDIBLE: validar ANTES de reservar cuota o crear multipart R2.
-   const receipt=await comprobarPagoCentral(data.orderId);
+   const receipt=await comprobarPagoCentral(data.orderId,data.meta);
    if(!pagoAprobadoParaR2(receipt,data.orderId,
       typeof now==='function'?now():Math.floor(Date.now()/1000)))
     return reply({ok:false,error:'R2_PAGO_NO_CONFIRMADO'},402);
@@ -113,7 +113,7 @@ export async function manejarR2GrandePrivado(request,env,{
    return reply({ok:false,error:'El PDF pertenece a otra sesion'},403);
   // Revalidar pago en cada reintento/parcialidad; un uploadId firmado no es
   // licencia perpetua para crear objetos si el pago fue revertido.
-  const pagoActual=await comprobarPagoCentral(c.orderId);
+  const pagoActual=await comprobarPagoCentral(c.orderId,{fileId:c.fileId,sha256:c.sha256,bytes:c.bytes});
   if(!pagoAprobadoParaR2(pagoActual,c.orderId,
      typeof now==='function'?now():Math.floor(Date.now()/1000)))
    return reply({ok:false,error:'R2_PAGO_NO_CONFIRMADO'},402);
