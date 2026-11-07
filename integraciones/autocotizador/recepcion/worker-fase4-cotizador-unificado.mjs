@@ -56,6 +56,7 @@ import {tusPrivadoConfigurado,diagnosticarTUSPrivado,comprobarTUSAntesDeEnviar,i
 import {manejarR2GrandePrivado} from './r2-pdf-grandes-api-privada.mjs';
 import {comprobarPagoR2EnCentral} from './r2-confirmar-pago-central.mjs';
 import {prepararR2PagoSinArchivo} from './r2-prepago-documentos.mjs';
+import {checkoutR2PrepaidSandboxDocumentos} from './r2-prepago-checkout-documentos.mjs';
 import {descargarR2GrandePersonal} from './r2-pdf-grandes-descarga-personal.mjs';
 import {descargarR2PendientePorD1Personal} from './r2-pdf-descarga-d1-personal.mjs';
 /**
@@ -2142,6 +2143,17 @@ export default {
        authorized:v2PrivateBrowserAuthorized(request,env)==='allow'
       });
     // R2 de PDF grandes: mismo acceso que TUS pero bandera independiente.
+    if(page==='/prueba-v2/api/ensayo-r2-prepago-checkout'){
+      const staff=v2PrivateBrowserAuthorized(request,env)==='allow'||
+        await v2SessionAuthorized(request,env);
+      const buyer=!staff&&await autorizadoPedidoCliente(request,env);
+      const data=buyer?await request.clone().json().catch(()=>null):null;
+      const belongs=buyer&&
+        await autorizadoPedidoClienteVinculado(request,env,data?.webOrderId);
+      return checkoutR2PrepaidSandboxDocumentos(request,env,{
+        authorized:staff||belongs
+      });
+    }
     if(page==='/prueba-v2/api/ensayo-r2-prepago'){
       const staff=v2PrivateBrowserAuthorized(request,env)==='allow'||
         await v2SessionAuthorized(request,env);
