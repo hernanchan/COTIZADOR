@@ -107,7 +107,7 @@ test('direct checkout rechecks D1 despite an untrusted preflight header',async()
 test('mixed document and Polaroids Express order is blocked without payment call',async()=>{
  reset();env.DOCS_SANDBOX_CHECKOUT_ENABLED='PRIVATE_TEST_ONLY';
  lines.push({sku:'POLAROID_EXPRESS_A4',line_total_ars:1,unit_price_ars:1,quantity:1});
- assert.match(source,/ORDER BY CASE WHEN sku='POLAROID_EXPRESS_A4' THEN 0 ELSE 1 END LIMIT 1/);
+ assert.match(source,/ORDER BY CASE WHEN sku='POLAROID_EXPRESS_A4' THEN 0 WHEN sku='R2_PREPAID_PLOT' THEN 1 ELSE 2 END LIMIT 1/);
  const r=await scope.worker.fetch(new Request('https://test.invalid/demo/checkout',{method:'POST',
   headers:{Authorization:'Bearer test-admin','Content-Type':'application/json'},
   body:JSON.stringify({order_id:id})}),env);
