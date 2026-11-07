@@ -110,3 +110,24 @@ test('multipart 200 MiB completo NO se marca como PDF verificado ni habilita pag
  assert.equal(calls.complete.length,1);
  assert.equal(calls.head.length,1);
 });
+
+test('admite uploadId R2 real de 343 caracteres en recibo HMAC sin abrir permisos de pago',async()=>{
+ const {bucket}=fixture();
+ bucket.createMultipartUpload=async()=>({uploadId:'R'.repeat(343)});
+ const session=await start(bucket);
+ const claim=await leerReciboR2(session.proof,{secret,now,subtle:webcrypto.subtle});
+ assert.equal(claim.uploadId.length,343);
+ assert.ok(session.proof.length<4096);
+ assert.equal(session.paymentAuthorized,false);
+ assert.equal(session.checkoutEnabled,false);
+});
+test('aborta multipart si Cloudflare entrega uploadId fuera del limite seguro',async()=>{
+ const {bucket}=fixture();
+ let aborted=0;
+ bucket.createMultipartUpload=async()=>({
+  uploadId:'Z'.repeat(1025),
+  abort:async()=>{aborted++}
+ });
+ await assert.rejects(start(bucket),/R2_COMPROBANTE_INVALIDO/);
+ assert.equal(aborted,1);
+});
