@@ -56,7 +56,9 @@ function validarClaim(c){
   !SHA.test(c.sha256||'')||!Number.isSafeInteger(c.bytes)||c.bytes<=LOWER||c.bytes>UPPER||
   !Number.isInteger(c.pages)||c.pages<1||c.pages>2000||
   c.partBytes!==PART||c.parts!==Math.ceil(c.bytes/PART)||
-  !validString(c.uploadId,256)||!Number.isSafeInteger(c.issuedAt)||
+  // Cloudflare R2 real entrega uploadId de 343 caracteres (06/11/2026).
+  // Limitar a 1024, nunca asumir el tamaño del mock de CI.
+  !validString(c.uploadId,1024)||!Number.isSafeInteger(c.issuedAt)||
   !Number.isSafeInteger(c.expiresAt)||c.expiresAt-c.issuedAt!==TTL||
   typeof c.key!=='string'||!new RegExp('^r2-v1/'+c.orderId.replace(/[-/\\^$*+?.()|[\]{}]/g,'\\$&')+
   '/[a-f0-9-]{36}\\.pdf$','i').test(c.key))
@@ -101,13 +103,19 @@ export async function iniciarR2Grande({bucket,orderId,meta,secret,uuid=()=>crypt
  // Comprobar clave ANTES de crear carga temporal.
  await hmac('preflight',secret,subtle);
  const upload=await bucket.createMultipartUpload(key,{httpMetadata:{contentType:'application/pdf'}});
- const c=validarClaim({v:1,orderId,fileId:meta.fileId,name:meta.name,
-  mode:meta.mode,bytes:meta.bytes,sha256:meta.sha256,pages:meta.pages,
-  key,uploadId:upload.uploadId,partBytes:PART,parts:Math.ceil(meta.bytes/PART),
-  issuedAt,expiresAt:issuedAt+TTL});
- return Object.freeze({proof:await firmar(c,secret,subtle),
-  fileId:c.fileId,bytes:c.bytes,partBytes:c.partBytes,parts:c.parts,
-  expiresAt:c.expiresAt,checkoutEnabled:false,paymentAuthorized:false});
+ try{
+  const c=validarClaim({v:1,orderId,fileId:meta.fileId,name:meta.name,
+   mode:meta.mode,bytes:meta.bytes,sha256:meta.sha256,pages:meta.pages,
+   key,uploadId:upload.uploadId,partBytes:PART,parts:Math.ceil(meta.bytes/PART),
+   issuedAt,expiresAt:issuedAt+TTL});
+  return Object.freeze({proof:await firmar(c,secret,subtle),
+   fileId:c.fileId,bytes:c.bytes,partBytes:c.partBytes,parts:c.parts,
+   expiresAt:c.expiresAt,checkoutEnabled:false,paymentAuthorized:false});
+ }catch(error){
+  // Una firma o validacion fallida NO debe dejar multipart sin abortar.
+  try{await upload?.abort?.();}catch{console.warn('saber_r2_abort_start_failed')}
+  throw error;
+ }
 }
 /** Endpoints deben exigir autenticacion del pedido ANTES de llamar esta funcion. */
 export async function subirParteR2Grande({bucket,proof,partNumber,request,secret,now,subtle}={}){
