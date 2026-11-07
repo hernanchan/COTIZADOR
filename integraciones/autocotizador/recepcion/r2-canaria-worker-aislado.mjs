@@ -33,7 +33,7 @@ export default {
     !env.CANARY_RECEIPT_KEY||env.CANARY_RECEIPT_KEY.length<32)return reply({ok:false},503);
   if(request.headers.get('Origin')!==url.origin)return reply({ok:false},403);
   if(action==='health'&&request.method==='GET')return reply({ok:true,canary:true});
-  if(!['start','part','finish','verify','verify-direct','cleanup','sweep','diagnose'].includes(action))return reply({ok:false},404);
+  if(!['start','part','finish','verify','verify-direct','verify-ranges','cleanup','sweep','diagnose'].includes(action))return reply({ok:false},404);
   if((action==='part'&&request.method!=='PUT')||(action!=='part'&&request.method!=='POST'))return reply({ok:false},405);
   const options={bucket:env.SABER_R2_GRANDES,secret:env.CANARY_RECEIPT_KEY};
   try{
@@ -91,6 +91,37 @@ export default {
    if(action==='finish'){
     const result=await completarR2Grande({...options,proof:data.proof,uploadedParts:data.parts});
     return reply({ok:true,result});
+   }
+   if(action==='verify-ranges'){
+    // 8 MiB: 25 lecturas para 200 MiB, <50 subrequests del plan Free.
+    // Una sola cadena SHA-256; nunca alojar todo el PDF de 200 MiB.
+    const r2=env.SABER_R2_GRANDES;
+    const head=await r2.head(claim.key);
+    if(!head||head.size!==claim.bytes||!head.etag)throw Error('CANARY_HEAD_INVALID');
+    const digest=new crypto.DigestStream('SHA-256'),writer=digest.getWriter();
+    let bytes=0,header='',ranges=0;
+    try{
+     for(let offset=0;offset<claim.bytes;offset+=8*1024*1024){
+      const len=Math.min(8*1024*1024,claim.bytes-offset);
+      const chunkObj=await r2.get(claim.key,{
+       onlyIf:{etagMatches:head.etag},
+       range:{offset,length:len}
+      });
+      if(!chunkObj||typeof chunkObj.arrayBuffer!=='function')throw Error('CANARY_RANGE_NOT_FOUND');
+      const chunk=new Uint8Array(await chunkObj.arrayBuffer());
+      if(chunk.length!==len)throw Error('CANARY_RANGE_INVALID');
+      if(offset===0)header=new TextDecoder().decode(chunk.subarray(0,5));
+      await writer.write(chunk);
+      bytes+=len;ranges++;
+     }
+     await writer.close();
+    }catch(e){try{await writer.abort(e)}catch{}throw e}
+    const sha=Array.from(new Uint8Array(await digest.digest),b=>b.toString(16).padStart(2,'0')).join('');
+    if(header!=='%PDF-'||sha!==claim.sha256||bytes!==claim.bytes)
+      throw Error('CANARY_SHA_RANGE_MISMATCH');
+    return reply({ok:true,verified:{bytes,sha256:sha,sha256Verificado:true,
+      contenidoPdfVerificado:false,paymentAuthorized:false,
+      digestMethod:'ranges-8m',ranges}});
    }
    if(action==='verify-direct'){
     const r2=env.SABER_R2_GRANDES;
