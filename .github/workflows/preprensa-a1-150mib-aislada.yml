@@ -27,6 +27,8 @@ jobs:
           command -v pdftoppm
           node --check tools/preprensa-plano-a1-qpdf.mjs
           node --check tools/generar-panel-a1-150mib-ensayo.mjs
+          node --check integraciones/autocotizador/recepcion/medidas-pdf-grande-rangos.mjs
+          npm install --no-save --no-audit --no-fund pdfjs-dist@3.11.174
       - name: Generar un PDF A1 de 150 MiB, preparar copia separada y verificar integridad
         shell: bash
         run: |
@@ -36,6 +38,7 @@ jobs:
           input="$temp/panel-original-a1-150mib.pdf"
           output="$temp/panel-candidato-a1.pdf"
           node tools/generar-panel-a1-150mib-ensayo.mjs "$input"
+          SABER_TEST_A1_150MIB="$input" node --test tests/r2-metadata-pdfjs-150mib.test.mjs
           echo 'ORIGINAL_PDFINFO_BEGIN'
           pdfinfo -box "$input" | grep -E 'Pages:|Page size:|Encrypted:' || true
           original_sha=$(sha256sum "$input" | awk '{print $1}')
