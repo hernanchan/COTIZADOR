@@ -54,6 +54,7 @@ import {obtenerTarifarioD1Privado} from './obtener-tarifario-d1-privado.mjs';
 import {verificarPdfAlmacenado} from './verificacion-pdf-drive-servidor.mjs';
 import {tusPrivadoConfigurado,diagnosticarTUSPrivado,comprobarTUSAntesDeEnviar,iniciarTandaTUSPrivada,finalizarPedidoTUSPrivado,recuperarPedidoTUSPrivado,descargarPdfTUSPersonal} from './tus-pedido-worker.mjs';
 import {manejarR2GrandePrivado} from './r2-pdf-grandes-api-privada.mjs';
+import {comprobarPagoR2EnCentral} from './r2-confirmar-pago-central.mjs';
 import {descargarR2GrandePersonal} from './r2-pdf-grandes-descarga-personal.mjs';
 import {descargarR2PendientePorD1Personal} from './r2-pdf-descarga-d1-personal.mjs';
 /**
@@ -2147,6 +2148,10 @@ export default {
       const staff=basic||await v2SessionAuthorized(request,env);
       const buyer=!staff&&await autorizadoPedidoCliente(request,env);
       return manejarR2GrandePrivado(request,env,{
+       // Solo el pago concilado por Central y ligado al SHA-256/bytes
+       // autoriza la subida. Basic del operador NO saltea esta barrera.
+       comprobarPagoCentral:async(orderId,meta)=>
+        comprobarPagoR2EnCentral({env,orderId,meta}),
        autorizadoIniciar:async()=>staff||buyer,
        autorizadoOrden:async orderId=>staff||
         (buyer&&await autorizadoPedidoClienteVinculado(request,env,orderId)),
