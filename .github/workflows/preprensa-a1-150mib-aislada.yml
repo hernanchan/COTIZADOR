@@ -40,6 +40,7 @@ jobs:
           output="$temp/panel-candidato-a1.pdf"
           node tools/generar-panel-a1-150mib-ensayo.mjs "$input"
           SABER_TEST_A1_150MIB="$input" node --test tests/r2-metadata-pdfjs-150mib.test.mjs
+          SABER_TEST_A1_150MIB="$input" node --test tests/r2-local-file-slice-150mib.test.mjs
           echo 'ORIGINAL_PDFINFO_BEGIN'
           pdfinfo -box "$input" | grep -E 'Pages:|Page size:|Encrypted:' || true
           original_sha=$(sha256sum "$input" | awk '{print $1}')
