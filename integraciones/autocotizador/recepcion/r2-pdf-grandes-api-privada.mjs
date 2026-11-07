@@ -9,6 +9,7 @@ import {iniciarR2Grande,subirParteR2Grande,completarR2Grande,
 import {verificarIntegridadR2Grande} from './r2-pdf-integridad-stream.mjs';
 import {reservarR2GrandeAntesDeSubir} from './r2-grandes-reserva-central.mjs';
 import {enviarPreRecepcionR2Central} from './r2-grandes-enviar-central.mjs';
+import {pagoAprobadoParaR2,R2_PAID_GATE} from './r2-recepcion-solo-pagada.mjs';
 
 const FLAG='PRIVATE_TEST_ONLY';
 const ROOT='/prueba-v2/api/ensayo-r2/';
@@ -44,6 +45,7 @@ async function bodyJSON(request,maxBytes=12288){
 }
 export async function manejarR2GrandePrivado(request,env,{
  autorizadoIniciar=async()=>false,autorizadoOrden=async()=>false,
+ comprobarPagoCentral=async()=>null,
  vincularOrden=async()=>null,now,subtle,digestFactory,
  stage=enviarPreRecepcionR2Central,
  reserve=reservarR2GrandeAntesDeSubir,uuid=()=>crypto.randomUUID(),
@@ -53,6 +55,10 @@ export async function manejarR2GrandePrivado(request,env,{
  const action=route.slice(ROOT.length);
  if(!['iniciar','parte','completar','verificar'].includes(action))
   return reply({ok:false,error:'Ruta R2 inexistente'},404);
+ // Nunca permitir uploads cuando no esta implementada la compuerta postpago.
+ // El flag no autoriza nada: requiere verificacion Central en cada operacion.
+ if(env?.[R2_PAID_GATE.flag]!==R2_PAID_GATE.value)
+  return reply({ok:false,error:'Recepción R2 requiere pago previo verificado'},503);
  // 503 antes de cualquier escritura: no cargar nada cuando no esta el bucket.
  if(!validarEntorno(env))
   return reply({ok:false,error:'Recepcion de PDF grandes no habilitada'},503);
@@ -76,6 +82,11 @@ export async function manejarR2GrandePrivado(request,env,{
     return reply({ok:false,error:'Datos de inicio incorrectos'},422);
    if(!await autorizadoIniciar(data.orderId))
     return reply({ok:false,error:'Sesion de comprador no autorizada'},403);
+   // IMPRESCINDIBLE: validar ANTES de reservar cuota o crear multipart R2.
+   const receipt=await comprobarPagoCentral(data.orderId);
+   if(!pagoAprobadoParaR2(receipt,data.orderId,
+      typeof now==='function'?now():Math.floor(Date.now()/1000)))
+    return reply({ok:false,error:'R2_PAGO_NO_CONFIRMADO'},402);
    validarMetaR2(data.meta);
    // Primero reservar espacio global y del pedido en la Central con SQL atómico.
    // Una cuenta con R2 habilitado pero sin cuota NO puede crear uploads.
@@ -100,6 +111,12 @@ export async function manejarR2GrandePrivado(request,env,{
   const c=await leerReciboR2(proof,options);
   if(!await autorizadoOrden(c.orderId))
    return reply({ok:false,error:'El PDF pertenece a otra sesion'},403);
+  // Revalidar pago en cada reintento/parcialidad; un uploadId firmado no es
+  // licencia perpetua para crear objetos si el pago fue revertido.
+  const pagoActual=await comprobarPagoCentral(c.orderId);
+  if(!pagoAprobadoParaR2(pagoActual,c.orderId,
+     typeof now==='function'?now():Math.floor(Date.now()/1000)))
+   return reply({ok:false,error:'R2_PAGO_NO_CONFIRMADO'},402);
   if(action==='parte'){
    const n=url.searchParams.get('n');
    if(!/^[1-9][0-9]{0,2}$/.test(n||''))
