@@ -272,7 +272,7 @@ function pagoSandboxEnRecibo(){
  // El servidor verifica los pagos pendientes con su propio límite de frecuencia.
  // Esta consulta nunca crea cobros, cambia importes ni habilita producción.
  setInterval(()=>{if(!document.hidden)void check()},30000);
- document.addEventListener('visibilitychange',()=>{
+ document.addEventListener?.('visibilitychange',()=>{
   if(!document.hidden)void check();
  });
  void check();
@@ -526,7 +526,7 @@ function motivoBloqueoEnvio(){
  if(registering)return 'Se está registrando el pedido.';
  if(handoffInProgress)return 'Preparando los archivos del pedido.';
  if(registeredOrder)return 'El pedido ya fue registrado.';
- if(r2PrepagoFlujo)return 'Este presupuesto de ploteo grande ya está preparado; continuá con el pago en el panel.';
+ if(typeof r2PrepagoFlujo!=='undefined'&&r2PrepagoFlujo)return 'Este presupuesto de ploteo grande ya está preparado; continuá con el pago en el panel.';
  if(smartReady&&(refs.length===0||borradorAnteriorSinPDF()))return '';
  if(!refs.length)return smartBlockedReason||'Todavía no hay un presupuesto completo listo para enviar.';
  if(all.some(item=>item.references.length===0))
@@ -1080,7 +1080,7 @@ async function r2ConsultarPagoYContinuar(){
    String(error?.message||error).slice(0,140)+'. R2 permanece bloqueado.');
  }finally{r2Consultando=false}
 }
-r2Pagar.addEventListener('click',async()=>{
+r2Pagar?.addEventListener?.('click',async()=>{
  if(!r2PrepagoFlujo||r2PrepagoFlujo.phase!=='presupuesto_sin_archivo')return;
  r2Pagar.disabled=true;
  r2Informar('Preparando el enlace seguro de Mercado Pago (solamente cuenta de prueba)…');
@@ -1099,7 +1099,7 @@ r2Pagar.addEventListener('click',async()=>{
   r2Informar('No se pudo preparar el pago de prueba: '+String(error?.message||error).slice(0,180));
  }
 });
-r2Retry.addEventListener('click',async()=>{
+r2Retry?.addEventListener?.('click',async()=>{
  if(r2PrepagoFlujo?.phase==='pagado_esperando_subida')
   await r2SubirSoloDespuesPago();
 });
