@@ -169,11 +169,12 @@ async function resume(){
  const complete=await call('finish','POST',{proof:state.proof,parts});
  if(complete.body.result?.storageReady!==true||
     complete.body.result?.sha256Verificado!==false)throw Error('CANARY_FINISH_INVALID');
- let verification,method='legacy-transform';
+ let verification,method='ranges-8m';
  try{
-  verification=await call('verify','POST',{proof:state.proof});
+  verification=await call('verify-ranges','POST',{proof:state.proof});
  }catch(error){
-  console.log('CANARY_LEGACY_SHA_VERIFY_FAILED_PROBING_DIRECT_R2_STREAM');
+  if(sizeMiB!==80)throw error;
+  console.log('CANARY_RANGE_SHA_80_FAILED_RETRY_DIRECT_STREAM');
   verification=await call('verify-direct','POST',{proof:state.proof});
   method='direct-r2-stream';
  }
