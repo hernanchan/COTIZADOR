@@ -1103,7 +1103,7 @@ r2Retry?.addEventListener?.('click',async()=>{
  if(r2PrepagoFlujo?.phase==='pagado_esperando_subida')
   await r2SubirSoloDespuesPago();
 });
-document.addEventListener('visibilitychange',()=>{
+if(typeof document.addEventListener==='function')document.addEventListener('visibilitychange',()=>{
  if(document.visibilityState==='visible'&&r2PagoTimer!==null)
   void r2ConsultarPagoYContinuar();
 });
