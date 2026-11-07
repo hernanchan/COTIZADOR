@@ -1,5 +1,5 @@
 name: Saber - smoke privado de Documentos y Central desplegados (solo GET)
-# Reejecución tras instalar código R2 inerte; solo GET, sin pedidos ni escrituras.
+# Reejecución tras desplegar verificador R2 por rangos; solo GET, sin pedidos ni escrituras.
 on:
   push:
     branches:
