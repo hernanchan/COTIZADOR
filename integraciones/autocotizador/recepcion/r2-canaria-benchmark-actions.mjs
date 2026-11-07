@@ -169,15 +169,9 @@ async function resume(){
  const complete=await call('finish','POST',{proof:state.proof,parts});
  if(complete.body.result?.storageReady!==true||
     complete.body.result?.sha256Verificado!==false)throw Error('CANARY_FINISH_INVALID');
- let verification,method='ranges-8m';
- try{
-  verification=await call('verify-ranges','POST',{proof:state.proof});
- }catch(error){
-  if(sizeMiB!==80)throw error;
-  console.log('CANARY_RANGE_SHA_80_FAILED_RETRY_DIRECT_STREAM');
-  verification=await call('verify-direct','POST',{proof:state.proof});
-  method='direct-r2-stream';
- }
+ // Exigir el verificador de produccion experimental, sin fallback canario.
+ const verification=await call('verify','POST',{proof:state.proof});
+ const method='core-ranges-8m';
  const result=verification.body.verified;
  if(!result||result.sha256!==state.sha256||result.bytes!==sizeMiB*MIB||
     result.sha256Verificado!==true||result.contenidoPdfVerificado!==false||
