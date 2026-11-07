@@ -50,6 +50,7 @@ jobs:
           node --check integraciones/mercadopago/pruebas/r2-prepago-intencion-central.mjs
           node --test tests/r2-prepago-sin-archivo-central.test.mjs
           node --test tests/r2-prepago-checkout-sandbox.test.mjs
+          node --test tests/r2-flujo-sin-archivo-cero-costo.test.mjs
           node --check integraciones/mercadopago/pruebas/r2-prepago-checkout-sandbox-central.mjs
           node --check integraciones/autocotizador/recepcion/r2-prepago-checkout-documentos.mjs
           node --check integraciones/autocotizador/recepcion/r2-confirmar-pago-central.mjs
