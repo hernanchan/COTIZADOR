@@ -180,3 +180,15 @@ Comprobación independiente de solo lectura preparada en `.github/workflows/r2-v
 ### Smoke del Worker activo después del despliegue
 - [42332273427](https://github.com/hernanchan/COTIZADOR/actions/runs/42332273427) **SUCCESS**: rutas privadas anónimas HTTP 401; las pantallas de Documentos `/prueba-v2/`, `/prueba-v2/carga-inteligente` y recurso JS responden HTTP 200 autenticado con marcadores esperados. Central `/health`: `ok=true`, `databaseReady=true`, `paymentsEnabled=false`.
 - [42332273395](https://github.com/hernanchan/COTIZADOR/actions/runs/42332273395) **SUCCESS**: CI TUS y R2 sin despliegue. No se ejecutó pedido real TUS ni transacción en esta comprobación.
+
+
+## 07/11/2026 — A1 150 MiB: PREPRENSA Y LECTURA PARCIAL DEMOSTRADAS
+
+Se atendió caso operativo del titular: un solo PDF A1 de ~150 MB puede bloquear las PC y el RIP/plotter; **la solución no es sólo cargar archivos grandes en R2**.
+
+- `tools/preprensa-plano-a1-qpdf.mjs`: preparador **separado**, sin pérdida, sin rasterizar ni tocar original, compara boxes/páginas y una muestra visual Poppler; no genera candidato salvo reducción >=5%, nunca autoriza impresión. Ensayo exitoso: PDF A1 sintético 150 MiB → copia 0,15 MiB en ~7,6s. **No implica que todos los 150 MB sean comprensibles**.
+- Ensayo negativo: A1 con imagen ya comprimida (~16 MiB) → **0% reducción**, estado `SIN_REDUCCION_SUFICIENTE_REQUIERE_OTRO_TRATAMIENTO`, original conservado, sin falsa copia preparada. [Actions 42382841817](https://github.com/hernanchan/COTIZADOR/actions/runs/42382841817) SUCCESS.
+- `medidas-pdf-grande-rangos.mjs`: PDF.js en entorno Node aislado, máximo 8 MiB de lectura y 35 solicitudes, **150 MiB / A1 / 1 página reconocidos leyendo solamente 128 KiB en 2 rangos**, sin canvas, sin volcar original a memoria. Se probó también conectado a `abrirRangosR2Privados` (mock de bucket local, contrato D1/ETag comprobado), [Actions 42383270551](https://github.com/hernanchan/COTIZADOR/actions/runs/42383270551) **SUCCESS**.
+- **NO está conectado a producción, ni a Cloudflare Worker de documentos**, ni crea pedido/ZIP ni realiza pago. El Worker de pagos/Central todavía limita recibos TUS a 40 MiB, y al normalizar la ficha **descarta propiedades adicionales** como el nuevo aviso de preprensa. No levantar ese límite sin construir recepción R2, verificación de páginas, cotización y manifest separados y seguros.
+- Documento con plan, resultados y limitaciones: [PREPRENSA-PDF-A1-150MIB-20261107.md](./PREPRENSA-PDF-A1-150MIB-20261107.md).
+- Próximos P0 para publicar nuevo cotizador: integrar parser por rangos con motor de cálculo autoritativo, asignar TUS/R2 por archivo, conciliar D1 y pago seguro, y trasladar **candidato de preprensa** a la Central con revisión antes de mandar al plotter; añadir borrado de originales y copias post-entrega. Prueba final A1 real de 150 MB sin colgar PC/impresora.
