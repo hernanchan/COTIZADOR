@@ -66,7 +66,7 @@ export class Sha256Incremental{
  digestHex(){
   if(this.finished)throw Error('HASH_PDF_FINALIZADO');
   const bits=this.bytes*8;
-  const tail=new Uint8Array(this.used+1+((56-(this.used+1)%64+64)%64)+8);
+  const tail=new Uint8Array(1+((56-(this.used+1)%64+64)%64)+8);
   tail[0]=0x80;
   const offset=tail.length-8;
   const high=Math.floor(bits/4294967296),low=bits>>>0;
