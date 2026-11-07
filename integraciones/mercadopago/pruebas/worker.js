@@ -4360,6 +4360,10 @@ export default {
     const {lookupR2PendienteCentral}=await import("./r2-grandes-central-pendientes.mjs");
     return await lookupR2PendienteCentral(req,env,{readSigned:centralReadSigned});
    }
+   if(url.pathname==="/internal/central/r2-payment-lookup"){
+    const {consultarPagoR2PreviaCarga}=await import("./r2-pago-verificado-central.mjs");
+    return await consultarPagoR2PreviaCarga(req,env,{readSigned:centralReadSigned});
+   }
    if(url.pathname==="/internal/central/stage")return await centralStage(req,env);
    if(url.pathname==="/internal/central/receipt-check")return await centralTUSReceiptLookup(req,env);
    if(url.pathname==="/internal/central/tus-purge-plan")return await centralTUSDeliveryPurgePlan(req,env);
