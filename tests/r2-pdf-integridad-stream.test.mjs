@@ -76,3 +76,48 @@ test('carga incompleta o tipo diferente nunca es PDF verificado',async()=>{
  await assert.rejects(verificarIntegridadR2Grande(await setup(45,{pdf:false})),/R2_NO_ES_PDF/);
  await assert.rejects(verificarIntegridadR2Grande(await setup(45,{size:10})),/R2_OBJETO_INCOMPLETO/);
 });
+
+async function setupRango(n,opts={}){
+ const input=await setup(n),etag='etag-seguro-r2-rangos-2026';
+ const ranges=[];
+ input.bucket.head=async()=>({size:n*chunkBytes,etag});
+ input.bucket.get=async(name,options)=>{
+  assert.equal(typeof name,'string');
+  const {offset,length}=options?.range||{};
+  assert.equal(options?.onlyIf?.etagMatches,etag);
+  assert.ok(Number.isInteger(offset)&&offset>=0);
+  assert.ok(length>0&&length<=8*chunkBytes);
+  ranges.push({offset,length});
+  if(opts.etagCambia&&offset>=8*chunkBytes)return null;
+  const bytes=new Uint8Array(length-(opts.truncado?1:0));
+  if(offset===0&&!opts.noPdf)bytes.set(new TextEncoder().encode('%PDF-'));
+  if(offset===8*chunkBytes&&opts.alterado)bytes[19]=101;
+  return {arrayBuffer:async()=>bytes.buffer};
+ };
+ return {...input,ranges};
+}
+test('R2 realista 200 MiB: 25 rangos de 8 MiB, ETag fijo y SHA completo',async()=>{
+ const f=await setupRango(200);
+ const result=await verificarIntegridadR2Grande(f);
+ assert.equal(f.ranges.length,25);
+ assert.equal(f.ranges[24].offset,192*chunkBytes);
+ assert.equal(f.ranges[24].length,8*chunkBytes);
+ assert.equal(result.bytes,200*chunkBytes);
+ assert.equal(result.sha256,hashForParts(200));
+ assert.equal(result.etag,'etag-seguro-r2-rangos-2026');
+ assert.equal(result.sha256Verificado,true);
+ assert.equal(result.contenidoPdfVerificado,false);
+ assert.equal(result.registeredInD1,false);
+ assert.equal(result.paymentAuthorized,false);
+});
+test('R2 rangos rechaza ETag cambiante, truncamiento, corrupción y cabecera ajena',async()=>{
+ for(const [flags,pattern] of [
+  [{etagCambia:true},/R2_ETAG_O_RANGO_INCORRECTO/],
+  [{truncado:true},/R2_LONGITUD_INCORRECTA/],
+  [{alterado:true},/R2_SHA256_NO_COINCIDE/],
+  [{noPdf:true},/R2_NO_ES_PDF/]
+ ]){
+  const f=await setupRango(80,flags);
+  await assert.rejects(verificarIntegridadR2Grande(f),pattern);
+ }
+});
