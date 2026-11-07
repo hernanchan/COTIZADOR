@@ -1,4 +1,5 @@
 name: R2 - PRUEBA REAL AISLADA 80 y 200 MiB con borrado verificable
+# Diagnosticar SHA 503: comparar transform y digest directo, sin cambiar Workers comerciales.
 on:
   push:
     branches: [integracion/tus-pedido-privado-20261101]
