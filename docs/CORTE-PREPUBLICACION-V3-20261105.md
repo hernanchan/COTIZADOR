@@ -80,3 +80,21 @@ Se buscó en el Google Drive conectado por «productos», «precios», «inventa
 5. Solo después del GO técnico y autorización explícita del titular: abrir compra y cobro reales. El catálogo/portada pueden tener un calendario separado si siguen enlazando al cotizador público vigente; **no** presentar la nueva recepción como lista.
 
 **Se retira cualquier compromiso de publicar el nuevo cotizador el lunes 09/11/2026** basado solo en que la portada esté terminada. No fijar nueva fecha sin completar las verificaciones de aceptación.
+
+
+## 07/11/2026 — Caso real: plano/panel A1 de 150 MB bloquea equipos e impresoras
+
+El propietario reporta experiencia operativa: clientes envían **un PDF de ~150 MB de una única página A1** y al intentar imprimirlo se bloquean computadoras/impresoras. Esto constituye riesgo de procesamiento en preprensa, **no motivo para rechazar la recepción comercial**.
+
+**Revisión de código:** `medidas-local-pdf.mjs` abre el PDF completo con `file.arrayBuffer()` y `pdf-lib`; la clasificación CAD/Póster `clasificar-paginas-ploteo.mjs` vuelve a abrir el archivo y dibuja vistas de cada página en el navegador. Para 150 MB y geometría/efectos complejos esto puede producir mucha presión de memoria. El tamaño del archivo por sí solo **no demuestra** complejidad ni corrupción.
+
+**Decisión de producto/preprensa:**
+1. **Recibir** PDF de hasta 200 MiB por R2 sin que el navegador procese simultáneamente 150 MiB en memoria.
+2. **Reconocer tamaño A1** por medidas verificadas y presupuestar con clasificación CAD/Póster fiable. Si el análisis no consigue verificar páginas/medidas o apariencia, el pedido queda en revisión; **no inventar precio ni cobrar como impresión lista**.
+3. **Preparación de impresión separada:** original privado e íntegro → preparar una **copia de salida** con optimización de imágenes/acoplado o rasterizado solo si corresponde al contenido. No reemplazar original, no degradar líneas finas de planos CAD con DPI fijo ni imprimir automáticamente el original complejo.
+4. **Señal de preprensa para operador:** PDF de ploteo **≥60 MiB** queda marcado para preparación especial, sin constituir diagnóstico de contenido, ni autorización para imprimir. Se implementa `riesgo-preprensa-ploteo.mjs`, conectado a la ficha de Central `ficha-produccion-central.mjs`, más pruebas `tests/preprensa-ploteo-pesado.test.mjs`. Esto es **una advertencia de metadatos**, no el motor de optimización terminado.
+5. **Validación de producción:** comparar medida real, líneas/textos, color y escala del original frente a la copia preparada; imprimir una muestra representativa si hiciera falta. Sólo después liberar la cola, preferiblemente una carga pesada por vez para no saturar la máquina de ploteo.
+
+**Bloqueante adicional para publicar el cotizador nuevo:** comprobar **PDF 150 MB / A1** de punta a punta incluyendo PDF procesable para impresión, sin colgar navegador, PC de producción ni plotter. No declarar esto probado sólo porque R2 transfirió 200 MiB.
+
+La web comercial, `main` y pagos reales siguen sin modificaciones. No desplegar la alerta en Central comercial por el solo hecho de incluirla en rama de ensayo.
