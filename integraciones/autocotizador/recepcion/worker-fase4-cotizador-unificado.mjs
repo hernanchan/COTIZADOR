@@ -55,6 +55,7 @@ import {verificarPdfAlmacenado} from './verificacion-pdf-drive-servidor.mjs';
 import {tusPrivadoConfigurado,diagnosticarTUSPrivado,comprobarTUSAntesDeEnviar,iniciarTandaTUSPrivada,finalizarPedidoTUSPrivado,recuperarPedidoTUSPrivado,descargarPdfTUSPersonal} from './tus-pedido-worker.mjs';
 import {manejarR2GrandePrivado} from './r2-pdf-grandes-api-privada.mjs';
 import {comprobarPagoR2EnCentral} from './r2-confirmar-pago-central.mjs';
+import {prepararR2PagoSinArchivo} from './r2-prepago-documentos.mjs';
 import {descargarR2GrandePersonal} from './r2-pdf-grandes-descarga-personal.mjs';
 import {descargarR2PendientePorD1Personal} from './r2-pdf-descarga-d1-personal.mjs';
 /**
@@ -2141,6 +2142,24 @@ export default {
        authorized:v2PrivateBrowserAuthorized(request,env)==='allow'
       });
     // R2 de PDF grandes: mismo acceso que TUS pero bandera independiente.
+    if(page==='/prueba-v2/api/ensayo-r2-prepago'){
+      const staff=v2PrivateBrowserAuthorized(request,env)==='allow'||
+        await v2SessionAuthorized(request,env);
+      const buyer=!staff&&await autorizadoPedidoCliente(request,env);
+      const result=await prepararR2PagoSinArchivo(request,env,{
+        authorized:staff||buyer
+      });
+      if(result.ok&&buyer){
+        const data=await request.clone().json().catch(()=>null);
+        const link=await cookiePedidoClienteVinculado(request,env,data?.webOrderId);
+        if(link){
+          const headers=new Headers(result.headers);
+          headers.append('Set-Cookie',link);
+          return new Response(result.body,{status:result.status,headers});
+        }
+      }
+      return result;
+    }
     // Sin bucket ni llave de firma, devuelve 503; nunca registra D1 o pagos.
     // El comprador solo sube partes para SU orden vinculada; el personal usa Basic.
     if(page.startsWith('/prueba-v2/api/ensayo-r2/')){
