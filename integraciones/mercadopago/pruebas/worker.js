@@ -4360,6 +4360,12 @@ export default {
     const {lookupR2PendienteCentral}=await import("./r2-grandes-central-pendientes.mjs");
     return await lookupR2PendienteCentral(req,env,{readSigned:centralReadSigned});
    }
+   if(url.pathname==="/internal/central/r2-prepay-intent"){
+    const {registrarIntencionR2Prepaga}=await import("./r2-prepago-intencion-central.mjs");
+    if(env.CENTRAL_R2_PREPAY_DRAFT_ENABLED==="PRIVATE_TEST_ONLY")
+      await ensureOrderItems(env);
+    return await registrarIntencionR2Prepaga(req,env,{readSigned:centralReadSigned});
+   }
    if(url.pathname==="/internal/central/r2-payment-lookup"){
     const {consultarPagoR2PreviaCarga}=await import("./r2-pago-verificado-central.mjs");
     return await consultarPagoR2PreviaCarga(req,env,{readSigned:centralReadSigned});
