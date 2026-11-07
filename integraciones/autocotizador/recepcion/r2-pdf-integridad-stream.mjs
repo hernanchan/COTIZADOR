@@ -24,6 +24,8 @@ async function verificarIntegridadConRangos(bucket,c,digestFactory){
  if(!digest||typeof digest.getWriter!=='function'||!digest.digest)
   throw Error('R2_DIGEST_NO_DISPONIBLE');
  const writer=digest.getWriter();
+ // El rechazo del digest tras abort() debe observarse, no quedar sin manejar.
+ void Promise.resolve(digest.digest).catch(()=>{});
  let bytes=0,headerLength=0;
  const header=new Uint8Array(5);
  try{
