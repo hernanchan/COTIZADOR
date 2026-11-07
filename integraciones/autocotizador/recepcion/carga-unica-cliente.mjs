@@ -19,6 +19,25 @@ function actualizarModoLote(){
 
 const MAX_PDF_CARGA=location.pathname==='/prueba-v2/carga-inteligente'?10:30;
 const MAX_PDF_TUS_BYTES=40*1024*1024;
+const MAX_PDF_R2_PREPAGO_BYTES=200*1024*1024;
+const R2_PREPAGO_ENSAYO=location.pathname==='/prueba-v2/carga-inteligente'&&
+ window.parent!==window&&new URLSearchParams(location.search).get('r2Prepago')==='1';
+function admitePrepagoR2Grande(e){
+ if(!R2_PREPAGO_ENSAYO||entries.length!==1||!e||
+    !(e.archivoOriginal instanceof File)||
+    e.archivoOriginal.size<=MAX_PDF_TUS_BYTES||
+    e.archivoOriginal.size>MAX_PDF_R2_PREPAGO_BYTES||
+    !/\.pdf$/i.test(e.name)||e.name.length>120||
+    e.servicio!=='auto'||e.anillado!=='ninguno'||
+    !Array.isArray(e.paginas)||e.paginas.length<1||
+    e.paginas.length>2000||e.seleccion!=='original'||
+    e.paginas.some(p=>!['cad','poster'].includes(p.modo))||
+    !Number.isSafeInteger(e.copias)||e.copias<1||e.copias>200)
+  return false;
+ try{return clasificarDestino(e.paginas,e.seleccion).destino==='ploteo'}
+ catch{return false}
+}
+
 const MAX_LOTE_TUS_BYTES=60*1024*1024;
 const tamanoPdfMiB=f=>(f.size/(1024*1024)).toFixed(1).replace('.',',')+' MiB';
 const WHATSAPP_CONSULTAS_SABER='5493513110130';
@@ -48,6 +67,9 @@ function alertasRecepcionPDF(){
   const file=e.archivoOriginal;
   if(!(file instanceof File))continue;
   if(file.size>MAX_PDF_TUS_BYTES){
+   // Presupuesto de un único ploteo grande: File permanece en cliente.
+   // Sin pago confirmado R2 no recibe ni una parte del original.
+   if(admitePrepagoR2Grande(e))continue;
    alertas.set(e,'El PDF «'+file.name+'» no se admite: pesa '+tamanoPdfMiB(file)+
     ' y el máximo actual es 40 MiB por PDF. Los demás archivos siguen cargados.');
    continue;
@@ -787,7 +809,9 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
  bridgeButton.textContent='Agregar PDF al envío privado';
  const info=document.createElement('p');
  info.className='pie';info.setAttribute('role','status');
- info.textContent='Recepción privada de hasta 10 PDF por pedido (máximo 40 MiB por archivo y 60 MiB en total). Impresiones y ploteos se verifican y registran en la Central. Las páginas elegidas se verifican sobre el PDF original antes de registrar la orden.';
+ info.textContent=R2_PREPAGO_ENSAYO?
+  'PDF de hasta 40 MiB: recepción privada habitual. Un único ploteo PDF de 40–200 MiB: primero presupuesto local, después pago confirmado y recién entonces subida R2. Sin pago, no se almacena ningún original.':
+  'Recepción privada de hasta 10 PDF por pedido (máximo 40 MiB por archivo y 60 MiB en total). Impresiones y ploteos se verifican y registran en la Central. Las páginas elegidas se verifican sobre el PDF original antes de registrar la orden.';
  const resumen=$('resumenPedido');
  resumen?.parentNode?.insertBefore(bridgeButton,resumen);
  bridgeButton.insertAdjacentElement('afterend',info);
@@ -798,6 +822,22 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
       entries.length<1||entries.length>MAX_PDF_CARGA||
       ultimoPresupuesto.plan?.length!==entries.length)
     throw Error('Completá primero la cotización de todos los documentos.');
+   if(entries.length===1&&admitePrepagoR2Grande(entries[0])){
+    const e=entries[0],plan=ultimoPresupuesto.plan[0];
+    if(plan?.destino!=='ploteos'||plan.paginasElegidas.length!==e.paginas.length||
+       ultimoPresupuesto.pendientes?.length)
+     throw Error('El ploteo grande todavía no tiene presupuesto completo.');
+    const archivos=prepararLoteParcial(entries).archivos;
+    if(archivos.length!==1||archivos[0].servicio!=='auto')
+     throw Error('El ploteo grande debe presupuestarse individualmente.');
+    window.parent.postMessage({type:'SABER_SMART_R2_PREPAGO',
+     file:e.archivoOriginal,archivos,
+     totalOrientativo:ultimoPresupuesto.total},location.origin);
+    info.classList?.remove?.('estado-recepcion-error');
+    info.textContent='Ploteo grande: primero pedido sin archivo y pago sandbox. No se subió nada a R2.';
+    window.parent.postMessage({type:'SABER_SMART_HANDOFF_READY',cantidad:1},location.origin);
+    return;
+   }
    const files=[],options=[],ploteosPendientes=[];
    for(let i=0;i<entries.length;i++){
     const e=entries[i],plan=ultimoPresupuesto.plan.find(p=>p.indice===i);
