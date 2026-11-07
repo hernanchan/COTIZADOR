@@ -2146,12 +2146,13 @@ export default {
       const staff=v2PrivateBrowserAuthorized(request,env)==='allow'||
         await v2SessionAuthorized(request,env);
       const buyer=!staff&&await autorizadoPedidoCliente(request,env);
+      // Clonar ANTES de consumir el cuerpo al cotizar. Nunca duplicar POST.
+      const clientData=buyer?await request.clone().json().catch(()=>null):null;
       const result=await prepararR2PagoSinArchivo(request,env,{
         authorized:staff||buyer
       });
       if(result.ok&&buyer){
-        const data=await request.clone().json().catch(()=>null);
-        const link=await cookiePedidoClienteVinculado(request,env,data?.webOrderId);
+        const link=await cookiePedidoClienteVinculado(request,env,clientData?.webOrderId);
         if(link){
           const headers=new Headers(result.headers);
           headers.append('Set-Cookie',link);
