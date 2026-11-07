@@ -85,8 +85,18 @@ async function call(route,method='POST',data=null,extraHeaders={}){
  const started=performance.now();
  const res=await fetch(base+'/__saber-r2-canario/'+route,{
   method,headers,body,signal:AbortSignal.timeout(180000),redirect:'error'});
- const reply=await res.json().catch(()=>null);
- if(!res.ok||reply?.ok!==true)throw Error('CANARY_HTTP_'+res.status+'_'+(reply?.error||route));
+ const raw=await res.text();
+ let reply=null;
+ try{reply=JSON.parse(raw)}catch{}
+ if(!res.ok||reply?.ok!==true){
+  // No registrar tokens, proofs, URL ni cabeceras de autenticacion.
+  console.error('CANARY_HTTP_DIAGNOSTIC route='+route.split('?')[0]+
+   ' status='+res.status+' contentType='+(res.headers.get('content-type')||'unknown')+
+   ' provider='+((res.headers.get('server')||'unknown').slice(0,30))+
+   ' errorCode='+(reply?.error||'non-json')+
+   ' responseHead='+raw.slice(0,250).replace(/<[^>]*>/g,' ').replace(/\s+/g,' '));
+  throw Error('CANARY_HTTP_'+res.status+'_'+(reply?.error||route));
+ }
  return {body:reply,elapsedMs:Math.round(performance.now()-started)};
 }
 function save(state){
@@ -159,7 +169,14 @@ async function resume(){
  const complete=await call('finish','POST',{proof:state.proof,parts});
  if(complete.body.result?.storageReady!==true||
     complete.body.result?.sha256Verificado!==false)throw Error('CANARY_FINISH_INVALID');
- const verification=await call('verify','POST',{proof:state.proof});
+ let verification,method='legacy-transform';
+ try{
+  verification=await call('verify','POST',{proof:state.proof});
+ }catch(error){
+  console.log('CANARY_LEGACY_SHA_VERIFY_FAILED_PROBING_DIRECT_R2_STREAM');
+  verification=await call('verify-direct','POST',{proof:state.proof});
+  method='direct-r2-stream';
+ }
  const result=verification.body.verified;
  if(!result||result.sha256!==state.sha256||result.bytes!==sizeMiB*MIB||
     result.sha256Verificado!==true||result.contenidoPdfVerificado!==false||
@@ -172,7 +189,7 @@ async function resume(){
   ' RESUMED_PARTS='+missing.length+
   ' TRANSFER_WALL_MS='+totalMs+
   ' EFFECTIVE_MIB_PER_SECOND='+(sizeMiB/(totalMs/1000)).toFixed(2)+
-  ' R2_SHA256_READ_MS='+verification.elapsedMs+
+  ' SHA_METHOD='+method+' R2_SHA256_READ_MS='+verification.elapsedMs+
   ' R2_OBJECT_DELETED_CONFIRMED=true');
  unlinkSync(stateFile);unlinkSync(file);
 }
