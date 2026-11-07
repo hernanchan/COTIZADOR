@@ -69,7 +69,7 @@ function alertasRecepcionPDF(){
   if(file.size>MAX_PDF_TUS_BYTES){
    // Presupuesto de un único ploteo grande: File permanece en cliente.
    // Sin pago confirmado R2 no recibe ni una parte del original.
-   if(admitePrepagoR2Grande(e))continue;
+   if(typeof admitePrepagoR2Grande==='function'&&admitePrepagoR2Grande(e))continue;
    alertas.set(e,'El PDF «'+file.name+'» no se admite: pesa '+tamanoPdfMiB(file)+
     ' y el máximo actual es 40 MiB por PDF. Los demás archivos siguen cargados.');
    continue;
@@ -822,7 +822,7 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
       entries.length<1||entries.length>MAX_PDF_CARGA||
       ultimoPresupuesto.plan?.length!==entries.length)
     throw Error('Completá primero la cotización de todos los documentos.');
-   if(entries.length===1&&admitePrepagoR2Grande(entries[0])){
+   if(entries.length===1&&typeof admitePrepagoR2Grande==='function'&&admitePrepagoR2Grande(entries[0])){
     const e=entries[0],plan=ultimoPresupuesto.plan[0];
     if(plan?.destino!=='ploteos'||plan.paginasElegidas.length!==e.paginas.length||
        ultimoPresupuesto.pendientes?.length)
