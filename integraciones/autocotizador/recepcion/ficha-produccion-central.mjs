@@ -1,3 +1,4 @@
+import {evaluarRiesgoPreprensaPloteo} from './riesgo-preprensa-ploteo.mjs';
 /** Ficha técnica PREVIA al pago para la Central única, construida solo a partir
  * de un pedido cuyo contenido y cantidad de páginas fue comprobado en backend.
  * No contiene URL de Drive, tokens, ni enlaces imprimibles. Aún NO es orden de producción.
@@ -90,8 +91,14 @@ export function prepararFichaCentral({pedidoVerificado}){
      anchoCm:pag.anchoCm,altoCm:pag.altoCm,rollo:pag.material,papel:pag.papel});
    });
   }
+  // Archivo pesado verificado: advertencia visible para produccion, sin
+  // autorizar ni generar un PDF rasterizado; se conserva el original.
+  const preprensa=fila.destino==='ploteos'
+   ?evaluarRiesgoPreprensaPloteo({bytes:origen.bytes,paginas:planoPorPagina})
+   :null;
   lineas.push({
    orden:fila.indice+1,idTrabajo:fila.id,servicio:fila.destino,
+   preprensa,
    nombreOriginal:origen.nombre,
    fileId:origen.fileId,reciboPrivado:origen.receiptId,
    sha256:origen.sha256,paginasOriginales:origen.paginas,
