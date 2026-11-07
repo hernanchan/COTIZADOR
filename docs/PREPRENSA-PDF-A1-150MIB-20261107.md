@@ -35,3 +35,13 @@ El comercio recibe PDFs de alrededor de **150 MB que son una sola página A1**. 
 - Detectar medidas y páginas verificadas por servidor y cobrar únicamente presupuesto real.
 - Recibir archivo completo en R2, registro único en Central, permitir preparar una **copia de producción** separada y trazable, con aviso de preprensa visible para operador.
 - Verificar el PDF final y bloquear impresión automática de ploteos pesados hasta validar preprensa; borrar originales/candidatas después de entrega según política.
+
+
+## Lector de páginas/medidas por rangos: prueba adicional aprobada
+- Archivo: `integraciones/autocotizador/recepcion/medidas-pdf-grande-rangos.mjs`. Adaptador R2 existente: `r2-lectura-parcial-segura.mjs`; se comprueba `head`, ETag y bytes por rango asociados a D1 antes de aceptar datos.
+- PDF.js 3.11.174 se inyecta sólo en el ensayo Node; aún **no está desplegado en el Worker ni integrado a la cotización comercial**. No se usa `file.arrayBuffer()` del PDF completo, ni canvas.
+- Límites duros del parser: máximo 8 MiB de lectura parcial, hasta 35 solicitudes, 2.000 páginas; rechazo si falta PDF, datos alterados o se agota el presupuesto de lecturas.
+- [GitHub Actions 42383270551](https://github.com/hernanchan/COTIZADOR/actions/runs/42383270551) **SUCCESS**: sobre PDF sintético A1 de **150 MiB**, PDF.js identificó **1 página de 59,4 × 84,1 cm** leyendo **131.072 bytes (128 KiB) en 2 solicitudes**.
+- Segundo test integra el mismo parser con el adaptador de rangos que comprueba D1/ETag, sobre **bucket simulado por archivo local**, y obtiene el mismo resultado: `R2_ETAG_D1_ADAPTER_A1_150_METADATA_OK read_bytes=131072 get_calls=2`. **No confundir esta simulación del adaptador con una ejecución de PDF.js sobre un objeto R2 real**; el transporte R2 real sí fue validado por separado con 80/200 MiB.
+- El módulo devuelve `aptoParaCobro:false`, `impresionAutomaticaAutorizada:false` y `contenidoPdfVerificado:false`. Falta integrarlo al Worker con un motor PDF adecuado al runtime de Cloudflare o a un proceso aislado, validar tipos y medidas complejas, y usar las métricas para el precio autoritativo.
+- Advertencias `DOMMatrix/Path2D` en Node: PDF.js no tenía canvas instalado. En esta prueba sólo se leyó geometría, no se renderizó con PDF.js; el preparador usó Poppler para comparar las muestras.
