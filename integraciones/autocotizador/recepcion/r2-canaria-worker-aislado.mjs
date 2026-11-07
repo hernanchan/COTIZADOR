@@ -33,10 +33,26 @@ export default {
     !env.CANARY_RECEIPT_KEY||env.CANARY_RECEIPT_KEY.length<32)return reply({ok:false},503);
   if(request.headers.get('Origin')!==url.origin)return reply({ok:false},403);
   if(action==='health'&&request.method==='GET')return reply({ok:true,canary:true});
-  if(!['start','part','finish','verify','cleanup','sweep'].includes(action))return reply({ok:false},404);
+  if(!['start','part','finish','verify','cleanup','sweep','diagnose'].includes(action))return reply({ok:false},404);
   if((action==='part'&&request.method!=='PUT')||(action!=='part'&&request.method!=='POST'))return reply({ok:false},405);
   const options={bucket:env.SABER_R2_GRANDES,secret:env.CANARY_RECEIPT_KEY};
   try{
+   if(action==='diagnose'){
+    const uuid=crypto.randomUUID();
+    const diagnosticKey='r2-v1/'+env.CANARY_ORDER_ID+'/'+uuid+'.pdf';
+    const upload=await env.SABER_R2_GRANDES.createMultipartUpload(diagnosticKey);
+    const data={
+      uploadIdType:typeof upload.uploadId,
+      uploadIdLength:typeof upload.uploadId==='string'?upload.uploadId.length:-1,
+      uploadIdAtMost256:typeof upload.uploadId==='string'&&upload.uploadId.length<=256,
+      keyType:typeof upload.key,
+      keyLength:typeof upload.key==='string'?upload.key.length:-1,
+      keyMatches:upload.key===diagnosticKey,
+      uuidV4:/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(uuid)
+    };
+    await upload.abort();
+    return reply({ok:true,diagnostic:data});
+   }
    if(action==='sweep'){
     const prefix='r2-v1/'+env.CANARY_ORDER_ID+'/';
     if(!/^WEB-ENSAYO-R2-CANARIO-[0-9]{6,15}$/.test(env.CANARY_ORDER_ID||''))
