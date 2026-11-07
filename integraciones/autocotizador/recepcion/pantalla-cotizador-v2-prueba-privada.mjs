@@ -272,7 +272,7 @@ function pagoSandboxEnRecibo(){
  // El servidor verifica los pagos pendientes con su propio límite de frecuencia.
  // Esta consulta nunca crea cobros, cambia importes ni habilita producción.
  setInterval(()=>{if(!document.hidden)void check()},30000);
- document.addEventListener?.('visibilitychange',()=>{
+ if(typeof document.addEventListener==='function')document.addEventListener('visibilitychange',()=>{
   if(!document.hidden)void check();
  });
  void check();
