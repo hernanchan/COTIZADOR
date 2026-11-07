@@ -5,6 +5,7 @@
  * recuperar dimensiones para COTIZACIÓN PRELIMINAR; el backend verifica de nuevo.
  */
 import {PDFDocument,PDFName,PDFNumber} from 'pdf-lib';
+import {leerMedidasPdfGrandeLocal} from './medidas-pdf-file-local-rangos.mjs';
 
 function chequearDimensiones(anchoCm,altoCm){
  if(!Number.isFinite(anchoCm)||!Number.isFinite(altoCm)||
@@ -63,6 +64,10 @@ export async function leerMedidasPloteo(file,{maxBytes=250*1024*1024,maxPaginas=
  if(!file||!/\.pdf$/i.test(String(file.name))||
     !Number.isSafeInteger(file.size)||file.size<5||file.size>maxBytes)
    throw Error('PDF inválido o mayor de 250 MB.');
+ // R2 no interviene en la cotización. Archivos grandes se inspeccionan
+ // por File.slice (lecturas limitadas), sin materializar 150 MB en memoria.
+ if(file.size>40*1024*1024)
+  return leerMedidasPdfGrandeLocal(file,{pdfjs});
  const buffer=await file.arrayBuffer();
  if(buffer.byteLength!==file.size||
     String.fromCharCode(...new Uint8Array(buffer,0,5))!=='%PDF-')
