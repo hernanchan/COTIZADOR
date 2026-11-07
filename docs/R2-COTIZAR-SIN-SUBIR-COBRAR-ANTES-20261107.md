@@ -35,3 +35,16 @@ El propietario habilitó Cloudflare R2 con tarjeta, pero **no autoriza que el si
 - Garantizar que ningún archivo impago de pruebas anteriores quede permanentemente en el bucket; inspeccionar y ajustar limpieza sin tocar objetos de pedidos activos.
 
 **Importante:** `pagoAprobadoParaR2` valida el **formato** de la constancia server-side y NO consulta por sí solo Mercado Pago. Para habilitar bytes hace falta implementar la consulta firmada de Central de punta a punta; está expresamente pendiente. Los costos de las lecturas de precios/API y el servicio R2 si excede cuotas gratuitas no son necesariamente cero; la regla elimina el almacenamiento R2 causado por usuarios que sólo cotizan.
+
+
+## 07/11/2026 — Verificación real por servidor Central D1 ANTES de crear un objeto R2
+
+**Nuevos módulos en la rama de ensayo:**
+- `integraciones/mercadopago/pruebas/r2-pago-verificado-central.mjs`: ruta interna `POST /internal/central/r2-payment-lookup`, verificada con `centralReadSigned` (HMAC ya existente entre Workers), **sólo lectura D1**.
+- El permiso exige una intención de compra previa `central_r2_prepaid_intents` vinculada por **webOrderId + fileId + SHA-256 + bytes + commercialOrderId + importe**. Luego comprueba pedido `paid`, cobro total, `payment_reviews.state='verified'`, datos de Mercado Pago o acreditación bancaria válida. Ningún pago de otro pedido autoriza subir un PDF distinto.
+- `integraciones/autocotizador/recepcion/r2-confirmar-pago-central.mjs`: puente de Documentos a Central por Service Binding y HMAC, valida respuesta, orden, archivo, importe, firma, caducidad.
+- `r2-pdf-grandes-api-privada.mjs` consulta la Central antes de reservar cupo R2 y en **cada parte** y cierre. La ruta de Documentos recibe este comprobador desde `worker-fase4-cotizador-unificado.mjs`; autenticación Basic del operador tampoco saltea la barrera.
+- Nuevo control Central `CENTRAL_R2_POSTPAY_ENABLED=PRIVATE_TEST_ONLY`, y control Documentos `DOCS_R2_POSTPAY_REQUIRED=PRIVATE_TEST_ONLY`; **ambos apagados**. La tabla `central_r2_prepaid_intents` no fue creada ni poblada: lectura falla cerrada. **No se ha habilitado R2 comercial ni hay orden pagable prearchivo todavía**.
+- [GitHub Actions 42402034253](https://github.com/hernanchan/COTIZADOR/actions/runs/42402034253) **SUCCESS**: pruebas negativas sin orden, pago pendiente/revocado, intención inexistente, cambio de hash/tamaño, firma inválida/host ajeno, transferencia sin acreditación; positivas MP y transferencia sintéticas. No es prueba de dinero real ni de D1 real de producción.
+
+**Siguiente P0 sin vueltas:** crear el estado de *pedido presupuestado sin archivo* en D1, generar preferencia Mercado Pago sandbox por ese importe, enlazar el comprobante a `central_r2_prepaid_intents` sólo desde servidor y probar *cliente cotiza 150 MB local → paga sandbox → recibe permiso → carga R2 → verifica original → Central*. Diseñar cancelación/devolución si las páginas/tipo no coinciden luego. Sin este circuito no publicar ni activar los flags. **El cotizador gratis sigue sin tocar R2**.
