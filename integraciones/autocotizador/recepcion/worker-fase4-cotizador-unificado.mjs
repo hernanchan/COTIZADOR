@@ -2184,7 +2184,10 @@ export default {
        // autoriza la subida. Basic del operador NO saltea esta barrera.
        comprobarPagoCentral:async(orderId,meta)=>
         comprobarPagoR2EnCentral({env,orderId,meta}),
-       autorizadoIniciar:async()=>staff||buyer,
+       // El comprador sólo puede iniciar R2 para SU orden vinculada, incluso
+       // si conoce un pago válido ajeno. Basic no salta el pago obligatorio.
+       autorizadoIniciar:async orderId=>staff||
+        (buyer&&await autorizadoPedidoClienteVinculado(request,env,orderId)),
        autorizadoOrden:async orderId=>staff||
         (buyer&&await autorizadoPedidoClienteVinculado(request,env,orderId)),
        vincularOrden:async orderId=>buyer?
