@@ -61,3 +61,22 @@ Se buscó en el Google Drive conectado por «productos», «precios», «inventa
 - Cambios exclusivos del `quotePage` en `integraciones/autocotizador/recepcion/cotizador-cliente-publico.mjs`: resumen único de precio trasladado arriba (sticky), tipografía y anchura mejoradas, nota breve, se ocultó el botón de revisión local y su resumen, y las opciones compartidas de lote se ocultan si sólo hay un PDF (la personalización individual permanece). No se tocó el motor de precios, el código de cargas del portal privado ni los cobros.
 - Validación: CI general [42228424159](https://github.com/hernanchan/COTIZADOR/actions/runs/42228424159) SUCCESS; incluye comprobación de HTML, precio único primero y compilación del JavaScript inline de mejora. Deploy exclusivo Workers de ensayo [42228543045](https://github.com/hernanchan/COTIZADOR/actions/runs/42228543045) SUCCESS. Documentos versión `2b9e372f-5509-43bb-b395-256e41d2453b`; sigue preservado acceso Turnstile a cotización, 3 banderas de purga OFF, ZIP y operador protegidos.
 - Pendiente: usuario vuelve a mirar la misma URL tras actualizar pantalla; no se afirma haber completado validación visual humana después de este cambio. Sitio comercial main intacto.
+
+
+## 07/11/2026 — Bloqueante de publicación: PDF de 60 MB
+**Decisión del titular:** rechazar un PDF de ~60 MB en el primer uso no es una experiencia aceptable del nuevo cotizador. La publicación del cotizador nuevo queda **NO-GO** mientras un archivo válido de 60 MB (y objetivo hasta 200 MiB) no pueda pasar el circuito completo sin atención manual.
+
+**Diagnóstico comprobado en rama:**
+- `carga-unica-cliente.mjs` todavía bloquea archivos **>40 MiB**, y un conjunto **>60 MiB** antes de enviarlos; `tus-pedido-contrato.mjs` tiene estos límites TUS expresos.
+- Existe alternativa R2 con transferencia multipart de 8 MiB probada realmente a 80 y 200 MiB, reanudación, SHA-256 por rangos y borrado de objetos de ensayo (Actions `42332131513`).
+- **No** equivale a cotización comercial integrada: falta análisis **autoritativo** de páginas/medidas grandes, asignación TUS/R2 por archivo, pedidos mixtos, ZIP de originales y liberación de cuotas al entregar.
+- La web comercial y `main` siguen intactos; R2 permanece apagado para compradores.
+
+**Requisitos de aceptación para publicar el cotizador nuevo:**
+1. PDF real/sintético representativo de **60 MB**: carga completa con rutas R2, SHA-256 correcto, páginas y medidas verificadas por servidor sin exceder memoria; presupuesto calculado con las tarifas existentes.
+2. Mismo recorrido con PDF de **200 MiB**, más pedido combinado de PDF pequeño TUS + grande R2, con número único de orden, protección por sesión y registro verificado en Central.
+3. Descarga del original desde la Central/ZIP con instrucciones, pago Sandbox conciliado y bloqueo de pedidos incompletos o impagos. El cliente puede reanudar tras interrupción sin repetir toda la carga.
+4. Retención/borrado: eliminar originales tras marcar entregado, liberar cuotas verificablemente y nunca borrar pedidos pendientes. Ensayo desde navegador móvil con condiciones realistas.
+5. Solo después del GO técnico y autorización explícita del titular: abrir compra y cobro reales. El catálogo/portada pueden tener un calendario separado si siguen enlazando al cotizador público vigente; **no** presentar la nueva recepción como lista.
+
+**Se retira cualquier compromiso de publicar el nuevo cotizador el lunes 09/11/2026** basado solo en que la portada esté terminada. No fijar nueva fecha sin completar las verificaciones de aceptación.
