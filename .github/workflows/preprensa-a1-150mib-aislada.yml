@@ -1,0 +1,76 @@
+name: Preprensa A1 150MiB - copia lossless aislada y verificacion
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/preprensa-a1-150mib-aislada.yml]
+permissions:
+  contents: read
+jobs:
+  panel-a1-real-150:
+    if: github.ref == 'refs/heads/integracion/tus-pedido-privado-20261101'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar qpdf y Poppler solamente en runner efimero de ensayo
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends qpdf poppler-utils >/dev/null
+          command -v qpdf
+          command -v pdfinfo
+          command -v pdftoppm
+          node --check tools/preprensa-plano-a1-qpdf.mjs
+          node --check tools/generar-panel-a1-150mib-ensayo.mjs
+      - name: Generar un PDF A1 de 150 MiB, preparar copia separada y verificar integridad
+        shell: bash
+        run: |
+          set -euo pipefail
+          temp=$(mktemp -d)
+          trap 'rm -rf "$temp"' EXIT
+          input="$temp/panel-original-a1-150mib.pdf"
+          output="$temp/panel-candidato-a1.pdf"
+          node tools/generar-panel-a1-150mib-ensayo.mjs "$input"
+          echo 'ORIGINAL_PDFINFO_BEGIN'
+          pdfinfo -box "$input" | grep -E 'Pages:|Page size:|Encrypted:' || true
+          original_sha=$(sha256sum "$input" | awk '{print $1}')
+          original_size=$(stat -c%s "$input")
+          test "$original_size" = 157286400
+          node tools/preprensa-plano-a1-qpdf.mjs "$input" "$output"
+          test -f "$output"
+          test -f "$output.manifest.json"
+          test "$original_sha" = "$(sha256sum "$input" | awk '{print $1}')"
+          qpdf --check "$output"
+          node --input-type=module - "$output.manifest.json" <<'NODE'
+          import {readFileSync} from 'node:fs';
+          import assert from 'node:assert/strict';
+          const data=JSON.parse(readFileSync(process.argv[2]));
+          assert.equal(data.schema,'saber-preprensa-pdf-candidato-v1');
+          assert.equal(data.status,'CANDIDATO_REQUIERE_REVISION');
+          assert.equal(data.pageCount,1);
+          assert.equal(data.sourceBytes,157286400);
+          assert.ok(data.outputBytes<data.sourceBytes*0.10);
+          assert.ok(Math.abs(data.pageSize.widthCm-59.4)<0.1);
+          assert.ok(Math.abs(data.pageSize.heightCm-84.1)<0.1);
+          assert.equal(data.previewComparison,'MUESTRA_720PX_IDENTICA');
+          assert.equal(data.contentsLosslessCompressionOnly,true);
+          assert.equal(data.imagesDownsampled,false);
+          assert.equal(data.plotterPrintAuthorized,false);
+          assert.equal(data.paymentAuthorized,false);
+          assert.equal(data.requiresOperatorReview,true);
+          console.log('PREPRENSA_A1_150_MIB_SIN_PERDIDA_COPIA_SEPARADA_VERIFICADA');
+          console.log('PREPRENSA_NO_ENVIADO_A_PLOTTER_NO_WEB_NO_PAGOS');
+          NODE
+          # Nunca permitir reemplazar la copia o el original.
+          if node tools/preprensa-plano-a1-qpdf.mjs "$input" "$output" 2>/dev/null; then
+            echo 'ALERT_PREPRENSA_OVERWRITE_ALLOWED'; exit 1
+          fi
+          if node tools/preprensa-plano-a1-qpdf.mjs "$input" "$input" 2>/dev/null; then
+            echo 'ALERT_PREPRENSA_ORIGINAL_OVERWRITTEN'; exit 1
+          fi
+          echo 'PREPRENSA_OVERWRITE_REJECTED_ORIGINAL_SHA_STABLE'
