@@ -86,7 +86,20 @@ export async function registrarIntencionR2Prepaga(req,env,{
     'quote_sha256,quote_revision,commercial_order_id) '+
     'VALUES(?,?,?,?,?,?,?,?,?)')
     .bind(p.webOrderId,p.fileId,p.sha256,p.bytes,p.amountArs,
-     p.declaredPages,p.quoteSha256,p.quoteRevision,id)
+     p.declaredPages,p.quoteSha256,p.quoteRevision,id),
+   // SKU restringido: impide que /demo/checkout trate la orden como
+   // carrito común; siempre exigirá la intención prearchivo.
+   db.prepare('INSERT INTO order_items('+
+    'order_id,line_number,item_type,sku,title,quantity,unit_price_ars,'+
+    'line_total_ars,detail_json,file_references_json) '+
+    'VALUES(?,1,\'print\',\'R2_PREPAID_PLOT\',?,1,?,?,?,\'[]\')')
+    .bind(id,'Ploteo grande · presupuesto sujeto a verificación',
+     p.amountArs,p.amountArs,JSON.stringify({
+      schema:p.schema,webOrderId:p.webOrderId,fileId:p.fileId,
+      sha256:p.sha256,bytes:p.bytes,declaredPages:p.declaredPages,
+      quoteSha256:p.quoteSha256,quoteRevision:p.quoteRevision,
+      requiresUploadAfterPayment:true,
+      requiresReviewOnQuoteMismatch:true}))
   ]);
  }catch{
   // Una pestaña pudo registrar la misma intención concurrentemente.
