@@ -1,5 +1,5 @@
 name: R2 - PRUEBA REAL AISLADA 80 y 200 MiB con borrado verificable
-# Verificar R2 en rangos de 8 MiB: evita una lectura gigante, sin cambios a TUS.
+# Regresion end-to-end REAL: core R2 con rangos 8 MiB, 80/200 MiB y borrado.
 on:
   push:
     branches: [integracion/tus-pedido-privado-20261101]
