@@ -30,7 +30,7 @@ function store(){
    async run(){return {meta:{changes:1}}},
    async first(){
     const args=this.args||[];
-    if(sql.includes('SELECT i.web_order_id,i.file_id')){
+    if(sql.includes('SELECT i.web_order_id,i.file_id')&&sql.includes('i.quote_revision')){
      const i=intents.find(x=>x.web_order_id===args[0]&&x.file_id===args[1]);
      return i?{...i,order_status:orders.find(x=>x.id===i.commercial_order_id)?.status}:null;
     }
@@ -99,11 +99,7 @@ function store(){
      schema:'saber-central-r2-payment-lookup-v1',orderId:WEB,
      fileId:FILE,bytes:BYTES,sha256:SHA
     })}),central,{readSigned:signed,now:()=>NOW});
-  if(!response.ok){
-   const error=await response.json();
-   console.log('R2_TEST_PAGO_CENTRAL_NEGADO',response.status,error.error);
-   return null;
-  }
+  if(!response.ok)return null;
   const data=await response.json();
   return data.receipt;
  };
