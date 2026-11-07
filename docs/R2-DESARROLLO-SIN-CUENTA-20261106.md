@@ -151,3 +151,27 @@ Comprobación independiente de solo lectura preparada en `.github/workflows/r2-v
 - **Central** `/health` confirmó `ok=true`, `databaseReady=true`, `paymentsEnabled=false`.
 - Solo solicitudes GET; sin crear pedidos, subir archivos o efectuar pagos.
 - **No confundir el smoke GET y las simulaciones del CI con una subida real TUS o R2 posterior al despliegue.** Primer ensayo de 80/200 MiB R2 continúa pendiente.
+
+
+## PRIMERAS TRANSFERENCIAS REALES 80/200 MiB — 07/11/2026 UTC
+
+**Pruebas con R2 real, no simulaciones.**
+- Canario aislado `saber-r2-canario-<run-id>`, creado únicamente por GitHub Actions, con token efímero y binding al mismo bucket privado. Nunca utilizó rutas, precios, D1, pagos ni los archivos de clientes; Worker comercial y `main` intactos.
+- Se generaron dos archivos **PDF sintéticos con estructura PDF y tamaño exacto** 80 MiB / 200 MiB. Multipart 8 MiB por parte, 3 partes iniciales y pausa deliberada del proceso; segundo proceso reanudó desde los ETags persistidos, sin repetir esas 3 partes.
+- **Fallo REAL descubierto y corregido:** Cloudflare R2 generó un `uploadId` de **343 caracteres**. El contrato previo sólo aceptaba 256. Commit [1f2aed4](https://github.com/hernanchan/COTIZADOR/commit/1f2aed4dd19eb0df8c1b26c8bfff218daabc90b2): máximo 1024 y abortar multipart si la validación/firma inicial falla. Agregados tests de 343 y 1025 caracteres.
+- **Segundo fallo REAL:** verificación original con stream completo retornó HTTP 503 para 80 MiB; la lectura directa sin `TransformStream` funcionó a 80 MiB, pero también retornó 503 con 200 MiB. Se evitó leer el objeto completo usando **25 GET por rango de 8 MiB** para 200 MiB, siempre comparando ETag de `head`, y **una única cadena SHA-256** con `crypto.DigestStream`, sin hashes de trozos independientes. Nueva implementación en `r2-pdf-integridad-stream.mjs` con tests de rango alterado, ETag cambiante, tamaño y cabecera. Commit [18084d0](https://github.com/hernanchan/COTIZADOR/commit/18084d04cf9407e25f59216a472a43d1eae396d5).
+- **Prueba definitiva del MÓDULO CENTRAL R2 real**: [Actions 42332131513](https://github.com/hernanchan/COTIZADOR/actions/runs/42332131513) **SUCCESS**:
+  - 80 MiB: **10 partes**, 7 recuperadas tras pausa; transferencia activa **3.354 ms**, velocidad efectiva **23,85 MiB/s**, SHA completo servidor por rangos **5.086 ms**; PDF borrado, ausencia confirmada.
+  - 200 MiB: **25 partes**, 22 recuperadas tras pausa; transferencia activa **6.817 ms**, velocidad efectiva **29,34 MiB/s**, SHA completo servidor por rangos **12.917 ms**; PDF borrado, ausencia confirmada.
+  - `R2_CANARY_BUCKET_PREFIX_EMPTY_CONFIRMED`, Worker canario **eliminado HTTP 200**, Worker Documentos entonces activo sin cambiar.
+- Las mediciones son **desde GitHub Actions**, no la conectividad del comprador de Córdoba; transferencia activa excluye la pausa deliberada, generación del PDF y hash final. Son pruebas de transporte y bytes, **NO** verificación de páginas/medidas ni presupuesto.
+- El primer intento fallido, anterior al arreglo de `uploadId`, creó posiblemente una sesión multipart sin ninguna parte transferida. Su abortado no pudo acreditarse por falta del identificador firmado, aunque el Worker temporal sí se eliminó y la lista de objetos finalizados quedó vacía. Cloudflare documenta auto-aborto de multipart incompletos tras 7 días por defecto. Los arranques posteriores ya abortan en error y el canario final pasó sin residuos de objetos.
+
+### Integración del módulo corregido al Worker de pruebas
+
+- Regresión completa en [42332093811](https://github.com/hernanchan/COTIZADOR/actions/runs/42332093811) **SUCCESS**.
+- Nueva versión subida sin activar, con paridad de bindings no secretos y runtime confirmada: `b7405698-8b7c-48ea-8642-3552916a2adf`; [workflow 42332186229](https://github.com/hernanchan/COTIZADOR/actions/runs/42332186229) **SUCCESS**.
+- Se promovió **solo código, flags R2 OFF** en `saber-documentos-pruebas`: [workflow 42332244497](https://github.com/hernanchan/COTIZADOR/actions/runs/42332244497) **SUCCESS**. Versión activa desde esa ejecución: `b7405698-8b7c-48ea-8642-3552916a2adf`; rollback: `67f61c11-fe13-4193-aa30-e76450ed8597`. Portal anónimo **401**, rutas R2 **503 sin autorizar cobro**, GET precios con mismo estado HTTP.
+- No se modificó Worker de pagos, ni `main`, ni web comercial. No se habilitaron banderas R2 ni cobros reales.
+
+**Pendiente esencial antes de clientes:** análisis confiable de páginas/medidas de PDFs grandes usando rangos, tarificación autoritativa, pedidos mixtos TUS+R2, D1/ZIP, expiración y purga segura post-entrega; pruebas móviles de red y subida TUS real posterior al despliegue. No confundir prueba de integridad real con pedido listo para cobrar.
