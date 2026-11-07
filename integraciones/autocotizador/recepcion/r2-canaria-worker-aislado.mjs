@@ -33,7 +33,7 @@ export default {
     !env.CANARY_RECEIPT_KEY||env.CANARY_RECEIPT_KEY.length<32)return reply({ok:false},503);
   if(request.headers.get('Origin')!==url.origin)return reply({ok:false},403);
   if(action==='health'&&request.method==='GET')return reply({ok:true,canary:true});
-  if(!['start','part','finish','verify','cleanup','sweep','diagnose'].includes(action))return reply({ok:false},404);
+  if(!['start','part','finish','verify','verify-direct','cleanup','sweep','diagnose'].includes(action))return reply({ok:false},404);
   if((action==='part'&&request.method!=='PUT')||(action!=='part'&&request.method!=='POST'))return reply({ok:false},405);
   const options={bucket:env.SABER_R2_GRANDES,secret:env.CANARY_RECEIPT_KEY};
   try{
@@ -91,6 +91,22 @@ export default {
    if(action==='finish'){
     const result=await completarR2Grande({...options,proof:data.proof,uploadedParts:data.parts});
     return reply({ok:true,result});
+   }
+   if(action==='verify-direct'){
+    const r2=env.SABER_R2_GRANDES;
+    const head=await r2.head(claim.key);
+    if(!head||head.size!==claim.bytes)throw Error('CANARY_SIZE_MISMATCH');
+    const headerObj=await r2.get(claim.key,{range:{offset:0,length:5}});
+    const header=new Uint8Array(await headerObj.arrayBuffer());
+    if(header.length!==5||new TextDecoder().decode(header)!=='%PDF-')
+      throw Error('CANARY_PDF_HEADER_INVALID');
+    const obj=await r2.get(claim.key);
+    const digest=new crypto.DigestStream('SHA-256');
+    await obj.body.pipeTo(digest);
+    const sha=Array.from(new Uint8Array(await digest.digest),b=>b.toString(16).padStart(2,'0')).join('');
+    if(sha!==claim.sha256)throw Error('CANARY_SHA_DIRECT_MISMATCH');
+    return reply({ok:true,verified:{bytes:head.size,sha256:sha,sha256Verificado:true,
+      contenidoPdfVerificado:false,paymentAuthorized:false,digestMethod:'direct-r2-stream'}});
    }
    if(action==='verify'){
     const result=await verificarIntegridadR2Grande({...options,proof:data.proof});
