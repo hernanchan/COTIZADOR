@@ -526,6 +526,7 @@ function motivoBloqueoEnvio(){
  if(registering)return 'Se está registrando el pedido.';
  if(handoffInProgress)return 'Preparando los archivos del pedido.';
  if(registeredOrder)return 'El pedido ya fue registrado.';
+ if(r2PrepagoFlujo)return 'Este presupuesto de ploteo grande ya está preparado; continuá con el pago en el panel.';
  if(smartReady&&(refs.length===0||borradorAnteriorSinPDF()))return '';
  if(!refs.length)return smartBlockedReason||'Todavía no hay un presupuesto completo listo para enviar.';
  if(all.some(item=>item.references.length===0))
@@ -1025,6 +1026,117 @@ async function recuperarNumeroCentralTUS(){
    data.numeroOrden);
   return true;
  }catch{return false;}
+}
+const r2Panel=document.getElementById('r2-prepago-panel');
+const r2Mensaje=document.getElementById('r2-prepago-mensaje');
+const r2Total=document.getElementById('r2-prepago-total');
+const r2Pagar=document.getElementById('r2-prepago-pagar');
+const r2Link=document.getElementById('r2-prepago-link');
+const r2Retry=document.getElementById('r2-prepago-reintentar');
+function r2Informar(texto){
+ r2Panel.hidden=false;
+ r2Mensaje.textContent=texto;
+ batchProgress.textContent=texto;
+}
+function r2DetenerConsultas(){
+ if(r2PagoTimer!==null){clearInterval(r2PagoTimer);r2PagoTimer=null;}
+}
+async function r2SubirSoloDespuesPago(){
+ if(r2Subiendo||!r2PrepagoFlujo||
+    r2PrepagoFlujo.phase!=='pagado_esperando_subida')return;
+ r2Subiendo=true;r2DetenerConsultas();
+ r2Pagar.hidden=true;r2Link.hidden=true;r2Retry.hidden=true;
+ r2Informar('Pago sandbox confirmado por Central. Ahora sí, recibiendo el PDF en R2…');
+ try{
+  const result=await r2PrepagoFlujo.subirDespuesDePagar();
+  if(result?.sha256Verificado!==true)throw Error('Falta verificar la integridad del PDF');
+  r2Informar('PDF recibido y SHA-256 verificado. El original está pendiente de revisión de medidas, tipo CAD/Póster y orden de producción. Conservá el archivo y la referencia de pago.');
+  r2Total.textContent='Importe abonado en ensayo: '+
+   new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',
+    maximumFractionDigits:0}).format(r2PrepagoFlujo.amountArs);
+ }catch(error){
+  r2Informar('La recepción no finalizó: '+String(error?.message||error).slice(0,160)+
+   '. El pago no se repite. Podés reintentar el envío del mismo PDF.');
+  r2Retry.hidden=false;
+ }finally{r2Subiendo=false}
+}
+async function r2ConsultarPagoYContinuar(){
+ if(r2Consultando||r2Subiendo||!r2PrepagoFlujo||
+    !['esperando_pago','pagado_esperando_subida','revocado'].includes(r2PrepagoFlujo.phase))return;
+ r2Consultando=true;
+ try{
+  const estado=await r2PrepagoFlujo.consultarPago();
+  if(estado==='pagado'){
+   r2Informar('Pago sandbox confirmado en Central. Habilitando el envío del PDF.');
+   await r2SubirSoloDespuesPago();
+  }else if(estado==='revocado'){
+   r2DetenerConsultas();r2Pagar.hidden=true;r2Link.hidden=true;
+   r2Informar('El pago fue revocado. No se permite almacenar ni imprimir este archivo.');
+  }else{
+   r2Informar('Esperando la confirmación de Mercado Pago. El PDF sigue en este dispositivo; no se cargó a R2.');
+  }
+ }catch(error){
+  r2Informar('El pago todavía no puede comprobarse: '+
+   String(error?.message||error).slice(0,140)+'. R2 permanece bloqueado.');
+ }finally{r2Consultando=false}
+}
+r2Pagar.addEventListener('click',async()=>{
+ if(!r2PrepagoFlujo||r2PrepagoFlujo.phase!=='presupuesto_sin_archivo')return;
+ r2Pagar.disabled=true;
+ r2Informar('Preparando el enlace seguro de Mercado Pago (solamente cuenta de prueba)…');
+ try{
+  const url=await r2PrepagoFlujo.iniciarPagoSandbox();
+  r2Link.href=url;r2Link.hidden=false;
+  r2Pagar.hidden=true;
+  r2Link.textContent='Abrir Mercado Pago de prueba';
+  r2Informar('El enlace está preparado. Abrí Mercado Pago, pagá con usuario de prueba y volvé a esta pestaña. El PDF permanece local.');
+  if(r2PagoTimer===null)r2PagoTimer=setInterval(()=>{
+   if(document.visibilityState!=='hidden')void r2ConsultarPagoYContinuar();
+  },25000);
+  void r2ConsultarPagoYContinuar();
+ }catch(error){
+  r2Pagar.disabled=false;
+  r2Informar('No se pudo preparar el pago de prueba: '+String(error?.message||error).slice(0,180));
+ }
+});
+r2Retry.addEventListener('click',async()=>{
+ if(r2PrepagoFlujo?.phase==='pagado_esperando_subida')
+  await r2SubirSoloDespuesPago();
+});
+document.addEventListener('visibilitychange',()=>{
+ if(document.visibilityState==='visible'&&r2PagoTimer!==null)
+  void r2ConsultarPagoYContinuar();
+});
+async function prepararPedidoR2Grande(){
+ if(!R2_PREPAY_UI_ENABLED||!r2PrepagoPendiente||r2PrepagoFlujo)
+  throw Error('Este ploteo ya fue preparado o el circuito privado está apagado.');
+ const mod=await import('/prueba-v2/r2-prepago-flujo.mjs');
+ const data=r2PrepagoPendiente;
+ r2PrepagoFlujo=mod.crearFlujoR2PagoAntesDeCarga({
+  file:data.file,archivos:data.archivos,webOrderId:orderId,
+  onState:s=>{
+   if(s.phase==='calculando_hash_local')
+    r2Informar('Identificando el PDF en este dispositivo, sin subirlo a R2…');
+   if(s.phase==='registrando_presupuesto')
+    r2Informar('Registrando presupuesto en Central, sin archivo y sin cobro…');
+  },
+  onProgress:p=>{
+   if(Number.isFinite(p.porcentaje))
+    r2Informar('Identificando PDF local: '+p.porcentaje+' %. Cero carga a R2.');
+   else if(Number.isFinite(p.percent))
+    r2Informar('PDF pagado: subiendo a R2 '+p.percent+' %.');
+  }
+ });
+ r2Informar('Preparando presupuesto sin recibir archivos…');
+ const draft=await r2PrepagoFlujo.preparar();
+ r2Total.textContent='Total presupuestado por servidor: '+
+  new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',
+   maximumFractionDigits:0}).format(draft.amountArs);
+ r2Pagar.hidden=false;r2Pagar.disabled=false;
+ r2Informar('Presupuesto registrado. Ningún archivo fue enviado. Si aceptás el precio, continuá al pago de prueba; después podrás subir el PDF.');
+ document.getElementById('precio-smart').textContent='Ploteo grande · Importe del servidor: '+
+  new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',
+   maximumFractionDigits:0}).format(draft.amountArs)+' · PDF sin subir';
 }
 sendAllButton.addEventListener('click',async()=>{
  if(batchSending||registering||handoffInProgress||registeredOrder||TUS_BLOCKED)return;
