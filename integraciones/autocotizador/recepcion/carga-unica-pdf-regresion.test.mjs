@@ -15,9 +15,9 @@ test('el cliente generado es JavaScript sintacticamente valido',()=>{
  assert.doesNotThrow(()=>new Script(built,{filename:'carga-inteligente.js'}));
 });
 
-test('cuatro validaciones PDF incluyen alerta anticipada, carga, ploteos y envío',()=>{
+test('cinco validaciones PDF incluyen prepago R2, alerta, carga y envío',()=>{
  const patterns=[...source.matchAll(/\/([^\n/]*pdf\$)\/i\.test\((file\.name|e\.name)\)/g)];
- assert.equal(patterns.length,4,'Se suma validación visual previa sin quitar las del envío');
+ assert.equal(patterns.length,5,'Cuatro controles TUS originales más la comprobación R2 local');
  for(const [,pattern] of patterns){
   assert.equal(pattern,String.raw`\.pdf$`,'Expresión de extensión inesperada');
   const rx=new RegExp(pattern,'i');
