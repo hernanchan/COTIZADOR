@@ -33,10 +33,28 @@ export default {
     !env.CANARY_RECEIPT_KEY||env.CANARY_RECEIPT_KEY.length<32)return reply({ok:false},503);
   if(request.headers.get('Origin')!==url.origin)return reply({ok:false},403);
   if(action==='health'&&request.method==='GET')return reply({ok:true,canary:true});
-  if(!['start','part','finish','verify','cleanup'].includes(action))return reply({ok:false},404);
+  if(!['start','part','finish','verify','cleanup','sweep'].includes(action))return reply({ok:false},404);
   if((action==='part'&&request.method!=='PUT')||(action!=='part'&&request.method!=='POST'))return reply({ok:false},405);
   const options={bucket:env.SABER_R2_GRANDES,secret:env.CANARY_RECEIPT_KEY};
   try{
+   if(action==='sweep'){
+    const prefix='r2-v1/'+env.CANARY_ORDER_ID+'/';
+    if(!/^WEB-ENSAYO-R2-CANARIO-[0-9]{6,15}$/.test(env.CANARY_ORDER_ID||''))
+      throw Error('CANARY_PREFIX_NOT_SAFE');
+    let deleted=0,continuation;
+    for(let page=0;page<5;page++){
+      const listed=await env.SABER_R2_GRANDES.list({prefix,limit:200,...(continuation?{cursor:continuation}:{})});
+      if(!listed||!Array.isArray(listed.objects))throw Error('CANARY_LIST_FAILED');
+      const names=listed.objects.map(o=>o.key).filter(k=>k.startsWith(prefix));
+      if(names.length){await env.SABER_R2_GRANDES.delete(names);deleted+=names.length}
+      if(!listed.truncated)break;
+      if(!listed.cursor||page===4)throw Error('CANARY_LIST_TRUNCATED');
+      continuation=listed.cursor;
+    }
+    const final=await env.SABER_R2_GRANDES.list({prefix,limit:1});
+    if(final.objects?.length||final.truncated)return reply({ok:false,error:'CANARY_SWEEP_INCOMPLETE'},500);
+    return reply({ok:true,objectAbsent:true,sweptObjects:deleted});
+   }
    if(action==='start'){
     const data=await json(request);
     if(!/^WEB-ENSAYO-R2-CANARIO-[0-9]{6,15}$/.test(data.orderId||'')||
