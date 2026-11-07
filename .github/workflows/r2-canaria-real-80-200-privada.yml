@@ -1,0 +1,183 @@
+name: R2 - PRUEBA REAL AISLADA 80 y 200 MiB con borrado verificable
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/r2-canaria-real-80-200-privada.yml]
+permissions:
+  contents: read
+concurrency:
+  group: saber-r2-canaria-real
+  cancel-in-progress: false
+jobs:
+  transferencia-real-aislada:
+    if: github.ref == 'refs/heads/integracion/tus-pedido-privado-20261101'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validar transporte existente y compilar canario sin tocar comprador
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.25.12
+          node --check integraciones/autocotizador/recepcion/r2-canaria-worker-aislado.mjs
+          node --check integraciones/autocotizador/recepcion/r2-canaria-benchmark-actions.mjs
+          node --test tests/r2-pdf-grandes-privado.test.mjs tests/r2-pdf-integridad-stream.test.mjs tests/r2-pdf-grandes-cliente.test.mjs
+          npx esbuild integraciones/autocotizador/recepcion/r2-canaria-worker-aislado.mjs \
+            --bundle --minify --platform=browser --format=esm --target=es2022 \
+            --outfile=/tmp/saber-r2-canaria-worker-bundle.mjs
+          node --check /tmp/saber-r2-canaria-worker-bundle.mjs
+          echo 'CANARY_BUILD_AND_R2_REGRESSION_OK'
+      - name: Crear Worker efimero aislado, 80/200 MiB reales, reanudar, verificar y eliminar
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          script="saber-r2-canario-$GITHUB_RUN_ID"
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts"
+          active_api="$root/saber-documentos-pruebas"
+          origin="https://$script.libreriasaber.workers.dev"
+          auth="Authorization: Bearer $TOKEN"
+          tmp=$(mktemp -d)
+          chmod 700 "$tmp"
+          export CANARY_WORKDIR="$tmp"
+          export CANARY_URL="$origin"
+          export CANARY_AUTH_SECRET="$(openssl rand -hex 32)"
+          receipt_secret="$(openssl rand -hex 32)"
+          echo "::add-mask::$CANARY_AUTH_SECRET"
+          echo "::add-mask::$receipt_secret"
+          created=0
+          wrote=0
+          expected_active='67f61c11-fe13-4193-aa30-e76450ed8597'
+          cleanup(){
+            rc=$?
+            trap - EXIT
+            if [ "$created" = 1 ]; then
+              clean_ok=1
+              if [ "$wrote" = 1 ]; then
+                for size in 80 200; do
+                  if [ -f "$tmp/saber-canario-$size.json" ]; then
+                    node integraciones/autocotizador/recepcion/r2-canaria-benchmark-actions.mjs cleanup "$size" || echo "CANARY_PARTIAL_CLEANUP_RETRY_$size"
+                  fi
+                done
+                for attempt in 1 2 3; do
+                  sweep_status=$(curl -sS --max-time 90 -o "$tmp/sweep.json" -w '%{http_code}' \
+                    -X POST -H "Authorization: Bearer $CANARY_AUTH_SECRET" -H "Origin: $origin" \
+                    -H 'Content-Type: application/json' --data '{}' \
+                    "$origin/__saber-r2-canario/sweep" || true)
+                  if [ "$sweep_status" = 200 ] &&
+                    jq -e '.ok==true and .objectAbsent==true' "$tmp/sweep.json" >/dev/null 2>&1; then
+                    echo "R2_CANARY_BUCKET_PREFIX_EMPTY_CONFIRMED"
+                    clean_ok=1
+                    break
+                  fi
+                  clean_ok=0
+                  sleep 2
+                done
+              fi
+              if [ "$clean_ok" = 1 ]; then
+                del_status=$(curl -sS --max-time 50 -o "$tmp/delete.json" -w '%{http_code}' \
+                  -X DELETE -H "$auth" "$root/$script" || true)
+                if [ "$del_status" = 200 ] || [ "$del_status" = 204 ]; then
+                  echo "R2_CANARY_TEMP_WORKER_DELETED_HTTP_$del_status"
+                else
+                  echo "R2_CANARY_WORKER_DELETE_FAILED_HTTP_$del_status"
+                  rc=1
+                fi
+              else
+                echo 'CRITICAL_R2_CANARY_SWEEP_FAILED_KEEP_SCRIPT_FOR_RECOVERY'
+                curl -sS --max-time 25 -X POST -H "$auth" -H 'Content-Type: application/json' \
+                  --data '{"enabled":false,"previews_enabled":false}' "$root/$script/subdomain" \
+                  -o /dev/null || true
+                echo 'CRITICAL_CANARY_SUBDOMAIN_DISABLED_ATTEMPTED'
+                rc=1
+              fi
+            fi
+            # Siempre verificar que el Worker comprador no fue sustituido.
+            if curl -fsS --max-time 25 -H "$auth" "$active_api/deployments" > "$tmp/docs-final.json"; then
+              observed=$(jq -r '.result.deployments[0].versions[]?|select(.percentage==100)|.version_id' "$tmp/docs-final.json"|head -n 1)
+              if [ "$observed" = "$expected_active" ]; then
+                echo "SABER_DOCUMENTOS_PRUEBAS_STILL_ACTIVE=$observed"
+              else
+                echo 'ALERT_DOCUMENTS_ACTIVE_VERSION_NOT_BASELINE'
+                rc=1
+              fi
+            else
+              echo 'ALERT_DOCUMENTS_ACTIVE_VERSION_NOT_VERIFIABLE'
+              rc=1
+            fi
+            rm -rf "$tmp"
+            exit "$rc"
+          }
+          trap cleanup EXIT
+          # No sobrescribir nombres preexistentes ni siquiera si parecen del canario.
+          status=$(curl -sS --max-time 25 -o "$tmp/existence.json" -w '%{http_code}' -H "$auth" "$root/$script")
+          test "$status" = 404 || { echo "CANARY_NAME_UNEXPECTED_EXISTS_OR_FORBIDDEN_HTTP_$status"; exit 1; }
+          curl -fsS --max-time 25 -H "$auth" "$active_api/deployments" > "$tmp/docs-before.json"
+          observed=$(jq -r '.result.deployments[0].versions[]?|select(.percentage==100)|.version_id' "$tmp/docs-before.json"|head -n 1)
+          test "$observed" = "$expected_active" || { echo 'DOCUMENTOS_WORKER_VERSION_CHANGED_STOP'; exit 1; }
+          code=$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' \
+            'https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/')
+          test "$code" = 401 || { echo 'DOCUMENTOS_PORTAL_NOT_PRIVATE_STOP'; exit 1; }
+          echo 'CANARY_PREFLIGHT_DOCS_AND_PORTAL_UNTOUCHED'
+          jq -n --arg auth_secret "$CANARY_AUTH_SECRET" \
+            --arg receipt_secret "$receipt_secret" \
+            --arg order "WEB-ENSAYO-R2-CANARIO-$GITHUB_RUN_ID" \
+            '{main_module:"index.mjs",compatibility_date:"2026-11-06",
+              bindings:[
+               {name:"SABER_R2_GRANDES",type:"r2_bucket",bucket_name:"saber-documentos-grandes-ensayo-20261106"},
+               {name:"CANARY_AUTH_SECRET",type:"secret_text",text:$auth_secret},
+               {name:"CANARY_RECEIPT_KEY",type:"secret_text",text:$receipt_secret},
+               {name:"CANARY_ORDER_ID",type:"plain_text",text:$order},
+               {name:"CANARY_ONLY",type:"plain_text",text:"RUNNER_CONTROLLED"}
+              ]}' > "$tmp/metadata.json"
+          created=1
+          upload_status=$(curl -sS --max-time 120 -o "$tmp/script-created.json" -w '%{http_code}' \
+            -X PUT -H "$auth" \
+            -F "metadata=@$tmp/metadata.json;type=application/json" \
+            -F "index.mjs=@/tmp/saber-r2-canaria-worker-bundle.mjs;filename=index.mjs;type=application/javascript+module" \
+            "$root/$script")
+          if [ "$upload_status" != 200 ] || ! jq -e '.success==true' "$tmp/script-created.json" >/dev/null; then
+            echo "R2_CANARY_WORKER_CREATE_UNAVAILABLE_HTTP_$upload_status"
+            jq -c '{codes:[.errors[]?|.code]}' "$tmp/script-created.json" || true
+            exit 1
+          fi
+          echo "R2_CANARY_SEPARATE_WORKER_CREATED_NO_CUSTOM_DOMAIN_NO_MAIN"
+          config_status=$(curl -sS --max-time 45 -o "$tmp/subdomain.json" -w '%{http_code}' \
+            -X POST -H "$auth" -H 'Content-Type: application/json' \
+            --data '{"enabled":true,"previews_enabled":false}' "$root/$script/subdomain")
+          test "$config_status" = 200 &&
+            jq -e '.success==true and .result.enabled==true' "$tmp/subdomain.json" >/dev/null
+          ready=0
+          for attempt in 1 2 3 4 5 6 7 8; do
+            health_status=$(curl -sS --max-time 30 -o "$tmp/health.json" -w '%{http_code}' \
+              -H "Authorization: Bearer $CANARY_AUTH_SECRET" -H "Origin: $origin" \
+              "$origin/__saber-r2-canario/health" || true)
+            if [ "$health_status" = 200 ] &&
+              jq -e '.ok==true and .canary==true and .paymentAuthorized==false' "$tmp/health.json" >/dev/null 2>&1; then
+              ready=1; break
+            fi
+            sleep 2
+          done
+          test "$ready" = 1 || { echo "CANARY_HEALTH_BLOCKED_HTTP_$health_status"; exit 1; }
+          unauthorized=$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' \
+            "$origin/__saber-r2-canario/health" || true)
+          test "$unauthorized" = 404 || { echo 'CANARY_EXPOSED_WITHOUT_AUTH'; exit 1; }
+          echo 'CANARY_R2_BUCKET_BOUND_BEARER_REQUIRED'
+          wrote=1
+          for size in 80 200; do
+            node integraciones/autocotizador/recepcion/r2-canaria-benchmark-actions.mjs first "$size"
+            node integraciones/autocotizador/recepcion/r2-canaria-benchmark-actions.mjs resume "$size"
+          done
+          echo 'R2_REAL_CANARY_80_AND_200_COMPLETE_WITH_SHA_AND_DELETIONS'
