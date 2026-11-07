@@ -3,7 +3,7 @@
  * Sólo puede abrirse con la compuerta BASIC privada del Worker, apagada
  * por defecto, y no interactúa con la tienda pública.
  */
-export function paginaCotizadorV2PruebaPrivada(sitekey,tusEnabled=false,tusDiagnostico=null,sandboxEnabled=false){
+export function paginaCotizadorV2PruebaPrivada(sitekey,tusEnabled=false,tusDiagnostico=null,sandboxEnabled=false,r2PrepayEnabled=false){
  // En esta rama de integración el portal NUNCA vuelve silenciosamente a Drive.
  const tusBloqueado=!tusEnabled;
  const fallas=Array.isArray(tusDiagnostico?.invalidos)?tusDiagnostico.invalidos:[];
@@ -58,6 +58,14 @@ body.estado-envio #smart,body.estado-registro #smart{display:none}
 <p id="cliente-telefono-ayuda" class="contacto-ayuda">Para consultar algo de tu archivo o avisarte cuando esté listo. No se usa para publicidad.</p>
 <p id="cliente-telefono-error" class="contacto-error" role="alert" aria-live="polite"></p>
 <p id="batch-progress" class="state" role="status" aria-live="polite">Cargá tus PDF y revisá las opciones.</p></div>
+<section id="r2-prepago-panel" hidden style="max-width:850px;margin:12px auto;padding:18px;background:white;border:1px solid #bed5e7;border-radius:12px" role="status" aria-live="polite">
+<h2 style="font-size:18px;margin:0 0 8px">Ploteo grande · pago antes de enviar</h2>
+<p id="r2-prepago-mensaje">El PDF sigue en tu dispositivo. No enviamos nada a R2 mientras el pago esté pendiente.</p>
+<p id="r2-prepago-total" style="font-size:20px;font-weight:700"></p>
+<button type="button" id="r2-prepago-pagar" hidden>Pagar con Mercado Pago (prueba)</button>
+<a id="r2-prepago-link" hidden target="_blank" rel="noopener noreferrer">Abrir Mercado Pago de prueba</a>
+<button type="button" id="r2-prepago-reintentar" hidden>Reintentar envío del PDF pagado</button>
+</section>
 <section role="alert" class="warning" style="margin:12px auto;max-width:1110px" ${tusBloqueado?'':'hidden'}>Supabase/TUS no está operativo. El envío está BLOQUEADO para evitar volver a Google Drive. Revisar: ${fallas.join(', ')||'configuración privada'}. No vuelvas a subir PDF todavía.</section>
 <div id="seguridad-privada"><small>Verificación de seguridad para el envío:</small><div class="cf-turnstile" data-sitekey="${sitekey}" data-action="documentos"></div></div>
 <div style="max-width:1140px;margin:18px auto 0;padding:0 14px">
@@ -65,7 +73,7 @@ body.estado-envio #smart,body.estado-registro #smart{display:none}
 <main><section class="panel" style="padding:0;border:0;background:transparent">
 <section id="vista-estado-pedido" hidden role="status" aria-live="polite"></section>
 <output id="rendimiento-privado" hidden style="display:block;margin:8px 0;padding:11px 14px;background:#f9fcff;border:1px solid #cbd5e1;border-radius:10px;font-size:13px;white-space:pre-wrap" aria-label="Tiempos del ensayo"></output>
-<iframe id="smart" title="Análisis automático de PDF, tamaños, CAD y póster" src="/prueba-v2/carga-inteligente" loading="eager"></iframe>
+<iframe id="smart" title="Análisis automático de PDF, tamaños, CAD y póster" src="/prueba-v2/carga-inteligente${r2PrepayEnabled?'?r2Prepago=1':''}" loading="eager"></iframe>
 </section>
 <details id="recepcion-avanzada" class="panel" style="margin-top:14px"><summary style="font-size:16px;font-weight:700;cursor:pointer;padding:5px 0">Detalles de la recepción y verificación (ensayo privado)</summary><div style="padding-top:12px">
 <div class="warning">Los PDF se verifican en Drive y la Central registra automáticamente el pedido. Sin cobros.</div>
@@ -105,6 +113,7 @@ telefonoContacto.addEventListener('input',()=>{telefonoError.textContent='';tele
 const modoDiagnostico=new URLSearchParams(location.search).get('diagnostico')==='1';
 const TUS_ENABLED=${tusEnabled===true};
  const SANDBOX_PAYMENT_ENABLED=${sandboxEnabled===true};
+ const R2_PREPAY_UI_ENABLED=${r2PrepayEnabled===true};
  const MAX_PDF_PRIVADOS=TUS_ENABLED?10:30;
 const TUS_BLOCKED=${tusBloqueado};
 let tusPreflightOK=false;
@@ -315,6 +324,7 @@ function pagoSandboxEnRecibo(){
  return wrap;
 }
 let batchSending=false,smartReady=false,smartBlockedReason='',handoffInProgress=false,handoffResolve=null;
+let r2PrepagoPendiente=null,r2PrepagoFlujo=null,r2PagoTimer=null,r2Consultando=false,r2Subiendo=false;
 const dropPdf=document.getElementById('drop-pdf'),batchFiles=document.getElementById('batch-files'),batchStatus=document.getElementById('batch-status');
  // Mediciones locales: sin archivos, nombres, importes, credenciales ni hashes.
  // Son invisibles para el cliente y no se transmiten a servicios externos.
@@ -919,6 +929,7 @@ async function prepararDesdeCotizador(){
    batchProgress.textContent=result.error||'No se pudo preparar el envío.';
    return false;
   }
+  if(r2PrepagoPendiente&&R2_PREPAY_UI_ENABLED)return true;
   for(let n=0;n<100;n++){
    const refs=all.flatMap(item=>item.references);
    if(refs.length===result.cantidad&&refs.every(d=>d.archivoLocal&&
@@ -1031,6 +1042,18 @@ sendAllButton.addEventListener('click',async()=>{
   marcarTiempo('preparacion_inicio');
   if(!(await prepararDesdeCotizador())){terminarMedicion('preparacion_fallida');return;}
   marcarTiempo('preparacion_terminada');
+ }
+ if(r2PrepagoPendiente){
+  batchSending=true;updateSummary();
+  try{
+   await prepararPedidoR2Grande();
+   terminarMedicion('r2_presupuesto_sin_archivo');
+  }catch(error){
+   batchProgress.textContent='No se registró el presupuesto del ploteo grande: '+
+    String(error?.message||error).slice(0,180)+'. R2 no recibió archivos.';
+   terminarMedicion('r2_presupuesto_fallido');
+  }finally{batchSending=false;updateSummary();}
+  return;
  }
  const allEntries=all.flatMap(item=>item.references);
  const pending=allEntries.filter(d=>!d.confirmacion);
@@ -1218,6 +1241,23 @@ async function registrarPedidoVerificado(){
 }
 window.addEventListener('message',async event=>{
  if(event.origin!==location.origin)return;
+ if(event.source===smart.contentWindow&&event.data?.type==='SABER_SMART_R2_PREPAGO'){
+  const p=event.data;
+  if(!R2_PREPAY_UI_ENABLED||batchSending||registering||registeredOrder||
+     r2PrepagoFlujo||r2PrepagoPendiente||
+     !(p.file instanceof File)||p.file.size<=40*1024*1024||
+     p.file.size>200*1024*1024||
+     !Array.isArray(p.archivos)||p.archivos.length!==1||
+     p.archivos[0]?.servicio!=='auto'||
+     !Array.isArray(p.archivos[0]?.paginas)||
+     !Number.isSafeInteger(p.totalOrientativo)||p.totalOrientativo<1){
+   batchProgress.textContent='El ploteo grande no cumple las condiciones de este ensayo.';return;
+  }
+  r2PrepagoPendiente={file:p.file,archivos:p.archivos,
+   totalOrientativo:p.totalOrientativo};
+  return;
+ }
+
  if(event.source===smart.contentWindow&&event.data?.type==='SABER_FASE1_PLOTEO_PRELIMINAR'){
   const p=event.data;
   const paginas=p.clasificacionCliente;
