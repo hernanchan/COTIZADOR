@@ -13,7 +13,10 @@ export async function leerMedidasPdfGrandeLocal(file,{pdfjs=globalThis.pdfjsLib}
    !/\.pdf$/i.test(String(file.name||''))||
    !pdfjs?.getDocument||!pdfjs?.PDFDataRangeTransport)
   throw Error('LECTURA_LOCAL_RANGOS_NO_DISPONIBLE');
- if(pdfjs.GlobalWorkerOptions)pdfjs.GlobalWorkerOptions.workerSrc=WORKER;
+ // El Worker JS de CDN sólo corresponde al navegador. En los tests
+ // Node, pdfjs-dist usa su propio worker local (no admite URL HTTP).
+ if(typeof window!=='undefined'&&typeof document!=='undefined'&&
+    pdfjs.GlobalWorkerOptions)pdfjs.GlobalWorkerOptions.workerSrc=WORKER;
  const reader={
   bytes:file.size,maxReadBytes:2*MIB,
   async leer(offset,length){
