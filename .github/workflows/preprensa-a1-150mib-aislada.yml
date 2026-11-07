@@ -74,3 +74,17 @@ jobs:
             echo 'ALERT_PREPRENSA_ORIGINAL_OVERWRITTEN'; exit 1
           fi
           echo 'PREPRENSA_OVERWRITE_REJECTED_ORIGINAL_SHA_STABLE'
+          # Ensayo NEGATIVO: imagen A1 que ya viene comprimida. No vender
+          # la compresion sin perdida como solucion universal para un RIP lento.
+          compressed="$temp/panel-a1-imagen-ya-comprimida.pdf"
+          rejected="$temp/panel-imagen-candidato.pdf"
+          node tools/generar-a1-imagen-comprimida-ensayo.mjs "$compressed"
+          qpdf --check "$compressed"
+          before_sha=$(sha256sum "$compressed" | awk '{print $1}')
+          negative=$(node tools/preprensa-plano-a1-qpdf.mjs "$compressed" "$rejected")
+          echo "$negative"
+          echo "$negative" | jq -e '.status=="SIN_REDUCCION_SUFICIENTE_REQUIERE_OTRO_TRATAMIENTO" and .originalPreserved==true and .automaticPrinting==false'
+          test ! -e "$rejected"
+          test ! -e "$rejected.manifest.json"
+          test "$before_sha" = "$(sha256sum "$compressed" | awk '{print $1}')"
+          echo 'PREPRENSA_NEGATIVO_NO_PROMETER_COMPRESION_PARA_IMAGEN_PRECOMPRIMIDA'
