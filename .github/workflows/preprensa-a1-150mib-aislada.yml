@@ -1,4 +1,5 @@
 name: Preprensa A1 150MiB - copia lossless aislada y verificacion
+# Incluir contrato PDF.js por rangos con adaptador D1/R2/ETag sobre 150 MiB.
 on:
   push:
     branches: [integracion/tus-pedido-privado-20261101]
