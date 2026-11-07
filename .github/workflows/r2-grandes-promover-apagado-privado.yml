@@ -1,4 +1,5 @@
 name: R2 - promover codigo apagado SOLO Documentos pruebas con rollback
+# Version core SHA por rangos validada REAL con 80/200 MiB, R2 cliente sigue OFF.
 on:
   push:
     branches: [integracion/tus-pedido-privado-20261101]
@@ -27,8 +28,8 @@ jobs:
           test -n "$ACCOUNT" && test -n "$TOKEN"
           root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-documentos-pruebas"
           base='https://saber-documentos-pruebas.libreriasaber.workers.dev'
-          old='82ded703-0b3b-4e4b-ac7f-b312a78f78ea'
-          candidate='67f61c11-fe13-4193-aa30-e76450ed8597'
+          old='67f61c11-fe13-4193-aa30-e76450ed8597'
+          candidate='b7405698-8b7c-48ea-8642-3552916a2adf'
           auth="Authorization: Bearer $TOKEN"
           tmp=$(mktemp -d)
           touched=0
