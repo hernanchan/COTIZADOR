@@ -175,3 +175,8 @@ Comprobación independiente de solo lectura preparada en `.github/workflows/r2-v
 - No se modificó Worker de pagos, ni `main`, ni web comercial. No se habilitaron banderas R2 ni cobros reales.
 
 **Pendiente esencial antes de clientes:** análisis confiable de páginas/medidas de PDFs grandes usando rangos, tarificación autoritativa, pedidos mixtos TUS+R2, D1/ZIP, expiración y purga segura post-entrega; pruebas móviles de red y subida TUS real posterior al despliegue. No confundir prueba de integridad real con pedido listo para cobrar.
+
+
+### Smoke del Worker activo después del despliegue
+- [42332273427](https://github.com/hernanchan/COTIZADOR/actions/runs/42332273427) **SUCCESS**: rutas privadas anónimas HTTP 401; las pantallas de Documentos `/prueba-v2/`, `/prueba-v2/carga-inteligente` y recurso JS responden HTTP 200 autenticado con marcadores esperados. Central `/health`: `ok=true`, `databaseReady=true`, `paymentsEnabled=false`.
+- [42332273395](https://github.com/hernanchan/COTIZADOR/actions/runs/42332273395) **SUCCESS**: CI TUS y R2 sin despliegue. No se ejecutó pedido real TUS ni transacción en esta comprobación.
