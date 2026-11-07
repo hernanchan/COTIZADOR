@@ -181,8 +181,8 @@ jobs:
           test "$diagnostic_status" = 200 || { echo "CANARY_DIAGNOSE_HTTP_$diagnostic_status"; exit 1; }
           jq -e '.ok==true and .diagnostic.uuidV4==true and .diagnostic.keyMatches==true' "$tmp/diagnose.json" >/dev/null
           jq -c '.diagnostic' "$tmp/diagnose.json"
-          if ! jq -e '.diagnostic.uploadIdAtMost256==true' "$tmp/diagnose.json" >/dev/null; then
-            echo 'R2_LIVE_UPLOAD_ID_EXCEEDS_EXISTING_VALIDATION'
+          if ! jq -e '.diagnostic.uploadIdType=="string" and (.diagnostic.uploadIdLength>=1) and (.diagnostic.uploadIdLength<=1024)' "$tmp/diagnose.json" >/dev/null; then
+            echo 'R2_LIVE_UPLOAD_ID_EXCEEDS_SAFE_1024'
             exit 1
           fi
           echo 'CANARY_R2_REAL_MULTIPART_CREATE_AND_ABORT_OK'
