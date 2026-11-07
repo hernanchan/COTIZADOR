@@ -43,6 +43,7 @@ import v2UploadClientJs from './subir-vincular-pdf-v2-privado.txt';
 import v2ManifestClientJs from './preparar-manifiesto-v2-documental.txt';
 import v2TUSClientJs from './tus-directo-cliente.txt';
 import v2R2ClientJs from './r2-pdf-grandes-cliente.txt';
+import v2R2PrepaidClientJs from './r2-prepago-flujo-cliente.txt';
 import cargaClienteJs from './carga-unica-cliente.txt';
 import {cotizarPloteosRapido} from '../pruebas/cotizar-ploteos-rapido.mjs';
 import plotClienteJs from './ploteos-rapido-cliente.txt';
@@ -1885,9 +1886,23 @@ async function v2MobileInviteExchange(request,env){
  return new Response(JSON.stringify({ok:true,expiresInSeconds:1800}),{headers});
 }
 
+// Activar UI postpago sólo con todas las compuertas de prueba disponibles.
+// Los endpoints vuelven a validar D1 y cobro; el booleano visual NO habilita R2.
+function r2PrepagoUiConfigurado(env){
+ return env?.DOCS_R2_PREPAY_DRAFT_ENABLED==='PRIVATE_TEST_ONLY'&&
+  env?.DOCS_R2_POSTPAY_REQUIRED==='PRIVATE_TEST_ONLY'&&
+  env?.DOCS_R2_BIG_ENABLED==='PRIVATE_TEST_ONLY'&&
+  env?.DOCS_R2_QUOTA_ENABLED==='PRIVATE_TEST_ONLY'&&
+  env?.DOCS_CLIENT_SANDBOX_CHECKOUT_ENABLED==='PRIVATE_TEST_ONLY'&&
+  env?.DOCS_CENTRAL_SYNC_ENABLED==='PRIVATE_TEST_ONLY'&&
+  env?.DOCS_PRICE_ADMIN_D1_ENABLED==='PRIVATE_TEST_ONLY'&&
+  typeof env?.SABER_CENTRAL?.fetch==='function'&&
+  !!env?.SABER_R2_GRANDES;
+}
 const V2_BUYER_PUBLIC_ASSETS=new Set([
  '/prueba-v2/carga-inteligente','/prueba-v2/carga-inteligente.js',
  '/prueba-v2/precios-web.json','/prueba-v2/tus-directo.mjs','/prueba-v2/r2-grandes.mjs',
+ '/prueba-v2/r2-prepago-flujo.mjs',
  '/prueba-v2/subir-vincular-pdf.mjs','/prueba-v2/preparar-manifiesto.mjs',
  '/prueba-v2/cotizador-v2-ensayo-archivos.mjs'
 ]);
@@ -1938,7 +1953,7 @@ async function v2PrivateBrowserResponse(request,env,path,{buyer=false}={}){
    }});
   }
   if(path==='/prueba-v2/'){
-   const html=paginaCotizadorV2PruebaPrivada(env.DOCS_TURNSTILE_SITE_KEY,tusPrivadoConfigurado(env),diagnosticarTUSPrivado(env),env.DOCS_CLIENT_SANDBOX_CHECKOUT_ENABLED==='PRIVATE_TEST_ONLY');
+   const html=paginaCotizadorV2PruebaPrivada(env.DOCS_TURNSTILE_SITE_KEY,tusPrivadoConfigurado(env),diagnosticarTUSPrivado(env),env.DOCS_CLIENT_SANDBOX_CHECKOUT_ENABLED==='PRIVATE_TEST_ONLY',r2PrepagoUiConfigurado(env));
    const responseHeaders=new Headers({...headers,
     'Content-Type':'text/html; charset=utf-8'});
    responseHeaders.append('Set-Cookie',await v2SessionCookie(env));
@@ -2034,6 +2049,9 @@ async function v2PrivateBrowserResponse(request,env,path,{buyer=false}={}){
     ...headers,'Content-Type':'text/javascript; charset=utf-8'}});
   if(path==='/prueba-v2/tus-directo.mjs'&&tusPrivadoConfigurado(env))
    return new Response(v2TUSClientJs,{status:200,headers:{...headers,'Content-Type':'text/javascript; charset=utf-8'}});
+  if(path==='/prueba-v2/r2-prepago-flujo.mjs'&&r2PrepagoUiConfigurado(env))
+   return new Response(v2R2PrepaidClientJs,{status:200,headers:{
+    ...headers,'Content-Type':'text/javascript; charset=utf-8'}});
   if(path==='/prueba-v2/r2-grandes.mjs'&&
      env?.DOCS_R2_BIG_ENABLED==='PRIVATE_TEST_ONLY'&&env?.SABER_R2_GRANDES)
    return new Response(v2R2ClientJs,{status:200,headers:{...headers,'Content-Type':'text/javascript; charset=utf-8'}});
@@ -2100,6 +2118,7 @@ export default {
        page==='/prueba-v2/subir-vincular-pdf.mjs'||
        page==='/prueba-v2/tus-directo.mjs'||
        page==='/prueba-v2/r2-grandes.mjs'||
+       page==='/prueba-v2/r2-prepago-flujo.mjs'||
        page==='/prueba-v2/preparar-manifiesto.mjs')
       return v2PrivateBrowserResponse(request,env,page,{
         buyer:V2_BUYER_PUBLIC_ASSETS.has(page)&&await autorizadoPedidoCliente(request,env)
