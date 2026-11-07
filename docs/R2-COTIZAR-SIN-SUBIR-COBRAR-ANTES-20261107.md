@@ -11,6 +11,13 @@ El propietario habilitó Cloudflare R2 con tarjeta, pero **no autoriza que el si
 5. Tras la carga, SHA-256 y páginas/medidas se recalculan en servidor. Ante discrepancia entre presupuesto preliminar y datos reales, **no imprimir** ni aplicar cargo adicional sin nueva autorización; definir procedimiento claro de diferencia (preferible corrección y devolución si no se acepta nueva cotización).
 6. Pedido pagado y PDF íntegro verificado: activar la Central, preparar copia de preprensa si es pesada y entregar. **Borrado de original y copias después de entregado**, cuota liberada y aborto/limpieza de multipart incompletos.
 
+## Cotizador local para PDF grandes: lectura por fragmentos validada
+- `medidas-pdf-file-local-rangos.mjs`: usa `File.slice()` en el navegador, no `file.arrayBuffer()` completo para PDFs >40 MiB; acoplado a `medidas-local-pdf.mjs`.
+- `carga-unica-cliente.mjs`: para ploteos >40 MiB evita el clasificador visual que carga/rasteriza el PDF entero. El comprador debe elegir **CAD o Póster** para ver una cotización orientativa sin subir el PDF; se informa expresamente que luego habrá validación técnica. La pantalla de pedido privada continúa bloqueando >40 MiB hasta conectar compra postpago; **no se habilitó recepción incompleta**.
+- Ensayo [Actions 42384272965](https://github.com/hernanchan/COTIZADOR/actions/runs/42384272965) **SUCCESS**: PDF sintético A1 **150 MiB**, `File.slice` **dos fragmentos, 131.072 bytes (128 KiB)**, dimensión 59,4 × 84,1 cm, **sin llamada a R2** ni `file.arrayBuffer()` completo.
+- Regresión integral Worker/TUS [42384272999](https://github.com/hernanchan/COTIZADOR/actions/runs/42384272999) **SUCCESS**. Cambios en rama GitHub únicamente; no se desplegó a `saber-documentos-pruebas` ni a `libreriasaber.com.ar`.
+- El cotizador local **no valida composición CAD/Póster de forma autoritativa**: la selección es una declaración del cliente, y no se habilita una compra real hasta completar reglas de diferencias/reembolso y verificación del backend. Cerrar este punto antes de comercialización.
+
 ## Guardia de costo YA implementada en rama de ensayo
 - `integraciones/autocotizador/recepcion/r2-recepcion-solo-pagada.mjs` valida exclusivamente comprobante normalizado **emitido por backend Central**: misma orden, pago aprobado, `ARS`, monto positivo, fuente `CENTRAL_D1_RECONCILED`, verificación de MP/Banco, no reversión ni devolución, verificación reciente (≤300 s).
 - `r2-pdf-grandes-api-privada.mjs` rechaza `/iniciar` antes de reservar cuota o invocar `createMultipartUpload`, y vuelve a comprobar pago antes de `/parte`, `/completar` y `/verificar`.
