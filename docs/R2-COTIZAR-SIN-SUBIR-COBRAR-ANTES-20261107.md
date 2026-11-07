@@ -76,3 +76,26 @@ El propietario habilitó Cloudflare R2 con tarjeta, pero **no autoriza que el si
 5. Probar protección de peticiones, costo R2 real y presupuesto de operaciones con límite. La cuenta R2 ya existe pero ninguna de estas banderas se activó.
 
 **Precisión económica:** no hubo despliegue ni uso de R2 en estos ensayos de lógica. GitHub Actions sí ejecuta minutos de CI sujetos al plan de GitHub; su eventual costo no fue verificado. Evitar ejecuciones redundantes.
+
+
+## 07/11/2026 — Interfaz del comprador para ploteo 40–200 MiB, sin R2 antes del pago
+
+**Implementación:** nuevos módulos \`sha256-pdf-local-fragmentos.mjs\` y \`r2-prepago-flujo-cliente.mjs\`; integrados al iframe de \`carga-unica-cliente.mjs\`, portal \`pantalla-cotizador-v2-prueba-privada.mjs\` y rutas del \`worker-fase4-cotizador-unificado.mjs\`. La build privada \`build:unificado\` ya compila el nuevo módulo \`r2-prepago-flujo-cliente.txt\` mediante \`build:v2-r2-prepago\`.
+
+**Recorrido funcional implementado para ensayo (NO desplegado):**
+1. Con la nueva bandera de UI compuesta habilitada, un **único PDF de ploteo** entre 40 y 200 MiB puede obtener presupuesto local sin pasar por el rechazo TUS. Los PDFs pequeños conservan el flujo TUS existente. No se admite mezclar ese ploteo grande con otros PDF todavía.
+2. El botón actual «Enviar mi pedido» para ese caso **sólo calcula SHA-256 incremental de \`File.slice()\` (1 MiB por vez), cotiza desde el tarifario D1 aprobado en el servidor y crea la intención en D1**. Aún no abre Mercado Pago ni transmite PDF.
+3. El cliente ve el **importe devuelto por el servidor**, puede aceptar y abrir un enlace de Mercado Pago **sandbox**. El precio preliminar jamás se envía como importe confiable ni se carga el archivo para consultar.
+4. La pantalla consulta Central cada 25 segundos mientras espera, y al detectar \`pagado_esperando_archivo\` ejecuta \`enviarArchivoR2Grande\`. El Worker valida una y otra vez pago D1, sesión vinculada al pedido, archivo, SHA, bytes y cuota, **antes de crear multipart y antes de cada parte**. Se reforzó \`autorizadoIniciar\`: el login genérico del comprador no sustituye su cookie de orden vinculada.
+5. El resultado sólo es \`sha256Verificado\`: todavía **no declara contenido clasificado, precio revalidado ni producción autorizada**. El mensaje indica que queda bajo revisión. Si falla la red, puede reintentarse el envío sin pagar otra vez mientras siga en la misma pestaña.
+
+**CI:** [GitHub Actions 42415460295](https://github.com/hernanchan/COTIZADOR/actions/runs/42415460295) **SUCCESS** tras verificar contrato comprador (cero upload en consulta, cero R2 ante pago pendiente/revocado, un upload tras pago simulado), SHA incremental 150 MiB equivalente a Node crypto, regresiones TUS, build de Worker y rutas cerradas al faltar flags.
+
+**PENDIENTES BLOQUEANTES PARA PUBLICAR:**
+- Ejecutar prueba **en Cloudflare Workers sandbox desplegado** de intención sin original, preferencia **Mercado Pago test_user real**, webhook/consulta de acreditación, subida **R2 real** de 100–150 MB y validación SHA contra objeto realmente almacenado. El CI usa almacenamiento y pagos simulados.
+- El comprador móvil que cierre/reinicie la pestaña **pierde el objeto File**. Hace falta reelección local segura del mismo PDF (comparar SHA, tamaño y orden) tras volver del pago, sin obligarlo a comprar otra vez.
+- Revisar clasificación CAD/Póster y medidas **del PDF recibido** para conciliar con el presupuesto preliminar; gestionar diferencia o devolución si cambia el precio.
+- Incorporar el R2 grande pagado a la **Central de Pedidos real**, con hoja de preprensa y ZIP de trabajo y limpieza del objeto al entregar; el staging actual aún no es orden imprimible.
+- Falta validar navegador móvil con un PDF problemático real de 150 MB y cargas interrumpidas; el ensayo de SHA y transporte no equivale a esa experiencia.
+- Control de consumo/cuotas/TTL, alarmas y cancelación automática de multipart huérfanos, antes de activar público.
+- Las banderas de UI y cobro siguen **apagadas en Cloudflare**. Ninguna actualización en \`main\`, web pública, facturación real, bucket ni Worker comercial. No se generaron objetos R2 ni pagos reales para estas pruebas de código.
