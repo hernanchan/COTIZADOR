@@ -11,7 +11,15 @@ const meta={fileId:'pdf200',name:'Plano 200 MiB.pdf',mode:'bn',
  bytes:200*1024*1024,pages:15,sha256:'f'.repeat(64)};
 const now=()=>1793970000;
 const objectUUID='12345678-1234-4123-8123-123456789abc';
+const paid=(id=orderId)=>({
+ source:'CENTRAL_D1_RECONCILED',orderId:id,method:'mercadopago',
+ authority:'MERCADOPAGO_API_RECONCILED',paymentState:'PAID_CONFIRMED',
+ providerVerified:true,reversed:false,refunded:false,currency:'ARS',
+ amountArs:25000,paymentReference:'MP-FICTICIO-12345',
+ verifiedAt:now()-20
+});
 const options={now,subtle:webcrypto.subtle,uuid:()=>objectUUID,
+ comprobarPagoCentral:async id=>paid(id),
  reserve:async({orderId:oid,meta:m,objectUUID:id})=>({reserved:true,
   orderId:oid,bytes:m.bytes,objectUUID:id,paymentAuthorized:false})};
 function jsonRequest(action,data,{origin=ORIGIN,method='POST'}={}){
@@ -33,6 +41,7 @@ function fixtures(){
   head:async()=>({size:meta.bytes})
  };
  const env={DOCS_R2_BIG_ENABLED:'PRIVATE_TEST_ONLY',
+  DOCS_R2_POSTPAY_REQUIRED:'PRIVATE_TEST_ONLY',
   DOCS_R2_QUOTA_ENABLED:'PRIVATE_TEST_ONLY',DOCS_R2_RECEIPT_KEY:sec,
   SABER_R2_GRANDES:bucket};
  return {calls,env};
