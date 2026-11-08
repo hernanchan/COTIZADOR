@@ -1138,9 +1138,17 @@ async function r2SubirSoloDespuesPago(){
    new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',
     maximumFractionDigits:0}).format(r2PrepagoFlujo.amountArs);
  }catch(error){
-  r2Informar('La recepción no finalizó: '+String(error?.message||error).slice(0,160)+
-   '. El pago no se repite. Podés reintentar el envío del mismo PDF.');
-  r2Retry.hidden=false;
+  const code=String(error?.message||error);
+  if(code.includes('R2_CARGA_ANTERIOR_REQUIERE_REVISION')){
+   r2Informar('Detectamos una transferencia anterior que no terminó. Tu pago no se repite. No vuelvas a subir el PDF: contactá a Librería Saber con la referencia de este pedido para revisar la recepción.');
+   r2Retry.hidden=true;
+  }else if(code.includes('R2_CENTRAL_PENDIENTE')){
+   r2Informar('El PDF ya se recibió pero la Central aún no confirmó el registro. No vuelvas a pagar ni a subir el archivo. Podés volver a comprobar la recepción.');
+   r2Retry.hidden=false;
+  }else{
+   r2Informar('No se pudo confirmar todavía la recepción. No vuelvas a pagar. Podés reintentar con el mismo PDF. Si persiste, consultá con la referencia del pedido.');
+   r2Retry.hidden=false;
+  }
  }finally{r2Subiendo=false}
 }
 async function r2ConsultarPagoYContinuar(){
