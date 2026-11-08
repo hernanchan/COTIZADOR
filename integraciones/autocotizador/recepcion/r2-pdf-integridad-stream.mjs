@@ -121,3 +121,28 @@ export async function verificarIntegridadR2Grande({
   registeredInD1:false,listoParaProducir:false,checkoutEnabled:false,
   paymentAuthorized:false});
 }
+
+
+/**
+ * Recuperación postpago sin proof transitorio: la identidad del objeto
+ * procede exclusivamente de la reserva D1 consultada por HMAC. No acepta
+ * rutas de R2 del comprador. Reutiliza la misma verificación real SHA-256.
+ */
+export async function verificarObjetoR2Reservado({
+ bucket,reserva,digestFactory=algorithm=>new crypto.DigestStream(algorithm)
+}={}){
+ const key=reserva?.objectKey;
+ if(!reserva||reserva.found!==true||
+    typeof key!=='string'||
+    !/^r2-v1\/WEB-ENSAYO-[A-F0-9]{32}\/[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}\.pdf$/i.test(key)||
+    !key.startsWith('r2-v1/'+reserva.orderId+'/')||
+    typeof reserva.fileId!=='string'||reserva.fileId.length<1||
+    !/^[a-f0-9]{64}$/.test(reserva.sha256||'')||
+    !Number.isSafeInteger(reserva.bytes)||
+    reserva.bytes<=40*1024*1024||reserva.bytes>256*1024*1024||
+    typeof bucket?.head!=='function'||typeof bucket?.get!=='function')
+  throw Error('R2_RESERVA_NO_CONFIABLE');
+ return verificarIntegridadConRangos(bucket,{
+  key,bytes:reserva.bytes,sha256:reserva.sha256
+ },digestFactory);
+}
