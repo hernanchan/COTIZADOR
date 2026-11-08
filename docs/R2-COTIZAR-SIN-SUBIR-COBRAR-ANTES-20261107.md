@@ -141,3 +141,28 @@ El propietario habilitó Cloudflare R2 con tarjeta, pero **no autoriza que el si
 **Otras condiciones de publicación sin cambios:** prueba real de web/cookie en Android, pago MP sandbox conciliado y R2 real (60, 100, 150 MiB; máximo anunciado a verificar 200 MiB), revalidación de tipo/medidas/páginas, diferencias/reembolsos, Central con paquete imprimible y preprensa, borrado al Entregado, cuotas/observabilidad y reversión. Los objetos que sólo tengan SHA válido deben permanecer como `awaiting_pdf_analysis`, nunca liberarse a producción sin inspección.
 
 **Cambios sólo en rama de prueba de GitHub.** Sin cambios en `main`, desplegados, facturación, variables Cloudflare, bucket ni pagos reales.
+
+
+## 08/11/2026 — Recuperación de objeto R2 completo sin proof ni nueva carga
+
+**Problema real:** si la pestaña pierde `sessionStorage` o vence el proof multipart (2 h), un objeto R2 ya completado y pagado podía quedar inaccesible desde el comprador. Nunca volver a crear una segunda carga a ciegas, tanto por costos como por riesgo de duplicar el trabajo.
+
+**Corrección en la rama, NO desplegada:**
+
+1. `r2-reserva-consulta-central.mjs` incorpora consulta **sólo lectura, HMAC**, de `central_r2_large_reservations` por `webOrderId+fileId+sha256+bytes`, exigiendo `state=reserved` y el `objectKey` de la MISMA orden. Distingue reserva inexistente de una reserva previa. No ofrece uploadId ni URLs públicas. Ruta interna nueva `POST /internal/central/r2-reservation-lookup`, conectada en `integraciones/mercadopago/pruebas/worker.js`.
+2. `r2-reserva-consulta-documentos.mjs` firma la consulta a Central mediante `SABER_CENTRAL` y `CENTRAL_BRIDGE_KEY`, comprueba identidad de la respuesta y rechaza fallas de servicio (sin caer a una subida nueva).
+3. `r2-pdf-grandes-api-privada.mjs` recibe `POST /prueba-v2/api/ensayo-r2/recuperar`: exige sesión del comprador vinculada a la misma orden (o personal autorizado) **más pago realmente conciliado**, sin cambios al cierre obligatorio de R2 impago. Si D1 dice *sin reserva*, permite iniciar el circuito normal. Si reserva pero R2 no tiene objeto completo, devuelve `multipart_incomplete` con `uploadPossible=false`: **no crea multipart ni cobra otra vez**. Si el objeto está completo, verifica tamaño, PDF magic y SHA-256 nuevamente desde R2 por lectura acotada, exige que Central acepte el `stage` (idempotente), y confirma sólo la recepción pendiente de análisis.
+4. `r2-pdf-integridad-stream.mjs` reutiliza la comprobación SHA-256 por rangos de 8 MiB de R2, sin requerir el proof vencido, pero únicamente con identidad aportada por la reserva firmada de D1.
+5. `r2-pdf-grandes-cliente.mjs` consulta el estado del servidor **antes** de `/iniciar` cuando falta una sesión local y se requiere staging. Si está `stored_and_staged`, retorna el recibo sin subir ninguna parte. Si está `multipart_incomplete`, bloquea nueva carga y solicita revisión. Conserva el reintento normal cuando existe un proof multipart válido. La interfaz explica la incidencia en lenguaje comercial y no expone códigos internos.
+
+**Regresiones creadas:**
+- `tests/r2-reserva-lookup-central.test.mjs`: reserva exacta, nunca iniciada, identidad diferente/liberada, HMAC ausente/flags OFF.
+- `tests/r2-recuperacion-sin-reenvio.test.mjs`: recuperación postpago, pedido ajeno, falta de pago, SHA distinto, multipart incompleto, flags OFF, sin `createMultipartUpload`.
+- `tests/r2-recuperacion-integridad-rangos.test.mjs`: digest incremental real de 41 MiB con `node:crypto`, 6 lecturas R2 acotadas, rechazo de SHA alterado y objeto de orden ajena.
+- `tests/r2-cliente-no-duplicar-central.test.mjs`: agrega reanudación sin `sessionStorage` que evita segunda carga y bloqueo explícito de multipart incompleto.
+
+**Verificación ejecutada ahora:** se releyó el código desde GitHub; 11 archivos modificados/añadidos sin errores de sintaxis JavaScript; 4 pruebas de la consulta D1, 5 de la API postpago y 4 del transporte cliente aprobadas con dobles en un ejecutor JavaScript aislado (13/13); comprobación por rangos con digest inyectado simulado, 6 lecturas, rechazo de otra orden. **Las pruebas Node recién agregadas NO se ejecutaron por CI ni con R2 real**, por lo que estos resultados no certifican integración, rendimiento ni SHA auténtico de un objeto real en Cloudflare.
+
+**P0 todavía abierto:** si el multipart quedó **incompleto** y se pierde el proof/uploadId, el servidor no puede reanudarlo porque D1 reserva la clave del objeto pero **no conserva el uploadId**. Para mantener seguridad y evitar costos, ahora bloquea otra subida y obliga a revisión (no repago). Queda pendiente mecanismo durable de recuperar/abortar multipart incompletos, controles de costos/cuotas/limpieza, validación real con dispositivo, MP sandbox, SHA real, medida y clasificación de preprensa, ajuste/reembolso y Central productiva. El límite hasta 200 MiB no está certificado por pruebas reales.
+
+**Política aplicada:** cero objetos R2 nuevos por presupuestos impagos; en esta intervención sólo commits en la rama, sin despliegue, variables/bucket tocados ni cobros reales.
