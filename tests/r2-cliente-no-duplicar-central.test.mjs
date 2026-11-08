@@ -44,9 +44,9 @@ function fixture(){
   }
   throw Error('Ruta inesperada: '+route);
  };
- const send=()=>enviarArchivoR2Grande({
+ const send=(requireCentralStaging=true)=>enviarArchivoR2Grande({
   file,orderId,meta,fetcher,storage,concurrency:2,
-  requireCentralStaging:true
+  requireCentralStaging
  });
  return {calls,memory,send,session,setCentral:v=>{central=v}};
 }
@@ -69,13 +69,12 @@ test('Central pendiente conserva el multipart completo y reintenta sólo verific
  assert.equal(f.memory.size,0);
 });
 
-test('sin exigencia de staging, el transporte R2 de ensayos conserva compatibilidad',async()=>{
+test('sin exigencia de staging, conserva compatibilidad de ensayo R2 anterior',async()=>{
  const f=fixture();
- const result=await enviarArchivoR2Grande({
-  file,orderId,meta,fetcher:async()=>{throw Error('No ejecutar en este test')},
-  storage:{getItem:()=>null},
-  requireCentralStaging:false,
-  signal:{aborted:true}
- }).catch(error=>error);
- assert.ok(result instanceof Error);
+ const result=await f.send(false);
+ assert.equal(result.sha256Verificado,true);
+ assert.equal(result.stagedForCentral,false);
+ assert.equal(f.calls.start,1);
+ assert.equal(f.calls.complete,1);
+ assert.equal(f.memory.size,0);
 });
