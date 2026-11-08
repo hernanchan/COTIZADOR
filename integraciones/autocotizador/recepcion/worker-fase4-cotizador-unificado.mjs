@@ -2072,7 +2072,8 @@ export default {
       return manejarPortalPedidosCliente(request,env,{
        paginaPedido:()=>tusPrivadoConfigurado(env)?paginaCotizadorTUSClientePruebas(
         env.DOCS_TURNSTILE_SITE_KEY,true,diagnosticarTUSPrivado(env),
-        env.DOCS_CLIENT_SANDBOX_CHECKOUT_ENABLED==='PRIVATE_TEST_ONLY'):null
+        env.DOCS_CLIENT_SANDBOX_CHECKOUT_ENABLED==='PRIVATE_TEST_ONLY',
+        r2PrepagoUiConfigurado(env)):null
       });
     // Cotizador quote-only histórico: su cookie nunca autoriza TUS.
     if(page==='/prueba-v2/cotizar-cliente')
