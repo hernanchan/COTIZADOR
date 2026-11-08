@@ -6,7 +6,8 @@
  */
 import {iniciarR2Grande,subirParteR2Grande,completarR2Grande,
  leerReciboR2,validarMetaR2} from './r2-pdf-grandes-privado.mjs';
-import {verificarIntegridadR2Grande} from './r2-pdf-integridad-stream.mjs';
+import {verificarIntegridadR2Grande,verificarObjetoR2Reservado} from './r2-pdf-integridad-stream.mjs';
+import {consultarReservaR2Documentos} from './r2-reserva-consulta-documentos.mjs';
 import {reservarR2GrandeAntesDeSubir} from './r2-grandes-reserva-central.mjs';
 import {enviarPreRecepcionR2Central} from './r2-grandes-enviar-central.mjs';
 import {pagoAprobadoParaR2,R2_PAID_GATE} from './r2-recepcion-solo-pagada.mjs';
@@ -48,12 +49,15 @@ export async function manejarR2GrandePrivado(request,env,{
  comprobarPagoCentral=async()=>null,
  vincularOrden=async()=>null,now,subtle,digestFactory,
  stage=enviarPreRecepcionR2Central,
- reserve=reservarR2GrandeAntesDeSubir,uuid=()=>crypto.randomUUID(),
+ reserve=reservarR2GrandeAntesDeSubir,
+ consultaReserva=consultarReservaR2Documentos,
+ verificarReserva=verificarObjetoR2Reservado,
+ uuid=()=>crypto.randomUUID(),
 }={}){
  const url=new URL(request.url),route=url.pathname;
  if(!route.startsWith(ROOT))return reply({ok:false,error:'Ruta R2 inexistente'},404);
  const action=route.slice(ROOT.length);
- if(!['iniciar','parte','completar','verificar'].includes(action))
+ if(!['iniciar','parte','completar','verificar','recuperar'].includes(action))
   return reply({ok:false,error:'Ruta R2 inexistente'},404);
  // Nunca permitir uploads cuando no esta implementada la compuerta postpago.
  // El flag no autoriza nada: requiere verificacion Central en cada operacion.
@@ -74,6 +78,60 @@ export async function manejarR2GrandePrivado(request,env,{
   const options={bucket:env.SABER_R2_GRANDES,secret:env.DOCS_R2_RECEIPT_KEY,
    ...(typeof now==='function'?{now}:{}),
    ...(subtle?{subtle}:{})};
+  if(action==='recuperar'){
+   // Consulta/recuperación únicamente postpago, nunca crea multipart.
+   if(env.DOCS_R2_STAGING_ENABLED!==FLAG||
+      typeof env.SABER_R2_GRANDES?.head!=='function')
+    return reply({ok:false,error:'R2_RECUPERACION_NO_CONFIGURADA'},503);
+   const data=await bodyJSON(request);
+   if(!data||Object.keys(data).sort().join(',')!=='meta,orderId')
+    return reply({ok:false,error:'R2_RECUPERACION_DATOS_INVALIDOS'},422);
+   if(!await autorizadoIniciar(data.orderId))
+    return reply({ok:false,error:'R2_RECUPERACION_SESION_AJENA'},403);
+   // La reserva D1 no es un pago: esta consulta vuelve a exigir constancia
+   // firmada de Central, vinculada a la misma orden, hash y tamaño.
+   const receipt=await comprobarPagoCentral(data.orderId,data.meta);
+   if(!pagoAprobadoParaR2(receipt,data.orderId,
+      typeof now==='function'?now():Math.floor(Date.now()/1000)))
+    return reply({ok:false,error:'R2_PAGO_NO_CONFIRMADO'},402);
+   validarMetaR2(data.meta);
+   const reserva=await consultaReserva({env,orderId:data.orderId,meta:data.meta});
+   if(reserva?.found===false&&reserva.state==='not_started')
+    return reply({ok:true,state:'not_started',alreadyStored:false,
+     uploadPossible:true,productionAuthorized:false});
+   if(reserva?.found!==true||reserva.orderId!==data.orderId||
+      reserva.fileId!==data.meta.fileId||reserva.sha256!==data.meta.sha256||
+      reserva.bytes!==data.meta.bytes)
+    throw Error('R2_RESERVA_NO_COINCIDE');
+   const head=await env.SABER_R2_GRANDES.head(reserva.objectKey);
+   if(!head){
+    // Reserva sin objeto completo: si se perdió el uploadId NO iniciar
+    // otro multipart con otro objectKey ni dar un falso recibo.
+    return reply({ok:true,state:'multipart_incomplete',alreadyStored:false,
+     uploadPossible:false,productionAuthorized:false});
+   }
+   if(head.size!==data.meta.bytes)throw Error('R2_OBJETO_TAMANO_INCORRECTO');
+   const verified=await verificarReserva({bucket:env.SABER_R2_GRANDES,
+    reserva,...(digestFactory?{digestFactory}:{})});
+   if(verified?.sha256Verificado!==true||
+      verified.objectKey!==reserva.objectKey||
+      verified.sha256!==data.meta.sha256||
+      verified.bytes!==data.meta.bytes||
+      verified.contenidoPdfVerificado!==false)
+    throw Error('R2_RECUPERACION_SHA_NO_VERIFICADO');
+   const claim={orderId:data.orderId,fileId:data.meta.fileId,
+    name:data.meta.name,mode:data.meta.mode,pages:data.meta.pages,
+    bytes:data.meta.bytes,sha256:data.meta.sha256,key:reserva.objectKey};
+   const pending=await stage({env,claim,verified,
+    ...(typeof now==='function'?{now}:{})});
+   if(pending?.stagedForCentral!==true)
+    throw Error('R2_CENTRAL_PENDIENTE');
+   return reply({ok:true,state:'stored_and_staged',alreadyStored:true,
+    uploadPossible:false,result:{sha256Verificado:true,
+     sha256:data.meta.sha256,bytes:data.meta.bytes,
+     contenidoPdfVerificado:false,registeredInD1:false,
+     stagedForCentral:true,productionAuthorized:false}});
+  }
   if(action==='iniciar'){
    if(env.DOCS_R2_QUOTA_ENABLED!==FLAG)
     return reply({ok:false,error:'Recepción R2 bloqueada: cupo sin habilitar'},503);
