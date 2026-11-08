@@ -1132,6 +1132,7 @@ async function r2SubirSoloDespuesPago(){
  try{
   const result=await r2PrepagoFlujo.subirDespuesDePagar();
   if(result?.sha256Verificado!==true)throw Error('Falta verificar la integridad del PDF');
+  borrarRecuperacionR2();
   r2Informar('PDF recibido y SHA-256 verificado. El original está pendiente de revisión de medidas, tipo CAD/Póster y orden de producción. Conservá el archivo y la referencia de pago.');
   r2Total.textContent='Importe abonado en ensayo: '+
    new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',
@@ -1153,6 +1154,7 @@ async function r2ConsultarPagoYContinuar(){
    await r2SubirSoloDespuesPago();
   }else if(estado==='revocado'){
    r2DetenerConsultas();r2Pagar.hidden=true;r2Link.hidden=true;
+   borrarRecuperacionR2();
    r2Informar('El pago fue revocado. No se permite almacenar ni imprimir este archivo.');
   }else{
    r2Informar('Esperando la confirmación de Mercado Pago. El PDF sigue en este dispositivo; no se cargó a R2.');
@@ -1168,10 +1170,13 @@ r2Pagar?.addEventListener?.('click',async()=>{
  r2Informar('Preparando el enlace seguro de Mercado Pago (solamente cuenta de prueba)…');
  try{
   const url=await r2PrepagoFlujo.iniciarPagoSandbox();
+  const recuperacionGuardada=guardarRecuperacionR2();
   r2Link.href=url;r2Link.hidden=false;
   r2Pagar.hidden=true;
   r2Link.textContent='Abrir Mercado Pago de prueba';
-  r2Informar('El enlace está preparado. Abrí Mercado Pago, pagá con usuario de prueba y volvé a esta pestaña. El PDF permanece local.');
+  r2Informar('El enlace está preparado. Abrí Mercado Pago de prueba y volvé a esta pestaña. El PDF permanece local.'+
+   (recuperacionGuardada?' Podés volver a seleccionar el mismo PDF si se cierra la pestaña.':
+    ' Este navegador no permite guardar la recuperación; conservá la pestaña abierta.'));
   if(r2PagoTimer===null)r2PagoTimer=setInterval(()=>{
    if(document.visibilityState!=='hidden')void r2ConsultarPagoYContinuar();
   },25000);
