@@ -49,7 +49,8 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 export async function enviarArchivoR2Grande({
  file,orderId,meta,fetcher=fetch,
  storage=typeof sessionStorage==='undefined'?null:sessionStorage,
- onProgress=()=>{},signal,retries=2,concurrency=3
+ onProgress=()=>{},signal,retries=2,concurrency=3,
+ requireCentralStaging=false
 }={}){
  if(!pattern.test(orderId||'')||!file||typeof file.slice!=='function'||
   !Number.isSafeInteger(file.size)||!meta||meta.bytes!==file.size||
@@ -57,7 +58,8 @@ export async function enviarArchivoR2Grande({
   file.size>R2_BIG_LIMITS.maxFileBytes||
   !Number.isInteger(concurrency)||concurrency<1||concurrency>4||
   !Number.isInteger(retries)||retries<0||retries>4||
-  typeof onProgress!=='function')throw Error('R2_ARCHIVO_NO_ADMITIDO');
+  typeof onProgress!=='function'||typeof requireCentralStaging!=='boolean')
+  throw Error('R2_ARCHIVO_NO_ADMITIDO');
  const key=keyFor(orderId,meta);
  let state=safeRead(storage,key);
  if(!state){
@@ -139,6 +141,11 @@ export async function enviarArchivoR2Grande({
   verified.result?.bytes!==file.size||
   verified.result?.sha256!==meta.sha256)
   throw Error('R2_SHA256_SIN_VERIFICAR');
+ // Con el pago confirmado el objeto puede estar íntegro pero pendiente de
+ // registro en Central. Mantener la sesión completa y reintentar /verificar,
+ // NUNCA iniciar otro multipart ni subir 150 MiB de nuevo por esta causa.
+ if(requireCentralStaging&&verified.result?.stagedForCentral!==true)
+  throw Error('R2_CENTRAL_PENDIENTE');
  storage?.removeItem(key);
  return verified.result;
 }
