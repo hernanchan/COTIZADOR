@@ -144,11 +144,12 @@ export function crearFlujoR2PagoAntesDeCarga({
     lastResult=await uploader({file,orderId:webOrderId,fetcher,storage,
      meta:{fileId,name:file.name,mode:archivos[0].modo,
       bytes:file.size,sha256,pages},
-     onProgress});
+     onProgress,requireCentralStaging:true});
     if(lastResult?.sha256Verificado!==true||
        lastResult?.sha256!==sha256||
        lastResult?.bytes!==file.size||
-       lastResult?.contenidoPdfVerificado!==false)
+       lastResult?.contenidoPdfVerificado!==false||
+       lastResult?.stagedForCentral!==true)
      throw Error('PREPAGO_CARGA_NO_VERIFICADA');
     transition('carga_verificada');
     return lastResult;
