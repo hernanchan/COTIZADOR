@@ -44,7 +44,7 @@ function tester(){
  };
  const flow=crearFlujoR2PagoAntesDeCarga({file,archivos,webOrderId:ID,
   fetcher,uploader,hasher:async()=>SHA,onState:s=>states.push(s),storage:null});
- return {flow,requests,states,get uploads(){return uploads},
+ return {flow,requests,states,fetcher,uploader,get uploads(){return uploads},
   set paid(v){paid=v},set revoked(v){revoked=v}};
 }
 test('cotizar y abandonar: no se llama a R2 antes de pagar',async()=>{
@@ -87,5 +87,49 @@ test('rechazar pedido ajeno o enlace MP apócrifo sin usar R2',async()=>{
  const original=t.requests.length;
  await assert.rejects(t.flow.subirDespuesDePagar(),/R2_BLOQUEADO_SIN_PAGO/);
  assert.equal(t.requests.length,original);
+ assert.equal(t.uploads,0);
+});
+
+
+test('recuperar PDF reelecto: mismo SHA antes de consultar pago; sin doble cobro',async()=>{
+ const t=tester();
+ const recovered=crearFlujoR2PagoAntesDeCarga({file,archivos,webOrderId:ID,
+  fetcher:t.fetcher,uploader:t.uploader,hasher:async()=>SHA,storage:null,
+  restaurarPago:{commercialOrderId:CID,amountArs:18000,sha256:SHA}});
+ assert.equal(recovered.phase,'archivo_pendiente_de_comparar');
+ assert.equal(t.requests.length,0);
+ await assert.rejects(recovered.subirDespuesDePagar(),/R2_BLOQUEADO_SIN_PAGO/);
+ await recovered.validarRestauracion();
+ assert.equal(recovered.phase,'esperando_pago');
+ assert.equal(t.requests.length,0);
+ assert.equal(await recovered.consultarPago(),'pendiente');
+ assert.equal(t.uploads,0);
+ t.paid=true;
+ assert.equal(await recovered.consultarPago(),'pagado');
+ await recovered.subirDespuesDePagar();
+ assert.equal(t.uploads,1);
+ assert.equal(recovered.phase,'carga_verificada');
+ assert.equal(t.requests.filter(x=>x.input.action==='start').length,0);
+});
+
+test('recuperar PDF diferente: rechaza SHA sin solicitar pago ni R2',async()=>{
+ const t=tester();
+ const recovered=crearFlujoR2PagoAntesDeCarga({file,archivos,webOrderId:ID,
+  fetcher:t.fetcher,uploader:t.uploader,storage:null,
+  hasher:async()=> 'f'.repeat(64),
+  restaurarPago:{commercialOrderId:CID,amountArs:18000,sha256:SHA}});
+ await assert.rejects(recovered.validarRestauracion(),/PDF_DIFERENTE_AL_COTIZADO/);
+ assert.equal(recovered.phase,'archivo_no_coincide');
+ assert.equal(t.uploads,0);
+ assert.equal(t.requests.length,0);
+ await assert.rejects(recovered.subirDespuesDePagar(),/R2_BLOQUEADO_SIN_PAGO/);
+});
+
+test('recuperación alterada: jamás habilita R2',()=>{
+ const t=tester();
+ assert.throws(()=>crearFlujoR2PagoAntesDeCarga({file,archivos,webOrderId:ID,
+  fetcher:t.fetcher,uploader:t.uploader,hasher:async()=>SHA,
+  restaurarPago:{commercialOrderId:CID,amountArs:0,sha256:SHA}}),
+ /PREPAGO_RECUPERACION_NO_VALIDA/);
  assert.equal(t.uploads,0);
 });
