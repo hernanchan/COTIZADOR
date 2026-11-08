@@ -297,3 +297,55 @@ export async function autorizadoPedidoClienteVinculado(request,env,orderId,optio
  if(!buyer||!order||order[1]!==orderId)return false;
  return equal(order[2],await bindingMac(env,orderId,buyer[1],options.subtle||crypto.subtle));
 }
+
+
+/**
+ * Recuperación por MISMA orden de ploteo grande tras vencer la cookie genérica
+ * de comprador. Exige iniciar una NUEVA sesión Turnstile y conserva sólo un
+ * vínculo HttpOnly de la orden original durante un máximo de 24 h.
+ *
+ * Esta cookie NO sustituye el pago conciliado (Central D1), NO habilita R2
+ * por sí sola y no sirve para TUS, documentos ajenos, descargas o checkout start.
+ * Sólo la consultan las rutas explícitas de estado R2 y subida postpago.
+ */
+const R2_RECOVERY_COOKIE='saber_r2_continuar_v1';
+const R2_RECOVERY_AGE=24*3600;
+const R2_COMMERCIAL_ID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
+const r2RecoveryOn=env=>orderOn(env)&&
+ env?.DOCS_R2_PREPAY_DRAFT_ENABLED==='PRIVATE_TEST_ONLY';
+async function r2RecoveryMac(env,orderId,commercialOrderId,issued,subtle){
+ const key=await subtle.importKey('raw',
+  new TextEncoder().encode(env.DOCS_TURNSTILE_SECRET),
+  {name:'HMAC',hash:'SHA-256'},false,['sign']);
+ const signed=await subtle.sign('HMAC',key,
+  new TextEncoder().encode('saber-r2-recuperacion-orden-v1\\n'+
+   orderId+'\\n'+commercialOrderId+'\\n'+issued));
+ return hex(new Uint8Array(signed));
+}
+export async function cookieRecuperacionR2Comprador(request,env,orderId,
+ commercialOrderId,{now=Date.now(),subtle=crypto.subtle}={}){
+ if(!r2RecoveryOn(env)||!ORDER_ID.test(orderId||'')||
+  !R2_COMMERCIAL_ID.test(commercialOrderId||'')||
+  !await autorizadoPedidoCliente(request,env,{now,subtle}))return null;
+ const issued=String(Math.floor(now/1000));
+ const signature=await r2RecoveryMac(env,orderId,commercialOrderId,issued,subtle);
+ return R2_RECOVERY_COOKIE+'='+orderId+'.'+commercialOrderId+'.'+issued+'.'+signature+
+  '; Path=/prueba-v2/api/ensayo-r2; Max-Age='+R2_RECOVERY_AGE+
+  '; Secure; HttpOnly; SameSite=Strict';
+}
+export async function autorizadoRecuperacionR2Comprador(request,env,orderId,{
+ commercialOrderId=null,now=Date.now(),subtle=crypto.subtle
+}={}){
+ // Reautenticación humana obligatoria: la cookie larga, sola, no alcanza.
+ if(!r2RecoveryOn(env)||!ORDER_ID.test(orderId||'')||
+    !await autorizadoPedidoCliente(request,env,{now,subtle}))return false;
+ const cookies=request.headers.get('Cookie')||'';
+ if(cookies.length>4096)return false;
+ const match=cookies.match(/(?:^|;\\s*)saber_r2_continuar_v1=(WEB-ENSAYO-[A-F0-9]{32})\\.([a-f0-9-]{36})\\.(\\d{10})\\.([a-f0-9]{64})(?=;|$)/);
+ if(!match||match[1]!==orderId||!R2_COMMERCIAL_ID.test(match[2])||
+    (commercialOrderId!==null&&match[2]!==commercialOrderId))return false;
+ const ts=Number(match[3]),seconds=Math.floor(now/1000);
+ if(!Number.isSafeInteger(ts)||ts>seconds+30||
+   seconds-ts>R2_RECOVERY_AGE)return false;
+ return equal(match[4],await r2RecoveryMac(env,match[1],match[2],match[3],subtle));
+}
