@@ -4352,6 +4352,10 @@ export default {
     const {reservarCupoR2Central}=await import("./r2-grandes-cuotas-central.mjs");
     return await reservarCupoR2Central(req,env,{readSigned:centralReadSigned});
    }
+   if(url.pathname==="/internal/central/r2-reservation-lookup"){
+    const {consultarReservaR2Central}=await import("./r2-reserva-consulta-central.mjs");
+    return await consultarReservaR2Central(req,env,{readSigned:centralReadSigned});
+   }
    if(url.pathname==="/internal/central/r2-pending-stage"){
     const {stageR2PendienteCentral}=await import("./r2-grandes-central-pendientes.mjs");
     return await stageR2PendienteCentral(req,env,{readSigned:centralReadSigned});
