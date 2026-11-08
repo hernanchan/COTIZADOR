@@ -65,6 +65,10 @@ body.estado-envio #smart,body.estado-registro #smart{display:none}
 <button type="button" id="r2-prepago-pagar" hidden>Pagar con Mercado Pago (prueba)</button>
 <a id="r2-prepago-link" hidden target="_blank" rel="noopener noreferrer">Abrir Mercado Pago de prueba</a>
 <button type="button" id="r2-prepago-reintentar" hidden>Reintentar envío del PDF pagado</button>
+<div id="r2-prepago-recuperacion" hidden>
+<label for="r2-prepago-recuperar-file">Para continuar tu pedido, seleccioná el mismo PDF original.</label>
+<input id="r2-prepago-recuperar-file" type="file" accept=".pdf,application/pdf">
+</div>
 </section>
 <section role="alert" class="warning" style="margin:12px auto;max-width:1110px" ${tusBloqueado?'':'hidden'}>Supabase/TUS no está operativo. El envío está BLOQUEADO para evitar volver a Google Drive. Revisar: ${fallas.join(', ')||'configuración privada'}. No vuelvas a subir PDF todavía.</section>
 <div id="seguridad-privada"><small>Verificación de seguridad para el envío:</small><div class="cf-turnstile" data-sitekey="${sitekey}" data-action="documentos"></div></div>
@@ -449,6 +453,30 @@ let registering=false,registeredOrder=null,registeredShortOrder=null;
 // Recuperación de metadatos no sensibles tras recarga o suspensión móvil.
  // Nunca conservar objetos File, base64, sesiones, credenciales ni confirmaciones.
 const RECOVERY_KEY='saber-v2-ensayo-metadatos-v1';
+const R2_RECOVERY_KEY='saber-r2-prepago-pendiente-v1';
+function recuperarR2Meta(){
+ try{
+  const raw=localStorage.getItem(R2_RECOVERY_KEY);
+  if(!raw||raw.length>1400)return null;
+  const x=JSON.parse(raw),age=Date.now()-x?.savedAt;
+  if(x?.schema!=='saber-r2-recuperacion-v1'||
+     !Number.isSafeInteger(x.savedAt)||age<0||age>24*3600*1000||
+     !/^WEB-ENSAYO-[A-F0-9]{32}$/.test(x.webOrderId||'')||
+     !/^[a-f0-9-]{36}$/i.test(x.commercialOrderId||'')||
+     !/^[a-f0-9]{64}$/.test(x.sha256||'')||
+     !Number.isSafeInteger(x.amountArs)||x.amountArs<1||
+     !Number.isSafeInteger(x.bytes)||x.bytes<=40*1024*1024||
+     x.bytes>200*1024*1024||
+     typeof x.name!=='string'||x.name.length>120||
+     !x.name.toLowerCase().endsWith('.pdf')||
+     !Number.isSafeInteger(x.pages)||x.pages<1||x.pages>2000||
+     typeof x.modo!=='string'||x.modo.length<1||x.modo.length>40)
+   return null;
+  return x;
+ }catch{return null}
+}
+function borrarRecuperacionR2(){try{localStorage.removeItem(R2_RECOVERY_KEY)}catch{}}
+const r2Recuperable=R2_PREPAY_UI_ENABLED?recuperarR2Meta():null;
 const RECOVERY_MAX_AGE=12*60*60*1000;
 const RECOVERY_MAX_BYTES=25000;
 const newOrderId=()=>{
@@ -492,7 +520,7 @@ function restore(){
  }catch{return null}
 }
 const previous=restore();
-let orderId=previous?.orderId||newOrderId();
+let orderId=previous?.orderId||r2Recuperable?.webOrderId||newOrderId();
 let clientOrderId=previous?.clientOrderId||newClientOrderId();
 const all=previous?.items||[],used=previous?.seen||new Set();
 function save(){
@@ -1033,6 +1061,60 @@ const r2Total=document.getElementById('r2-prepago-total');
 const r2Pagar=document.getElementById('r2-prepago-pagar');
 const r2Link=document.getElementById('r2-prepago-link');
 const r2Retry=document.getElementById('r2-prepago-reintentar');
+const r2Recuperacion=document.getElementById('r2-prepago-recuperacion');
+const r2RecuperarFile=document.getElementById('r2-prepago-recuperar-file');
+function guardarRecuperacionR2(){
+ const f=r2PrepagoPendiente?.file,a=r2PrepagoPendiente?.archivos?.[0];
+ if(!f||!a||!Array.isArray(a.paginas)||!r2PrepagoFlujo?.sha256||
+    !r2PrepagoFlujo?.commercialOrderId)return false;
+ const v={schema:'saber-r2-recuperacion-v1',savedAt:Date.now(),
+  webOrderId:r2PrepagoFlujo.webOrderId,commercialOrderId:r2PrepagoFlujo.commercialOrderId,
+  amountArs:r2PrepagoFlujo.amountArs,sha256:r2PrepagoFlujo.sha256,
+  name:f.name,bytes:f.size,pages:a.paginas.length,modo:a.modo};
+ try{localStorage.setItem(R2_RECOVERY_KEY,JSON.stringify(v));return true}
+ catch{return false}
+}
+if(r2Recuperable){
+ r2Recuperacion.hidden=false;r2Panel.hidden=false;
+ r2Mensaje.textContent='Tenés un pedido anterior con pago de prueba iniciado. Elegí el mismo PDF para verificar el pago y continuar, sin volver a pagar.';
+ r2Total.textContent='Pedido anterior · '+new Intl.NumberFormat('es-AR',{
+  style:'currency',currency:'ARS',maximumFractionDigits:0}).format(r2Recuperable.amountArs);
+}
+r2RecuperarFile?.addEventListener('change',async()=>{
+ const file=r2RecuperarFile.files?.[0];
+ if(!file||!r2Recuperable||r2Subiendo||r2Consultando)return;
+ if(file.name!==r2Recuperable.name||file.size!==r2Recuperable.bytes){
+  r2Informar('El archivo no coincide en nombre o tamaño. No se envió ningún archivo.');return;
+ }
+ r2RecuperarFile.disabled=true;
+ try{
+  const mod=await import('/prueba-v2/r2-prepago-flujo.mjs');
+  const flow=mod.crearFlujoR2PagoAntesDeCarga({
+   file,webOrderId:r2Recuperable.webOrderId,
+   archivos:[{servicio:'auto',modo:r2Recuperable.modo,
+    paginas:Array(r2Recuperable.pages).fill(null)}],
+   restaurarPago:{commercialOrderId:r2Recuperable.commercialOrderId,
+    amountArs:r2Recuperable.amountArs,sha256:r2Recuperable.sha256},
+   onProgress:p=>{
+    if(Number.isFinite(p.porcentaje))
+     r2Informar('Comparando PDF local sin subir: '+p.porcentaje+' %.');
+    else if(Number.isFinite(p.percent))
+     r2Informar('Subiendo PDF pagado: '+p.percent+' %.');
+   }
+  });
+  r2Informar('Verificando por SHA-256 que es el mismo PDF (sin enviarlo)…');
+  await flow.validarRestauracion();
+  r2PrepagoFlujo=flow;r2Recuperacion.hidden=true;
+  await r2ConsultarPagoYContinuar();
+  if(r2PrepagoFlujo?.phase==='esperando_pago'&&r2PagoTimer===null)
+   r2PagoTimer=setInterval(()=>{
+    if(document.visibilityState!=='hidden')void r2ConsultarPagoYContinuar();
+   },25000);
+ }catch(e){
+  r2Informar('Recuperación pendiente: '+String(e?.message||e).slice(0,140)+
+   '. No vuelvas a pagar. Si venció la sesión, contactá a Librería Saber con el comprobante.');
+ }finally{r2RecuperarFile.disabled=false}
+});
 function r2Informar(texto){
  r2Panel.hidden=false;
  r2Mensaje.textContent=texto;
