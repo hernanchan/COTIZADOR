@@ -318,8 +318,8 @@ async function r2RecoveryMac(env,orderId,commercialOrderId,issued,subtle){
   new TextEncoder().encode(env.DOCS_TURNSTILE_SECRET),
   {name:'HMAC',hash:'SHA-256'},false,['sign']);
  const signed=await subtle.sign('HMAC',key,
-  new TextEncoder().encode('saber-r2-recuperacion-orden-v1\\n'+
-   orderId+'\\n'+commercialOrderId+'\\n'+issued));
+  new TextEncoder().encode('saber-r2-recuperacion-orden-v1\n'+
+   orderId+'\n'+commercialOrderId+'\n'+issued));
  return hex(new Uint8Array(signed));
 }
 export async function cookieRecuperacionR2Comprador(request,env,orderId,
@@ -341,7 +341,7 @@ export async function autorizadoRecuperacionR2Comprador(request,env,orderId,{
     !await autorizadoPedidoCliente(request,env,{now,subtle}))return false;
  const cookies=request.headers.get('Cookie')||'';
  if(cookies.length>4096)return false;
- const match=cookies.match(/(?:^|;\\s*)saber_r2_continuar_v1=(WEB-ENSAYO-[A-F0-9]{32})\\.([a-f0-9-]{36})\\.(\\d{10})\\.([a-f0-9]{64})(?=;|$)/);
+ const match=cookies.match(/(?:^|;\s*)saber_r2_continuar_v1=(WEB-ENSAYO-[A-F0-9]{32})\.([a-f0-9-]{36})\.(\d{10})\.([a-f0-9]{64})(?=;|$)/);
  if(!match||match[1]!==orderId||!R2_COMMERCIAL_ID.test(match[2])||
     (commercialOrderId!==null&&match[2]!==commercialOrderId))return false;
  const ts=Number(match[3]),seconds=Math.floor(now/1000);
