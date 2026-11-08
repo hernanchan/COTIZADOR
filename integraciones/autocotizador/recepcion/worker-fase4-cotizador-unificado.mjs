@@ -6,7 +6,7 @@ import {paginaCotizadorRapido} from './cotizador-rapido-pagina.mjs';
 import {paginaPloteosRapido} from './ploteos-rapido-pagina.mjs';
 import {paginaCotizadorConjunto} from './cotizador-conjunto-pagina.mjs';
 import {paginaCargaUnica} from './carga-unica-pagina.mjs';
-import {manejarCotizadorCliente,autorizadoCotizadorCliente,manejarPortalPedidosCliente,autorizadoPedidoCliente,cookiePedidoClienteVinculado,autorizadoPedidoClienteVinculado} from './cotizador-cliente-publico.mjs';
+import {manejarCotizadorCliente,autorizadoCotizadorCliente,manejarPortalPedidosCliente,autorizadoPedidoCliente,cookiePedidoClienteVinculado,autorizadoPedidoClienteVinculado,cookieRecuperacionR2Comprador,autorizadoRecuperacionR2Comprador} from './cotizador-cliente-publico.mjs';
 import {cotizarCargaUnica} from './cotizar-carga-unica.mjs';
 import {cotizarNupReciboVerificado} from './cotizar-nup-recibo-verificado.mjs';
 import {cotizarPloteoReciboVerificado} from './cotizar-ploteo-recibo-verificado.mjs';
@@ -2169,8 +2169,13 @@ export default {
       const data=buyer?await request.clone().json().catch(()=>null):null;
       const belongs=buyer&&
         await autorizadoPedidoClienteVinculado(request,env,data?.webOrderId);
+      // Recuperación sólo para status; nunca inicia otro checkout.
+      const resume=buyer&&!belongs&&data?.action==='status'&&
+        await autorizadoRecuperacionR2Comprador(request,env,data?.webOrderId,{
+         commercialOrderId:data?.commercialOrderId
+        });
       return checkoutR2PrepaidSandboxDocumentos(request,env,{
-        authorized:staff||belongs
+        authorized:staff||belongs||resume
       });
     }
     if(page==='/prueba-v2/api/ensayo-r2-prepago'){
@@ -2183,12 +2188,21 @@ export default {
         authorized:staff||buyer
       });
       if(result.ok&&buyer){
-        const link=await cookiePedidoClienteVinculado(request,env,clientData?.webOrderId);
-        if(link){
-          const headers=new Headers(result.headers);
-          headers.append('Set-Cookie',link);
-          return new Response(result.body,{status:result.status,headers});
-        }
+        const saved=await result.clone().json().catch(()=>null);
+        if(saved?.ok!==true||saved?.webOrderId!==clientData?.webOrderId||
+           saved?.filesUploaded!==false||saved?.paymentAuthorized!==false||
+           saved?.quoteState!=='PRELIMINAR_SIN_ARCHIVO')
+         return testResponse({ok:false,error:'Pedido no disponible para recuperar'},502);
+        const link=await cookiePedidoClienteVinculado(request,env,clientData.webOrderId);
+        const recovery=await cookieRecuperacionR2Comprador(request,env,
+         clientData.webOrderId,saved.commercialOrderId);
+        // No abrir pago si el pedido no puede reanudarse tras una suspensión.
+        if(!link||!recovery)
+         return testResponse({ok:false,error:'Recuperación del pedido no disponible'},503);
+        const headers=new Headers(result.headers);
+        headers.append('Set-Cookie',link);
+        headers.append('Set-Cookie',recovery);
+        return new Response(result.body,{status:result.status,headers});
       }
       return result;
     }
@@ -2205,10 +2219,12 @@ export default {
         comprobarPagoR2EnCentral({env,orderId,meta}),
        // El comprador sólo puede iniciar R2 para SU orden vinculada, incluso
        // si conoce un pago válido ajeno. Basic no salta el pago obligatorio.
-       autorizadoIniciar:async orderId=>staff||
-        (buyer&&await autorizadoPedidoClienteVinculado(request,env,orderId)),
-       autorizadoOrden:async orderId=>staff||
-        (buyer&&await autorizadoPedidoClienteVinculado(request,env,orderId)),
+       autorizadoIniciar:async orderId=>staff||(buyer&&(
+        await autorizadoPedidoClienteVinculado(request,env,orderId)||
+        await autorizadoRecuperacionR2Comprador(request,env,orderId))),
+       autorizadoOrden:async orderId=>staff||(buyer&&(
+        await autorizadoPedidoClienteVinculado(request,env,orderId)||
+        await autorizadoRecuperacionR2Comprador(request,env,orderId))),
        vincularOrden:async orderId=>buyer?
         cookiePedidoClienteVinculado(request,env,orderId):null
       });
