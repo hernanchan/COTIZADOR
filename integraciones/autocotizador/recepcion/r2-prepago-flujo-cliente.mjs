@@ -31,7 +31,8 @@ export function crearFlujoR2PagoAntesDeCarga({
  uploader=enviarArchivoR2Grande,
  hasher=sha256PdfLocalPorFragmentos,
  onProgress=()=>{},onState=()=>{},
- storage=typeof sessionStorage==='undefined'?null:sessionStorage
+ storage=typeof sessionStorage==='undefined'?null:sessionStorage,
+ restaurarPago=null
 }={}){
  if(!file||typeof file.slice!=='function'||
   typeof file.name!=='string'||!/\.pdf$/i.test(file.name)||
@@ -45,9 +46,16 @@ export function crearFlujoR2PagoAntesDeCarga({
   typeof hasher!=='function'||typeof onProgress!=='function'||
   typeof onState!=='function')
   throw Error('PREPAGO_PLOTEO_GRANDE_NO_VALIDO');
+ if(restaurarPago!==null&&(!restaurarPago||
+    !/^[a-f0-9-]{36}$/i.test(restaurarPago.commercialOrderId||'')||
+    !Number.isSafeInteger(restaurarPago.amountArs)||restaurarPago.amountArs<1||
+    !/^[a-f0-9]{64}$/.test(restaurarPago.sha256||'')))
+  throw Error('PREPAGO_RECUPERACION_NO_VALIDA');
  const fileId='planoA1',pages=archivos[0].paginas.length;
- let phase='seleccionado',sha256=null,commercialOrderId=null,
-  amountArs=null,checkoutUrl=null,lastResult=null;
+ let phase=restaurarPago?'archivo_pendiente_de_comparar':'seleccionado',
+  sha256=restaurarPago?.sha256||null,
+  commercialOrderId=restaurarPago?.commercialOrderId||null,
+  amountArs=restaurarPago?.amountArs||null,checkoutUrl=null,lastResult=null;
  const emit=()=>onState(Object.freeze({
   phase,commercialOrderId,amountArs,checkoutUrl,webOrderId,
   sha256Verified:phase==='carga_verificada',
@@ -60,6 +68,21 @@ export function crearFlujoR2PagoAntesDeCarga({
   get amountArs(){return amountArs},
   get checkoutUrl(){return checkoutUrl},
   get webOrderId(){return webOrderId},
+  get sha256(){return sha256},
+  get commercialOrderId(){return commercialOrderId},
+  async validarRestauracion(){
+   if(phase!=='archivo_pendiente_de_comparar')
+    throw Error('PREPAGO_RECUPERACION_NO_DISPONIBLE');
+   // El almacenamiento local no acredita ni autoriza pagos: primero verificar
+   // todos los bytes originales; después consultar el estado a Central.
+   const actual=await hasher(file,{onProgress});
+   if(actual!==sha256){
+    transition('archivo_no_coincide');
+    throw Error('PREPAGO_PDF_DIFERENTE_AL_COTIZADO');
+   }
+   transition('esperando_pago');
+   return {webOrderId,commercialOrderId,amountArs};
+  },
   async preparar(){
    if(phase!=='seleccionado')throw Error('PREPAGO_ESTADO_INCORRECTO');
    transition('calculando_hash_local');
