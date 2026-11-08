@@ -99,3 +99,21 @@ El propietario habilitó Cloudflare R2 con tarjeta, pero **no autoriza que el si
 - Falta validar navegador móvil con un PDF problemático real de 150 MB y cargas interrumpidas; el ensayo de SHA y transporte no equivale a esa experiencia.
 - Control de consumo/cuotas/TTL, alarmas y cancelación automática de multipart huérfanos, antes de activar público.
 - Las banderas de UI y cobro siguen **apagadas en Cloudflare**. Ninguna actualización en \`main\`, web pública, facturación real, bucket ni Worker comercial. No se generaron objetos R2 ni pagos reales para estas pruebas de código.
+
+
+## 08/11/2026 — Corrección de recuperación al cerrar pestaña (código sin desplegar)
+
+**Auditoría de la rama:** el commit de referencia `d1763e3427` coincidía exactamente con la punta de `integracion/tus-pedido-privado-20261101` antes de esta intervención. La rama siguió siendo la única destinataria de las modificaciones. No hubo operaciones sobre `main`, web pública, Workers, R2 real ni cobros.
+
+**Cambios implementados:**
+- `integraciones/autocotizador/recepcion/r2-prepago-flujo-cliente.mjs`: restauración de un prepago ya existente sin reiniciar el checkout; primero exige reelección del PDF y comprobación SHA-256 por fragmentos, luego consulta estado de Central, y sólo sube si el backend acredita pago y orden vinculada. Rechaza PDF distinto y datos de recuperación alterados.
+- `integraciones/autocotizador/recepcion/pantalla-cotizador-v2-prueba-privada.mjs`: selector de recuperación visible tras recarga; almacenamiento local sólo de identificadores, importe, nombre, tamaño, cantidad de páginas, modo, SHA y fecha (sin contenido PDF, credenciales, cookie ni confirmación de pago). Caducidad local 24 h; elimina registro tras verificación íntegra o revocación.
+- `tests/r2-prepago-flujo-cliente.test.mjs`: tres regresiones adicionales: recuperación del mismo archivo sin segundo checkout, rechazo de SHA diferente y rechazo de recuperación inválida.
+
+**Commits:** `a57f6fc`, `19c7de4`, `98fdb17`, `8bb3100`.
+
+**Evidencia local de lectura de código:** se cargaron los contenidos actuales de GitHub, se comprobaron sintácticamente el controlador y la página, y se ejecutaron las 7 pruebas del archivo mencionado con dobles simulados de fetch/MP/R2 y un ejecutor JavaScript aislado: **7/7 aprobadas**. Esto **no es** ejecución de GitHub Actions, ni prueba funcional de navegador, ni operación real de R2/MP.
+
+**Límite de seguridad todavía P0:** `cotizador-cliente-publico.mjs` fija `ORDER_AGE=3600` (cookie de comprador, 60 minutos); la intención de pago se acepta durante hasta 24 horas. Aunque el navegador conserve metadatos 24 h, cuando la cookie expira el comprador no puede consultar/retomar la orden mediante las rutas protegidas. Requiere mecanismo de reautenticación **vinculado a la misma orden y al pago confirmado**, sin prolongar indiscriminadamente el acceso a otras órdenes. No considerar cerrada la recuperación móvil hasta pasar un ensayo real también después de ese vencimiento.
+
+**Bloqueos posteriores para lanzamiento:** despliegue aislado y conciliación auténtica de Mercado Pago **sandbox** con webhook; carga a bucket R2 **real** y verificación SHA de 60, 100, 150 MiB y límite 200 MiB; revalidar medidas/páginas/CAD-Póster y diferencias de precio; salida operable en Central con ZIP e instrucciones/preprensa; cuotas, limpieza multipart y borrado seguro luego de Entregado. Banderas comerciales de R2 permanecen apagadas en el despliegue según última documentación; no se verificaron en vivo en esta intervención.
