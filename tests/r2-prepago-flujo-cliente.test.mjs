@@ -9,7 +9,7 @@ const size=150*1024*1024;
 const file={name:'PANEL-A1.pdf',size,slice(){throw Error('READ_ONLY_IN_TEST')}};
 const archivos=[{nombre:file.name,paginas:[{numero:1,anchoCm:59.4,
  altoCm:84.1,modo:'cad'}],servicio:'auto',modo:'bn'}];
-function tester(){
+function tester({stagedForCentral=true}={}){
  const requests=[],states=[];let paid=false,revoked=false,uploads=0;
  const fetcher=async(route,opts)=>{
   const input=JSON.parse(opts.body);
@@ -36,11 +36,12 @@ function tester(){
  const uploader=async args=>{
   uploads++;
   assert.equal(args.orderId,ID);
+  assert.equal(args.requireCentralStaging,true);
   assert.equal(args.file,file);
   assert.deepEqual(args.meta,{fileId:'planoA1',name:file.name,mode:'bn',
    bytes:size,sha256:SHA,pages:1});
   return {sha256Verificado:true,sha256:SHA,bytes:size,
-   contenidoPdfVerificado:false,stagedForCentral:true};
+   contenidoPdfVerificado:false,stagedForCentral};
  };
  const flow=crearFlujoR2PagoAntesDeCarga({file,archivos,webOrderId:ID,
   fetcher,uploader,hasher:async()=>SHA,onState:s=>states.push(s),storage:null});
@@ -132,4 +133,16 @@ test('recuperación alterada: jamás habilita R2',()=>{
   restaurarPago:{commercialOrderId:CID,amountArs:0,sha256:SHA}}),
  /PREPAGO_RECUPERACION_NO_VALIDA/);
  assert.equal(t.uploads,0);
+});
+
+test('un PDF íntegro sin confirmación Central no se anuncia recibido',async()=>{
+ const t=tester({stagedForCentral:false});
+ await t.flow.preparar();
+ await t.flow.iniciarPagoSandbox();
+ t.paid=true;
+ assert.equal(await t.flow.consultarPago(),'pagado');
+ await assert.rejects(t.flow.subirDespuesDePagar(),/PREPAGO_CARGA_NO_VERIFICADA/);
+ assert.equal(t.flow.phase,'pagado_esperando_subida');
+ assert.equal(t.uploads,1);
+ assert.equal(t.requests.filter(x=>x.input.action==='start').length,1);
 });
