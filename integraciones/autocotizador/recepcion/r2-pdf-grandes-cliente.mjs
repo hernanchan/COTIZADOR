@@ -62,6 +62,29 @@ export async function enviarArchivoR2Grande({
   throw Error('R2_ARCHIVO_NO_ADMITIDO');
  const key=keyFor(orderId,meta);
  let state=safeRead(storage,key);
+ if(!state&&requireCentralStaging){
+  // La pestaña puede haber perdido sessionStorage o el proof haber vencido.
+  // Consultar D1/R2 ANTES de reservar otra cuota o iniciar otro multipart.
+  onProgress({phase:'recuperacion-servidor',percent:0});
+  const resume=await post(fetcher,'/recuperar',{orderId,meta},signal);
+  if(resume.state==='stored_and_staged'&&resume.alreadyStored===true){
+   const r=resume.result;
+   if(r?.sha256Verificado!==true||r?.sha256!==meta.sha256||
+      r?.bytes!==file.size||r?.stagedForCentral!==true||
+      r?.contenidoPdfVerificado!==false||r?.registeredInD1!==false)
+    throw Error('R2_RECUPERACION_INCONSISTENTE');
+   storage?.removeItem(key);
+   onProgress({phase:'recuperado-sin-reenvio',totalBytes:file.size,
+    bytesUploaded:0,percent:100});
+   return r;
+  }
+  if(resume.state==='multipart_incomplete'&&
+     resume.alreadyStored===false&&resume.uploadPossible===false)
+   throw Error('R2_CARGA_ANTERIOR_REQUIERE_REVISION');
+  if(resume.state!=='not_started'||resume.alreadyStored!==false||
+     resume.uploadPossible!==true)
+   throw Error('R2_RECUPERACION_INCONSISTENTE');
+ }
  if(!state){
   onProgress({phase:'autorizacion',percent:0});
   const started=await post(fetcher,'/iniciar',{orderId,meta},signal);
