@@ -1670,8 +1670,8 @@ if(TUS_ENABLED){
  * No inserta claves ni cookies del personal. El Worker decide qué rutas
  * están autorizadas; ocultar controles en HTML NO equivale a autorizar APIs.
  */
-export function paginaCotizadorTUSClientePruebas(sitekey,tusEnabled,tusDiagnostico,sandboxEnabled){
- let html=paginaCotizadorV2PruebaPrivada(sitekey,tusEnabled,tusDiagnostico,sandboxEnabled);
+export function paginaCotizadorTUSClientePruebas(sitekey,tusEnabled,tusDiagnostico,sandboxEnabled,r2PrepayEnabled=false){
+ let html=paginaCotizadorV2PruebaPrivada(sitekey,tusEnabled,tusDiagnostico,sandboxEnabled,r2PrepayEnabled);
  html=html
   .replace('<title>Librería Saber · Ensayo privado V2</title>',
    '<title>Impresiones y ploteos · Librería Saber</title>')
