@@ -51,7 +51,7 @@ jobs:
           tmp=$(mktemp -d)
           chmod 700 "$tmp"
           modified=0
-          baseline='7e33ae44-4e56-4afe-a893-b31ea4f5ac2c'
+          baseline='c3858ef5-e98d-4202-b812-83b049843644'
           cleanup(){
             rc=$?
             trap - EXIT
