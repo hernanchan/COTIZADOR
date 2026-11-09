@@ -38,7 +38,21 @@ export async function reservarR2GrandeAntesDeSubir({
   'x-saber-request-id':id,'x-saber-signature':signature
  },body}));
  if(result.status===429)throw Error('R2_CUPO_AGOTADO');
- if(!result.ok)throw Error('R2_CUPO_RECHAZADO');
+ if(!result.ok){
+  // Traducir errores conocidos a un código operacional cerrado.
+  // Nunca propagar detalles arbitrarios de D1, cuentas ni firmas HMAC.
+  const upstream=await result.json().catch(()=>null);
+  const reasons={
+   'Cupo R2 no habilitado':'FLAG_APAGADO',
+   'Cupo R2 no configurado':'CONFIGURACION',
+   'Reserva no autorizada':'FIRMA_RECHAZADA',
+   'Reserva fuera de límites':'SOLICITUD_INVALIDA',
+   'El archivo tiene otra reserva R2':'RESERVA_CONFLICTIVA',
+   'No se pudo reservar R2':'D1_ESCRITURA_RECHAZADA'
+  };
+  const reason=Object.hasOwn(reasons,upstream?.error)?reasons[upstream.error]:'CENTRAL_ERROR';
+  throw Error('R2_CUPO_RECHAZADO_'+reason+'_'+result.status);
+ }
  const raw=await result.text();
  if(raw.length>1600)throw Error('R2_CUPO_RESPUESTA_INVALIDA');
  let data;try{data=JSON.parse(raw)}catch{throw Error('R2_CUPO_RESPUESTA_INVALIDA')}
