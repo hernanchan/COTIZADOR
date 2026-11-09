@@ -15,7 +15,7 @@ function mock({delivered=true,paid=true,received=true,approved=true,scope=true}=
    tus_key:TKEY,tus_sha:'a'.repeat(64),tus_bytes:2*M},
   {web_order_id:WEB,file_id:'huge',transport:'r2',sha256:'b'.repeat(64),
    bytes:70*M,received:received?1:0,name:'Plano.pdf',
-   r2_receipt:'DOC-'+R,r2_key:R2KEY,r2_sha:'b'.repeat(64),r2_bytes:70*M,
+   r2_receipt:'DOC-'+R,r2_key:R2KEY,r2_etag:'strong-etag-0123',r2_sha:'b'.repeat(64),r2_bytes:70*M,
    r2_status:'awaiting_pdf_analysis',r2_reservation:'reserved'}
  ];
  const queue=[],audit=[];
@@ -69,8 +69,8 @@ function mock({delivered=true,paid=true,received=true,approved=true,scope=true}=
    const a=s.args;
    if(!queue.some(x=>x.file_id===a[2]))queue.push({
     order_id:a[0],web_order_id:a[1],file_id:a[2],transport:a[3],
-    receipt_id:a[4],object_key:a[5],sha256:a[6],bytes:a[7],
-    production_version:a[8],state:'pending',attempts:0
+    receipt_id:a[4],object_key:a[5],etag:a[6],sha256:a[7],bytes:a[8],
+    production_version:a[9],state:'pending',attempts:0
    });
   }
   return stmts.map(()=>({meta:{changes:1}}));

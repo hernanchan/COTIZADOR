@@ -17,7 +17,7 @@ export const UNIVERSAL_PURGE_SQL="CREATE TABLE IF NOT EXISTS central_r2_universa
  "order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE RESTRICT,"+
  "web_order_id TEXT NOT NULL,file_id TEXT NOT NULL,"+
  "transport TEXT NOT NULL CHECK(transport IN ('tus','r2')),"+
- "receipt_id TEXT NOT NULL,object_key TEXT NOT NULL UNIQUE,"+
+ "receipt_id TEXT NOT NULL,object_key TEXT NOT NULL UNIQUE,etag TEXT,"+
  "sha256 TEXT NOT NULL,bytes INTEGER NOT NULL,production_version INTEGER NOT NULL,"+
  "state TEXT NOT NULL DEFAULT 'pending' CHECK(state IN ('pending','processing','deleted','error')),"+
  "attempts INTEGER NOT NULL DEFAULT 0,last_try TEXT,deleted_at TEXT,"+
@@ -33,6 +33,7 @@ const validPath=(row,web)=>{
     !['r2','tus'].includes(row.transport))return false;
  const m=row.transport==='r2'?R2KEY.exec(row.object_key||''):
   TUSKEY.exec(row.object_key||'');
+ if(row.transport==='r2'&&(!row.etag||typeof row.etag!=='string'||row.etag.length<8))return false;
  const min=row.transport==='r2'?40*1048576:5;
  const max=row.transport==='r2'?200*1048576:40*1048576;
  return Boolean(m&&m[1]===web&&('DOC-'+m[2]).toLowerCase()===row.receipt_id.toLowerCase()&&
@@ -73,7 +74,7 @@ export async function planBorradoUniversalD1(env,orderId,version){
   'SELECT f.file_id,f.transport,f.sha256,f.bytes,f.received,'+
   'f.web_order_id,f.name,t.receipt_id AS tus_receipt,t.object_name AS tus_key,'+
   't.sha256 AS tus_sha,t.bytes AS tus_bytes,'+
-  'p.receipt_id AS r2_receipt,p.object_key AS r2_key,'+
+  'p.receipt_id AS r2_receipt,p.object_key AS r2_key,p.etag AS r2_etag,'+
   'p.sha256 AS r2_sha,p.bytes AS r2_bytes,p.status AS r2_status,'+
   'q.state AS r2_reservation '+
   'FROM central_r2_universal_files f '+
@@ -94,7 +95,7 @@ export async function planBorradoUniversalD1(env,orderId,version){
   const row={web_order_id:base.web_order_id,file_id:x.file_id,transport:x.transport,
    sha256:x.sha256,bytes:x.bytes,
    receipt_id:isR2?x.r2_receipt:x.tus_receipt,
-   object_key:isR2?x.r2_key:x.tus_key};
+   object_key:isR2?x.r2_key:x.tus_key,etag:isR2?x.r2_etag:null};
   if(!validPath(row,base.web_order_id)||
      (isR2?(x.r2_sha!==x.sha256||x.r2_bytes!==x.bytes):
       (x.tus_sha!==x.sha256||x.tus_bytes!==x.bytes)))
@@ -120,18 +121,18 @@ export async function encolarBorradoUniversalEntregado(env,orderId,version){
  await tables(db);
  const statements=plan.files.map(x=>db.prepare('INSERT OR IGNORE INTO '+
   'central_r2_universal_purge_files '+
-  '(order_id,web_order_id,file_id,transport,receipt_id,object_key,sha256,bytes,production_version) '+
-  'VALUES(?,?,?,?,?,?,?,?,?)').bind(orderId,plan.webOrderId,x.file_id,
-   x.transport,x.receipt_id,x.object_key,x.sha256,x.bytes,version));
+  '(order_id,web_order_id,file_id,transport,receipt_id,object_key,etag,sha256,bytes,production_version) '+
+  'VALUES(?,?,?,?,?,?,?,?,?,?)').bind(orderId,plan.webOrderId,x.file_id,
+   x.transport,x.receipt_id,x.object_key,x.etag,x.sha256,x.bytes,version));
  try{await db.batch(statements)}catch{return {state:'d1_error',filesDeleted:0}}
  const state=await db.prepare('SELECT web_order_id,file_id,transport,receipt_id,'+
-  'object_key,sha256,bytes,production_version,state FROM central_r2_universal_purge_files '+
+  'object_key,etag,sha256,bytes,production_version,state FROM central_r2_universal_purge_files '+
   'WHERE order_id=?').bind(orderId).all();
  const registered=state.results||[];
  if(registered.length!==plan.files.length||plan.files.some(x=>!registered.some(y=>
     y.web_order_id===plan.webOrderId&&y.file_id===x.file_id&&
     y.transport===x.transport&&y.receipt_id===x.receipt_id&&
-    y.object_key===x.object_key&&y.sha256===x.sha256&&
+    y.object_key===x.object_key&&y.etag===x.etag&&y.sha256===x.sha256&&
     y.bytes===x.bytes&&y.production_version===version)))
   return {state:'conflict',filesDeleted:0};
  return {state:registered.every(x=>x.state==='deleted')?'deleted':'pending',
@@ -185,7 +186,7 @@ export async function procesarBorradoUniversalEntregado(env,orderId,{
   const plan=await planBorradoUniversalD1(env,orderId,r.production_version);
   const row=plan?.files.find(x=>x.file_id===r.file_id);
   if(!row||row.transport!==r.transport||row.object_key!==r.object_key||
-     row.receipt_id!==r.receipt_id||row.sha256!==r.sha256||row.bytes!==r.bytes){
+     row.receipt_id!==r.receipt_id||row.etag!==r.etag||row.sha256!==r.sha256||row.bytes!==r.bytes){
    failed++;continue;
   }
   const claim=await db.prepare("UPDATE central_r2_universal_purge_files "+
@@ -202,7 +203,8 @@ export async function procesarBorradoUniversalEntregado(env,orderId,{
     if(!bucket?.head||!bucket?.delete)throw Error('UNIVERSAL_PURGE_R2_OFF');
     const obj=await bucket.head(r.object_key);
     if(obj){
-     if(obj.size!==r.bytes||typeof obj.etag!=='string')
+     if(obj.size!==r.bytes||typeof obj.etag!=='string'||
+       obj.etag.replaceAll('"','')!==r.etag.replaceAll('"',''))
       throw Error('UNIVERSAL_PURGE_R2_OBJECT_CHANGED');
      await bucket.delete(r.object_key);
     }else if(r.attempts===0)
