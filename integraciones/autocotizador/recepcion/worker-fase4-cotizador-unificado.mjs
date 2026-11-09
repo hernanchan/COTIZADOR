@@ -58,6 +58,7 @@ import {manejarR2GrandePrivado} from './r2-pdf-grandes-api-privada.mjs';
 import {comprobarPagoR2EnCentral} from './r2-confirmar-pago-central.mjs';
 import {prepararR2PagoSinArchivo} from './r2-prepago-documentos.mjs';
 import {cotizarPlanUniversalSinSubida} from './r2-plan-universal-api-privada.mjs';
+import {guardarBorradorUniversal} from './r2-borrador-universal-documentos.mjs';
 import {checkoutR2PrepaidSandboxDocumentos} from './r2-prepago-checkout-documentos.mjs';
 import {descargarR2GrandePersonal} from './r2-pdf-grandes-descarga-personal.mjs';
 import {descargarR2PendientePorD1Personal} from './r2-pdf-descarga-d1-personal.mjs';
@@ -2209,6 +2210,11 @@ export default {
       return cotizarPlanUniversalSinSubida(request,env,{
         authorized:staff||buyer
       });
+    }
+    if(page==='/prueba-v2/api/ensayo-r2-borrador-universal'){
+      const staff=v2PrivateBrowserAuthorized(request,env)==='allow'||
+        await v2SessionAuthorized(request,env);
+      return guardarBorradorUniversal(request,env,{authorized:staff});
     }
     if(page==='/prueba-v2/api/ensayo-r2-prepago'){
       const staff=v2PrivateBrowserAuthorized(request,env)==='allow'||

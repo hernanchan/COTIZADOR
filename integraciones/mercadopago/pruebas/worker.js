@@ -4685,7 +4685,11 @@ export default {
       trackingLink: id=>trackingUrl(env,id,req.url)
     });
    }
-   if(url.pathname==="/internal/central/r2-prepay-intent"){
+   if(url.pathname==="/internal/central/r2-universal-draft"){
+     const {registrarFichaUniversalD1}=await import("./r2-lote-universal-central.mjs");
+     return await registrarFichaUniversalD1(req,env,{readSigned:centralReadSigned});
+    }
+    if(url.pathname==="/internal/central/r2-prepay-intent"){
     const {registrarIntencionR2Prepaga}=await import("./r2-prepago-intencion-central.mjs");
     if(env.CENTRAL_R2_PREPAY_DRAFT_ENABLED==="PRIVATE_TEST_ONLY")
       await ensureOrderItems(env);
