@@ -5,6 +5,7 @@
  * para evaluar recepcion, nunca declara el trabajo listo ni pagado.
  */
 import {consultarR2PendienteCentral} from './r2-grandes-lookup-central.mjs';
+import {verificarObjetoR2Reservado} from './r2-pdf-integridad-stream.mjs';
 const ROUTE='/prueba-v2/api/ensayo-r2-descargar-d1-personal';
 const respond=(error,status)=>new Response(JSON.stringify({
  ok:false,error,paymentAuthorized:false,registeredInD1:false,
@@ -26,6 +27,27 @@ export async function verificarObjetoR2Pendiente({
   typeof entry.etag!=='string'||entry.etag.length<8)
   throw Error('R2_REFERENCIA_NO_VERIFICADA');
  // La referencia proviene EXCLUSIVAMENTE de lookup HMAC en D1.
+ // Usar la verificación R2 POR RANGOS que ya pasó la prueba real de 60MiB.
+ // Evita una única cadena pipeThrough sobre 60-200MiB dentro del Worker.
+ if(typeof bucket.head==='function'){
+  const orderId=entry.webOrderId;
+  if(!/^WEB-ENSAYO-[A-F0-9]{32}$/.test(orderId||'')||
+     !entry.objectKey.startsWith('r2-v1/'+orderId+'/')||
+     !/^[A-Za-z0-9_-]{1,80}$/.test(entry.fileId||''))
+   throw Error('R2_REFERENCIA_NO_VERIFICADA');
+  const verified=await verificarObjetoR2Reservado({bucket,reserva:{
+   found:true,objectKey:entry.objectKey,orderId,
+   fileId:entry.fileId,sha256:entry.sha256,bytes:entry.bytes
+  },...(digestFactory?{digestFactory}:{})});
+  if(verified.sha256Verificado!==true||
+     verified.bytes!==entry.bytes||verified.sha256!==entry.sha256||
+     verified.etag!==entry.etag)
+   throw Error('R2_REFERENCIA_SHA_ETAG_NO_COINCIDE');
+  return Object.freeze({objectKey:entry.objectKey,etag:verified.etag,
+   bytes:entry.bytes,sha256:verified.sha256,sha256Verificado:true,
+   contenidoPdfVerificado:false,paymentAuthorized:false});
+ }
+
  const object=await bucket.get(entry.objectKey);
  if(!object||object.size!==entry.bytes||object.etag!==entry.etag||
   !(object.body instanceof ReadableStream))
