@@ -47,7 +47,7 @@ jobs:
           base="https://saber-pagos-pruebas.libreriasaber.workers.dev"
           docs="https://saber-documentos-pruebas.libreriasaber.workers.dev"
           auth="Authorization: Bearer $TOKEN"
-          baseline='77a6b723-6f8d-40d1-91d8-710329b25b87'
+          baseline='5c5c5c10-d4b4-494e-91c8-ece121127898'
           tmp=$(mktemp -d)
           chmod 700 "$tmp"
           modified=0
@@ -84,7 +84,18 @@ jobs:
           echo 'CENTRAL_PRIVATE_SANDBOX_PREFLIGHT_OK_NO_REAL_PAYMENT'
           jq -n --arg sha "$GITHUB_SHA" --slurpfile s "$tmp/settings.json" '{
             main_module:"index.mjs",annotations:{"workers/message":"Cola R2 pagados pendiente preprensa SOLO privada sin cobro real","workers/commit_sha":$sha},
-            bindings:[$s[0].result.bindings[]|{name,type:"inherit"}]
+            bindings:(
+              [$s[0].result.bindings[]|
+                select((.name=="SABER_R2_GRANDES" or
+                 .name=="CENTRAL_R2_PURGE_QUEUE_ENABLED" or
+                 .name=="CENTRAL_R2_PURGE_EXECUTE_ENABLED" or
+                 .name=="CENTRAL_R2_PURGE_SCOPE")|not)|
+                {name,type:"inherit"}]+[
+                {name:"SABER_R2_GRANDES",type:"r2_bucket",bucket_name:"saber-documentos-grandes-ensayo-20261106"},
+                {name:"CENTRAL_R2_PURGE_QUEUE_ENABLED",type:"plain_text",text:"PRIVATE_TEST_ONLY"},
+                {name:"CENTRAL_R2_PURGE_EXECUTE_ENABLED",type:"plain_text",text:"PRIVATE_TEST_ONLY"},
+                {name:"CENTRAL_R2_PURGE_SCOPE",type:"plain_text",text:"NEW_ORDERS_ONLY"}
+              ])
           }' > "$tmp/metadata.json"
           status=$(curl -sS --max-time 120 -o "$tmp/upload.json" -w '%{http_code}' -H "$auth" \
             -F "metadata=@$tmp/metadata.json;type=application/json" \
@@ -94,10 +105,21 @@ jobs:
           candidate=$(jq -r '.result.id' "$tmp/upload.json")
           for version in "$baseline" "$candidate";do
             curl -fsS --max-time 25 -H "$auth" "$root/versions/$version" > "$tmp/$version.json"
-            jq -S '[.result.resources.bindings[]|if .type=="secret_text" then {name,type} else . end]|sort_by(.name)' "$tmp/$version.json" > "$tmp/$version-bindings"
+            jq -S '[.result.resources.bindings[]|
+              select((.name=="SABER_R2_GRANDES" or
+               .name=="CENTRAL_R2_PURGE_QUEUE_ENABLED" or
+               .name=="CENTRAL_R2_PURGE_EXECUTE_ENABLED" or
+               .name=="CENTRAL_R2_PURGE_SCOPE")|not)|
+              if .type=="secret_text" then {name,type} else . end]|sort_by(.name)' "$tmp/$version.json" > "$tmp/$version-bindings"
             jq -S '.result.resources.script_runtime|{compatibility_date,compatibility_flags,usage_model,limits,placement}' "$tmp/$version.json" > "$tmp/$version-runtime"
           done
           cmp "$tmp/$baseline-bindings" "$tmp/$candidate-bindings" >/dev/null || { echo 'CENTRAL_BINDINGS_DIFFERS_STOP';exit 1; }
+          jq -e '[.result.resources.bindings[]] as $b|
+            ($b|any(.name=="SABER_R2_GRANDES" and .type=="r2_bucket" and .bucket_name=="saber-documentos-grandes-ensayo-20261106")) and
+            ($b|any(.name=="CENTRAL_R2_PURGE_QUEUE_ENABLED" and .type=="plain_text" and .text=="PRIVATE_TEST_ONLY")) and
+            ($b|any(.name=="CENTRAL_R2_PURGE_EXECUTE_ENABLED" and .type=="plain_text" and .text=="PRIVATE_TEST_ONLY")) and
+            ($b|any(.name=="CENTRAL_R2_PURGE_SCOPE" and .type=="plain_text" and .text=="NEW_ORDERS_ONLY"))' "$tmp/$candidate.json" >/dev/null ||
+           { echo 'CENTRAL_R2_PURGE_BINDING_MISSING_NO_DEPLOY';exit 1; }
           cmp "$tmp/$baseline-runtime" "$tmp/$candidate-runtime" >/dev/null || { echo 'CENTRAL_RUNTIME_DIFFERS_STOP';exit 1; }
           curl -fsS --max-time 25 -H "$auth" "$root/deployments" > "$tmp/deploy-verify.json"
           test "$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/deploy-verify.json")" = "$baseline"
@@ -111,7 +133,15 @@ jobs:
           jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$tmp/health-final.json" >/dev/null
           test "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$base/admin/api/orders")" = 401
           test "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$base/admin/api/central/r2-paid-review")" = 401
+          test "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 -X POST -H 'Content-Type: application/json' --data '{}' "$base/admin/api/central/r2-prepress-approve")" = 401
+          curl -fsS --max-time 25 -H "$auth" "$root/settings" > "$tmp/settings-after.json"
+          jq -e '[.result.bindings[]] as $b|
+            ($b|any(.name=="SABER_R2_GRANDES" and .type=="r2_bucket" and .bucket_name=="saber-documentos-grandes-ensayo-20261106")) and
+            ($b|any(.name=="CENTRAL_R2_PURGE_QUEUE_ENABLED" and .text=="PRIVATE_TEST_ONLY")) and
+            ($b|any(.name=="CENTRAL_R2_PURGE_EXECUTE_ENABLED" and .text=="PRIVATE_TEST_ONLY")) and
+            ($b|any(.name=="CENTRAL_R2_PURGE_SCOPE" and .text=="NEW_ORDERS_ONLY"))' "$tmp/settings-after.json" >/dev/null
           echo "CENTRAL_R2_REVIEW_PRIVATE_ACTIVE=$candidate"
+          echo 'CENTRAL_PRIVATE_R2_DELETE_BINDING_CONFIRMED_ONLY_PAID_APPROVED_DELIVERED'
           payload='{"action":"status","webOrderId":"WEB-ENSAYO-255BFE122477AC6C7666EB6D342707FE","commercialOrderId":"66f10bd2-77ce-46ef-930c-49dc3d22d23e"}'
           http=$(curl -sS --max-time 70 -u "operador:$PASSWORD" -H "Origin: $docs" \
              -H 'Content-Type: application/json' -o "$tmp/checkout.json" -w '%{http_code}' -X POST \
