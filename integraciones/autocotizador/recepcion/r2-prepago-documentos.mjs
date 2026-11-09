@@ -76,11 +76,25 @@ export async function prepararR2PagoSinArchivo(request,env,{
   files:p.archivos,priceRevision:price.revision,quote
  }));
  const digest=hex(new Uint8Array(await subtle.digest('SHA-256',quoteBytes)));
- const data={schema:'saber-central-r2-prepaid-intent-v1',
+ // Ficha inmutable para cotejo de preprensa; no expone tarifa a navegador.
+ // Sólo contiene campos elegidos y calculados por el servidor con D1.
+ const ploteo=quote.detallePloteos[0];
+ const quoteSnapshot={
+  schema:'saber-r2-cotizacion-firmada-v1',
+  nombre:file.nombre,seleccion:file.seleccion,modoImpresion:file.modo,
+  copias:file.copias,papelPoster:file.papelPoster,
+  rolloBase:ploteo.material,importeArs:quote.total,
+  paginas:ploteo.paginas.map(v=>[v.anchoCm,v.altoCm,v.modo,v.material,v.papel])
+ };
+ const data={schema:'saber-central-r2-prepaid-intent-v2',
   webOrderId:p.webOrderId,fileId:p.fileId,sha256:p.sha256,
   bytes:p.bytes,amountArs:quote.total,declaredPages:file.paginas.length,
-  quoteSha256:digest,quoteRevision:price.prices.priceVersion};
+  quoteSha256:digest,quoteRevision:price.prices.priceVersion,quoteSnapshot};
  const body=JSON.stringify(data);
+ // El puente Central limita el body HMAC a 32.000 caracteres. Nunca
+ // registrar una orden sin ficha completa de sus páginas.
+ if(body.length>31000)
+  return response({ok:false,error:'R2_PREPAGO_DETALLE_NO_REGISTRABLE'},422);
  const key=await subtle.importKey('raw',new TextEncoder().encode(env.CENTRAL_BRIDGE_KEY),
   {name:'HMAC',hash:'SHA-256'},false,['sign']);
  const sig=hex(new Uint8Array(await subtle.sign('HMAC',key,

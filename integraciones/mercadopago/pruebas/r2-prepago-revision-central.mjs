@@ -29,18 +29,29 @@ export async function listarR2PagadosRevision(request,env,{authorized=false}={})
   'i.state AS intent_state,i.created_at AS quoted_at,'+
   'o.paid_at,o.status AS commercial_status,'+
   'p.receipt_id,p.name AS received_name,p.bytes AS received_bytes,'+
-  'p.sha256 AS received_sha256,p.pages_claimed,p.status AS received_status '+
+  'p.sha256 AS received_sha256,p.pages_claimed,p.status AS received_status,'+
+  't.detail_json AS quote_detail_json '+
   'FROM central_r2_prepaid_intents i '+
   'JOIN orders o ON o.id=i.commercial_order_id '+
   'JOIN payment_reviews v ON v.order_id=o.id '+
   'LEFT JOIN central_r2_large_pending p ON '+
   'p.web_order_id=i.web_order_id AND p.file_id=i.file_id '+
+  'LEFT JOIN order_items t ON t.order_id=i.commercial_order_id '+
+  "AND t.sku='R2_PREPAID_PLOT' AND t.line_number=1 "+
   'WHERE o.status=\'paid\' AND o.paid_at IS NOT NULL '+
   'AND o.deposit_ars=o.amount_ars AND v.state=\'verified\' '+
   'AND i.state NOT IN (\'cancelled\',\'delivered\') '+
   'ORDER BY o.paid_at DESC LIMIT 50';
  const data=await env.DB.prepare(sql).all();
  const orders=(data.results||[]).map(row=>{
+  let quoteSnapshot=null;
+  try{
+   const q=JSON.parse(row.quote_detail_json||'null')?.quoteSnapshot;
+   if(q?.schema==='saber-r2-cotizacion-firmada-v1'&&
+    q.importeArs===row.amount_ars&&Array.isArray(q.paginas)&&
+    q.paginas.length===row.declared_pages&&q.paginas.length<=2000)
+    quoteSnapshot=q;
+  }catch{}
   const matching=Boolean(row.receipt_id)&&
    row.received_status==='awaiting_pdf_analysis'&&
    row.received_sha256===row.expected_sha256&&
@@ -57,6 +68,8 @@ export async function listarR2PagadosRevision(request,env,{authorized=false}={})
    fileId:row.file_id,receiptId:hasReceipt?row.receipt_id:null,
    originalName:hasReceipt?row.received_name:null,
    estado,verifiedReceipt:matching,received:hasReceipt,
+   quoteSnapshot,quotedParametersAvailable:Boolean(quoteSnapshot),
+   requiresCommercialReview:true,
    measuredPages:null,measuredDimensions:null,priceFinalVerified:false,
    readyForPrinting:false,productionAuthorized:false
   };

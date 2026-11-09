@@ -18,7 +18,8 @@ function fixture(){
   web_order_id TEXT,file_id TEXT,receipt_id TEXT,name TEXT,
   bytes INTEGER,sha256 TEXT,pages_claimed INTEGER,status TEXT);
  CREATE TABLE orders(id TEXT,status TEXT,paid_at TEXT,deposit_ars INTEGER,amount_ars INTEGER);
- CREATE TABLE payment_reviews(order_id TEXT,state TEXT);`);
+ CREATE TABLE payment_reviews(order_id TEXT,state TEXT);
+ CREATE TABLE order_items(order_id TEXT,line_number INTEGER,sku TEXT,detail_json TEXT);`);
  sqlite.prepare('INSERT INTO orders VALUES(?,?,?,?,?)')
   .run(id,'paid','2026-11-09 13:13:00',4400,4400);
  sqlite.prepare('INSERT INTO payment_reviews VALUES(?,?)').run(id,'verified');
@@ -102,5 +103,32 @@ test('No crea tablas ausentes ni realiza consultas sin flags de pruebas',async()
   assert.equal((await r.json()).count,0);
   const found=f.sqlite.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='central_r2_large_pending'").all();
   assert.equal(found.length,0);
+ }finally{f.sqlite.close()}
+});
+
+test('Conserva parámetros completos de ploteo para comparar preprensa sin habilitar impresión',async()=>{
+ const f=fixture();
+ try{
+  f.receipt();
+  const q={schema:'saber-r2-cotizacion-firmada-v1',nombre:'A1.pdf',
+   seleccion:'original',modoImpresion:'bn',copias:2,papelPoster:'obra80',
+   rolloBase:'rollo60',importeArs:4400,paginas:[[59.4,84.1,'cad','rollo60','obra80']]};
+  f.sqlite.prepare('INSERT INTO order_items VALUES(?,?,?,?)').run(
+   id,1,'R2_PREPAID_PLOT',JSON.stringify({quoteSnapshot:q}));
+  const j=await (await f.call(true)).json();
+  assert.deepEqual(j.orders[0].quoteSnapshot,q);
+  assert.equal(j.orders[0].quotedParametersAvailable,true);
+  assert.equal(j.orders[0].requiresCommercialReview,true);
+  assert.equal(j.orders[0].productionAuthorized,false);
+  assert.ok(!JSON.stringify(j).includes(sha));
+ }finally{f.sqlite.close()}
+});
+test('Intención histórica sin detalle permanece bloqueada para revisión',async()=>{
+ const f=fixture();try{
+  f.receipt();
+  const j=await (await f.call(true)).json();
+  assert.equal(j.orders[0].quoteSnapshot,null);
+  assert.equal(j.orders[0].quotedParametersAvailable,false);
+  assert.equal(j.orders[0].productionAuthorized,false);
  }finally{f.sqlite.close()}
 });

@@ -3381,6 +3381,18 @@ document.querySelector("#refreshR2Paid")?.addEventListener("click",async()=>{
    item.append(node("p","Pedido comercial: "+r.commercialOrderId+
     " · "+(Number(r.expectedBytes)/1048576).toFixed(1)+" MiB previstos"+
     " · "+r.declaredPages+" página(s) declarada(s), aún sin validar"));
+   if(r.quotedParametersAvailable&&r.quoteSnapshot){
+    const q=r.quoteSnapshot;
+    item.append(node("p","Cotizado (declarado, NO comprobado): "+
+     q.copias+" copia(s) · "+q.modoImpresion+" · póster "+q.papelPoster+
+     " · rollo base "+q.rolloBase+" · "+q.paginas.length+" página(s)"));
+    const pag=q.paginas.slice(0,20).map((v,i)=>
+     "#"+(i+1)+" "+v[0]+"×"+v[1]+" cm "+v[2]+" / "+v[3]+" / "+v[4]);
+    item.append(node("p","Detalle por página: "+pag.join("; ")+
+      (q.paginas.length>20?" · consultar resto en ficha":"")));
+   }else{
+    item.append(node("p","ATENCIÓN: presupuesto anterior sin detalle completo de papel/rollo/copias; revisar manualmente antes de producir."));
+   }
    if(r.receiptId){
     item.append(node("p","Referencia del original en R2: "+r.receiptId));
     if(/^WEB-ENSAYO-[A-F0-9]{32}$/.test(r.webOrderId||"")&&

@@ -28,10 +28,32 @@ const TABLE=[
  'PRIMARY KEY(web_order_id,file_id))'
 ].join(' ');
 export function validarIntencionR2Prepaga(x){
+ const oldKeys='amountArs,bytes,declaredPages,fileId,quoteRevision,quoteSha256,schema,sha256,webOrderId';
+ const newKeys='amountArs,bytes,declaredPages,fileId,quoteRevision,quoteSha256,quoteSnapshot,schema,sha256,webOrderId';
+ const keys=x&&typeof x==='object'&&!Array.isArray(x)?Object.keys(x).sort().join(','):'';
+ const v1=x?.schema==='saber-central-r2-prepaid-intent-v1'&&keys===oldKeys;
+ const v2=x?.schema==='saber-central-r2-prepaid-intent-v2'&&keys===newKeys;
+ const q=x?.quoteSnapshot;
+ const validQuote=v1||(
+  q&&typeof q==='object'&&!Array.isArray(q)&&
+  Object.keys(q).sort().join(',')===
+   'copias,importeArs,modoImpresion,nombre,paginas,papelPoster,rolloBase,schema,seleccion'&&
+  q.schema==='saber-r2-cotizacion-firmada-v1'&&
+  typeof q.nombre==='string'&&q.nombre.length>0&&q.nombre.length<=160&&
+  q.seleccion==='original'&&['bn','color'].includes(q.modoImpresion)&&
+  Number.isSafeInteger(q.copias)&&q.copias>=1&&q.copias<=500&&
+  ['obra80','recubierto'].includes(q.papelPoster)&&
+  /^rollo\\d+$/.test(q.rolloBase||'')&&q.importeArs===x.amountArs&&
+  Array.isArray(q.paginas)&&q.paginas.length===x.declaredPages&&
+  q.paginas.every(p=>Array.isArray(p)&&p.length===5&&
+   Number.isFinite(p[0])&&p[0]>0&&p[0]<=2000&&
+   Number.isFinite(p[1])&&p[1]>0&&p[1]<=2000&&
+   ['cad','poster'].includes(p[2])&&/^(rollo|rec)\\d+$/.test(p[3]||'')&&
+   ['obra80','recubierto'].includes(p[4])&&
+   (p[2]==='cad'?p[4]==='obra80':true))
+ );
  if(!x||typeof x!=='object'||Array.isArray(x)||
-  Object.keys(x).sort().join(',')!==
-   'amountArs,bytes,declaredPages,fileId,quoteRevision,quoteSha256,schema,sha256,webOrderId'||
-  x.schema!=='saber-central-r2-prepaid-intent-v1'||
+  !(v1||v2)||!validQuote||
   !WEB.test(x.webOrderId||'')||!FILE.test(x.fileId||'')||
   !SHA.test(x.sha256||'')||!SHA.test(x.quoteSha256||'')||
   !Number.isSafeInteger(x.bytes)||x.bytes<=40*MIB||x.bytes>200*MIB||
@@ -41,6 +63,9 @@ export function validarIntencionR2Prepaga(x){
   typeof x.quoteRevision!=='string'||!/^d1-approved-revision-[1-9]\d{0,7}$/.test(x.quoteRevision))
   throw Error('R2_PREPAGO_INTENCION_INVALIDA');
  return x;
+}
+function v2Quote(p){
+ return p.schema==='saber-central-r2-prepaid-intent-v2'?p.quoteSnapshot:null;
 }
 export async function registrarIntencionR2Prepaga(req,env,{
  readSigned,uuid=()=>crypto.randomUUID()
@@ -99,7 +124,9 @@ export async function registrarIntencionR2Prepaga(req,env,{
       sha256:p.sha256,bytes:p.bytes,declaredPages:p.declaredPages,
       quoteSha256:p.quoteSha256,quoteRevision:p.quoteRevision,
       requiresUploadAfterPayment:true,
-      requiresReviewOnQuoteMismatch:true}))
+      requiresReviewOnQuoteMismatch:true,
+      // v1 histórico no tiene ficha y permanece siempre en revisión.
+      quoteSnapshot:v2Quote(p)}))
   ]);
  }catch{
   // Una pestaña pudo registrar la misma intención concurrentemente.

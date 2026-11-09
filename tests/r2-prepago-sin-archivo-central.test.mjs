@@ -121,7 +121,12 @@ test('Documentos: cotiza A1 de 150 MiB sin PDF/R2 y no acepta un total del compr
   requests.push(signed);
   assert.equal(new URL(signed.url).pathname,'/internal/central/r2-prepay-intent');
   const raw=await signed.text(),payload=JSON.parse(raw);
-  assert.equal(payload.schema,'saber-central-r2-prepaid-intent-v1');
+  assert.equal(payload.schema,'saber-central-r2-prepaid-intent-v2');
+  assert.equal(payload.quoteSnapshot.schema,'saber-r2-cotizacion-firmada-v1');
+  assert.equal(payload.quoteSnapshot.importeArs,payload.amountArs);
+  assert.equal(payload.quoteSnapshot.copias,1);
+  assert.equal(payload.quoteSnapshot.rolloBase.startsWith('rollo'),true);
+  assert.deepEqual(payload.quoteSnapshot.paginas[0].slice(0,3),[59.4,84.1,'cad']);
   assert.equal(payload.webOrderId,ORDER);
   assert.equal(payload.bytes,META.bytes);
   assert.ok(payload.amountArs>0);
@@ -172,4 +177,19 @@ test('Documentos: sesión ausente nunca consulta D1 ni crea pedido',async()=>{
  },{authorized:false,service});
  assert.equal(r.status,401);
  assert.equal(calls,0);
+});
+
+test('Validador R2 v2 rechaza alterar páginas, importe o parámetros antes del registro',()=>{
+ const snapshot={schema:'saber-r2-cotizacion-firmada-v1',nombre:'A1.pdf',
+  seleccion:'original',modoImpresion:'bn',copias:1,papelPoster:'obra80',
+  rolloBase:'rollo60',importeArs:12000,paginas:[[59.4,84.1,'cad','rollo60','obra80']]};
+ const valid={...p,schema:'saber-central-r2-prepaid-intent-v2',quoteSnapshot:snapshot};
+ assert.equal(validarIntencionR2Prepaga(valid),valid);
+ for(const bad of [
+  {...valid,quoteSnapshot:{...snapshot,importeArs:1}},
+  {...valid,quoteSnapshot:{...snapshot,paginas:[]}},
+  {...valid,quoteSnapshot:{...snapshot,paginas:[[59.4,84.1,'poster','rollo60','obra80'],[1,1,'cad','rollo60','obra80']]}},
+  {...valid,quoteSnapshot:{...snapshot,paginas:[[59.4,84.1,'cad','rec60','recubierto']]}},
+  {...valid,quoteSnapshot:{...snapshot,rolloBase:'../../otro'}}
+ ])assert.throws(()=>validarIntencionR2Prepaga(bad),/R2_PREPAGO_INTENCION_INVALIDA/);
 });
