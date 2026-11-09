@@ -26,7 +26,8 @@ test('R2 ya presente en SELECT de pagos NO se descarta: entra a Nuevos sin prepr
  const pending={commercialOrderId:id,webOrderId:web,amountArs:4400,
   estado:'RECIBIDO_PENDIENTE_PREPRENSA',received:true,verifiedReceipt:true,
   receiptId:'DOC-572d0a2e-6558-473b-98ca-121705bc8ba8',
-  paidAt:'2026-11-09 13:14:00'};
+  paidAt:'2026-11-09 13:14:00',quotedParametersAvailable:true,
+  quoteSnapshot:{schema:'saber-r2-cotizacion-firmada-v1'}};
  merge(board,[pending]);
  assert.equal(board.length,2,'sin duplicar ni perder una orden');
  assert.equal(board[0].production_state,'pendiente');
@@ -54,12 +55,54 @@ test('R2 sin recibo sigue en Nuevos esperando archivo, nunca ofrece producción'
  merge(board,[{commercialOrderId:'89608817-95b1-41bc-ac88-579da519d32c',
   webOrderId:'WEB-ENSAYO-72E9F66A8BC34CC9B25D70EF49C1A8D3',
   amountArs:4400,estado:'PAGADO_ESPERANDO_ARCHIVO',
-  received:false,verifiedReceipt:false}]);
+  received:false,verifiedReceipt:false,quotedParametersAvailable:true,
+  quoteSnapshot:{schema:'saber-r2-cotizacion-firmada-v1'}}]);
  assert.equal(board.length,1);
  assert.equal(board[0].production_state,'pendiente');
  assert.equal(board[0].file_count,0);
  assert.equal(board[0].r2_prepress_pending,true);
  assert.equal(board[0].r2_prepress_receipt_verified,false);
+});
+test('Dos R2 sandbox de $4400 son dos órdenes distintas: sólo V2 operativo va a Nuevos',()=>{
+ const merge=vm.runInContext('centralMergePendingR2Orders',ctx);
+ const currentId='89608817-95b1-41bc-ac88-579da519d32c';
+ const legacyId='66f10bd2-77ce-46ef-930c-49dc3d22d23e';
+ const board=[
+  {id:legacyId,amount_ars:4400,production_state:null,description:'Ploteo viejo',work_number:null},
+  {id:currentId,amount_ars:4400,production_state:null,description:'Ploteo nuevo',work_number:null}
+ ];
+ merge(board,[
+  {commercialOrderId:legacyId,webOrderId:'WEB-ENSAYO-255BFE122477AC6C7666EB6D342707FE',
+   amountArs:4400,received:true,verifiedReceipt:true,
+   estado:'RECIBIDO_PENDIENTE_PREPRENSA',quotedParametersAvailable:false,quoteSnapshot:null},
+  {commercialOrderId:currentId,webOrderId:'WEB-ENSAYO-72E9F66A8BC34CC9B25D70EF49C1A8D3',
+   amountArs:4400,received:true,verifiedReceipt:true,
+   estado:'RECIBIDO_PENDIENTE_PREPRENSA',quotedParametersAvailable:true,
+   quoteSnapshot:{schema:'saber-r2-cotizacion-firmada-v1'}}
+ ]);
+ assert.equal(board.length,2);
+ assert.equal(board.filter(x=>x.production_state==='pendiente').length,1);
+ assert.equal(board.filter(x=>x.production_state===null).length,1);
+ const old=board.find(x=>x.id===legacyId);
+ const fresh=board.find(x=>x.id===currentId);
+ assert.equal(old.r2_legacy_unusable,true);
+ assert.equal(old.r2_prepress_pending,false);
+ assert.match(old.description,/histórico/);
+ assert.equal(fresh.r2_prepress_pending,true);
+ assert.equal(fresh.r2_legacy_unusable,undefined);
+ merge(board,[]);
+ assert.equal(board.length,2);
+});
+test('Un R2 ya aprobado no vuelve a revisión aunque venga una cotización legada',()=>{
+ const merge=vm.runInContext('centralMergePendingR2Orders',ctx);
+ const board=[{id:'66f10bd2-77ce-46ef-930c-49dc3d22d23e',
+  amount_ars:4400,production_state:'en_preparacion',work_number:21}];
+ merge(board,[{commercialOrderId:board[0].id,
+  webOrderId:'WEB-ENSAYO-255BFE122477AC6C7666EB6D342707FE',
+  amountArs:4400,quotedParametersAvailable:false,quoteSnapshot:null}]);
+ assert.equal(board[0].production_state,'en_preparacion');
+ assert.equal(board[0].work_number,21);
+ assert.equal(board[0].r2_legacy_unusable,undefined);
 });
 test('El operador encuentra preprensa R2 desde el acceso superior con un clic',()=>{
  assert.match(html,/id="goR2Paid"[^>]*>Ver ploteos R2 para aprobar/);
