@@ -25,6 +25,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Reproducir Cloudflare Pages cuando omite instalación de dependencias:
+          # este intento puede fallar; no afecta el resultado final del trabajo.
+          set +e
+          npx --yes wrangler@4.50.0 pages functions build functions --outdir /tmp/saber-sin-install > /tmp/saber-pages-sin-install.log 2>&1
+          no_install_code=$?
+          set -e
+          if [ "$no_install_code" != 0 ]; then
+            echo "PAGES_FUNCTIONS_NO_INSTALL_FAILED_AS_EXPECTED"
+            grep -Ei 'could not resolve|failed|error|pdf-lib' /tmp/saber-pages-sin-install.log | tail -n 15 || true
+          else
+            echo "PAGES_FUNCTIONS_NO_INSTALL_PASSED_DEPENDENCIES_ALREADY_PRESENT"
+          fi
           npm install --ignore-scripts --no-audit --no-fund --package-lock=false
           npx --yes wrangler@4.50.0 pages functions build functions \
             --outdir /tmp/saber-pages-build \
