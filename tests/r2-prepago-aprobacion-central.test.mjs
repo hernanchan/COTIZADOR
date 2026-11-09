@@ -10,7 +10,7 @@ const quote={schema:'saber-r2-cotizacion-firmada-v1',seleccion:'original',
  modoImpresion:'bn',copias:1,importeArs:4400,
  paginas:[[59.4,84.1,'cad','rollo60','obra80']]};
 const approved={schema:'saber-r2-preprensa-aprobacion-v1',orderId:id,
- receiptId:receipt,sha256:sha,medidasCm:[[59.4,84.1]],
+ receiptId:receipt,medidasCm:[[59.4,84.1]],
  operator:'Operador',notes:'Revisado en Acrobat; contenido coincide.',
  confirmed:{contenido:true,clasificacion:true,papel:true,rollo:true,copias:true,precio:true}};
 function fixture({paid=true,quoteSnapshot=quote,actual=62915011}={}){
@@ -59,7 +59,7 @@ test('preprensa R2 se registra una vez con hash, medida, operador y número de o
 });
 test('sin pago, sin ficha v2 o con cambio de medidas/hash no aprueba ni numera',async()=>{
  for(const opt of [{paid:false},{quoteSnapshot:null},{actual:62915012},
-  {body:{...approved,sha256:'c'.repeat(64)}},
+  {body:{...approved,receiptId:'DOC-00000000-0000-4000-8000-000000000000'}},
   {body:{...approved,medidasCm:[[60,84.1]]}},
   {body:{...approved,confirmed:{...approved.confirmed,precio:false}}}
  ]){

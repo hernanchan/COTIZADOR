@@ -11,9 +11,9 @@ export const APPROVAL_TABLE="CREATE TABLE IF NOT EXISTS central_r2_prepress_appr
  "notes TEXT NOT NULL,approved_at TEXT NOT NULL DEFAULT(datetime('now')))";
 export function validarAprobacionR2(p){
  if(!p||typeof p!=='object'||Array.isArray(p)||
-  Object.keys(p).sort().join(',')!=='confirmed,medidasCm,notes,operator,orderId,receiptId,schema,sha256'||
+  Object.keys(p).sort().join(',')!=='confirmed,medidasCm,notes,operator,orderId,receiptId,schema'||
   p.schema!=='saber-r2-preprensa-aprobacion-v1'||!UUID.test(p.orderId||'')||
-  !DOC.test(p.receiptId||'')||!SHA.test(p.sha256||'')||
+  !DOC.test(p.receiptId||'')||
   typeof p.operator!=='string'||p.operator.trim().length<2||p.operator.length>60||
   typeof p.notes!=='string'||p.notes.trim().length<6||p.notes.length>280||
   !p.confirmed||typeof p.confirmed!=='object'||Array.isArray(p.confirmed)||
@@ -63,14 +63,14 @@ export async function aprobarPreprensaR2(req,env,{authorized=false}={}){
   'WHERE o.id=? LIMIT 1').bind(p.orderId).first();
  if(!row||row.commercial_order_id!==p.orderId||
    !['awaiting_upload_after_payment','under_review','uploaded_verified'].includes(row.intent_state)||
-   row.receipt_id!==p.receiptId||row.expected_sha!==p.sha256||
-   row.received_sha!==p.sha256||row.received_bytes!==row.expected_bytes||
+   row.receipt_id!==p.receiptId||!SHA.test(row.expected_sha||'')||
+   row.expected_sha!==row.received_sha||row.received_bytes!==row.expected_bytes||
    row.pages_claimed!==row.declared_pages||row.receipt_status!=='awaiting_pdf_analysis'||
    row.payment_status!=='paid'||!row.paid_at||row.review_state!=='verified'||
    row.paid_amount!==row.amount_ars||row.deposit_ars!==row.amount_ars)
   return respond({ok:false,error:'Pago o integridad no verificados'},409);
  let detail;try{detail=JSON.parse(row.detail_json)}catch{}
- if(!detail||detail.sha256!==p.sha256||
+ if(!detail||detail.sha256!==row.expected_sha||
    detail.bytes!==row.expected_bytes||detail.quoteSha256!==row.quote_sha256||
    !cotizacionCoincideR2(detail.quoteSnapshot,p,row.amount_ars,row.declared_pages))
   return respond({ok:false,error:'Diferencia con cotización: revisión comercial obligatoria'},409);
@@ -78,7 +78,7 @@ export async function aprobarPreprensaR2(req,env,{authorized=false}={}){
  const get=()=>db.prepare('SELECT receipt_id,sha256,bytes,quote_sha256,amount_ars,measured_json FROM central_r2_prepress_approvals WHERE order_id=?')
   .bind(p.orderId).first();
  const measured=JSON.stringify(p.medidasCm);
- const equal=x=>x&&x.receipt_id===p.receiptId&&x.sha256===p.sha256&&
+ const equal=x=>x&&x.receipt_id===p.receiptId&&x.sha256===row.expected_sha&&
   x.bytes===row.expected_bytes&&x.quote_sha256===row.quote_sha256&&
   x.amount_ars===row.amount_ars&&x.measured_json===measured;
  const old=await get();
@@ -88,7 +88,7 @@ export async function aprobarPreprensaR2(req,env,{authorized=false}={}){
   const result=await db.batch([
    db.prepare('INSERT INTO central_r2_prepress_approvals '+
     '(order_id,receipt_id,sha256,bytes,quote_sha256,amount_ars,measured_json,operator,notes) '+
-    'VALUES(?,?,?,?,?,?,?,?,?)').bind(p.orderId,p.receiptId,p.sha256,
+    'VALUES(?,?,?,?,?,?,?,?,?)').bind(p.orderId,p.receiptId,row.expected_sha,
       row.expected_bytes,row.quote_sha256,row.amount_ars,measured,p.operator.trim(),p.notes.trim()),
    db.prepare('INSERT OR IGNORE INTO central_work_order_numbers(commercial_order_id) VALUES(?)').bind(p.orderId)
   ]);
