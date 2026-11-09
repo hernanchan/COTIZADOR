@@ -3273,14 +3273,112 @@ function inlineDeliveryEditor(order){
  return {toggle,panel};
 }
 
+/** Revisión R2 en una sola tarjeta: sin exigir navegar a otra cola. */
+function inlineR2Review(order){
+ const toggle=node("button","Revisar preprensa");toggle.type="button";
+ toggle.className="primary-next";
+ const panel=node("section","");panel.className="delivery-editor";panel.hidden=true;
+ toggle.addEventListener("click",async()=>{
+  panel.hidden=!panel.hidden;
+  if(panel.hidden)return;
+  panel.replaceChildren(node("p","Consultando presupuesto y archivo verificado…"));
+  try{
+   const review=await api("/admin/api/central/r2-paid-review");
+   const r=(review.orders||[]).find(v=>v.commercialOrderId===order.id);
+   if(!r)throw Error("Este pedido cambió de estado. Actualizá Nuevos.");
+   const q=r.quoteSnapshot;
+   if(!r.verifiedReceipt||!r.quotedParametersAvailable||!q){
+    panel.replaceChildren(node("p","No se puede aprobar todavía: falta el PDF íntegro o la ficha cotizada. Revisá la recepción desde la cola R2."));
+    return;
+   }
+   const pageInfo=q.paginas.map((v,i)=>
+    "#"+(i+1)+" · "+v[0]+"×"+v[1]+" cm · "+v[2]+
+    " · "+v[3]+" · "+v[4]).join("; ");
+   panel.replaceChildren(
+    node("h4","Preprensa R2 · "+(q.nombre||"Archivo")),
+    node("p","Pagado "+money(r.amountArs)+" · "+q.copias+" copia(s) · "+
+     (q.modoImpresion==="bn"?"B/N":"Color")+
+     " · "+q.papelPoster+" · rollo "+q.rolloBase),
+    node("p","Cotizado: "+pageInfo));
+   const url=new URL("https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/r2-preprensa-personal");
+   url.searchParams.set("webOrderId",r.webOrderId);
+   url.searchParams.set("receiptId",r.receiptId);
+   const original=node("a","Abrir PDF original para verificar");
+   original.href=url.href;original.target="_blank";original.rel="noopener noreferrer";
+   panel.append(original);
+   const label=node("label","Medidas REALES del PDF, ancho × alto en cm (separar páginas con ;)");
+   const dimensions=node("input","");
+   dimensions.type="text";dimensions.maxLength=2000;
+   dimensions.placeholder="Ej.: 59,4 x 84,1";
+   label.append(dimensions);panel.append(label);
+   const confirmLabel=node("label","");
+   const confirmed=node("input","");confirmed.type="checkbox";
+   confirmLabel.append(confirmed);
+   confirmLabel.append(node("span"," Verifiqué el contenido real, medidas, CAD/póster, copias, rollo, papel y precio contra el presupuesto. No imprimir si hay diferencias."));
+   panel.append(confirmLabel);
+   const save=node("button","Aprobar preprensa");save.type="button";
+   const feedback=node("p","");feedback.className="delivery-feedback";
+   feedback.setAttribute("role","status");feedback.setAttribute("aria-live","polite");
+   panel.append(save,feedback);
+   save.addEventListener("click",async()=>{
+    if(!confirmed.checked){
+     feedback.textContent="Primero revisá el original y confirmá todos los controles.";return;
+    }
+    const parts=dimensions.value.trim().split(";").map(x=>x.trim());
+    const sizes=parts.map(x=>{
+     const m=x.match(/^(\d+(?:[,.]\d+)?)\s*[x×]\s*(\d+(?:[,.]\d+)?)$/i);
+     return m?[Number(m[1].replace(",",".")),Number(m[2].replace(",","."))]:null;
+    });
+    if(parts.length!==q.paginas.length||sizes.some(x=>!x||x.some(v=>!Number.isFinite(v)||v<=0||v>2000))){
+     feedback.textContent="Ingresá las medidas reales de todas las páginas. No se aprobó el pedido.";return;
+    }
+    const operator=requestOperator();
+    if(!operator){feedback.textContent="Falta responsable del control.";return}
+    save.disabled=true;feedback.textContent="Registrando verificación en D1…";
+    try{
+     const result=await apiPost("/admin/api/central/r2-prepress-approve",{
+      schema:"saber-r2-preprensa-aprobacion-v1",
+      orderId:order.id,receiptId:r.receiptId,medidasCm:sizes,operator,
+      notes:"Preprensa confirmada en Nuevos: original, medidas, clasificación, copias, papel, rollo y precio verificados por el responsable.",
+      confirmed:{contenido:true,clasificacion:true,copias:true,papel:true,rollo:true,precio:true}
+     });
+     if(result.approved!==true)throw Error("La Central no confirmó la aprobación");
+     await refresh({silent:true,force:true});
+     status.textContent="Preprensa aprobada · el ploteo continúa en Nuevos, listo para iniciar.";
+    }catch(e){feedback.textContent="Sin aprobación: "+String(e.message||e);save.disabled=false}
+   });
+  }catch(e){panel.replaceChildren(node("p","No se pudo abrir la preprensa: "+String(e.message||e)))}
+ });
+ return {toggle,panel};
+}
+
 function boardCard(order){
  const card=node("article","");card.className="board-card";
  const num=order.work_number?String(order.work_number).padStart(3,"0"):"Sin número";
- const heading=node("h4","Orden "+num);card.append(heading);
+ const heading=node("h4",order.r2_prepress_pending?
+  "Nuevo ploteo R2 · "+String(order.web_order_id||"").slice(-8):
+  "Orden "+num);card.append(heading);
  card.append(node("p",String(order.description||"Pedido documental").slice(0,130)));
  const totals=node("p",money(order.amount_ars)+" · "+(order.file_count||0)+" PDF · Pago verificado");
  totals.className="money";card.append(totals);
  if(order.customer_phone)card.append(node("p","Teléfono: "+order.customer_phone));
+ if(order.r2_prepress_pending){
+  const received=order.r2_prepress_state==="RECIBIDO_PENDIENTE_PREPRENSA";
+  const label=received?"Original recibido · falta aprobar preprensa":
+   order.r2_prepress_state==="PAGADO_ESPERANDO_ARCHIVO"?
+    "Pago confirmado · esperando PDF del cliente":
+    "Recepción a revisar · NO imprimir";
+  card.append(node("p",label));
+  const controls=node("div","");controls.className="actions";
+  if(received&&order.r2_prepress_receipt_verified){
+   const review=inlineR2Review(order);
+   controls.append(review.toggle);card.append(controls,review.panel);
+  }else{
+   card.append(node("p","El pedido permanece en Nuevos hasta recibir y verificar el original."));
+  }
+  card.append(node("p","Revisión obligatoria antes de habilitar producción y ZIP final."));
+  return card;
+ }
   if(order.estimated_ready_at&&["pendiente","en_preparacion","en_espera"].includes(order.production_state))
    card.append(node("p","Preparación estimada: "+preparationTimeLocal(order.estimated_ready_at)+" · provisional"));
  const controls=node("div","");controls.className="actions";
@@ -4628,7 +4726,36 @@ export default {
      "SELECT 1 FROM payment_reviews WHERE order_id=o.id AND state='verified') "+
      "ORDER BY CASE COALESCE(s.state,'pendiente') WHEN 'en_espera' THEN 0 WHEN 'pendiente' THEN 1 "+
      "WHEN 'en_preparacion' THEN 2 WHEN 'listo' THEN 3 ELSE 4 END,o.paid_at DESC LIMIT 100").all();
-    return json({orders:rows.results});
+    // Mostrar TODOS los R2 pagos pendientes en Nuevos, aunque falte la
+    // preprensa. Solo la ficha aprobada habilita acciones de producción.
+    const board=Array.isArray(rows.results)?rows.results:[];
+    if(env.CENTRAL_R2_PREPAY_DRAFT_ENABLED==="PRIVATE_TEST_ONLY"&&
+       env.CENTRAL_R2_STAGING_ENABLED==="PRIVATE_TEST_ONLY"){
+     try{
+      const {listarR2PagadosRevision}=await import("./r2-prepago-revision-central.mjs");
+      const reviewResponse=await listarR2PagadosRevision(req,env,{authorized:true});
+      if(!reviewResponse.ok)throw Error("No se confirmó cola R2");
+      const review=await reviewResponse.json();
+      for(const r of review.orders||[]){
+       if(board.some(o=>o.id===r.commercialOrderId))continue;
+       board.unshift({
+        id:r.commercialOrderId,description:"Ploteo R2 · "+r.webOrderId.slice(-8),
+        amount_ars:r.amountArs,status:"paid",paid_at:r.paidAt,
+        production_state:"pendiente",production_version:0,
+        work_number:null,file_count:r.received?1:0,
+        web_order_id:r.webOrderId,r2_receipt_id:r.receiptId,
+        r2_prepress_pending:true,r2_prepress_state:r.estado,
+        r2_prepress_receipt_verified:r.verifiedReceipt,
+        estimated_ready_at:null,estimated_ready_version:0
+       });
+      }
+     }catch(_){
+      // Falla visible, no permitir que un pedido pagado quede oculto
+      // como "Otros" por una excepción de la cola de revisión.
+      return json({error:"No se pudo cargar la cola de ploteos R2; reintentá."},503);
+     }
+    }
+    return json({orders:board});
    }
    // Un pedido histórico se numera SOLO al solicitar su ficha desde un
    // POST administrativo. No mutar D1 en GET ni renumerar pedidos ya asignados.
