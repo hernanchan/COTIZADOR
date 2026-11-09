@@ -42,7 +42,8 @@ function fixtures(){
  };
  const env={DOCS_R2_BIG_ENABLED:'PRIVATE_TEST_ONLY',
   DOCS_R2_POSTPAY_REQUIRED:'PRIVATE_TEST_ONLY',
-  DOCS_R2_QUOTA_ENABLED:'PRIVATE_TEST_ONLY',DOCS_R2_RECEIPT_KEY:sec,
+  DOCS_R2_QUOTA_ENABLED:'PRIVATE_TEST_ONLY',
+  DOCS_R2_STAGING_ENABLED:'PRIVATE_TEST_ONLY',DOCS_R2_RECEIPT_KEY:sec,
   SABER_R2_GRANDES:bucket};
  return {calls,env};
 }
@@ -145,4 +146,20 @@ test('cupo de R2 agotado devuelve HTTP 429 y no crea multipart',async()=>{
  assert.equal(r.status,429);
  assert.equal(calls.start,0);
  assert.equal((await r.json()).paymentAuthorized,false);
+});
+
+test('sin registro Central activo no crea multipart aunque el comprador haya pagado',async()=>{
+ const {calls,env}=fixtures();
+ let checkedPayment=false,checkedQuota=false;
+ const result=await manejarR2GrandePrivado(jsonRequest('iniciar',{orderId,meta}),
+  {...env,DOCS_R2_STAGING_ENABLED:'OFF'},{
+   autorizadoIniciar:async()=>true,
+   comprobarPagoCentral:async()=>{checkedPayment=true;return paid()},
+   reserve:async()=>{checkedQuota=true;return {reserved:true}},
+   ...options
+  });
+ assert.equal(result.status,503);
+ assert.equal((await result.json()).paymentAuthorized,false);
+ assert.equal(calls.start,0);
+ assert.equal(checkedQuota,false);
 });
