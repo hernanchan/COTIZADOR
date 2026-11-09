@@ -5,6 +5,8 @@ on:
     paths:
       - integraciones/autocotizador/recepcion/plan-recepcion-universal-r2.mjs
       - tests/r2-plan-universal-sin-subida.test.mjs
+      - tests/r2-plan-universal-api-privada.test.mjs
+      - integraciones/autocotizador/recepcion/r2-plan-universal-api-privada.mjs
       - .github/workflows/saber-r2-plan-universal-no-deploy.yml
   workflow_dispatch:
 permissions:
@@ -23,5 +25,5 @@ jobs:
       - name: Clasificación de PDF y presupuesto universal sin subir originales
         run: |
           set -euo pipefail
-          node --test tests/r2-plan-universal-sin-subida.test.mjs
+          node --test tests/r2-plan-universal-sin-subida.test.mjs tests/r2-plan-universal-api-privada.test.mjs
           echo 'NO_R2_UPLOAD_NO_MP_NO_ORDER_NO_D1_NO_DEPLOY_NO_MAIN'
