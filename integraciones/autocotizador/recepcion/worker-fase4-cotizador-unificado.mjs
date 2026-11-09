@@ -2124,7 +2124,7 @@ export default {
     if(page==='/prueba-v2/ingresar')return v2MobileInviteExchange(request,env);
     if(page==='/prueba-v2/admin-tarifario-ensayo')
       return probeTarifarioD1SoloOperador(request,env);
-    if(page==='/prueba-v2/'||page==='/prueba-v2/r2-preprensa-personal'||page==='/prueba-v2/orden-paquete'||page==='/prueba-v2/personal-descargar'||page==='/prueba-v2/cotizador'||
+    if(page==='/prueba-v2/'||page==='/prueba-v2/orden-paquete'||page==='/prueba-v2/r2-preprensa-personal'||page==='/prueba-v2/personal-descargar'||page==='/prueba-v2/cotizador'||
        page==='/prueba-v2/carga-inteligente'||
        page==='/prueba-v2/carga-inteligente.js'||
        page==='/prueba-v2/precios-web.json'||
