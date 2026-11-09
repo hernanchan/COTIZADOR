@@ -56,6 +56,7 @@ import {verificarPdfAlmacenado} from './verificacion-pdf-drive-servidor.mjs';
 import {tusPrivadoConfigurado,diagnosticarTUSPrivado,comprobarTUSAntesDeEnviar,iniciarTandaTUSPrivada,finalizarPedidoTUSPrivado,recuperarPedidoTUSPrivado,descargarPdfTUSPersonal} from './tus-pedido-worker.mjs';
 import {manejarR2GrandePrivado} from './r2-pdf-grandes-api-privada.mjs';
 import {comprobarPagoR2EnCentral} from './r2-confirmar-pago-central.mjs';
+import {comprobarPagoUniversalR2EnCentral} from './r2-universal-confirmar-pago-central.mjs';
 import {prepararR2PagoSinArchivo} from './r2-prepago-documentos.mjs';
 import {cotizarPlanUniversalSinSubida} from './r2-plan-universal-api-privada.mjs';
 import {guardarBorradorUniversal} from './r2-borrador-universal-documentos.mjs';
@@ -2292,8 +2293,15 @@ export default {
       return manejarR2GrandePrivado(request,env,{
        // Solo el pago concilado por Central y ligado al SHA-256/bytes
        // autoriza la subida. Basic del operador NO saltea esta barrera.
-       comprobarPagoCentral:async(orderId,meta)=>
-        comprobarPagoR2EnCentral({env,orderId,meta}),
+       comprobarPagoCentral:async(orderId,meta)=>{
+        // Histórico primero; universal sólo como segunda comprobación
+        // HMAC exacta. Ninguna sesión ni bandera del navegador acredita pago.
+        const classic=await comprobarPagoR2EnCentral({env,orderId,meta});
+        if(classic)return classic;
+        if(env.DOCS_R2_UNIVERSAL_POSTPAY_ENABLED!=='PRIVATE_TEST_ONLY')
+         return null;
+        return comprobarPagoUniversalR2EnCentral({env,orderId,meta});
+       },
        // El comprador sólo puede iniciar R2 para SU orden vinculada, incluso
        // si conoce un pago válido ajeno. Basic no salta el pago obligatorio.
        autorizadoIniciar:async orderId=>staff||(buyer&&(
