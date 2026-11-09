@@ -1,0 +1,33 @@
+name: Saber V2 - inspeccionar PDF R2 real recibido, sin aprobar ni entregar
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-cierre-v2-preprensa-real-20261109.yml]
+permissions:
+  contents: read
+concurrency:
+  group: saber-v2-r2-72e9-preprensa
+  cancel-in-progress: false
+jobs:
+  preprensa-v2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Inspeccionar original real de la orden V2 sin tocar estado de producción
+        shell: bash
+        env:
+          SABER_V2_OPERATOR_PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+        run: |
+          set -euo pipefail
+          node --check integraciones/autocotizador/recepcion/e2e-preprensa-v2-r2-real-20261109.mjs
+          node integraciones/autocotizador/recepcion/e2e-preprensa-v2-r2-real-20261109.mjs
+          echo 'V2_R2_PDF_REAL_A1_PREPRENSA_INTEGRA_SIN_APROBACION'
