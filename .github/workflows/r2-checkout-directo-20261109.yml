@@ -1,0 +1,42 @@
+name: R2 - diagnóstico directo del checkout sandbox de la orden E2E
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/r2-checkout-directo-20261109.yml]
+permissions:
+  contents: read
+jobs:
+  checkout-diagnostico:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Inspeccionar motivo de rechazo de un pedido R2 ya registrado
+        shell: bash
+        env:
+          KEY1: ${{ secrets.DEMO_ADMIN_KEY }}
+          KEY2: ${{ secrets.SABER_CENTRAL_DEMO_ADMIN_KEY }}
+          KEY3: ${{ secrets.SABER_CENTRAL_ADMIN_KEY }}
+          KEY4: ${{ secrets.SABER_DOCS_CENTRAL_ADMIN_KEY }}
+        run: |
+          set -euo pipefail
+          tmp=$(mktemp)
+          trap 'rm -f "$tmp"' EXIT
+          order='66f10bd2-77ce-46ef-930c-49dc3d22d23e'
+          url='https://saber-pagos-pruebas.libreriasaber.workers.dev/demo/checkout'
+          for n in 1 2 3 4; do
+            var=KEY$n
+            value=${!var}
+            if [ -z "$value" ]; then echo "GH_CHECKOUT_ADMIN_KEY_${n}=NOT_CONFIGURED";continue; fi
+            code=$(curl -sS --max-time 40 -o "$tmp" -w '%{http_code}' -X POST \
+              -H "Authorization: Bearer $value" -H 'Content-Type: application/json' \
+              --data "{\"order_id\":\"$order\"}" "$url")
+            if [ "$code" = 401 ]; then echo "GH_CHECKOUT_ADMIN_KEY_${n}=NOT_AUTHORIZED";continue; fi
+            echo "GH_CHECKOUT_ADMIN_KEY_${n}=AUTHORIZED_HTTP_$code"
+            jq -c '{error:(.error//null),reason:(.reason//null),preference_created:(.preference_id!=null),url_returned:(.checkout_url!=null),order_matched:(.order_id=="66f10bd2-77ce-46ef-930c-49dc3d22d23e")}' "$tmp"
+            if [ "$code" = 200 ]; then echo 'R2_SANDBOX_PREFERENCE_AVAILABLE';fi
+            exit 0
+          done
+          echo 'BLOCKER_NO_MATCHING_GH_ADMIN_KEY_FOR_DIRECT_CHECKOUT'
