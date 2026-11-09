@@ -3412,7 +3412,18 @@ function boardCard(order){
  const totals=node("p",money(order.amount_ars)+" · "+(order.file_count||0)+" PDF · Pago verificado");
  totals.className="money";card.append(totals);
  if(order.customer_phone)card.append(node("p","Teléfono: "+order.customer_phone));
- if(order.r2_prepress_pending){
+ if(order.universal_pdf_pending===true){
+  const count=Number.isSafeInteger(order.universal_pdf_pending_count)?
+   order.universal_pdf_pending_count:order.file_count;
+  card.append(node("p","PDF mixtos TUS/R2 · "+count+
+   " original(es) pendiente(s) de verificación. No preparar ni imprimir."));
+  card.append(node("p","Pedido pagado: se conserva en Nuevos hasta completar recepción y preprensa."));
+  const only=node("button","Detalle");only.className="outline";
+  only.addEventListener("click",()=>showOrder(order.id));
+  card.append(only);
+  return card;
+ }
+  if(order.r2_prepress_pending){
   const received=order.r2_prepress_state==="RECIBIDO_PENDIENTE_PREPRENSA";
   const label=received?"Original recibido · falta aprobar preprensa":
    order.r2_prepress_state==="PAGADO_ESPERANDO_ARCHIVO"?
@@ -3545,7 +3556,9 @@ async function refresh({silent=false,force=false}={}){
   }
   document.querySelector("#count-other").textContent=other;
   if(other===0)orders.append(node("p","No hay otros pedidos pagados."));
-  if(response.r2ReviewUnavailable){
+  if(response.universalReviewUnavailable){
+   status.textContent="ATENCIÓN: la cola universal de pedidos pagados no pudo verificarse. Revisá la Central.";
+  }else if(response.r2ReviewUnavailable){
    status.textContent="ATENCIÓN: no se pudo cargar la cola de R2 pagados. Reintentá; los pedidos documentales siguen visibles.";
   }else if(!silent)status.textContent="Tablero actualizado · "+
    (counts.pendiente+counts.en_preparacion+counts.listo+counts.en_espera)+" trabajos activos";
@@ -4826,7 +4839,38 @@ export default {
       r2ReviewUnavailable=true;
      }
     }
-    return json({orders:board,r2ReviewUnavailable});
+    // Mostrar en NUEVOS los pedidos universales pagados, sin ofrecer
+    // preparación ni ZIP mientras no estén todos los PDF y la preprensa.
+    let universalReviewUnavailable=false;
+    if(env.CENTRAL_R2_UNIVERSAL_ORDER_ENABLED==="PRIVATE_TEST_ONLY"){
+     try{
+      const schema=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' "+
+       "AND name IN ('central_r2_universal_order_links','central_r2_universal_files','central_r2_universal_drafts')").all();
+      if((schema.results||[]).length!==3)throw Error("Tablas universales no disponibles");
+      const pending=await env.DB.prepare(
+       "SELECT l.commercial_order_id,l.web_order_id,d.file_count,"+
+       "SUM(CASE WHEN f.received=0 THEN 1 ELSE 0 END) AS pending_count "+
+       "FROM central_r2_universal_order_links l "+
+       "JOIN central_r2_universal_drafts d ON d.web_order_id=l.web_order_id "+
+       "JOIN central_r2_universal_files f ON f.web_order_id=l.web_order_id "+
+       "JOIN orders o ON o.id=l.commercial_order_id "+
+       "WHERE o.status='paid' AND o.paid_at IS NOT NULL "+
+       "AND o.deposit_ars=o.amount_ars AND o.amount_ars=l.amount_ars "+
+       "AND EXISTS (SELECT 1 FROM payment_reviews p WHERE p.order_id=o.id AND p.state='verified') "+
+       "GROUP BY l.commercial_order_id,l.web_order_id,d.file_count LIMIT 100").all();
+      const byId=new Map(board.map(order=>[order.id,order]));
+      for(const entry of pending.results||[]){
+       const card=byId.get(entry.commercial_order_id);
+       if(!card)continue;
+       card.universal_pdf_pending=true;
+       card.universal_pdf_pending_count=entry.pending_count;
+       card.production_state="pendiente";
+       card.web_order_id=entry.web_order_id;
+       card.file_count=entry.file_count;
+      }
+     }catch(_){universalReviewUnavailable=true}
+    }
+    return json({orders:board,r2ReviewUnavailable,universalReviewUnavailable});
    }
    // Un pedido histórico se numera SOLO al solicitar su ficha desde un
    // POST administrativo. No mutar D1 en GET ni renumerar pedidos ya asignados.
