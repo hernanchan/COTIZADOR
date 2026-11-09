@@ -52,7 +52,7 @@ jobs:
           node --check integraciones/autocotizador/recepcion/r2-prepago-documentos.mjs
           node --check integraciones/mercadopago/pruebas/r2-prepago-intencion-central.mjs
           node --test tests/r2-prepago-sin-archivo-central.test.mjs
-          node --test tests/r2-prepago-revision-central.test.mjs tests/r2-prepago-seguimiento-central.test.mjs tests/r2-prepago-aprobacion-central.test.mjs
+          node --test tests/r2-prepago-revision-central.test.mjs tests/r2-prepago-seguimiento-central.test.mjs tests/r2-prepago-aprobacion-central.test.mjs tests/r2-borrado-entregado-central.test.mjs
           node --check integraciones/mercadopago/pruebas/r2-prepago-revision-central.mjs
           node --test tests/r2-prepago-checkout-sandbox.test.mjs
           node --test tests/r2-flujo-sin-archivo-cero-costo.test.mjs
