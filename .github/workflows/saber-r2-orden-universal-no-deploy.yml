@@ -32,6 +32,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Dependencias PDF para verificación real del módulo TUS
+        run: npm install --no-save --no-audit --no-fund pdf-lib@1.17.1
       - name: Pedido único, idempotencia y compatibilidad sin pagos
         run: |
           set -euo pipefail
