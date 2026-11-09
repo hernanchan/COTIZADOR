@@ -1647,7 +1647,7 @@ async function centralUpdateProduction(req,env,ctx){
   const {comprobarPreprensaUniversal}=await import("./r2-universal-preprensa-central.mjs");
   const authorized=await comprobarPreprensaUniversal(env,d.order_id);
   if(!authorized)return json({error:"Preprensa del pedido mixto sin aprobación"},409);
-  if(d.to==="entregado"&&env.CENTRAL_R2_UNIVERSAL_DELETE_ENABLED!=="PRIVATE_TEST_ONLY")
+  if(d.to==="entregado"&&env.CENTRAL_R2_UNIVERSAL_PURGE_ENABLED!=="PRIVATE_TEST_ONLY")
    return json({error:"No marcar Entregado: borrado mixto aún no habilitado"},409);
  }
  const eligible=universalLink?

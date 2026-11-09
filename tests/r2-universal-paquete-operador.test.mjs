@@ -127,7 +127,7 @@ test('descarga TUS personal: SHA verificado; negación por alteración y sin Bas
   receiptId:'DOC-'+TUS,preprensaPendiente:true});
  const opts={authorized:true,lookup,readTUS:async()=>PDF,subtle:webcrypto.subtle};
  const r=await descargarUniversalPersonal(request(),env,opts);
- assert.equal(r.status,200,JSON.stringify(await r.clone().json()));
+ assert.equal(r.status,200,await r.clone().text());
  assert.deepEqual(new Uint8Array(await r.arrayBuffer()),PDF);
  const bad=await descargarUniversalPersonal(request(),env,{...opts,
   readTUS:async()=>new Uint8Array(PDF.length)});
