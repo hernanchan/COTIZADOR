@@ -71,7 +71,7 @@ function alertasRecepcionPDF(){
   if(!(file instanceof File))continue;
   const transporte=decidirTransportePDF(file.size);
   if(transporte.ruta==='r2'){
-   if(R2_UNIVERSAL_ENSAYO)continue;
+   if(typeof R2_UNIVERSAL_ENSAYO!=='undefined'&&R2_UNIVERSAL_ENSAYO)continue;
    // R2 corresponde por TAMAÑO a cualquier PDF. El circuito actual de
    // Central solo recibe ploteo individual: no cobrar A4/A3 grandes aún.
    if(admitePrepagoR2Grande(e))continue;
@@ -832,7 +832,7 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
       entries.length<1||entries.length>MAX_PDF_CARGA||
       ultimoPresupuesto.plan?.length!==entries.length)
     throw Error('Completá primero la cotización de todos los documentos.');
-   if(R2_UNIVERSAL_ENSAYO&&entries.some(e=>
+   if(typeof R2_UNIVERSAL_ENSAYO!=='undefined'&&R2_UNIVERSAL_ENSAYO&&entries.some(e=>
       e.archivoOriginal instanceof File&&e.archivoOriginal.size>MAX_PDF_TUS_BYTES)){
     const lote=prepararLoteParcial(entries);
     if(lote.archivos.length!==entries.length||
