@@ -60,6 +60,7 @@ import {prepararR2PagoSinArchivo} from './r2-prepago-documentos.mjs';
 import {cotizarPlanUniversalSinSubida} from './r2-plan-universal-api-privada.mjs';
 import {guardarBorradorUniversal} from './r2-borrador-universal-documentos.mjs';
 import {prepararOrdenUniversalSinCheckout} from './r2-orden-universal-documentos.mjs';
+import {pagoSandboxUniversalDocumentos} from './r2-universal-checkout-documentos.mjs';
 import {checkoutR2PrepaidSandboxDocumentos} from './r2-prepago-checkout-documentos.mjs';
 import {descargarR2GrandePersonal} from './r2-pdf-grandes-descarga-personal.mjs';
 import {descargarR2PendientePorD1Personal} from './r2-pdf-descarga-d1-personal.mjs';
@@ -2212,15 +2213,47 @@ export default {
         authorized:staff||buyer
       });
     }
-    if(page==='/prueba-v2/api/ensayo-r2-orden-universal'){
-      const staff=v2PrivateBrowserAuthorized(request,env)==='allow'||
-        await v2SessionAuthorized(request,env);
-      return prepararOrdenUniversalSinCheckout(request,env,{authorized:staff});
-    }
     if(page==='/prueba-v2/api/ensayo-r2-borrador-universal'){
       const staff=v2PrivateBrowserAuthorized(request,env)==='allow'||
         await v2SessionAuthorized(request,env);
-      return guardarBorradorUniversal(request,env,{authorized:staff});
+      const buyer=!staff&&await autorizadoPedidoCliente(request,env);
+      const input=buyer?await request.clone().json().catch(()=>null):null;
+      const saved=await guardarBorradorUniversal(request,env,{
+       authorized:staff||buyer
+      });
+      if(saved.ok&&buyer){
+       const value=await saved.clone().json().catch(()=>null);
+       if(value?.ok!==true||value.webOrderId!==input?.webOrderId||
+          value.checkoutEnabled!==false||value.paymentAuthorized!==false)
+        return testResponse({ok:false,error:'Borrador universal sin identidad verificable'},502);
+       const cookie=await cookiePedidoClienteVinculado(request,env,value.webOrderId);
+       if(!cookie)return testResponse({ok:false,error:'Sesión de pedido no vinculado'},503);
+       const headers=new Headers(saved.headers);headers.append('Set-Cookie',cookie);
+       return new Response(saved.body,{status:saved.status,headers});
+      }
+      return saved;
+    }
+    if(page==='/prueba-v2/api/ensayo-r2-orden-universal'){
+      const staff=v2PrivateBrowserAuthorized(request,env)==='allow'||
+        await v2SessionAuthorized(request,env);
+      const buyer=!staff&&await autorizadoPedidoCliente(request,env);
+      const input=buyer?await request.clone().json().catch(()=>null):null;
+      const belongs=buyer&&await autorizadoPedidoClienteVinculado(
+       request,env,input?.webOrderId);
+      return prepararOrdenUniversalSinCheckout(request,env,{
+       authorized:staff||belongs
+      });
+    }
+    if(page==='/prueba-v2/api/ensayo-r2-checkout-universal'){
+      const staff=v2PrivateBrowserAuthorized(request,env)==='allow'||
+        await v2SessionAuthorized(request,env);
+      const buyer=!staff&&await autorizadoPedidoCliente(request,env);
+      const input=buyer?await request.clone().json().catch(()=>null):null;
+      const belongs=buyer&&await autorizadoPedidoClienteVinculado(
+       request,env,input?.webOrderId);
+      return pagoSandboxUniversalDocumentos(request,env,{
+       authorized:staff||belongs
+      });
     }
     if(page==='/prueba-v2/api/ensayo-r2-prepago'){
       const staff=v2PrivateBrowserAuthorized(request,env)==='allow'||
