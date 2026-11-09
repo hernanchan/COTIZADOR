@@ -104,7 +104,18 @@ jobs:
           test "$status" = 200 && jq -e '.success==true and (.result.id|type=="string")' "$tmp/upload.json" >/dev/null || { echo "CENTRAL_STAGE_HTTP_$status";exit 1; }
           candidate=$(jq -r '.result.id' "$tmp/upload.json")
           for version in "$baseline" "$candidate";do
-            curl -fsS --max-time 25 -H "$auth" "$root/versions/$version" > "$tmp/$version.json"
+            # Cloudflare puede tardar en hacer consultable una versión recién subida.
+            # No promover sin verificar las DOS versiones y los bindings.
+            available=0
+            for attempt in 1 2 3 4 5 6 7 8;do
+              code=$(curl -sS --max-time 25 -H "$auth" -o "$tmp/$version.json" -w '%{http_code}' "$root/versions/$version")
+              if [ "$code" = 200 ] && jq -e '.success==true and (.result.id|type=="string")' "$tmp/$version.json" >/dev/null;then
+                available=1;break
+              fi
+              echo "CENTRAL_VERSION_CHECK_ATTEMPT_${attempt}_HTTP_${code}"
+              sleep 2
+            done
+            test "$available" = 1 || { echo 'CENTRAL_VERSION_NOT_READABLE_STOP_NO_DEPLOY';exit 1; }
             jq -S '[.result.resources.bindings[]|
               select((.name=="SABER_R2_GRANDES" or
                .name=="CENTRAL_R2_PURGE_QUEUE_ENABLED" or
