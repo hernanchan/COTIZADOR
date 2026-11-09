@@ -60,6 +60,7 @@ import {prepararR2PagoSinArchivo} from './r2-prepago-documentos.mjs';
 import {checkoutR2PrepaidSandboxDocumentos} from './r2-prepago-checkout-documentos.mjs';
 import {descargarR2GrandePersonal} from './r2-pdf-grandes-descarga-personal.mjs';
 import {descargarR2PendientePorD1Personal} from './r2-pdf-descarga-d1-personal.mjs';
+import {resolverReferenciaR2Personal} from './r2-referencia-personal.mjs';
 /**
  * SABER — DOCUMENTOS — ARCHIVO ÚNICO LISTO PARA PEGAR EN CLOUDFLARE
  *
@@ -2153,6 +2154,10 @@ export default {
     if(page==='/api/ensayo-preparar-documentos-v2-lote')return apiPrepararDocumentosV2Lote(request,env);
     // Acceso permanente POR D1: recibo consultado por HMAC, sin proof de 2h.
     // No revela objetos R2 a compradores ni genera pedido cobrable.
+    if(page==='/prueba-v2/api/ensayo-r2-referencia-personal')
+      return resolverReferenciaR2Personal(request,env,{
+       authorized:v2PrivateBrowserAuthorized(request,env)==='allow'
+      });
     if(page==='/prueba-v2/api/ensayo-r2-descargar-d1-personal')
       return descargarR2PendientePorD1Personal(request,env,{
        authorized:v2PrivateBrowserAuthorized(request,env)==='allow'
