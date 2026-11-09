@@ -1,4 +1,4 @@
-name: Saber R2 - corregir diagnóstico checkout SOLO Documentos privados y probar orden
+name: Saber R2 - diagnosticar respuesta cuota SOLO Documentos privados
 on:
   push:
     branches: [integracion/tus-pedido-privado-20261101]
@@ -50,7 +50,7 @@ jobs:
           tmp=$(mktemp -d)
           chmod 700 "$tmp"
           modified=0
-          baseline='9d65d908-4353-4fa1-912d-7eff83e94330'
+          baseline='f5adf1cb-f75a-46f6-90b5-478ec579c022'
           cleanup(){
             rc=$?
             trap - EXIT
@@ -110,7 +110,7 @@ jobs:
           curl -fsS --max-time 20 "$central/health" > "$tmp/health-final.json"
           jq -e '.paymentsEnabled==false and .databaseReady==true' "$tmp/health-final.json" >/dev/null
           echo "DOCS_PRIVATE_DIAGNOSTIC_DEPLOYED=$candidate"
-          payload='{"action":"start","webOrderId":"WEB-ENSAYO-255BFE122477AC6C7666EB6D342707FE","commercialOrderId":"66f10bd2-77ce-46ef-930c-49dc3d22d23e"}'
+          payload='{"action":"status","webOrderId":"WEB-ENSAYO-255BFE122477AC6C7666EB6D342707FE","commercialOrderId":"66f10bd2-77ce-46ef-930c-49dc3d22d23e"}'
           code=$(curl -sS --max-time 65 -u "operador:$PASSWORD" \
              -H "Origin: $base" -H 'Content-Type: application/json' \
              -o "$tmp/start.json" -w '%{http_code}' -X POST --data "$payload" \
@@ -118,10 +118,10 @@ jobs:
           echo "EXISTING_R2_CHECKOUT_HTTP=$code"
           jq -c '{ok,error,reasonCode,estado,amountArs,hasLink:(.checkoutUrl!=null),uploadAuthorized}' "$tmp/start.json"
           if [ "$code" = 200 ];then
-            jq -e '.ok==true and .amountArs==4400 and .estado=="pendiente" and .uploadAuthorized==false' "$tmp/start.json" >/dev/null
-            echo 'EXISTING_R2_MP_TEST_CHECKOUT_CREATED_NO_R2_UPLOAD'
+            jq -e '.ok==true and .amountArs==4400 and .estado=="pagado_esperando_archivo" and .uploadAuthorized==true' "$tmp/start.json" >/dev/null
+            echo 'PAID_MP_CONFIRMED_BEFORE_R2_QUOTA_DIAG_NO_R2_UPLOAD'
           elif [ "$code" = 503 ] || [ "$code" = 409 ];then
             jq -e '.ok==false and (.reasonCode|type=="string")' "$tmp/start.json" >/dev/null
-            echo 'EXISTING_R2_MP_REJECTION_ROOT_CODE_COLLECTED'
+            echo 'EXISTING_R2_MP_STATUS_REJECTION_DIAG'
           else echo 'EXISTING_R2_MP_UNEXPECTED_HTTP';exit 1;fi
           echo 'PRIVATE_ONLY_NO_MAIN_NO_REAL_PAYMENT_NO_R2_BYTES'
