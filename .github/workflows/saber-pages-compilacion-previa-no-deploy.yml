@@ -1,0 +1,35 @@
+name: Saber Pages - compilar funciones SIN desplegar
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths:
+      - .github/workflows/saber-pages-compilacion-previa-no-deploy.yml
+      - functions/**
+      - integraciones/polaroids/express/**
+      - package.json
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pages-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Resolver dependencias locales y compilar todas las Pages Functions
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+          npx --yes wrangler@4.50.0 pages functions build functions \
+            --outdir /tmp/saber-pages-build \
+            --output-routes-path /tmp/saber-pages-routes.json
+          test -s /tmp/saber-pages-build/index.js
+          echo "PAGES_FUNCTIONS_BUNDLE_BYTES=$(wc -c < /tmp/saber-pages-build/index.js)"
+          echo "PAGES_FUNCTIONS_BUILD_NO_DEPLOY_SUCCESS"
+          echo "NO_PRODUCTION_NO_MAIN_NO_CLOUDFLARE_WRITE"
