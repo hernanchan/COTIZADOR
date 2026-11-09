@@ -4,6 +4,7 @@
  * through the Documents service binding. No browser-supplied keys.
  */
 import {comprobarPreprensaUniversal} from './r2-universal-preprensa-central.mjs';
+import {TUS_RECEIPT_TABLE} from './r2-universal-tus-central.mjs';
 const ON='PRIVATE_TEST_ONLY',LIMIT=10,CUTOFF='2026-11-09 00:00:00';
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 const WEB=/^WEB-ENSAYO-[A-F0-9]{32}$/;
@@ -65,6 +66,9 @@ export async function planBorradoUniversalD1(env,orderId,version){
     !Number.isSafeInteger(base.file_count)||base.file_count<1||
     base.file_count>LIMIT||!(await comprobarPreprensaUniversal(env,orderId)))
   return null;
+ // An all-R2 batch may never have initialized the TUS table.
+ // Creating the empty receipt table cannot authorize any file for deletion.
+ await db.prepare(TUS_RECEIPT_TABLE).run();
  const rows=await db.prepare(
   'SELECT f.file_id,f.transport,f.sha256,f.bytes,f.received,'+
   'f.web_order_id,f.name,t.receipt_id AS tus_receipt,t.object_name AS tus_key,'+
