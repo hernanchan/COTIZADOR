@@ -1,4 +1,4 @@
-name: Saber R2 - referencia operario real y preprensa SOLO documentos privados
+name: Saber R2 - lectura staff D1 por rangos 8MiB SOLO pruebas
 on:
   push:
     branches: [integracion/tus-pedido-privado-20261101]
@@ -26,7 +26,7 @@ jobs:
         run: |
           set -euo pipefail
           npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.25.12
-          node --test tests/r2-prepago-checkout-sandbox.test.mjs tests/r2-referencia-personal.test.mjs tests/r2-preprensa-archivo-local.test.mjs
+          node --test tests/r2-prepago-checkout-sandbox.test.mjs tests/r2-referencia-personal.test.mjs tests/r2-preprensa-archivo-local.test.mjs tests/r2-grandes-d1-descarga-personal.test.mjs
           node --check integraciones/autocotizador/recepcion/r2-prepago-checkout-documentos.mjs
           cd integraciones/autocotizador/recepcion
           npm install --no-audit --no-fund
@@ -50,7 +50,7 @@ jobs:
           tmp=$(mktemp -d)
           chmod 700 "$tmp"
           modified=0
-          baseline='386f05c6-c7d5-4b51-94fb-b09ae4086a97'
+          baseline='48bd6e99-a877-439d-a3f0-c9208db2448c'
           cleanup(){
             rc=$?
             trap - EXIT
@@ -81,7 +81,7 @@ jobs:
           echo 'PREDEPLOY_PRIVATE_PAYMENTS_OFF_PORTAL_401'
           jq -n --arg sha "$GITHUB_SHA" --slurpfile s "$tmp/settings.json" '{
             main_module:"index.mjs",
-            annotations:{"workers/message":"Referencia staff de R2 con HMAC y preprensa pendiente SOLO privado","workers/commit_sha":$sha},
+            annotations:{"workers/message":"R2 download D1 staff hash rangos 8MiB SOLO privado","workers/commit_sha":$sha},
             bindings:[$s[0].result.bindings[]|{name,type:"inherit"}]
           }' > "$tmp/metadata.json"
           status=$(curl -sS --max-time 100 -o "$tmp/new.json" -w '%{http_code}' -H "$auth" \
@@ -100,7 +100,7 @@ jobs:
           curl -fsS --max-time 20 -H "$auth" "$root/deployments" > "$tmp/verify-predeploy.json"
           current=$(jq -er '.result.deployments[0].versions | if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/verify-predeploy.json")
           test "$current" = "$baseline" || { echo 'DOCS_CONCURRENT_DEPLOY_STOP';exit 1; }
-          jq -n --arg id "$candidate" '{strategy:"percentage",versions:[{version_id:$id,percentage:100}],annotations:{"workers/message":"Worker Documentos privado, consulta staff por R2 D1 y pago verificado"}}' > "$tmp/promote.json"
+          jq -n --arg id "$candidate" '{strategy:"percentage",versions:[{version_id:$id,percentage:100}],annotations:{"workers/message":"Worker Documentos privado, verificación R2 de descarga staff por rangos"}}' > "$tmp/promote.json"
           modified=1
           curl -fsS --max-time 60 -H "$auth" -H 'Content-Type: application/json' --data-binary "@$tmp/promote.json" "$root/deployments" > "$tmp/promoted.json"
           jq -e '.success==true' "$tmp/promoted.json" >/dev/null
