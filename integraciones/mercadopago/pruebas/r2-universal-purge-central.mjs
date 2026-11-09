@@ -227,3 +227,25 @@ export async function procesarBorradoUniversalEntregado(env,orderId,{
  }
  return {state:failed?'error':'processed',filesDeleted:deleted,failed};
 }
+
+/** Cron only for existing pending rows. Flags OFF means no Storage access. */
+export async function reintentarBorradosUniversal(env,{limit=3}={}){
+ if(!feature(env)||env.CENTRAL_R2_UNIVERSAL_PURGE_EXECUTE_ENABLED!==ON||
+    !Number.isSafeInteger(limit)||limit<1||limit>5)
+  return {enabled:false,attempted:0,deleted:0};
+ const exists=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' "+
+  "AND name='central_r2_universal_purge_files'").first();
+ if(!exists)return {enabled:true,attempted:0,deleted:0};
+ const rows=await env.DB.prepare("SELECT DISTINCT order_id FROM "+
+  "central_r2_universal_purge_files WHERE state IN ('pending','error') "+
+  "OR (state='processing' AND last_try<datetime('now','-3 minutes')) "+
+  "ORDER BY order_id LIMIT ?").bind(limit).all();
+ let deleted=0,errors=0;
+ for(const entry of rows.results||[]){
+  try{const r=await procesarBorradoUniversalEntregado(env,entry.order_id);
+   deleted+=r.filesDeleted;
+   errors+=r.failed;
+  }catch{errors++}
+ }
+ return {enabled:true,attempted:(rows.results||[]).length,deleted,errors};
+}
