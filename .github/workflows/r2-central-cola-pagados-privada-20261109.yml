@@ -97,11 +97,24 @@ jobs:
                 {name:"CENTRAL_R2_PURGE_SCOPE",type:"plain_text",text:"NEW_ORDERS_ONLY"}
               ])
           }' > "$tmp/metadata.json"
-          status=$(curl -sS --max-time 120 -o "$tmp/upload.json" -w '%{http_code}' -H "$auth" \
-            -F "metadata=@$tmp/metadata.json;type=application/json" \
-            -F "index.mjs=@/tmp/saber-central-r2-bundle.mjs;filename=index.mjs;type=application/javascript+module" \
-            "$root/versions?bindings_inherit=strict")
-          test "$status" = 200 && jq -e '.success==true and (.result.id|type=="string")' "$tmp/upload.json" >/dev/null || { echo "CENTRAL_STAGE_HTTP_$status";exit 1; }
+          # Cloudflare puede responder 504 transitorio al stage. Reintentar
+          # solamente crear VERSIONES; JAMÁS reintentar promoción ni cambiar pagos.
+          stage_ok=0
+          for stage_attempt in 1 2 3;do
+            status=$(curl -sS --max-time 150 -o "$tmp/upload.json" -w '%{http_code}' -H "$auth" \
+              -F "metadata=@$tmp/metadata.json;type=application/json" \
+              -F "index.mjs=@/tmp/saber-central-r2-bundle.mjs;filename=index.mjs;type=application/javascript+module" \
+              "$root/versions?bindings_inherit=strict") || status=000
+            if [ "$status" = 200 ] && jq -e '.success==true and (.result.id|type=="string")' "$tmp/upload.json" >/dev/null;then
+              stage_ok=1;break
+            fi
+            echo "CENTRAL_STAGE_ATTEMPT_${stage_attempt}_HTTP_${status}"
+            if [ "$status" != 503 ] && [ "$status" != 504 ] && [ "$status" != 000 ];then
+              echo 'CENTRAL_STAGE_NONRETRYABLE_STOP';exit 1
+            fi
+            if [ "$stage_attempt" -lt 3 ];then sleep 9;fi
+          done
+          test "$stage_ok" = 1 || { echo 'CENTRAL_STAGE_UNAVAILABLE_NO_DEPLOY';exit 1; }
           candidate=$(jq -r '.result.id' "$tmp/upload.json")
           for version in "$baseline" "$candidate";do
             # Cloudflare puede tardar en hacer consultable una versión recién subida.
