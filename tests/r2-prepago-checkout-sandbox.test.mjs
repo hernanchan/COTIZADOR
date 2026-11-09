@@ -191,3 +191,45 @@ test('Central: clave DEMO existente de longitud previa no bloquea R2; verificaci
  assert.equal((await denied.json()).error,'R2_PREPAGO_PASARELA_NO_CONFIGURADA');
  assert.equal(missing.dispatches,0);
 });
+
+test('R2 pagado emite el mismo enlace de seguimiento firmado; no si espera pago',async()=>{
+ const link='https://saber-pagos-pruebas.libreriasaber.workers.dev/seguimiento?token='+
+  UUID+'.'+'b'.repeat(64);
+ const f=fake({status:'paid',rev:'verified'});
+ const paid=await f.call({...body,action:'status'},{
+  trackingLink:async id=>{assert.equal(id,UUID);return link}
+ });
+ const data=await paid.json();
+ assert.equal(data.seguimientoUrl,link);
+ assert.equal(data.productionAuthorized,false);
+ const missing=fake();
+ const notPaid=await missing.call({...body,action:'status'},{
+  trackingLink:async()=>{throw Error('Never expose link without verified payment')}
+ });
+ assert.equal((await notPaid.json()).seguimientoUrl,undefined);
+});
+test('Proxy Documentos sólo permite el enlace de Central verificado para un pago auténtico',async()=>{
+ const link='https://saber-pagos-pruebas.libreriasaber.workers.dev/seguimiento?token='+
+  UUID+'.'+'c'.repeat(64);
+ const env={DOCS_R2_PREPAY_DRAFT_ENABLED:'PRIVATE_TEST_ONLY',
+  DOCS_CLIENT_SANDBOX_CHECKOUT_ENABLED:'PRIVATE_TEST_ONLY',
+  DOCS_CENTRAL_SYNC_ENABLED:'PRIVATE_TEST_ONLY',
+  CENTRAL_BRIDGE_KEY:SECRET,
+  CENTRAL_TEST_URL:'https://saber-pagos-pruebas.libreriasaber.workers.dev/internal/central/stage'};
+ const make=()=>new Request('https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/api/ensayo-r2-prepago-checkout',{
+  method:'POST',headers:{Origin:'https://saber-documentos-pruebas.libreriasaber.workers.dev',
+   'Content-Type':'application/json'},
+  body:JSON.stringify({action:'status',webOrderId:WEB,commercialOrderId:UUID})});
+ const fetchResult=seguimientoUrl=>({fetch:async()=>Response.json({ok:true,
+  webOrderId:WEB,commercialOrderId:UUID,amountArs:15000,
+  estado:'pagado_esperando_archivo',filesUploaded:false,
+  uploadAuthorized:true,productionAuthorized:false,seguimientoUrl})});
+ const deps={authorized:true,now:()=>1794070000,nonce:()=>UUID,subtle:webcrypto.subtle};
+ const ok=await checkoutR2PrepaidSandboxDocumentos(make(),env,{...deps,service:fetchResult(link)});
+ assert.equal(ok.status,200);
+ assert.equal((await ok.json()).seguimientoUrl,link);
+ const bad=await checkoutR2PrepaidSandboxDocumentos(make(),env,{
+  ...deps,service:fetchResult('https://sitio-externo.example/seguimiento?token='+UUID+'.'+'c'.repeat(64))});
+ assert.equal(bad.status,502);
+ assert.equal((await bad.json()).error,'R2_SEGUIMIENTO_CENTRAL_INVALIDO');
+});

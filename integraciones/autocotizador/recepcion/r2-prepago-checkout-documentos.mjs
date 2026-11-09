@@ -82,6 +82,15 @@ export async function checkoutR2PrepaidSandboxDocumentos(request,env,{
     !['pendiente','pagado_esperando_archivo','revocado'].includes(d.estado)||
     d.filesUploaded!==false||d.productionAuthorized!==false)
   return reply({ok:false,error:'R2_PREPAGO_PAGO_NO_COINCIDE'},502);
+ if(p.action==='status'&&d.seguimientoUrl!==undefined){
+  let u;try{u=new URL(d.seguimientoUrl)}catch{}
+  if(d.estado!=='pagado_esperando_archivo'||!u||u.protocol!=='https:'||
+     !HOST.test(u.hostname)||u.pathname!=='/seguimiento'||
+     u.username||u.password||u.hash||u.port||
+     [...u.searchParams.keys()].join(',')!=='token'||
+     !/^[a-f0-9-]{36}\\.[a-f0-9]{64}$/.test(u.searchParams.get('token')||''))
+    return reply({ok:false,error:'R2_SEGUIMIENTO_CENTRAL_INVALIDO'},502);
+ }
  if(p.action==='start'){
   let u;try{u=new URL(d.checkoutUrl)}catch{}
   if(!u||u.protocol!=='https:'||
@@ -92,6 +101,7 @@ export async function checkoutR2PrepaidSandboxDocumentos(request,env,{
  return reply({ok:true,commercialOrderId:p.commercialOrderId,
   webOrderId:p.webOrderId,amountArs:d.amountArs,estado:d.estado,
   ...(p.action==='start'?{checkoutUrl:d.checkoutUrl}:{}),
+  ...(d.seguimientoUrl?{seguimientoUrl:d.seguimientoUrl}:{}),
   filesUploaded:false,productionAuthorized:false,
   uploadAuthorized:d.estado==='pagado_esperando_archivo'},200);
 }

@@ -1061,6 +1061,18 @@ const r2Total=document.getElementById('r2-prepago-total');
 const r2Pagar=document.getElementById('r2-prepago-pagar');
 const r2Link=document.getElementById('r2-prepago-link');
 const r2Retry=document.getElementById('r2-prepago-reintentar');
+const r2Seguimiento=document.createElement('a');
+r2Seguimiento.textContent='Consultar el seguimiento de mi ploteo';
+r2Seguimiento.target='_blank';r2Seguimiento.rel='noopener noreferrer';
+r2Seguimiento.hidden=true;
+r2Seguimiento.style.cssText='display:none;margin:12px 0;font-weight:700;color:#175b8c';
+r2Total?.insertAdjacentElement('afterend',r2Seguimiento);
+function actualizarSeguimientoR2(){
+ const u=r2PrepagoFlujo?.seguimientoUrl;
+ if(!u)return;
+ r2Seguimiento.href=u;r2Seguimiento.hidden=false;
+ r2Seguimiento.style.display='inline-block';
+}
 const r2Recuperacion=document.getElementById('r2-prepago-recuperacion');
 const r2RecuperarFile=document.getElementById('r2-prepago-recuperar-file');
 function guardarRecuperacionR2(){
@@ -1158,9 +1170,11 @@ async function r2ConsultarPagoYContinuar(){
  try{
   const estado=await r2PrepagoFlujo.consultarPago();
   if(estado==='pagado'){
+   actualizarSeguimientoR2();
    r2Informar('Pago sandbox confirmado en Central. Habilitando el envío del PDF.');
    await r2SubirSoloDespuesPago();
   }else if(estado==='revocado'){
+   r2Seguimiento.hidden=true;r2Seguimiento.style.display='none';
    r2DetenerConsultas();r2Pagar.hidden=true;r2Link.hidden=true;
    borrarRecuperacionR2();
    r2Informar('El pago fue revocado. No se permite almacenar ni imprimir este archivo.');

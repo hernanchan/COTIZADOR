@@ -55,9 +55,10 @@ export function crearFlujoR2PagoAntesDeCarga({
  let phase=restaurarPago?'archivo_pendiente_de_comparar':'seleccionado',
   sha256=restaurarPago?.sha256||null,
   commercialOrderId=restaurarPago?.commercialOrderId||null,
-  amountArs=restaurarPago?.amountArs||null,checkoutUrl=null,lastResult=null;
+  amountArs=restaurarPago?.amountArs||null,checkoutUrl=null,
+  seguimientoUrl=null,lastResult=null;
  const emit=()=>onState(Object.freeze({
-  phase,commercialOrderId,amountArs,checkoutUrl,webOrderId,
+  phase,commercialOrderId,amountArs,checkoutUrl,seguimientoUrl,webOrderId,
   sha256Verified:phase==='carga_verificada',
   uploaded:phase==='carga_verificada'
  }));
@@ -67,6 +68,7 @@ export function crearFlujoR2PagoAntesDeCarga({
   get phase(){return phase},
   get amountArs(){return amountArs},
   get checkoutUrl(){return checkoutUrl},
+  get seguimientoUrl(){return seguimientoUrl},
   get webOrderId(){return webOrderId},
   get sha256(){return sha256},
   get commercialOrderId(){return commercialOrderId},
@@ -125,9 +127,18 @@ export function crearFlujoR2PagoAntesDeCarga({
       data.amountArs!==amountArs||data.filesUploaded!==false)
     throw Error('PREPAGO_ESTADO_CENTRAL_NO_COINCIDE');
    if(data.estado==='revocado'){
-    transition('revocado');return 'revocado';
+    seguimientoUrl=null;transition('revocado');return 'revocado';
    }
    if(data.estado==='pagado_esperando_archivo'&&data.uploadAuthorized===true){
+    if(typeof data.seguimientoUrl==='string'){
+     const u=new URL(data.seguimientoUrl);
+     if(u.protocol!=='https:'||
+        !/^saber-pagos-pruebas\\.[a-z0-9-]+\\.workers\\.dev$/.test(u.hostname)||
+        u.pathname!=='/seguimiento'||u.searchParams.size!==1||
+        !/^[a-f0-9-]{36}\\.[a-f0-9]{64}$/.test(u.searchParams.get('token')||''))
+      throw Error('PREPAGO_SEGUIMIENTO_NO_CONFIABLE');
+     seguimientoUrl=u.href;
+    }
     transition('pagado_esperando_subida');return 'pagado';
    }
    if(data.estado!=='pendiente'||data.uploadAuthorized!==false)
