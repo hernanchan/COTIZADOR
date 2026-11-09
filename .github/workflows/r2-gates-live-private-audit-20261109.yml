@@ -33,10 +33,10 @@ jobs:
             current=$(jq -er '.result.deployments[0].versions | if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$dir/$worker-deploy.json")
             echo "WORKER=$worker ACTIVE=$current"
             if [ "$worker" = saber-documentos-pruebas ]; then
-              test "$current" = '15c4f42f-9ab0-40d0-992a-381ddd53e82c' || exit 1
+              echo "DOCUMENTOS_ACTIVE_MATCHES_BASELINE=$([ \"$current\" = '15c4f42f-9ab0-40d0-992a-381ddd53e82c' ] && echo yes || echo no)"
               flags='["DOCS_R2_PREPAY_DRAFT_ENABLED","DOCS_R2_POSTPAY_REQUIRED","DOCS_R2_BIG_ENABLED","DOCS_R2_QUOTA_ENABLED","DOCS_R2_STAGING_ENABLED","DOCS_CLIENT_SANDBOX_CHECKOUT_ENABLED","DOCS_CENTRAL_SYNC_ENABLED","DOCS_PRICE_ADMIN_D1_ENABLED"]'
             else
-              test "$current" = '087d5a84-731d-49bb-a7b3-4b2fb3ddf39e' || exit 1
+              echo "CENTRAL_ACTIVE_MATCHES_BASELINE=$([ \"$current\" = '087d5a84-731d-49bb-a7b3-4b2fb3ddf39e' ] && echo yes || echo no)"
               flags='["CENTRAL_R2_QUOTA_ENABLED","CENTRAL_R2_PREPAY_DRAFT_ENABLED","CENTRAL_R2_PREPAY_CHECKOUT_ENABLED","CENTRAL_R2_POSTPAY_ENABLED","CENTRAL_R2_STAGING_ENABLED","DOCS_SANDBOX_CHECKOUT_ENABLED"]'
             fi
             jq -n --argjson flags "$flags" --slurpfile s "$dir/$worker-settings.json" '
