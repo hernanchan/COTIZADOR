@@ -2486,6 +2486,7 @@ body.price-only #priceAdminFieldset summary{font-size:1.3rem}
 <fieldset><legend>Detalle de pedido e instrucciones</legend>
 <div id="details">Elegí «Detalle» en un pedido para consultar las instrucciones, archivos e historial.</div></fieldset>
 <fieldset><legend>Polaroids Express · PDF privado único</legend><button id="refreshExpress" class="outline">Consultar PDF recibidos</button><p class="note">Hasta cuatro hojas A4 por pedido. Archivo listo en Drive privado; el pago todavía no está confirmado.</p><ol id="expressReceipts"></ol></fieldset>
+<fieldset><legend>Ploteos grandes pagados · revisión de preprensa</legend><div class="toolbar"><button id="refreshR2Paid" class="outline">Consultar originales R2 pagados</button></div><p class="note">Pago acreditado y archivo recibido son etapas distintas. Las páginas, medidas y precio final deben verificarse antes de imprimir. Sin producción automática.</p><ol id="r2PaidReview"></ol></fieldset>
 <fieldset><legend>Recepciones de PDF verificadas sin pedido comercial</legend><div class="toolbar"><button id="refreshReceipts" class="outline">Consultar recepciones pendientes</button></div><p class="note">Documentos confirmados en Drive, todavía no vinculados a un pedido cobrado. No están listos para imprimir.</p><ol id="verifiedReceipts"></ol></fieldset>
 
 <fieldset><legend>Pedidos con PDF y pago pendiente</legend><button id="refreshUnpaid" class="outline">Consultar pedidos sin pago confirmado</button><ol id="unpaidDocs"></ol></fieldset>
@@ -3361,6 +3362,33 @@ document.querySelector("#refreshExpress").addEventListener("click",async()=>{
   }
   status.textContent=info.manifests.length+" pedido(s) Polaroids Express recibido(s)";
  }catch(e){status.textContent=e.message}
+});
+document.querySelector("#refreshR2Paid").addEventListener("click",async()=>{
+ const list=document.querySelector("#r2PaidReview");
+ list.replaceChildren(node("li","Consultando pagos y originales..."));
+ try{
+  const data=await api("/admin/api/central/r2-paid-review");
+  list.replaceChildren();
+  const rows=Array.isArray(data.orders)?data.orders:[];
+  if(!rows.length)list.append(node("li","Sin ploteos grandes pagados pendientes."));
+  for(const r of rows){
+   const statusName=r.estado==="RECIBIDO_PENDIENTE_PREPRENSA"
+    ?"Original recibido · verificar contenido, medida y precio"
+    :r.estado==="PAGADO_ESPERANDO_ARCHIVO"
+    ?"Pago acreditado · esperando archivo del comprador"
+    :"ATENCIÓN · el archivo recibido no coincide con la reserva";
+   const item=node("li",(r.webOrderId||"Orden sin referencia")+" · "+money(r.amountArs)+" · "+statusName);
+   item.append(node("p","Pedido comercial: "+r.commercialOrderId+
+    " · "+(Number(r.expectedBytes)/1048576).toFixed(1)+" MiB previstos"+
+    " · "+r.declaredPages+" página(s) declarada(s), aún sin validar"));
+   if(r.receiptId)item.append(node("p","Referencia del original en R2: "+r.receiptId));
+   item.append(node("p","No habilitado para impresión ni ZIP de producción hasta completar preprensa."));
+   list.append(item);
+  }
+  status.textContent=rows.length+" ploteo(s) grandes pagados en revisión";
+ }catch(e){
+  list.replaceChildren(node("li","No se pudo consultar R2: "+String(e.message||e)));
+ }
 });
 document.querySelector("#refreshReceipts").addEventListener("click",async()=>{
  const list=document.querySelector("#verifiedReceipts");
@@ -4431,6 +4459,11 @@ export default {
     if(url.pathname==="/admin/api/central/mobile-invite")return await createMobileInvite(req,env);
     if(url.pathname==="/admin/api/central/resource-capacity")return await etaResourcesApi(req,env);
     if(url.pathname==="/admin/api/central/productivity-samples")return await etaSamplesApi(req,env);
+   if(url.pathname==="/admin/api/central/r2-paid-review"&&req.method==="GET"){
+    if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+    const {listarR2PagadosRevision}=await import("./r2-prepago-revision-central.mjs");
+    return await listarR2PagadosRevision(req,env,{authorized:true});
+   }
    if(url.pathname==="/admin/api/orders"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
     await ensurePaymentReviews(env);
