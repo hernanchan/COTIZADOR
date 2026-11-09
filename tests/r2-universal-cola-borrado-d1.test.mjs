@@ -36,10 +36,10 @@ function mock({delivered=true,paid=true,received=true,approved=true,scope=true}=
   },
   async all(){
    if(sql.includes('FROM central_r2_universal_files f'))return {results:rows};
-   if(sql.includes('FROM central_r2_universal_purge_files WHERE order_id=?'))
-    return {results:queue};
    if(sql.includes('SELECT * FROM central_r2_universal_purge_files'))
     return {results:queue.filter(x=>x.state!=='deleted')};
+   if(sql.includes('FROM central_r2_universal_purge_files WHERE order_id=?'))
+    return {results:queue};
    throw Error('Unknown all query '+sql);
   },
   async run(){
