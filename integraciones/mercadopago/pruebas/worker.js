@@ -4488,6 +4488,12 @@ export default {
     if(url.pathname==="/admin/api/central/mobile-invite")return await createMobileInvite(req,env);
     if(url.pathname==="/admin/api/central/resource-capacity")return await etaResourcesApi(req,env);
     if(url.pathname==="/admin/api/central/productivity-samples")return await etaSamplesApi(req,env);
+   if(url.pathname==="/admin/api/central/r2-prepress-approve"&&req.method==="POST"){
+    if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+    await centralTables(env);
+    const {aprobarPreprensaR2}=await import("./r2-prepago-aprobacion-central.mjs");
+    return await aprobarPreprensaR2(req,env,{authorized:true});
+   }
    if(url.pathname==="/admin/api/central/r2-paid-review"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
     const {listarR2PagadosRevision}=await import("./r2-prepago-revision-central.mjs");
