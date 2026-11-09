@@ -147,3 +147,23 @@ test('lectura de Central: sólo personal, ficha con tres trabajos y sin autoriza
  assert.equal(data.drafts[0].productionAuthorized,false);
  assert.equal(data.drafts[0].checkoutEnabled,false);
 });
+
+
+test('A3 pesado y anillado conjunto TUS/R2 conservan desglose único',()=>{
+ const docs=[
+  {...a4('Libro grande.pdf'),anillado:'grupo',grupoAnillado:'1'},
+  {...a4('Capitulos.pdf'),anillado:'grupo',grupoAnillado:'1'},
+  {...a4('Lámina A3.pdf'),paginas:[{numero:1,anchoCm:29.7,altoCm:42,modo:'sin-clasificar'}]}
+ ];
+ const meta=docs.map((a,i)=>({fileId:'f_'+i,nombre:a.nombre,
+  sha256:String(i+3).repeat(64),bytes:[60*MIB,2*MIB,70*MIB][i]}));
+ const q=fichaPrearchivoUniversal({webOrderId,archivos:docs,manifiestos:meta,tarifario});
+ assert.deepEqual(q.archivos.map(f=>f.transporte),['r2','tus','r2']);
+ assert.equal(q.archivos[2].formatoFinal,'a3');
+ assert.equal(q.archivos[2].destino,'documentos');
+ assert.equal(q.armados.length,1);
+ assert.equal(q.armados[0].archivos.length,2);
+ assert.equal(q.armados[0].grupo,'1');
+ assert.equal(q.totalArs,q.archivos.reduce((sum,f)=>sum+f.importeArs,0)+q.armados[0].subtotal);
+ assert.ok(q.armados[0].subtotal>0);
+});
