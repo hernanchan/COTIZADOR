@@ -78,9 +78,9 @@ export async function reservarCupoR2Central(request,env,{readSigned}={}){
   "WHERE state='reserved') <= ? "+
   'AND (SELECT COALESCE(SUM(bytes),0) FROM central_r2_large_reservations '+
   "WHERE state='reserved') + ? <= ? "+
-  '(SELECT COUNT(*) FROM central_r2_large_reservations '+
+  'AND (SELECT COUNT(*) FROM central_r2_large_reservations '+
   "WHERE web_order_id=? AND state='reserved') < ? "+
-  '(SELECT COALESCE(SUM(bytes),0) FROM central_r2_large_reservations '+
+  'AND (SELECT COALESCE(SUM(bytes),0) FROM central_r2_large_reservations '+
   "WHERE web_order_id=? AND state='reserved') + ? <= ?";
  try{
   const result=await env.DB.prepare(sql).bind(
