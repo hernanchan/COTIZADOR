@@ -3492,7 +3492,9 @@ async function refresh({silent=false,force=false}={}){
   }
   document.querySelector("#count-other").textContent=other;
   if(other===0)orders.append(node("p","No hay otros pedidos pagados."));
-  if(!silent)status.textContent="Tablero actualizado · "+
+  if(response.r2ReviewUnavailable){
+   status.textContent="ATENCIÓN: no se pudo cargar la cola de R2 pagados. Reintentá; los pedidos documentales siguen visibles.";
+  }else if(!silent)status.textContent="Tablero actualizado · "+
    (counts.pendiente+counts.en_preparacion+counts.listo+counts.en_espera)+" trabajos activos";
  }catch(e){status.textContent="No se pudo actualizar el tablero: "+String(e.message||e)}
  finally{refreshingBoard=false}
@@ -4729,6 +4731,7 @@ export default {
     // Mostrar TODOS los R2 pagos pendientes en Nuevos, aunque falte la
     // preprensa. Solo la ficha aprobada habilita acciones de producción.
     const board=Array.isArray(rows.results)?rows.results:[];
+    let r2ReviewUnavailable=false;
     if(env.CENTRAL_R2_PREPAY_DRAFT_ENABLED==="PRIVATE_TEST_ONLY"&&
        env.CENTRAL_R2_STAGING_ENABLED==="PRIVATE_TEST_ONLY"){
      try{
@@ -4750,12 +4753,12 @@ export default {
        });
       }
      }catch(_){
-      // Falla visible, no permitir que un pedido pagado quede oculto
-      // como "Otros" por una excepción de la cola de revisión.
-      return json({error:"No se pudo cargar la cola de ploteos R2; reintentá."},503);
+      // No derribar el tablero TUS si falla el listado R2.
+      // Exponer alerta explícita al operador sin fingir que la cola está vacía.
+      r2ReviewUnavailable=true;
      }
     }
-    return json({orders:board});
+    return json({orders:board,r2ReviewUnavailable});
    }
    // Un pedido histórico se numera SOLO al solicitar su ficha desde un
    // POST administrativo. No mutar D1 en GET ni renumerar pedidos ya asignados.
