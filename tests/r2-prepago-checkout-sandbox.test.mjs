@@ -176,3 +176,18 @@ test('Documentos: rechazo Central 503 propaga sólo código permitido, no detall
  assert.equal(b.status,503);
  assert.equal((await b.json()).reasonCode,'R2_PREPAGO_ERROR_INTERNO');
 });
+
+test('Central: clave DEMO existente de longitud previa no bloquea R2; verificación delegada a checkout',async()=>{
+ const f=fake();
+ f.env.DEMO_ADMIN_KEY='saber-ensayo-2026';
+ const r=await f.call();
+ assert.equal(r.status,200);
+ assert.equal((await r.json()).ok,true);
+ assert.equal(f.dispatches,1);
+ const missing=fake();
+ missing.env.DEMO_ADMIN_KEY='';
+ const denied=await missing.call();
+ assert.equal(denied.status,503);
+ assert.equal((await denied.json()).error,'R2_PREPAGO_PASARELA_NO_CONFIGURADA');
+ assert.equal(missing.dispatches,0);
+});
