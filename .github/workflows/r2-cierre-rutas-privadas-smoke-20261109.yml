@@ -1,0 +1,38 @@
+name: Saber R2 - comprobar rutas nuevas tras despliegue privado sin modificar pedidos
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/r2-cierre-rutas-privadas-smoke-20261109.yml]
+permissions:
+  contents: read
+jobs:
+  routes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Seguridad y salud en Workers reales - solo lectura, cero pagos y borrados
+        shell: bash
+        run: |
+          set -euo pipefail
+          central='https://saber-pagos-pruebas.libreriasaber.workers.dev'
+          docs='https://saber-documentos-pruebas.libreriasaber.workers.dev'
+          tmp=$(mktemp -d)
+          trap 'rm -rf "$tmp"' EXIT
+          curl -fsS --max-time 25 "$central/health" > "$tmp/health.json"
+          jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$tmp/health.json" >/dev/null
+          code=$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$central/admin/api/orders")
+          test "$code" = 401
+          code=$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' -X POST \
+            -H 'Content-Type: application/json' --data '{}' "$central/admin/api/central/r2-prepress-approve")
+          test "$code" = 401
+          code=$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' -X POST \
+            -H 'Content-Type: application/json' --data '{}' "$central/internal/central/r2-production-sheet")
+          test "$code" = 401
+          code=$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$docs/prueba-v2/r2-preprensa-personal")
+          test "$code" = 401
+          code=$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' -X POST \
+            -H "Origin: $docs" -H 'Content-Type: application/json' --data '{}' \
+            "$docs/prueba-v2/api/ensayo-r2-ficha-produccion-personal")
+          test "$code" = 401
+          echo 'R2_WORKERS_PRIVATE_ROUTES_FAIL_CLOSED_PAYMENT_OFF'
+          echo 'NO_CREATE_ORDER_NO_PAYMENT_NO_R2_UPLOAD_DELETE_OR_DELIVERY'
