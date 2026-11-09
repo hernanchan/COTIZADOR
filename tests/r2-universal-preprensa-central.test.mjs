@@ -42,7 +42,8 @@ function build({paid=true,received=true,r2Receipt=true}={}){
   CENTRAL_R2_UNIVERSAL_PACKAGE_ENABLED:'PRIVATE_TEST_ONLY',
   CENTRAL_R2_UNIVERSAL_PREPRESS_ENABLED:'PRIVATE_TEST_ONLY',
   DOCS_SANDBOX_CHECKOUT_ENABLED:'PRIVATE_TEST_ONLY'};
- env.DB={prepare(sql){return {sql,args:[],bind(...a){this.args=a;return this},
+ env.DB={async batch(){throw Error('batch not needed by immutable approval');},
+  prepare(sql){return {sql,args:[],bind(...a){this.args=a;return this},
   async all(){
    if(sql.includes('FROM order_items'))return {results:[{
     sku:'PDF_UNIVERSAL_PREPAID',quantity:1,
