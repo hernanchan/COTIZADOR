@@ -26,7 +26,7 @@ jobs:
           curl -fsS --max-time 25 -H "Authorization: Bearer $TOKEN" \
             "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-pagos-pruebas/settings" > "$tmp"
           jq -e '.success==true' "$tmp" >/dev/null
-          for key in DB MP_TEST_ACCESS_TOKEN DEMO_ADMIN_KEY MP_TEST_SELLER_ID TEST_WEBHOOK_URL MP_WEBHOOK_SECRET CENTRAL_BRIDGE_ENABLED CENTRAL_BRIDGE_KEY CENTRAL_R2_PREPAY_CHECKOUT_ENABLED CENTRAL_R2_PREPAY_DRAFT_ENABLED DOCS_SANDBOX_CHECKOUT_ENABLED; do
+          for key in DB MP_TEST_ACCESS_TOKEN DEMO_ADMIN_KEY MP_TEST_SELLER_ID TEST_WEBHOOK_URL MP_WEBHOOK_SECRET CENTRAL_BRIDGE_ENABLED CENTRAL_BRIDGE_KEY CENTRAL_R2_PREPAY_CHECKOUT_ENABLED CENTRAL_R2_PREPAY_DRAFT_ENABLED CENTRAL_R2_STAGING_ENABLED DOCS_SANDBOX_CHECKOUT_ENABLED; do
             jq -r --arg n "$key" '
               (.result.bindings|map(select(.name==$n))|first) as $x |
               if $x==null then "MISSING="+$n
