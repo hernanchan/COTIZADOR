@@ -4685,7 +4685,18 @@ export default {
       trackingLink: id=>trackingUrl(env,id,req.url)
     });
    }
-   if(url.pathname==="/internal/central/r2-universal-order"){
+   if(url.pathname==="/internal/central/r2-universal-checkout"){
+     const {checkoutUniversalSandboxCentral}=await import("./r2-universal-checkout-central.mjs");
+     return await checkoutUniversalSandboxCentral(req,env,{
+      readSigned:centralReadSigned,dispatch:async internal=>this.fetch(internal,env),
+      reconcile:reconcileCustomerPaymentIfDue
+     });
+    }
+    if(url.pathname==="/internal/central/r2-universal-payment-lookup"){
+     const {consultarPagoUniversalR2}=await import("./r2-universal-checkout-central.mjs");
+     return await consultarPagoUniversalR2(req,env,{readSigned:centralReadSigned});
+    }
+    if(url.pathname==="/internal/central/r2-universal-order"){
      const {promoverPedidoUniversalD1}=await import("./r2-universal-order-central.mjs");
      return await promoverPedidoUniversalD1(req,env,{readSigned:centralReadSigned});
     }
@@ -5069,8 +5080,13 @@ export default {
     // un carrito mixto o un cambio de título nunca puede eludirla.
     await ensureOrderItems(env);
     const restricted=await env.DB.prepare("SELECT sku FROM order_items WHERE order_id=? AND sku IN ('DOCS_VERIFIED','POLAROID_EXPRESS_A4','R2_PREPAID_PLOT','PDF_UNIVERSAL_PREPAID') ORDER BY CASE WHEN sku='POLAROID_EXPRESS_A4' THEN 0 WHEN sku='R2_PREPAID_PLOT' THEN 1 ELSE 2 END LIMIT 1").bind(orderId).first();
-    if(restricted?.sku==="PDF_UNIVERSAL_PREPAID")
-     return json({error:"Pedido universal aún no habilitado para pagar: falta recepción mixta verificada"},503);
+    if(restricted?.sku==="PDF_UNIVERSAL_PREPAID"){
+      const {verificarPedidoUniversalCobrable}=await import("./r2-universal-checkout-central.mjs");
+      const approved=await verificarPedidoUniversalCobrable(env,order.id);
+      if(!approved.ok)
+       return json({error:"Pedido universal no apto para cobro Sandbox",
+        reason:approved.reason},503);
+     }
     if(restricted?.sku==="POLAROID_EXPRESS_A4")return json({error:"Cobro de Polaroids Express todavía deshabilitado"},503);
      if(restricted?.sku==="R2_PREPAID_PLOT"){
       if(env.CENTRAL_R2_PREPAY_CHECKOUT_ENABLED!=="PRIVATE_TEST_ONLY"||
