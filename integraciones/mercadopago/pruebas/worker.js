@@ -4707,6 +4707,14 @@ export default {
       reconcile:reconcileCustomerPaymentIfDue
      });
     }
+    if(url.pathname==="/internal/central/r2-universal-package-manifest"){
+     const {consultarPaqueteUniversalCentral}=await import("./r2-universal-package-central.mjs");
+     return consultarPaqueteUniversalCentral(req,env,{readSigned:centralReadSigned});
+    }
+    if(url.pathname==="/internal/central/r2-universal-package-file"){
+     const {consultarArchivoUniversalCentral}=await import("./r2-universal-package-central.mjs");
+     return consultarArchivoUniversalCentral(req,env,{readSigned:centralReadSigned});
+    }
     if(url.pathname==="/internal/central/r2-universal-tus-gate"){
      const {autorizarTUSUniversalCentral}=await import("./r2-universal-tus-central.mjs");
      return autorizarTUSUniversalCentral(req,env,{readSigned:centralReadSigned});
