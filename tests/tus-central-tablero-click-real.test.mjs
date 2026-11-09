@@ -259,6 +259,8 @@ test('R2 permite control y aprobación en la misma tarjeta, sin prompts de medid
  assert.ok(panel.children.some(e=>e.tagName==='a'&&String(e.href).includes('r2-preprensa-personal')));
  const labels=panel.children.filter(e=>e.tagName==='label');
  const dimensions=labels[0].children[0],checkbox=labels[1].children[0];
+ assert.equal(dimensions.value,'59.4 x 84.1','las medidas cotizadas ya aparecen precargadas');
+ assert.match(labels[0].textContent,/Medidas del presupuesto/);
  const save=panel.children.find(e=>e.textContent==='Aprobar preprensa');
  const feedback=panel.children.find(e=>e.className==='delivery-feedback');
  assert.ok(save);
