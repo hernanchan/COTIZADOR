@@ -1,0 +1,101 @@
+name: Saber universal - subir versiones inactivas Documentos y Central (SIN DEPLOY)
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths:
+      - .github/workflows/saber-universal-stage-workers-no-deploy.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: saber-universal-stage-private-no-deploy
+  cancel-in-progress: false
+jobs:
+  staged-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Bundle integral y seguridad - sin usar Cloudflare todavía
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.25.12
+          cd integraciones/autocotizador/recepcion
+          npm install --no-audit --no-fund
+          npm run build:unificado
+          node --check dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq '/prueba-v2/universal-paquete' dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq '/internal/r2-universal-purge-delivered' dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq '/prueba-v2/flujo-universal.mjs' dist/saber-documentos-cotizador-fase4.mjs
+          cd ../../..
+          npx esbuild integraciones/mercadopago/pruebas/worker.js \
+            --bundle --format=esm --platform=browser --target=es2022 \
+            --outfile=/tmp/saber-universal-central-private.mjs
+          node --check /tmp/saber-universal-central-private.mjs
+          grep -Fq '/internal/central/r2-universal-package-manifest' /tmp/saber-universal-central-private.mjs
+          grep -Fq 'central_r2_universal_purge_files' /tmp/saber-universal-central-private.mjs
+          grep -Fq '/admin/api/central/r2-universal-prepress-approve' /tmp/saber-universal-central-private.mjs
+          echo 'BOTH_WORKERS_BUNDLE_AND_UNIVERSAL_ROUTES_VERIFIED_NO_DEPLOY'
+      - name: Cargar a Cloudflare versiones INACTIVAS con mismos bindings, sin desplegar
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          dir=$(mktemp -d)
+          trap 'rm -rf "$dir"' EXIT
+          printf '{"branch":"private","deployed":false,"versions":{}}' > /tmp/saber-universal-inactive-versions.json
+          for worker in saber-documentos-pruebas saber-pagos-pruebas; do
+            root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/$worker"
+            curl -fsS --max-time 30 -H "Authorization: Bearer $TOKEN" "$root/settings" > "$dir/settings.json"
+            curl -fsS --max-time 30 -H "Authorization: Bearer $TOKEN" "$root/deployments" > "$dir/deploy-before.json"
+            jq -e '.success==true and (.result.bindings|type=="array")' "$dir/settings.json" >/dev/null
+            active=$(jq -er '.result.deployments[0].versions | if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$dir/deploy-before.json")
+            echo "$worker CURRENT_ACTIVE_PRIVATE=$active"
+            test -n "$active"
+            jq -n --arg sha "$GITHUB_SHA" --slurpfile s "$dir/settings.json" \
+              '{main_module:"index.mjs",annotations:{"workers/message":"Saber universal: version inactiva de prueba SIN deploy","workers/commit_sha":$sha},bindings:[$s[0].result.bindings[]|{name,type:"inherit"}]}' > "$dir/metadata.json"
+            if [ "$worker" = saber-documentos-pruebas ]; then
+              artifact=integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
+            else
+              artifact=/tmp/saber-universal-central-private.mjs
+            fi
+            code=$(curl --silent --show-error --max-time 150 \
+              -o "$dir/upload.json" -w '%{http_code}' -H "Authorization: Bearer $TOKEN" \
+              -F "metadata=@$dir/metadata.json;type=application/json" \
+              -F "index.mjs=@$artifact;filename=index.mjs;type=application/javascript+module" \
+              "$root/versions?bindings_inherit=strict")
+            if [ "$code" != 200 ] || ! jq -e '.success==true and (.result.id|type=="string")' "$dir/upload.json" >/dev/null; then
+              echo "PRIVATE_INACTIVE_STAGE_FAILED worker=$worker http=$code"
+              jq -c '{success,errors:[.errors[]?|{code,message}]}' "$dir/upload.json" || true
+              exit 1
+            fi
+            candidate=$(jq -r '.result.id' "$dir/upload.json")
+            curl -fsS --max-time 25 -H "Authorization: Bearer $TOKEN" "$root/deployments" > "$dir/deploy-after.json"
+            observed=$(jq -er '.result.deployments[0].versions | if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$dir/deploy-after.json")
+            test "$observed" = "$active" || { echo "ACTIVE_WORKER_CHANGED_UNEXPECTEDLY";exit 1; }
+            jq --arg worker "$worker" --arg active "$active" --arg candidate "$candidate" \
+              '.versions[$worker]={baseline:$active,inactive:$candidate}' \
+              /tmp/saber-universal-inactive-versions.json > "$dir/versions.tmp"
+            mv "$dir/versions.tmp" /tmp/saber-universal-inactive-versions.json
+            echo "$worker STAGED_INACTIVE=$candidate ACTIVE_UNCHANGED=$active"
+          done
+          echo 'BOTH_PRIVATE_VERSIONS_STAGED_NO_DEPLOY_NO_MP_NO_STORAGE_DELETIONS'
+      - name: Guardar identificadores de versiones inactivas para posible rollback
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: saber-universal-inactive-versions
+          path: /tmp/saber-universal-inactive-versions.json
+          retention-days: 7
