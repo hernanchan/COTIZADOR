@@ -1,0 +1,149 @@
+name: Saber R2 - referencia operario real y preprensa SOLO documentos privados
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/r2-preprensa-recibo-privado-deploy-20261109.yml]
+permissions:
+  contents: read
+concurrency:
+  group: saber-documentos-private-deploy
+  cancel-in-progress: false
+jobs:
+  diagnosticar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Regresiones exactas, build privado y control de seguridad
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.25.12
+          node --test tests/r2-prepago-checkout-sandbox.test.mjs tests/r2-referencia-personal.test.mjs tests/r2-preprensa-archivo-local.test.mjs
+          node --check integraciones/autocotizador/recepcion/r2-prepago-checkout-documentos.mjs
+          cd integraciones/autocotizador/recepcion
+          npm install --no-audit --no-fund
+          npm run build:unificado
+          node --check dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq '/prueba-v2/api/ensayo-r2-referencia-personal' dist/saber-documentos-cotizador-fase4.mjs
+          echo 'DOCS_BUILD_TEST_OK'
+      - name: Stage, deploy privado seguro y consultar checkout exacto; rollback automatico
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+          PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN" && test -n "$PASSWORD"
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-documentos-pruebas"
+          base="https://saber-documentos-pruebas.libreriasaber.workers.dev"
+          central="https://saber-pagos-pruebas.libreriasaber.workers.dev"
+          auth="Authorization: Bearer $TOKEN"
+          tmp=$(mktemp -d)
+          chmod 700 "$tmp"
+          modified=0
+          baseline='386f05c6-c7d5-4b51-94fb-b09ae4086a97'
+          cleanup(){
+            rc=$?
+            trap - EXIT
+            if [ "$rc" -ne 0 ] && [ "$modified" = 1 ]; then
+              echo 'PRIVATE_DOCS_ROLLBACK_REQUESTED'
+              jq -n --arg id "$baseline" '{strategy:"percentage",versions:[{version_id:$id,percentage:100}],annotations:{"workers/message":"Rollback diagnóstico checkout privado"}}' > "$tmp/rollback.json"
+              if curl -fsS --max-time 60 -H "$auth" -H 'Content-Type: application/json' --data-binary "@$tmp/rollback.json" "$root/deployments" > "$tmp/rollback-result.json" &&
+                 jq -e '.success==true' "$tmp/rollback-result.json" >/dev/null;then
+                curl -fsS --max-time 25 -H "$auth" "$root/deployments" > "$tmp/rollback-check.json"
+                restored=$(jq -er '.result.deployments[0].versions[] | select(.percentage==100) | .version_id' "$tmp/rollback-check.json" | head -n1)
+                if [ "$restored" = "$baseline" ];then echo 'DOCS_ROLLBACK_CONFIRMED';else echo 'DOCS_ROLLBACK_NOT_CONFIRMED';fi
+              else echo 'DOCS_ROLLBACK_FAILED_NEEDS_OPERATOR';fi
+            fi
+            rm -rf "$tmp"
+            exit "$rc"
+          }
+          trap cleanup EXIT
+          curl -fsS --max-time 25 -H "$auth" "$root/settings" > "$tmp/settings.json"
+          curl -fsS --max-time 25 -H "$auth" "$root/deployments" > "$tmp/deployments.json"
+          current=$(jq -er '.result.deployments[0].versions | if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/deployments.json")
+          test "$current" = "$baseline" || { echo 'DOCS_PRIVATE_ACTIVE_CHANGED_STOP';exit 1; }
+          jq -e '.result.bindings|any(.name=="SABER_R2_GRANDES" and .type=="r2_bucket")' "$tmp/settings.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="SABER_CENTRAL" and .type=="service" and .service=="saber-pagos-pruebas")' "$tmp/settings.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="DOCS_R2_POSTPAY_REQUIRED" and .type=="plain_text" and .text=="PRIVATE_TEST_ONLY")' "$tmp/settings.json" >/dev/null
+          test "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$base/prueba-v2/")" = 401
+          curl -fsS --max-time 20 "$central/health" > "$tmp/health.json"
+          jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$tmp/health.json" >/dev/null
+          echo 'PREDEPLOY_PRIVATE_PAYMENTS_OFF_PORTAL_401'
+          jq -n --arg sha "$GITHUB_SHA" --slurpfile s "$tmp/settings.json" '{
+            main_module:"index.mjs",
+            annotations:{"workers/message":"Referencia staff de R2 con HMAC y preprensa pendiente SOLO privado","workers/commit_sha":$sha},
+            bindings:[$s[0].result.bindings[]|{name,type:"inherit"}]
+          }' > "$tmp/metadata.json"
+          status=$(curl -sS --max-time 100 -o "$tmp/new.json" -w '%{http_code}' -H "$auth" \
+            -F "metadata=@$tmp/metadata.json;type=application/json" \
+            -F "index.mjs=@integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs;filename=index.mjs;type=application/javascript+module" \
+            "$root/versions?bindings_inherit=strict")
+          test "$status" = 200 && jq -e '.success==true and (.result.id|type=="string")' "$tmp/new.json" >/dev/null || { echo "DOCS_STAGE_HTTP_$status";exit 1; }
+          candidate=$(jq -r '.result.id' "$tmp/new.json")
+          for version in "$baseline" "$candidate";do
+            curl -fsS --max-time 25 -H "$auth" "$root/versions/$version" > "$tmp/$version.json"
+            jq -S '[.result.resources.bindings[]|if .type=="secret_text" then {name,type} else . end]|sort_by(.name)' "$tmp/$version.json" > "$tmp/$version-bindings"
+            jq -S '.result.resources.script_runtime|{compatibility_date,compatibility_flags,usage_model,limits,placement}' "$tmp/$version.json" > "$tmp/$version-runtime"
+          done
+          cmp "$tmp/$baseline-bindings" "$tmp/$candidate-bindings" >/dev/null || { echo 'DOCS_BINDINGS_DIFFER_NO_DEPLOY';exit 1; }
+          cmp "$tmp/$baseline-runtime" "$tmp/$candidate-runtime" >/dev/null || { echo 'DOCS_RUNTIME_DIFFERS_NO_DEPLOY';exit 1; }
+          curl -fsS --max-time 20 -H "$auth" "$root/deployments" > "$tmp/verify-predeploy.json"
+          current=$(jq -er '.result.deployments[0].versions | if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/verify-predeploy.json")
+          test "$current" = "$baseline" || { echo 'DOCS_CONCURRENT_DEPLOY_STOP';exit 1; }
+          jq -n --arg id "$candidate" '{strategy:"percentage",versions:[{version_id:$id,percentage:100}],annotations:{"workers/message":"Worker Documentos privado, consulta staff por R2 D1 y pago verificado"}}' > "$tmp/promote.json"
+          modified=1
+          curl -fsS --max-time 60 -H "$auth" -H 'Content-Type: application/json' --data-binary "@$tmp/promote.json" "$root/deployments" > "$tmp/promoted.json"
+          jq -e '.success==true' "$tmp/promoted.json" >/dev/null
+          curl -fsS --max-time 30 -H "$auth" "$root/deployments" > "$tmp/active.json"
+          test "$(jq -er '.result.deployments[0].versions | if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/active.json")" = "$candidate"
+          test "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$base/prueba-v2/")" = 401
+          curl -fsS --max-time 20 "$central/health" > "$tmp/health-final.json"
+          jq -e '.paymentsEnabled==false and .databaseReady==true' "$tmp/health-final.json" >/dev/null
+          echo "DOCS_PRIVATE_STAFF_REF_DEPLOYED=$candidate"
+          # Sólo personal con Basic puede resolver el recibo, después de
+          # pago firmado, reserva D1, recepción D1 y ETag R2 actual.
+          test "$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' \
+            -H "Origin: $base" -H 'Content-Type: application/json' \
+            -X POST --data '{}' "$base/prueba-v2/api/ensayo-r2-referencia-personal")" = 403
+          echo 'STAFF_R2_ENDPOINT_REJECTS_UNAUTHENTICATED'
+          refpayload='{"webOrderId":"WEB-ENSAYO-255BFE122477AC6C7666EB6D342707FE","fileId":"planoA1","sha256":"68efbfed36babb0b76d3cf98d547d94b2af00af4dcbbd619d04f1c9f7fa13ee5","bytes":62915011}'
+          httpref=$(curl -sS --max-time 85 -u "operador:$PASSWORD" \
+            -H "Origin: $base" -H 'Content-Type: application/json' \
+            -o "$tmp/receipt.json" -w '%{http_code}' -X POST \
+            --data "$refpayload" "$base/prueba-v2/api/ensayo-r2-referencia-personal")
+          echo "STAFF_R2_REFERENCE_HTTP=$httpref"
+          if [ "$httpref" != 200 ];then
+            jq -c '{ok,error}' "$tmp/receipt.json"
+            exit 1
+          fi
+          jq -e '.ok==true and .paidVerified==true and .received==true and
+            .bytes==62915011 and .declaredPages==1 and 
+            (.receiptId|test("^DOC-[a-f0-9-]{36}$")) and
+            .readyForPrinting==false and .productionAuthorized==false' "$tmp/receipt.json" >/dev/null
+          echo 'STAFF_R2_PAYMENT_RESERVATION_D1_ETAG_MATCHED'
+
+          payload='{"action":"status","webOrderId":"WEB-ENSAYO-255BFE122477AC6C7666EB6D342707FE","commercialOrderId":"66f10bd2-77ce-46ef-930c-49dc3d22d23e"}'
+          code=$(curl -sS --max-time 65 -u "operador:$PASSWORD" \
+             -H "Origin: $base" -H 'Content-Type: application/json' \
+             -o "$tmp/start.json" -w '%{http_code}' -X POST --data "$payload" \
+             "$base/prueba-v2/api/ensayo-r2-prepago-checkout")
+          echo "EXISTING_R2_CHECKOUT_HTTP=$code"
+          jq -c '{ok,error,reasonCode,estado,amountArs,hasLink:(.checkoutUrl!=null),uploadAuthorized}' "$tmp/start.json"
+          if [ "$code" = 200 ];then
+            jq -e '.ok==true and .amountArs==4400 and .estado=="pagado_esperando_archivo" and .uploadAuthorized==true' "$tmp/start.json" >/dev/null
+            echo 'PAID_MP_CONFIRMED_PREPRESS_STAFF_ENABLED_NO_NEW_UPLOAD'
+          elif [ "$code" = 503 ] || [ "$code" = 409 ];then
+            jq -e '.ok==false and (.reasonCode|type=="string")' "$tmp/start.json" >/dev/null
+            echo 'EXISTING_R2_MP_STATUS_REJECTION_DIAG'
+          else echo 'EXISTING_R2_MP_UNEXPECTED_HTTP';exit 1;fi
+          echo 'PRIVATE_ONLY_NO_MAIN_NO_REAL_PAYMENT_NO_R2_BYTES'
