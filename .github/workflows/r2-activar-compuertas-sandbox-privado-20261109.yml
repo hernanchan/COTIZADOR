@@ -62,7 +62,7 @@ jobs:
               required='["DB","CENTRAL_BRIDGE_KEY","MP_TEST_ACCESS_TOKEN","MP_TEST_SELLER_ID","DEMO_ADMIN_KEY","DOCS_SANDBOX_CHECKOUT_ENABLED"]'
               jq -e '.result.bindings|any(.name=="DOCS_SANDBOX_CHECKOUT_ENABLED" and .type=="plain_text" and .text=="PRIVATE_TEST_ONLY")' "$dir/$w-before.json" >/dev/null
             else
-              test "$current" = '15c4f42f-9ab0-40d0-992a-381ddd53e82c'
+              test "$current" = 'e5cb3961-d814-4919-8b66-a7e2f3092192'
               flags='["DOCS_R2_PREPAY_DRAFT_ENABLED","DOCS_R2_POSTPAY_REQUIRED","DOCS_R2_BIG_ENABLED","DOCS_R2_QUOTA_ENABLED","DOCS_R2_STAGING_ENABLED"]'
               required='["SABER_R2_GRANDES","SABER_CENTRAL","DOCS_R2_RECEIPT_KEY","DOCS_CENTRAL_SYNC_ENABLED","DOCS_PRICE_ADMIN_D1_ENABLED","DOCS_CLIENT_SANDBOX_CHECKOUT_ENABLED","CENTRAL_BRIDGE_KEY","CENTRAL_TEST_URL","DOCS_V2_PRIVATE_UI_SECRET"]'
               jq -e '.result.bindings|any(.name=="SABER_R2_GRANDES" and .type=="r2_bucket" and .bucket_name=="saber-documentos-grandes-ensayo-20261106")' "$dir/$w-before.json" >/dev/null
