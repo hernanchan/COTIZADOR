@@ -17,12 +17,13 @@ export async function listarR2PagadosRevision(request,env,{authorized=false}={})
   return respond({ok:false,error:'R2_REVISION_NO_CONFIGURADA'},503);
  const tables=await env.DB.prepare(
   "SELECT name FROM sqlite_master WHERE type='table' AND name IN "+
-  "('central_r2_prepaid_intents','central_r2_large_pending','payment_reviews')"
+  "('central_r2_prepaid_intents','central_r2_large_pending','payment_reviews','central_r2_prepress_approvals')"
  ).all();
  const present=new Set((tables.results||[]).map(row=>row.name));
  if(['central_r2_prepaid_intents','central_r2_large_pending','payment_reviews']
     .some(name=>!present.has(name)))
   return respond({ok:true,orders:[],count:0,productionAuthorized:false});
+ const hasApproved=present.has('central_r2_prepress_approvals');
  const sql=
   'SELECT i.web_order_id,i.file_id,i.commercial_order_id,i.amount_ars,'+
   'i.bytes AS expected_bytes,i.sha256 AS expected_sha256,i.declared_pages,'+
@@ -38,9 +39,11 @@ export async function listarR2PagadosRevision(request,env,{authorized=false}={})
   'p.web_order_id=i.web_order_id AND p.file_id=i.file_id '+
   'LEFT JOIN order_items t ON t.order_id=i.commercial_order_id '+
   "AND t.sku='R2_PREPAID_PLOT' AND t.line_number=1 "+
+  (hasApproved?'LEFT JOIN central_r2_prepress_approvals a ON a.order_id=o.id ':'')+
   'WHERE o.status=\'paid\' AND o.paid_at IS NOT NULL '+
   'AND o.deposit_ars=o.amount_ars AND v.state=\'verified\' '+
   'AND i.state NOT IN (\'cancelled\',\'delivered\') '+
+  (hasApproved?'AND a.order_id IS NULL ':'')+
   'ORDER BY o.paid_at DESC LIMIT 50';
  const data=await env.DB.prepare(sql).all();
  const orders=(data.results||[]).map(row=>{

@@ -3429,6 +3429,44 @@ document.querySelector("#refreshR2Paid")?.addEventListener("click",async()=>{
      item.append(link);
     }
    }
+   if(r.verifiedReceipt&&r.quotedParametersAvailable&&r.quoteSnapshot){
+    const approve=node("button","Confirmar preprensa y enviar a producción");
+    approve.type="button";
+    approve.addEventListener("click",async()=>{
+     const operator=requestOperator();
+     if(!operator){status.textContent="Falta responsable de preprensa.";return}
+     const count=r.quoteSnapshot.paginas.length;
+     const measured=prompt("Ingresá las medidas REALES leídas del original en Acrobat. "+
+      count+" página(s), cada una ancho x alto en centímetros, separadas por punto y coma. "+
+      "Ejemplo: 59,4 x 84,1; 60 x 90. No copies automáticamente las medidas cotizadas.","");
+     if(measured===null)return;
+     const nums=measured.split(";").map(part=>{
+      const m=part.trim().match(/^(\\d+(?:[,.]\\d+)?)\\s*[x×]\\s*(\\d+(?:[,.]\\d+)?)$/i);
+      return m?[Number(m[1].replace(",",".")),Number(m[2].replace(",","."))]:null;
+     });
+     if(nums.length!==count||nums.some(x=>!x||x.some(n=>!Number.isFinite(n)||n<=0))){
+      status.textContent="Medidas reales inválidas; no se aprobó el ploteo.";return;
+     }
+     const notes=prompt("Constancia breve de revisión del original (mínimo 6 caracteres):","");
+     if(notes===null||notes.trim().length<6){status.textContent="Falta constancia de revisión.";return}
+     if(!confirm("¿Verificaste visualmente contenido PDF, clasificación CAD/póster de CADA página, "+
+      "copias, papel, rollo y precio contra la ficha guardada? "+
+      "Si hay una diferencia, CANCELÁ y resolvé comercialmente antes de producir."))return;
+     approve.disabled=true;
+     try{
+      await apiPost("/admin/api/central/r2-prepress-approve",{
+       schema:"saber-r2-preprensa-aprobacion-v1",orderId:r.commercialOrderId,
+       receiptId:r.receiptId,medidasCm:nums,operator,notes:notes.trim(),
+       confirmed:{contenido:true,clasificacion:true,copias:true,papel:true,
+        rollo:true,precio:true}
+      });
+      status.textContent="Preprensa aprobada en D1. Pedido disponible en el tablero de producción.";
+      await refresh({force:true});document.querySelector("#refreshR2Paid")?.click();
+     }catch(e){status.textContent="NO APROBADO: "+String(e.message||e)}
+     finally{approve.disabled=false}
+    });
+    item.append(approve);
+   }
    item.append(node("p","No habilitado para impresión ni ZIP de producción hasta completar preprensa."));
    list.append(item);
   }
