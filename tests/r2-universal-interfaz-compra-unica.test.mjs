@@ -34,6 +34,7 @@ function setup(){
   if(path.endsWith('/ensayo-r2-orden-universal')){
    assert.equal(p.draftId,ID);
    assert.equal(p.quoteHash,'a'.repeat(64));
+   assert.equal(p.telefono,'3515551234');
    return Response.json({ok:true,webOrderId:ORDER,
     commercialOrderId:ID,numeroOrden:'093',totalArs:12500,
     fileCount:2,checkoutEnabled:false,uploadAuthorized:false,
@@ -55,7 +56,7 @@ function setup(){
  };
  let r2=0,tus=0;
  const flow=crearFlujoUniversalPDF({
-  files,archivos,webOrderId:ORDER,
+  files,archivos,webOrderId:ORDER,telefono:'3515551234',
   fetcher,uuid:()=>ID,
   hasher:async f=>f.size>40*MiB?SHA2:SHA1,
   uploadTus:async args=>{
@@ -121,7 +122,7 @@ test('origen de importe adulterado no genera checkout ni subida',async()=>{
     checkoutEnabled:false,filesUploaded:false});
   throw Error('unexpected');
  }
- const flow=crearFlujoUniversalPDF({files,archivos,webOrderId:ORDER,
+ const flow=crearFlujoUniversalPDF({files,archivos,webOrderId:ORDER,telefono:'3515551234',
   fetcher:badFetcher,uuid:()=>ID,
   hasher:async f=>f.size>40*MiB?SHA2:SHA1,
   uploadR2:async()=>{throw Error('MUST_NOT_UPLOAD')},
@@ -132,10 +133,10 @@ test('origen de importe adulterado no genera checkout ni subida',async()=>{
 test('rechaza lote grande sin R2 o TUS >60MiB',()=>{
  const only=[file('Solo.pdf',2*MiB)];
  assert.throws(()=>crearFlujoUniversalPDF({files:only,archivos:[arch('Solo.pdf')],
-  webOrderId:ORDER}),/UNIVERSAL_CUPO_RECEPCION_INVALIDO/);
+  webOrderId:ORDER,telefono:'3515551234'}),/UNIVERSAL_CUPO_RECEPCION_INVALIDO/);
  const all=[file('1.pdf',35*MiB),file('2.pdf',30*MiB),file('3.pdf',90*MiB)];
  assert.throws(()=>crearFlujoUniversalPDF({files:all,
-  archivos:all.map(x=>arch(x.name)),webOrderId:ORDER}),/UNIVERSAL_CUPO_RECEPCION_INVALIDO/);
+  archivos:all.map(x=>arch(x.name)),webOrderId:ORDER,telefono:'3515551234'}),/UNIVERSAL_CUPO_RECEPCION_INVALIDO/);
 });
 test('Uppy TUS universal no llama registro comercial viejo',async()=>{
  const original=file('Tema.pdf',2*MiB),paths=[];
