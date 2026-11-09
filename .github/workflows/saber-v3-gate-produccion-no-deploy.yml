@@ -9,6 +9,9 @@ on:
       - .github/workflows/saber-v3-gate-produccion-no-deploy.yml
       - integraciones/publicacion/mercadopago-live-preflight.mjs
       - tests/mp-live-verificador-no-deploy.test.mjs
+      - integraciones/autocotizador/recepcion/seleccionar-transporte-pdf.mjs
+      - integraciones/autocotizador/recepcion/carga-unica-cliente.mjs
+      - tests/r2-tamano-independiente-servicio.test.mjs
   workflow_dispatch:
 permissions:
   contents: read
@@ -27,7 +30,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node --test tests/v3-cotizar-preview-nuevo.test.mjs tests/mp-live-verificador-no-deploy.test.mjs
+          node --test tests/v3-cotizar-preview-nuevo.test.mjs tests/mp-live-verificador-no-deploy.test.mjs tests/r2-tamano-independiente-servicio.test.mjs
           node -e "const a=require('./vidriera/portal-comercial.json');if(a.enabled!==false||a.release!=='NO_GO'||a.buyerUrl!==null)process.exit(1);console.log('COMMERCIAL_GATE_DEFAULT_OFF')"
           echo 'MP_LIVE_VALIDATOR_OFFLINE_ONLY_NOT_WIRED_TO_CHECKOUT'
           echo 'NO_GO_UNTIL_EXPLICIT_AUTHORIZATION'

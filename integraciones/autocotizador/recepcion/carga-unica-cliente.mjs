@@ -7,6 +7,7 @@ import {decidirTamanoCliente} from './decision-tamano-impresion.mjs';
 import {clasificarPaginasPloteo} from './clasificar-paginas-ploteo.mjs';
 import {prepararLoteParcial,recomponerLoteParcial} from './cotizar-lote-parcial.mjs';
 import {solicitarCotizacionPrivada} from './solicitar-cotizacion-privada.mjs';
+import {decidirTransportePDF,LIMITE_TUS_PDF_BYTES,LIMITE_R2_PDF_BYTES} from './seleccionar-transporte-pdf.mjs';
 const $=id=>document.getElementById(id);
 const entries=[];
 let modoLote=null; // El usuario elige antes de cargar: común o individual.
@@ -18,8 +19,8 @@ function actualizarModoLote(){
 }
 
 const MAX_PDF_CARGA=location.pathname==='/prueba-v2/carga-inteligente'?10:30;
-const MAX_PDF_TUS_BYTES=40*1024*1024;
-const MAX_PDF_R2_PREPAGO_BYTES=200*1024*1024;
+const MAX_PDF_TUS_BYTES=LIMITE_TUS_PDF_BYTES;
+const MAX_PDF_R2_PREPAGO_BYTES=LIMITE_R2_PDF_BYTES;
 const R2_PREPAGO_ENSAYO=location.pathname==='/prueba-v2/carga-inteligente'&&
  window.parent!==window&&new URLSearchParams(location.search).get('r2Prepago')==='1';
 function admitePrepagoR2Grande(e){
@@ -66,12 +67,19 @@ function alertasRecepcionPDF(){
  for(const e of entries){
   const file=e.archivoOriginal;
   if(!(file instanceof File))continue;
-  if(file.size>MAX_PDF_TUS_BYTES){
-   // Presupuesto de un único ploteo grande: File permanece en cliente.
-   // Sin pago confirmado R2 no recibe ni una parte del original.
-   if(typeof admitePrepagoR2Grande==='function'&&admitePrepagoR2Grande(e))continue;
-   alertas.set(e,'El PDF «'+file.name+'» no se admite: pesa '+tamanoPdfMiB(file)+
-    ' y el máximo actual es 40 MiB por PDF. Los demás archivos siguen cargados.');
+  const transporte=decidirTransportePDF(file.size);
+  if(transporte.ruta==='r2'){
+   // R2 corresponde por TAMAÑO a cualquier PDF. El circuito actual de
+   // Central solo recibe ploteo individual: no cobrar A4/A3 grandes aún.
+   if(admitePrepagoR2Grande(e))continue;
+   alertas.set(e,'El PDF «'+file.name+'» pesa '+tamanoPdfMiB(file)+
+    '. Este tipo de archivo grande todavía necesita recepción especial. '+
+    'Consultanos antes de enviar archivos o realizar pagos.');
+   continue;
+  }
+  if(transporte.ruta==='supera_cupo'){
+   alertas.set(e,'El PDF «'+file.name+'» supera los 200 MiB admitidos en esta versión. '+
+    'Consultanos cómo enviarlo; no se genera pedido ni pago automático.');
    continue;
   }
   if(file.size<5||file.name.length>120||!/\.pdf$/i.test(file.name)){
@@ -809,9 +817,8 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
  bridgeButton.textContent='Agregar PDF al envío privado';
  const info=document.createElement('p');
  info.className='pie';info.setAttribute('role','status');
- info.textContent=R2_PREPAGO_ENSAYO?
-  'PDF de hasta 40 MiB: recepción privada habitual. Un único ploteo PDF de 40–200 MiB: primero presupuesto local, después pago confirmado y recién entonces subida R2. Sin pago, no se almacena ningún original.':
-  'Recepción privada de hasta 10 PDF por pedido (máximo 40 MiB por archivo y 60 MiB en total). Impresiones y ploteos se verifican y registran en la Central. Las páginas elegidas se verifican sobre el PDF original antes de registrar la orden.';
+ info.textContent='Elegí tus PDF, revisá las opciones y el precio de impresión. '+
+  'Si algún archivo necesita recepción especial, te indicaremos cómo continuar antes de confirmar el pedido.';
  const resumen=$('resumenPedido');
  resumen?.parentNode?.insertBefore(bridgeButton,resumen);
  bridgeButton.insertAdjacentElement('afterend',info);
