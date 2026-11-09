@@ -3326,7 +3326,7 @@ function inlineR2Review(order){
     }
     const parts=dimensions.value.trim().split(";").map(x=>x.trim());
     const sizes=parts.map(x=>{
-     const m=x.match(/^(\d+(?:[,.]\d+)?)\s*[x×]\s*(\d+(?:[,.]\d+)?)$/i);
+     const m=x.match(/^(\\d+(?:[,.]\\d+)?)\\s*[x×]\\s*(\\d+(?:[,.]\\d+)?)$/i);
      return m?[Number(m[1].replace(",",".")),Number(m[2].replace(",","."))]:null;
     });
     if(parts.length!==q.paginas.length||sizes.some(x=>!x||x.some(v=>!Number.isFinite(v)||v<=0||v>2000))){
