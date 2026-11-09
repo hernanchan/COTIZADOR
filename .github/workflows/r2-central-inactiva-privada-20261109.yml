@@ -1,0 +1,112 @@
+name: R2 Central - compilar y preparar VERSION INACTIVA del Worker de pruebas
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/r2-central-inactiva-privada-20261109.yml]
+permissions:
+  contents: read
+  statuses: write
+concurrency:
+  group: saber-central-private-deploy
+  cancel-in-progress: false
+jobs:
+  stage-central-inactiva:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Contratos R2, pagos conciliados y Central, sin servicios externos
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.25.12
+          node --test tests/r2-reserva-lookup-central.test.mjs tests/r2-grandes-cuotas-central.test.mjs tests/r2-grandes-central-pendientes.test.mjs tests/r2-prepago-sin-archivo-central.test.mjs tests/r2-prepago-checkout-sandbox.test.mjs tests/r2-recepcion-solo-pagada.test.mjs
+          node --check integraciones/mercadopago/pruebas/worker.js
+      - name: Compilar Worker de Central CON los modulos R2 importados dinamicamente
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./node_modules/.bin/esbuild integraciones/mercadopago/pruebas/worker.js --bundle --format=esm --platform=browser --target=es2022 --outfile=/tmp/saber-central-r2-bundle.mjs
+          node --check /tmp/saber-central-r2-bundle.mjs
+          for marker in '/internal/central/r2-reservation-lookup' 'saber-central-r2-reservation-lookup-v1' '/internal/central/r2-pending-stage' '/internal/central/r2-payment-lookup'; do
+            grep -Fq "$marker" /tmp/saber-central-r2-bundle.mjs || { echo "CENTRAL_MODULE_MISSING"; exit 1; }
+          done
+          if grep -Eq "import\\([\\x27\\x22]\\./r2-" /tmp/saber-central-r2-bundle.mjs; then
+            echo "CENTRAL_BUNDLE_HAS_UNRESOLVED_RELATIVE_IMPORTS"; exit 1
+          fi
+          echo "CENTRAL_BUNDLE_ALL_R2_MODULES_PRESENT"
+      - name: Auditar Cloudflare y crear SOLO version inactiva Central pruebas
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-pagos-pruebas"
+          base="https://saber-pagos-pruebas.libreriasaber.workers.dev"
+          auth="Authorization: Bearer $TOKEN"
+          dir=$(mktemp -d)
+          trap 'rm -rf "$dir"' EXIT
+          curl -fsS --max-time 30 -H "$auth" "$root/settings" > "$dir/settings.json"
+          curl -fsS --max-time 30 -H "$auth" "$root/deployments" > "$dir/deployments.json"
+          jq -e '.success==true and (.result.bindings|type=="array")' "$dir/settings.json" >/dev/null
+          for binding in DB CENTRAL_BRIDGE_KEY DEMO_ADMIN_KEY MP_TEST_ACCESS_TOKEN; do
+            jq -e --arg n "$binding" '.result.bindings|any(.name==$n)' "$dir/settings.json" >/dev/null || { echo "CENTRAL_REQUIRED_BINDING_MISSING_$binding"; exit 1; }
+          done
+          jq -e '.result.bindings|any(.name=="DB" and (.type=="d1" or .type=="d1_database"))' "$dir/settings.json" >/dev/null
+          jq -e '.result.bindings|all(.[]|select(.name=="CENTRAL_R2_QUOTA_ENABLED" or .name=="CENTRAL_R2_POSTPAY_ENABLED" or .name=="CENTRAL_R2_PREPAY_CHECKOUT_ENABLED");.type=="plain_text" and (.text=="OFF" or .text=="PRIVATE_TEST_ONLY"))' "$dir/settings.json" >/dev/null
+          old=$(jq -er '.result.deployments[0].versions | if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$dir/deployments.json")
+          test -n "$old"
+          status=$(curl -sS --max-time 20 -o "$dir/admin.json" -w '%{http_code}' "$base/admin/api/orders")
+          test "$status" = 401 || { echo "CENTRAL_ADMIN_NOT_PRIVATE"; exit 1; }
+          curl -fsS --max-time 20 "$base/health" > "$dir/health.json"
+          jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$dir/health.json" >/dev/null || { echo "CENTRAL_NOT_SAFE_TO_STAGE"; exit 1; }
+          echo "CENTRAL_CURRENT_HEALTH_PRIVATE_NO_REAL_PAYMENTS"
+          jq -n --arg commit "$GITHUB_SHA" --slurpfile s "$dir/settings.json" '{main_module:"index.mjs",annotations:{"workers/message":"Central R2 con dependencias compiladas, SOLO version INACTIVA; trafico sin cambios","workers/commit_sha":$commit},bindings:[$s[0].result.bindings[]|{name,type:"inherit"}]}' > "$dir/metadata.json"
+          http=$(curl -sS --max-time 100 -o "$dir/upload.json" -w '%{http_code}' -H "$auth" -F "metadata=@$dir/metadata.json;type=application/json" -F "index.mjs=@/tmp/saber-central-r2-bundle.mjs;filename=index.mjs;type=application/javascript+module" "$root/versions?bindings_inherit=strict")
+          if [ "$http" != 200 ] || ! jq -e '.success==true and (.result.id|type=="string")' "$dir/upload.json" >/dev/null; then
+            echo "CENTRAL_STAGE_FAILED_HTTP_$http"
+            jq -c '{codes:[.errors[]?|.code]}' "$dir/upload.json" || true
+            exit 1
+          fi
+          candidate=$(jq -r '.result.id' "$dir/upload.json")
+          test "$candidate" != "$old"
+          for id in "$old" "$candidate"; do
+            curl -fsS --max-time 25 -H "$auth" "$root/versions/$id" > "$dir/$id.json"
+            jq -e --arg id "$id" '.success==true and .result.id==$id and (.result.resources.bindings|type=="array")' "$dir/$id.json" >/dev/null
+            jq -S '[.result.resources.bindings[]|if .type=="secret_text" then {name,type} else . end]|sort_by(.name)' "$dir/$id-bindings"
+          done
+          cmp -s "$dir/$old-bindings" "$dir/$candidate-bindings" || { echo "CENTRAL_CANDIDATE_BINDINGS_DIFFER"; exit 1; }
+          curl -fsS --max-time 25 -H "$auth" "$root/deployments" > "$dir/after.json"
+          current=$(jq -er '.result.deployments[0].versions | if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$dir/after.json")
+          test "$current" = "$old" || { echo "CENTRAL_ACTIVE_MOVED_NOT_DEPLOYING"; exit 1; }
+          after_status=$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$base/admin/api/orders")
+          test "$after_status" = 401 || { echo "CENTRAL_PRIVATE_ROUTE_CHANGED"; exit 1; }
+          echo "CENTRAL_VERSION_INACTIVA=$candidate"
+          echo "CENTRAL_ACTIVA_INTACTA=$old"
+          echo "CENTRAL_NO_DEPLOY_NO_PAYMENTS_NO_PUBLIC_WEB"
+      - name: Registrar resultado en commit
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_RESULT: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          if [ "$CI_RESULT" = success ]; then state=success; else state=failure; fi
+          jq -n --arg state "$state" \
+            --arg context 'saber/r2-central-inactiva' \
+            --arg description "Central R2 privada compilada/inactiva: $CI_RESULT" \
+            --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/r2-central-status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/r2-central-status.json >/dev/null
+          echo "STAGE_CENTRAL_RESULT=$CI_RESULT"
