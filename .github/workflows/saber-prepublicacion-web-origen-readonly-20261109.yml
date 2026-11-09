@@ -19,6 +19,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
           TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+          EDITOR_TOKEN: ${{ secrets.SABER_CF_EDITOR_TOKEN }}
         run: |
           set -euo pipefail
           temp=$(mktemp -d)
@@ -46,7 +47,12 @@ jobs:
           base="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/pages"
           auth="Authorization: Bearer $TOKEN"
           status=$(curl -sS --max-time 25 -H "$auth" -o "$temp/projects.json" -w '%{http_code}' "$base/projects?per_page=100")
-          echo "CLOUDFLARE_PAGES_LIST_HTTP=$status"
+          echo "CLOUDFLARE_PAGES_LIST_DEPLOY_TOKEN_HTTP=$status"
+          if [ "$status" = 403 ] && [ -n "${EDITOR_TOKEN:-}" ]; then
+            status=$(curl -sS --max-time 25 -H "Authorization: Bearer $EDITOR_TOKEN" -o "$temp/projects.json" -w '%{http_code}' "$base/projects?per_page=100")
+            echo "CLOUDFLARE_PAGES_LIST_EDITOR_TOKEN_HTTP=$status"
+            if [ "$status" = 200 ]; then auth="Authorization: Bearer $EDITOR_TOKEN"; fi
+          fi
           if [ "$status" = 200 ] && jq -e '.success == true and (.result | type == "array")' "$temp/projects.json" >/dev/null; then
             jq -r '.result[] | select(any(.domains[]?; . == "libreriasaber.com.ar" or . == "www.libreriasaber.com.ar")) | [.name, (.production_branch // ""), (.subdomain // ""), ((.domains // []) | join(","))] | @tsv' "$temp/projects.json" > "$temp/matched.tsv"
             if [ -s "$temp/matched.tsv" ]; then
