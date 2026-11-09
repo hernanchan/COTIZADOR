@@ -78,7 +78,7 @@ jobs:
           curl -fsS --max-time 25 "$base/health" > "$tmp/health-pre.json"
           jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$tmp/health-pre.json" >/dev/null
           test "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$base/admin/api/orders")" = 401
-          test "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$base/admin/api/central/r2-paid-review")" = 401
+          echo 'NEW_R2_REVIEW_ROUTE_CHECK_POSTDEPLOY_ONLY'
           test "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$docs/prueba-v2/")" = 401
           echo 'CENTRAL_PRIVATE_SANDBOX_PREFLIGHT_OK_NO_REAL_PAYMENT'
           jq -n --arg sha "$GITHUB_SHA" --slurpfile s "$tmp/settings.json" '{
@@ -109,6 +109,7 @@ jobs:
           curl -fsS --max-time 25 "$base/health" > "$tmp/health-final.json"
           jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$tmp/health-final.json" >/dev/null
           test "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$base/admin/api/orders")" = 401
+          test "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$base/admin/api/central/r2-paid-review")" = 401
           echo "CENTRAL_R2_REVIEW_PRIVATE_ACTIVE=$candidate"
           payload='{"action":"status","webOrderId":"WEB-ENSAYO-255BFE122477AC6C7666EB6D342707FE","commercialOrderId":"66f10bd2-77ce-46ef-930c-49dc3d22d23e"}'
           http=$(curl -sS --max-time 70 -u "operador:$PASSWORD" -H "Origin: $docs" \
