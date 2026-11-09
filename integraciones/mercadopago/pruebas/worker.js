@@ -1376,6 +1376,25 @@ function centralMergePendingR2Orders(board,reviewOrders){
   // Aprobados, órdenes TUS y pedidos en preparación no se tocan.
   if(existing&&existing.production_state!=null)continue;
   if(existing&&Number(existing.amount_ars)!==r.amountArs)continue;
+  // V1 histórico: pagado pero SIN cotización inmutable de papel/rollo/copias.
+  // No puede pasar la preprensa v2. Conservar el registro de pago pero fuera
+  // de Nuevos: no convertir un ensayo viejo en una orden operativa falsa.
+  if(r.quotedParametersAvailable!==true||r.quoteSnapshot?.schema!=="saber-r2-cotizacion-firmada-v1"){
+   const legacy={
+    production_state:null,
+    r2_legacy_unusable:true,
+    r2_prepress_pending:false,
+    web_order_id:r.webOrderId,
+    r2_receipt_id:r.receiptId,
+    description:"Ensayo R2 histórico · sin ficha completa · "+r.webOrderId.slice(-8)
+   };
+   if(existing)Object.assign(existing,legacy);
+   else board.push({
+    id:r.commercialOrderId,amount_ars:r.amountArs,
+    status:"paid",paid_at:r.paidAt,...legacy
+   });
+   continue;
+  }
   const waiting={
    production_state:"pendiente",production_version:0,
    work_number:null,file_count:r.received?1:0,
@@ -3334,10 +3353,13 @@ function inlineR2Review(order){
    const original=node("a","Abrir PDF original para verificar");
    original.href=url.href;original.target="_blank";original.rel="noopener noreferrer";
    panel.append(original);
-   const label=node("label","Medidas REALES del PDF, ancho × alto en cm (separar páginas con ;)");
+   const label=node("label","Medidas del presupuesto (corregí si el PDF real difiere; separar páginas con ;)");
    const dimensions=node("input","");
    dimensions.type="text";dimensions.maxLength=2000;
    dimensions.placeholder="Ej.: 59,4 x 84,1";
+   // Referencia del presupuesto, no una medición del archivo recibido:
+   // el operador la contrasta con el PDF y sólo entonces confirma.
+   dimensions.value=q.paginas.map(v=>v[0]+" x "+v[1]).join("; ");
    label.append(dimensions);panel.append(label);
    const confirmLabel=node("label","");
    const confirmed=node("input","");confirmed.type="checkbox";
@@ -3505,7 +3527,10 @@ async function refresh({silent=false,force=false}={}){
    }else{
     other++;
     const item=node("p",(o.description||"Pedido")+
-     " · "+money(o.amount_ars)+" · pago confirmado");
+     " · "+money(o.amount_ars)+
+     (o.r2_legacy_unusable?
+       " · ENSAYO HISTÓRICO, no operativo: requiere ficha nueva para producir.":
+       " · pago confirmado"));
     const b=node("button","Detalle");b.className="outline";
     b.addEventListener("click",()=>showOrder(o.id));
     item.append(b);orders.append(item);
