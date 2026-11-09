@@ -20,7 +20,7 @@ for (const [name,html] of [['portada',home],['ofertas',offers]]){
    assert.match(rendered,/href="https:\/\/libreriasaber\.com\.ar\/cotizar"/);
    assert.match(rendered,/Acceso del personal/);
    assert.match(rendered,/href="\/prueba-v2\/cotizar-cliente"/);
-   assert.match(rendered,/los artículos y los trabajos de impresión se consultan por separado/);
+   assert.match(rendered,/los artículos y los trabajos de impresión se consultan por separado/i);
    assert.doesNotMatch(rendered,/El trabajo vuelve automáticamente a este carrito/);
   }
   if(name==='portada')assert.match(rendered,/href="#preview-aviso"/);

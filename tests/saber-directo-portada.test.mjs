@@ -31,7 +31,7 @@ test('Conserva catálogo, carrito, consulta WhatsApp y puertas comerciales exist
     'productsCsvUrl','data-panel="escolar"','data-panel="oficina"',
     'data-panel="novedades"','data-panel="impresion"','id="gridEscolar"',
     'id="gridOficina"','id="cartBody"','id="grandTotal"',
-    'window.openCart=function()','window.sendWhatsApp=function()',
+    'window.openCart=function()','window.sendWhatsApp=async function()',
     "fetch('polaroids/recepcion-config.json'"
   ]) assert.ok(html.includes(token),'Falta contrato histórico: '+token);
   assert.match(html,/href="cotizar\.html"/);
