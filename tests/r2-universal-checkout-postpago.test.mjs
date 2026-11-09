@@ -143,6 +143,20 @@ test('estado pago viene de reconciliación MP; sin pago no habilita R2',async()=
   readSigned:signed,now:()=>Date.parse('2026-11-09T20:00:00Z')});
  assert.equal((await revoked.json()).uploadAuthorized,false);
 });
+test('una orden pagada no pierde su consulta de pago luego de 24h',async()=>{
+ const {env,signed,state}=await fixture({paid:true});
+ const p={schema:'saber-central-r2-universal-checkout-v1',
+  action:'status',webOrderId,commercialOrderId:orderId};
+ const result=await checkoutUniversalSandboxCentral(request('internal/central/r2-universal-checkout',p),env,{
+  readSigned:signed,now:()=>Date.parse('2026-11-14T15:00:00Z'),subtle:webcrypto.subtle});
+ assert.equal(result.status,200);
+ assert.equal((await result.json()).uploadAuthorized,true);
+ const denied=await checkoutUniversalSandboxCentral(request('internal/central/r2-universal-checkout',{
+  ...p,action:'start'}),env,{
+  readSigned:signed,now:()=>Date.parse('2026-11-14T15:00:00Z'),subtle:webcrypto.subtle,
+  dispatch:()=>{throw Error('not allowed')}});
+ assert.equal(denied.status,409);
+});
 test('pago por archivo R2 exacto: no permite PDF TUS, hash distinto, ni venta no conciliada',async()=>{
  const {env,signed,state}=await fixture({paid:false});
  const q={schema:'saber-central-r2-universal-payment-lookup-v1',

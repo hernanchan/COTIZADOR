@@ -78,7 +78,9 @@ export async function autorizarTUSUniversalCentral(request,env,{
  try{result=await resolve(env,p,subtle)}
  catch{return respond({ok:false,error:'UNIVERSAL_TUS_D1_NO_VALIDO'},409)}
  if(!result)return respond({ok:false,error:'UNIVERSAL_TUS_ARCHIVO_O_PAGO_NO_CONCILIA'},402);
- if(result.row.received!==0)
+ // A paid order may retry the confirmation after a lost network response;
+ // only the stored proof can be linked again. No new upload token is issued.
+ if(result.row.received!==0&&p.action==='start')
   return respond({ok:false,error:'UNIVERSAL_TUS_YA_RECIBIDO'},409);
  return respond({ok:true,webOrderId:p.orderId,fileId:p.fileId,
   bytes:p.bytes,sha256:p.sha256,name:p.name,pages:p.pages,

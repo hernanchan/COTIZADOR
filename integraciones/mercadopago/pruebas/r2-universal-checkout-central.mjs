@@ -125,7 +125,8 @@ export async function checkoutUniversalSandboxCentral(request,env,{
  if(!checked.ok)return reply({ok:false,error:checked.reason},409);
  const order=checked.link;
  const created=Date.parse(String(order.created_at||'').replace(' ','T')+'Z');
- if(!Number.isFinite(created)||created>now()+30000||now()-created>24*60*60*1000)
+ if(p.action==='start'&&(!Number.isFinite(created)||
+    created>now()+30000||now()-created>24*60*60*1000))
   return reply({ok:false,error:'UNIVERSAL_COTIZACION_VENCIDA'},409);
  if(p.action==='status'){
   if(order.status==='awaiting_payment'&&order.preference_id&&typeof reconcile==='function')
