@@ -85,8 +85,9 @@ export async function verificarPedidoUniversalCobrable(env,commercialOrderId,{
   await verificarFichaUniversal({
    schema:'saber-r2-universal-draft-v1',webOrderId:link.web_order_id,
    priceRevision:link.price_revision,totalArs:link.total_ars,
-   archivos:works,armados:groups,estado:'PRELIMINAR_SIN_ORIGINALES',
-   pagoAutorizado:false,subidaAutorizada:false,produccionAutorizada:false,
+   archivos:works,armados:groups,pagoAutorizado:false,
+   subidaAutorizada:false,produccionAutorizada:false,
+   estado:'PRELIMINAR_SIN_ORIGINALES',
    quoteHash:link.quote_hash
   },{subtle});
  }catch{return error('UNIVERSAL_COTIZACION_FUERA_DE_CONTRATO')}
