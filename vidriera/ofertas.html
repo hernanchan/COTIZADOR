@@ -118,7 +118,8 @@ footer{background:#0c2942}
    cart.forEach(x=>lines.push(x.qty+' × '+x.name+' ('+x.id+') — '+money(x.price*x.qty)));
    lines.push('','TOTAL ORIENTATIVO: '+money(cart.reduce((s,x)=>s+x.price*x.qty,0)),
     '¿Me confirman disponibilidad y precio final?','No es una reserva ni un pago.');
-   window.open('https://wa.me/5493513110130?text='+encodeURIComponent(lines.join('\n')),'_blank','noopener,noreferrer');
+   // Navegar en la misma pestaña después de la consulta evita bloqueo de popups asíncronos.
+   window.location.assign('https://wa.me/5493513110130?text='+encodeURIComponent(lines.join('\n')));
   }catch(e){alert('No pudimos verificar los precios actuales. Probá nuevamente antes de enviar el pedido.')}
  };
  renderCart();loadProducts();
