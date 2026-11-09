@@ -70,8 +70,11 @@ export async function checkoutR2PrepaidSandboxCentral(request,env,{
    .bind(row.id).first();
   if(t)return reply({ok:false,error:'R2_PREPAGO_TRANSFERENCIA_EN_CURSO'},409);
  }
+ // La clave existente de Central ya se verifica por coincidencia exacta en
+ // /demo/checkout. No exigir otra longitud solo para R2: cortaba un
+ // checkout autorizado sin mejorar la autenticación del endpoint.
  if(typeof dispatch!=='function'||typeof env.DEMO_ADMIN_KEY!=='string'||
-    env.DEMO_ADMIN_KEY.length<20)
+    env.DEMO_ADMIN_KEY.length===0)
   return reply({ok:false,error:'R2_PREPAGO_PASARELA_NO_CONFIGURADA'},503);
  const payment=await dispatch(new Request(new URL('/demo/checkout',request.url),{
   method:'POST',headers:{'Authorization':'Bearer '+env.DEMO_ADMIN_KEY,
