@@ -1,0 +1,98 @@
+name: R2 - configurar secreto de firma SOLO en Documentos de pruebas
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/r2-firma-recibo-privada-20261109.yml]
+permissions:
+  contents: read
+  statuses: write
+concurrency:
+  group: saber-r2-privado-habilitacion
+  cancel-in-progress: false
+jobs:
+  firmar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Crear clave aleatoria fuerte en Worker privado; nunca en repositorio
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-documentos-pruebas"
+          base="https://saber-documentos-pruebas.libreriasaber.workers.dev"
+          auth="Authorization: Bearer $TOKEN"
+          dir=$(mktemp -d)
+          modified=0
+          cleanup(){
+            rc=$?
+            trap - EXIT
+            if [ "$rc" -ne 0 ] && [ "$modified" = 1 ]; then
+              echo 'R2_RECEIPT_SECRET_ROLLBACK_REQUESTED'
+              if curl -fsS --max-time 45 -X PATCH -H "$auth" -F "settings=@$dir/restore.json;type=application/json" "$root/settings" > "$dir/rollback.json" &&
+                 jq -e '.success==true' "$dir/rollback.json" >/dev/null; then
+                echo 'R2_RECEIPT_SECRET_ROLLBACK_ACCEPTED'
+              else
+                echo 'R2_RECEIPT_SECRET_ROLLBACK_UNCONFIRMED'
+              fi
+            fi
+            rm -rf "$dir"
+            exit "$rc"
+          }
+          trap cleanup EXIT
+          curl -fsS --max-time 25 -H "$auth" "$root/settings" > "$dir/before.json"
+          jq -e '.success==true and (.result.bindings|type=="array") and
+            (.result.bindings|any(.name=="SABER_R2_GRANDES" and .type=="r2_bucket")) and
+            (.result.bindings|any(.name=="DOCS_R2_RECEIPT_KEY")|not)' "$dir/before.json" >/dev/null || { echo 'R2_RECEIPT_KEY_MUST_BE_NEW'; exit 1; }
+          curl -fsS --max-time 25 -H "$auth" "$root/deployments" > "$dir/version.json"
+          active=$(jq -er '.result.deployments[0].versions | if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$dir/version.json")
+          test "$active" = '15c4f42f-9ab0-40d0-992a-381ddd53e82c'
+          test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$base/prueba-v2/")" = 401
+          # Mantener TODAS las bindings existentes, generar nueva clave solo en la memoria del runner.
+          receipt_secret=$(openssl rand -hex 32)
+          test "${#receipt_secret}" = 64
+          jq -n --slurpfile a "$dir/before.json" --arg secret "$receipt_secret" '{
+            bindings: ([$a[0].result.bindings[]|{name,type:"inherit"}] +
+              [{name:"DOCS_R2_RECEIPT_KEY",type:"secret_text",text:$secret}])
+          }' > "$dir/enable.json"
+          unset receipt_secret
+          jq -n --slurpfile a "$dir/before.json" '{
+            bindings:[$a[0].result.bindings[]|{name,type:"inherit"}]
+          }' > "$dir/restore.json"
+          modified=1
+          http=$(curl -sS --max-time 60 -o "$dir/update.json" -w '%{http_code}' -X PATCH -H "$auth" -F "settings=@$dir/enable.json;type=application/json" "$root/settings")
+          if [ "$http" != 200 ] || ! jq -e '.success==true' "$dir/update.json" >/dev/null; then
+            echo 'R2_RECEIPT_SECRET_PATCH_REJECTED'; exit 1
+          fi
+          curl -fsS --max-time 25 -H "$auth" "$root/settings" > "$dir/after.json"
+          jq -e --slurpfile before "$dir/before.json" '
+            .success==true and
+            ([.result.bindings[]|.name]|sort)==
+               ([$before[0].result.bindings[]|.name]+["DOCS_R2_RECEIPT_KEY"]|unique|sort) and
+            (.result.bindings|any(.name=="DOCS_R2_RECEIPT_KEY" and .type=="secret_text"))
+          ' "$dir/after.json" >/dev/null || { echo 'R2_RECEIPT_SECRET_BINDING_NOT_VERIFIED'; exit 1; }
+          test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$base/prueba-v2/")" = 401
+          code=$(curl -sS --max-time 20 -o "$dir/r2-off.json" -w '%{http_code}' -X POST -H "Origin: $base" -H 'Content-Type: application/json' --data '{"orderId":"WEB-ENSAYO-CONTROL","meta":{}}' "$base/prueba-v2/api/ensayo-r2/iniciar")
+          test "$code" = 503 && jq -e '.paymentAuthorized==false' "$dir/r2-off.json" >/dev/null
+          echo 'R2_RECEIPT_SECRET_CREATED_TEST_WORKER_ONLY_NO_SECRET_LOGGED'
+          echo 'R2_STILL_OFF_NO_PAYMENT_NO_UPLOAD'
+      - name: Resultado en GitHub
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          if [ "$RESULT" = success ]; then state=success; else state=failure; fi
+          jq -n --arg state "$state" --arg context 'saber/r2-receipt-secret-private' \
+            --arg description "Clave de firma R2 solo Worker privado: $RESULT" \
+            --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/r2-secret-private.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/r2-secret-private.json >/dev/null
