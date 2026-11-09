@@ -196,8 +196,17 @@ export async function consultarPagoUniversalR2(request,env,{
   webOrderId:p.orderId,subtle});
  if(!checked.ok)return reply({ok:false,error:'UNIVERSAL_R2_FICHA_INCORRECTA'},409);
  const matches=checked.rows.filter(x=>x.file_id===p.fileId&&x.sha256===p.sha256&&
-  x.bytes===p.bytes&&x.transport==='r2'&&x.received===0);
+  x.bytes===p.bytes&&x.transport==='r2'&&[0,1].includes(x.received));
  if(matches.length!==1)return reply({ok:false,error:'UNIVERSAL_R2_ARCHIVO_NO_PENDIENTE'},409);
+ const productionTable=await env.DB.prepare(
+  "SELECT name FROM sqlite_master WHERE type='table' AND name='central_production_status'"
+ ).first();
+ if(productionTable){
+  const stage=await env.DB.prepare('SELECT state FROM central_production_status WHERE order_id=?')
+   .bind(checked.commercialOrderId).first();
+  if(stage?.state==='entregado')
+   return reply({ok:false,error:'UNIVERSAL_R2_PEDIDO_YA_ENTREGADO'},409);
+ }
  const pay=await estadoPagoUniversal(env,checked.commercialOrderId);
  if(!pay.verified)return reply({ok:false,error:'UNIVERSAL_R2_PAGO_NO_CONFIRMADO'},402);
  const verifiedAt=now();
