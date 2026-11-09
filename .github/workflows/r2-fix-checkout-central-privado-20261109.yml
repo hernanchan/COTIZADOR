@@ -1,0 +1,125 @@
+name: Saber R2 - corregir checkout MP solo Central sandbox privada
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/r2-fix-checkout-central-privado-20261109.yml]
+permissions:
+  contents: read
+concurrency:
+  group: saber-central-private-deploy
+  cancel-in-progress: false
+jobs:
+  central-sandbox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Regresión auth existente y bundle real Central
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.25.12
+          node --test tests/r2-prepago-checkout-sandbox.test.mjs tests/r2-prepago-sin-archivo-central.test.mjs tests/r2-pago-central-bridge-prepago.test.mjs
+          node --check integraciones/mercadopago/pruebas/r2-prepago-checkout-sandbox-central.mjs
+          npx esbuild integraciones/mercadopago/pruebas/worker.js --bundle --format=esm --platform=browser --target=es2022 --outfile=/tmp/saber-central-r2-bundle.mjs
+          node --check /tmp/saber-central-r2-bundle.mjs
+          grep -Fq 'R2_PREPAGO_PASARELA_NO_CONFIGURADA' /tmp/saber-central-r2-bundle.mjs
+          echo 'CENTRAL_R2_SANDBOX_BUILD_GREEN'
+      - name: Activar sólo versión corregida del Worker privado; rollback ante error
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+          PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN" && test -n "$PASSWORD"
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-pagos-pruebas"
+          base="https://saber-pagos-pruebas.libreriasaber.workers.dev"
+          docs="https://saber-documentos-pruebas.libreriasaber.workers.dev"
+          auth="Authorization: Bearer $TOKEN"
+          baseline='8771eae2-fe87-46c2-946a-024986d36271'
+          tmp=$(mktemp -d)
+          chmod 700 "$tmp"
+          modified=0
+          cleanup(){
+            rc=$?
+            trap - EXIT
+            if [ "$rc" -ne 0 ] && [ "$modified" = 1 ]; then
+              echo 'CENTRAL_SANDBOX_ROLLBACK_REQUESTED'
+              jq -n --arg id "$baseline" '{strategy:"percentage",versions:[{version_id:$id,percentage:100}],annotations:{"workers/message":"Rollback Central MP sandbox"}}' > "$tmp/rollback.json"
+              if curl -fsS --max-time 60 -H "$auth" -H 'Content-Type: application/json' --data-binary "@$tmp/rollback.json" "$root/deployments" > "$tmp/rollback-response.json" &&
+                jq -e '.success==true' "$tmp/rollback-response.json" >/dev/null;then
+                curl -fsS --max-time 25 -H "$auth" "$root/deployments" > "$tmp/rollback-verify.json"
+                observed=$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/rollback-verify.json")
+                if [ "$observed" = "$baseline" ];then echo 'CENTRAL_SANDBOX_ROLLBACK_CONFIRMED';else echo 'CENTRAL_ROLLBACK_UNCONFIRMED';fi
+              else echo 'CENTRAL_ROLLBACK_FAILED_NEEDS_OPERATOR';fi
+            fi
+            rm -rf "$tmp"
+            exit "$rc"
+          }
+          trap cleanup EXIT
+          curl -fsS --max-time 25 -H "$auth" "$root/settings" > "$tmp/settings.json"
+          curl -fsS --max-time 25 -H "$auth" "$root/deployments" > "$tmp/deploy-before.json"
+          current=$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/deploy-before.json")
+          test "$current" = "$baseline" || { echo "CENTRAL_VERSION_CHANGED_STOP=$current";exit 1; }
+          jq -e '.result.bindings|any(.name=="CENTRAL_R2_PREPAY_CHECKOUT_ENABLED" and .type=="plain_text" and .text=="PRIVATE_TEST_ONLY")' "$tmp/settings.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="DEMO_ADMIN_KEY" and .type=="secret_text")' "$tmp/settings.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="DB" and .type=="d1")' "$tmp/settings.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="MP_TEST_ACCESS_TOKEN" and .type=="secret_text")' "$tmp/settings.json" >/dev/null
+          curl -fsS --max-time 25 "$base/health" > "$tmp/health-pre.json"
+          jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$tmp/health-pre.json" >/dev/null
+          test "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$base/admin/api/orders")" = 401
+          test "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$docs/prueba-v2/")" = 401
+          echo 'CENTRAL_PRIVATE_SANDBOX_PREFLIGHT_OK_NO_REAL_PAYMENT'
+          jq -n --arg sha "$GITHUB_SHA" --slurpfile s "$tmp/settings.json" '{
+            main_module:"index.mjs",annotations:{"workers/message":"Checkout R2 usa DEMO_ADMIN_KEY existente, prueba privada sin cobro real","workers/commit_sha":$sha},
+            bindings:[$s[0].result.bindings[]|{name,type:"inherit"}]
+          }' > "$tmp/metadata.json"
+          status=$(curl -sS --max-time 120 -o "$tmp/upload.json" -w '%{http_code}' -H "$auth" \
+            -F "metadata=@$tmp/metadata.json;type=application/json" \
+            -F "index.mjs=@/tmp/saber-central-r2-bundle.mjs;filename=index.mjs;type=application/javascript+module" \
+            "$root/versions?bindings_inherit=strict")
+          test "$status" = 200 && jq -e '.success==true and (.result.id|type=="string")' "$tmp/upload.json" >/dev/null || { echo "CENTRAL_STAGE_HTTP_$status";exit 1; }
+          candidate=$(jq -r '.result.id' "$tmp/upload.json")
+          for version in "$baseline" "$candidate";do
+            curl -fsS --max-time 25 -H "$auth" "$root/versions/$version" > "$tmp/$version.json"
+            jq -S '[.result.resources.bindings[]|if .type=="secret_text" then {name,type} else . end]|sort_by(.name)' "$tmp/$version.json" > "$tmp/$version-bindings"
+            jq -S '.result.resources.script_runtime|{compatibility_date,compatibility_flags,usage_model,limits,placement}' "$tmp/$version.json" > "$tmp/$version-runtime"
+          done
+          cmp "$tmp/$baseline-bindings" "$tmp/$candidate-bindings" >/dev/null || { echo 'CENTRAL_BINDINGS_DIFFERS_STOP';exit 1; }
+          cmp "$tmp/$baseline-runtime" "$tmp/$candidate-runtime" >/dev/null || { echo 'CENTRAL_RUNTIME_DIFFERS_STOP';exit 1; }
+          curl -fsS --max-time 25 -H "$auth" "$root/deployments" > "$tmp/deploy-verify.json"
+          test "$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/deploy-verify.json")" = "$baseline"
+          jq -n --arg id "$candidate" '{strategy:"percentage",versions:[{version_id:$id,percentage:100}],annotations:{"workers/message":"Fix R2 checkout privado token existente, no pagos reales"}}' > "$tmp/promote.json"
+          modified=1
+          curl -fsS --max-time 60 -H "$auth" -H 'Content-Type: application/json' --data-binary "@$tmp/promote.json" "$root/deployments" > "$tmp/promote-response.json"
+          jq -e '.success==true' "$tmp/promote-response.json" >/dev/null
+          curl -fsS --max-time 25 -H "$auth" "$root/deployments" > "$tmp/deploy-after.json"
+          test "$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/deploy-after.json")" = "$candidate"
+          curl -fsS --max-time 25 "$base/health" > "$tmp/health-final.json"
+          jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$tmp/health-final.json" >/dev/null
+          test "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$base/admin/api/orders")" = 401
+          echo "CENTRAL_PRIVATE_CHECKOUT_FIX_ACTIVE=$candidate"
+          payload='{"action":"start","webOrderId":"WEB-ENSAYO-255BFE122477AC6C7666EB6D342707FE","commercialOrderId":"66f10bd2-77ce-46ef-930c-49dc3d22d23e"}'
+          http=$(curl -sS --max-time 70 -u "operador:$PASSWORD" -H "Origin: $docs" \
+             -H 'Content-Type: application/json' -o "$tmp/checkout.json" -w '%{http_code}' -X POST \
+             --data "$payload" "$docs/prueba-v2/api/ensayo-r2-prepago-checkout")
+          echo "EXISTING_R2_SANDBOX_CHECKOUT_HTTP=$http"
+          jq -c '{ok,error,reasonCode,estado,amountArs,hasLink:(.checkoutUrl!=null),uploadAuthorized}' "$tmp/checkout.json"
+          if [ "$http" = 200 ];then
+            jq -e '.ok==true and .amountArs==4400 and .estado=="pendiente" and .uploadAuthorized==false and (.checkoutUrl|type=="string")' "$tmp/checkout.json" >/dev/null
+            echo 'MP_TEST_CHECKOUT_READY_WAIT_PAYMENT_VERIFIED_NO_R2'
+          elif [ "$http" = 409 ] || [ "$http" = 503 ];then
+            jq -e '.ok==false and (.reasonCode|type=="string")' "$tmp/checkout.json" >/dev/null
+            echo 'NEXT_MP_SANDBOX_BLOCKER_IDENTIFIED_NO_R2'
+          else echo 'UNEXPECTED_MP_CHECKOUT_HTTP';exit 1;fi
+          echo 'CENTRAL_PRIVATE_ONLY_NO_MAIN_NO_REAL_PAYMENT_NO_R2_UPLOAD'
