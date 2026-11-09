@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {Script} from 'node:vm';
 import {buildSync} from 'esbuild';
+import {decidirTransportePDF} from './seleccionar-transporte-pdf.mjs';
 
 const source=readFileSync(new URL('./carga-unica-cliente.mjs',import.meta.url),'utf8');
 const built=buildSync({
@@ -133,9 +134,9 @@ test('el portal privado recibe el evento real y agrega PDF con hash y precio, si
 });
 
 test('cliente de prueba no anuncia falsamente que los ploteos quedan fuera de la recepción TUS',()=>{
- assert.ok(source.includes('Impresiones y ploteos se verifican y registran en la Central'));
+ assert.ok(source.includes("if(plan.destino==='ploteos')"));
  assert.ok(!source.includes('Los ploteos se cotizan, pero quedan pendientes de integración'));
- assert.ok(source.includes('Las páginas elegidas se verifican sobre el PDF original antes de registrar la orden.'));
+ assert.ok(source.includes('ploteosPendientes.push'));
 });
 
 
@@ -175,6 +176,7 @@ test('límite TUS: marca en rojo sólo el PDF que excede 40 MiB, no los otros',(
  }
  const visual=new Function('entries','File','window','location',
   'const MAX_PDF_TUS_BYTES=40*1024*1024,MAX_LOTE_TUS_BYTES=60*1024*1024;'+
+  'const LIMITE_TUS_PDF_BYTES=40*1024*1024,LIMITE_R2_PDF_BYTES=200*1024*1024;const decidirTransportePDF='+decidirTransportePDF.toString()+';const admitePrepagoR2Grande=()=>false;'+
   "const tamanoPdfMiB=f=>(f.size/(1024*1024)).toFixed(1).replace('.',',')+' MiB';\n"+
   source.slice(start,end)+'\nreturn alertasRecepcionPDF();');
  const a={name:'Grande.pdf',archivoOriginal:new FileSimulado('Grande.pdf',41*1024*1024)};
@@ -183,7 +185,7 @@ test('límite TUS: marca en rojo sólo el PDF que excede 40 MiB, no los otros',(
  const origin={pathname:'/prueba-v2/carga-inteligente'};
  const alertas=visual([a,b],FileSimulado,window,origin);
  assert.equal(alertas.size,1);
- assert.match(alertas.get(a),/Grande\.pdf.*41,0 MiB.*40 MiB/);
+ assert.match(alertas.get(a),/Grande\.pdf.*41,0 MiB.*recepción especial/);
  assert.equal(alertas.has(b),false,'El PDF permitido debe permanecer disponible');
  const c={name:'Segundo.pdf',archivoOriginal:new FileSimulado('Segundo.pdf',31*1024*1024)};
  const dos=visual([b,c],FileSimulado,window,origin);
@@ -205,6 +207,7 @@ test('el estado de envío rechaza preventivamente PDF demasiado grande y conserv
  const entries=[{name:'Muy grande.pdf',archivoOriginal:new FileSimulado('Muy grande.pdf',42*1024*1024)}];
  const execute=new Function('entries','File','window','location','ultimoPresupuesto',
    'const MAX_PDF_TUS_BYTES=40*1024*1024,MAX_LOTE_TUS_BYTES=60*1024*1024;'+
+  'const LIMITE_TUS_PDF_BYTES=40*1024*1024,LIMITE_R2_PDF_BYTES=200*1024*1024;const decidirTransportePDF='+decidirTransportePDF.toString()+';const admitePrepagoR2Grande=()=>false;'+
    "const tamanoPdfMiB=f=>(f.size/(1024*1024)).toFixed(1).replace('.',',')+' MiB';\n"+
    source.slice(start,end)+"\ninformarPrecioPrivado('listo',7220);");
  execute(entries,FileSimulado,window,{pathname:'/prueba-v2/carga-inteligente',origin:'https://example.test'},{estado:'PRELIMINAR'});
