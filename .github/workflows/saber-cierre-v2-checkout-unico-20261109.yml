@@ -1,0 +1,111 @@
+name: Saber - pedido V2 con cotización inmutable y enlace MP sandbox, SIN R2
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-cierre-v2-checkout-unico-20261109.yml]
+permissions:
+  contents: read
+concurrency:
+  group: saber-prepay-v2-72e9f66a-una-vez
+  cancel-in-progress: false
+jobs:
+  v2-quote-sandbox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Una orden nueva V2, precio D1 y checkout TEST sin cargar R2
+        shell: bash
+        env:
+          SABER_V2_OPERATOR_PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import {randomBytes,createHash} from 'node:crypto';
+          import {open,unlink} from 'node:fs/promises';
+          import {createReadStream} from 'node:fs';
+          const host='https://saber-documentos-pruebas.libreriasaber.workers.dev';
+          const central='https://saber-pagos-pruebas.libreriasaber.workers.dev';
+          const password=process.env.SABER_V2_OPERATOR_PASSWORD;
+          if(typeof password!=='string'||password.length<16)throw Error('BLOCKER_OPERATOR_TEST_SECRET');
+          const auth='Basic '+Buffer.from('operador:'+password).toString('base64');
+          const headers={Authorization:auth,Origin:host};
+          const post=async(path,payload)=>{
+           const r=await fetch(host+path,{method:'POST',headers:{...headers,'Content-Type':'application/json'},
+            body:JSON.stringify(payload),redirect:'manual',signal:AbortSignal.timeout(60000)});
+           const data=await r.json().catch(()=>({error:'NOT_JSON'}));return {status:r.status,data};
+          };
+          const h=await fetch(central+'/health',{signal:AbortSignal.timeout(15000)}).then(r=>r.json());
+          if(h.ok!==true||h.databaseReady!==true||h.paymentsEnabled!==false)throw Error('BLOCKER_SANDBOX_CENTRAL_HEALTH');
+          const p=await fetch(host+'/prueba-v2/precios-web.json',{headers,signal:AbortSignal.timeout(20000)});
+          if(p.status!==200)throw Error('BLOCKER_PRIVATE_PRICE_HTTP_'+p.status);
+          const prices=await p.json();
+          if(!/^d1-approved-revision-[1-9][0-9]*$/.test(prices.priceVersion||''))throw Error('BLOCKER_PRICE_NOT_APPROVED');
+          console.log('LIVE_D1_PRICES_AND_CENTRAL_DB_OK_REAL_PAYMENTS_OFF');
+          const path='/tmp/saber-r2-e2e-60mib.pdf',n=60*1024*1024;
+          const f=await open(path,'w');let pos=0;const offsets=[0];
+          const put=async data=>{const b=Buffer.isBuffer(data)?data:Buffer.from(data);await f.write(b,0,b.length,pos);pos+=b.length};
+          await put('%PDF-1.4\n');
+          for(const [id,data] of [[1,'<< /Type /Catalog /Pages 2 0 R >>'],
+           [2,'<< /Type /Pages /Kids [3 0 R] /Count 1 >>'],
+           [3,'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 1683.78 2383.94] /Contents 4 0 R /Resources << >> >>']]){
+            offsets[id]=pos;await put(id+' 0 obj\n'+data+'\nendobj\n');
+          }
+          offsets[4]=pos;await put('4 0 obj\n<< /Length '+n+' >>\nstream\n');
+          const blank=Buffer.alloc(1024*1024,32);for(let i=0;i<60;i++)await put(blank);
+          await put('\nendstream\nendobj\n');const xref=pos;
+          await put('xref\n0 5\n0000000000 65535 f \n');
+          for(let i=1;i<=4;i++)await put(String(offsets[i]).padStart(10,'0')+' 00000 n \n');
+          await put('trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n'+xref+'\n%%EOF\n');await f.close();
+          const bytes=pos;
+          const sha256=await new Promise((resolve,reject)=>{
+            const d=createHash('sha256'),stream=createReadStream(path);
+            stream.on('data',b=>d.update(b));stream.on('error',reject);
+            stream.on('end',()=>resolve(d.digest('hex')));
+          });
+          if(bytes<=40*1024*1024||bytes>200*1024*1024)throw Error('BLOCKER_PDF_SIZE');
+          console.log('PDF_LOCAL_A1_BYTES='+bytes+' HASH_VALID='+String(sha256.length===64)+' NO_R2_UPLOAD');
+          const webOrderId='WEB-ENSAYO-72E9F66A8BC34CC9B25D70EF49C1A8D3';
+          const archivos=[{nombre:'ENSAYO-A1-SABER-60MiB.pdf',
+           paginas:[{numero:1,anchoCm:59.4,altoCm:84.1,modo:'cad'}],seleccion:'original',
+           servicio:'auto',copias:1,modo:'bn',caras:'simple',anillado:'ninguno',
+           grupoAnillado:'',materialColor:'',papelPoster:'obra80'}];
+          const meta={fileId:'planoA1',name:archivos[0].nombre,mode:'bn',bytes,sha256,pages:1};
+          const quote=await post('/prueba-v2/api/ensayo-r2-prepago',{archivos,bytes,fileId:meta.fileId,sha256,webOrderId});
+          console.log('LIVE_QUOTE_HTTP='+quote.status+' CODE='+(quote.data.error||'OK'));
+          if(![200,201].includes(quote.status)||quote.data.ok!==true||quote.data.webOrderId!==webOrderId||
+           quote.data.filesUploaded!==false||quote.data.paymentAuthorized!==false||
+           quote.data.uploadAuthorized!==false||!Number.isSafeInteger(quote.data.amountArs)||
+           quote.data.amountArs<1)throw Error('BLOCKER_LIVE_PREPAY_D1');
+          const commercialOrderId=quote.data.commercialOrderId;
+          console.log('D1_ORDER_NO_FILE='+webOrderId+' COMMERCIAL='+commercialOrderId+' AMOUNT_ARS='+quote.data.amountArs);
+          const unpaid=await post('/prueba-v2/api/ensayo-r2/iniciar',{orderId:webOrderId,meta});
+          console.log('UNPAID_R2_START_HTTP='+unpaid.status);
+          if(unpaid.status!==402||unpaid.data.ok!==false)throw Error('SECURITY_BLOCKER_UNPAID_R2');
+          const ck=await post('/prueba-v2/api/ensayo-r2-prepago-checkout',{action:'start',webOrderId,commercialOrderId});
+          console.log('SANDBOX_CHECKOUT_HTTP='+ck.status+' CODE='+(ck.data.error||'OK'));
+          if(ck.status!==200||ck.data.ok!==true||ck.data.estado!=='pendiente'||
+           ck.data.amountArs!==quote.data.amountArs||ck.data.uploadAuthorized!==false||
+           !/^https:\/\/[^/]*mercadopago\.com(\.ar)?\//.test(ck.data.checkoutUrl||''))
+             throw Error('BLOCKER_MP_TEST_PREFERENCE_CREATION');
+          console.log('CHECKOUT_TEST_USER_PREFERENCE_CREATED');
+          const check=await post('/prueba-v2/api/ensayo-r2-prepago-checkout',{
+           action:'status',webOrderId,commercialOrderId
+          });
+          if(check.status!==200||check.data.ok!==true)throw Error('BLOCKER_SANDBOX_STATUS_'+check.status);
+          if(check.data.amountArs!==quote.data.amountArs||
+             !['pendiente','pagado_esperando_archivo'].includes(check.data.estado))
+           throw Error('BLOCKER_SANDBOX_PAYMENT_MISMATCH');
+          console.log('NEW_V2_QUOTE_D1_SAVED_AMOUNT='+quote.data.amountArs+
+           ' PRICE_REVISION='+quote.data.priceRevision);
+          console.log('NEW_V2_SANDBOX_ORDER='+webOrderId+' COMMERCIAL_ID='+commercialOrderId);
+          console.log('NEW_V2_TEST_BUYER_LINK='+ck.data.checkoutUrl);
+          console.log('NEW_V2_PAYMENT_STATUS='+check.data.estado);
+          console.log('DO_NOT_UPLOAD_UNTIL_MP_SANDBOX_VERIFIED_NO_R2_COST');
+          await unlink(path);
+          NODE
