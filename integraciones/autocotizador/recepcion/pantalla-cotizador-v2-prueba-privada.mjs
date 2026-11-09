@@ -1296,7 +1296,7 @@ async function prepararPedidoUniversal(){
  const mod=await import('/prueba-v2/flujo-universal.mjs');
  universalFlujo=mod.crearFlujoUniversalPDF({
   files:universalPendiente.files,archivos:universalPendiente.archivos,
-  webOrderId:orderId,
+  webOrderId:orderId,telefono:telefonoContacto.value.trim(),
   onProgress:p=>{
    if(p.phase==='hash')
     r2Informar('Identificando PDF '+p.index+' de '+p.count+
