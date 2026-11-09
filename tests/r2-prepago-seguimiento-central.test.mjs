@@ -78,3 +78,28 @@ test('orden ajena, flags apagados y tabla ausente no filtran pedido',async()=>{
   r=await f.call();assert.equal(r.status,404);
  }finally{f.sql.close()}
 });
+
+test('R2 aprobado reutiliza estados y hora manual, sin habilitar impresión',async()=>{
+ const f=fixture();try{
+  f.receipt();
+  f.sql.exec("CREATE TABLE central_r2_prepress_approvals(order_id TEXT,receipt_id TEXT,sha256 TEXT,bytes INTEGER,amount_ars INTEGER,quote_sha256 TEXT);"+
+   "CREATE TABLE central_production_status(order_id TEXT,state TEXT);"+
+   "CREATE TABLE central_work_order_numbers(commercial_order_id TEXT,number INTEGER);");
+  f.sql.prepare('INSERT INTO central_r2_prepress_approvals VALUES(?,?,?,?,?,?)')
+   .run(id,'DOC-12345678-1234-4123-8123-123456789abc',sha,62915011,4400,'b'.repeat(64));
+  f.sql.prepare('INSERT INTO central_production_status VALUES(?,?)').run(id,'en_preparacion');
+  f.sql.prepare('INSERT INTO central_work_order_numbers VALUES(?,?)').run(id,23);
+  const r=await consultarSeguimientoR2PrevioPreprensa(f.env,id,{
+   readEstimate:async()=>({ready_at:'2026-11-10T15:00:00.000Z'}),
+   readPlan:async()=>{throw Error('plan no corresponde durante preparación')},
+   formatNumber:n=>String(n).padStart(3,'0')
+  });
+  const x=await r.json();
+  assert.equal(x.stage,'en_preparacion');
+  assert.equal(x.orderNumber,'023');
+  assert.equal(x.estimate.type,'manual');
+  assert.equal(x.prepressPending,false);
+  assert.equal(x.readyForPrinting,false);
+  assert.equal(x.productionAuthorized,false);
+ }finally{f.sql.close()}
+});

@@ -2271,7 +2271,12 @@ async function trackingCustomerStatus(req,env){
   // Solo el pedido firmado que corresponda a un R2 prepago conciliado:
   // NO falsear un manifiesto TUS, prometer hora o iniciar impresión.
   const {consultarSeguimientoR2PrevioPreprensa}=await import("./r2-prepago-seguimiento-central.mjs");
-  return await consultarSeguimientoR2PrevioPreprensa(env,match[1]);
+  return await consultarSeguimientoR2PrevioPreprensa(env,match[1],{
+   readEstimate:id=>preparationEstimateDetail(env,id),
+   readPlan:async (paidAt,stage)=>deliveryPlanForCustomer(
+    (await deliveryPlanSetting(env)).mode,paidAt,stage),
+   formatNumber:shortWorkNumber
+  });
  }
  const paid=x.status==="paid"&&Boolean(x.paid_at)&&x.deposit_ars===x.amount_ars&&x.review_state==="verified";
  const review=x.review_state==="revoked",stage=paid?x.stage:null;
