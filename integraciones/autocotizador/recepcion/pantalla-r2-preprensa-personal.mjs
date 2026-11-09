@@ -26,7 +26,7 @@ export function paginaR2PreprensaPersonal(){
  del archivo no acreditan que sus páginas, medida, escala, clasificación CAD/póster,
  material y precio final coincidan con la impresión solicitada.</p>
  <button id="download" disabled>Descargar PDF original privado</button>
- <button id="zip-r2" disabled>Descargar ZIP de revisión + hoja A4</button>
+ <button id="zip-r2" disabled>Descargar ZIP con original + instrucciones PDF</button>
  <p class="warning">El ZIP es exclusivamente para preprensa: NO es una orden lista para imprimir.</p>
  <p class="note">Sólo personal autorizado. Descarga verificada con Central D1 y SHA-256
  del objeto R2. No modifica el PDF ni genera pedidos o cobros.</p>
@@ -58,8 +58,17 @@ export function paginaR2PreprensaPersonal(){
   zipButton.addEventListener('click',async()=>{
    if(active)return;
    active=true;button.disabled=true;zipButton.disabled=true;
-   status.textContent='Preparando paquete de revisión: descargando y verificando original…';
+   status.textContent='Consultando la ficha de producción aprobada en Central…';
    try{
+    const fichaResponse=await fetch('/prueba-v2/api/ensayo-r2-ficha-produccion-personal',{
+     method:'POST',credentials:'same-origin',cache:'no-store',redirect:'error',
+     headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({webOrderId,receiptId})
+    });
+    const ficha=fichaResponse.ok?await fichaResponse.json():null;
+    if(fichaResponse.status!==200&&fichaResponse.status!==409)
+     throw Error('Central no pudo confirmar la ficha de producción. Intentá después.');
+    status.textContent='Descargando original íntegro desde R2…';
     const res=await fetch('/prueba-v2/api/ensayo-r2-descargar-d1-personal',{
      method:'POST',credentials:'same-origin',cache:'no-store',redirect:'error',
      headers:{'Content-Type':'application/json'},
@@ -76,18 +85,24 @@ export function paginaR2PreprensaPersonal(){
     const original=await res.blob();
     if(original.size!==size||original.type!=='application/pdf')
      throw Error('Descarga incompleta o formato inesperado.');
-    const hoja=generarHojaPreprensaR2(webOrderId,receiptId,size);
-    status.textContent='Generando ZIP local sin alterar el PDF…';
+    const hoja=ficha?generarHojaProduccionR2(ficha):
+     generarHojaPreprensaR2(webOrderId,receiptId,size);
+    const nombreHoja=ficha?'ORDEN_'+ficha.numeroOrden+'_INSTRUCCIONES.pdf':
+     'PREPRENSA_R2_NO_IMPRIMIR.pdf';
+    status.textContent='Generando ZIP local con original y hoja de instrucciones…';
     const paquete=await crearZipSinCompresion([
      {name:'PDF_01.pdf',blob:original},
-     {name:'PREPRENSA_R2_NO_IMPRIMIR.pdf',blob:hoja}
+     {name:nombreHoja,blob:hoja}
     ],{maxBytes:210*1024*1024});
     const href=URL.createObjectURL(paquete);
     const a=document.createElement('a');a.href=href;
-    a.download='PREPRENSA_'+receiptId+'.zip';
+    a.download=ficha?'ORDEN_'+ficha.numeroOrden+'_R2.zip':
+     'PREPRENSA_'+receiptId+'.zip';
     document.body.append(a);a.click();a.remove();
     setTimeout(()=>URL.revokeObjectURL(href),60000);
-    status.textContent='ZIP de revisión generado. Original + hoja A4. NO imprimir hasta aprobar medidas, CAD/póster, papel, copias y precio.';
+    status.textContent=ficha?
+     'ZIP de producción preparado con ficha verificada. Original + instrucciones A4. Verificar en Acrobat antes de imprimir.':
+     'ZIP de revisión preparado. NO imprimir hasta aprobar contenido, medidas, papel y precio.';
    }catch(e){
     status.textContent='No se generó el ZIP: '+String(e?.message||e);
    }finally{active=false;button.disabled=false;zipButton.disabled=false}

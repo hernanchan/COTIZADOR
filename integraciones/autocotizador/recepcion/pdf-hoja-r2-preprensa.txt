@@ -51,3 +51,35 @@ function generarHojaPreprensaR2(webOrderId,receiptId,originalBytes){
  if(!/^[\x00-\x7f]*$/.test(raw))throw Error('Hoja de preprensa no ASCII');
  return new Blob([raw],{type:'application/pdf'});
 }
+
+/** Orden definitiva de PREPARACIÓN, basada sólo en ficha aprobada por D1. */
+function generarHojaProduccionR2(d){
+ if(!d||d.schema!=='saber-central-r2-production-sheet-v1'||
+    d.preprensaAprobada!==true||d.productionAuthorized!==false||
+    d.readyForPrinting!==false||!/^\d{3,}$/.test(d.numeroOrden||'')||
+    !Number.isSafeInteger(d.importe)||d.importe<1||
+    !Number.isSafeInteger(d.copias)||d.copias<1||
+    !['bn','color'].includes(d.modoImpresion)||
+    !Array.isArray(d.paginas)||!d.paginas.length||d.paginas.length>2000||
+    !/^WEB-ENSAYO-[A-F0-9]{32}$/.test(d.webOrderId||''))
+  throw Error('Ficha R2 sin aprobación de la Central');
+ const filas=[
+  ['Preprensa aprobada por',String(d.aprobadoPor||'')],
+  ['Fecha de aprobación',String(d.aprobadoEn||'')],
+  ['Copias por página',String(d.copias)],
+  ['Impresión',d.modoImpresion==='bn'?'Blanco y negro':'Color'],
+  ['Papel solicitado para póster',String(d.papelPoster||'NO CONSTA')],
+  ['Rollo base',String(d.rolloBase||'NO CONSTA')],
+  ['Cantidad de páginas',String(d.paginas.length)],
+  ...d.paginas.map((p,i)=>['Página '+(i+1),
+   p[0]+' × '+p[1]+' cm · '+String(p[2]).toUpperCase()+
+   ' · '+p[3]+' · '+p[4]]),
+  ['Control antes de imprimir',
+   'Corroborar PDF original, papel, medidas y escala en Acrobat. No enviar PDF grande directo al plotter.'],
+  ['Estado de impresión','Requiere configuración final y autorización del operador.']
+ ];
+ const order={numeroOrden:d.numeroOrden,webOrderId:d.webOrderId,
+  importe:d.importe,pagoVerificado:true,estadoPago:'PAGADO_VERIFICADO',
+  trabajos:[{nombreOriginal:String(d.nombreOriginal||'Original R2 verificado')}]};
+ return generarPdfOrdenTrabajo(order,[filas]);
+}
