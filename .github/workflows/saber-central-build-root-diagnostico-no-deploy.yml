@@ -1,0 +1,46 @@
+name: Saber Central - diagnosticar raíz Workers Builds SIN desplegar
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-central-build-root-diagnostico-no-deploy.yml]
+permissions:
+  contents: read
+jobs:
+  diagnostico:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Comparar root del repositorio vs raíz real del Worker (dry-run)
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'WORKER_AUTOBUILD_DIAGNOSTIC_READONLY'
+          echo 'NO_GITHUB_DEPLOY_NO_CLOUDFLARE_API_NO_PRODUCTION'
+          test ! -f wrangler.toml && test ! -f wrangler.jsonc && test ! -f wrangler.json
+          echo 'REPOSITORY_ROOT_HAS_NO_WRANGLER_CONFIG'
+          test -f integraciones/mercadopago/pruebas/wrangler.toml
+          grep -q 'name = "saber-pagos-pruebas"' integraciones/mercadopago/pruebas/wrangler.toml
+          echo 'CENTRAL_WORKER_CONFIG_EXISTS_IN_SUBDIRECTORY'
+          set +e
+          npx --yes wrangler@4.50.0 deploy --dry-run --outdir /tmp/saber-central-root > /tmp/root-build.log 2>&1
+          code=$?
+          set -e
+          echo "WORKER_BUILD_FROM_REPOSITORY_ROOT_EXIT=$code"
+          if [ "$code" != 0 ]; then
+            grep -Ei 'Missing entry-point|entry-point|configuration|wrangler|ERROR|cannot find' /tmp/root-build.log | tail -n 12 || true
+          fi
+          cd integraciones/mercadopago/pruebas
+          npx --yes wrangler@4.50.0 deploy --dry-run --outdir /tmp/saber-central-correct-root > /tmp/central-build.log 2>&1 || {
+            echo 'WORKER_BUILD_CORRECT_ROOT_FAILED'
+            tail -n 45 /tmp/central-build.log
+            exit 1
+          }
+          test -n "$(find /tmp/saber-central-correct-root -type f -name '*.js' -print -quit)"
+          echo 'WORKER_BUILD_CORRECT_ROOT_DRYRUN_SUCCESS'
+          echo 'NO_WORKER_DEPLOY_NO_D1_WRITE_NO_PAYMENT_NO_R2_DELETE'
