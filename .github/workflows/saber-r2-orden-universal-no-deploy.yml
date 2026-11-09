@@ -1,0 +1,33 @@
+name: Saber R2 - orden comercial universal sin pago ni deploy
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths:
+      - integraciones/mercadopago/pruebas/r2-universal-order-central.mjs
+      - integraciones/autocotizador/recepcion/r2-orden-universal-documentos.mjs
+      - integraciones/mercadopago/pruebas/worker.js
+      - integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs
+      - integraciones/mercadopago/pruebas/r2-lote-universal-central.mjs
+      - tests/r2-orden-universal-sin-cobro.test.mjs
+      - .github/workflows/saber-r2-orden-universal-no-deploy.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Pedido único, idempotencia y compatibilidad sin pagos
+        run: |
+          set -euo pipefail
+          node --test tests/r2-orden-universal-sin-cobro.test.mjs tests/r2-borrador-universal-central.test.mjs tests/r2-prepago-sin-archivo-central.test.mjs tests/r2-plan-universal-sin-subida.test.mjs
+          node --check integraciones/mercadopago/pruebas/worker.js
+          node --check integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs
+          echo 'NO_R2_UPLOAD_NO_MP_NO_PRODUCTION_NO_DEPLOY_NO_MAIN'
