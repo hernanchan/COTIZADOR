@@ -72,6 +72,7 @@ async function fixture({paid=false,tampered=false}={}){
    if(sql.includes('SELECT state FROM payment_reviews'))
     return state.review?{state:state.review}:null;
    if(sql.includes("name='transfer_requests'"))return null;
+   if(sql.includes("name='central_production_status'"))return null;
    throw Error('Unexpected first '+sql);
   }}
  }};
