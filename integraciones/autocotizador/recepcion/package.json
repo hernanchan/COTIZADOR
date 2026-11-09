@@ -8,7 +8,7 @@
     "build:pilot": "esbuild ./worker-fase2-validar-pdf.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --outfile=./dist/saber-documentos-validacion-fase2.mjs",
     "test": "node --test ./validacion-fase2.test.mjs ./presupuesto-fase3.test.mjs",
     "build:quote": "esbuild ./worker-fase3-presupuesto-pdf.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --outfile=./dist/saber-documentos-presupuesto-fase3.mjs",
-    "build:unificado": "npm run test:handoff && npm run build:fast-client && npm run build:plot-client && npm run build:intake-client && npm run build:v2-reader && npm run build:v2-upload && npm run build:v2-manifest && npm run build:v2-tus && npm run build:v2-r2 && npm run build:v2-r2-prepago && esbuild ./worker-fase4-cotizador-unificado.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --loader:.html=text --outfile=./dist/saber-documentos-cotizador-fase4.mjs && node --test ./fase4-comprobante-worker-e2e.test.mjs && node --test ./v2-cookies-precios-d1-e2e.test.mjs",
+    "build:unificado": "npm run test:handoff && npm run build:fast-client && npm run build:plot-client && npm run build:intake-client && npm run build:v2-reader && npm run build:v2-upload && npm run build:v2-manifest && npm run build:v2-tus && npm run build:v2-r2 && npm run build:v2-r2-prepago && npm run build:v2-universal-client && npm run build:v2-universal-tus && esbuild ./worker-fase4-cotizador-unificado.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --loader:.html=text --outfile=./dist/saber-documentos-cotizador-fase4.mjs && node --test ./fase4-comprobante-worker-e2e.test.mjs && node --test ./v2-cookies-precios-d1-e2e.test.mjs",
     "test:unificado": "node --test ./fase4-e2e.test.mjs ./lectura-local-pdf.test.mjs ./borrador-anillados.test.mjs",
     "build:fast-client": "esbuild ./cotizador-rapido-cliente.mjs --bundle --minify --platform=browser --format=iife --target=es2022 --outfile=./cotizador-rapido-cliente.txt",
     "build:intake-client": "esbuild ./carga-unica-cliente.mjs --bundle --minify --platform=browser --format=iife --target=es2022 --outfile=./carga-unica-cliente.txt",
@@ -19,7 +19,9 @@
     "test:handoff": "node --test ./tus-smart-handoff-grupo.test.mjs ./tus-smart-receptor-grupo.test.mjs ./discriminar-plano-denso.test.mjs ./paginas-por-cara-ui.test.mjs ./decision-tamano-impresion.test.mjs ./carga-unica-pdf-regresion.test.mjs ../../../tests/fase1-lectura-privada-concurrente.test.mjs ../../../tests/fase1-comprobante-pdf-unico.test.mjs ../../../tests/fase1-comprobantes-ids-lote-regresion.test.mjs ../../../tests/fase1-diagnostico-autorizacion-lote-sin-archivos.test.mjs ../../../tests/fase1-hmac-unicode-escape-worker.test.mjs ./receptor-gas-recuperacion.test.mjs ./subida-sesion-fresca.test.mjs ./recepcion-paralela-lote.test.mjs",
     "build:v2-tus": "esbuild ./tus-directo-cliente.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --outfile=./tus-directo-cliente.txt",
     "build:v2-r2": "esbuild ./r2-pdf-grandes-cliente.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --outfile=./r2-pdf-grandes-cliente.txt",
-    "build:v2-r2-prepago": "esbuild ./r2-prepago-flujo-cliente.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --outfile=./r2-prepago-flujo-cliente.txt"
+    "build:v2-r2-prepago": "esbuild ./r2-prepago-flujo-cliente.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --outfile=./r2-prepago-flujo-cliente.txt",
+    "build:v2-universal-client": "esbuild ./flujo-universal-pdf-cliente.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --outfile=./flujo-universal-pdf-cliente.txt",
+    "build:v2-universal-tus": "esbuild ./tus-universal-directo-cliente.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --outfile=./tus-universal-directo-cliente.txt"
   },
   "dependencies": {
     "pdf-lib": "1.17.1"
