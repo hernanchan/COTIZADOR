@@ -1,0 +1,66 @@
+name: Saber R2 - leer compuertas reales de dos Workers privados sin escrituras
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/r2-gates-live-private-audit-20261109.yml]
+permissions:
+  contents: read
+  statuses: write
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Comparar VERSIONES activas y compuertas requeridas R2 (SOLO GET)
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          api="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts"
+          auth="Authorization: Bearer $TOKEN"
+          dir=$(mktemp -d)
+          trap 'rm -rf "$dir"' EXIT
+          for worker in saber-documentos-pruebas saber-pagos-pruebas; do
+            curl -fsS --max-time 20 -H "$auth" "$api/$worker/settings" > "$dir/$worker-settings.json"
+            curl -fsS --max-time 20 -H "$auth" "$api/$worker/deployments" > "$dir/$worker-deploy.json"
+            jq -e '.success==true and (.result.bindings|type=="array")' "$dir/$worker-settings.json" >/dev/null
+            current=$(jq -er '.result.deployments[0].versions | if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$dir/$worker-deploy.json")
+            echo "WORKER=$worker ACTIVE=$current"
+            if [ "$worker" = saber-documentos-pruebas ]; then
+              test "$current" = '15c4f42f-9ab0-40d0-992a-381ddd53e82c' || exit 1
+              flags='["DOCS_R2_PREPAY_DRAFT_ENABLED","DOCS_R2_POSTPAY_REQUIRED","DOCS_R2_BIG_ENABLED","DOCS_R2_QUOTA_ENABLED","DOCS_R2_STAGING_ENABLED","DOCS_CLIENT_SANDBOX_CHECKOUT_ENABLED","DOCS_CENTRAL_SYNC_ENABLED","DOCS_PRICE_ADMIN_D1_ENABLED"]'
+            else
+              test "$current" = '087d5a84-731d-49bb-a7b3-4b2fb3ddf39e' || exit 1
+              flags='["CENTRAL_R2_QUOTA_ENABLED","CENTRAL_R2_PREPAY_DRAFT_ENABLED","CENTRAL_R2_PREPAY_CHECKOUT_ENABLED","CENTRAL_R2_POSTPAY_ENABLED","CENTRAL_R2_STAGING_ENABLED","DOCS_SANDBOX_CHECKOUT_ENABLED"]'
+            fi
+            jq -n --argjson flags "$flags" --slurpfile s "$dir/$worker-settings.json" '
+              [$flags[] as $name |
+                ($s[0].result.bindings | map(select(.name==$name)) | first) as $b |
+                {name:$name,state:(if $b==null then "MISSING" elif $b.type!="plain_text" then "TYPE_NOT_PLAIN" elif $b.text=="PRIVATE_TEST_ONLY" then "TEST_ONLY" elif $b.text=="OFF" then "OFF" else "OTHER" end)}
+              ]' > "$dir/$worker-flags.json"
+            jq -r '.[] | "FLAG "+.name+"="+.state' "$dir/$worker-flags.json"
+            jq -e 'all(.[]; .state=="TEST_ONLY" or .state=="OFF" or .state=="MISSING")' "$dir/$worker-flags.json" >/dev/null
+          done
+          curl -fsS --max-time 20 'https://saber-pagos-pruebas.libreriasaber.workers.dev/health' > "$dir/health.json"
+          jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$dir/health.json" >/dev/null
+          echo 'READONLY_R2_GATES_AUDIT_OK_NO_WRITES_REAL_PAYMENTS_OFF'
+      - name: Registrar auditoría
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          if [ "$RESULT" = success ]; then state=success; else state=failure; fi
+          jq -n --arg state "$state" --arg context 'saber/r2-gates-private-audit' \
+            --arg description "Auditoria real compuertas y versiones privadas: $RESULT" \
+            --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/r2-gates-ci.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/r2-gates-ci.json >/dev/null
