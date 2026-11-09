@@ -26,7 +26,7 @@ class Element{
   }return null;
  }
 }
-function scene({promptValue='Responsable del mostrador',failCode=null,stage='pendiente',timeSaveError=null}={}){
+function scene({promptValue='Responsable del mostrador',failCode=null,stage='pendiente',timeSaveError=null,r2Pending=false}={}){
  const elements=new Map();
  for(const id of ['secret','productionOperator','status','details','orders',
   'refreshExpress','refreshReceipts','refreshR2Paid','r2PaidReview','r2ReviewPanel','goR2Paid','refreshTransfers','refreshUnpaid','refresh',
@@ -47,6 +47,16 @@ function scene({promptValue='Responsable del mostrador',failCode=null,stage='pen
   work_number:13,amount_ars:4730,file_count:3,
   web_order_id:'WEB-ENSAYO-12345678901234567890123456789012',
   description:'3 PDF recibidos',paid_at:'2026-11-02 15:28:27'};
+ if(r2Pending){
+  order.web_order_id='WEB-ENSAYO-72E9F66A8BC34CC9B25D70EF49C1A8D3';
+  order.r2_receipt_id='DOC-572d0a2e-6558-473b-98ca-121705bc8ba8';
+  order.r2_prepress_pending=true;
+  order.r2_prepress_state='RECIBIDO_PENDIENTE_PREPRENSA';
+  order.r2_prepress_receipt_verified=true;
+  order.work_number=null;
+  order.file_count=1;
+  order.amount_ars=4400;
+ }
  const calls=[],deliveryCalls=[];
  const document={
   hidden:false,
@@ -60,13 +70,24 @@ function scene({promptValue='Responsable del mostrador',failCode=null,stage='pen
   setInterval:()=>1,
   prompt(){return promptValue},confirm(){return true},
   async fetch(path,opts={}){
+   if(path==='/admin/api/central/r2-prepress-approve'){
+    const q=JSON.parse(opts.body);
+    calls.push({r2Approval:q});
+    if(!r2Pending||q.orderId!==orderId)throw Error('Unexpected approval');
+    order.r2_prepress_pending=false;order.work_number=26;
+    return {ok:true,json:async()=>({ok:true,approved:true})};
+   }
    if(path==='/admin/api/central/r2-paid-review')
     return {ok:true,json:async()=>({orders:[{
       webOrderId:'WEB-ENSAYO-255BFE122477AC6C7666EB6D342707FE',
       commercialOrderId:orderId,amountArs:4400,expectedBytes:62915011,
       declaredPages:1,estado:'RECIBIDO_PENDIENTE_PREPRENSA',
       receiptId:'DOC-12345678-1234-4123-8123-123456789abc',
-      readyForPrinting:false,productionAuthorized:false
+      readyForPrinting:false,productionAuthorized:false,
+      verifiedReceipt:true,quotedParametersAvailable:true,
+      quoteSnapshot:{schema:'saber-r2-cotizacion-firmada-v1',nombre:'Plano A1.pdf',
+       copias:1,modoImpresion:'bn',papelPoster:'obra80',rolloBase:'rollo60',
+       paginas:[[59.4,84.1,'cad','rollo60','obra80']]}
     }]})};
    if(path==='/admin/api/orders')
     return {ok:true,json:async()=>({orders:[{...order}]})};
@@ -212,4 +233,45 @@ test('La Central muestra original R2 pagado en revisión sin habilitar producci�
  assert.match(String(link.href),/receiptId=DOC-/);
  assert.equal(link.target,'_blank');
  assert.match(String(x.elements.get('#status').textContent),/ploteo/);
+});
+
+
+test('R2 pagado aparece en Nuevos antes de preprensa, sin botón de iniciar ni ZIP',async()=>{
+ const x=scene({r2Pending:true});
+ await vm.runInContext('refresh({silent:true})',x.env);
+ const card=x.elements.get('#lane-pendiente').children[0];
+ assert.match(card.children[0].textContent,/Nuevo ploteo R2/);
+ assert.ok(card.children.some(e=>String(e.textContent).includes('Original recibido')));
+ const controls=card.children.find(e=>e.className==='actions');
+ assert.deepEqual(controls.children.map(v=>v.textContent),['Revisar preprensa']);
+ assert.equal(x.elements.get('#count-pendiente').textContent,1);
+ assert.equal(x.calls.length,0,'el tablero no autoriza producción');
+});
+test('R2 permite control y aprobación en la misma tarjeta, sin prompts de medidas ni imprimir',async()=>{
+ const x=scene({r2Pending:true});
+ await vm.runInContext('refresh({silent:true})',x.env);
+ const card=x.elements.get('#lane-pendiente').children[0];
+ const controls=card.children.find(e=>e.className==='actions');
+ const review=controls.children[0],panel=card.children.find(e=>e.className==='delivery-editor');
+ assert.equal(panel.hidden,true);
+ await review.listeners.click();
+ assert.equal(panel.hidden,false);
+ assert.ok(panel.children.some(e=>e.tagName==='a'&&String(e.href).includes('r2-preprensa-personal')));
+ const labels=panel.children.filter(e=>e.tagName==='label');
+ const dimensions=labels[0].children[0],checkbox=labels[1].children[0];
+ const save=panel.children.find(e=>e.textContent==='Aprobar preprensa');
+ const feedback=panel.children.find(e=>e.className==='delivery-feedback');
+ assert.ok(save);
+ await save.listeners.click();
+ assert.match(feedback.textContent,/revisá el original/);
+ assert.equal(x.calls.length,0);
+ dimensions.value='59,4 x 84,1';checkbox.checked=true;
+ await save.listeners.click();
+ assert.equal(x.calls.length,1);
+ const p=x.calls[0].r2Approval;
+ assert.equal(p.orderId,orderId);
+ assert.equal(p.confirmed.precio,true);
+ assert.deepEqual(Array.from(p.medidasCm[0]),[59.4,84.1]);
+ assert.equal(x.order.r2_prepress_pending,false);
+ assert.equal(x.elements.get('#lane-pendiente').children[0].children[0].textContent,'Orden 026');
 });
