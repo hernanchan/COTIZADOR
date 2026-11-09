@@ -21,6 +21,8 @@ test('Navegador: único enlace resuelve servidor con POST, sin URL pública R2',
  assert.match(html,/response\.blob|res\.blob\(/);
  assert.match(html,/showSaveFilePicker/);
  assert.match(html,/read\!\=size|read!==size/);
- assert.match(html,/r2-preprensa/);
+ assert.match(html,/Original recibido por R2/);
+ assert.ok(html.indexOf('window.showSaveFilePicker')<html.indexOf("await fetch('/prueba-v2/api/ensayo-r2-descargar-d1-personal'"),
+  'el selector de archivos debe abrirse antes de perder activación del clic');
  assert.doesNotMatch(html,/Authorization:\s*'Bearer|access_token|service_role/);
 });
