@@ -138,3 +138,19 @@ test('documentos consulta cuota de D1 mediante HMAC y rechaza destino externo',a
   objectUUID:ID,service}),/DESTINO_INVALIDO/);
  assert.equal(calls,1);
 });
+
+test('Documentos: rechazo de cuota no filtra mensajes D1 ni secretos',async()=>{
+ const env={DOCS_R2_QUOTA_ENABLED:'PRIVATE_TEST_ONLY',
+  DOCS_CENTRAL_SYNC_ENABLED:'PRIVATE_TEST_ONLY',
+  CENTRAL_BRIDGE_KEY:SECRET,
+  CENTRAL_TEST_URL:'https://saber-pagos-pruebas.libreriasaber.workers.dev/internal/central/stage'};
+ const opts={env,orderId:ORDER,meta:{fileId:'pdf200',bytes:200*MIB,sha256:'a'.repeat(64)},
+  objectUUID:ID,now:()=>1793970000,nonce:()=>ID,subtle:webcrypto.subtle};
+ const bad=await assert.rejects(reservarR2GrandeAntesDeSubir({
+  ...opts,service:{fetch:async()=>Response.json(
+   {ok:false,error:'No se pudo reservar R2',secret:'NUNCA'}, {status:409})}
+ }),/R2_CUPO_RECHAZADO_D1_ESCRITURA_RECHAZADA_409/);
+ await assert.rejects(reservarR2GrandeAntesDeSubir({
+  ...opts,service:{fetch:async()=>Response.json({error:'token SECRET'}, {status:502})}
+ }),/R2_CUPO_RECHAZADO_CENTRAL_ERROR_502/);
+});
