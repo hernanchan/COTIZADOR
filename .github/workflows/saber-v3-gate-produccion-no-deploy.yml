@@ -1,0 +1,31 @@
+name: Saber V3 - seguridad puerta comercial OFF sin desplegar
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths:
+      - vidriera/cotizar.html
+      - vidriera/portal-comercial.json
+      - tests/v3-cotizar-preview-nuevo.test.mjs
+      - .github/workflows/saber-v3-gate-produccion-no-deploy.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  contrato-comercial:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probar bloqueo producción, destino propio y preview aislada
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test tests/v3-cotizar-preview-nuevo.test.mjs
+          node -e "const a=require('./vidriera/portal-comercial.json');if(a.enabled!==false||a.release!=='NO_GO'||a.buyerUrl!==null)process.exit(1);console.log('COMMERCIAL_GATE_DEFAULT_OFF')"
+          echo 'NO_GO_UNTIL_EXPLICIT_AUTHORIZATION'
+          echo 'NO_WORKER_DEPLOY_NO_MAIN_NO_MP_LIVE_NO_ORDERS_NO_R2'

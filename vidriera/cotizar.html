@@ -16,7 +16,34 @@
       var host=location.hostname.toLowerCase();
       if(host.endsWith('.libreriasaber.pages.dev')){
         location.replace('https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/pedido-cliente');
+        return;
       }
+      // La producción comercial conserva el cotizador anterior mientras
+      // el nuevo backend esté en Sandbox. Un JSON sin autorización NO abre
+      // el servicio de pruebas ni habilita pagos. Los bloqueos verdaderos
+      // de producción también deben vivir en el servidor y en MP.
+      if(host!=='libreriasaber.com.ar'&&host!=='www.libreriasaber.com.ar')return;
+      fetch('portal-comercial.json',{cache:'no-store'})
+        .then(function(response){
+          if(!response.ok)throw Error('Configuración comercial no disponible');
+          return response.json();
+        })
+        .then(function(config){
+          if(!config||config.schema!=='saber-portal-comercial-v1'||
+            config.enabled!==true||config.release!=='GO_COMERCIAL_CONFIRMADO'||
+            typeof config.buyerUrl!=='string')return;
+          var target;
+          try{target=new URL(config.buyerUrl)}catch(_){return}
+          // Host de producción previsto, sujeto a vinculación/validación.
+          // Nunca workers.dev, pages.dev, /prueba-v2, admin ni Sandbox.
+          if(target.protocol!=='https:'||
+            target.hostname!=='pedidos.libreriasaber.com.ar'||
+            target.pathname!=='/cotizar'||
+            target.port||target.search||target.hash||
+            target.username||target.password)return;
+          location.replace(target.href);
+        })
+        .catch(function(){/* Fail closed: continúa el cotizador previo. */});
     })();
   </script>
   <style>
