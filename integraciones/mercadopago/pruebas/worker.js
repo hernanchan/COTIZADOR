@@ -1647,8 +1647,15 @@ async function centralUpdateProduction(req,env,ctx){
   const {comprobarPreprensaUniversal}=await import("./r2-universal-preprensa-central.mjs");
   const authorized=await comprobarPreprensaUniversal(env,d.order_id);
   if(!authorized)return json({error:"Preprensa del pedido mixto sin aprobación"},409);
-  if(d.to==="entregado"&&env.CENTRAL_R2_UNIVERSAL_PURGE_ENABLED!=="PRIVATE_TEST_ONLY")
-   return json({error:"No marcar Entregado: borrado mixto aún no habilitado"},409);
+  if(d.to==="entregado"&&(
+      env.CENTRAL_R2_UNIVERSAL_PURGE_ENABLED!=="PRIVATE_TEST_ONLY"||
+      env.CENTRAL_R2_UNIVERSAL_PURGE_EXECUTE_ENABLED!=="PRIVATE_TEST_ONLY"||
+      typeof env.SABER_DOCUMENTOS?.fetch!=="function"||
+      typeof env.SABER_R2_GRANDES?.head!=="function"||
+      typeof env.SABER_R2_GRANDES?.delete!=="function"||
+      !(env.CENTRAL_R2_UNIVERSAL_PURGE_SCOPE==="NEW_ORDERS_ONLY"||
+        env.CENTRAL_R2_UNIVERSAL_PURGE_CANARY_ORDER===universalLink.web_order_id)))
+   return json({error:"Borrado mixto no preparado: no marcar Entregado"},409);
  }
  const eligible=universalLink?
   await env.DB.prepare("SELECT o.id FROM orders o WHERE o.id=? "+
@@ -1702,8 +1709,22 @@ async function centralUpdateProduction(req,env,ctx){
     cleanupR2=await ejecutarBorradoR2Entregado(env,d.order_id);
   }catch{cleanupR2={state:'error',filesDeleted:0}}
  }
+ let cleanupUniversal=null;
+ if(d.to==='entregado'&&universalLink){
+  try{
+   const {encolarBorradoUniversalEntregado,procesarBorradoUniversalEntregado}=
+    await import("./r2-universal-purge-central.mjs");
+   cleanupUniversal=await encolarBorradoUniversalEntregado(env,d.order_id,d.version+1);
+   if(cleanupUniversal.state==='pending'){
+    const executed=await procesarBorradoUniversalEntregado(env,d.order_id);
+    cleanupUniversal={...cleanupUniversal,...executed,
+     state:executed.failed?'pendiente_reintento':'procesado'};
+   }
+  }catch{cleanupUniversal={state:'error_pendiente',filesDeleted:0}}
+ }
  const current=await centralProductionDetail(env,d.order_id);
- return json({saved:true,production:current,cleanup,cleanupR2,productionAuthorized:false});
+ return json({saved:true,production:current,cleanup,cleanupR2,
+  cleanupUniversal,productionAuthorized:false});
 }
 
 
@@ -4664,6 +4685,11 @@ export default {
  async scheduled(event,env,ctx){
   ctx.waitUntil(runScheduledReconciliation(env).catch(e=>console.error("Scheduled payment sync failed",String(e?.message||"unknown").slice(0,120))));
   ctx.waitUntil(centralProcessTUSPurgeQueue(env).catch(()=>{}));
+  if(env.CENTRAL_R2_UNIVERSAL_PURGE_ENABLED==='PRIVATE_TEST_ONLY'&&
+     env.CENTRAL_R2_UNIVERSAL_PURGE_EXECUTE_ENABLED==='PRIVATE_TEST_ONLY')
+   ctx.waitUntil(import("./r2-universal-purge-central.mjs")
+    .then(({reintentarBorradosUniversal})=>reintentarBorradosUniversal(env))
+    .catch(()=>{}));
   if(env.CENTRAL_R2_PURGE_EXECUTE_ENABLED==='PRIVATE_TEST_ONLY')
    ctx.waitUntil(import("./r2-borrado-entregado-central.mjs")
     .then(({reintentarBorradosR2})=>reintentarBorradosR2(env)).catch(()=>{}));

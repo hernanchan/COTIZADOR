@@ -2125,6 +2125,10 @@ async function v2PrivateBrowserResponse(request,env,path,{buyer=false}={}){
 export default {
   async fetch(request, env, ctx) {
     const page=new URL(request.url).pathname;
+    if(page==='/internal/r2-universal-purge-delivered'){
+      const {atenderBorradoUniversalTUS}=await import("./r2-universal-purge-documentos.mjs");
+      return atenderBorradoUniversalTUS(request,env);
+    }
     if(page==='/internal/tus-purge-delivered')
       return recibirLimpiezaEntregadaInterna(request,env);
     // Comprador: pantalla TUS existente, sin contraseña de personal.
