@@ -30,7 +30,7 @@ jobs:
           node --check integraciones/autocotizador/recepcion/e2e-preprensa-original-r2-real-20261109.mjs
           node --test tests/r2-preprensa-archivo-local.test.mjs tests/r2-referencia-personal.test.mjs
           echo 'PDF_PREPRESS_LOCAL_TESTS_OK'
-      - name: Sólo pago verificado y original R2 ya guardado: 60 MiB y medidas A1
+      - name: 'Sólo pago verificado y original R2 ya guardado: 60 MiB y medidas A1'
         shell: bash
         env:
           SABER_V2_OPERATOR_PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
