@@ -1,4 +1,4 @@
-name: Saber R2 - corregir checkout MP solo Central sandbox privada
+name: Saber R2 - corregir SQL cuota D1 SOLO Central sandbox privada
 on:
   push:
     branches: [integracion/tus-pedido-privado-20261101]
@@ -27,7 +27,7 @@ jobs:
         run: |
           set -euo pipefail
           npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.25.12
-          node --test tests/r2-prepago-checkout-sandbox.test.mjs tests/r2-prepago-sin-archivo-central.test.mjs tests/r2-pago-central-bridge-prepago.test.mjs
+          node --test tests/r2-prepago-checkout-sandbox.test.mjs tests/r2-prepago-sin-archivo-central.test.mjs tests/r2-pago-central-bridge-prepago.test.mjs tests/r2-grandes-cuotas-central.test.mjs
           node --check integraciones/mercadopago/pruebas/r2-prepago-checkout-sandbox-central.mjs
           npx esbuild integraciones/mercadopago/pruebas/worker.js --bundle --format=esm --platform=browser --target=es2022 --outfile=/tmp/saber-central-r2-bundle.mjs
           node --check /tmp/saber-central-r2-bundle.mjs
@@ -46,7 +46,7 @@ jobs:
           base="https://saber-pagos-pruebas.libreriasaber.workers.dev"
           docs="https://saber-documentos-pruebas.libreriasaber.workers.dev"
           auth="Authorization: Bearer $TOKEN"
-          baseline='8771eae2-fe87-46c2-946a-024986d36271'
+          baseline='b29cbca1-77f2-4446-9aed-cf085db0e9af'
           tmp=$(mktemp -d)
           chmod 700 "$tmp"
           modified=0
@@ -109,17 +109,17 @@ jobs:
           jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$tmp/health-final.json" >/dev/null
           test "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$base/admin/api/orders")" = 401
           echo "CENTRAL_PRIVATE_CHECKOUT_FIX_ACTIVE=$candidate"
-          payload='{"action":"start","webOrderId":"WEB-ENSAYO-255BFE122477AC6C7666EB6D342707FE","commercialOrderId":"66f10bd2-77ce-46ef-930c-49dc3d22d23e"}'
+          payload='{"action":"status","webOrderId":"WEB-ENSAYO-255BFE122477AC6C7666EB6D342707FE","commercialOrderId":"66f10bd2-77ce-46ef-930c-49dc3d22d23e"}'
           http=$(curl -sS --max-time 70 -u "operador:$PASSWORD" -H "Origin: $docs" \
              -H 'Content-Type: application/json' -o "$tmp/checkout.json" -w '%{http_code}' -X POST \
              --data "$payload" "$docs/prueba-v2/api/ensayo-r2-prepago-checkout")
           echo "EXISTING_R2_SANDBOX_CHECKOUT_HTTP=$http"
           jq -c '{ok,error,reasonCode,estado,amountArs,hasLink:(.checkoutUrl!=null),uploadAuthorized}' "$tmp/checkout.json"
           if [ "$http" = 200 ];then
-            jq -e '.ok==true and .amountArs==4400 and .estado=="pendiente" and .uploadAuthorized==false and (.checkoutUrl|type=="string")' "$tmp/checkout.json" >/dev/null
-            echo 'MP_TEST_CHECKOUT_READY_WAIT_PAYMENT_VERIFIED_NO_R2'
+            jq -e '.ok==true and .amountArs==4400 and .estado=="pagado_esperando_archivo" and .uploadAuthorized==true' "$tmp/checkout.json" >/dev/null
+            echo 'MP_TEST_PAYMENT_RECONCILED_AFTER_QUOTA_FIX_NO_R2_YET'
           elif [ "$http" = 409 ] || [ "$http" = 503 ];then
             jq -e '.ok==false and (.reasonCode|type=="string")' "$tmp/checkout.json" >/dev/null
-            echo 'NEXT_MP_SANDBOX_BLOCKER_IDENTIFIED_NO_R2'
+            echo 'MP_SANDBOX_STATUS_BLOCKER_IDENTIFIED_NO_R2'
           else echo 'UNEXPECTED_MP_CHECKOUT_HTTP';exit 1;fi
           echo 'CENTRAL_PRIVATE_ONLY_NO_MAIN_NO_REAL_PAYMENT_NO_R2_UPLOAD'
