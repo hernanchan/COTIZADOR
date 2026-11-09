@@ -11,6 +11,11 @@ on:
       - tests/r2-orden-universal-sin-cobro.test.mjs
       - tests/r2-universal-checkout-postpago.test.mjs
       - tests/r2-universal-tus-mixto-postpago.test.mjs
+      - tests/r2-universal-interfaz-compra-unica.test.mjs
+      - integraciones/autocotizador/recepcion/flujo-universal-pdf-cliente.mjs
+      - integraciones/autocotizador/recepcion/tus-universal-directo-cliente.mjs
+      - integraciones/autocotizador/recepcion/carga-unica-cliente.mjs
+      - integraciones/autocotizador/recepcion/pantalla-cotizador-v2-prueba-privada.mjs
       - integraciones/mercadopago/pruebas/r2-universal-tus-central.mjs
       - integraciones/autocotizador/recepcion/tus-universal-worker.mjs
       - integraciones/autocotizador/recepcion/tus-universal-puente-central.mjs
@@ -37,7 +42,7 @@ jobs:
       - name: Pedido único, idempotencia y compatibilidad sin pagos
         run: |
           set -euo pipefail
-          node --test tests/r2-orden-universal-sin-cobro.test.mjs tests/r2-universal-checkout-postpago.test.mjs tests/r2-universal-tus-mixto-postpago.test.mjs tests/r2-borrador-universal-central.test.mjs tests/r2-prepago-sin-archivo-central.test.mjs tests/r2-plan-universal-sin-subida.test.mjs
+          node --test tests/r2-orden-universal-sin-cobro.test.mjs tests/r2-universal-checkout-postpago.test.mjs tests/r2-universal-tus-mixto-postpago.test.mjs tests/r2-universal-interfaz-compra-unica.test.mjs tests/r2-borrador-universal-central.test.mjs tests/r2-prepago-sin-archivo-central.test.mjs tests/r2-plan-universal-sin-subida.test.mjs
           node --check integraciones/mercadopago/pruebas/worker.js
           node --check integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs
           echo 'NO_R2_UPLOAD_NO_MP_NO_PRODUCTION_NO_DEPLOY_NO_MAIN'
