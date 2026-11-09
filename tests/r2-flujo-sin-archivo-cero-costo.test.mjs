@@ -85,6 +85,7 @@ function store(){
   resumeMultipartUpload:()=>({})};
  const docs={DOCS_R2_BIG_ENABLED:'PRIVATE_TEST_ONLY',
   DOCS_R2_QUOTA_ENABLED:'PRIVATE_TEST_ONLY',
+  DOCS_R2_STAGING_ENABLED:'PRIVATE_TEST_ONLY',
   DOCS_R2_POSTPAY_REQUIRED:'PRIVATE_TEST_ONLY',
   DOCS_R2_RECEIPT_KEY:SECRET,SABER_R2_GRANDES:bucket};
  const signed=async req=>({payload:await req.json()});
