@@ -267,7 +267,7 @@ test('R2 permite control y aprobación en la misma tarjeta, sin prompts de medid
  assert.equal(x.calls.length,0);
  dimensions.value='59,4 x 84,1';checkbox.checked=true;
  await save.listeners.click();
- assert.equal(x.calls.length,1);
+ assert.equal(x.calls.length,1,"Preprensa detenida: "+feedback.textContent);
  const p=x.calls[0].r2Approval;
  assert.equal(p.orderId,orderId);
  assert.equal(p.confirmed.precio,true);
