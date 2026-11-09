@@ -1640,7 +1640,22 @@ async function centralUpdateProduction(req,env,ctx){
  await ensurePaymentReviews(env);
  await centralTables(env);
  await centralProductionTables(env);
- const eligible=await env.DB.prepare(
+ const universalLink=env.CENTRAL_R2_UNIVERSAL_ORDER_ENABLED==="PRIVATE_TEST_ONLY"?
+  await env.DB.prepare("SELECT web_order_id FROM central_r2_universal_order_links "+
+   "WHERE commercial_order_id=?").bind(d.order_id).first().catch(()=>null):null;
+ if(universalLink){
+  const {comprobarPreprensaUniversal}=await import("./r2-universal-preprensa-central.mjs");
+  const authorized=await comprobarPreprensaUniversal(env,d.order_id);
+  if(!authorized)return json({error:"Preprensa del pedido mixto sin aprobación"},409);
+  if(d.to==="entregado"&&env.CENTRAL_R2_UNIVERSAL_DELETE_ENABLED!=="PRIVATE_TEST_ONLY")
+   return json({error:"No marcar Entregado: borrado mixto aún no habilitado"},409);
+ }
+ const eligible=universalLink?
+  await env.DB.prepare("SELECT o.id FROM orders o WHERE o.id=? "+
+   "AND o.status='paid' AND o.paid_at IS NOT NULL AND o.deposit_ars=o.amount_ars "+
+   "AND EXISTS(SELECT 1 FROM payment_reviews r WHERE r.order_id=o.id "+
+   "AND r.state='verified') LIMIT 1").bind(d.order_id).first():
+ await env.DB.prepare(
   "SELECT o.id FROM orders o "+
   "LEFT JOIN central_document_manifests m ON m.commercial_order_id=o.id "+
   "LEFT JOIN central_r2_prepress_approvals a ON a.order_id=o.id "+
@@ -4723,14 +4738,6 @@ export default {
      const {recibirTUSUniversalCentral}=await import("./r2-universal-tus-central.mjs");
      return recibirTUSUniversalCentral(req,env,{readSigned:centralReadSigned});
     }
-    if(url.pathname==="/internal/central/r2-universal-tus-gate"){
-     const {autorizarTUSUniversalCentral}=await import("./r2-universal-tus-central.mjs");
-     return autorizarTUSUniversalCentral(req,env,{readSigned:centralReadSigned});
-    }
-    if(url.pathname==="/internal/central/r2-universal-tus-received"){
-     const {recibirTUSUniversalCentral}=await import("./r2-universal-tus-central.mjs");
-     return recibirTUSUniversalCentral(req,env,{readSigned:centralReadSigned});
-    }
     if(url.pathname==="/internal/central/r2-universal-received"){
      const {confirmarOriginalUniversalR2}=await import("./r2-universal-recibido-central.mjs");
      return await confirmarOriginalUniversalR2(req,env,{readSigned:centralReadSigned});
@@ -4806,6 +4813,11 @@ export default {
     if(url.pathname==="/admin/api/central/mobile-invite")return await createMobileInvite(req,env);
     if(url.pathname==="/admin/api/central/resource-capacity")return await etaResourcesApi(req,env);
     if(url.pathname==="/admin/api/central/productivity-samples")return await etaSamplesApi(req,env);
+   if(url.pathname==="/admin/api/central/r2-universal-prepress-approve"&&req.method==="POST"){
+    if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+    const {aprobarPreprensaUniversalCentral}=await import("./r2-universal-preprensa-central.mjs");
+    return aprobarPreprensaUniversalCentral(req,env,{authorized:true});
+   }
    if(url.pathname==="/admin/api/central/r2-prepress-approve"&&req.method==="POST"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
     await centralTables(env);
