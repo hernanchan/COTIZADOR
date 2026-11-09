@@ -12,6 +12,55 @@ vm.runInContext(source.replace('export default {','globalThis.worker = {'),ctx);
 const html=vm.runInContext('adminHtml',ctx);
 const script=html.slice(html.indexOf('<script>')+8,html.indexOf('</script>'));
 new vm.Script(script);
+
+test('R2 ya presente en SELECT de pagos NO se descarta: entra a Nuevos sin preprensa aprobada',()=>{
+ const merge=vm.runInContext('centralMergePendingR2Orders',ctx);
+ const id='89608817-95b1-41bc-ac88-579da519d32c';
+ const web='WEB-ENSAYO-72E9F66A8BC34CC9B25D70EF49C1A8D3';
+ const board=[
+  {id,amount_ars:4400,description:'Ploteo pagado',
+   production_state:null,work_number:null,web_order_id:null},
+  {id:'b69f8ef5-63eb-4728-a967-584c63f39c41',
+   amount_ars:3600,production_state:'en_preparacion',work_number:12}
+ ];
+ const pending={commercialOrderId:id,webOrderId:web,amountArs:4400,
+  estado:'RECIBIDO_PENDIENTE_PREPRENSA',received:true,verifiedReceipt:true,
+  receiptId:'DOC-572d0a2e-6558-473b-98ca-121705bc8ba8',
+  paidAt:'2026-11-09 13:14:00'};
+ merge(board,[pending]);
+ assert.equal(board.length,2,'sin duplicar ni perder una orden');
+ assert.equal(board[0].production_state,'pendiente');
+ assert.equal(board[0].r2_prepress_pending,true);
+ assert.equal(board[0].r2_prepress_receipt_verified,true);
+ assert.equal(board[0].work_number,null,'preprensa pendiente no asigna número');
+ assert.equal(board[1].production_state,'en_preparacion','no altera otros pedidos');
+ merge(board,[pending]);assert.equal(board.length,2,'sin duplicar en refrescos');
+});
+test('R2 aprobado conserva su estado: nunca vuelve a preprensa ni reinicia producción',()=>{
+ const merge=vm.runInContext('centralMergePendingR2Orders',ctx);
+ const id='89608817-95b1-41bc-ac88-579da519d32c';
+ const web='WEB-ENSAYO-72E9F66A8BC34CC9B25D70EF49C1A8D3';
+ const board=[{id,amount_ars:4400,production_state:'listo',production_version:2,work_number:33}];
+ merge(board,[{commercialOrderId:id,webOrderId:web,amountArs:4400,
+  estado:'RECIBIDO_PENDIENTE_PREPRENSA',received:true,verifiedReceipt:true}]);
+ assert.equal(board.length,1);
+ assert.equal(board[0].production_state,'listo');
+ assert.equal(board[0].work_number,33);
+ assert.equal(board[0].r2_prepress_pending,undefined);
+});
+test('R2 sin recibo sigue en Nuevos esperando archivo, nunca ofrece producción',()=>{
+ const merge=vm.runInContext('centralMergePendingR2Orders',ctx);
+ const board=[];
+ merge(board,[{commercialOrderId:'89608817-95b1-41bc-ac88-579da519d32c',
+  webOrderId:'WEB-ENSAYO-72E9F66A8BC34CC9B25D70EF49C1A8D3',
+  amountArs:4400,estado:'PAGADO_ESPERANDO_ARCHIVO',
+  received:false,verifiedReceipt:false}]);
+ assert.equal(board.length,1);
+ assert.equal(board[0].production_state,'pendiente');
+ assert.equal(board[0].file_count,0);
+ assert.equal(board[0].r2_prepress_pending,true);
+ assert.equal(board[0].r2_prepress_receipt_verified,false);
+});
 test('El operador encuentra preprensa R2 desde el acceso superior con un clic',()=>{
  assert.match(html,/id="goR2Paid"[^>]*>Ver ploteos R2 para aprobar/);
  assert.match(html,/id="r2ReviewPanel"/);
