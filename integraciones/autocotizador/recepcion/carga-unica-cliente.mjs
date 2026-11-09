@@ -23,6 +23,8 @@ const MAX_PDF_TUS_BYTES=LIMITE_TUS_PDF_BYTES;
 const MAX_PDF_R2_PREPAGO_BYTES=LIMITE_R2_PDF_BYTES;
 const R2_PREPAGO_ENSAYO=location.pathname==='/prueba-v2/carga-inteligente'&&
  window.parent!==window&&new URLSearchParams(location.search).get('r2Prepago')==='1';
+const R2_UNIVERSAL_ENSAYO=location.pathname==='/prueba-v2/carga-inteligente'&&
+ window.parent!==window&&new URLSearchParams(location.search).get('universal')==='1';
 function admitePrepagoR2Grande(e){
  if(!R2_PREPAGO_ENSAYO||entries.length!==1||!e||
     !(e.archivoOriginal instanceof File)||
@@ -69,6 +71,7 @@ function alertasRecepcionPDF(){
   if(!(file instanceof File))continue;
   const transporte=decidirTransportePDF(file.size);
   if(transporte.ruta==='r2'){
+   if(R2_UNIVERSAL_ENSAYO)continue;
    // R2 corresponde por TAMAÑO a cualquier PDF. El circuito actual de
    // Central solo recibe ploteo individual: no cobrar A4/A3 grandes aún.
    if(admitePrepagoR2Grande(e))continue;
@@ -829,6 +832,41 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
       entries.length<1||entries.length>MAX_PDF_CARGA||
       ultimoPresupuesto.plan?.length!==entries.length)
     throw Error('Completá primero la cotización de todos los documentos.');
+   if(R2_UNIVERSAL_ENSAYO&&entries.some(e=>
+      e.archivoOriginal instanceof File&&e.archivoOriginal.size>MAX_PDF_TUS_BYTES)){
+    const lote=prepararLoteParcial(entries);
+    if(lote.archivos.length!==entries.length||
+       ultimoPresupuesto.pendientes?.length||
+       entries.length>10)
+     throw Error('Completá la clasificación y el presupuesto de todos los PDF.');
+    let tusTotal=0;
+    for(let i=0;i<entries.length;i++){
+     const e=entries[i],plan=ultimoPresupuesto.plan.find(p=>p.indice===i);
+     const f=e.archivoOriginal,config=lote.archivos[i];
+     if(!(f instanceof File)||!config||config.nombre!==f.name||
+        !plan||!['documentos','ploteos'].includes(plan.destino)||
+        !Number.isSafeInteger(f.size)||f.size<5||
+        f.size>MAX_PDF_R2_PREPAGO_BYTES||
+        f.name.length>120||!/\.pdf$/i.test(f.name)||
+        !Array.isArray(e.paginas)||!e.paginas.length||
+        e.paginas.length>2000||
+        !['bn','color'].includes(e.modo)||
+        (plan.destino==='ploteos'&&e.paginas.some(p=>!['cad','poster'].includes(p.modo))))
+      throw Error('Revisá el archivo «'+e.name+'»: tamaño, tipo, páginas o presupuesto pendiente.');
+     if(f.size<=MAX_PDF_TUS_BYTES)tusTotal+=f.size;
+    }
+    if(tusTotal>MAX_LOTE_TUS_BYTES)
+     throw Error('Los archivos chicos superan los 60 MiB combinados para TUS.');
+    // Un solo mensaje a la vista padre, sin originales al servidor.
+    window.parent.postMessage({type:'SABER_SMART_UNIVERSAL_PDF',
+     files:entries.map(e=>e.archivoOriginal),
+     archivos:lote.archivos,totalOrientativo:ultimoPresupuesto.total
+    },location.origin);
+    info.classList?.remove?.('estado-recepcion-error');
+    info.textContent='Pedido completo preparado. El servidor confirmará el precio; los PDF siguen en tu dispositivo hasta el pago de prueba.';
+    window.parent.postMessage({type:'SABER_SMART_HANDOFF_READY',cantidad:entries.length},location.origin);
+    return;
+   }
    if(entries.length===1&&typeof admitePrepagoR2Grande==='function'&&admitePrepagoR2Grande(entries[0])){
     const e=entries[0],plan=ultimoPresupuesto.plan[0];
     if(plan?.destino!=='ploteos'||plan.paginasElegidas.length!==e.paginas.length||
