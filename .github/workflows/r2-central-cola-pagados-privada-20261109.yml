@@ -28,6 +28,7 @@ jobs:
           set -euo pipefail
           npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.25.12
           node --test tests/r2-prepago-checkout-sandbox.test.mjs tests/r2-prepago-sin-archivo-central.test.mjs tests/r2-pago-central-bridge-prepago.test.mjs tests/r2-grandes-cuotas-central.test.mjs tests/r2-prepago-revision-central.test.mjs
+          node --test tests/tus-central-seguimiento-operativo.test.mjs tests/tus-central-tablero-click-real.test.mjs
           node --check integraciones/mercadopago/pruebas/r2-prepago-checkout-sandbox-central.mjs
           npx esbuild integraciones/mercadopago/pruebas/worker.js --bundle --format=esm --platform=browser --target=es2022 --outfile=/tmp/saber-central-r2-bundle.mjs
           node --check /tmp/saber-central-r2-bundle.mjs
@@ -47,7 +48,7 @@ jobs:
           base="https://saber-pagos-pruebas.libreriasaber.workers.dev"
           docs="https://saber-documentos-pruebas.libreriasaber.workers.dev"
           auth="Authorization: Bearer $TOKEN"
-          baseline='f4554595-ea33-4813-a2d8-21bf1b991959'
+          baseline='f9527c77-36c5-428a-a622-f0e5ed3cfd31'
           tmp=$(mktemp -d)
           chmod 700 "$tmp"
           modified=0
