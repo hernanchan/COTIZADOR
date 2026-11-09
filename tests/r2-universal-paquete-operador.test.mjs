@@ -106,6 +106,7 @@ test('no empaqueta pedidos sin pago, entrega o recibos originales completos',asy
 test('descarga TUS personal: SHA verificado; negación por alteración y sin Basic',async()=>{
  const {env}=make();Object.assign(env,{
   DOCS_R2_UNIVERSAL_PACKAGE_ENABLED:'PRIVATE_TEST_ONLY',
+  DOCS_R2_UNIVERSAL_POSTPAY_ENABLED:'PRIVATE_TEST_ONLY',
   DOCS_CENTRAL_SYNC_ENABLED:'PRIVATE_TEST_ONLY',
   DOCS_V2_PRIVATE_UI_ENABLED:'PRIVATE_TEST_ONLY',
   DOCS_TUS_PRIVATE_ENABLED:'PRIVATE_TEST_ONLY',
