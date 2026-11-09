@@ -146,3 +146,33 @@ test('Documentos: sesión ausente o switch apagado NO consulta Central',async()=
  assert.equal(r.status,503);
  assert.equal(calls,0);
 });
+
+test('Documentos: rechazo Central 503 propaga sólo código permitido, no detalles ni secretos',async()=>{
+ const env={DOCS_R2_PREPAY_DRAFT_ENABLED:'PRIVATE_TEST_ONLY',
+  DOCS_CLIENT_SANDBOX_CHECKOUT_ENABLED:'PRIVATE_TEST_ONLY',
+  DOCS_CENTRAL_SYNC_ENABLED:'PRIVATE_TEST_ONLY',
+  CENTRAL_BRIDGE_KEY:SECRET,
+  CENTRAL_TEST_URL:'https://saber-pagos-pruebas.libreriasaber.workers.dev/internal/central/stage'};
+ const make=()=>new Request('https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/api/ensayo-r2-prepago-checkout',{
+  method:'POST',headers:{Origin:'https://saber-documentos-pruebas.libreriasaber.workers.dev',
+   'Content-Type':'application/json'},
+  body:JSON.stringify({action:'start',webOrderId:WEB,commercialOrderId:UUID})
+ });
+ const reqOpts={authorized:true,now:()=>1794070000,nonce:()=>UUID,subtle:webcrypto.subtle};
+ const a=await checkoutR2PrepaidSandboxDocumentos(make(),env,{
+  ...reqOpts,service:{fetch:async()=>Response.json({
+   ok:false,error:'R2_PREPAGO_PASARELA_NO_CONFIGURADA',
+   detail:'no enviar este secreto'
+  },{status:503})}
+ });
+ assert.equal(a.status,503);
+ assert.deepEqual(await a.json(),{ok:false,error:'R2_PREPAGO_CHECKOUT_CENTRAL_RECHAZO',
+  reasonCode:'R2_PREPAGO_PASARELA_NO_CONFIGURADA'});
+ const b=await checkoutR2PrepaidSandboxDocumentos(make(),env,{
+  ...reqOpts,service:{fetch:async()=>Response.json({
+    error:'error inventado por un servidor intermedio',secret:'HIDDEN'
+  },{status:503})}
+ });
+ assert.equal(b.status,503);
+ assert.equal((await b.json()).reasonCode,'R2_PREPAGO_ERROR_INTERNO');
+});
