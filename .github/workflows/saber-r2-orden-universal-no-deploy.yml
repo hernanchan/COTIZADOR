@@ -10,6 +10,9 @@ on:
       - integraciones/mercadopago/pruebas/r2-lote-universal-central.mjs
       - tests/r2-orden-universal-sin-cobro.test.mjs
       - tests/r2-universal-checkout-postpago.test.mjs
+      - integraciones/mercadopago/pruebas/r2-universal-checkout-central.mjs
+      - integraciones/autocotizador/recepcion/r2-universal-confirmar-pago-central.mjs
+      - integraciones/autocotizador/recepcion/r2-universal-checkout-documentos.mjs
       - .github/workflows/saber-r2-orden-universal-no-deploy.yml
   workflow_dispatch:
 permissions:
