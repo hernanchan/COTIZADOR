@@ -1,0 +1,36 @@
+name: Saber Central - confirmar R2 en Nuevos en Worker privado desplegado
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-central-r2-nuevos-smoke-20261109.yml]
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Comprobar HTML real, controles de acceso y pagos OFF sin modificar datos
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://saber-pagos-pruebas.libreriasaber.workers.dev'
+          f=$(mktemp)
+          trap 'rm -f "$f"' EXIT
+          status=$(curl -sS --max-time 25 -o "$f" -w '%{http_code}' "$base/admin")
+          test "$status" = 200
+          grep -Fq 'function inlineR2Review(order)' "$f"
+          grep -Fq 'Nuevo ploteo R2' "$f"
+          grep -Fq 'Revisar preprensa' "$f"
+          grep -Fq 'Aprobar preprensa' "$f"
+          grep -Fq 'r2_prepress_pending' "$f"
+          grep -Fq 'No se puede aprobar todavía: falta el PDF íntegro' "$f"
+          echo 'LIVE_CENTRAL_R2_IN_NEW_AND_REVIEW_INLINE_PRESENT'
+          code=$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$base/admin/api/orders")
+          test "$code" = 401
+          code=$(curl -sS --max-time 25 -X POST -H 'Content-Type: application/json' \
+            --data '{}' -o /dev/null -w '%{http_code}' "$base/admin/api/central/r2-prepress-approve")
+          test "$code" = 401
+          health=$(curl -fsS --max-time 25 "$base/health")
+          echo "$health" | jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' >/dev/null
+          echo 'LIVE_CENTRAL_PRIVATE_SECURITY_GUARDS_PAYMENT_OFF'
