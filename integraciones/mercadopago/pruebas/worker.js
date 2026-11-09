@@ -2917,6 +2917,16 @@ async function showOrder(id){try{status.textContent="Consultando detalle...";con
   d.medidas.map((v,i)=>"#"+(i+1)+" "+v[0]+"×"+v[1]+" cm").join("; ")));
  details.append(node("p","Importe verificado: "+money(d.importe)+
   " · Original privado disponible para preparación. NO enviar el PDF pesado directamente al plotter."));
+ const zipR2=node("button","Abrir ZIP R2 original + instrucciones");
+ zipR2.addEventListener("click",()=>{
+  const url=new URL("https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/r2-preprensa-personal");
+  url.searchParams.set("webOrderId",d.webOrderId);
+  url.searchParams.set("receiptId",d.recibo);
+  const link=document.createElement("a");
+  link.href=url.href;link.target="_blank";link.rel="noopener noreferrer";
+  document.body.append(link);link.click();link.remove();
+ });
+ details.append(zipR2);
 }if(x.produccion?.seguimiento)renderProductionTracking(id,x.produccion.seguimiento);if(x.produccion?.seguimiento&&x.produccion?.preparacionEstimada)renderPreparationEstimate(id,x.produccion.seguimiento,x.produccion.preparacionEstimada);if(x.produccion){const pr=x.produccion;details.append(node("h4","Estado operativo: "+pr.estado.replaceAll("_"," ")));details.append(node("p",pr.mensaje));for(const t of pr.trabajos){const area=node("section","");area.append(node("h4",t.linea+". "+t.cantidad+" × "+t.descripcion+" — "+money(t.subtotal)));area.append(node("p","Estado: "+t.etapa.replaceAll("_"," ")+" · "+t.instruccion));const valores=Object.entries(t.especificaciones||{}).map(a=>a[0]+": "+a[1]).join(" · ");if(valores)area.append(node("p","Ficha técnica: "+valores));if(t.referencias?.length)area.append(node("p","Referencias privadas: "+t.referencias.join(", ")));details.append(area)}}else details.append(node("p","La ficha de producción no está disponible."));if(x.produccion?.documentosVerificados){
  const d=x.produccion.documentosVerificados;
  details.append(node("h4",(d.numeroOrden?"Orden de trabajo N.º "+d.numeroOrden+" · ":"")+
@@ -3285,10 +3295,13 @@ function boardCard(order){
   hold.addEventListener("click",()=>moveCard(order,"en_espera",hold));controls.append(hold);
  }
  if(current!=="entregado"&&/^WEB-ENSAYO-[A-F0-9]{32}$/.test(order.web_order_id||"")){
-  const zip=node("button","Descargar ZIP");zip.className="outline";
+  const isR2=/^DOC-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(order.r2_receipt_id||"");
+  const zip=node("button",isR2?"ZIP ploteo grande":"Descargar ZIP");zip.className="outline";
   zip.addEventListener("click",()=>{
-   const u=new URL("https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/orden-paquete");
+   const u=new URL("https://saber-documentos-pruebas.libreriasaber.workers.dev"+
+    (isR2?"/prueba-v2/r2-preprensa-personal":"/prueba-v2/orden-paquete"));
    u.searchParams.set("webOrderId",order.web_order_id);
+   if(isR2)u.searchParams.set("receiptId",order.r2_receipt_id);
    const link=document.createElement("a");
    link.href=u.href;link.target="_blank";link.rel="noopener noreferrer";
    document.body.append(link);link.click();link.remove();
@@ -4592,7 +4605,8 @@ export default {
     await centralTables(env);await centralProductionTables(env);await ensurePreparationEstimates(env);
     const rows=await env.DB.prepare("SELECT o.id,o.description,o.amount_ars,o.status,o.paid_at,o.created_at,"+
      "CASE WHEN m.commercial_order_id IS NULL AND a.order_id IS NULL THEN NULL ELSE COALESCE(s.state,'pendiente') END AS production_state,"+
-     "n.number AS work_number,COALESCE(m.file_count,CASE WHEN a.order_id IS NOT NULL THEN 1 END) AS file_count,"+
+     "n.number AS work_number,a.receipt_id AS r2_receipt_id,"+
+     "COALESCE(m.file_count,CASE WHEN a.order_id IS NOT NULL THEN 1 END) AS file_count,"+
      "COALESCE(m.web_order_id,i.web_order_id) AS web_order_id,"+
      "c.phone AS customer_phone,COALESCE(s.version,0) AS production_version,"+
      "e.ready_at AS estimated_ready_at,COALESCE(e.version,0) AS estimated_ready_version FROM orders o "+
