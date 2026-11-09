@@ -5,6 +5,7 @@ on:
     paths: [.github/workflows/r2-grandes-stage-seguro-privado.yml]
 permissions:
   contents: read
+  statuses: write
 concurrency:
   group: saber-documentos-private-deploy
   cancel-in-progress: false
@@ -107,3 +108,20 @@ jobs:
           echo "R2_VERSION_INACTIVA=$candidate"
           echo "WORKER_ACTIVO_SIN_CAMBIOS=$old"
           echo "PORTAL_401_BINDINGS_INTACTOS_R2_OFF_NO_DEPLOY_NO_PAYMENT"
+      - name: Registrar preflight y versión inactiva en estado de commit
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_RESULT: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          if [ "$CI_RESULT" = success ]; then state=success; else state=failure; fi
+          jq -n --arg state "$state" \
+            --arg context 'saber/r2-version-inactiva' \
+            --arg description "Worker R2 privado INACTIVO, preflight: $CI_RESULT" \
+            --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/r2-inactive-ci-status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+            --input /tmp/r2-inactive-ci-status.json >/dev/null
+          echo "INACTIVE_STAGE_RESULT=$CI_RESULT NO_DEPLOY"
