@@ -9,7 +9,7 @@ const reply=(data,status=200)=>Response.json(data,{status,headers:{
  'Cache-Control':'no-store, private','X-Content-Type-Options':'nosniff'
 }});
 export async function checkoutR2PrepaidSandboxCentral(request,env,{
- readSigned,dispatch,reconcile,now=()=>Date.now()
+ readSigned,dispatch,reconcile,trackingLink=async()=>null,now=()=>Date.now()
 }={}){
  if(env?.CENTRAL_R2_PREPAY_CHECKOUT_ENABLED!=='PRIVATE_TEST_ONLY'||
    env?.DOCS_SANDBOX_CHECKOUT_ENABLED!=='PRIVATE_TEST_ONLY'||
@@ -53,8 +53,11 @@ export async function checkoutR2PrepaidSandboxCentral(request,env,{
   const estado=review?.state==='revoked'?'revocado':
    fresh?.status==='paid'&&fresh?.paid_at&&review?.state==='verified'?
     'pagado_esperando_archivo':'pendiente';
+  const seguimientoUrl=estado==='pagado_esperando_archivo'&&
+   typeof trackingLink==='function'?await trackingLink(row.id):null;
   return reply({ok:true,webOrderId:p.webOrderId,
    commercialOrderId:row.id,estado,amountArs:row.amount_ars,
+   ...(seguimientoUrl?{seguimientoUrl}:{}),
    uploadAuthorized:estado==='pagado_esperando_archivo',
    filesUploaded:false,productionAuthorized:false});
  }

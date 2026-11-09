@@ -2255,7 +2255,12 @@ async function trackingCustomerStatus(req,env){
   "LEFT JOIN central_work_order_numbers n ON n.commercial_order_id=o.id "+
   "LEFT JOIN central_production_status s ON s.order_id=o.id "+
   "LEFT JOIN payment_reviews p ON p.order_id=o.id WHERE o.id=? LIMIT 1").bind(match[1]).first();
- if(!x)return json({error:"Enlace inválido"},404);
+ if(!x){
+  // Solo el pedido firmado que corresponda a un R2 prepago conciliado:
+  // NO falsear un manifiesto TUS, prometer hora o iniciar impresión.
+  const {consultarSeguimientoR2PrevioPreprensa}=await import("./r2-prepago-seguimiento-central.mjs");
+  return await consultarSeguimientoR2PrevioPreprensa(env,match[1]);
+ }
  const paid=x.status==="paid"&&Boolean(x.paid_at)&&x.deposit_ars===x.amount_ars&&x.review_state==="verified";
  const review=x.review_state==="revoked",stage=paid?x.stage:null;
  const phases={pendiente:"Pago confirmado",en_preparacion:"En preparación",en_espera:"En espera",
@@ -4420,7 +4425,8 @@ export default {
     return await checkoutR2PrepaidSandboxCentral(req,env,{
       readSigned:centralReadSigned,
       dispatch:async request=>this.fetch(request,env),
-      reconcile:reconcileCustomerPaymentIfDue
+      reconcile:reconcileCustomerPaymentIfDue,
+      trackingLink: id=>trackingUrl(env,id,req.url)
     });
    }
    if(url.pathname==="/internal/central/r2-prepay-intent"){
