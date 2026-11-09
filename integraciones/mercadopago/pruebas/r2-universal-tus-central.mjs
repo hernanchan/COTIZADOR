@@ -154,8 +154,7 @@ export async function recibirTUSUniversalCentral(request,env,{
   ]);
   if(a?.length!==2||a.some(x=>x?.meta?.changes!==1))
    return respond({ok:false,error:'UNIVERSAL_TUS_TRANSACCION_INCOMPLETA'},409);
- }catch(error){
-  console.warn('UNIVERSAL_TUS_BATCH_CLOSED',String(error?.name||'ERR').slice(0,40),String(error?.message||'').slice(0,120));
+ }catch{
   const existing=await lookup().catch(()=>null);
   const fresh=await db.prepare('SELECT received FROM central_r2_universal_files '+
    'WHERE web_order_id=? AND file_id=?').bind(p.orderId,p.fileId).first().catch(()=>null);
