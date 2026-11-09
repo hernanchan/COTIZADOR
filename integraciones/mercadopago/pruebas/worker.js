@@ -1364,6 +1364,34 @@ async function priceAdminHandle(req,env,pathname){
   publicPricingConnected:false,paymentsEnabled:false});
 }
 
+/** Integrar R2 pagado sin aprobar, incluso cuando SELECT ya devolvió su orden.
+ * Nunca habilita producción. La aprobación D1 sigue siendo condición del backend. */
+function centralMergePendingR2Orders(board,reviewOrders){
+ if(!Array.isArray(board)||!Array.isArray(reviewOrders))return board;
+ for(const r of reviewOrders){
+  if(!r||typeof r.commercialOrderId!=="string"||
+     !/^WEB-ENSAYO-[A-F0-9]{32}$/.test(r.webOrderId||"")||
+     !Number.isSafeInteger(r.amountArs)||r.amountArs<1)continue;
+  const existing=board.find(o=>o.id===r.commercialOrderId);
+  // Aprobados, órdenes TUS y pedidos en preparación no se tocan.
+  if(existing&&existing.production_state!=null)continue;
+  if(existing&&Number(existing.amount_ars)!==r.amountArs)continue;
+  const waiting={
+   production_state:"pendiente",production_version:0,
+   work_number:null,file_count:r.received?1:0,
+   web_order_id:r.webOrderId,r2_receipt_id:r.receiptId,
+   r2_prepress_pending:true,r2_prepress_state:r.estado,
+   r2_prepress_receipt_verified:r.verifiedReceipt===true,
+   estimated_ready_at:null,estimated_ready_version:0
+  };
+  if(existing)Object.assign(existing,waiting);
+  else board.unshift({
+   id:r.commercialOrderId,description:"Ploteo R2 · "+r.webOrderId.slice(-8),
+   amount_ars:r.amountArs,status:"paid",paid_at:r.paidAt,...waiting
+  });
+ }
+ return board;
+}
 const PRODUCTION_STATES=["pendiente","en_preparacion","en_espera","listo","entregado"];
 const PRODUCTION_NEXT={
  pendiente:["en_preparacion","en_espera"],
@@ -4739,19 +4767,10 @@ export default {
       const reviewResponse=await listarR2PagadosRevision(req,env,{authorized:true});
       if(!reviewResponse.ok)throw Error("No se confirmó cola R2");
       const review=await reviewResponse.json();
-      for(const r of review.orders||[]){
-       if(board.some(o=>o.id===r.commercialOrderId))continue;
-       board.unshift({
-        id:r.commercialOrderId,description:"Ploteo R2 · "+r.webOrderId.slice(-8),
-        amount_ars:r.amountArs,status:"paid",paid_at:r.paidAt,
-        production_state:"pendiente",production_version:0,
-        work_number:null,file_count:r.received?1:0,
-        web_order_id:r.webOrderId,r2_receipt_id:r.receiptId,
-        r2_prepress_pending:true,r2_prepress_state:r.estado,
-        r2_prepress_receipt_verified:r.verifiedReceipt,
-        estimated_ready_at:null,estimated_ready_version:0
-       });
-      }
+      // Las órdenes pagas YA vienen en board por el SELECT general.
+      // Marcarlas "duplicadas" omitía justo las R2 pendientes: quedaban
+      // en Otros (production_state=null) en vez de Nuevos.
+      centralMergePendingR2Orders(board,review.orders||[]);
      }catch(_){
       // No derribar el tablero TUS si falla el listado R2.
       // Exponer alerta explícita al operador sin fingir que la cola está vacía.
