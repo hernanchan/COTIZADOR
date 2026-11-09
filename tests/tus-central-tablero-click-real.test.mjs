@@ -15,6 +15,8 @@ class Element{
  append(...nodes){for(const child of nodes){if(typeof child==='object'&&child!==null){child.parent=this;this.children.push(child)}}}
  replaceChildren(...nodes){this.children=[];this.append(...nodes)}
  addEventListener(name,fn){this.listeners[name]=fn}
+ click(){return this.listeners.click?.()}
+ scrollIntoView(){this.scrolled=true}
  setAttribute(){}
  focus(){this.focused=true}
  closest(selector){if(selector==='.board-card'){let p=this;while(p&&p.className!=='board-card')p=p.parent;return p}return null}
@@ -27,7 +29,7 @@ class Element{
 function scene({promptValue='Responsable del mostrador',failCode=null,stage='pendiente',timeSaveError=null}={}){
  const elements=new Map();
  for(const id of ['secret','productionOperator','status','details','orders',
-  'refreshExpress','refreshReceipts','refreshR2Paid','r2PaidReview','refreshTransfers','refreshUnpaid','refresh',
+  'refreshExpress','refreshReceipts','refreshR2Paid','r2PaidReview','r2ReviewPanel','goR2Paid','refreshTransfers','refreshUnpaid','refresh',
   'etaStatus','etaHours','etaCapacity','etaLoad','etaSave',
   'deliveryPlanMode','deliveryPlanSave','deliveryPlanLoad','deliveryPlanStatus',
   'etaCalendarStatus','etaCalendarLoad','etaCalendarSave','etaCalendarWeekdayDraft',
