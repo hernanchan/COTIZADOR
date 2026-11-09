@@ -330,6 +330,8 @@ function pagoSandboxEnRecibo(){
 }
 let batchSending=false,smartReady=false,smartBlockedReason='',handoffInProgress=false,handoffResolve=null;
 let r2PrepagoPendiente=null,r2PrepagoFlujo=null,r2PagoTimer=null,r2Consultando=false,r2Subiendo=false;
+let universalPendiente=null,universalFlujo=null,universalPagoTimer=null,
+ universalConsultando=false,universalSubiendo=false;
 const dropPdf=document.getElementById('drop-pdf'),batchFiles=document.getElementById('batch-files'),batchStatus=document.getElementById('batch-status');
  // Mediciones locales: sin archivos, nombres, importes, credenciales ni hashes.
  // Son invisibles para el cliente y no se transmiten a servicios externos.
@@ -959,6 +961,7 @@ async function prepararDesdeCotizador(){
    batchProgress.textContent=result.error||'No se pudo preparar el envío.';
    return false;
   }
+  if(universalPendiente&&UNIVERSAL_R2_UI_ENABLED)return true;
   if(r2PrepagoPendiente&&R2_PREPAY_UI_ENABLED)return true;
   for(let n=0;n<100;n++){
    const refs=all.flatMap(item=>item.references);
@@ -1188,6 +1191,25 @@ async function r2ConsultarPagoYContinuar(){
  }finally{r2Consultando=false}
 }
 r2Pagar?.addEventListener?.('click',async()=>{
+ if(universalFlujo){
+  if(universalFlujo.phase!=='presupuesto_sin_archivos')return;
+  r2Pagar.disabled=true;
+  try{
+   const url=await universalFlujo.iniciarPagoSandbox();
+   r2Link.href=url;r2Link.hidden=false;r2Pagar.hidden=true;
+   r2Link.textContent='Abrir Mercado Pago de prueba';
+   r2Informar('Enlace de pago de prueba creado. Los PDF siguen en tu dispositivo. Una sola orden, un solo pago.');
+   if(universalPagoTimer===null)universalPagoTimer=setInterval(()=>{
+    if(document.visibilityState==='visible')void universalConsultarPago();
+   },25000);
+   void universalConsultarPago();
+  }catch(e){
+   r2Pagar.disabled=false;
+   r2Informar('Pago no iniciado: '+String(e?.message||e).slice(0,150));
+  }
+  return;
+ }
+
  if(!r2PrepagoFlujo||r2PrepagoFlujo.phase!=='presupuesto_sin_archivo')return;
  r2Pagar.disabled=true;
  r2Informar('Preparando el enlace seguro de Mercado Pago (solamente cuenta de prueba)…');
@@ -1210,13 +1232,94 @@ r2Pagar?.addEventListener?.('click',async()=>{
  }
 });
 r2Retry?.addEventListener?.('click',async()=>{
+ if(universalFlujo){
+  await universalSubirPagados();
+  return;
+ }
+
  if(r2PrepagoFlujo?.phase==='pagado_esperando_subida')
   await r2SubirSoloDespuesPago();
 });
 if(typeof document.addEventListener==='function')document.addEventListener('visibilitychange',()=>{
  if(document.visibilityState==='visible'&&r2PagoTimer!==null)
   void r2ConsultarPagoYContinuar();
+ if(document.visibilityState==='visible'&&universalPagoTimer!==null)
+  void universalConsultarPago();
 });
+async function universalSubirPagados(){
+ if(universalSubiendo||!universalFlujo||
+    !['pagado_esperando_archivos','subida_parcial'].includes(universalFlujo.phase))return;
+ universalSubiendo=true;
+ r2Retry.hidden=true;r2Pagar.hidden=true;r2Link.hidden=true;
+ r2Informar('Pago verificado. Recibiendo y comprobando tus PDF; los grandes van a R2 y los chicos a TUS.');
+ try{
+  const received=await universalFlujo.subirArchivosPagados();
+  if(received.ok!==true||received.productionAuthorized!==false)
+   throw Error('Recepción del pedido sin confirmar');
+  r2Informar('Recibimos los '+received.fileCount+
+   ' PDF de la orden '+received.numeroOrden+'. Están pendientes de preprensa y preparación. No vuelvas a pagar.');
+  document.getElementById('precio-smart').textContent='Orden N.º '+
+   received.numeroOrden+' · PDF recibidos · Preprensa pendiente';
+  r2Retry.hidden=true;
+ }catch(e){
+  r2Informar('Tu pago no se repite. Hay archivos pendientes de confirmar: '+
+   String(e?.message||e).slice(0,150)+
+   '. Si ya se transmitieron y falló la confirmación, consultá a Librería Saber antes de reenviar.');
+  r2Retry.hidden=false;
+ }finally{universalSubiendo=false}
+}
+async function universalConsultarPago(){
+ if(universalConsultando||universalSubiendo||!universalFlujo||
+    !['esperando_pago','pagado_esperando_archivos','subida_parcial','revocado'].includes(universalFlujo.phase))return;
+ universalConsultando=true;
+ try{
+  const current=await universalFlujo.consultarPago();
+  if(current==='pagado'){
+   if(universalPagoTimer!==null){clearInterval(universalPagoTimer);universalPagoTimer=null;}
+   r2Informar('Pago de prueba verificado para toda la orden. No vuelvas a pagar.');
+   universalConsultando=false;
+   await universalSubirPagados();
+   return;
+  }
+  if(current==='revocado'){
+   if(universalPagoTimer!==null){clearInterval(universalPagoTimer);universalPagoTimer=null;}
+   r2Informar('El pago fue revocado. No podemos recibir los PDF.');
+  }else r2Informar('Esperando confirmación de Mercado Pago. Ningún PDF fue almacenado antes del pago.');
+ }catch(e){
+  r2Informar('No pudimos comprobar el pago: '+String(e?.message||e).slice(0,140)+
+   '. Conservá el comprobante. No vuelvas a pagar.');
+ }finally{universalConsultando=false}
+}
+async function prepararPedidoUniversal(){
+ if(!UNIVERSAL_R2_UI_ENABLED||!universalPendiente||universalFlujo)
+  throw Error('El pedido universal no está disponible.');
+ const mod=await import('/prueba-v2/flujo-universal.mjs');
+ universalFlujo=mod.crearFlujoUniversalPDF({
+  files:universalPendiente.files,archivos:universalPendiente.archivos,
+  webOrderId:orderId,
+  onProgress:p=>{
+   if(p.phase==='hash')
+    r2Informar('Identificando PDF '+p.index+' de '+p.count+
+     ' en tu dispositivo: '+(p.porcentaje??0)+' %. Sin subirlo.');
+   else if(Number.isFinite(p.percent))
+    r2Informar('Recibiendo PDF pagados: '+p.percent+' %.');
+   else if(p.phase==='verificacion')
+    r2Informar('Verificando integridad y medidas de los PDF recibidos…');
+  }
+ });
+ r2Panel.querySelector('h2').textContent='Impresiones y ploteos · Un solo pago';
+ r2Recuperacion.hidden=true;r2Panel.hidden=false;
+ r2Pagar.hidden=true;r2Link.hidden=true;r2Retry.hidden=true;
+ r2Informar('Cotizando todos los archivos en la Central. Todavía no se subió ningún original.');
+ const result=await universalFlujo.preparar();
+ r2Total.textContent='Orden N.º '+result.numeroOrden+' · Total: '+
+  new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',
+   maximumFractionDigits:0}).format(result.totalArs);
+ document.getElementById('precio-smart').textContent=r2Total.textContent+
+  ' · Archivos locales, sin subir';
+ r2Pagar.hidden=false;r2Pagar.disabled=false;
+ r2Informar(result.fileCount+' PDF cotizados. Un pago de prueba para toda la orden; después se reciben los archivos.');
+}
 async function prepararPedidoR2Grande(){
  if(!R2_PREPAY_UI_ENABLED||!r2PrepagoPendiente||r2PrepagoFlujo)
   throw Error('Este ploteo ya fue preparado o el circuito privado está apagado.');
@@ -1264,6 +1367,18 @@ sendAllButton.addEventListener('click',async()=>{
   marcarTiempo('preparacion_inicio');
   if(!(await prepararDesdeCotizador())){terminarMedicion('preparacion_fallida');return;}
   marcarTiempo('preparacion_terminada');
+ }
+ if(universalPendiente){
+  batchSending=true;updateSummary();
+  try{
+   await prepararPedidoUniversal();
+   terminarMedicion('universal_presupuesto_sin_archivos');
+  }catch(e){
+   batchProgress.textContent='Pedido pendiente de cotización: '+
+    String(e?.message||e).slice(0,170)+'. No se cobró ni subió ningún PDF.';
+   terminarMedicion('universal_cotizacion_pendiente');
+  }finally{batchSending=false;updateSummary()}
+  return;
  }
  if(r2PrepagoPendiente){
   batchSending=true;updateSummary();
@@ -1463,6 +1578,22 @@ async function registrarPedidoVerificado(){
 }
 window.addEventListener('message',async event=>{
  if(event.origin!==location.origin)return;
+ if(event.source===smart.contentWindow&&event.data?.type==='SABER_SMART_UNIVERSAL_PDF'){
+  const p=event.data;
+  if(!UNIVERSAL_R2_UI_ENABLED||batchSending||registering||registeredOrder||
+     universalPendiente||universalFlujo||!Array.isArray(p.files)||
+     !Array.isArray(p.archivos)||p.files.length<1||p.files.length>10||
+     p.files.length!==p.archivos.length||
+     !p.files.some(f=>f instanceof File&&f.size>40*1024*1024)||
+     p.files.some((f,i)=>!(f instanceof File)||
+      f.name!==p.archivos[i]?.nombre||f.size<5||
+      f.size>200*1024*1024||!/\.pdf$/i.test(f.name))){
+   batchProgress.textContent='Revisá los archivos del pedido; todavía no se recibió ni cobró nada.';
+   return;
+  }
+  universalPendiente={files:p.files,archivos:p.archivos};
+  return;
+ }
  if(event.source===smart.contentWindow&&event.data?.type==='SABER_SMART_R2_PREPAGO'){
   const p=event.data;
   if(!R2_PREPAY_UI_ENABLED||batchSending||registering||registeredOrder||
