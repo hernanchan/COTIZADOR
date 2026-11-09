@@ -51,6 +51,13 @@ export function paginaR2PreprensaPersonal(){
    active=true;button.disabled=true;
    status.textContent='Central y R2: comprobando hash antes de descargar…';
    try{
+    // Chrome exige activación de usuario PARA ABRIR el selector de archivo.
+    // Debe invocarse antes del primer await de red, no después del hash R2.
+    const fileHandle=window.showSaveFilePicker?await window.showSaveFilePicker({
+     suggestedName:receiptId+'.pdf',types:[{
+      description:'Documento PDF original',accept:{'application/pdf':['.pdf']}
+     }]
+    }):null;
     const res=await fetch('/prueba-v2/api/ensayo-r2-descargar-d1-personal',{
      method:'POST',credentials:'same-origin',cache:'no-store',redirect:'error',
      headers:{'Content-Type':'application/json'},
@@ -61,13 +68,8 @@ export function paginaR2PreprensaPersonal(){
     const size=Number(res.headers.get('Content-Length'));
     if(!Number.isSafeInteger(size)||size<=40*1024*1024||size>256*1024*1024)
       throw Error('El tamaño recibido no está dentro del cupo esperado.');
-    if(window.showSaveFilePicker&&res.body){
-      const target=await window.showSaveFilePicker({
-       suggestedName:receiptId+'.pdf',types:[{
-        description:'Documento PDF original',accept:{'application/pdf':['.pdf']}
-       }]
-      });
-      const writable=await target.createWritable();
+    if(fileHandle&&res.body){
+      const writable=await fileHandle.createWritable();
       try{
        const reader=res.body.getReader();let read=0;
        while(true){
