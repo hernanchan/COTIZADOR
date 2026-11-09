@@ -40,3 +40,21 @@ jobs:
             exit 0
           done
           echo 'BLOCKER_NO_MATCHING_GH_ADMIN_KEY_FOR_DIRECT_CHECKOUT'
+      - name: Verificar lectura HMAC del estado de la misma orden sin checkout
+        shell: bash
+        env:
+          PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$PASSWORD"
+          url='https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/api/ensayo-r2-prepago-checkout'
+          body='{"action":"status","webOrderId":"WEB-ENSAYO-255BFE122477AC6C7666EB6D342707FE","commercialOrderId":"66f10bd2-77ce-46ef-930c-49dc3d22d23e"}'
+          tmp=$(mktemp)
+          trap 'rm -f "$tmp"' EXIT
+          code=$(curl -sS --max-time 40 -u "operador:$PASSWORD" \
+            -H 'Origin: https://saber-documentos-pruebas.libreriasaber.workers.dev' \
+            -H 'Content-Type: application/json' -X POST \
+            --data "$body" -o "$tmp" -w '%{http_code}' "$url")
+          echo "R2_EXISTING_ORDER_STATUS_HTTP=$code"
+          jq -c '{ok,estado,error,amountArs,filesUploaded,uploadAuthorized}' "$tmp"
+          test "$code" = 200
