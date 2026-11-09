@@ -133,6 +133,10 @@ export async function manejarR2GrandePrivado(request,env,{
      stagedForCentral:true,productionAuthorized:false}});
   }
   if(action==='iniciar'){
+   // No crear un objeto aunque el pago esté confirmado si el registro final
+   // en Central está desactivado: evita originales pagados sin trazabilidad.
+   if(env.DOCS_R2_STAGING_ENABLED!==FLAG)
+    return reply({ok:false,error:'Recepción R2 bloqueada: Central no habilitada'},503);
    if(env.DOCS_R2_QUOTA_ENABLED!==FLAG)
     return reply({ok:false,error:'Recepción R2 bloqueada: cupo sin habilitar'},503);
    const data=await bodyJSON(request);
