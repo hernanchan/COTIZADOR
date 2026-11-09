@@ -55,8 +55,26 @@ export async function checkoutR2PrepaidSandboxDocumentos(request,env,{
    'Content-Type':'application/json','x-saber-ts':String(ts),
    'x-saber-request-id':rid,'x-saber-signature':signature},body:payload}));
  }catch{return reply({ok:false,error:'R2_PREPAGO_CENTRAL_NO_RESPONDE'},503)}
- if(!response.ok)return reply({ok:false,error:'R2_PREPAGO_CHECKOUT_CENTRAL_RECHAZO'},
-  response.status===409?409:503);
+ if(!response.ok){
+  // Sólo códigos propios predefinidos, nunca mensajes de Mercado Pago,
+  // credenciales, detalles de D1 ni URLs. Permite aislar un bloqueo real
+  // del checkout de ENSAYO sin relajar la compuerta de pago.
+  const upstream=await response.json().catch(()=>null);
+  const known=new Set([
+   'R2_PREPAGO_CHECKOUT_APAGADO',
+   'R2_PREPAGO_FIRMA_NO_DISPONIBLE',
+   'R2_PREPAGO_FIRMA_RECHAZADA',
+   'R2_PREPAGO_NO_COINCIDE',
+   'R2_PREPAGO_COTIZACION_VENCIDA',
+   'R2_PREPAGO_PASARELA_NO_CONFIGURADA',
+   'R2_PREPAGO_CHECKOUT_RECHAZADO',
+   'R2_PREPAGO_TRANSFERENCIA_EN_CURSO',
+   'R2_PREPAGO_YA_PAGADO_O_CANCELADO'
+  ]);
+  const reasonCode=known.has(upstream?.error)?upstream.error:'R2_PREPAGO_ERROR_INTERNO';
+  return reply({ok:false,error:'R2_PREPAGO_CHECKOUT_CENTRAL_RECHAZO',reasonCode},
+   response.status===409?409:503);
+ }
  let d;try{d=await response.json()}catch{return reply({ok:false,error:'R2_PREPAGO_CHECKOUT_INVALIDO'},502)}
  if(d?.ok!==true||d.webOrderId!==p.webOrderId||
     d.commercialOrderId!==p.commercialOrderId||
