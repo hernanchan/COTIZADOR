@@ -57,7 +57,7 @@ async function fixture({paid=false,tampered=false}={}){
    if(sql.includes('FROM central_r2_universal_order_links')&&!sql.includes('JOIN'))
     return {commercial_order_id:orderId};
    if(sql.includes('FROM central_r2_universal_order_links l'))
-    return {web_order_id:webOrderId,quote_hash:quoteHash,
+    return this.args[0]!==orderId?null:{web_order_id:webOrderId,quote_hash:quoteHash,
      amount_ars:ficha.totalArs,draft_id:orderId,price_revision:ficha.priceRevision,
      total_ars:ficha.totalArs,file_count:f.length,armados_json:JSON.stringify(ficha.armados),
      state:'draft_not_payable',id:orderId,status:state.paid?'paid':'awaiting_payment',
