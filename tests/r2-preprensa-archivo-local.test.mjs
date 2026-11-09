@@ -4,7 +4,7 @@ import {mkdtemp,open,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createHash} from 'node:crypto';
-import {revisarPdfR2Local,compararGeometriaR2}
+import {revisarPdfR2Local,compararGeometriaR2,cotejarFichaCotizadaR2}
  from '../integraciones/autocotizador/recepcion/preprensa-r2-archivo-local.mjs';
 const web='WEB-ENSAYO-255BFE122477AC6C7666EB6D342707FE';
 const commercial='66f10bd2-77ce-46ef-930c-49dc3d22d23e';
@@ -84,4 +84,35 @@ test('PDF no legible o cifrado no pasa a producción',async()=>{
   await assert.rejects(revisarPdfR2Local({...params(f),preparacion:async()=>{throw Error('password')}}),
    /R2_PREPRENSA_PDF_NO_ANALIZABLE/);
  }finally{await rm(f.dir,{recursive:true,force:true})}
+});
+
+test('La ficha pagada conserva papel/copias/rollo; geometría real puede coincidir pero impresión sigue prohibida',()=>{
+ const quoteSnapshot={schema:'saber-r2-cotizacion-firmada-v1',
+  nombre:'A1 cotizado.pdf',seleccion:'original',
+  modoImpresion:'bn',copias:2,papelPoster:'obra80',
+  rolloBase:'rollo60',importeArs:4400,
+  paginas:[[59.4,84.1,'cad','rollo60','obra80']]};
+ const actual=[{anchoCm:59.4,altoCm:84.1,modo:'sin-clasificar'}];
+ const ok=cotejarFichaCotizadaR2(quoteSnapshot,actual,4400);
+ assert.equal(ok.geometryMatchesQuote,true);
+ assert.equal(ok.quoteSnapshotAvailable,true);
+ assert.equal(ok.declaredCopies,2);
+ assert.equal(ok.declaredPaper,'obra80');
+ assert.equal(ok.declaredRoll,'rollo60');
+ assert.equal(ok.priceRecalculated,false);
+ assert.equal(ok.classificationVerified,false);
+ assert.equal(ok.materialsVerified,false);
+ assert.equal(ok.productionAuthorized,false);
+ assert.equal(ok.state,'GEOMETRIA_COINCIDE_RESTA_VALIDAR_CONTENIDO_Y_PRECIO');
+ const wrong=cotejarFichaCotizadaR2(quoteSnapshot,[{anchoCm:42,altoCm:84.1}],4400);
+ assert.equal(wrong.geometryMatchesQuote,false);
+ assert.ok(wrong.issues.some(x=>x.tipo==='MEDIDA_PAGINA'));
+ const price=cotejarFichaCotizadaR2(quoteSnapshot,actual,5500);
+ assert.ok(price.issues.some(x=>x.tipo==='IMPORTE_PAGADO_NO_COINCIDE_CON_FICHA'));
+ assert.equal(price.productionAuthorized,false);
+ const old=cotejarFichaCotizadaR2(null,actual,4400);
+ assert.equal(old.quoteSnapshotAvailable,false);
+ assert.equal(old.state,'REQUIERE_REVISION_COMERCIAL');
+ assert.throws(()=>cotejarFichaCotizadaR2({...quoteSnapshot,copias:0},actual,4400),
+  /R2_PREPRENSA_FICHA_COTIZADA_INVALIDA/);
 });

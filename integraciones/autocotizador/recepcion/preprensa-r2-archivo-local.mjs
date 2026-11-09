@@ -58,12 +58,12 @@ export function cotejarFichaCotizadaR2(quoteSnapshot,medidas,amountArs){
   !Number.isSafeInteger(q.copias)||q.copias<1||q.copias>500||
   !['bn','color'].includes(q.modoImpresion)||
   !['obra80','recubierto'].includes(q.papelPoster)||
-  !/^rollo\\d+$/.test(q.rolloBase||'')||
+  !/^rollo\d+$/.test(q.rolloBase||'')||
   q.paginas.some(p=>!Array.isArray(p)||p.length!==5||
    !Number.isFinite(p[0])||p[0]<=0||p[0]>2000||
    !Number.isFinite(p[1])||p[1]<=0||p[1]>2000||
    !['cad','poster'].includes(p[2])||
-   !/^(rollo|rec)\\d+$/.test(p[3]||'')||
+   !/^(rollo|rec)\d+$/.test(p[3]||'')||
    !['obra80','recubierto'].includes(p[4])))
   throw Error('R2_PREPRENSA_FICHA_COTIZADA_INVALIDA');
  const declaradas=q.paginas.map((p,i)=>({
