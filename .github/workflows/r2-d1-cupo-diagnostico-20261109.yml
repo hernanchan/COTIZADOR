@@ -1,0 +1,56 @@
+name: R2 D1 - diagnosticar cupo rechazo postpago SOLO lectura
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/r2-d1-cupo-diagnostico-20261109.yml]
+permissions:
+  contents: read
+jobs:
+  diagnostico:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Leer flags y D1 de Central privada sin mutar datos ni exponer secretos
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT"
+          auth="Authorization: Bearer $TOKEN"
+          tmp=$(mktemp -d)
+          trap 'rm -rf "$tmp"' EXIT
+          curl -fsS --max-time 25 -H "$auth" "$root/workers/scripts/saber-pagos-pruebas/settings" > "$tmp/settings.json"
+          jq -e '.success==true' "$tmp/settings.json" >/dev/null
+          for key in CENTRAL_R2_QUOTA_ENABLED CENTRAL_R2_POSTPAY_ENABLED CENTRAL_R2_PREPAY_CHECKOUT_ENABLED; do
+            jq -r --arg n "$key" '(.result.bindings|map(select(.name==$n))|first) as $x |
+            "FLAG_"+$n+"="+(if $x==null then "MISSING" elif $x.type=="plain_text" and $x.text=="PRIVATE_TEST_ONLY" then "ON_TEST_ONLY" else "NOT_ON" end)' "$tmp/settings.json"
+          done
+          dbid=$(jq -r '.result.bindings[]|select(.name=="DB" and .type=="d1")|.id//.database_id//empty' "$tmp/settings.json" | head -n 1)
+          test -n "$dbid" || { echo 'D1_BINDING_ID_UNAVAILABLE';exit 0; }
+          echo 'D1_BINDING_PRESENT'
+          query(){
+            local label="$1" sql="$2"
+            jq -n --arg sql "$sql" '{sql:$sql,params:[]}' > "$tmp/q.json"
+            local http
+            http=$(curl -sS --max-time 35 -H "$auth" -H 'Content-Type: application/json' \
+              -o "$tmp/response.json" -w '%{http_code}' --data-binary "@$tmp/q.json" \
+              "$root/d1/database/$dbid/query")
+            if [ "$http" != 200 ]; then echo "D1_READONLY_${label}_HTTP=$http";return 0;fi
+            if ! jq -e '.success==true' "$tmp/response.json" >/dev/null; then
+              echo "D1_READONLY_${label}_QUERY_REJECTED";
+              jq -c '{errorCodes:[.errors[]?|.code]}' "$tmp/response.json";
+              return 0
+            fi
+            echo "D1_READONLY_${label}_OK"
+            jq -c '.result[0].results // .result.results // []' "$tmp/response.json"
+          }
+          query table "SELECT name FROM sqlite_master WHERE type='table' AND name='central_r2_large_reservations' LIMIT 1"
+          query sample "SELECT COUNT(*) AS reservations,COALESCE(SUM(CASE WHEN state='reserved' THEN bytes ELSE 0 END),0) AS active_bytes FROM central_r2_large_reservations"
+          query order "SELECT file_id,state,bytes FROM central_r2_large_reservations WHERE web_order_id='WEB-ENSAYO-255BFE122477AC6C7666EB6D342707FE' LIMIT 15"
+          echo 'D1_READONLY_NO_SECRET_VALUES_NO_MUTATIONS'
