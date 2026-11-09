@@ -76,7 +76,14 @@ jobs:
               ([ $required[] | select(. as $n | $b | any(.[]; .name==$n)) ]|length)==($required|length) and
               ([ $flags[] | select(. as $n | $b | any(.[]; .name==$n)) ]|length)==0
             ' > "$dir/$w-ready.json"
-            jq -e '.==true' "$dir/$w-ready.json" >/dev/null || { echo "R2_PRIVATE_PREFLIGHT_BINDINGS_MISSING_OR_ALREADY_CHANGED_$w"; exit 1; }
+            if ! jq -e '.==true' "$dir/$w-ready.json" >/dev/null; then
+              jq -r --argjson required "$required" --argjson flags "$flags" '
+                .result.bindings|map(.name) as $present |
+                ($required[]|select(. as $n|($present|index($n))==null)|"REQUIRED_BINDING_MISSING="+.),
+                ($flags[]|select(. as $n|($present|index($n))!=null)|"R2_FLAG_ALREADY_EXISTS="+.)
+              ' "$dir/$w-before.json"
+              echo "R2_PRIVATE_PREFLIGHT_BINDINGS_MISSING_OR_ALREADY_CHANGED_$w"; exit 1
+            fi
             jq -n --argjson flags "$flags" --slurpfile a "$dir/$w-before.json" '{
               bindings: ([$a[0].result.bindings[]|{name,type:"inherit"}] +
                 [$flags[]|{name:.,type:"plain_text",text:"PRIVATE_TEST_ONLY"}])
