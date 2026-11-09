@@ -28,7 +28,7 @@ jobs:
         run: |
           set -euo pipefail
           node --check integraciones/autocotizador/recepcion/ensayo-e2e-r2-pagado-20261109.mjs
-          if grep -Eq 'ensayo-r2-prepago\x27|action:\x27start\x27' integraciones/autocotizador/recepcion/ensayo-e2e-r2-pagado-20261109.mjs;then
+          if grep -Fq "action:'start'" integraciones/autocotizador/recepcion/ensayo-e2e-r2-pagado-20261109.mjs;then
             echo 'BLOCKER_SCRIPT_TRIES_CREATE_NEW_ORDER_OR_CHECKOUT';exit 1;
           fi
           echo 'POSTPAY_ONLY_SCRIPT_READY_NO_NEW_CHECKOUT'
