@@ -43,12 +43,12 @@ export function validarIntencionR2Prepaga(x){
   q.seleccion==='original'&&['bn','color'].includes(q.modoImpresion)&&
   Number.isSafeInteger(q.copias)&&q.copias>=1&&q.copias<=500&&
   ['obra80','recubierto'].includes(q.papelPoster)&&
-  /^rollo\\d+$/.test(q.rolloBase||'')&&q.importeArs===x.amountArs&&
+  /^rollo\d+$/.test(q.rolloBase||'')&&q.importeArs===x.amountArs&&
   Array.isArray(q.paginas)&&q.paginas.length===x.declaredPages&&
   q.paginas.every(p=>Array.isArray(p)&&p.length===5&&
    Number.isFinite(p[0])&&p[0]>0&&p[0]<=2000&&
    Number.isFinite(p[1])&&p[1]>0&&p[1]<=2000&&
-   ['cad','poster'].includes(p[2])&&/^(rollo|rec)\\d+$/.test(p[3]||'')&&
+   ['cad','poster'].includes(p[2])&&/^(rollo|rec)\d+$/.test(p[3]||'')&&
    ['obra80','recubierto'].includes(p[4])&&
    (p[2]==='cad'?p[4]==='obra80':true))
  );
