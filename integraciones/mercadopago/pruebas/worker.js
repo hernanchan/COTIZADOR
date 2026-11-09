@@ -4499,6 +4499,10 @@ export default {
     const {lookupR2PendienteCentral}=await import("./r2-grandes-central-pendientes.mjs");
     return await lookupR2PendienteCentral(req,env,{readSigned:centralReadSigned});
    }
+   if(url.pathname==="/internal/central/r2-production-sheet"){
+    const {consultarFichaR2AprobadaCentral}=await import("./r2-ficha-produccion-firmada-central.mjs");
+    return await consultarFichaR2AprobadaCentral(req,env,{readSigned:centralReadSigned});
+   }
    if(url.pathname==="/internal/central/r2-prepay-checkout"){
     const {checkoutR2PrepaidSandboxCentral}=await import("./r2-prepago-checkout-sandbox-central.mjs");
     return await checkoutR2PrepaidSandboxCentral(req,env,{
