@@ -2399,7 +2399,7 @@ body.price-only #priceAdminFieldset summary{font-size:1.3rem}
 <fieldset id="privateAccess"><legend>Acceso privado</legend><div class="toolbar">
 <input type="password" autocomplete="off" id="secret" placeholder="Clave privada del panel" aria-label="Clave privada">
 <input type="text" id="productionOperator" maxlength="60" placeholder="Responsable del cambio" aria-label="Nombre de responsable" autocomplete="off">
-<button id="refresh">Consultar pedidos</button><button id="sync" class="outline">Verificar pagos pendientes</button><button id="openPricing" class="outline" type="button">Editar precios y promociones</button>
+<button id="refresh">Consultar pedidos</button><button type="button" id="goR2Paid" class="outline">Ver ploteos R2 para aprobar</button><button id="sync" class="outline">Verificar pagos pendientes</button><button id="openPricing" class="outline" type="button">Editar precios y promociones</button>
 <button id="mobileInviteCreate" class="outline" type="button">Acceso temporal al celular</button>
 </div><p id="status" role="status" aria-live="polite"></p>
 <div id="mobileInviteArea" hidden>
@@ -2495,6 +2495,7 @@ body.price-only #priceAdminFieldset summary{font-size:1.3rem}
 <details><summary>Entregados · historial (<span id="count-entregado">0</span>)</summary><div class="board-cards" id="lane-entregado"></div></details>
 <details><summary>Otros pedidos pagados (<span id="count-other">0</span>)</summary><div id="orders"></div></details>
 </div></fieldset>
+<fieldset id="r2ReviewPanel"><legend>Ploteos grandes pagados · revisión de preprensa</legend><div class="toolbar"><button id="refreshR2Paid" class="outline">Consultar originales R2 pagados</button></div><p class="note">Pago acreditado y archivo recibido son etapas distintas. Las páginas, medidas y precio final deben verificarse antes de imprimir. Sin producción automática.</p><ol id="r2PaidReview"></ol></fieldset>
 <fieldset id="priceAdminFieldset"><details id="pricingPanel" class="pricing-panel"><summary>Precios y promociones · administración privada</summary>
 <p class="price-note">Ensayo: estos valores provienen de un tarifario histórico del 21/08/2026 y de los cupones existentes. Guardar o aprobar aquí NO cambia los precios de la web pública, los pagos ni el cotizador. Primero hay que validar los precios comerciales reales y conectar un único tarifario al motor.</p>
 <div class="price-toolbar">
@@ -2517,7 +2518,7 @@ body.price-only #priceAdminFieldset summary{font-size:1.3rem}
 <fieldset><legend>Detalle de pedido e instrucciones</legend>
 <div id="details">Elegí «Detalle» en un pedido para consultar las instrucciones, archivos e historial.</div></fieldset>
 <fieldset><legend>Polaroids Express · PDF privado único</legend><button id="refreshExpress" class="outline">Consultar PDF recibidos</button><p class="note">Hasta cuatro hojas A4 por pedido. Archivo listo en Drive privado; el pago todavía no está confirmado.</p><ol id="expressReceipts"></ol></fieldset>
-<fieldset><legend>Ploteos grandes pagados · revisión de preprensa</legend><div class="toolbar"><button id="refreshR2Paid" class="outline">Consultar originales R2 pagados</button></div><p class="note">Pago acreditado y archivo recibido son etapas distintas. Las páginas, medidas y precio final deben verificarse antes de imprimir. Sin producción automática.</p><ol id="r2PaidReview"></ol></fieldset>
+
 <fieldset><legend>Recepciones de PDF verificadas sin pedido comercial</legend><div class="toolbar"><button id="refreshReceipts" class="outline">Consultar recepciones pendientes</button></div><p class="note">Documentos confirmados en Drive, todavía no vinculados a un pedido cobrado. No están listos para imprimir.</p><ol id="verifiedReceipts"></ol></fieldset>
 
 <fieldset><legend>Pedidos con PDF y pago pendiente</legend><button id="refreshUnpaid" class="outline">Consultar pedidos sin pago confirmado</button><ol id="unpaidDocs"></ol></fieldset>
@@ -3418,6 +3419,12 @@ document.querySelector("#refreshExpress").addEventListener("click",async()=>{
   }
   status.textContent=info.manifests.length+" pedido(s) Polaroids Express recibido(s)";
  }catch(e){status.textContent=e.message}
+});
+document.querySelector("#goR2Paid")?.addEventListener("click",()=>{
+ const panel=document.querySelector("#r2ReviewPanel");
+ if(!panel)return;
+ panel.scrollIntoView({behavior:"smooth",block:"start"});
+ document.querySelector("#refreshR2Paid")?.click();
 });
 document.querySelector("#refreshR2Paid")?.addEventListener("click",async()=>{
  const list=document.querySelector("#r2PaidReview");
