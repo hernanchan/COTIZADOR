@@ -39,7 +39,7 @@ function fakeDB(){
    for(const x of statements.slice(1))files.push({
     webOrderId:x.args[0],fileId:x.args[1],transport:x.args[6],
     trabajo:JSON.parse(x.args[8])});
-  }}
+  }
  }};
 }
 test('un solo lote con tres PDFs y configuración completa por archivo',()=>{
