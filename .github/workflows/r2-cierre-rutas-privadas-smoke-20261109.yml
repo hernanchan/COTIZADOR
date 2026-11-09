@@ -19,20 +19,26 @@ jobs:
           tmp=$(mktemp -d)
           trap 'rm -rf "$tmp"' EXIT
           curl -fsS --max-time 25 "$central/health" > "$tmp/health.json"
+          jq -c '{ok,databaseReady,paymentsEnabled}' "$tmp/health.json"
           jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$tmp/health.json" >/dev/null
           code=$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$central/admin/api/orders")
+          echo "R2_ROUTE_1_HTTP=$code"
           test "$code" = 401
           code=$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' -X POST \
             -H 'Content-Type: application/json' --data '{}' "$central/admin/api/central/r2-prepress-approve")
+          echo "R2_ROUTE_2_HTTP=$code"
           test "$code" = 401
           code=$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' -X POST \
             -H 'Content-Type: application/json' --data '{}' "$central/internal/central/r2-production-sheet")
+          echo "R2_ROUTE_3_HTTP=$code"
           test "$code" = 401
           code=$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$docs/prueba-v2/r2-preprensa-personal")
+          echo "R2_ROUTE_4_HTTP=$code"
           test "$code" = 401
           code=$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' -X POST \
             -H "Origin: $docs" -H 'Content-Type: application/json' --data '{}' \
             "$docs/prueba-v2/api/ensayo-r2-ficha-produccion-personal")
+          echo "R2_ROUTE_5_HTTP=$code"
           test "$code" = 401
           echo 'R2_WORKERS_PRIVATE_ROUTES_FAIL_CLOSED_PAYMENT_OFF'
           echo 'NO_CREATE_ORDER_NO_PAYMENT_NO_R2_UPLOAD_DELETE_OR_DELIVERY'
