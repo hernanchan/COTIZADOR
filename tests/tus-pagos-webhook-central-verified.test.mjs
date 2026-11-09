@@ -13,7 +13,8 @@ test('successful webhook reconciliation marks payment review immediately',()=>{
 });
 test('commercial document and Express checkout remains blocked before approval',()=>{
  const checkout=src.slice(src.indexOf('if(url.pathname==="/demo/checkout"'),src.indexOf('if(url.pathname==="/webhooks/mercadopago"'));
- assert.match(checkout,/sku IN \('DOCS_VERIFIED','POLAROID_EXPRESS_A4','R2_PREPAID_PLOT'\)/);
+ assert.match(checkout,/sku IN \('DOCS_VERIFIED','POLAROID_EXPRESS_A4','R2_PREPAID_PLOT','PDF_UNIVERSAL_PREPAID'\)/);
+ assert.match(checkout,/restricted\?\.sku==="PDF_UNIVERSAL_PREPAID"[\s\S]*?return json\(/);
  assert.match(checkout,/restricted\?\.sku==="R2_PREPAID_PLOT"/);
  assert.match(checkout,/CENTRAL_R2_PREPAY_CHECKOUT_ENABLED/);
  assert.match(checkout,/restricted\?\.sku===\"POLAROID_EXPRESS_A4\"/);
