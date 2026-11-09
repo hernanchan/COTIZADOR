@@ -87,9 +87,12 @@ test('R2 no admite por el momento archivos mayores a 200 MiB',()=>{
  assert.equal(REGLAS_RECEPCION_UNIVERSAL.pdfR2MaxBytes,200*MIB);
  assert.throws(()=>plan([a4()],[200*MIB+1]),/TAMANO_FUERA_DE_LIMITE/);
 });
-test('ni las tarifas ni un subtotal propuesto por el comprador son entrada aceptada',()=>{
+test('un subtotal extra del navegador se ignora: prevalece precio D1 aprobado',()=>{
  const archivos=[a4()],manifiestos=[manifest(archivos[0],1,60*MIB)];
- assert.throws(()=>prepararPlanRecepcionUniversal({
-  archivos,manifiestos,tarifario:tarifario,totalArs:1
- }),undefined);
+ const correcto=prepararPlanRecepcionUniversal({archivos,manifiestos,tarifario});
+ const manipulado=prepararPlanRecepcionUniversal({
+  archivos,manifiestos,tarifario,totalArs:1
+ });
+ assert.deepEqual(manipulado,correcto);
+ assert.notEqual(manipulado.totalArs,1);
 });
