@@ -22,6 +22,7 @@ async function fixture({paid=true,altered=false}={}){
   seleccion:'original',servicio:'auto',copias:1,modo:'bn',caras:'simple',
   anillado:'ninguno',grupoAnillado:'',materialColor:'',papelPoster:'obra80'});
  const files=[a4('Apuntes.pdf',21,29.7),a4('Panel.pdf',59.4,84.1)];
+ files[1].paginas[0].modo='cad';
  const metas=[{fileId:'small',nombre:'Apuntes.pdf',bytes:B.length,sha256:HASH},
   {fileId:'large',nombre:'Panel.pdf',bytes:70*1048576,sha256:'b'.repeat(64)}];
  const ficha=fichaPrearchivoUniversal({webOrderId:ORDER,archivos:files,
