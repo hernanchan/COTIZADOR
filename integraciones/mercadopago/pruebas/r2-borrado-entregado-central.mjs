@@ -129,3 +129,21 @@ export async function ejecutarBorradoR2Entregado(env,orderId,{bucket=env?.SABER_
   return {state:'error',filesDeleted:0};
  }
 }
+
+/** Reintentos durables: no hacen nada mientras la compuerta o el binding estén OFF. */
+export async function reintentarBorradosR2(env,{limit=3}={}){
+ if(env?.CENTRAL_R2_PURGE_EXECUTE_ENABLED!==ENABLED||
+    env?.CENTRAL_R2_PURGE_QUEUE_ENABLED!==ENABLED||
+    !env?.SABER_R2_GRANDES?.delete)return {enabled:false,checked:0};
+ const exists=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='central_r2_purge_queue'").first();
+ if(!exists)return {enabled:true,checked:0};
+ const rows=await env.DB.prepare("SELECT order_id FROM central_r2_purge_queue WHERE "+
+  "state IN ('pending','error') OR (state='deleting' AND last_try<datetime('now','-3 minutes')) "+
+  "ORDER BY created_at ASC LIMIT ?").bind(Math.max(1,Math.min(5,limit))).all();
+ let deleted=0;
+ for(const job of rows.results||[]){
+  const r=await ejecutarBorradoR2Entregado(env,job.order_id);
+  if(r.state==='deleted')deleted++;
+ }
+ return {enabled:true,checked:(rows.results||[]).length,deleted};
+}
