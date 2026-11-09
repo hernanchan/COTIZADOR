@@ -94,7 +94,7 @@ export async function verificarPedidoUniversalCobrable(env,commercialOrderId,{
  return {ok:true,link,works,rows,commercialOrderId:link.id,
   webOrderId:link.web_order_id,amountArs:link.amount_ars};
 }
-async function estadoPagoUniversal(env,orderId,db=env.DB){
+export async function estadoPagoUniversal(env,orderId,db=env.DB){
  const [fresh,review]=await Promise.all([
   db.prepare('SELECT status,paid_at,payment_id,preference_id,amount_ars,deposit_ars '+
    'FROM orders WHERE id=?').bind(orderId).first(),
