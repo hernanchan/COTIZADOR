@@ -34,6 +34,13 @@ jobs:
           jq -c '{ok,error,reasonCode,estado,amountArs,checkoutUrlPresent:(.checkoutUrl!=null),uploadAuthorized}' "$tmp"
           if [ "$code" = 200 ];then
             jq -e '.ok==true and .amountArs==4400 and .uploadAuthorized==false' "$tmp" >/dev/null
+            # Enlace únicamente de preferencia TEST y vendedor verificado por backend.
+            link=$(jq -er '.checkoutUrl' "$tmp")
+            case "$link" in
+              https://*.mercadopago.com.ar/*|https://*.mercadopago.com/*) ;;
+              *) echo 'CHECKOUT_URL_UNEXPECTED_HOST';exit 1;;
+            esac
+            echo "LINK_COMPRA_PRUEBA=$link"
             echo 'R2_SANDBOX_CHECKOUT_OK_NO_PAYMENT_NO_UPLOAD'
           else
             jq -e '.ok==false' "$tmp" >/dev/null
