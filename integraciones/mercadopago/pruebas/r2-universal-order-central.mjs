@@ -17,10 +17,12 @@ const response=(v,s=200)=>Response.json(v,{status:s,headers:{
  'Cache-Control':'no-store,private','X-Content-Type-Options':'nosniff'}});
 export function validarPromocionUniversal(x){
  if(!x||typeof x!=='object'||Array.isArray(x)||
-    Object.keys(x).sort().join(',')!=='draftId,quoteHash,schema,webOrderId'||
+    Object.keys(x).sort().join(',')!=='draftId,quoteHash,schema,telefono,webOrderId'||
     x.schema!=='saber-central-r2-universal-create-order-v1'||
     !WEB.test(x.webOrderId||'')||!UUID.test(x.draftId||'')||
-    !SHA.test(x.quoteHash||''))
+    !SHA.test(x.quoteHash||'')||
+    typeof x.telefono!=='string'||!/^\+?[0-9 ()-]{10,26}$/.test(x.telefono)||
+    x.telefono.replace(/\D/g,'').length<10||x.telefono.replace(/\D/g,'').length>15)
   throw Error('UNIVERSAL_PROMOCION_IDENTIDAD_INVALIDA');
  return x;
 }
@@ -40,10 +42,10 @@ export async function promoverPedidoUniversalD1(request,env,{
  const db=env.DB;
  const tables=await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN "+
   "('orders','order_items','central_work_order_numbers','central_r2_universal_drafts',"+
-  "'central_r2_universal_files','central_document_manifests','central_r2_prepaid_intents')").all();
+  "'central_r2_universal_files','central_order_contacts','central_document_manifests','central_r2_prepaid_intents')").all();
  const present=new Set((tables.results||[]).map(x=>x.name));
  if(['orders','order_items','central_work_order_numbers','central_r2_universal_drafts',
-    'central_r2_universal_files'].some(t=>!present.has(t)))
+    'central_r2_universal_files','central_order_contacts'].some(t=>!present.has(t)))
   return response({ok:false,error:'UNIVERSAL_PROMOCION_ESQUEMA_INCOMPLETO'},503);
  // Same web reference cannot secretly be reused for historic orders.
  for(const table of ['central_document_manifests','central_r2_prepaid_intents']){
@@ -101,18 +103,20 @@ export async function promoverPedidoUniversalD1(request,env,{
  async function confirmed(link,idempotent){
   if(!link||link.quote_hash!==p.quoteHash||link.amount_ars!==total)return null;
   const id=link.commercial_order_id;
-  const [order,line,count,number]=await Promise.all([
+  const [order,line,count,number,contact]=await Promise.all([
    db.prepare('SELECT status,amount_ars,deposit_ars FROM orders WHERE id=?').bind(id).first(),
    db.prepare('SELECT sku,quantity,line_total_ars,detail_json,file_references_json '+
     'FROM order_items WHERE order_id=? AND line_number=1').bind(id).first(),
    db.prepare('SELECT COUNT(*) AS total FROM order_items WHERE order_id=?').bind(id).first(),
-   db.prepare('SELECT number FROM central_work_order_numbers WHERE commercial_order_id=?').bind(id).first()
+   db.prepare('SELECT number FROM central_work_order_numbers WHERE commercial_order_id=?').bind(id).first(),
+   db.prepare('SELECT phone FROM central_order_contacts WHERE order_id=?').bind(id).first()
   ]);
   if(!order||order.status!=='awaiting_payment'||order.amount_ars!==total||
      order.deposit_ars!==total||line?.sku!==UNIVERSAL_ORDER_SKU||
      line.quantity!==1||line.line_total_ars!==total||
      line.detail_json!==detail||line.file_references_json!==JSON.stringify(ids)||
-     count?.total!==1||!Number.isSafeInteger(number?.number)||number.number<1)
+     count?.total!==1||contact?.phone!==p.telefono||
+     !Number.isSafeInteger(number?.number)||number.number<1)
    return null;
   return response({ok:true,webOrderId:p.webOrderId,commercialOrderId:id,
    numeroOrden:String(number.number).padStart(3,'0'),totalArs:total,
@@ -137,9 +141,10 @@ export async function promoverPedidoUniversalD1(request,env,{
    db.prepare('INSERT INTO central_r2_universal_order_links '+
     '(web_order_id,commercial_order_id,quote_hash,amount_ars) VALUES(?,?,?,?)')
     .bind(p.webOrderId,id,p.quoteHash,total),
-   db.prepare('INSERT INTO central_work_order_numbers(commercial_order_id) VALUES(?)').bind(id)
+   db.prepare('INSERT INTO central_work_order_numbers(commercial_order_id) VALUES(?)').bind(id),
+   db.prepare('INSERT INTO central_order_contacts(order_id,phone) VALUES(?,?)').bind(id,p.telefono)
   ]);
-  if(result?.[2]?.meta?.changes!==1||result?.[3]?.meta?.changes!==1)
+  if(result?.length!==5||result.some(x=>x?.meta?.changes!==1))
    return response({ok:false,error:'UNIVERSAL_PROMOCION_TRANSACCION_NO_CONFIRMADA'},503);
  }catch{
   return await confirmed(await find().catch(()=>null),true)||
