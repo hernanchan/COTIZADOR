@@ -22,8 +22,10 @@ function fixture(){
  const env={CENTRAL_R2_PREPAY_DRAFT_ENABLED:'PRIVATE_TEST_ONLY',
   CENTRAL_R2_STAGING_ENABLED:'PRIVATE_TEST_ONLY',
   DB:{prepare:s=>{const st=sql.prepare(s);return {
-   bind(...params){st.bind(...params);return this},
-   all:async()=>({results:st.all()}),first:async()=>st.get()
+   params:[],
+   bind(...params){this.params=params;return this},
+   all:async function(){return {results:st.all(...this.params)}},
+   first:async function(){return st.get(...this.params)}
   }}}};
  const receipt=()=>sql.prepare('INSERT INTO central_r2_large_pending VALUES(?,?,?,?,?,?,?)')
   .run(web,'planoA1','DOC-12345678-1234-4123-8123-123456789abc',
