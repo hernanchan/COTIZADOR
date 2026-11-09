@@ -1,0 +1,40 @@
+name: Saber R2 - diagnostico datos reales Nuevos D1 SOLO LECTURA
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-r2-tablero-d1-diagnostico-20261109.yml]
+permissions:
+  contents: read
+jobs:
+  diagnostico-r2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Leer solo estados R2 de prueba en D1, sin datos personales ni escrituras
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT"
+          tmp=$(mktemp -d)
+          trap 'rm -rf "$tmp"' EXIT
+          auth="Authorization: Bearer $TOKEN"
+          curl -fsS --max-time 25 -H "$auth" "$root/workers/scripts/saber-pagos-pruebas/settings" > "$tmp/settings.json"
+          jq -e '.success==true' "$tmp/settings.json" >/dev/null
+          db=$(jq -er '.result.bindings[]|select(.name=="DB" and .type=="d1")|.id//.database_id//empty' "$tmp/settings.json" | head -n 1)
+          echo 'LIVE_D1_BINDING_RESOLVED'
+          jq -n '{sql:"SELECT substr(i.web_order_id,-8) AS pedido_fin,o.status AS pago,v.state AS conciliacion,CASE WHEN a.order_id IS NULL THEN 0 ELSE 1 END AS preprensa_aprobada,COALESCE(s.state,\"pendiente\") AS etapa_produccion,CASE WHEN n.number IS NULL THEN 0 ELSE 1 END AS numerado,CASE WHEN p.receipt_id IS NULL THEN 0 ELSE 1 END AS recibido FROM central_r2_prepaid_intents i JOIN orders o ON o.id=i.commercial_order_id LEFT JOIN payment_reviews v ON v.order_id=o.id LEFT JOIN central_r2_prepress_approvals a ON a.order_id=o.id LEFT JOIN central_production_status s ON s.order_id=o.id LEFT JOIN central_work_order_numbers n ON n.commercial_order_id=o.id LEFT JOIN central_r2_large_pending p ON p.web_order_id=i.web_order_id AND p.file_id=i.file_id WHERE i.web_order_id IN (\u0027WEB-ENSAYO-72E9F66A8BC34CC9B25D70EF49C1A8D3\u0027,\u0027WEB-ENSAYO-255BFE122477AC6C7666EB6D342707FE\u0027) ORDER BY i.created_at DESC",params:[]}' > "$tmp/q.json"
+          code=$(curl -sS --max-time 35 -H "$auth" -H 'Content-Type: application/json' \
+             -o "$tmp/response.json" -w '%{http_code}' --data-binary "@$tmp/q.json" \
+             "$root/d1/database/$db/query")
+          if [ "$code" != 200 ];then echo "D1_READONLY_STATUS=$code";exit 1;fi
+          jq -e '.success==true' "$tmp/response.json" >/dev/null
+          jq -c '.result[0].results//[]' "$tmp/response.json" | sed 's/\\u0027/\x27/g'
+          echo 'D1_R2_STATES_REAL_VERIFIED_READONLY'
+          echo 'NO_ADMIN_KEY_NO_PII_NO_MUTATIONS_NO_PAYMENTS'
