@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  statuses: write
 
 jobs:
   pruebas-privadas:
@@ -194,3 +195,23 @@ jobs:
         run: node --test tests/saber-directo-preview.test.mjs
       - name: Confirmación SIN despliegues
         run: echo 'PRUEBA_TUS_PRIVADA_OK - SIN DESPLIEGUE - SIN PAGOS - WEB COMERCIAL INTACTA'
+      - name: Registrar resultado verificable del CI en el commit
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_RESULT: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          case "$CI_RESULT" in
+            success) state=success;;
+            *) state=failure;;
+          esac
+          jq -n --arg state "$state" \
+            --arg context 'saber/integracion-privada-ci' \
+            --arg description "Pruebas completas y build privado: $CI_RESULT" \
+            --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/saber-private-ci-status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+            --input /tmp/saber-private-ci-status.json >/dev/null
+          echo "CI_RESULT=$CI_RESULT COMMIT=$GITHUB_SHA"
