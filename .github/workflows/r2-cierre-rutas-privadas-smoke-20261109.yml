@@ -39,6 +39,7 @@ jobs:
             -H "Origin: $docs" -H 'Content-Type: application/json' --data '{}' \
             "$docs/prueba-v2/api/ensayo-r2-ficha-produccion-personal")
           echo "R2_ROUTE_5_HTTP=$code"
-          test "$code" = 401
+          # El API de ficha usa 403 (fail-closed); la página Basic usa 401.
+          test "$code" = 403
           echo 'R2_WORKERS_PRIVATE_ROUTES_FAIL_CLOSED_PAYMENT_OFF'
           echo 'NO_CREATE_ORDER_NO_PAYMENT_NO_R2_UPLOAD_DELETE_OR_DELIVERY'
