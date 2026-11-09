@@ -27,13 +27,13 @@ async function fixture(){
  const hash=Buffer.from(await webcrypto.subtle.digest('SHA-256',
   new TextEncoder().encode(JSON.stringify(f)))).toString('hex');
  return {f,hash,request:{schema:'saber-central-r2-universal-create-order-v1',
-  webOrderId:order,draftId,quoteHash:hash}};
+  webOrderId:order,draftId,quoteHash:hash,telefono:'3515551234'}};
 }
 function fakeDB(f,hash,{wrongTransport=false,oldReference=false}={}){
- const orders=[],items=[],links=[],numbers=[],queries=[];
+ const orders=[],items=[],links=[],numbers=[],contacts=[],queries=[];
  const tables=['orders','order_items','central_work_order_numbers',
   'central_r2_universal_drafts','central_r2_universal_files',
-  'central_document_manifests'];
+  'central_document_manifests','central_order_contacts'];
  const DB={prepare(sql){
   const stmt={sql,args:[],bind(...v){this.args=v;return this},
    async run(){return {meta:{changes:0}}},
@@ -59,17 +59,20 @@ function fakeDB(f,hash,{wrongTransport=false,oldReference=false}={}){
      return {total:items.filter(r=>r.order_id===this.args[0]).length};
     if(sql.includes('FROM central_work_order_numbers'))
      return numbers.find(r=>r.commercial_order_id===this.args[0])||null;
+    if(sql.includes('FROM central_order_contacts'))
+     return contacts.find(r=>r.order_id===this.args[0])||null;
     throw Error('unhandled first: '+sql);
    }
   };queries.push(stmt);return stmt;
  },async batch(stmts){
-  assert.equal(stmts.length,4);
+  assert.equal(stmts.length,5);
   if(links.length)throw Error('duplicate');
-  const [a,b,c,d]=stmts;
+  const [a,b,c,d,e]=stmts;
   assert.match(a.sql,/INSERT INTO orders/);
   assert.match(b.sql,/INSERT INTO order_items/);
   assert.match(c.sql,/INSERT INTO central_r2_universal_order_links/);
   assert.match(d.sql,/INSERT INTO central_work_order_numbers/);
+  assert.match(e.sql,/INSERT INTO central_order_contacts/);
   orders.push({id:a.args[0],status:'awaiting_payment',amount_ars:a.args[2],deposit_ars:a.args[3]});
   items.push({order_id:b.args[0],sku:b.args[2],quantity:b.args[4],
    line_total_ars:b.args[6],detail_json:b.args[7],
@@ -77,9 +80,10 @@ function fakeDB(f,hash,{wrongTransport=false,oldReference=false}={}){
   links.push({web_order_id:c.args[0],commercial_order_id:c.args[1],
    quote_hash:c.args[2],amount_ars:c.args[3]});
   numbers.push({commercial_order_id:d.args[0],number:24});
+  contacts.push({order_id:e.args[0],phone:e.args[1]});
   return stmts.map(()=>({meta:{changes:1}}));
  }};
- return {DB,orders,items,links,numbers,queries};
+ return {DB,orders,items,links,numbers,contacts,queries};
 }
 function promote(db,p,flag='PRIVATE_TEST_ONLY'){
  return promoverPedidoUniversalD1(new Request('https://central.invalid/internal/central/r2-universal-order',{
@@ -92,7 +96,8 @@ test('promoción obliga UUID, hash e identificador exacto, sin importes de UI',a
  const {request:p}=await fixture();
  assert.equal(validarPromocionUniversal(p),p);
  for(const x of [{...p,totalArs:1},{...p,uploadAuthorized:true},
-  {...p,draftId:'invalido'},{...p,quoteHash:'0'}])
+  {...p,draftId:'invalido'},{...p,quoteHash:'0'},
+  {...p,telefono:'123'},{...p,telefono:'351 555 1234',amountArs:1}])
   assert.throws(()=>validarPromocionUniversal(x));
 });
 test('tres archivos se convierten en un pedido D1 y una línea agregada sin checkout',async()=>{
@@ -112,6 +117,8 @@ test('tres archivos se convierten en un pedido D1 y una línea agregada sin chec
   ['file_0','file_1','file_2']);
  assert.equal(db.links.length,1);
  assert.equal(db.numbers.length,1);
+ assert.equal(db.contacts.length,1);
+ assert.equal(db.contacts[0].phone,'3515551234');
  const replay=await promote(db,p);
  assert.equal(replay.status,200);
  assert.equal((await replay.json()).idempotent,true);
@@ -165,14 +172,14 @@ test('Documentos firma HMAC y exige personal; jamás fabrica checkout',async()=>
  const args={authorized:true,service:svc,subtle:webcrypto.subtle,
   now:()=>1793970000,nonce:()=>uuid};
  const ok=await prepararOrdenUniversalSinCheckout(make({
-  webOrderId:p.webOrderId,draftId:p.draftId,quoteHash:p.quoteHash}),env,args);
+  webOrderId:p.webOrderId,draftId:p.draftId,quoteHash:p.quoteHash,telefono:p.telefono}),env,args);
  assert.equal(ok.status,201,JSON.stringify(await ok.clone().json()));
  assert.equal((await ok.json()).checkoutEnabled,false);
  const forged=await prepararOrdenUniversalSinCheckout(make({
-  webOrderId:p.webOrderId,draftId:p.draftId,quoteHash:p.quoteHash,totalArs:1}),env,args);
+  webOrderId:p.webOrderId,draftId:p.draftId,quoteHash:p.quoteHash,telefono:p.telefono,totalArs:1}),env,args);
  assert.equal(forged.status,422);assert.equal(calls,1);
  const denied=await prepararOrdenUniversalSinCheckout(make({
-  webOrderId:p.webOrderId,draftId:p.draftId,quoteHash:p.quoteHash}),env,{
+  webOrderId:p.webOrderId,draftId:p.draftId,quoteHash:p.quoteHash,telefono:p.telefono}),env,{
   ...args,authorized:false});
  assert.equal(denied.status,401);assert.equal(calls,1);
 });
