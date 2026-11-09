@@ -60,7 +60,7 @@ export async function guardarBorradorUniversal(request,env,{
     saved.paymentAuthorized!==false||saved.productionAuthorized!==false)
   return reply({ok:false,error:'UNIVERSAL_RESPUESTA'},502);
  return reply({ok:true,webOrderId:ficha.webOrderId,draftId:saved.draftId,
-  totalArs:ficha.totalArs,fileCount:ficha.archivos.length,
+  quoteHash:hash,totalArs:ficha.totalArs,fileCount:ficha.archivos.length,
   idempotent:!!saved.idempotent,checkoutEnabled:false,
   filesUploaded:false,paymentAuthorized:false,productionAuthorized:false},
   saved.idempotent?200:201);
