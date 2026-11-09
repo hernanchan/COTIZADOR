@@ -138,16 +138,29 @@ jobs:
             verify_get 401 "$workdir/anon" "$origin$route" || { echo "PRIVATE_ROUTE_ANON_ACCESS_NOT_401 $route"; exit 1; }
           done
           echo "BASIC_GUARD_ALL_THREE_ROUTES_401"
-          verify_get 200 "$workdir/preview.html" "$origin/prueba-v2/diseno-saber-directo" --user "operador:$PASSWORD" || { echo "PREVIEW_AUTH_FAILED"; exit 1; }
+          # Un HTTP 200 no confirma versión: esperar contenido específico de esta revisión.
+          verify_release_html(){
+            local output="$1" url="$2" expected="$3" code attempt
+            shift 3
+            for attempt in {1..20}; do
+              code=$(curl --silent --show-error --max-time 25 -H 'Cache-Control: no-cache' "$@" -o "$output" -w '%{http_code}' "$url" || true)
+              if [ "$code" = 200 ] && grep -Fq "$expected" "$output"; then return 0; fi
+              echo "HTML_PROPAGATION_PENDING attempt=$attempt http=$code"
+              sleep 2
+            done
+            echo "HTML_RELEASE_MARKER_NOT_VISIBLE"
+            return 1
+          }
+          verify_release_html "$workdir/preview.html" "$origin/prueba-v2/diseno-saber-directo" 'Los artículos y los trabajos de impresión se consultan por separado.' --user "operador:$PASSWORD" || { echo "PREVIEW_VERSION_NOT_VERIFIED"; exit 1; }
           for marker in 'VISTA PREVIA PRIVADA DE DISEÑO' 'class="hero hero-direct"' 'id="promoTitle"' 'href="/prueba-v2/"'; do
             grep -Fq "$marker" "$workdir/preview.html" || { echo "PREVIEW_MARKER_MISSING: $marker"; exit 1; }
           done
-          verify_get 200 "$workdir/offers.html" "$origin/prueba-v2/diseno-saber-directo/ofertas.html" --user "operador:$PASSWORD" || { echo "OFFERS_VIEW_AUTH_FAILED"; exit 1; }
+          verify_release_html "$workdir/offers.html" "$origin/prueba-v2/diseno-saber-directo/ofertas.html" 'Podés consultarlos por WhatsApp; las impresiones se encargan por separado.' --user "operador:$PASSWORD" || { echo "OFFERS_VERSION_NOT_VERIFIED"; exit 1; }
           grep -Fq 'VISTA PREVIA PRIVADA DE DISEÑO' "$workdir/offers.html" || { echo "OFFERS_VIEW_MARKER_MISSING"; exit 1; }
           verify_get 200 "$workdir/cotizador.html" "$origin/prueba-v2/" --user "operador:$PASSWORD" || { echo "COTIZADOR_AUTH_FAILED"; exit 1; }
           grep -Fq 'id="smart"' "$workdir/cotizador.html" && grep -Fq 'send-all-pdf' "$workdir/cotizador.html" || { echo "COTIZADOR_REGRESSION"; exit 1; }
           # Nueva vista de sólo lectura: 200 sin clave; sin cookies ni scripts de venta.
-          verify_get 200 "$workdir/libre.html" "$origin/prueba-v2/diseno-sin-clave" || { echo "OPEN_PREVIEW_NOT_200"; exit 1; }
+          verify_release_html "$workdir/libre.html" "$origin/prueba-v2/diseno-sin-clave" 'Los artículos y los trabajos de impresión se consultan por separado.' || { echo "OPEN_PREVIEW_VERSION_UNVERIFIED"; exit 1; }
           grep -Fq 'VISTA DE DISEÑO · SIN CONTRASEÑA' "$workdir/libre.html" || { echo "OPEN_PREVIEW_BANNER_MISSING"; exit 1; }
           grep -Fq 'class="hero hero-direct"' "$workdir/libre.html" || { echo "OPEN_PREVIEW_VISUAL_MISSING"; exit 1; }
           for forbidden in 'localStorage' 'sendWhatsApp' 'libreriasaber.mp' '20-22792046' 'productsCsvUrl'; do
