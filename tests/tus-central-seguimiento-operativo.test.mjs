@@ -12,6 +12,15 @@ vm.runInContext(source.replace('export default {','globalThis.worker = {'),ctx);
 const html=vm.runInContext('adminHtml',ctx);
 const script=html.slice(html.indexOf('<script>')+8,html.indexOf('</script>'));
 new vm.Script(script);
+test('El operador encuentra preprensa R2 desde el acceso superior con un clic',()=>{
+ assert.match(html,/id="goR2Paid"[^>]*>Ver ploteos R2 para aprobar/);
+ assert.match(html,/id="r2ReviewPanel"/);
+ assert.match(script,/document\.querySelector\("#goR2Paid"\)/);
+ assert.match(script,/document\.querySelector\("#refreshR2Paid"\)\?\.click\(\)/);
+ assert.ok(html.indexOf('id="goR2Paid"')<html.indexOf('id="productionBoardArea"'));
+ assert.ok(html.indexOf('id="r2ReviewPanel"')<html.indexOf('id="priceAdminFieldset"'));
+ assert.equal((html.match(/id="r2PaidReview"/g)||[]).length,1);
+});
 const uuid='b69f8ef5-63eb-4728-a967-584c63f39c41';
 let paid=true,current=null,events=[],writes=0;
 const db={prepare(sql){
