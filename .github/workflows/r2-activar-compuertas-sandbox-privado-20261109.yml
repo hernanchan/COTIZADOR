@@ -1,0 +1,136 @@
+name: Saber R2 - activar SOLO compuertas pagadas de ensayo en Workers PRIVADOS
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/r2-activar-compuertas-sandbox-privado-20261109.yml]
+permissions:
+  contents: read
+  statuses: write
+concurrency:
+  group: saber-r2-privado-habilitacion
+  cancel-in-progress: false
+jobs:
+  activar-solo-ensayo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Verificar dependencias y activar 10 flags R2 en privados con rollback
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+          PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN" && test -n "$PASSWORD"
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts"
+          auth="Authorization: Bearer $TOKEN"
+          docs='https://saber-documentos-pruebas.libreriasaber.workers.dev'
+          central='https://saber-pagos-pruebas.libreriasaber.workers.dev'
+          dir=$(mktemp -d)
+          modified=''
+          cleanup(){
+            rc=$?
+            trap - EXIT
+            if [ "$rc" -ne 0 ] && [ -n "$modified" ]; then
+              echo 'R2_PRIVATE_FLAGS_ROLLBACK_REQUESTED'
+              for w in $modified; do
+                if curl -sS --max-time 45 -o "$dir/$w-rollback-result.json" -w '%{http_code}' -X PATCH -H "$auth" -F "settings=@$dir/$w-restore.json;type=application/json" "$root/$w/settings" | grep -qx '200' &&
+                   jq -e '.success==true' "$dir/$w-rollback-result.json" >/dev/null; then
+                  echo "R2_FLAGS_ROLLBACK_ACCEPTED_$w"
+                else
+                  echo "R2_FLAGS_ROLLBACK_NOT_VERIFIED_$w"
+                fi
+              done
+            fi
+            rm -rf "$dir"
+            exit "$rc"
+          }
+          trap cleanup EXIT
+          # Verificar AMBOS Workers y todas las dependencias ANTES de modificar algo.
+          for w in saber-pagos-pruebas saber-documentos-pruebas; do
+            curl -fsS --max-time 25 -H "$auth" "$root/$w/settings" > "$dir/$w-before.json"
+            curl -fsS --max-time 25 -H "$auth" "$root/$w/deployments" > "$dir/$w-deploy.json"
+            jq -e '.success==true and (.result.bindings|type=="array")' "$dir/$w-before.json" >/dev/null
+            current=$(jq -er '.result.deployments[0].versions | if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$dir/$w-deploy.json")
+            if [ "$w" = saber-pagos-pruebas ]; then
+              test "$current" = '087d5a84-731d-49bb-a7b3-4b2fb3ddf39e'
+              flags='["CENTRAL_R2_QUOTA_ENABLED","CENTRAL_R2_PREPAY_DRAFT_ENABLED","CENTRAL_R2_PREPAY_CHECKOUT_ENABLED","CENTRAL_R2_POSTPAY_ENABLED","CENTRAL_R2_STAGING_ENABLED"]'
+              required='["DB","CENTRAL_BRIDGE_KEY","MP_TEST_ACCESS_TOKEN","MP_TEST_SELLER_ID","DEMO_ADMIN_KEY","DOCS_SANDBOX_CHECKOUT_ENABLED"]'
+              jq -e '.result.bindings|any(.name=="DOCS_SANDBOX_CHECKOUT_ENABLED" and .type=="plain_text" and .text=="PRIVATE_TEST_ONLY")' "$dir/$w-before.json" >/dev/null
+            else
+              test "$current" = '15c4f42f-9ab0-40d0-992a-381ddd53e82c'
+              flags='["DOCS_R2_PREPAY_DRAFT_ENABLED","DOCS_R2_POSTPAY_REQUIRED","DOCS_R2_BIG_ENABLED","DOCS_R2_QUOTA_ENABLED","DOCS_R2_STAGING_ENABLED"]'
+              required='["SABER_R2_GRANDES","SABER_CENTRAL","DOCS_R2_RECEIPT_KEY","DOCS_CENTRAL_SYNC_ENABLED","DOCS_PRICE_ADMIN_D1_ENABLED","DOCS_CLIENT_SANDBOX_CHECKOUT_ENABLED","CENTRAL_BRIDGE_KEY","CENTRAL_TEST_URL","DOCS_V2_PRIVATE_UI_SECRET"]'
+              jq -e '.result.bindings|any(.name=="SABER_R2_GRANDES" and .type=="r2_bucket" and .bucket_name=="saber-documentos-grandes-ensayo-20261106")' "$dir/$w-before.json" >/dev/null
+              jq -e '.result.bindings|any(.name=="SABER_CENTRAL" and .type=="service" and .service=="saber-pagos-pruebas")' "$dir/$w-before.json" >/dev/null
+              for name in DOCS_CENTRAL_SYNC_ENABLED DOCS_PRICE_ADMIN_D1_ENABLED DOCS_CLIENT_SANDBOX_CHECKOUT_ENABLED; do
+                jq -e --arg n "$name" '.result.bindings|any(.name==$n and .type=="plain_text" and .text=="PRIVATE_TEST_ONLY")' "$dir/$w-before.json" >/dev/null
+              done
+            fi
+            jq -n --argjson flags "$flags" --argjson required "$required" --slurpfile a "$dir/$w-before.json" '
+              ($a[0].result.bindings) as $b |
+              ([ $required[] | select(. as $n | $b | any(.[]; .name==$n)) ]|length)==($required|length) and
+              ([ $flags[] | select(. as $n | $b | any(.[]; .name==$n)) ]|length)==0
+            ' > "$dir/$w-ready.json"
+            jq -e '.==true' "$dir/$w-ready.json" >/dev/null || { echo "R2_PRIVATE_PREFLIGHT_BINDINGS_MISSING_OR_ALREADY_CHANGED_$w"; exit 1; }
+            jq -n --argjson flags "$flags" --slurpfile a "$dir/$w-before.json" '{
+              bindings: ([$a[0].result.bindings[]|{name,type:"inherit"}] +
+                [$flags[]|{name:.,type:"plain_text",text:"PRIVATE_TEST_ONLY"}])
+            }' > "$dir/$w-enable.json"
+            jq -n --slurpfile a "$dir/$w-before.json" '{
+              bindings:[$a[0].result.bindings[]|{name,type:"inherit"}]
+            }' > "$dir/$w-restore.json"
+            echo "R2_FLAG_PREFLIGHT_OK_$w"
+          done
+          curl -fsS --max-time 25 "$central/health" > "$dir/health-before.json"
+          jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$dir/health-before.json" >/dev/null
+          test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$docs/prueba-v2/")" = 401
+          test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$central/admin/api/orders")" = 401
+          echo 'REAL_PAYMENTS_OFF_PRIVATE_PORTAL_401_NO_UPLOADS_YET'
+          # Central primero: el comprador no podra cargar antes de que la Central este lista.
+          for w in saber-pagos-pruebas saber-documentos-pruebas; do
+            modified="$w $modified"
+            http=$(curl -sS --max-time 45 -o "$dir/$w-update.json" -w '%{http_code}' -X PATCH -H "$auth" -F "settings=@$dir/$w-enable.json;type=application/json" "$root/$w/settings")
+            if [ "$http" != 200 ] || ! jq -e '.success==true' "$dir/$w-update.json" >/dev/null; then
+              echo "R2_PRIVATE_FLAGS_PATCH_FAILED_$w";exit 1
+            fi
+            curl -fsS --max-time 25 -H "$auth" "$root/$w/settings" > "$dir/$w-after.json"
+            if [ "$w" = saber-pagos-pruebas ]; then
+              flags='["CENTRAL_R2_QUOTA_ENABLED","CENTRAL_R2_PREPAY_DRAFT_ENABLED","CENTRAL_R2_PREPAY_CHECKOUT_ENABLED","CENTRAL_R2_POSTPAY_ENABLED","CENTRAL_R2_STAGING_ENABLED"]'
+            else
+              flags='["DOCS_R2_PREPAY_DRAFT_ENABLED","DOCS_R2_POSTPAY_REQUIRED","DOCS_R2_BIG_ENABLED","DOCS_R2_QUOTA_ENABLED","DOCS_R2_STAGING_ENABLED"]'
+            fi
+            jq -e --argjson flags "$flags" --slurpfile before "$dir/$w-before.json" '
+              .success==true and
+              ([.result.bindings[]|.name]|sort)==([ $before[0].result.bindings[]|.name ]+$flags|unique|sort) and
+              ([.result.bindings[]|select(.name as $n|$flags|index($n)!=null)|select(.type=="plain_text" and .text=="PRIVATE_TEST_ONLY")]|length)==($flags|length)
+            ' "$dir/$w-after.json" >/dev/null || { echo "R2_PRIVATE_FLAGS_NOT_VERIFIED_$w";exit 1; }
+            echo "R2_PRIVATE_GATES_TEST_ONLY_ENABLED_$w"
+          done
+          # Tests de seguridad sin mutar D1, sin crear preferencias MP ni subir bytes R2.
+          curl -fsS --max-time 25 "$central/health" > "$dir/health-after.json"
+          jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$dir/health-after.json" >/dev/null || { echo 'REAL_PAYMENT_CHANGED_ROLLBACK';exit 1; }
+          test "$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$docs/prueba-v2/")" = 401 || { echo 'BUYER_PORTAL_NOT_PRIVATE';exit 1; }
+          test "$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$central/admin/api/orders")" = 401 || { echo 'CENTRAL_NOT_PRIVATE';exit 1; }
+          curl -fsS --max-time 25 -u "operador:$PASSWORD" "$docs/prueba-v2/" > "$dir/buyer.html"
+          grep -Fq 'R2_PREPAY_UI_ENABLED=true;' "$dir/buyer.html" || { echo 'BUYER_R2_SANDBOX_UI_NOT_ENABLED';exit 1; }
+          echo 'R2_BUYER_TEST_UI_ENABLED_NO_PDF_UPLOADED'
+          echo 'R2_GATE_TEST_ONLY_BOTH_WORKERS_SUCCESS_REAL_PAYMENTS_OFF'
+      - name: Registrar compuertas habilitadas en entorno privado
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          if [ "$RESULT" = success ]; then state=success; else state=failure; fi
+          jq -n --arg state "$state" --arg context 'saber/r2-private-postpay-enabled' \
+            --arg description "R2 privados solo postpago sandbox + rollback: $RESULT" \
+            --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/r2-private-enabled.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/r2-private-enabled.json >/dev/null
