@@ -33,4 +33,9 @@ jobs:
               elif ($x.type=="plain_text") then $n+"="+(if $x.text=="PRIVATE_TEST_ONLY" then "TEST_ONLY" else "PRESENT_OTHER" end)
               else $n+"=PRESENT_TYPE_"+$x.type end' "$tmp"
           done
+          for w in saber-documentos-pruebas saber-pagos-pruebas; do
+            curl -fsS --max-time 25 -H "Authorization: Bearer $TOKEN" \
+              "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/$w/deployments" > "$tmp"
+            jq -r --arg w "$w" '"ACTIVE_VERSION "+$w+"="+([.result.deployments[0].versions[]?|select(.percentage==100)|.version_id]|first)' "$tmp"
+          done
           echo 'CHECKOUT_ENV_READONLY_NO_CLOUDFLARE_CHANGES'
