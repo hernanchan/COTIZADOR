@@ -28,7 +28,7 @@ const db={prepare(sql){
    throw Error('Unexpected write '+sql);
   },
   async first(){
-   if(sql.startsWith('SELECT o.id FROM orders o JOIN central_document_manifests'))
+   if(sql.startsWith('SELECT o.id FROM orders o')&&sql.includes('central_r2_prepress_approvals'))
     return paid?{id:uuid}:null;
    if(sql.startsWith('SELECT state,version FROM central_production_status'))
     return current&&params[0]===uuid?current:null;
@@ -146,8 +146,8 @@ test('tablero práctico: cuatro columnas, historial y control por tarjeta',()=>{
 test('GET del tablero incluye versión de D1 y recibo sin exponer credenciales',()=>{
  const area=source.slice(source.indexOf('if(url.pathname==="/admin/api/orders"'),source.indexOf('if(url.pathname==="/admin/api/central/asignar-numero"'));
  assert.match(area,/COALESCE\(s\.version,0\) AS production_version/);
- assert.match(area,/m\.web_order_id AS web_order_id/);
- assert.match(area,/m\.file_count AS file_count/);
+ assert.match(area,/COALESCE\(m\.web_order_id,i\.web_order_id\) AS web_order_id/);
+ assert.match(area,/COALESCE\(m\.file_count,CASE WHEN a\.order_id IS NOT NULL THEN 1 END\) AS file_count/);
  assert.match(area,/payment_reviews/);
  assert.match(area,/state='verified'/);
  assert.doesNotMatch(area,/service_role|secret_text/);
