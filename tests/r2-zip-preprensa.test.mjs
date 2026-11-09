@@ -17,7 +17,9 @@ test('R2 ZIP conserva bytes originales y hoja PDF A4 sin autorización',async()=
  const raw=Buffer.from(await note.arrayBuffer()).toString('latin1');
  assert.match(raw,/^%PDF-1.4/);
  assert.match(raw,/\/MediaBox \[0 0 595 842\]/);
- assert.match(raw,/BLOQUEADO/);
+ const decoded=[...raw.matchAll(/<([0-9a-f]{6,})> Tj/g)]
+  .map(x=>Buffer.from(x[1],'hex').toString('latin1')).join('\n');
+ assert.match(decoded,/BLOQUEADO/);
  const original=new Blob(['%PDF-1.4\nOriginal R2 intacto']);
  const output=await sandbox.zip([
   {name:'PDF_01.pdf',blob:original},
@@ -32,5 +34,5 @@ test('R2 ZIP conserva bytes originales y hoja PDF A4 sin autorización',async()=
  assert.deepEqual(bytes.slice(start,start+original.size),
   new Uint8Array(await original.arrayBuffer()));
  assert.equal(dv.getUint32(start+original.size,true),0x04034b50);
- assert.throws(()=>sandbox.make('WEB-OTRO',receipt,62915011),/invalid/i);
+ assert.throws(()=>sandbox.make('WEB-OTRO',receipt,62915011),/inválidos/);
 });

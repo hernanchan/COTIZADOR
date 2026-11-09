@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
+import {readFileSync} from 'node:fs';
 import {paginaR2PreprensaPersonal} from '../integraciones/autocotizador/recepcion/pantalla-r2-preprensa-personal.mjs';
 
 test('Mostrador: página R2 advierte de preprensa, no libera producción ni pagos',()=>{
@@ -22,7 +23,9 @@ test('Navegador: único enlace resuelve servidor con POST, sin URL pública R2',
  assert.match(html,/showSaveFilePicker/);
  assert.match(html,/read\!\=size|read!==size/);
  assert.match(html,/Original recibido por R2/);
- assert.ok(html.indexOf('window.showSaveFilePicker')<html.indexOf("await fetch('/prueba-v2/api/ensayo-r2-descargar-d1-personal'"),
+ const originalButtonHandler=html.slice(html.indexOf("button.addEventListener('click'"));
+ assert.ok(originalButtonHandler.indexOf('window.showSaveFilePicker')<
+  originalButtonHandler.indexOf("await fetch('/prueba-v2/api/ensayo-r2-descargar-d1-personal'"),
   'el selector de archivos debe abrirse antes de perder activación del clic');
  assert.doesNotMatch(html,/Authorization:\s*'Bearer|access_token|service_role/);
 });
