@@ -1,4 +1,4 @@
-name: Saber QA V2 - aprobar SOLO PDF sintetico sandbox tras verificación original
+name: Saber QA V2 - aprobar SOLO PDF sintetico sandbox tras cotejo y acceso autorizado
 on:
   push:
     branches: [integracion/tus-pedido-privado-20261101]
