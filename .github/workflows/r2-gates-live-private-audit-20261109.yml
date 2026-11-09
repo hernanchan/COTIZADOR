@@ -49,6 +49,8 @@ jobs:
           done
           curl -fsS --max-time 20 'https://saber-pagos-pruebas.libreriasaber.workers.dev/health' > "$dir/health.json"
           jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$dir/health.json" >/dev/null
+          # Sólo nombres y tipos; jamás exportar valor de secreto.
+          jq -r '.result.bindings[]|select(.name=="DOCS_R2_RECEIPT_KEY")|"RECEIPT_BINDING_TYPE="+.type' "$dir/saber-documentos-pruebas-settings.json"
           echo 'READONLY_R2_GATES_AUDIT_OK_NO_WRITES_REAL_PAYMENTS_OFF'
       - name: Registrar auditoría
         if: always()
