@@ -192,6 +192,13 @@ async function centralTables(env){
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_work_order_numbers (number INTEGER PRIMARY KEY AUTOINCREMENT,commercial_order_id TEXT NOT NULL UNIQUE REFERENCES orders(id) ON DELETE RESTRICT,assigned_at TEXT NOT NULL DEFAULT (datetime('now')) )").run();
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_document_manifests (web_order_id TEXT PRIMARY KEY,commercial_order_id TEXT UNIQUE REFERENCES orders(id) ON DELETE RESTRICT,amount_ars INTEGER NOT NULL CHECK(amount_ars>0 AND amount_ars<=50000000),file_count INTEGER NOT NULL CHECK(file_count BETWEEN 1 AND 30),manifest_hash TEXT NOT NULL,manifest_json TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'verified_waiting_order' CHECK(status IN ('verified_waiting_order','linked_waiting_payment','linked_paid_pending_preparation')),created_at TEXT NOT NULL DEFAULT (datetime('now')),linked_at TEXT)").run();
  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_central_manifests_commercial_order ON central_document_manifests(commercial_order_id)").run();
+ // Aprobación R2 inmóvil y asociada a la orden, nunca a la ruta R2 del navegador.
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_r2_prepress_approvals ("+
+  "order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE RESTRICT,"+
+  "receipt_id TEXT NOT NULL UNIQUE REFERENCES central_r2_large_pending(receipt_id),"+
+  "sha256 TEXT NOT NULL,bytes INTEGER NOT NULL,quote_sha256 TEXT NOT NULL,"+
+  "amount_ars INTEGER NOT NULL,measured_json TEXT NOT NULL,operator TEXT NOT NULL,"+
+  "notes TEXT NOT NULL,approved_at TEXT NOT NULL DEFAULT(datetime('now')))").run();
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_order_contacts (order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE RESTRICT,phone TEXT NOT NULL CHECK(length(phone) BETWEEN 10 AND 26),created_at TEXT NOT NULL DEFAULT(datetime('now')))").run();
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_bridge_requests (request_id TEXT PRIMARY KEY,request_hash TEXT NOT NULL,action TEXT NOT NULL CHECK(action IN ('stage','link')),created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_document_receipts (receipt_id TEXT PRIMARY KEY,web_order_id TEXT NOT NULL REFERENCES central_document_manifests(web_order_id) ON DELETE CASCADE,file_id TEXT NOT NULL,sha256 TEXT NOT NULL,UNIQUE(web_order_id,file_id))").run();
@@ -1585,8 +1592,11 @@ async function centralUpdateProduction(req,env,ctx){
  await centralTables(env);
  await centralProductionTables(env);
  const eligible=await env.DB.prepare(
-  "SELECT o.id FROM orders o JOIN central_document_manifests m ON m.commercial_order_id=o.id "+
-  "WHERE o.id=? AND o.status='paid' AND o.paid_at IS NOT NULL "+
+  "SELECT o.id FROM orders o "+
+  "LEFT JOIN central_document_manifests m ON m.commercial_order_id=o.id "+
+  "LEFT JOIN central_r2_prepress_approvals a ON a.order_id=o.id "+
+  "WHERE (m.commercial_order_id IS NOT NULL OR a.order_id IS NOT NULL) "+
+  "AND o.id=? AND o.status='paid' AND o.paid_at IS NOT NULL "+
   "AND o.deposit_ars=o.amount_ars AND EXISTS (SELECT 1 FROM payment_reviews p "+
   "WHERE p.order_id=o.id AND p.state='verified') LIMIT 1"
  ).bind(d.order_id).first();
@@ -1666,9 +1676,11 @@ async function updatePreparationEstimate(req,env){
  await centralTables(env);await ensurePaymentReviews(env);await centralProductionTables(env);
  const eligible=await env.DB.prepare(
   "SELECT o.id,COALESCE(s.state,'pendiente') AS stage FROM orders o "+
-  "JOIN central_document_manifests m ON m.commercial_order_id=o.id "+
+  "LEFT JOIN central_document_manifests m ON m.commercial_order_id=o.id "+
+  "LEFT JOIN central_r2_prepress_approvals a ON a.order_id=o.id "+
   "LEFT JOIN central_production_status s ON s.order_id=o.id "+
-  "WHERE o.id=? AND o.status='paid' AND o.paid_at IS NOT NULL "+
+  "WHERE (m.commercial_order_id IS NOT NULL OR a.order_id IS NOT NULL) AND "+
+  "o.id=? AND o.status='paid' AND o.paid_at IS NOT NULL "+
   "AND o.deposit_ars=o.amount_ars AND EXISTS (SELECT 1 FROM payment_reviews p "+
   "WHERE p.order_id=o.id AND p.state='verified') LIMIT 1"
  ).bind(d.order_id).first();
@@ -2884,6 +2896,13 @@ function renderPreparationEstimate(orderId,track,estimate){
 async function showOrder(id){try{status.textContent="Consultando detalle...";const x=await api("/admin/api/order?id="+encodeURIComponent(id));details.replaceChildren();details.append(node("h3","Pedido "+x.order.id));details.append(node("p","Total: "+money(x.order.amount_ars)+" · Aprobado: "+(x.order.paid_at||"sin fecha")));if(x.bankAccreditation){
  details.append(node("p","Acreditación bancaria verificada por "+x.bankAccreditation.operator+
   " · "+x.bankAccreditation.recorded_at+" · Ref.: "+x.bankAccreditation.bank_reference));
+}if(x.produccion?.r2Preprensa){
+ const d=x.produccion.r2Preprensa;
+ details.append(node("h4","Ploteo grande R2 · preprensa aprobada por "+d.responsable));
+ details.append(node("p","Recibo "+d.recibo+" · "+
+  d.medidas.map((v,i)=>"#"+(i+1)+" "+v[0]+"×"+v[1]+" cm").join("; ")));
+ details.append(node("p","Importe verificado: "+money(d.importe)+
+  " · Original privado disponible para preparación. NO enviar el PDF pesado directamente al plotter."));
 }if(x.produccion?.seguimiento)renderProductionTracking(id,x.produccion.seguimiento);if(x.produccion?.seguimiento&&x.produccion?.preparacionEstimada)renderPreparationEstimate(id,x.produccion.seguimiento,x.produccion.preparacionEstimada);if(x.produccion){const pr=x.produccion;details.append(node("h4","Estado operativo: "+pr.estado.replaceAll("_"," ")));details.append(node("p",pr.mensaje));for(const t of pr.trabajos){const area=node("section","");area.append(node("h4",t.linea+". "+t.cantidad+" × "+t.descripcion+" — "+money(t.subtotal)));area.append(node("p","Estado: "+t.etapa.replaceAll("_"," ")+" · "+t.instruccion));const valores=Object.entries(t.especificaciones||{}).map(a=>a[0]+": "+a[1]).join(" · ");if(valores)area.append(node("p","Ficha técnica: "+valores));if(t.referencias?.length)area.append(node("p","Referencias privadas: "+t.referencias.join(", ")));details.append(area)}}else details.append(node("p","La ficha de producción no está disponible."));if(x.produccion?.documentosVerificados){
  const d=x.produccion.documentosVerificados;
  details.append(node("h4",(d.numeroOrden?"Orden de trabajo N.º "+d.numeroOrden+" · ":"")+
@@ -4508,11 +4527,14 @@ export default {
     }
     await centralTables(env);await centralProductionTables(env);await ensurePreparationEstimates(env);
     const rows=await env.DB.prepare("SELECT o.id,o.description,o.amount_ars,o.status,o.paid_at,o.created_at,"+
-     "CASE WHEN m.commercial_order_id IS NULL THEN NULL ELSE COALESCE(s.state,'pendiente') END AS production_state,"+
-     "n.number AS work_number,m.file_count AS file_count,m.web_order_id AS web_order_id,"+
+     "CASE WHEN m.commercial_order_id IS NULL AND a.order_id IS NULL THEN NULL ELSE COALESCE(s.state,'pendiente') END AS production_state,"+
+     "n.number AS work_number,COALESCE(m.file_count,CASE WHEN a.order_id IS NOT NULL THEN 1 END) AS file_count,"+
+     "COALESCE(m.web_order_id,i.web_order_id) AS web_order_id,"+
      "c.phone AS customer_phone,COALESCE(s.version,0) AS production_version,"+
      "e.ready_at AS estimated_ready_at,COALESCE(e.version,0) AS estimated_ready_version FROM orders o "+
      "LEFT JOIN central_document_manifests m ON m.commercial_order_id=o.id "+
+     "LEFT JOIN central_r2_prepress_approvals a ON a.order_id=o.id "+
+     "LEFT JOIN central_r2_prepaid_intents i ON i.commercial_order_id=a.order_id "+
      "LEFT JOIN central_production_status s ON s.order_id=o.id "+
      "LEFT JOIN central_preparation_estimates e ON e.order_id=o.id "+
      "LEFT JOIN central_work_order_numbers n ON n.commercial_order_id=o.id "+
@@ -4596,6 +4618,22 @@ export default {
     const rows=await env.DB.prepare("SELECT line_number,item_type,sku,title,quantity,unit_price_ars,line_total_ars,detail_json,file_references_json FROM order_items WHERE order_id=? ORDER BY line_number").bind(id).all();
     const central=await centralAdminDetail(env,id);
     const produccion=estadoProduccionPrivado(order,rows.results);
+    await centralTables(env);
+    const r2=await env.DB.prepare("SELECT a.receipt_id,a.operator,a.approved_at,"+
+     "a.measured_json,a.amount_ars,i.web_order_id "+
+     "FROM central_r2_prepress_approvals a "+
+     "JOIN central_r2_prepaid_intents i ON i.commercial_order_id=a.order_id "+
+     "WHERE a.order_id=? LIMIT 1").bind(id).first();
+    if(r2){
+     produccion.r2Preprensa={recibo:r2.receipt_id,
+      responsable:r2.operator,aprobadoEn:r2.approved_at,
+      medidas:JSON.parse(r2.measured_json),importe:r2.amount_ars,
+      webOrderId:r2.web_order_id};
+     if(env.CENTRAL_PRODUCTION_TRACKING_ENABLED==="PRIVATE_TEST_ONLY"){
+      produccion.seguimiento=await centralProductionDetail(env,id);
+      produccion.preparacionEstimada=await preparationEstimateDetail(env,id);
+     }
+    }
     if(central){
      produccion.documentosVerificados=central;
      if(env.CENTRAL_PRODUCTION_TRACKING_ENABLED==="PRIVATE_TEST_ONLY"){
