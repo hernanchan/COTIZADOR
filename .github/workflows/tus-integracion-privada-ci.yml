@@ -70,6 +70,8 @@ jobs:
           node --check integraciones/mercadopago/pruebas/r2-pago-verificado-central.mjs
           node --test tests/r2-lectura-parcial-segura.test.mjs
           node --test tests/r2-grandes-d1-descarga-personal.test.mjs
+          node --check integraciones/autocotizador/recepcion/r2-referencia-personal.mjs
+          node --test tests/r2-referencia-personal.test.mjs
           node --test tests/r2-grandes-central-pendientes.test.mjs
           node --test tests/r2-pdf-grandes-privado.test.mjs tests/r2-pdf-grandes-cliente.test.mjs tests/r2-pdf-grandes-api-privada.test.mjs tests/r2-pdf-integridad-stream.test.mjs tests/r2-pdf-grandes-descarga-personal.test.mjs
       - name: Sintaxis de módulos integrados
