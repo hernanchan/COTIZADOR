@@ -35,6 +35,8 @@ import {pagoTUSSandboxCliente} from './tus-pago-sandbox-cliente.mjs';
 import {checkoutCanarioTUSPersonal} from './tus-canaria-checkout-privado.mjs';
 import {paginaDescargaTUSPersonal} from './pantalla-descarga-tus-personal.mjs';
 import {paginaPaqueteTUSPersonal} from './pantalla-paquete-tus-personal.mjs';
+import {paginaPaqueteUniversalPersonal} from './pantalla-paquete-universal-personal.mjs';
+import {consultarPaqueteUniversalPersonal,descargarUniversalPersonal} from './r2-universal-paquete-personal.mjs';
 import {consultarPaqueteTUSPersonal} from './tus-paquete-personal.mjs';
 import {simularLimpiezaTUS,recibirLimpiezaEntregadaInterna} from './borrado-tus-entregado.mjs';
 import cotizadorV2OriginalHtml from '../../../cotizador-web-v2.html';
@@ -1944,7 +1946,8 @@ async function v2PrivateBrowserResponse(request,env,path,{buyer=false}={}){
   await autorizadoPedidoCliente(request,env);
  const status=v2PrivateBrowserAuthorized(request,env);
  if(status==='off'&&!buyerOK)return testResponse({ok:false,error:'Ensayo privado deshabilitado'},503);
- const allowMobile=path!=='/prueba-v2/r2-preprensa-personal'&&
+ const allowMobile=path!=='/prueba-v2/universal-paquete'&&
+  path!=='/prueba-v2/r2-preprensa-personal'&&
   path!=='/prueba-v2/orden-paquete'&&
   path!=='/prueba-v2/personal-descargar'&&
   status==='deny'&&await v2SessionAuthorized(request,env);
@@ -1973,6 +1976,17 @@ async function v2PrivateBrowserResponse(request,env,path,{buyer=false}={}){
       env?.DOCS_R2_STAGING_ENABLED!=='PRIVATE_TEST_ONLY')
     return testResponse({ok:false,error:'Preprensa R2 privada no habilitada'},503);
    return new Response(paginaR2PreprensaPersonal(),{status:200,headers:{
+    ...headers,'Content-Type':'text/html; charset=utf-8',
+    'Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+   }});
+  }
+  if(path==='/prueba-v2/universal-paquete'){
+   if(env?.DOCS_R2_UNIVERSAL_PACKAGE_ENABLED!=='PRIVATE_TEST_ONLY'||
+      env?.DOCS_R2_UNIVERSAL_POSTPAY_ENABLED!=='PRIVATE_TEST_ONLY')
+    return testResponse({ok:false,error:'Paquete universal no habilitado'},503);
+   if(v2PrivateBrowserAuthorized(request,env)!=='allow')
+    return testResponse({ok:false,error:'Solo operador con autenticación privada'},403);
+   return new Response(paginaPaqueteUniversalPersonal(),{status:200,headers:{
     ...headers,'Content-Type':'text/html; charset=utf-8',
     'Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
    }});
@@ -2158,7 +2172,7 @@ export default {
     if(page==='/prueba-v2/ingresar')return v2MobileInviteExchange(request,env);
     if(page==='/prueba-v2/admin-tarifario-ensayo')
       return probeTarifarioD1SoloOperador(request,env);
-    if(page==='/prueba-v2/'||page==='/prueba-v2/orden-paquete'||page==='/prueba-v2/r2-preprensa-personal'||page==='/prueba-v2/personal-descargar'||page==='/prueba-v2/cotizador'||
+    if(page==='/prueba-v2/'||page==='/prueba-v2/universal-paquete'||page==='/prueba-v2/orden-paquete'||page==='/prueba-v2/r2-preprensa-personal'||page==='/prueba-v2/personal-descargar'||page==='/prueba-v2/cotizador'||
        page==='/prueba-v2/carga-inteligente'||
        page==='/prueba-v2/carga-inteligente.js'||
        page==='/prueba-v2/precios-web.json'||
@@ -2385,6 +2399,14 @@ export default {
      // Retención de PDF: SOLO simulación, protegida con Basic; sin DELETE real.
     if(page==='/prueba-v2/api/ensayo-tus-retencion')
       return simularLimpiezaTUS(request,env,{
+       authorized:v2PrivateBrowserAuthorized(request,env)==='allow'
+      });
+    if(page==='/prueba-v2/api/ensayo-universal-paquete-personal')
+      return consultarPaqueteUniversalPersonal(request,env,{
+       authorized:v2PrivateBrowserAuthorized(request,env)==='allow'
+      });
+    if(page==='/prueba-v2/api/ensayo-universal-descargar-personal')
+      return descargarUniversalPersonal(request,env,{
        authorized:v2PrivateBrowserAuthorized(request,env)==='allow'
       });
     if(page==='/prueba-v2/api/ensayo-tus-paquete-manifiesto')
