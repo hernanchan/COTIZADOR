@@ -78,7 +78,8 @@ test('el navegador recupera el número visible del pedido sin subir PDF',async()
  const js=html.match(/<script type="module">([\s\S]*?)<\/script>/)?.[1];
  assert.ok(js,'Falta el módulo de portal privado');
  const start=js.indexOf('async function recuperarNumeroCentralTUS(){');
- const end=js.indexOf('\nsendAllButton.addEventListener',start);
+ // Aislar la función TUS: la pantalla incluye ahora otros controladores R2.
+ const end=js.indexOf('\n const r2Panel=',start);
  assert.ok(start>=0&&end>start);
  const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
  const run=new AsyncFunction('fetch','document','mostrarEstadoCliente',
