@@ -1,0 +1,44 @@
+name: Saber cierre V2 - continuar pedido sandbox confirmado sin duplicarlo
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-cierre-v2-postpago-r2-20261109.yml, docs/SABER-V2-POSTPAGO-CONTINUAR.trigger]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: saber-r2-v2-72e9f66a-postpago-unico
+  cancel-in-progress: false
+jobs:
+  postpay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 19
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Comprobar ID fijo V2 y cero creación de pedidos
+        shell: bash
+        run: |
+          set -euo pipefail
+          script=integraciones/autocotizador/recepcion/ensayo-e2e-v2-r2-postpago-20261109.mjs
+          node --check "$script"
+          grep -Fq 'WEB-ENSAYO-72E9F66A8BC34CC9B25D70EF49C1A8D3' "$script"
+          grep -Fq '89608817-95b1-41bc-ac88-579da519d32c' "$script"
+          ! grep -Fq "action:'start'" "$script"
+          ! grep -Fq '/r2-prepago"' "$script"
+          echo 'NO_SECOND_QUOTE_NO_SECOND_CHECKOUT_NO_PAYMENT_OVERRIDE'
+      - name: D1 pago sandbox verified, entonces R2 y descarga staff con SHA exacto
+        shell: bash
+        env:
+          SABER_V2_OPERATOR_PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+        run: |
+          set -euo pipefail
+          node integraciones/autocotizador/recepcion/ensayo-e2e-v2-r2-postpago-20261109.mjs
+          echo 'NO_AUTO_PRINT_NO_AUTO_DELIVERY_NO_MAIN_NO_REAL_PAYMENTS'
