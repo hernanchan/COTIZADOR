@@ -109,3 +109,51 @@ export async function registrarFichaUniversalD1(request,env,{
   fileCount:ficha.archivos.length,idempotent:false,paymentAuthorized:false,
   filesUploaded:false,checkoutEnabled:false,productionAuthorized:false},201);
 }
+
+/**
+ * Consulta de fichas SIN cobro ni PDF: exclusivo panel de personal.
+ * No aparecen en Nuevos (pedidos pagados) hasta promoverse con garantías.
+ * La consulta no crea tablas ni permisos de acceso a originales.
+ */
+export async function listarFichasR2Universales(request,env,{authorized=false}={}){
+ if(!authorized)return reply({ok:false,error:'UNIVERSAL_PERSONAL_NO_AUTORIZADO'},401);
+ if(request.method!=='GET')return reply({ok:false,error:'UNIVERSAL_METODO'},405);
+ if(env?.CENTRAL_R2_UNIVERSAL_DRAFT_ENABLED!=='PRIVATE_TEST_ONLY'||
+    !env?.DB?.prepare)return reply({ok:false,error:'UNIVERSAL_OFF'},503);
+ const db=env.DB;
+ const tables=await db.prepare("SELECT name FROM sqlite_master WHERE type='table' "+
+  "AND name IN ('central_r2_universal_drafts','central_r2_universal_files')").all();
+ const names=new Set((tables.results||[]).map(t=>t.name));
+ if(names.size!==2)return reply({ok:true,count:0,drafts:[],productionAuthorized:false});
+ const rows=await db.prepare('SELECT web_order_id,draft_id,quote_hash,price_revision,'+
+  'total_ars,file_count,armados_json,state,created_at '+
+  'FROM central_r2_universal_drafts ORDER BY created_at DESC LIMIT 50').all();
+ const drafts=[];
+ for(const d of rows.results||[]){
+  if(d.state!=='draft_not_payable'||!UUID.test(d.draft_id||'')||
+     !WEB.test(d.web_order_id||''))continue;
+  const files=await db.prepare('SELECT file_id,ordinal,name,sha256,bytes,transport,'+
+   'service,work_json,status FROM central_r2_universal_files '+
+   'WHERE web_order_id=? ORDER BY ordinal ASC').bind(d.web_order_id).all()
+   .catch(()=>({results:[]}));
+  const lines=(files.results||[]).map(x=>{
+   let w;try{w=JSON.parse(x.work_json)}catch{}
+   if(!w||w.fileId!==x.file_id||w.nombre!==x.name||
+      w.bytes!==x.bytes||w.sha256!==x.sha256||
+      w.transporte!==x.transport||w.destino!==x.service||
+      w.indice!==x.ordinal||x.status!=='not_received')
+    return null;
+   return {...w,originalRecibido:false,integridadVerificada:false,preprensaAprobada:false};
+  });
+  if(lines.some(x=>!x)||lines.length!==d.file_count)continue;
+  let armados;try{armados=JSON.parse(d.armados_json)}catch{}
+  if(!Array.isArray(armados))continue;
+  drafts.push({draftId:d.draft_id,webOrderId:d.web_order_id,
+   totalArs:d.total_ars,priceRevision:d.price_revision,quotedAt:d.created_at,
+   trabajos:lines,armados,fileCount:lines.length,
+   estado:'PRESUPUESTO_SIN_ORIGINALES',
+   checkoutEnabled:false,filesUploaded:false,
+   paymentAuthorized:false,productionAuthorized:false});
+ }
+ return reply({ok:true,count:drafts.length,drafts,productionAuthorized:false});
+}

@@ -4754,7 +4754,12 @@ export default {
     const {aprobarPreprensaR2}=await import("./r2-prepago-aprobacion-central.mjs");
     return await aprobarPreprensaR2(req,env,{authorized:true});
    }
-   if(url.pathname==="/admin/api/central/r2-paid-review"&&req.method==="GET"){
+   if(url.pathname==="/admin/api/central/r2-universal-drafts"&&req.method==="GET"){
+     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
+     const {listarFichasR2Universales}=await import("./r2-lote-universal-central.mjs");
+     return await listarFichasR2Universales(req,env,{authorized:true});
+    }
+    if(url.pathname==="/admin/api/central/r2-paid-review"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
     const {listarR2PagadosRevision}=await import("./r2-prepago-revision-central.mjs");
     return await listarR2PagadosRevision(req,env,{authorized:true});

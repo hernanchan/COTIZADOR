@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {webcrypto,createHmac} from 'node:crypto';
 import prices from '../precios-web.json' with {type:'json'};
 import {fichaPrearchivoUniversal} from '../integraciones/autocotizador/recepcion/ficha-prearchivo-universal.mjs';
-import {verificarFichaUniversal,registrarFichaUniversalD1} from '../integraciones/mercadopago/pruebas/r2-lote-universal-central.mjs';
+import {verificarFichaUniversal,registrarFichaUniversalD1,listarFichasR2Universales} from '../integraciones/mercadopago/pruebas/r2-lote-universal-central.mjs';
 import {guardarBorradorUniversal} from '../integraciones/autocotizador/recepcion/r2-borrador-universal-documentos.mjs';
 const MIB=1048576;
 const webOrderId='WEB-ENSAYO-0123456789ABCDEF0123456789ABCDEF';
@@ -115,4 +115,35 @@ test('Documentos firma HMAC y no crea preferencias de pago',async()=>{
  assert.equal((await result.json()).paymentAuthorized,false);
  const invalid=await guardarBorradorUniversal(make({webOrderId,archivos,manifiestos,totalArs:1}),env,opts);
  assert.equal(invalid.status,422);assert.equal(sent,1);
+});
+
+
+test('lectura de Central: sólo personal, ficha con tres trabajos y sin autorización',async()=>{
+ const q=await firmada(ficha()),uuid='12345678-1234-4123-8123-123456789abc';
+ const db={prepare(sql){
+  return {bind(){return this},async all(){
+   if(sql.includes('sqlite_master'))return {results:[{name:'central_r2_universal_drafts'},{name:'central_r2_universal_files'}]};
+   if(sql.includes('FROM central_r2_universal_drafts'))return {results:[{
+    web_order_id:webOrderId,draft_id:uuid,quote_hash:q.quoteHash,
+    price_revision:q.priceRevision,total_ars:q.totalArs,file_count:q.archivos.length,
+    armados_json:JSON.stringify(q.armados),state:'draft_not_payable',
+    created_at:'2026-11-09 18:00:00'}]};
+   if(sql.includes('FROM central_r2_universal_files'))return {results:q.archivos.map((x,i)=>({
+    file_id:x.fileId,ordinal:i,name:x.nombre,sha256:x.sha256,bytes:x.bytes,
+    transport:x.transporte,service:x.destino,work_json:JSON.stringify(x),
+    status:'not_received'}))};
+   throw Error('Consulta no simulada');
+  }};
+ }};
+ const env={CENTRAL_R2_UNIVERSAL_DRAFT_ENABLED:'PRIVATE_TEST_ONLY',DB:db};
+ const req=new Request('https://central.invalid/admin/api/central/r2-universal-drafts');
+ const denied=await listarFichasR2Universales(req,env,{authorized:false});
+ assert.equal(denied.status,401);
+ const accepted=await listarFichasR2Universales(req,env,{authorized:true});
+ const data=await accepted.json();
+ assert.equal(data.count,1);assert.equal(data.drafts[0].fileCount,3);
+ assert.deepEqual(data.drafts[0].trabajos.map(x=>x.transporte),['r2','tus','r2']);
+ assert.equal(data.drafts[0].trabajos[0].detalle.caras,'double');
+ assert.equal(data.drafts[0].productionAuthorized,false);
+ assert.equal(data.drafts[0].checkoutEnabled,false);
 });
