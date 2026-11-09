@@ -4705,6 +4705,14 @@ export default {
       reconcile:reconcileCustomerPaymentIfDue
      });
     }
+    if(url.pathname==="/internal/central/r2-universal-tus-gate"){
+     const {autorizarTUSUniversalCentral}=await import("./r2-universal-tus-central.mjs");
+     return autorizarTUSUniversalCentral(req,env,{readSigned:centralReadSigned});
+    }
+    if(url.pathname==="/internal/central/r2-universal-tus-received"){
+     const {recibirTUSUniversalCentral}=await import("./r2-universal-tus-central.mjs");
+     return recibirTUSUniversalCentral(req,env,{readSigned:centralReadSigned});
+    }
     if(url.pathname==="/internal/central/r2-universal-received"){
      const {confirmarOriginalUniversalR2}=await import("./r2-universal-recibido-central.mjs");
      return await confirmarOriginalUniversalR2(req,env,{readSigned:centralReadSigned});
