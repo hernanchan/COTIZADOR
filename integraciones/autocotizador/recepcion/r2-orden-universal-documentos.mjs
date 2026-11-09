@@ -28,9 +28,11 @@ export async function prepararOrdenUniversalSinCheckout(req,env,{
  if(raw.length>1200)return response({ok:false,error:'UNIVERSAL_ORDEN_LIMITE'},413);
  let p;try{p=JSON.parse(raw)}catch{}
  if(!p||typeof p!=='object'||Array.isArray(p)||
-    Object.keys(p).sort().join(',')!=='draftId,quoteHash,webOrderId'||
+    Object.keys(p).sort().join(',')!=='draftId,quoteHash,telefono,webOrderId'||
     !WEB.test(p.webOrderId||'')||!UUID.test(p.draftId||'')||
-    !SHA.test(p.quoteHash||''))
+    !SHA.test(p.quoteHash||'')||typeof p.telefono!=='string'||
+    !/^\+?[0-9 ()-]{10,26}$/.test(p.telefono)||
+    p.telefono.replace(/\D/g,'').length<10||p.telefono.replace(/\D/g,'').length>15)
   return response({ok:false,error:'UNIVERSAL_ORDEN_PARAMETROS'},422);
  let central;try{central=new URL(env.CENTRAL_TEST_URL)}catch{}
  if(!central||central.protocol!=='https:'||!HOST.test(central.hostname)||
