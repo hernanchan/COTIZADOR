@@ -3381,7 +3381,18 @@ document.querySelector("#refreshR2Paid")?.addEventListener("click",async()=>{
    item.append(node("p","Pedido comercial: "+r.commercialOrderId+
     " · "+(Number(r.expectedBytes)/1048576).toFixed(1)+" MiB previstos"+
     " · "+r.declaredPages+" página(s) declarada(s), aún sin validar"));
-   if(r.receiptId)item.append(node("p","Referencia del original en R2: "+r.receiptId));
+   if(r.receiptId){
+    item.append(node("p","Referencia del original en R2: "+r.receiptId));
+    if(/^WEB-ENSAYO-[A-F0-9]{32}$/.test(r.webOrderId||"")&&
+       /^DOC-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(r.receiptId)){
+     const u=new URL("https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/r2-preprensa-personal");
+     u.searchParams.set("webOrderId",r.webOrderId);
+     u.searchParams.set("receiptId",r.receiptId);
+     const link=node("a","Descargar original R2 (personal autorizado)");
+     link.href=u.href;link.target="_blank";link.rel="noopener noreferrer";
+     item.append(link);
+    }
+   }
    item.append(node("p","No habilitado para impresión ni ZIP de producción hasta completar preprensa."));
    list.append(item);
   }
