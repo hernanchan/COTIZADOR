@@ -29,6 +29,8 @@ jobs:
           node --check integraciones/autocotizador/recepcion/riesgo-preprensa-ploteo.mjs
           node --check integraciones/autocotizador/recepcion/ficha-produccion-central.mjs
           node --test tests/preprensa-ploteo-pesado.test.mjs tests/autocotizador-ficha-central.test.mjs
+          node --check integraciones/autocotizador/recepcion/preprensa-r2-archivo-local.mjs
+          node --test tests/r2-preprensa-archivo-local.test.mjs
       - name: Contrato R2 multipart grande, sin cuenta ni despliegue
         run: |
           node --check integraciones/autocotizador/recepcion/r2-pdf-grandes-privado.mjs
