@@ -3,7 +3,7 @@
  * Sólo puede abrirse con la compuerta BASIC privada del Worker, apagada
  * por defecto, y no interactúa con la tienda pública.
  */
-export function paginaCotizadorV2PruebaPrivada(sitekey,tusEnabled=false,tusDiagnostico=null,sandboxEnabled=false,r2PrepayEnabled=false){
+export function paginaCotizadorV2PruebaPrivada(sitekey,tusEnabled=false,tusDiagnostico=null,sandboxEnabled=false,r2PrepayEnabled=false,universalEnabled=false){
  // En esta rama de integración el portal NUNCA vuelve silenciosamente a Drive.
  const tusBloqueado=!tusEnabled;
  const fallas=Array.isArray(tusDiagnostico?.invalidos)?tusDiagnostico.invalidos:[];
@@ -77,7 +77,7 @@ body.estado-envio #smart,body.estado-registro #smart{display:none}
 <main><section class="panel" style="padding:0;border:0;background:transparent">
 <section id="vista-estado-pedido" hidden role="status" aria-live="polite"></section>
 <output id="rendimiento-privado" hidden style="display:block;margin:8px 0;padding:11px 14px;background:#f9fcff;border:1px solid #cbd5e1;border-radius:10px;font-size:13px;white-space:pre-wrap" aria-label="Tiempos del ensayo"></output>
-<iframe id="smart" title="Análisis automático de PDF, tamaños, CAD y póster" src="/prueba-v2/carga-inteligente${r2PrepayEnabled?'?r2Prepago=1':''}" loading="eager"></iframe>
+<iframe id="smart" title="Análisis automático de PDF, tamaños, CAD y póster" src="/prueba-v2/carga-inteligente${universalEnabled?'?universal=1':r2PrepayEnabled?'?r2Prepago=1':''}" loading="eager"></iframe>
 </section>
 <details id="recepcion-avanzada" class="panel" style="margin-top:14px"><summary style="font-size:16px;font-weight:700;cursor:pointer;padding:5px 0">Detalles de la recepción y verificación (ensayo privado)</summary><div style="padding-top:12px">
 <div class="warning">Los PDF se verifican en Drive y la Central registra automáticamente el pedido. Sin cobros.</div>
@@ -118,6 +118,7 @@ const modoDiagnostico=new URLSearchParams(location.search).get('diagnostico')===
 const TUS_ENABLED=${tusEnabled===true};
  const SANDBOX_PAYMENT_ENABLED=${sandboxEnabled===true};
  const R2_PREPAY_UI_ENABLED=${r2PrepayEnabled===true};
+ const UNIVERSAL_R2_UI_ENABLED=${universalEnabled===true};
  const MAX_PDF_PRIVADOS=TUS_ENABLED?10:30;
 const TUS_BLOCKED=${tusBloqueado};
 let tusPreflightOK=false;
@@ -1692,8 +1693,8 @@ if(TUS_ENABLED){
  * No inserta claves ni cookies del personal. El Worker decide qué rutas
  * están autorizadas; ocultar controles en HTML NO equivale a autorizar APIs.
  */
-export function paginaCotizadorTUSClientePruebas(sitekey,tusEnabled,tusDiagnostico,sandboxEnabled,r2PrepayEnabled=false){
- let html=paginaCotizadorV2PruebaPrivada(sitekey,tusEnabled,tusDiagnostico,sandboxEnabled,r2PrepayEnabled);
+export function paginaCotizadorTUSClientePruebas(sitekey,tusEnabled,tusDiagnostico,sandboxEnabled,r2PrepayEnabled=false,universalEnabled=false){
+ let html=paginaCotizadorV2PruebaPrivada(sitekey,tusEnabled,tusDiagnostico,sandboxEnabled,r2PrepayEnabled,universalEnabled);
  html=html
   .replace('<title>Librería Saber · Ensayo privado V2</title>',
    '<title>Impresiones y ploteos · Librería Saber</title>')
