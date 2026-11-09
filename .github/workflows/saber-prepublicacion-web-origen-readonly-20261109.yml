@@ -1,0 +1,71 @@
+name: Saber V3 - identificar origen de web y rollback SIN publicar
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-prepublicacion-web-origen-readonly-20261109.yml]
+permissions:
+  contents: read
+jobs:
+  salida-readonly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Identificar main, sitio actual y proyecto Pages existente SIN cambios
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          temp=$(mktemp -d)
+          trap 'rm -rf "$temp"' EXIT
+          main=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
+          [[ "$main" =~ ^[0-9a-f]{40}$ ]]
+          echo "GITHUB_MAIN_BASE_SHA=$main"
+          echo "CANDIDATE_BRANCH=$GITHUB_REF_NAME"
+          echo "CANDIDATE_SHA=$GITHUB_SHA"
+          site_code=$(curl -L -sS --max-time 25 -o "$temp/site.html" -w '%{http_code}' https://libreriasaber.com.ar/)
+          quote_code=$(curl -L -sS --max-time 25 -o "$temp/quote.html" -w '%{http_code}' https://libreriasaber.com.ar/cotizar)
+          echo "PUBLIC_SITE_GET_HTTP=$site_code"
+          echo "PUBLIC_QUOTE_GET_HTTP=$quote_code"
+          if [ "$site_code" = 200 ] && grep -Fq 'Un solo pedido' "$temp/site.html"; then
+            echo 'PUBLIC_SITE_STILL_PREVIOUS_CART_VERSION'
+          else
+            echo 'PUBLIC_SITE_CONTENT_NEEDS_MANUAL_COMPARISON'
+          fi
+          if [ "$quote_code" = 200 ] && grep -Eq 'hernanchan.github.io/COTIZADOR|cotizadorFrame' "$temp/quote.html"; then
+            echo 'PUBLIC_QUOTE_STILL_LEGACY_IFRAME'
+          else
+            echo 'PUBLIC_QUOTE_ROUTE_NEEDS_MANUAL_COMPARISON'
+          fi
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          base="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/pages"
+          auth="Authorization: Bearer $TOKEN"
+          status=$(curl -sS --max-time 25 -H "$auth" -o "$temp/projects.json" -w '%{http_code}' "$base/projects?per_page=100")
+          echo "CLOUDFLARE_PAGES_LIST_HTTP=$status"
+          if [ "$status" = 200 ] && jq -e '.success == true and (.result | type == "array")' "$temp/projects.json" >/dev/null; then
+            jq -r '.result[] | select(any(.domains[]?; . == "libreriasaber.com.ar" or . == "www.libreriasaber.com.ar")) | [.name, (.production_branch // ""), (.subdomain // ""), ((.domains // []) | join(","))] | @tsv' "$temp/projects.json" > "$temp/matched.tsv"
+            if [ -s "$temp/matched.tsv" ]; then
+              while IFS=$'\t' read -r name production subdomain domains; do
+                echo "MATCHED_PAGES_PROJECT=$name"
+                echo "MATCHED_PAGES_PRODUCTION_BRANCH=$production"
+                echo "MATCHED_PAGES_SUBDOMAIN=$subdomain"
+                echo "MATCHED_PAGES_DOMAINS=$domains"
+                status_d=$(curl -sS --max-time 25 -H "$auth" -o "$temp/deployments.json" -w '%{http_code}' "$base/projects/$name/deployments?per_page=8")
+                echo "MATCHED_PAGES_DEPLOYMENTS_HTTP=$status_d"
+                if [ "$status_d" = 200 ]; then
+                  jq -r --arg branch "$production" '.result | map(select(.deployment_trigger.metadata.branch == $branch)) | .[0] // {} | ["PAGES_LAST_PRODUCTION_DEPLOYMENT_ID="+(.id // "none"), "PAGES_LAST_PRODUCTION_COMMIT="+(.deployment_trigger.metadata.commit_hash // "unknown")] | .[]' "$temp/deployments.json"
+                fi
+              done < "$temp/matched.tsv"
+            else
+              echo 'PAGES_DOMAIN_NOT_MATCHED_IN_ACCOUNT'
+            fi
+          else
+            echo 'PAGES_MAPPING_UNAVAILABLE_WITH_CURRENT_TOKEN'
+          fi
+          echo 'ONLY_GET_NO_MAIN_WRITE_NO_CF_DEPLOY_NO_PAYMENT_NO_ORDERS_NO_R2_DELETE'
+          echo 'PRODUCTION_NOT_AUTHORIZED_BY_THIS_PREFLIGHT'
