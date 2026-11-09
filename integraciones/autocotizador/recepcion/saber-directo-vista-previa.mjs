@@ -128,8 +128,7 @@ export function prepararVistaDisenoAbierta(html,{ofertas=false,categoria='',pedi
      page=page.replace('id="'+id+'"></div>','id="'+id+'">'+(cards.length?grid(cards):
        '<div class="v3-sample-note">La planilla MODELO no tiene artículos activos en esta categoría.</div>')+'</div>');
    }
-   page=page.replace('<h2 id="promoTitle">Promoción semanal</h2>','<h2 id="promoTitle">Promoción del día</h2>');
-   page=page.replace('<p id="promoText">El cotizador aplica automáticamente el beneficio vigente.</p>','<p id="promoText">Aquí aparecerá la promoción vigente cuando se habiliten los pedidos.</p>');
+   // Conservar el mensaje prudente: nunca anunciar descuentos sin fuente autorizada.
  }
  // La preview sin clave no tiene carrito mixto funcional: evitar una promesa
  // de pedido único mientras los dos sistemas aún no se integraron.

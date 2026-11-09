@@ -21,7 +21,10 @@ test('Promoción dinámica única visible en la portada y enlaces internos váli
   for(const id of ['promoDay','promoTitle','promoText','beneficio','contacto','categorias','cartBadge'])
     assert.equal(count('id="'+id+'"'),1,'ID único: '+id);
   assert.match(html,/id="beneficio"[\s\S]*?<h2 id="promoTitle"/);
-  assert.match(html,/document\.getElementById\('promoTitle'\)\.textContent/);
+  assert.match(html,/Cotizá antes de encargar/);
+  assert.match(html,/Los precios y descuentos, si corresponden, se indican en el presupuesto/);
+  assert.doesNotMatch(html,/Lunes de planos|10% en ploteos CAD|10% en impresiones|Anillado sin cargo|20% online/);
+  assert.doesNotMatch(html,/promos=\\{/);
   assert.match(html,/href="#beneficio"/);
   assert.match(html,/href="#contacto"/);
 });
