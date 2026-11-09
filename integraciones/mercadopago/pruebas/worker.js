@@ -3363,7 +3363,7 @@ document.querySelector("#refreshExpress").addEventListener("click",async()=>{
   status.textContent=info.manifests.length+" pedido(s) Polaroids Express recibido(s)";
  }catch(e){status.textContent=e.message}
 });
-document.querySelector("#refreshR2Paid").addEventListener("click",async()=>{
+document.querySelector("#refreshR2Paid")?.addEventListener("click",async()=>{
  const list=document.querySelector("#r2PaidReview");
  list.replaceChildren(node("li","Consultando pagos y originales..."));
  try{
