@@ -3432,6 +3432,43 @@ function boardCard(order){
  if(order.universal_pdf_pending===true){
   const count=Number.isSafeInteger(order.universal_pdf_pending_count)?
    order.universal_pdf_pending_count:order.file_count;
+  if(count===0&&/^WEB-ENSAYO-[A-F0-9]{32}$/.test(order.web_order_id||"")){
+   card.append(node("p","Todos los PDF recibidos. Preprensa pendiente: NO imprimir ni iniciar hasta revisar el ZIP."));
+   const actions=node("div","");actions.className="actions";
+   const zip=node("button","Descargar ZIP y revisar");zip.className="outline";
+   zip.addEventListener("click",()=>{
+    const u=new URL("https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/universal-paquete");
+    u.searchParams.set("webOrderId",order.web_order_id);
+    const a=document.createElement("a");a.href=u.href;a.target="_blank";
+    a.rel="noopener noreferrer";document.body.append(a);a.click();a.remove();
+   });actions.append(zip);
+   const approve=node("button","Aprobar preprensa");approve.className="outline";
+   approve.addEventListener("click",async()=>{
+    const operator=requestOperator();
+    if(!operator){status.textContent="Indicar responsable de preprensa";return}
+    const checked=confirm("¿Revisaste TODOS los PDF del ZIP en Adobe? Confirmá integridad, medidas, clasificación CAD/Póster, páginas, caras, copias, material, rollos, escala y precio. NO aprobar sin revisar.");
+    if(!checked)return;
+    approve.disabled=true;
+    try{
+     const fields=["archivo","caras","clasificacion","copias","escala","material","medidas","paginas","precio","rollo"];
+     const confirmed=Object.fromEntries(fields.map(k=>[k,true]));
+     const result=await apiPost("/admin/api/central/r2-universal-prepress-approve",{
+      schema:"saber-central-r2-universal-prepress-approval-v1",
+      webOrderId:order.web_order_id,commercialOrderId:order.id,operator,confirmed
+     });
+     if(result.approved!==true||result.productionGatePassed!==true)
+      throw Error("Preprensa sin aprobación");
+     await refresh({silent:true,force:true});
+     status.textContent="Preprensa mixta aprobada: pedido habilitado para comenzar.";
+    }catch(e){
+     status.textContent="Preprensa pendiente: "+String(e.message||e);
+     approve.disabled=false;
+    }
+   });actions.append(approve);
+   const detail=node("button","Detalle");detail.className="outline";
+   detail.addEventListener("click",()=>showOrder(order.id));actions.append(detail);
+   card.append(actions);return card;
+  }
   card.append(node("p","PDF mixtos TUS/R2 · "+count+
    " original(es) pendiente(s) de verificación. No preparar ni imprimir."));
   card.append(node("p","Pedido pagado: se conserva en Nuevos hasta completar recepción y preprensa."));
@@ -3476,7 +3513,8 @@ function boardCard(order){
   const zip=node("button",isR2?"ZIP ploteo grande":"Descargar ZIP");zip.className="outline";
   zip.addEventListener("click",()=>{
    const u=new URL("https://saber-documentos-pruebas.libreriasaber.workers.dev"+
-    (isR2?"/prueba-v2/r2-preprensa-personal":"/prueba-v2/orden-paquete"));
+    (order.universal_pdf_approved?"/prueba-v2/universal-paquete":
+     isR2?"/prueba-v2/r2-preprensa-personal":"/prueba-v2/orden-paquete"));
    u.searchParams.set("webOrderId",order.web_order_id);
    if(isR2)u.searchParams.set("receiptId",order.r2_receipt_id);
    const link=document.createElement("a");
@@ -4889,8 +4927,18 @@ export default {
       const schema=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' "+
        "AND name IN ('central_r2_universal_order_links','central_r2_universal_files','central_r2_universal_drafts')").all();
       if((schema.results||[]).length!==3)throw Error("Tablas universales no disponibles");
+      const approvals=new Map();
+      if(env.CENTRAL_R2_UNIVERSAL_PREPRESS_ENABLED==="PRIVATE_TEST_ONLY"){
+       const prepressTable=await env.DB.prepare("SELECT name FROM sqlite_master "+
+        "WHERE type='table' AND name='central_r2_universal_prepress_approvals'").first();
+       if(prepressTable){
+        const res=await env.DB.prepare("SELECT commercial_order_id,web_order_id,"+
+         "quote_hash,file_count FROM central_r2_universal_prepress_approvals").all();
+        for(const row of res.results||[])approvals.set(row.commercial_order_id,row);
+       }
+      }
       const pending=await env.DB.prepare(
-       "SELECT l.commercial_order_id,l.web_order_id,d.file_count,"+
+       "SELECT l.commercial_order_id,l.web_order_id,d.file_count,d.quote_hash,"+
        "SUM(CASE WHEN f.received=0 THEN 1 ELSE 0 END) AS pending_count "+
        "FROM central_r2_universal_order_links l "+
        "JOIN central_r2_universal_drafts d ON d.web_order_id=l.web_order_id "+
@@ -4904,9 +4952,13 @@ export default {
       for(const entry of pending.results||[]){
        const card=byId.get(entry.commercial_order_id);
        if(!card)continue;
-       card.universal_pdf_pending=true;
+       const priorApproval=approvals.get(entry.commercial_order_id);
+       const approved=entry.pending_count===0&&priorApproval?.web_order_id===entry.web_order_id&&
+        priorApproval?.quote_hash===entry.quote_hash&&priorApproval?.file_count===entry.file_count;
+       card.universal_pdf_pending=!approved;
+       card.universal_pdf_approved=approved;
        card.universal_pdf_pending_count=entry.pending_count;
-       card.production_state="pendiente";
+       if(!approved)card.production_state="pendiente";
        card.web_order_id=entry.web_order_id;
        card.file_count=entry.file_count;
       }
