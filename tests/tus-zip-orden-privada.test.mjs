@@ -126,3 +126,23 @@ test('orden PDF acepta acentos y reparte numerosas instrucciones en varias pági
  assert.match(footer,/Página 1 de /);
  assert.match(footer,/PDF 30/);
 });
+
+test('Hoja R2 A4 y ZIP de revisión reutilizan generadores privados sin simular orden numerada',async()=>{
+ const hojaCode=readFileSync(new URL('../integraciones/autocotizador/recepcion/pdf-hoja-r2-preprensa.txt',import.meta.url),'utf8');
+ const ctx2=vm.createContext({Blob,TextEncoder,console,Uint8Array,Uint32Array,DataView});
+ vm.runInContext(pdfCode+'\n'+hojaCode+'\n'+zipJs+
+  '\nglobalThis.make=generarHojaPreprensaR2;globalThis.zip=crearZipSinCompresion;',ctx2);
+ const id='WEB-ENSAYO-255BFE122477AC6C7666EB6D342707FE';
+ const receipt='DOC-12345678-1234-4123-8123-123456789abc';
+ const hoja=ctx2.make(id,receipt,62915011);
+ const bytes=new Uint8Array(await hoja.arrayBuffer());
+ assert.equal(new TextDecoder().decode(bytes.slice(0,8)),'%PDF-1.4');
+ assert.match(Buffer.from(bytes).toString('latin1'),/\/MediaBox \[0 0 595 842\]/);
+ const zip=await ctx2.zip([
+  {name:'PDF_01.pdf',blob:new Blob(['%PDF-1.4 original'])},
+  {name:'PREPRENSA_R2_NO_IMPRIMIR.pdf',blob:hoja}
+ ],{maxBytes:210*1024*1024});
+ assert.equal(zip.type,'application/zip');
+ assert.ok(zip.size>hoja.size);
+ assert.throws(()=>ctx2.make(id,receipt,0),/Datos de preprensa/);
+});

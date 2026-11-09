@@ -1,0 +1,53 @@
+/**
+ * Hoja PDF A4 local para revisión de un original R2.
+ * Reutiliza pdfOrdenHex del generador TUS existente.
+ * No afirma orden numerada, clasificación/precio comprobado ni impresión lista.
+ */
+function generarHojaPreprensaR2(webOrderId,receiptId,originalBytes){
+ if(!/^WEB-ENSAYO-[A-F0-9]{32}$/.test(webOrderId||'')||
+   !/^DOC-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(receiptId||'')||
+   !Number.isSafeInteger(originalBytes)||originalBytes<=40*1024*1024||
+   originalBytes>200*1024*1024)throw Error('Datos de preprensa R2 inválidos');
+ const lines=[
+ 'LIBRERÍA SABER | HOJA DE REVISIÓN R2 | NO ES ORDEN IMPRIMIBLE',
+ 'Pedido: '+webOrderId,
+ 'Recibo R2: '+receiptId,
+ 'PDF_01.pdf: ORIGINAL SIN MODIFICAR',
+ 'Tamaño: '+(originalBytes/(1024*1024)).toFixed(2)+' MiB',
+ '',
+ 'PAGO: comprobar conciliación en la Central antes de producir.',
+ 'PÁGINAS Y MEDIDAS: comprobar con el PDF real.',
+ 'CLASIFICACIÓN: verificar CAD o póster por página.',
+ 'MATERIAL: revisar rollo, papel recubierto u obra y copias.',
+ 'PRECIO: cotejar cotización guardada contra contenido recibido.',
+ 'SI HAY DIFERENCIAS: detener y resolver comercialmente.',
+ 'PDF PESADO: preparar una copia, nunca enviar original directo al plotter.',
+ 'ARCHIVO ORIGINAL: conservar íntegro hasta Entregado.',
+ '',
+ 'BLOQUEADO: NO IMPRIMIR SIN REVISIÓN Y AUTORIZACIÓN DEL OPERADOR.'
+ ];
+ let commands='';
+ lines.forEach((line,i)=>{
+  if(line)commands+='BT /F1 '+(i===0?12:9)+' Tf 1 0 0 1 43 '+
+   (790-i*27)+' Tm <'+pdfOrdenHex(line)+'> Tj ET\n';
+ });
+ const objects=[
+  '<< /Type /Catalog /Pages 2 0 R >>',
+  '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+  '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+  '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
+  '<< /Length '+commands.length+' >>\nstream\n'+commands+'endstream'
+ ];
+ let raw='%PDF-1.4\n';const offsets=[0];
+ objects.forEach((object,i)=>{
+  offsets.push(raw.length);
+  raw+=(i+1)+' 0 obj\n'+object+'\nendobj\n';
+ });
+ const start=raw.length;
+ raw+='xref\n0 '+(objects.length+1)+'\n0000000000 65535 f \n';
+ for(let i=1;i<offsets.length;i++)
+  raw+=String(offsets[i]).padStart(10,'0')+' 00000 n \n';
+ raw+='trailer\n<< /Size '+(objects.length+1)+' /Root 1 0 R >>\nstartxref\n'+start+'\n%%EOF\n';
+ if(!/^[\x00-\x7f]*$/.test(raw))throw Error('Hoja de preprensa no ASCII');
+ return new Blob([raw],{type:'application/pdf'});
+}

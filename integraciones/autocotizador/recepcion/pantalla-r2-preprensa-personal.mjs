@@ -3,6 +3,9 @@
  * Acceso a la PÁGINA y POST protegido por HTTP Basic del Worker.
  * No concede permiso de imprimir; no utiliza URL del bucket.
  */
+import zipJs from './zip-tus-cliente.txt';
+import pdfOrdenJs from './pdf-orden-tus-cliente.txt';
+import pdfHojaR2Js from './pdf-hoja-r2-preprensa.txt';
 export function paginaR2PreprensaPersonal(){
  return `<!doctype html><html lang="es"><head><meta charset="utf-8">
  <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -23,10 +26,15 @@ export function paginaR2PreprensaPersonal(){
  del archivo no acreditan que sus páginas, medida, escala, clasificación CAD/póster,
  material y precio final coincidan con la impresión solicitada.</p>
  <button id="download" disabled>Descargar PDF original privado</button>
+ <button id="zip-r2" disabled>Descargar ZIP de revisión + hoja A4</button>
+ <p class="warning">El ZIP es exclusivamente para preprensa: NO es una orden lista para imprimir.</p>
  <p class="note">Sólo personal autorizado. Descarga verificada con Central D1 y SHA-256
  del objeto R2. No modifica el PDF ni genera pedidos o cobros.</p>
  <p id="result" role="status" aria-live="polite">Esperando…</p>
  </main><script>
+ ${zipJs}
+ ${pdfOrdenJs}
+ ${pdfHojaR2Js}
  (()=>{
   'use strict';
   const q=new URL(location.href).searchParams;
@@ -37,15 +45,53 @@ export function paginaR2PreprensaPersonal(){
   const label=document.getElementById('identidad');
   const status=document.getElementById('result');
   const button=document.getElementById('download');
+  const zipButton=document.getElementById('zip-r2');
   if(!valid){
    label.textContent='Referencia incompleta o inválida. Abrí el pedido desde la Central.';
    status.textContent='No se solicitó ninguna descarga.';
    return;
   }
   label.textContent='Pedido '+webOrderId+' · Recibo '+receiptId;
-  button.disabled=false;
+  button.disabled=false;zipButton.disabled=false;
   status.textContent='El original sólo se descargará cuando lo solicites.';
   let active=false;
+  zipButton.addEventListener('click',async()=>{
+   if(active)return;
+   active=true;button.disabled=true;zipButton.disabled=true;
+   status.textContent='Preparando paquete de revisión: descargando y verificando original…';
+   try{
+    const res=await fetch('/prueba-v2/api/ensayo-r2-descargar-d1-personal',{
+     method:'POST',credentials:'same-origin',cache:'no-store',redirect:'error',
+     headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({orderId:webOrderId,receiptId})
+    });
+    if(!res.ok||!String(res.headers.get('Content-Type')||'').startsWith('application/pdf'))
+     throw Error('No se autorizó el original R2 (HTTP '+res.status+').');
+    const size=Number(res.headers.get('Content-Length'));
+    if(!Number.isSafeInteger(size)||size<=40*1024*1024||
+       size>200*1024*1024)
+     throw Error('El PDF está fuera del límite permitido para este paquete.');
+    // Solo se arma en estación del operador; el Worker transmite el original
+    // verificado por SHA y ETag, pero nunca comprime PDF grande en Cloudflare.
+    const original=await res.blob();
+    if(original.size!==size||original.type!=='application/pdf')
+     throw Error('Descarga incompleta o formato inesperado.');
+    const hoja=generarHojaPreprensaR2(webOrderId,receiptId,size);
+    status.textContent='Generando ZIP local sin alterar el PDF…';
+    const paquete=await crearZipSinCompresion([
+     {name:'PDF_01.pdf',blob:original},
+     {name:'PREPRENSA_R2_NO_IMPRIMIR.pdf',blob:hoja}
+    ],{maxBytes:210*1024*1024});
+    const href=URL.createObjectURL(paquete);
+    const a=document.createElement('a');a.href=href;
+    a.download='PREPRENSA_'+receiptId+'.zip';
+    document.body.append(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(href),60000);
+    status.textContent='ZIP de revisión generado. Original + hoja A4. NO imprimir hasta aprobar medidas, CAD/póster, papel, copias y precio.';
+   }catch(e){
+    status.textContent='No se generó el ZIP: '+String(e?.message||e);
+   }finally{active=false;button.disabled=false;zipButton.disabled=false}
+  });
   button.addEventListener('click',async()=>{
    if(active)return;
    active=true;button.disabled=true;

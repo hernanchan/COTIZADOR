@@ -26,3 +26,13 @@ test('Navegador: único enlace resuelve servidor con POST, sin URL pública R2',
   'el selector de archivos debe abrirse antes de perder activación del clic');
  assert.doesNotMatch(html,/Authorization:\s*'Bearer|access_token|service_role/);
 });
+
+test('Página de preprensa R2 ofrece ZIP privado con PDF original y hoja A4, sin habilitar impresión',()=>{
+ const source=readFileSync(new URL('../integraciones/autocotizador/recepcion/pantalla-r2-preprensa-personal.mjs',import.meta.url),'utf8');
+ assert.match(source,/pdf-hoja-r2-preprensa\.txt/);
+ assert.match(source,/zip-tus-cliente\.txt/);
+ assert.match(source,/ZIP de revisión/);
+ assert.match(source,/ensayo-r2-descargar-d1-personal/);
+ assert.match(source,/NO imprimir/);
+ assert.doesNotMatch(source,/getPublicUrl|service_role|R2_GRANDES\.get/i);
+});

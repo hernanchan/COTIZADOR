@@ -26,7 +26,10 @@ function zipName(name){
 }
 function zip32(buf,offset,value){buf.setUint32(offset,value>>>0,true)}
 function zip16(buf,offset,value){buf.setUint16(offset,value,true)}
-async function crearZipSinCompresion(entries,{progress=()=>{}}={}){
+async function crearZipSinCompresion(entries,{progress=()=>{},maxBytes=160*1024*1024}={}){
+ if(!Number.isSafeInteger(maxBytes)||maxBytes<1024*1024||
+    maxBytes>220*1024*1024)
+  throw Error('Límite ZIP local inválido');
  if(!Array.isArray(entries)||!entries.length||entries.length>33)
   throw Error('Cantidad de archivos ZIP fuera del límite');
  const encoder=new TextEncoder(),localParts=[],centralParts=[];
@@ -42,8 +45,8 @@ async function crearZipSinCompresion(entries,{progress=()=>{}}={}){
    throw Error('Archivo ZIP demasiado grande');
   total+=blob.size;
   // Proteger la sesión del operador frente a pedidos muy pesados.
-  if(total>160*1024*1024)
-   throw Error('Este pedido supera 160 MiB: descargá los originales por separado');
+  if(total>maxBytes)
+   throw Error('El paquete excede el límite seguro de ZIP local; descargá los originales por separado');
   const crc=await crc32Blob(blob);
   const local=new Uint8Array(30+bytes.length),lh=new DataView(local.buffer);
   zip32(lh,0,0x04034b50);zip16(lh,4,20);zip16(lh,6,0x0800);
