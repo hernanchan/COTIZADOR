@@ -2,7 +2,24 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
-import {paginaR2PreprensaPersonal} from '../integraciones/autocotizador/recepcion/pantalla-r2-preprensa-personal.mjs';
+// Esta página incorpora scripts .txt mediante esbuild (text loader) en Workers.
+// Node no importa .txt; evaluar la plantilla con sus scripts como cadenas
+// conserva la misma página y permite comprobar la sintaxis resultante.
+const base='../integraciones/autocotizador/recepcion/';
+const read=name=>readFileSync(new URL(base+name,import.meta.url),'utf8');
+const source=read('pantalla-r2-preprensa-personal.mjs');
+const injected=[
+ "const zipJs="+JSON.stringify(read('zip-tus-cliente.txt'))+";",
+ "const pdfOrdenJs="+JSON.stringify(read('pdf-orden-tus-cliente.txt'))+";",
+ "const pdfHojaR2Js="+JSON.stringify(read('pdf-hoja-r2-preprensa.txt'))+";"
+].join('\n');
+const script=injected+'\n'+source.replace(/^import .*?;\s*$/gm,'')
+ .replace('export function paginaR2PreprensaPersonal(){',
+ 'function paginaR2PreprensaPersonal(){')+
+ '\nglobalThis.paginaR2PreprensaPersonal=paginaR2PreprensaPersonal;';
+const ctx=vm.createContext({});
+vm.runInContext(script,ctx);
+const paginaR2PreprensaPersonal=ctx.paginaR2PreprensaPersonal;
 
 test('Mostrador: página R2 advierte de preprensa, no libera producción ni pagos',()=>{
  const html=paginaR2PreprensaPersonal();
