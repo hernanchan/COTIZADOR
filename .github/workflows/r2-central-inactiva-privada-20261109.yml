@@ -83,7 +83,7 @@ jobs:
           for id in "$old" "$candidate"; do
             curl -fsS --max-time 25 -H "$auth" "$root/versions/$id" > "$dir/$id.json"
             jq -e --arg id "$id" '.success==true and .result.id==$id and (.result.resources.bindings|type=="array")' "$dir/$id.json" >/dev/null
-            jq -S '[.result.resources.bindings[]|if .type=="secret_text" then {name,type} else . end]|sort_by(.name)' "$dir/$id-bindings"
+            jq -S '[.result.resources.bindings[]|if .type=="secret_text" then {name,type} else . end]|sort_by(.name)' "$dir/$id.json" > "$dir/$id-bindings"
           done
           cmp -s "$dir/$old-bindings" "$dir/$candidate-bindings" || { echo "CENTRAL_CANDIDATE_BINDINGS_DIFFER"; exit 1; }
           curl -fsS --max-time 25 -H "$auth" "$root/deployments" > "$dir/after.json"
