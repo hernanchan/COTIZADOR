@@ -2296,7 +2296,9 @@ export default {
        comprobarPagoCentral:async(orderId,meta)=>{
         // Histórico primero; universal sólo como segunda comprobación
         // HMAC exacta. Ninguna sesión ni bandera del navegador acredita pago.
-        const classic=await comprobarPagoR2EnCentral({env,orderId,meta});
+        let classic=null;
+        if(env.DOCS_R2_POSTPAY_REQUIRED==='PRIVATE_TEST_ONLY')
+         classic=await comprobarPagoR2EnCentral({env,orderId,meta});
         if(classic)return classic;
         if(env.DOCS_R2_UNIVERSAL_POSTPAY_ENABLED!=='PRIVATE_TEST_ONLY')
          return null;
