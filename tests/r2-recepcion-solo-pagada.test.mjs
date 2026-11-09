@@ -35,7 +35,8 @@ function fixtures(){
  };
  const env={DOCS_R2_POSTPAY_REQUIRED:'PRIVATE_TEST_ONLY',
   DOCS_R2_BIG_ENABLED:'PRIVATE_TEST_ONLY',
-  DOCS_R2_QUOTA_ENABLED:'PRIVATE_TEST_ONLY',DOCS_R2_RECEIPT_KEY:sec,
+  DOCS_R2_QUOTA_ENABLED:'PRIVATE_TEST_ONLY',
+  DOCS_R2_STAGING_ENABLED:'PRIVATE_TEST_ONLY',DOCS_R2_RECEIPT_KEY:sec,
   SABER_R2_GRANDES:bucket};
  const deps={now,subtle:webcrypto.subtle,
   autorizadoIniciar:async()=>true,autorizadoOrden:async()=>true,
