@@ -1629,8 +1629,17 @@ async function centralUpdateProduction(req,env,ctx){
      .catch(()=>{}));
   }catch{cleanup={state:'error',filesDeleted:0}}
  }
+ let cleanupR2=null;
+ if(d.to==='entregado'){
+  try{
+   const {encolarBorradoR2Entregado,ejecutarBorradoR2Entregado}=await import("./r2-borrado-entregado-central.mjs");
+   cleanupR2=await encolarBorradoR2Entregado(env,d.order_id,d.version+1);
+   if(cleanupR2.state==='pending')
+    cleanupR2=await ejecutarBorradoR2Entregado(env,d.order_id);
+  }catch{cleanupR2={state:'error',filesDeleted:0}}
+ }
  const current=await centralProductionDetail(env,d.order_id);
- return json({saved:true,production:current,cleanup,productionAuthorized:false});
+ return json({saved:true,production:current,cleanup,cleanupR2,productionAuthorized:false});
 }
 
 
@@ -3316,12 +3325,17 @@ async function moveCard(order,next,button){
  button.disabled=true;
  if(feedback)feedback.textContent="Guardando cambio de estado…";
  try{
-  await apiPost("/admin/api/central/production-status",{
+  const updated=await apiPost("/admin/api/central/production-status",{
    order_id:order.id,from:order.production_state,to:next,
    version:order.production_version,operator,reason,confirmed:next==="listo"||next==="entregado"
   });
   await refresh({silent:true,force:true});
   status.textContent="Orden "+(order.work_number||"")+" → "+productionLabel(next)+" · cambio registrado.";
+  if(next==="entregado"&&updated.cleanupR2&&
+     !["no_elegible","desactivado"].includes(updated.cleanupR2.state))
+   status.textContent+=" · Limpieza R2: "+(
+    updated.cleanupR2.state==="deleted"?"original eliminado y auditado":
+    "PENDIENTE o ERROR; verificar antes de dar por eliminado");
   if(next==="en_preparacion")status.textContent+=" · Definí la hora de retiro desde el detalle del pedido.";
  }catch(e){
   inform("No se pudo cambiar el estado: "+String(e.message||e));
@@ -4409,6 +4423,9 @@ export default {
  async scheduled(event,env,ctx){
   ctx.waitUntil(runScheduledReconciliation(env).catch(e=>console.error("Scheduled payment sync failed",String(e?.message||"unknown").slice(0,120))));
   ctx.waitUntil(centralProcessTUSPurgeQueue(env).catch(()=>{}));
+  if(env.CENTRAL_R2_PURGE_EXECUTE_ENABLED==='PRIVATE_TEST_ONLY')
+   ctx.waitUntil(import("./r2-borrado-entregado-central.mjs")
+    .then(({reintentarBorradosR2})=>reintentarBorradosR2(env)).catch(()=>{}));
  },
  async fetch(req,env,ctx){
   const url=new URL(req.url);
