@@ -1,4 +1,4 @@
-name: Saber R2 - lectura staff D1 por rangos 8MiB SOLO pruebas
+name: Saber R2 - habilitar pagina personal R2 SOLO privados
 on:
   push:
     branches: [integracion/tus-pedido-privado-20261101]
@@ -33,6 +33,7 @@ jobs:
           npm run build:unificado
           node --check dist/saber-documentos-cotizador-fase4.mjs
           grep -Fq '/prueba-v2/api/ensayo-r2-referencia-personal' dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq '/prueba-v2/r2-preprensa-personal' dist/saber-documentos-cotizador-fase4.mjs
           echo 'DOCS_BUILD_TEST_OK'
       - name: Stage, deploy privado seguro y consultar checkout exacto; rollback automatico
         shell: bash
@@ -50,7 +51,7 @@ jobs:
           tmp=$(mktemp -d)
           chmod 700 "$tmp"
           modified=0
-          baseline='48bd6e99-a877-439d-a3f0-c9208db2448c'
+          baseline='e077b84c-dab3-4640-b740-bd6dfb84b356'
           cleanup(){
             rc=$?
             trap - EXIT
@@ -116,6 +117,8 @@ jobs:
             -H "Origin: $base" -H 'Content-Type: application/json' \
             -X POST --data '{}' "$base/prueba-v2/api/ensayo-r2-referencia-personal")" = 403
           echo 'STAFF_R2_ENDPOINT_REJECTS_UNAUTHENTICATED'
+          test "$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$base/prueba-v2/r2-preprensa-personal")" = 401
+          echo 'STAFF_R2_DOWNLOAD_PAGE_REJECTS_UNAUTHENTICATED'
           refpayload='{"webOrderId":"WEB-ENSAYO-255BFE122477AC6C7666EB6D342707FE","fileId":"planoA1","sha256":"68efbfed36babb0b76d3cf98d547d94b2af00af4dcbbd619d04f1c9f7fa13ee5","bytes":62915011}'
           httpref=$(curl -sS --max-time 85 -u "operador:$PASSWORD" \
             -H "Origin: $base" -H 'Content-Type: application/json' \
