@@ -47,7 +47,7 @@ jobs:
           base="https://saber-pagos-pruebas.libreriasaber.workers.dev"
           docs="https://saber-documentos-pruebas.libreriasaber.workers.dev"
           auth="Authorization: Bearer $TOKEN"
-          baseline='d64accd9-9f05-4e0a-acf8-f47e0741c15d'
+          baseline='f4554595-ea33-4813-a2d8-21bf1b991959'
           tmp=$(mktemp -d)
           chmod 700 "$tmp"
           modified=0
