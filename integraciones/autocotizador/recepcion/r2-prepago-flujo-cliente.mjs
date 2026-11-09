@@ -133,9 +133,9 @@ export function crearFlujoR2PagoAntesDeCarga({
     if(typeof data.seguimientoUrl==='string'){
      const u=new URL(data.seguimientoUrl);
      if(u.protocol!=='https:'||
-        !/^saber-pagos-pruebas\\.[a-z0-9-]+\\.workers\\.dev$/.test(u.hostname)||
+        !/^saber-pagos-pruebas\.[a-z0-9-]+\.workers\.dev$/.test(u.hostname)||
         u.pathname!=='/seguimiento'||u.searchParams.size!==1||
-        !/^[a-f0-9-]{36}\\.[a-f0-9]{64}$/.test(u.searchParams.get('token')||''))
+        !/^[a-f0-9-]{36}\.[a-f0-9]{64}$/.test(u.searchParams.get('token')||''))
       throw Error('PREPAGO_SEGUIMIENTO_NO_CONFIABLE');
      seguimientoUrl=u.href;
     }

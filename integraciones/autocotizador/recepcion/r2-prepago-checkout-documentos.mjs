@@ -88,7 +88,7 @@ export async function checkoutR2PrepaidSandboxDocumentos(request,env,{
      !HOST.test(u.hostname)||u.pathname!=='/seguimiento'||
      u.username||u.password||u.hash||u.port||
      [...u.searchParams.keys()].join(',')!=='token'||
-     !/^[a-f0-9-]{36}\\.[a-f0-9]{64}$/.test(u.searchParams.get('token')||''))
+     !/^[a-f0-9-]{36}\.[a-f0-9]{64}$/.test(u.searchParams.get('token')||''))
     return reply({ok:false,error:'R2_SEGUIMIENTO_CENTRAL_INVALIDO'},502);
  }
  if(p.action==='start'){
