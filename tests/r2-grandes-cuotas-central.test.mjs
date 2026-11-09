@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {DatabaseSync} from 'node:sqlite';
 import {webcrypto,createHmac} from 'node:crypto';
 import {validarSolicitudCupoR2,R2_QUOTA_LIMITS,reservarCupoR2Central}
  from '../integraciones/mercadopago/pruebas/r2-grandes-cuotas-central.mjs';
@@ -153,4 +154,35 @@ test('Documentos: rechazo de cuota no filtra mensajes D1 ni secretos',async()=>{
  await assert.rejects(reservarR2GrandeAntesDeSubir({
   ...opts,service:{fetch:async()=>Response.json({error:'token SECRET'}, {status:502})}
  }),/R2_CUPO_RECHAZADO_CENTRAL_ERROR_502/);
+});
+
+test('SQLite real: reserva atómica valida sintaxis, admite 60 MiB y evita repetición',async()=>{
+ const sqlite=new DatabaseSync(':memory:');
+ const driver={prepare(sql){
+  const prepared=sqlite.prepare(sql);
+  return {
+   run:async()=>{const r=prepared.run();return {meta:{changes:Number(r.changes)}}},
+   bind:(...args)=>({
+    first:async()=>prepared.get(...args)||null,
+    run:async()=>{const r=prepared.run(...args);return {meta:{changes:Number(r.changes)}}}
+   })
+  };
+ }};
+ const env={CENTRAL_R2_QUOTA_ENABLED:'PRIVATE_TEST_ONLY',DB:driver};
+ const signedPayload=p(ORDER,'archivoA1',ID,60*MIB+711);
+ const send=()=>reservarCupoR2Central(new Request('https://saber-pagos-pruebas.libreriasaber.workers.dev/internal/central/r2-reserve',{method:'POST',
+  headers:{'Content-Type':'application/json'},body:JSON.stringify(signedPayload)}),
+  env,{readSigned:async req=>({payload:await req.json()})});
+ const first=await send(),r1=await first.json();
+ assert.equal(first.status,201,JSON.stringify(r1));
+ assert.equal(r1.reserved,true);
+ assert.equal(r1.quotaGranted,true);
+ const second=await send(),r2=await second.json();
+ assert.equal(second.status,200,JSON.stringify(r2));
+ assert.equal(r2.idempotent,true);
+ const entries=sqlite.prepare('SELECT object_key,state,bytes FROM central_r2_large_reservations').all();
+ assert.equal(entries.length,1);
+ assert.equal(entries[0].state,'reserved');
+ assert.equal(entries[0].bytes,60*MIB+711);
+ sqlite.close();
 });
