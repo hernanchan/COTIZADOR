@@ -206,7 +206,7 @@ test('La Central muestra original R2 pagado en revisión sin habilitar producci�
  assert.ok(card.children.some(e=>String(e.textContent).includes('No habilitado para impresión')));
  const link=card.children.find(e=>e.tagName==='a');
  assert.ok(link,'el original recibido debe tener enlace privado al mostrador');
- assert.match(String(link.href),/saber-documentos-pruebas\\.libreriasaber\\.workers\\.dev\\/prueba-v2\\/r2-preprensa-personal/);
+ assert.ok(String(link.href).includes('saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/r2-preprensa-personal'));
  assert.match(String(link.href),/receiptId=DOC-/);
  assert.equal(link.target,'_blank');
  assert.match(String(x.elements.get('#status').textContent),/ploteo/);
