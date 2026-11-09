@@ -27,7 +27,7 @@ class Element{
 function scene({promptValue='Responsable del mostrador',failCode=null,stage='pendiente',timeSaveError=null}={}){
  const elements=new Map();
  for(const id of ['secret','productionOperator','status','details','orders',
-  'refreshExpress','refreshReceipts','refreshTransfers','refreshUnpaid','refresh',
+  'refreshExpress','refreshReceipts','refreshR2Paid','r2PaidReview','refreshTransfers','refreshUnpaid','refresh',
   'etaStatus','etaHours','etaCapacity','etaLoad','etaSave',
   'deliveryPlanMode','deliveryPlanSave','deliveryPlanLoad','deliveryPlanStatus',
   'etaCalendarStatus','etaCalendarLoad','etaCalendarSave','etaCalendarWeekdayDraft',
@@ -58,6 +58,14 @@ function scene({promptValue='Responsable del mostrador',failCode=null,stage='pen
   setInterval:()=>1,
   prompt(){return promptValue},confirm(){return true},
   async fetch(path,opts={}){
+   if(path==='/admin/api/central/r2-paid-review')
+    return {ok:true,json:async()=>({orders:[{
+      webOrderId:'WEB-ENSAYO-255BFE122477AC6C7666EB6D342707FE',
+      commercialOrderId:orderId,amountArs:4400,expectedBytes:62915011,
+      declaredPages:1,estado:'RECIBIDO_PENDIENTE_PREPRENSA',
+      receiptId:'DOC-12345678-1234-4123-8123-123456789abc',
+      readyForPrinting:false,productionAuthorized:false
+    }]})};
    if(path==='/admin/api/orders')
     return {ok:true,json:async()=>({orders:[{...order}]})};
    if(path==='/admin/api/central/preparation-estimate'){
@@ -183,4 +191,18 @@ test('hora vacía y errores de D1 se muestran junto al botón',async()=>{
  assert.match(feedback.textContent,/La estimación cambió en otro puesto/);
  assert.equal(editor.hidden,false,'ante error, el editor permanece abierto');
  assert.equal(save.disabled,false);
+});
+
+test('La Central muestra original R2 pagado en revisión sin habilitar producción ni confundirlo con ZIP',async()=>{
+ const x=scene();
+ const button=x.elements.get('#refreshR2Paid');
+ assert.equal(typeof button.listeners.click,'function');
+ await button.listeners.click();
+ const list=x.elements.get('#r2PaidReview');
+ assert.equal(list.children.length,1);
+ const card=list.children[0];
+ assert.match(card.textContent,/Original recibido/);
+ assert.ok(card.children.some(e=>String(e.textContent).includes('Pedido comercial:')));
+ assert.ok(card.children.some(e=>String(e.textContent).includes('No habilitado para impresión')));
+ assert.match(String(x.elements.get('#status').textContent),/ploteo/);
 });
