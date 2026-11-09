@@ -61,6 +61,7 @@ import {checkoutR2PrepaidSandboxDocumentos} from './r2-prepago-checkout-document
 import {descargarR2GrandePersonal} from './r2-pdf-grandes-descarga-personal.mjs';
 import {descargarR2PendientePorD1Personal} from './r2-pdf-descarga-d1-personal.mjs';
 import {resolverReferenciaR2Personal} from './r2-referencia-personal.mjs';
+import {paginaR2PreprensaPersonal} from './pantalla-r2-preprensa-personal.mjs';
 /**
  * SABER — DOCUMENTOS — ARCHIVO ÚNICO LISTO PARA PEGAR EN CLOUDFLARE
  *
@@ -1915,7 +1916,8 @@ async function v2PrivateBrowserResponse(request,env,path,{buyer=false}={}){
   await autorizadoPedidoCliente(request,env);
  const status=v2PrivateBrowserAuthorized(request,env);
  if(status==='off'&&!buyerOK)return testResponse({ok:false,error:'Ensayo privado deshabilitado'},503);
- const allowMobile=path!=='/prueba-v2/orden-paquete'&&
+ const allowMobile=path!=='/prueba-v2/r2-preprensa-personal'&&
+  path!=='/prueba-v2/orden-paquete'&&
   path!=='/prueba-v2/personal-descargar'&&
   status==='deny'&&await v2SessionAuthorized(request,env);
  if(status==='deny'&&!allowMobile&&!buyerOK)return new Response('Autenticación privada requerida',{
@@ -1937,6 +1939,15 @@ async function v2PrivateBrowserResponse(request,env,path,{buyer=false}={}){
      'Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src https: data:; connect-src 'self' https:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
     }
    });
+  }
+  if(path==='/prueba-v2/r2-preprensa-personal'){
+   if(env?.DOCS_R2_BIG_ENABLED!=='PRIVATE_TEST_ONLY'||
+      env?.DOCS_R2_STAGING_ENABLED!=='PRIVATE_TEST_ONLY')
+    return testResponse({ok:false,error:'Preprensa R2 privada no habilitada'},503);
+   return new Response(paginaR2PreprensaPersonal(),{status:200,headers:{
+    ...headers,'Content-Type':'text/html; charset=utf-8',
+    'Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+   }});
   }
   if(path==='/prueba-v2/orden-paquete'){
    if(!tusPrivadoConfigurado(env))
@@ -2113,7 +2124,7 @@ export default {
     if(page==='/prueba-v2/ingresar')return v2MobileInviteExchange(request,env);
     if(page==='/prueba-v2/admin-tarifario-ensayo')
       return probeTarifarioD1SoloOperador(request,env);
-    if(page==='/prueba-v2/'||page==='/prueba-v2/orden-paquete'||page==='/prueba-v2/personal-descargar'||page==='/prueba-v2/cotizador'||
+    if(page==='/prueba-v2/'||page==='/prueba-v2/r2-preprensa-personal'||page==='/prueba-v2/orden-paquete'||page==='/prueba-v2/personal-descargar'||page==='/prueba-v2/cotizador'||
        page==='/prueba-v2/carga-inteligente'||
        page==='/prueba-v2/carga-inteligente.js'||
        page==='/prueba-v2/precios-web.json'||
