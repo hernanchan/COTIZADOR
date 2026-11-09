@@ -90,6 +90,7 @@ async function fixture({paid=true,altered=false}={}){
    throw Error('Unexpected first '+sql);
   }
  }},async batch(cmds){
+  console.log('TUS_BATCH_MOCK',cmds.map(c=>c.sql.slice(0,100)),cmds.length);
   assert.equal(cmds.length,2);
   assert.match(cmds[0].sql,/INSERT INTO central_r2_universal_tus_receipts/);
   assert.match(cmds[1].sql,/UPDATE central_r2_universal_files SET received=1/);
