@@ -45,7 +45,8 @@ const creds=[
  ['SABER_CENTRAL_DEMO_ADMIN_KEY',process.env.SABER_CENTRAL_DEMO_ADMIN_KEY],
  ['DEMO_ADMIN_KEY',process.env.DEMO_ADMIN_KEY],
  ['SABER_CENTRAL_ADMIN_KEY',process.env.SABER_CENTRAL_ADMIN_KEY],
- ['SABER_DOCS_CENTRAL_ADMIN_KEY',process.env.SABER_DOCS_CENTRAL_ADMIN_KEY]
+ ['SABER_DOCS_CENTRAL_ADMIN_KEY',process.env.SABER_DOCS_CENTRAL_ADMIN_KEY],
+ ['SABER_V2_OPERATOR_PASSWORD',pass]
 ].filter(([_,secret])=>typeof secret==='string'&&secret);
 let authorization=null,reviews;
 for(const [label,key] of creds){
