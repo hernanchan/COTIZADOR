@@ -57,6 +57,8 @@ import {tusPrivadoConfigurado,diagnosticarTUSPrivado,comprobarTUSAntesDeEnviar,i
 import {manejarR2GrandePrivado} from './r2-pdf-grandes-api-privada.mjs';
 import {comprobarPagoR2EnCentral} from './r2-confirmar-pago-central.mjs';
 import {comprobarPagoUniversalR2EnCentral} from './r2-universal-confirmar-pago-central.mjs';
+import {enviarPreRecepcionR2Central} from './r2-grandes-enviar-central.mjs';
+import {registrarOriginalUniversalR2} from './r2-universal-recibido-documentos.mjs';
 import {prepararR2PagoSinArchivo} from './r2-prepago-documentos.mjs';
 import {cotizarPlanUniversalSinSubida} from './r2-plan-universal-api-privada.mjs';
 import {guardarBorradorUniversal} from './r2-borrador-universal-documentos.mjs';
@@ -2291,6 +2293,13 @@ export default {
       const staff=basic||await v2SessionAuthorized(request,env);
       const buyer=!staff&&await autorizadoPedidoCliente(request,env);
       return manejarR2GrandePrivado(request,env,{
+       stage:async args=>{
+        const staged=await enviarPreRecepcionR2Central(args);
+        if(staged.stagedForCentral!==true)return staged;
+        if(env.DOCS_R2_UNIVERSAL_POSTPAY_ENABLED==='PRIVATE_TEST_ONLY')
+         await registrarOriginalUniversalR2(args);
+        return staged;
+       },
        // Solo el pago concilado por Central y ligado al SHA-256/bytes
        // autoriza la subida. Basic del operador NO saltea esta barrera.
        comprobarPagoCentral:async(orderId,meta)=>{
