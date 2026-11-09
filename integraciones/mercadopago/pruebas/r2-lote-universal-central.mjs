@@ -133,7 +133,7 @@ export async function listarFichasR2Universales(request,env,{authorized=false}={
   if(d.state!=='draft_not_payable'||!UUID.test(d.draft_id||'')||
      !WEB.test(d.web_order_id||''))continue;
   const files=await db.prepare('SELECT file_id,ordinal,name,sha256,bytes,transport,'+
-   'service,work_json,status FROM central_r2_universal_files '+
+   'service,work_json,received FROM central_r2_universal_files '+
    'WHERE web_order_id=? ORDER BY ordinal ASC').bind(d.web_order_id).all()
    .catch(()=>({results:[]}));
   const lines=(files.results||[]).map(x=>{
@@ -141,7 +141,7 @@ export async function listarFichasR2Universales(request,env,{authorized=false}={
    if(!w||w.fileId!==x.file_id||w.nombre!==x.name||
       w.bytes!==x.bytes||w.sha256!==x.sha256||
       w.transporte!==x.transport||w.destino!==x.service||
-      w.indice!==x.ordinal||x.status!=='not_received')
+      w.indice!==x.ordinal||x.received!==0)
     return null;
    return {...w,originalRecibido:false,integridadVerificada:false,preprensaAprobada:false};
   });

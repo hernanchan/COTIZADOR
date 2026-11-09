@@ -131,7 +131,7 @@ test('lectura de Central: sólo personal, ficha con tres trabajos y sin autoriza
    if(sql.includes('FROM central_r2_universal_files'))return {results:q.archivos.map((x,i)=>({
     file_id:x.fileId,ordinal:i,name:x.nombre,sha256:x.sha256,bytes:x.bytes,
     transport:x.transporte,service:x.destino,work_json:JSON.stringify(x),
-    status:'not_received'}))};
+    received:0}))};
    throw Error('Consulta no simulada');
   }};
  }};
