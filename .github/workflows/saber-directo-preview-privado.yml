@@ -161,13 +161,13 @@ jobs:
           grep -Fq 'id="smart"' "$workdir/cotizador.html" && grep -Fq 'send-all-pdf' "$workdir/cotizador.html" || { echo "COTIZADOR_REGRESSION"; exit 1; }
           # Nueva vista de sólo lectura: 200 sin clave; sin cookies ni scripts de venta.
           verify_release_html "$workdir/libre.html" "$origin/prueba-v2/diseno-sin-clave" 'Los artículos y los trabajos de impresión se consultan por separado.' || { echo "OPEN_PREVIEW_VERSION_UNVERIFIED"; exit 1; }
-          grep -Fq 'VISTA DE DISEÑO · SIN CONTRASEÑA' "$workdir/libre.html" || { echo "OPEN_PREVIEW_BANNER_MISSING"; exit 1; }
+          grep -Eq 'VISTA DE (DISEÑO · SIN CONTRASEÑA|PRUEBAS)' "$workdir/libre.html" || { echo "OPEN_PREVIEW_BANNER_MISSING"; exit 1; }
           grep -Fq 'class="hero hero-direct"' "$workdir/libre.html" || { echo "OPEN_PREVIEW_VISUAL_MISSING"; exit 1; }
           for forbidden in 'localStorage' 'sendWhatsApp' 'libreriasaber.mp' '20-22792046' 'productsCsvUrl'; do
             if grep -Fq "$forbidden" "$workdir/libre.html"; then echo "PUBLIC_PREVIEW_SENSITIVE_MARKER=$forbidden"; exit 1; fi
           done
           verify_get 200 "$workdir/libre-offers.html" "$origin/prueba-v2/diseno-sin-clave/ofertas.html" || { echo "OPEN_OFFERS_NOT_200"; exit 1; }
-          grep -Fq 'SIN CONTRASEÑA' "$workdir/libre-offers.html" || { echo "OPEN_OFFERS_BANNER_MISSING"; exit 1; }
+          grep -Eq 'VISTA DE (DISEÑO · SIN CONTRASEÑA|PRUEBAS)' "$workdir/libre-offers.html" || { echo "OPEN_OFFERS_BANNER_MISSING"; exit 1; }
           # Revisión real de la fuente pública: permitir publicación solo si el
           # Worker puede leer Google Sheets y devolver precios, sin datos privados.
           verify_get 200 "$workdir/catalogo.json" "$origin/prueba-v2/diseno-sin-clave/catalogo.json" || { echo "CATALOGO_DINAMICO_NO_DISPONIBLE"; jq -r '.diagnostic // .error // "Sin detalle"' "$workdir/catalogo.json" || true; exit 1; }
