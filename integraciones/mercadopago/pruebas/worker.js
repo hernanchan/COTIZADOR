@@ -4685,7 +4685,11 @@ export default {
       trackingLink: id=>trackingUrl(env,id,req.url)
     });
    }
-   if(url.pathname==="/internal/central/r2-universal-draft"){
+   if(url.pathname==="/internal/central/r2-universal-order"){
+     const {promoverPedidoUniversalD1}=await import("./r2-universal-order-central.mjs");
+     return await promoverPedidoUniversalD1(req,env,{readSigned:centralReadSigned});
+    }
+    if(url.pathname==="/internal/central/r2-universal-draft"){
      const {registrarFichaUniversalD1}=await import("./r2-lote-universal-central.mjs");
      return await registrarFichaUniversalD1(req,env,{readSigned:centralReadSigned});
     }
@@ -5064,7 +5068,9 @@ export default {
     // La prohibición de cobro depende de los trabajos, NO de una descripción:
     // un carrito mixto o un cambio de título nunca puede eludirla.
     await ensureOrderItems(env);
-    const restricted=await env.DB.prepare("SELECT sku FROM order_items WHERE order_id=? AND sku IN ('DOCS_VERIFIED','POLAROID_EXPRESS_A4','R2_PREPAID_PLOT') ORDER BY CASE WHEN sku='POLAROID_EXPRESS_A4' THEN 0 WHEN sku='R2_PREPAID_PLOT' THEN 1 ELSE 2 END LIMIT 1").bind(orderId).first();
+    const restricted=await env.DB.prepare("SELECT sku FROM order_items WHERE order_id=? AND sku IN ('DOCS_VERIFIED','POLAROID_EXPRESS_A4','R2_PREPAID_PLOT','PDF_UNIVERSAL_PREPAID') ORDER BY CASE WHEN sku='POLAROID_EXPRESS_A4' THEN 0 WHEN sku='R2_PREPAID_PLOT' THEN 1 ELSE 2 END LIMIT 1").bind(orderId).first();
+    if(restricted?.sku==="PDF_UNIVERSAL_PREPAID")
+     return json({error:"Pedido universal aún no habilitado para pagar: falta recepción mixta verificada"},503);
     if(restricted?.sku==="POLAROID_EXPRESS_A4")return json({error:"Cobro de Polaroids Express todavía deshabilitado"},503);
      if(restricted?.sku==="R2_PREPAID_PLOT"){
       if(env.CENTRAL_R2_PREPAY_CHECKOUT_ENABLED!=="PRIVATE_TEST_ONLY"||
