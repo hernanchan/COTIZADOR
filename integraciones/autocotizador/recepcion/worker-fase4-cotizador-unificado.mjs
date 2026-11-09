@@ -63,6 +63,7 @@ import {prepararR2PagoSinArchivo} from './r2-prepago-documentos.mjs';
 import {cotizarPlanUniversalSinSubida} from './r2-plan-universal-api-privada.mjs';
 import {guardarBorradorUniversal} from './r2-borrador-universal-documentos.mjs';
 import {prepararOrdenUniversalSinCheckout} from './r2-orden-universal-documentos.mjs';
+import {iniciarLoteTUSUniversal,confirmarLoteTUSUniversal} from './tus-universal-worker.mjs';
 import {pagoSandboxUniversalDocumentos} from './r2-universal-checkout-documentos.mjs';
 import {checkoutR2PrepaidSandboxDocumentos} from './r2-prepago-checkout-documentos.mjs';
 import {descargarR2GrandePersonal} from './r2-pdf-grandes-descarga-personal.mjs';
@@ -2324,6 +2325,18 @@ export default {
        vincularOrden:async orderId=>buyer?
         cookiePedidoClienteVinculado(request,env,orderId):null
       });
+    }
+    if(page==='/prueba-v2/api/ensayo-tus-universal-iniciar'||
+       page==='/prueba-v2/api/ensayo-tus-universal-confirmar'){
+      const staff=v2PrivateBrowserAuthorized(request,env)==='allow'||
+       await v2SessionAuthorized(request,env);
+      const buyer=!staff&&await autorizadoPedidoCliente(request,env);
+      const body=buyer?await request.clone().json().catch(()=>null):null;
+      const belongs=buyer&&await autorizadoPedidoClienteVinculado(request,env,body?.orderId);
+      const authorized=staff||belongs;
+      return page.endsWith('-iniciar')?
+       iniciarLoteTUSUniversal(request,env,{authorized}):
+       confirmarLoteTUSUniversal(request,env,{authorized});
     }
     // V1 TUS: solo entorno privado y autorizado, nunca comercial ni pagos.
     // Ficha D1 para el ZIP, estrictamente Basic del operador.
