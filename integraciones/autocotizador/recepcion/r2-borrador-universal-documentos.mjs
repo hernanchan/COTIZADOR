@@ -31,8 +31,9 @@ export async function guardarBorradorUniversal(request,env,{
  const hash=hex(new Uint8Array(await subtle.digest('SHA-256',
    new TextEncoder().encode(JSON.stringify(ficha)))));
  const body=JSON.stringify({...ficha,quoteHash:hash});
- // La Central requiere HMAC de <=32k; bloquear, nunca truncar instrucciones.
- if(body.length>31000)return reply({ok:false,error:'UNIVERSAL_FICHA_DEMASIADO_GRANDE'},413);
+ // El manifiesto universal tiene límite HMAC privado especial de 512k;
+ // bloquear sin truncar instrucciones ni ampliar el límite de otras rutas.
+ if(body.length>500000)return reply({ok:false,error:'UNIVERSAL_FICHA_DEMASIADO_GRANDE'},413);
  let target;try{target=new URL(env.CENTRAL_TEST_URL)}catch{}
  if(!target||target.protocol!=='https:'||!HOST.test(target.hostname)||
     target.pathname!=='/internal/central/stage'||target.port||

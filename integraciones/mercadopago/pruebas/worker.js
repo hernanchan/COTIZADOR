@@ -219,7 +219,9 @@ async function centralReadSigned(req,env){
     Math.abs(Math.floor(Date.now()/1000)-Number(ts))>300)
   return {error:"Firma o tiempo de solicitud inválidos",status:401};
  const raw=await req.text();
- if(raw.length<10||raw.length>32000)
+ const maxSignedChars=new URL(req.url).pathname==="/internal/central/r2-universal-draft"
+  ?512000:32000;
+ if(raw.length<10||raw.length>maxSignedChars)
   return {error:"Tamaño de manifiesto no permitido",status:413};
  const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(env.CENTRAL_BRIDGE_KEY),
   {name:"HMAC",hash:"SHA-256"},false,["sign"]);
