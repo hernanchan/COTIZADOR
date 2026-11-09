@@ -8,7 +8,7 @@ const web='WEB-ENSAYO-255BFE122477AC6C7666EB6D342707FE';
 const receipt='DOC-12345678-1234-4123-8123-123456789abc';
 const key='r2-v1/'+web+'/12345678-1234-4123-8123-123456789abc.pdf';
 const sha='a'.repeat(64),etag='abc1234efgh567890';
-function fixture({delivered=true,paid=true,receiptBytes=62915011,bucketBytes=62915011}={}){
+function fixture({delivered=true,paid=true,receiptBytes=62915011,bucketBytes=62915011,createdAt='2026-11-09 13:00:00'}={}){
  const sql=new DatabaseSync(':memory:');
  sql.exec("PRAGMA foreign_keys=OFF;"+
   "CREATE TABLE orders(id TEXT,status TEXT,paid_at TEXT,amount_ars INTEGER,deposit_ars INTEGER);"+
@@ -21,7 +21,7 @@ function fixture({delivered=true,paid=true,receiptBytes=62915011,bucketBytes=629
  sql.prepare('INSERT INTO central_production_status VALUES(?,?,?)').run(id,delivered?'entregado':'listo',3);
  sql.prepare('INSERT INTO payment_reviews VALUES(?,?)').run(id,paid?'verified':'pending');
  sql.prepare('INSERT INTO central_r2_prepress_approvals VALUES(?,?,?,?,?)').run(id,receipt,sha,62915011,4400);
- sql.prepare('INSERT INTO central_r2_prepaid_intents VALUES(?,?,?,?)').run(id,web,'planoA1','2026-11-09 13:00:00');
+ sql.prepare('INSERT INTO central_r2_prepaid_intents VALUES(?,?,?,?)').run(id,web,'planoA1',createdAt);
  sql.prepare('INSERT INTO central_r2_large_pending VALUES(?,?,?,?,?,?,?)').run(web,'planoA1',receipt,key,sha,receiptBytes,etag);
  const db={prepare:q=>({st:sql.prepare(q),params:[],
   bind(...args){this.params=args;return this},
@@ -78,5 +78,70 @@ test('Flags apagados, ausencia de bucket y scope incorrecto mantienen originales
   delete f.env.SABER_R2_GRANDES;
   assert.equal((await ejecutarBorradoR2Entregado(f.env,id)).state,'desactivado');
   assert.equal(f.deleted,0);
+ }finally{f.sql.close()}
+});
+
+test('NEW_ORDERS_ONLY: R2 nuevo entregado borra UNA vez y conserva pago, aprobación y auditoría',async()=>{
+ const f=fixture();try{
+  f.env.CENTRAL_R2_PURGE_SCOPE='NEW_ORDERS_ONLY';
+  delete f.env.CENTRAL_R2_PURGE_CANARY_ORDER;
+  assert.equal((await encolarBorradoR2Entregado(f.env,id,3)).state,'pending');
+  assert.equal((await ejecutarBorradoR2Entregado(f.env,id)).state,'deleted');
+  assert.equal(f.deleted,1);
+  assert.equal(f.present,false);
+  assert.equal(f.sql.prepare('SELECT status FROM orders WHERE id=?').get(id).status,'paid');
+  assert.equal(f.sql.prepare('SELECT COUNT(*) AS c FROM central_r2_prepress_approvals').get().c,1);
+  assert.equal(f.sql.prepare('SELECT state FROM central_r2_purge_queue WHERE order_id=?').get(id).state,'deleted');
+  assert.deepEqual(f.sql.prepare('SELECT phase FROM central_r2_purge_audit ORDER BY id').all().map(x=>x.phase),
+   ['queued','attempt','deleted']);
+  assert.equal((await ejecutarBorradoR2Entregado(f.env,id)).filesDeleted,1);
+  assert.equal(f.deleted,1,'no intenta borrar dos veces el mismo archivo');
+ }finally{f.sql.close()}
+});
+test('NEW_ORDERS_ONLY: pedido anterior al corte no entra en borrado aunque esté entregado',async()=>{
+ const f=fixture({createdAt:'2026-11-08 23:59:59'});try{
+  f.env.CENTRAL_R2_PURGE_SCOPE='NEW_ORDERS_ONLY';
+  assert.equal((await encolarBorradoR2Entregado(f.env,id,3)).state,'no_elegible');
+  assert.equal((await ejecutarBorradoR2Entregado(f.env,id)).state,'sin_cola');
+  assert.equal(f.deleted,0);
+  assert.equal(f.present,true);
+ }finally{f.sql.close()}
+});
+test('R2: si HEAD transitorio falla queda error auditable y reintento lo borra',async()=>{
+ const f=fixture();try{
+  f.env.CENTRAL_R2_PURGE_SCOPE='NEW_ORDERS_ONLY';
+  let checks=0;
+  const original=f.bucket.head;
+  f.bucket.head=async k=>{
+   if(checks++===0)throw Error('TRANSIENT_R2_HEAD_UNAVAILABLE');
+   return original(k);
+  };
+  assert.equal((await encolarBorradoR2Entregado(f.env,id,3)).state,'pending');
+  const first=await ejecutarBorradoR2Entregado(f.env,id);
+  assert.equal(first.state,'error');
+  assert.equal(f.present,true);
+  assert.equal(f.deleted,0);
+  assert.equal(f.sql.prepare('SELECT state FROM central_r2_purge_queue').get().state,'error');
+  const retry=await reintentarBorradosR2(f.env);
+  assert.equal(retry.checked,1);
+  assert.equal(retry.deleted,1);
+  assert.equal(f.present,false);
+  assert.equal(f.deleted,1);
+  assert.deepEqual(f.sql.prepare('SELECT phase FROM central_r2_purge_audit ORDER BY id').all().map(x=>x.phase),
+   ['queued','attempt','error','attempt','deleted']);
+ }finally{f.sql.close()}
+});
+test('R2: entrega con hash o ETag de objeto distinto jamás elimina otro original',async()=>{
+ const f=fixture();try{
+  f.env.CENTRAL_R2_PURGE_SCOPE='NEW_ORDERS_ONLY';
+  assert.equal((await encolarBorradoR2Entregado(f.env,id,3)).state,'pending');
+  const original=f.bucket.head;
+  f.bucket.head=async k=>{
+   const x=await original(k);
+   return x?{...x,etag:'object-replaced-with-new-etag'}:x;
+  };
+  assert.equal((await ejecutarBorradoR2Entregado(f.env,id)).state,'error');
+  assert.equal(f.deleted,0);
+  assert.equal(f.present,true);
  }finally{f.sql.close()}
 });
