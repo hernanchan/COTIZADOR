@@ -8,10 +8,13 @@ on:
       - 'integraciones/autocotizador/pruebas/cotizar-ploteos-rapido.mjs'
       - 'integraciones/autocotizador/pruebas/ploteo-papel-cad-recubierto.test.mjs'
       - 'integraciones/autocotizador/recepcion/carga-unica-cliente.mjs'
+      - 'integraciones/autocotizador/recepcion/clasificar-ploteo-grande-visual-limitado.mjs'
+      - 'tests/ploteo-grande-visual-limitado.test.mjs'
       - 'integraciones/autocotizador/recepcion/ploteos-rapido-cliente.mjs'
   workflow_dispatch:
 permissions:
   contents: read
+  statuses: write
 jobs:
   regression:
     runs-on: ubuntu-latest
@@ -21,8 +24,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Test de tarifas y nombre de archivo
-        run: node --test integraciones/autocotizador/pruebas/ploteo-papel-cad-recubierto.test.mjs
+      - name: Test tarifas y PDF original 43,54 MiB sin leer ni subir el PDF
+        run: |
+          node --test integraciones/autocotizador/pruebas/ploteo-papel-cad-recubierto.test.mjs tests/ploteo-grande-visual-limitado.test.mjs tests/ploteo-deteccion-automatica-sin-opcion-cad.test.mjs tests/ploteo-grande-mosaico-raster-local.test.mjs
       - name: Compilar interfaces privadas sin desplegar
         working-directory: integraciones/autocotizador/recepcion
         run: |
@@ -35,3 +39,17 @@ jobs:
           grep -Fq 'Recubierto 130 g' carga-unica-cliente.txt
           grep -Fq 'Recubierto 130 g' ploteos-rapido-cliente.txt
           echo 'PAPEL_80_130_PRESENTE'
+
+      - name: Registrar resultado de clasificador sin despliegue
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          if [ "$RESULT" = success ]; then state=success; else state=failure; fi
+          jq -n --arg state "$state" --arg context "saber/plotter-multipagina-43mib" \
+            --arg description "Regresión y compilación privada PDF multipágina: $RESULT" \
+            --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/saber-plot-status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/saber-plot-status.json >/dev/null
