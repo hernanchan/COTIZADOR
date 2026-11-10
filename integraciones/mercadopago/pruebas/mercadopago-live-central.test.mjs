@@ -21,7 +21,7 @@ const order=()=>({
 });
 const response=x=>({ok:true,status:200,json:async()=>x});
 function fixture(){
- const o=order(),review={state:null};let attempts=0,posts=0;
+ const o=order(),review={state:null};let attempts=0,posts=0,transportType='tus';
  const lock=new Set(),attemptSet=new Set();
  const db={
   prepare(sql){let args=[];return {
@@ -39,7 +39,7 @@ function fixture(){
     },
     async all(){
      if(sql.includes('FROM order_items'))return {results:[{line_total_ars:4400,quantity:1,unit_price_ars:4400}]};
-     if(sql.includes('FROM central_r2_universal_files'))return {results:[{file_id:'pdf_0_abcdef',received:0}]};
+     if(sql.includes('FROM central_r2_universal_files'))return {results:[{file_id:'pdf_0_abcdef',received:0,transport:transportType}]};
      return {results:[]};
     },
     async run(){
@@ -95,7 +95,7 @@ function fixture(){
   commercialOrderId:ORDER,webOrderId:WEB
  }});
  return {env,db,o,payment,merchant,review,mpFetch,signed,
-  get posts(){return posts}};
+  setTransport(value){transportType=value},get posts(){return posts}};
 }
 async function signedWebhook(secret=envBase.MP_LIVE_WEBHOOK_SECRET){
  const ts=String(Math.floor(Date.now()/1000)),rid='qa-live-hmac-12345',id='123456';
@@ -319,4 +319,17 @@ test('carrera D1 que cancela el pedido NO registra review verified',async()=>{
  assert.equal(r.status,200);
  assert.equal((await r.json()).registered,false);
  assert.equal(f.review.state,null);
+});
+
+test('LIVE no emite checkout MP para PDF R2 con transporte sin habilitar',async()=>{
+ const f=fixture();f.setTransport('r2');let mpCalls=0;
+ const r=await checkoutMPLiveCentral(new Request(
+  'https://pagos.libreriasaber.com.ar/internal/central/live/checkout',
+  {method:'POST'}),{...f.env,CENTRAL_LIVE_R2_GATE:'NO_GO'},{
+   readSigned:f.signed,fetcher:async()=>{mpCalls++;throw Error('NO_MP')}
+  });
+ assert.equal(r.status,503);
+ assert.equal((await r.json()).error,'MP_LIVE_R2_NO_DISPONIBLE');
+ assert.equal(mpCalls,0);
+ assert.equal(f.posts,0);
 });
