@@ -51,7 +51,7 @@ test('puente de paquete firma solo metadatos y consulta Central productiva',asyn
  assert.equal(req.url,'https://pagos.libreriasaber.com.ar/internal/central/live/package-manifest');
  assert.equal(req.headers.has('Origin'),false);
  assert.equal(req.headers.get('x-saber-signature'),
-  createHmac('sha256',KEY).update('1794320000\\n'+UUID+'\\n'+body).digest('hex'));
+  createHmac('sha256',KEY).update(['1794320000',UUID,body].join(String.fromCharCode(10))).digest('hex'));
  assert.deepEqual(JSON.parse(body),{
   schema:'saber-central-r2-universal-package-manifest-v1',webOrderId:WEB});
 });
