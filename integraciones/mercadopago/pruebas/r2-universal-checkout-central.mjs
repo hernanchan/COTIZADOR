@@ -13,17 +13,32 @@ const FILE=/^[A-Za-z0-9_-]{1,80}$/;
 const MIB=1048576;
 const reply=(x,s=200)=>Response.json(x,{status:s,headers:{
  'Cache-Control':'no-store,private','X-Content-Type-Options':'nosniff'}});
-const enabled=env=>env?.CENTRAL_R2_UNIVERSAL_DRAFT_ENABLED===FLAG&&
+const LIVE='GO_COMERCIAL_CONFIRMADO';
+const livePostpay=env=>env?.SABER_ENTORNO==='produccion'&&
+ env?.CENTRAL_DB_ENV==='produccion'&&
+ env?.MP_LIVE_GATE===LIVE&&
+ env?.CENTRAL_LIVE_BRIDGE_ENABLED===LIVE&&
+ env?.CENTRAL_LIVE_POSTPAY_GATE===LIVE&&
+ env?.CENTRAL_LIVE_ORDER_GATE===LIVE&&
+ env?.CENTRAL_LIVE_PRICING_GATE===LIVE&&
+ env?.CENTRAL_R2_UNIVERSAL_DRAFT_ENABLED!==FLAG&&
+ env?.CENTRAL_R2_UNIVERSAL_ORDER_ENABLED!==FLAG&&
+ env?.CENTRAL_R2_UNIVERSAL_CHECKOUT_ENABLED!==FLAG&&
+ env?.DOCS_SANDBOX_CHECKOUT_ENABLED!==FLAG&&
+ env?.CENTRAL_R2_UNIVERSAL_POSTPAY_ENABLED!==FLAG;
+const sandboxCheckout=env=>env?.SABER_ENTORNO!=='produccion'&&
+ env?.CENTRAL_R2_UNIVERSAL_DRAFT_ENABLED===FLAG&&
  env.CENTRAL_R2_UNIVERSAL_ORDER_ENABLED===FLAG&&
  env.CENTRAL_R2_UNIVERSAL_CHECKOUT_ENABLED===FLAG&&
  env.DOCS_SANDBOX_CHECKOUT_ENABLED===FLAG&&
  env.CENTRAL_R2_UNIVERSAL_POSTPAY_ENABLED===FLAG;
+const enabled=env=>sandboxCheckout(env);
 const error=reason=>({ok:false,reason});
 /** Full consistency gate shared by the direct /demo/checkout and signed API. */
 export async function verificarPedidoUniversalCobrable(env,commercialOrderId,{
  webOrderId=null,subtle=crypto.subtle
 }={}){
- if(!enabled(env)||!UUID.test(commercialOrderId||'')||
+ if(!(sandboxCheckout(env)||livePostpay(env))||!UUID.test(commercialOrderId||'')||
     (webOrderId!==null&&!WEB.test(webOrderId)))
   return error('UNIVERSAL_PAGO_DESHABILITADO');
  const db=env?.DB;
@@ -89,7 +104,7 @@ export async function verificarPedidoUniversalCobrable(env,commercialOrderId,{
    subidaAutorizada:false,produccionAutorizada:false,
    estado:'PRELIMINAR_SIN_ORIGINALES',
    quoteHash:link.quote_hash
-  },{subtle});
+  },{subtle,allowTusOnly:livePostpay(env)});
  }catch{return error('UNIVERSAL_COTIZACION_FUERA_DE_CONTRATO')}
  return {ok:true,link,works,rows,commercialOrderId:link.id,
   webOrderId:link.web_order_id,amountArs:link.amount_ars};
