@@ -177,6 +177,16 @@ test('vendedor test_user queda rechazado incluso con ID de seller coincidente',a
  assert.equal(r.status,503);
  assert.equal(f.posts,0);
 });
+test('vendedor con test_user=true no puede abrir Checkout Pro LIVE',async()=>{
+ const f=fixture(),request=new Request('https://pagos.libreriasaber.com.ar/internal/central/live/checkout',{method:'POST'});
+ const fetcher=async (url,options)=>{
+  if(String(url).endsWith('/users/me'))return response({id:SELLER,tags:[],test_user:true});
+  return f.mpFetch(url,options);
+ };
+ const result=await checkoutMPLiveCentral(request,f.env,{readSigned:f.signed,fetcher});
+ assert.equal(result.status,503);
+ assert.equal(f.posts,0);
+});
 test('un webhook firmado con merchantOrder ajena no cambia D1',async()=>{
  const f=fixture();f.o.preference_id='MP-LIVE-PREF-1';
  const fetcher=async (url,options)=>{
