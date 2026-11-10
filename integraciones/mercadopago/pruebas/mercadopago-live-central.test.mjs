@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {webcrypto} from 'node:crypto';
-import {checkoutMPLiveCentral,conciliarWebhookMPLive}
+import {checkoutMPLiveCentral,conciliarWebhookMPLive,estadoMPLiveCentral}
  from './mercadopago-live-central.mjs';
 const ORDER='123e4567-e89b-42d3-a456-426614174000';
 const WEB='WEB-ENSAYO-'+'A'.repeat(32),SELLER='123456789';
@@ -39,6 +39,7 @@ function fixture(){
     },
     async all(){
      if(sql.includes('FROM order_items'))return {results:[{line_total_ars:4400,quantity:1,unit_price_ars:4400}]};
+     if(sql.includes('FROM central_r2_universal_files'))return {results:[{file_id:'pdf_0_abcdef',received:0}]};
      return {results:[]};
     },
     async run(){
@@ -195,4 +196,53 @@ test('reembolso posterior revoca verificación y nunca vuelve a marcarla verific
  r=await conciliarWebhookMPLive(await signedWebhook(),f.env,{fetcher:f.mpFetch});
  assert.equal(r.status,200);assert.equal((await r.json()).registered,false);
  assert.equal(f.review.state,'revoked');
+});
+
+test('estado LIVE solo por HMAC y vínculo de orden; no autoriza carga por retorno del navegador',async()=>{
+ const f=fixture();const req=new Request(
+  'https://pagos.libreriasaber.com.ar/internal/central/live/status',{method:'POST'});
+ const unsigned=await estadoMPLiveCentral(req,f.env,{readSigned:async()=>({error:'bad',status:401})});
+ assert.equal(unsigned.status,401);
+ const pending=await estadoMPLiveCentral(req,f.env,{
+  readSigned:async()=>({payload:{schema:'saber-mp-live-status-v1',
+   commercialOrderId:ORDER,webOrderId:WEB}})
+ });
+ assert.equal(pending.status,200);
+ const p=await pending.json();
+ assert.equal(p.estado,'pendiente');assert.equal(p.uploadAuthorized,false);
+ assert.equal(p.fileCount,1);assert.equal(p.pendingFiles,1);
+ assert.equal(p.amountArs,4400);
+ // Haber recibido pago del servidor, pero sin revisión no basta.
+ f.o.status='paid';f.o.payment_id='123456';f.o.paid_at='2026-11-10 10:20:00';
+ f.o.preference_id='MP-LIVE-PREF-1';
+ const unverified=await estadoMPLiveCentral(req,f.env,{
+  readSigned:async()=>({payload:{schema:'saber-mp-live-status-v1',
+   commercialOrderId:ORDER,webOrderId:WEB}})
+ });
+ assert.equal((await unverified.json()).uploadAuthorized,false);
+ f.review.state='verified';
+ const paid=await estadoMPLiveCentral(req,f.env,{
+  readSigned:async()=>({payload:{schema:'saber-mp-live-status-v1',
+   commercialOrderId:ORDER,webOrderId:WEB}})
+ });
+ const d=await paid.json();assert.equal(d.estado,'pagado_esperando_archivos');
+ assert.equal(d.uploadAuthorized,true);assert.equal(d.productionAuthorized,false);
+ f.review.state='revoked';
+ const reversed=await estadoMPLiveCentral(req,f.env,{
+  readSigned:async()=>({payload:{schema:'saber-mp-live-status-v1',
+   commercialOrderId:ORDER,webOrderId:WEB}})
+ });
+ assert.equal((await reversed.json()).uploadAuthorized,false);
+});
+test('status LIVE exige pedido propio, firma y gate; sin fallback sandbox',async()=>{
+ const f=fixture(),url='https://pagos.libreriasaber.com.ar/internal/central/live/status';
+ const readSigned=async()=>({payload:{
+  schema:'saber-mp-live-status-v1',webOrderId:WEB,commercialOrderId:ORDER}});
+ const off=await estadoMPLiveCentral(new Request(url,{method:'POST'}),{...f.env,MP_LIVE_GATE:'NO_GO'},{readSigned});
+ assert.equal(off.status,503);
+ const bad=await estadoMPLiveCentral(new Request(url,{method:'POST'}),f.env,{
+  readSigned:async()=>({payload:{schema:'saber-mp-live-status-v1',webOrderId:'WEB-ENSAYO-B'.padEnd(43,'B'),commercialOrderId:ORDER}})
+ });
+ assert.notEqual(bad.status,200);
+ assert.equal(f.posts,0,'No se crea preferencia al consultar estado');
 });
