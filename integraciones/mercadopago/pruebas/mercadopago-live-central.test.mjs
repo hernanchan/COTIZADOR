@@ -7,7 +7,10 @@ const ORDER='123e4567-e89b-42d3-a456-426614174000';
 const WEB='WEB-ENSAYO-'+'A'.repeat(32),SELLER='123456789';
 const envBase={
  SABER_ENTORNO:'produccion',MP_LIVE_GATE:'GO_COMERCIAL_CONFIRMADO',
- CENTRAL_DB_ENV:'produccion',MP_LIVE_ACCESS_TOKEN:'APP_USR-'+ 'x'.repeat(64),
+ CENTRAL_DB_ENV:'produccion',
+ CENTRAL_LIVE_TUS_GATE:'GO_COMERCIAL_CONFIRMADO',
+ CENTRAL_LIVE_POSTPAY_GATE:'GO_COMERCIAL_CONFIRMADO',
+ MP_LIVE_ACCESS_TOKEN:'APP_USR-'+ 'x'.repeat(64),
  MP_TEST_ACCESS_TOKEN:'TEST-'+ 'y'.repeat(60),MP_LIVE_SELLER_ID:SELLER,
  MP_TEST_SELLER_ID:'987654321',MP_LIVE_WEBHOOK_SECRET:'w'.repeat(48),
  CENTRAL_BRIDGE_KEY:'b'.repeat(48),
@@ -360,4 +363,21 @@ test('R2 LIVE exige juntas las cuatro compuertas, sin enviar cobro parcial',asyn
   });
  assert.equal(response.status,200);
  assert.equal(good.posts,1);
+});
+
+test('TUS LIVE no emite preferencia si el transporte pospago está cerrado',async()=>{
+ for(const key of ['CENTRAL_LIVE_TUS_GATE','CENTRAL_LIVE_POSTPAY_GATE']){
+  const f=fixture();let mpCalls=0;
+  const response=await checkoutMPLiveCentral(new Request(
+   'https://pagos.libreriasaber.com.ar/internal/central/live/checkout',
+   {method:'POST'}),{...f.env,[key]:'NO_GO'},{
+    readSigned:f.signed,fetcher:async()=>{
+      mpCalls++;throw Error('PROHIBIDO_COBRAR')
+    }
+   });
+  assert.equal(response.status,503,key);
+  assert.equal((await response.json()).error,'MP_LIVE_TUS_NO_DISPONIBLE');
+  assert.equal(mpCalls,0);
+  assert.equal(f.posts,0);
+ }
 });
