@@ -16,7 +16,9 @@ const routeSchema=new Map([
  ['/internal/central/live/r2-gate','saber-central-r2-universal-live-gate-v1'],
  ['/internal/central/live/r2-reserve','saber-central-r2-universal-live-reserve-v1'],
  ['/internal/central/live/r2-stage','saber-central-r2-grande-pendiente-v1'],
- ['/internal/central/live/r2-recover','saber-central-r2-universal-recovery-v1']
+ ['/internal/central/live/r2-recover','saber-central-r2-universal-recovery-v1'],
+ ['/internal/central/live/package-manifest','saber-central-r2-universal-package-manifest-v1'],
+ ['/internal/central/live/package-file','saber-central-r2-universal-package-file-v1']
 ]);
 export async function leerFirmaInternaLive(request,env,{
  now=()=>Math.floor(Date.now()/1000),subtle=crypto.subtle
@@ -53,12 +55,16 @@ export async function leerFirmaInternaLive(request,env,{
  const r2Reserve=url.pathname==='/internal/central/live/r2-reserve';
  const r2Stage=url.pathname==='/internal/central/live/r2-stage';
  const r2Recover=url.pathname==='/internal/central/live/r2-recover';
+ const packageManifest=url.pathname==='/internal/central/live/package-manifest';
+ const packageFile=url.pathname==='/internal/central/live/package-file';
  if(raw.length<40||raw.length>(draftRoute?512000:tusReceipt?140000:2000))
    return {error:'Tamaño LIVE inválido',status:413};
  let payload;try{payload=JSON.parse(raw)}catch{}
  const orderRoute=url.pathname==='/internal/central/live/order';
  const pricingRoute=url.pathname==='/internal/central/live/pricing';
- const keys=r2Recover?'bytes,fileId,name,orderId,pages,schema,sha256':
+ const keys=packageManifest?'schema,webOrderId':
+  packageFile?'fileId,schema,webOrderId':
+  r2Recover?'bytes,fileId,name,orderId,pages,schema,sha256':
   r2Stage?'bytes,contenidoPdfVerificado,etag,fileId,listoParaProducir,name,objectKey,orderId,pagesDeclaradas,paymentAuthorized,receiptId,registeredInD1,schema,sha256,sha256Verificado':
   r2Reserve?'bytes,fileId,name,objectKey,orderId,pages,schema,sha256':
   r2Gate?'bytes,fileId,name,orderId,pages,schema,sha256':
@@ -70,7 +76,10 @@ export async function leerFirmaInternaLive(request,env,{
  if(!payload||typeof payload!=='object'||Array.isArray(payload)||
     Object.keys(payload).sort().join(',')!==keys||
     payload.schema!==expectedSchema||
-    (r2Recover?(!WEB.test(payload.orderId||'')||
+    (packageManifest?!WEB.test(payload.webOrderId||''):
+     packageFile?(!WEB.test(payload.webOrderId||'')||
+       !/^[A-Za-z0-9_-]{1,80}$/.test(payload.fileId||'')):
+     r2Recover?(!WEB.test(payload.orderId||'')||
        !/^[A-Za-z0-9_-]{1,80}$/.test(payload.fileId||'')||
        !/^[a-f0-9]{64}$/.test(payload.sha256||'')||
        typeof payload.name!=='string'||payload.name.length<1||payload.name.length>120||
