@@ -1,0 +1,82 @@
+name: Saber - dominio y permisos Cloudflare prepublicacion SOLO LECTURA
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-live-dns-domain-permissions-readonly-20261110.yml]
+permissions:
+  contents: read
+  statuses: write
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Detectar permisos DNS/domains sin crear ni editar registros
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          DEPLOY: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+          EDITOR: ${{ secrets.SABER_CF_EDITOR_TOKEN }}
+          D1: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+        run: |
+          set -euo pipefail
+          tmp=$(mktemp -d);trap 'rm -rf "$tmp"' EXIT
+          for kind in DEPLOY EDITOR D1;do
+            case "$kind" in DEPLOY) token="$DEPLOY";;EDITOR) token="$EDITOR";;D1) token="$D1";;esac
+            if [ -z "$token" ];then echo "DOMAIN_TOKEN_${kind}=ABSENT";continue;fi
+            code=$(curl -sS --max-time 25 -o "$tmp/zone_$kind.json" -w '%{http_code}' \
+              -H "Authorization: Bearer $token" \
+              'https://api.cloudflare.com/client/v4/zones?name=libreriasaber.com.ar')
+            echo "DOMAIN_ZONE_READ_${kind}_HTTP=$code"
+            if [ "$code" = 200 ];then
+              jq -r '.result[]?|select(.name=="libreriasaber.com.ar")|
+                "DOMAIN_ZONE_FOUND=true DOMAIN_STATUS="+(.status//"unknown")' \
+                 "$tmp/zone_$kind.json"
+              zone=$(jq -r '[.result[]?|select(.name=="libreriasaber.com.ar")]|if length==1 then .[0].id else empty end' \
+                "$tmp/zone_$kind.json")
+              if [ -n "$zone" ];then
+                dns=$(curl -sS --max-time 25 -o "$tmp/dns_$kind.json" -w '%{http_code}' \
+                  -H "Authorization: Bearer $token" \
+                  "https://api.cloudflare.com/client/v4/zones/$zone/dns_records?per_page=100")
+                echo "DOMAIN_DNS_READ_${kind}_HTTP=$dns"
+                if [ "$dns" = 200 ];then
+                  for host in pedidos.libreriasaber.com.ar pagos.libreriasaber.com.ar;do
+                    jq -r --arg host "$host"                      '"DOMAIN_RECORD_"+$host+"="+
+                      (if any(.result[]?; .name==$host) then "PRESENT" else "ABSENT" end)' \
+                       "$tmp/dns_$kind.json"
+                  done
+                fi
+              fi
+            fi
+            code=$(curl -sS --max-time 25 -o "$tmp/domains_$kind.json" -w '%{http_code}' \
+              -H "Authorization: Bearer $token" \
+              "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/domains")
+            echo "DOMAIN_WORKERS_READ_${kind}_HTTP=$code"
+          done
+          for host in pedidos.libreriasaber.com.ar pagos.libreriasaber.com.ar;do
+            if command -v dig >/dev/null;then
+              answer=$(dig +short "$host" A | head -n1 || true)
+              if [ -n "$answer" ];then
+                echo "DOMAIN_PUBLIC_DNS_${host}=RESOLVES"
+              else
+                echo "DOMAIN_PUBLIC_DNS_${host}=NO_IPV4_FOUND"
+              fi
+            fi
+          done
+          echo 'DOMAIN_READ_ONLY_NO_DNS_CHANGES_NO_WORKERS_ROUTES_NO_PAYMENTS'
+      - name: Registrar estado de auditoria
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          if [ "$RESULT" = success ];then state=success;else state=failure;fi
+          jq -n --arg state "$state" --arg context 'saber/domains-permissions-readonly' \
+            --arg description "Consulta dominio/dns LIVE sin cambios: $RESULT" \
+            --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/domain-status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/domain-status.json >/dev/null
