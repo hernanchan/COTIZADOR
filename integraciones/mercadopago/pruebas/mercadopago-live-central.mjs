@@ -214,3 +214,53 @@ export async function conciliarWebhookMPLive(request,env,{
   return reply({ok:false,error:'MP_LIVE_RECONCILIACION_PENDIENTE'},503);
  }
 }
+
+/**
+ * Estado REAL para el comprador del lote universal, sin consultar ni escribir en
+ * MP. Solo confía en la conciliación HMAC+API ya persistida en D1.
+ * La cookie privada se valida en Documents ANTES de formar la firma de servicio.
+ */
+export async function estadoMPLiveCentral(request,env,{readSigned}={}){
+ if(!productionOn(env))return reply({ok:false,error:'MP_LIVE_GATE_CERRADO'},503);
+ if(request.method!=='POST'||typeof readSigned!=='function')
+  return reply({ok:false,error:'MP_LIVE_STATUS_FIRMA_OBLIGATORIA'},403);
+ const signed=await readSigned(request,env);
+ if(signed?.error)return reply({ok:false,error:'MP_LIVE_STATUS_HMAC'},signed.status||401);
+ const p=signed.payload;
+ if(!p||typeof p!=='object'||Array.isArray(p)||
+    Object.keys(p).sort().join(',')!=='commercialOrderId,schema,webOrderId'||
+    p.schema!=='saber-mp-live-status-v1'||
+    !UUID.test(p.commercialOrderId||'')||!WEB.test(p.webOrderId||''))
+  return reply({ok:false,error:'MP_LIVE_STATUS_IDENTIDAD'},422);
+ try{
+  const link=await env.DB.prepare(
+   'SELECT commercial_order_id FROM central_r2_universal_order_links WHERE web_order_id=? AND commercial_order_id=?'
+  ).bind(p.webOrderId,p.commercialOrderId).first();
+  if(!link)return reply({ok:false,error:'MP_LIVE_STATUS_ORDEN_AJENA'},404);
+  const order=await env.DB.prepare(
+   'SELECT o.id,o.status,o.paid_at,o.payment_id,o.preference_id,o.amount_ars,o.deposit_ars,r.state AS review_state '+
+   'FROM orders o LEFT JOIN payment_reviews r ON r.order_id=o.id WHERE o.id=?'
+  ).bind(p.commercialOrderId).first();
+  if(!order||order.amount_ars<1||order.deposit_ars!==order.amount_ars)
+   return reply({ok:false,error:'MP_LIVE_STATUS_ORDEN_INVALIDA'},409);
+  const files=(await env.DB.prepare(
+   'SELECT file_id,received FROM central_r2_universal_files WHERE web_order_id=? ORDER BY ordinal'
+  ).bind(p.webOrderId).all()).results||[];
+  if(files.length<1||files.length>10||files.some(x=>
+    !/^[A-Za-z0-9_-]{1,80}$/.test(x.file_id||'')||
+    ![0,1].includes(x.received))||new Set(files.map(x=>x.file_id)).size!==files.length)
+   return reply({ok:false,error:'MP_LIVE_STATUS_ARCHIVOS_INCOMPATIBLES'},409);
+  const revoked=order.review_state==='revoked';
+  const paid=order.status==='paid'&&Boolean(order.paid_at)&&
+   typeof order.payment_id==='string'&&PAYMENT.test(order.payment_id)&&
+   Boolean(order.preference_id)&&order.review_state==='verified';
+  const state=revoked?'revocado':paid?'pagado_esperando_archivos':'pendiente';
+  return reply({ok:true,webOrderId:p.webOrderId,
+   commercialOrderId:order.id,amountArs:order.amount_ars,fileCount:files.length,
+   estado:state,pendingFiles:files.filter(x=>x.received===0).length,
+   receivedFileIds:files.filter(x=>x.received===1).map(x=>x.file_id),
+   uploadAuthorized:paid&&!revoked,productionAuthorized:false},200);
+ }catch{
+  return reply({ok:false,error:'MP_LIVE_STATUS_D1_NO_DISPONIBLE'},503);
+ }
+}
