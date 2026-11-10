@@ -51,7 +51,10 @@ test('geometría estricta; página o escala distintas exige revisión',()=>{
  assert.equal(compararGeometriaR2(a1,[{anchoCm:50,altoCm:84.1}]).coinciden,false);
  assert.equal(compararGeometriaR2(a1,[{anchoCm:59.4,altoCm:84.1},{anchoCm:59.4,altoCm:84.1}]).issues?.length,undefined);
  assert.equal(compararGeometriaR2(a1,[...real,...real]).inconsistencias[0].tipo,'CANTIDAD_PAGINAS');
- assert.throws(()=>compararGeometriaR2([{...a1[0],modo:'sin-clasificar'}],real),/DECLARACION_INVALIDA/);
+ // Un PDF A4 de 100 MB usa R2 por peso, pero sigue siendo documento.
+ assert.equal(compararGeometriaR2([{...a1[0],modo:'sin-clasificar'}],real).coinciden,true);
+ assert.equal(compararGeometriaR2([{numero:1,anchoCm:21,altoCm:29.7,
+  modo:'sin-clasificar'}],[{anchoCm:21,altoCm:29.7}]).coinciden,true);
 });
 test('PDF A1 grande local: SHA, páginas y medidas reales; NO imprime ni reconfirma precio',async()=>{
  const f=await make();
