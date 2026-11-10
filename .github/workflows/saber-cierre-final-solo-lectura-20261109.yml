@@ -1,0 +1,76 @@
+name: Saber - cierre final privado sin pedidos ni pagos
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-cierre-final-solo-lectura-20261109.yml]
+permissions:
+  contents: read
+  statuses: write
+jobs:
+  cierre:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Contratos de tarifas, pedidos y borrado (sin datos reales)
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.24.2
+          node --test integraciones/autocotizador/pruebas/ploteo-papel-cad-recubierto.test.mjs tests/r2-borrado-entregado-central.test.mjs tests/r2-universal-cola-borrado-d1.test.mjs tests/r2-universal-preprensa-central.test.mjs
+          echo 'TEST_CONTRACTS_GREEN_NO_D1_WRITES'
+      - name: Smoke real de accesos, tarifas, central y tienda: SOLO GET
+        shell: bash
+        env:
+          PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$PASSWORD"
+          docs='https://saber-documentos-pruebas.libreriasaber.workers.dev'
+          central='https://saber-pagos-pruebas.libreriasaber.workers.dev'
+          got=$(curl -sS --max-time 25 -o /tmp/doc_anon -w '%{http_code}' "$docs/prueba-v2/")
+          test "$got" = 401 || { echo "BLOCKER_DOCUMENTS_EXPOSED_HTTP_$got"; exit 1; }
+          got=$(curl -sS --max-time 25 -u "operador:$PASSWORD" -o /tmp/doc_auth -w '%{http_code}' "$docs/prueba-v2/")
+          test "$got" = 200 || { echo "BLOCKER_DOCUMENTS_AUTH_HTTP_$got"; exit 1; }
+          grep -Fq 'id="smart"' /tmp/doc_auth
+          grep -Fq 'send-all-pdf' /tmp/doc_auth
+          got=$(curl -sS --max-time 25 -u "operador:$PASSWORD" -o /tmp/quotejs -w '%{http_code}' "$docs/prueba-v2/carga-inteligente.js")
+          test "$got" = 200 || { echo "BLOCKER_COTIZADOR_JS_HTTP_$got"; exit 1; }
+          grep -Fq 'Recubierto 130 g' /tmp/quotejs
+          grep -Fq 'No pudimos identificar' /tmp/quotejs
+          got=$(curl -sS --max-time 25 -u "operador:$PASSWORD" -o /tmp/prices -w '%{http_code}' "$docs/prueba-v2/precios-web.json")
+          test "$got" = 200 || { echo "BLOCKER_PRICING_HTTP_$got"; exit 1; }
+          jq -e '(.plotter.supports|type=="array") and (.plotter.supports|length>1) and (.priceVersion|test("^d1-approved-revision-"))' /tmp/prices >/dev/null
+          echo "PRICES_D1_APPROVED"
+          got=$(curl -sS --max-time 25 -o /tmp/admin_anon -w '%{http_code}' "$central/admin/api/orders")
+          test "$got" = 401 || { echo "BLOCKER_CENTRAL_ADMIN_HTTP_$got"; exit 1; }
+          curl -fsS --max-time 25 "$central/health" >/tmp/health
+          jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' /tmp/health >/dev/null
+          echo "CENTRAL_DB_READY_REAL_PAYMENTS_OFF"
+          got=$(curl -sS --max-time 25 -o /tmp/store -w '%{http_code}' "$docs/prueba-v2/diseno-sin-clave")
+          test "$got" = 200 || { echo "BLOCKER_STOREFRONT_HTTP_$got"; exit 1; }
+          grep -Fq 'Agregar al carrito' /tmp/store
+          got=$(curl -sS --max-time 25 -o /tmp/catalog -w '%{http_code}' "$docs/prueba-v2/diseno-sin-clave/catalogo.json")
+          test "$got" = 200 || { echo "BLOCKER_CATALOG_HTTP_$got"; exit 1; }
+          jq -e '.ok==true and (.products|type=="array") and (.products|length>0) and .ordersEnabled==false and .paymentsEnabled==false' /tmp/catalog >/dev/null
+          echo "PRIVATE_WEB_CLOSURE_READONLY_PASS_NO_ORDERS_NO_UPLOADS_NO_DEPLOY"
+      - name: Registrar resultado
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_SHA: ${{ github.sha }}
+          RESULT: ${{ job.status }}
+        run: |
+          if [ "$RESULT" = success ]; then state=success; desc="CI E2E local y smoke privado solo lectura OK"; else state=failure; desc="Revisar cierre final privado"; fi
+          jq -n --arg state "$state" --arg context 'saber/cierre-final-privado' --arg description "$desc" --arg target_url "https://github.com/$GH_REPO/actions/runs/$GITHUB_RUN_ID" '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/status.json
+          gh api -X POST "repos/$GH_REPO/statuses/$GH_SHA" --input /tmp/status.json
