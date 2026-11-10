@@ -4722,6 +4722,11 @@ export default {
      paymentAuthorized:false,commercialRelease:false,source:'production-d1-approved-only'});
    }catch{return json({ok:false,error:'LIVE_PRICING_UNAVAILABLE'},503)}
   }
+  if(url.pathname==='/internal/central/live/draft'){
+   const {registrarFichaUniversalD1}=await import('./r2-lote-universal-central.mjs');
+   const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
+   return registrarFichaUniversalD1(req,env,{readSigned:leerFirmaInternaLive});
+  }
   if(url.pathname==='/internal/central/live/order'){
    const {promoverPedidoUniversalD1}=await import('./r2-universal-order-central.mjs');
    const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
