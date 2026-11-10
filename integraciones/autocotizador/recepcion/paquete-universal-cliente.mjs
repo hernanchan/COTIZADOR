@@ -7,6 +7,9 @@ import {escribirZipUniversal} from './zip-universal-stream.mjs';
 import {sha256PdfLocalPorFragmentos} from './sha256-pdf-local-fragmentos.mjs';
 const $=id=>document.getElementById(id);
 const webOrderId=new URL(location.href).searchParams.get('webOrderId')||'';
+const liveStaff=location.pathname==='/personal/paquete';
+const packageAPI=liveStaff?'/personal/api/live-paquete':'/prueba-v2/api/ensayo-universal-paquete-personal';
+const originalAPI=liveStaff?'/personal/api/live-descargar':'/prueba-v2/api/ensayo-universal-descargar-personal';
 const WEB=/^WEB-ENSAYO-[A-F0-9]{32}$/;
 const SHA=/^[a-f0-9]{64}$/;
 const MiB=1048576;
@@ -84,7 +87,7 @@ function instruccionesPdf(f){
  return instruction;
 }
 async function obtenerArchivo(t){
- const response=await post('/prueba-v2/api/ensayo-universal-descargar-personal',{
+ const response=await post(originalAPI,{
   webOrderId,fileId:t.fileId});
  if(!response.headers.get('Content-Type')?.startsWith('application/pdf')||
     !response.body)
@@ -152,7 +155,7 @@ button?.addEventListener('click',()=>void descargarZIP());
 (async()=>{
  try{
   if(!WEB.test(webOrderId))throw Error('Número de pedido inválido');
-  const r=await post('/prueba-v2/api/ensayo-universal-paquete-personal',{webOrderId});
+  const r=await post(packageAPI,{webOrderId});
   const x=await r.json();
   if(x?.ok!==true||x.schema!=='saber-central-r2-universal-package-manifest-v1'||
      x.webOrderId!==webOrderId||x.estadoPago!=='PAGADO_VERIFICADO'||
