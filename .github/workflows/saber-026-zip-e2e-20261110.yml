@@ -2,7 +2,7 @@ name: Saber - validar ZIP real orden 026 desde Central privada
 on:
   push:
     branches: [integracion/tus-pedido-privado-20261101]
-    paths: [.github/workflows/saber-026-zip-e2e-20261110.yml]
+    paths: [.github/workflows/saber-026-zip-e2e-20261110.yml, integraciones/autocotizador/recepcion/piloto-026-zip-real-postpago-20261110.mjs]
 permissions: {contents: read, statuses: write}
 concurrency: {group: saber-026-zip-staff-no-payment, cancel-in-progress: false}
 jobs:
