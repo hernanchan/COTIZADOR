@@ -72,58 +72,9 @@ export async function leerFirmaInternaLive(request,env,{
        !Number.isSafeInteger(payload.bytes)||payload.bytes<=40*1048576||
        payload.bytes>200*1048576||
        !Number.isSafeInteger(payload.pages)||payload.pages<1||payload.pages>2000||
-       !new RegExp('^r2-v1/'+payload.orderId+'/[a-f0-9-]{36}[.]pdf
-       !/^[A-Za-z0-9_-]{1,80}$/.test(payload.fileId||'')||
-       !/^[a-f0-9]{64}$/.test(payload.sha256||'')||
-       typeof payload.name!=='string'||payload.name.length<1||payload.name.length>120||
-       !payload.name.toLowerCase().endsWith('.pdf')||
-       !Number.isSafeInteger(payload.bytes)||payload.bytes<=40*1048576||
-       payload.bytes>200*1048576||
-       !Number.isSafeInteger(payload.pages)||payload.pages<1||payload.pages>2000):
-     tusGate?(!['start','finish'].includes(payload.action)||!WEB.test(payload.orderId||'')||
-       !/^[A-Za-z0-9_-]{1,80}$/.test(payload.fileId||'')||
-       !/^[a-f0-9]{64}$/.test(payload.sha256||'')||
-       typeof payload.name!=='string'||payload.name.length<1||payload.name.length>120||
-       !/\.pdf$/i.test(payload.name)||
-       !Number.isSafeInteger(payload.bytes)||payload.bytes<5||payload.bytes>40*1048576||
-       !Number.isSafeInteger(payload.pages)||payload.pages<1||payload.pages>2000):
-     tusReceipt?(!WEB.test(payload.orderId||'')||
-       !/^[A-Za-z0-9_-]{1,80}$/.test(payload.fileId||'')||
-       !/^[a-f0-9]{64}$/.test(payload.sha256||'')||
-       typeof payload.name!=='string'||payload.name.length<1||payload.name.length>120||
-       !/\.pdf$/i.test(payload.name)||
-       !Number.isSafeInteger(payload.bytes)||payload.bytes<5||payload.bytes>40*1048576||
-       !Number.isSafeInteger(payload.pages)||payload.pages<1||payload.pages>2000||
-       !Array.isArray(payload.metrics)||payload.metrics.length!==payload.pages||
-       payload.metrics.some(m=>!m||!Number.isFinite(m.anchoCm)||!Number.isFinite(m.altoCm)||
-          m.modo!=='sin-clasificar')||
-       typeof payload.receiptId!=='string'||!/^DOC-[a-f0-9-]{36}$/i.test(payload.receiptId)||
-       typeof payload.objectName!=='string'||payload.objectName.length>150):
-     draftRoute?!/^[a-f0-9]{64}$/.test(payload.quoteHash||'')||
-       !/^d1-approved-revision-[1-9]\d{0,7}$/.test(payload.priceRevision||'')||
-       payload.pagoAutorizado!==false||payload.subidaAutorizada!==false||
-       payload.produccionAutorizada!==false||
-       payload.estado!=='PRELIMINAR_SIN_ORIGINALES':
-     pricingRoute?payload.purpose!=='quote-production-approved':
-     orderRoute?!UUID.test(payload.draftId||'')||
-      !/^[a-f0-9]{64}$/.test(payload.quoteHash||'')||
-      typeof payload.telefono!=='string'||
-      !/^\+?[0-9 ()-]{10,26}$/.test(payload.telefono)||
-      payload.telefono.replace(/\D/g,'').length<10||
-      payload.telefono.replace(/\D/g,'').length>15:
-      !UUID.test(payload.commercialOrderId||''))||
-    (!pricingRoute&&!tusGate&&!tusReceipt&&!r2Gate&&!r2Reserve&&!WEB.test(payload.webOrderId||'')))
-   return {error:'Orden LIVE inválida',status:422};
- const key=await subtle.importKey('raw',new TextEncoder().encode(env.CENTRAL_BRIDGE_KEY),
-  {name:'HMAC',hash:'SHA-256'},false,['verify']);
- const data=new TextEncoder().encode(ts+'\n'+id+'\n'+raw);
- const signed=Uint8Array.from(signature.match(/../g).map(x=>parseInt(x,16)));
- if(!await subtle.verify('HMAC',key,signed,data))
-   return {error:'Firma LIVE incorrecta',status:401};
- return {requestId:id,raw,payload};
-}
-,'i')
-         .test(payload.objectKey||'')):
+       typeof payload.objectKey!=='string'||
+       !payload.objectKey.startsWith('r2-v1/'+payload.orderId+'/')||
+       !/^r2-v1\/WEB-ENSAYO-[A-F0-9]{32}\/[a-f0-9-]{36}[.]pdf$/i.test(payload.objectKey)):
      r2Gate?(!WEB.test(payload.orderId||'')||
        !/^[A-Za-z0-9_-]{1,80}$/.test(payload.fileId||'')||
        !/^[a-f0-9]{64}$/.test(payload.sha256||'')||
