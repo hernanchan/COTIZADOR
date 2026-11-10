@@ -30,6 +30,7 @@ function scene({promptValue='Responsable del mostrador',failCode=null,stage='pen
  const elements=new Map();
  for(const id of ['secret','productionOperator','status','details','orders',
   'refreshExpress','refreshReceipts','refreshR2Paid','r2PaidReview','r2ReviewPanel','goR2Paid','refreshTransfers','refreshUnpaid','refresh',
+  'liveRecepcionStatus','liveRecepcionList','refreshLiveRecepcion','liveRecepcionPanel',
   'etaStatus','etaHours','etaCapacity','etaLoad','etaSave',
   'deliveryPlanMode','deliveryPlanSave','deliveryPlanLoad','deliveryPlanStatus',
   'etaCalendarStatus','etaCalendarLoad','etaCalendarSave','etaCalendarWeekdayDraft',
