@@ -1,0 +1,95 @@
+name: Saber - estado real orden sandbox y Central SIN cambios
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-cierre-estado-pago-central-20261110.yml]
+permissions:
+  contents: read
+  statuses: write
+jobs:
+  estado:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Comprobar pago sandbox, R2 y Central sin generar pedido ni subir archivos
+        env:
+          PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+          SABER_CENTRAL_DEMO_ADMIN_KEY: ${{ secrets.SABER_CENTRAL_DEMO_ADMIN_KEY }}
+          DEMO_ADMIN_KEY: ${{ secrets.DEMO_ADMIN_KEY }}
+          SABER_CENTRAL_ADMIN_KEY: ${{ secrets.SABER_CENTRAL_ADMIN_KEY }}
+          SABER_DOCS_CENTRAL_ADMIN_KEY: ${{ secrets.SABER_DOCS_CENTRAL_ADMIN_KEY }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const docs='https://saber-documentos-pruebas.libreriasaber.workers.dev';
+          const central='https://saber-pagos-pruebas.libreriasaber.workers.dev';
+          const web='WEB-ENSAYO-72E9F66A8BC34CC9B25D70EF49C1A8D3';
+          const commercial='89608817-95b1-41bc-ac88-579da519d32c';
+          const pass=process.env.PASSWORD;
+          assert.ok(typeof pass==='string'&&pass.length>=16,'STAFF_BASIC_REQUIRED');
+          const authorization='Basic '+Buffer.from('operador:'+pass).toString('base64');
+          const health=await fetch(central+'/health',{signal:AbortSignal.timeout(18000)}).then(r=>r.json());
+          assert.equal(health.ok,true);assert.equal(health.databaseReady,true);
+          assert.equal(health.paymentsEnabled,false,'BLOCKER_REAL_PAYMENTS_ENABLED');
+          async function post(path,data){
+            const r=await fetch(docs+path,{method:'POST',redirect:'error',
+              headers:{Authorization:authorization,Origin:docs,'Content-Type':'application/json'},
+              body:JSON.stringify(data),signal:AbortSignal.timeout(25000)});
+            const body=await r.json().catch(()=>null);
+            assert.equal(r.status,200,'STATUS_HTTP_'+r.status);
+            assert.equal(body?.ok,true,'STATUS_INVALID');
+            return body;
+          }
+          const payment=await post('/prueba-v2/api/ensayo-r2-prepago-checkout',{
+             action:'status',webOrderId:web,commercialOrderId:commercial
+          });
+          assert.equal(payment.amountArs,4400,'AMOUNT_CHANGED');
+          assert.ok(['pendiente','pagado_esperando_archivo'].includes(payment.estado),'UNEXPECTED_PAYMENT_STATE');
+          console.log('SANDBOX_PAYMENT_STATUS='+payment.estado);
+          if(payment.estado==='pendiente'){
+            assert.equal(payment.uploadAuthorized,false);
+            console.log('PENDING_SANDBOX_PAYMENT_NO_R2_UPLOAD_NO_DUPLICATE_ORDER');
+            process.exit(0);
+          }
+          assert.equal(payment.uploadAuthorized,true,'PAYMENT_NOT_AUTHORIZED_TO_RECEIVE');
+          console.log('SANDBOX_PAYMENT_CONFIRMED');
+          const names=['SABER_CENTRAL_DEMO_ADMIN_KEY','DEMO_ADMIN_KEY','SABER_CENTRAL_ADMIN_KEY','SABER_DOCS_CENTRAL_ADMIN_KEY'];
+          let review=null;
+          for(const name of names){
+            const token=process.env[name];
+            if(typeof token!=='string'||token.length<16)continue;
+            const r=await fetch(central+'/admin/api/central/r2-paid-review',{
+              headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(18000)});
+            if(r.status===200){review=await r.json();break}
+          }
+          assert.equal(review?.ok,true,'CENTRAL_REVIEW_AUTH_BLOCKER');
+          const matches=(review.orders||[]).filter(x=>x.commercialOrderId===commercial&&x.webOrderId===web);
+          assert.equal(matches.length,1,'CENTRAL_ORDER_DUPLICATED_OR_MISSING');
+          const row=matches[0];
+          assert.equal(row.amountArs,4400);
+          console.log('CENTRAL_ORDER_UNIQUE PAID='+String(row.paidVerified===true||row.paid===true)+
+            ' FILE_RECEIVED='+String(row.received===true)+
+            ' RECEIPT_VERIFIED='+String(row.verifiedReceipt===true));
+          if(row.received===true){
+            assert.equal(row.verifiedReceipt,true,'RECEIVED_PDF_NOT_VERIFIED');
+            assert.ok(/^DOC-[a-f0-9-]{36}$/i.test(row.receiptId||''),'RECEIPT_MISSING');
+          }else console.log('AWAITING_POSTPAY_R2_SYNTHETIC_FILE');
+          console.log('READONLY_CHECK_COMPLETE_NO_UPLOADS_NO_CHECKOUT_NO_D1_MUTATION');
+          NODE
+      - name: Registrar estado de control
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_SHA: ${{ github.sha }}
+          RESULT: ${{ job.status }}
+        run: |
+          if [ "$RESULT" = success ]; then state=success; desc="Consulta de estado MP sandbox y Central completada sin cambios"; else state=failure; desc="Revisar estado del pedido sandbox o su conciliacion"; fi
+          jq -n --arg state "$state" --arg context 'saber/estado-pago-central' --arg description "$desc" --arg target_url "https://github.com/$GH_REPO/actions/runs/$GITHUB_RUN_ID" '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/status.json
+          gh api -X POST "repos/$GH_REPO/statuses/$GH_SHA" --input /tmp/status.json
