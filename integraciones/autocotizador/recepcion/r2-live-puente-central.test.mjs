@@ -11,7 +11,8 @@ const meta={orderId:WEB,fileId:'pdf_0',name:'Panel.pdf',bytes:60*1048576,
  sha256:'a'.repeat(64),pages:1};
 function fake(answer={ok:true,webOrderId:WEB,fileId:'pdf_0',
  sha256:'a'.repeat(64),bytes:60*1048576,pages:1,transport:'r2',
- paymentVerified:true,uploadAuthorized:false,productionAuthorized:false},
+ paymentVerified:true,mode:'bn',expectedMetrics:[{anchoCm:59.4,altoCm:84.1}],
+ uploadAuthorized:false,productionAuthorized:false},
  status=200){
  const calls=[];
  return {calls,opts:{subtle:webcrypto.subtle,now:()=>1794320000,
