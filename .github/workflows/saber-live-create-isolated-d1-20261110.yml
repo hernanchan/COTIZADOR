@@ -21,18 +21,16 @@ jobs:
         shell: bash
         env:
           ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
-          EDITOR: ${{ secrets.SABER_CF_EDITOR_TOKEN }}
-          DEPLOY: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
           WRITE: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
         run: |
           set -euo pipefail
           test -n "$ACCOUNT"
-          if [ -z "$WRITE" ] && [ -z "$EDITOR" ];then
+          if [ -z "$WRITE" ];then
             echo 'LIVE_D1_WRITE_TOKEN_MISSING';exit 1
           fi
           root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/d1/database"
           tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
-          token="$WRITE"; if [ -z "$token" ];then token="$EDITOR";fi
+          token="$WRITE"
           curl -fsS --max-time 40 -H "Authorization: Bearer $token" "$root" > "$tmp/list.json"
           jq -e '.success==true and (.result|type=="array")' "$tmp/list.json" >/dev/null
           count=$(jq '[.result[]|select(.name=="saber-pagos-produccion")]|length' "$tmp/list.json")
@@ -46,19 +44,9 @@ jobs:
               -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
               --data-binary "@$tmp/create.json" "$root")
             if [ "$status" != 200 ] && [ "$status" != 201 ];then
-              echo "LIVE_D1_EDITOR_CREATE_HTTP=$status"
-              if [ -n "$DEPLOY" ] && [ "$DEPLOY" != "$EDITOR" ] &&
-                 { [ "$status" = 401 ] || [ "$status" = 403 ]; }; then
-                echo 'LIVE_D1_RETRY_WITH_EXISTING_DEPLOY_TOKEN'
-                status=$(curl -sS --max-time 45 -o "$tmp/new.json" -w '%{http_code}' \
-                  -H "Authorization: Bearer $DEPLOY" -H 'Content-Type: application/json' \
-                  --data-binary "@$tmp/create.json" "$root")
-                echo "LIVE_D1_DEPLOY_CREATE_HTTP=$status"
-              fi
-              if [ "$status" != 200 ] && [ "$status" != 201 ]; then
-                jq -c '{errors:[.errors[]?|{code,message}]}' "$tmp/new.json" || true
-                exit 1
-              fi
+              echo "LIVE_D1_CREATE_HTTP=$status"
+              jq -c '{errors:[.errors[]?|{code,message}]}' "$tmp/new.json" || true
+              exit 1
             fi
             jq -e '.success==true and (.result.uuid|type=="string")' "$tmp/new.json" >/dev/null
             echo 'LIVE_D1_CREATED_NO_SCHEMA_NO_DATA'
