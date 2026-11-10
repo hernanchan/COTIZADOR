@@ -77,7 +77,6 @@ jobs:
           node --test integraciones/autocotizador/recepcion/sesion-comprador-live.test.mjs
           node --test integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs
           node --test integraciones/autocotizador/recepcion/tus-universal-live-puente-central.test.mjs
-          node --test integraciones/autocotizador/recepcion/tus-live-recepcion-documentos.test.mjs
           node --test integraciones/autocotizador/recepcion/obtener-tarifario-d1-live.test.mjs
           node --test integraciones/autocotizador/recepcion/ordenes-universales-live-documentos.test.mjs
           node --test tests/r2-borrador-universal-central.test.mjs
@@ -95,6 +94,9 @@ jobs:
           cd integraciones/autocotizador/recepcion
           npm install --no-fund --no-audit
           npm run build:unificado
+          cd ../../..
+          node --test integraciones/autocotizador/recepcion/tus-live-recepcion-documentos.test.mjs
+          cd integraciones/autocotizador/recepcion
           grep -Fq '/api/pedido/live/borrador' ./dist/saber-documentos-cotizador-fase4.mjs
           grep -Fq '/cotizar/archivos' ./dist/saber-documentos-cotizador-fase4.mjs
           echo 'LIVE_BUYER_QUOTE_BUNDLE_OK_NO_DEPLOY'
