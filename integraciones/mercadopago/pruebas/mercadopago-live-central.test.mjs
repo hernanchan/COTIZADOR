@@ -120,6 +120,33 @@ test('nunca consulta MP ni D1 con compuerta de produccion cerrada',async()=>{
  });
  assert.equal(wh.status,503);assert.equal(calls,0);
 });
+test('retorno HTTPS admite comprador productivo y rechaza URL insegura sin crear pago',async()=>{
+ const f=fixture();let calls=0;
+ for(const returnUrl of [
+  'https://pedidos.libreriasaber.com.ar/pedido/estado',
+  'https://pedidos.libreriasaber.com.ar/seguimiento/estado'
+ ]){
+  const closed={...f.env,MP_LIVE_RETURN_URL:returnUrl,MP_LIVE_GATE:'NO_GO'};
+  const out=await checkoutMPLiveCentral(new Request('https://pagos.libreriasaber.com.ar/internal/central/live/checkout',{method:'POST'}),closed,{
+   readSigned:f.signed,fetcher:async()=>{calls++;throw Error('MP no debe consultarse')}
+  });
+  assert.equal(out.status,503);
+ }
+ for(const returnUrl of [
+  'http://pedidos.libreriasaber.com.ar/pedido/estado',
+  'https://pedidos.libreriasaber.com.ar/prueba-v2/pedido',
+  'https://saber-documentos-pruebas.libreriasaber.workers.dev/pedido/estado',
+  'https://pedidos.libreriasaber.com.ar/pedido/estado?token=abc'
+ ]){
+  const blocked={...f.env,MP_LIVE_RETURN_URL:returnUrl};
+  const out=await checkoutMPLiveCentral(new Request('https://pagos.libreriasaber.com.ar/internal/central/live/checkout',{method:'POST'}),blocked,{
+   readSigned:f.signed,fetcher:async()=>{calls++;throw Error('MP no debe consultarse')}
+  });
+  assert.equal(out.status,503,returnUrl);
+ }
+ assert.equal(calls,0);
+ assert.equal(f.posts,0);
+});
 test('checkout LIVE requiere HMAC de Central, orden asociada y vendedor real',async()=>{
  const f=fixture(),req=new Request('https://pagos.libreriasaber.com.ar/internal/central/live/checkout',{method:'POST'});
  assert.equal((await checkoutMPLiveCentral(req,f.env,{readSigned:async()=>({error:'bad',status:401}),fetcher:f.mpFetch})).status,401);
