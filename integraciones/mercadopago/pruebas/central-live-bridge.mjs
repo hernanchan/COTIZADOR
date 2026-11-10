@@ -8,7 +8,8 @@ const GATE='GO_COMERCIAL_CONFIRMADO';
 const routeSchema=new Map([
  ['/internal/central/live/checkout','saber-mp-live-checkout-v1'],
  ['/internal/central/live/status','saber-mp-live-status-v1'],
- ['/internal/central/live/order','saber-central-r2-universal-create-order-v1']
+ ['/internal/central/live/order','saber-central-r2-universal-create-order-v1'],
+ ['/internal/central/live/pricing','saber-price-snapshot-live-v1']
 ]);
 export async function leerFirmaInternaLive(request,env,{
  now=()=>Math.floor(Date.now()/1000),subtle=crypto.subtle
@@ -42,19 +43,21 @@ export async function leerFirmaInternaLive(request,env,{
    return {error:'Tamaño LIVE inválido',status:413};
  let payload;try{payload=JSON.parse(raw)}catch{}
  const orderRoute=url.pathname==='/internal/central/live/order';
- const keys=orderRoute?'draftId,quoteHash,schema,telefono,webOrderId':
+ const pricingRoute=url.pathname==='/internal/central/live/pricing';
+ const keys=pricingRoute?'purpose,schema':orderRoute?'draftId,quoteHash,schema,telefono,webOrderId':
   'commercialOrderId,schema,webOrderId';
  if(!payload||typeof payload!=='object'||Array.isArray(payload)||
     Object.keys(payload).sort().join(',')!==keys||
     payload.schema!==expectedSchema||
-    (orderRoute?!UUID.test(payload.draftId||'')||
+    (pricingRoute?payload.purpose!=='quote-production-approved':
+     orderRoute?!UUID.test(payload.draftId||'')||
       !/^[a-f0-9]{64}$/.test(payload.quoteHash||'')||
       typeof payload.telefono!=='string'||
       !/^\+?[0-9 ()-]{10,26}$/.test(payload.telefono)||
       payload.telefono.replace(/\D/g,'').length<10||
       payload.telefono.replace(/\D/g,'').length>15:
       !UUID.test(payload.commercialOrderId||''))||
-    !WEB.test(payload.webOrderId||''))
+    (!pricingRoute&&!WEB.test(payload.webOrderId||'')))
    return {error:'Orden LIVE inválida',status:422};
  const key=await subtle.importKey('raw',new TextEncoder().encode(env.CENTRAL_BRIDGE_KEY),
   {name:'HMAC',hash:'SHA-256'},false,['verify']);
