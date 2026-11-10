@@ -58,11 +58,49 @@ export function esCadPorEstructuraPDF({miniatura,fnArray,OPS,texto=''}={}){
  // Sin rótulos recuperables, exigir MUCHÍSIMOS trazados y bajo pleno.
  return trazados>=12000&&continuo<=0.70;
 }
+/**
+ * Contornos vectoriales SIN rellenos ni imágenes: costo de trazados (CAD).
+ * No depende del tamaño de la hoja, del nombre, de rótulos técnicos ni de
+ * la cantidad arbitraria de operadores en el PDF.
+ *
+ * No recategorizar si el PDF emplea bitmap, sombreado o rellenos vectoriales,
+ * incluso aunque también haya líneas: un póster ilustrado puede mezclar todo.
+ */
+export function esCadPorContornosVectoriales({fnArray,OPS}={}){
+ if(!Array.isArray(fnArray)||!OPS||
+    !Number.isInteger(OPS.constructPath)||!Number.isInteger(OPS.stroke)||
+    fnArray.length<6)return false;
+ const prohibidos=[
+  'paintImageXObject','paintImageXObjectRepeat','paintInlineImageXObject',
+  'paintInlineImageXObjectGroup','paintImageMaskXObject',
+  'paintImageMaskXObjectGroup','paintImageMaskXObjectRepeat',
+  'paintSolidColorImageMask','shadingFill',
+  'fill','eoFill','fillStroke','eoFillStroke','closeFillStroke',
+  'closeEOFillStroke'
+ ].map(k=>OPS[k]).filter(Number.isInteger);
+ const deny=new Set(prohibidos);
+ const trazos=new Set([OPS.stroke,OPS.closeStroke].filter(Number.isInteger));
+ let paths=0,strokes=0;
+ for(const op of fnArray){
+  if(deny.has(op))return false;
+  if(op===OPS.constructPath)paths++;
+  if(trazos.has(op))strokes++;
+ }
+ // El texto puro puede renderizarse con glifos rellenos; no alcanza para CAD.
+ return paths>=3&&strokes>=3;
+}
+
 /** No analizar todos los pósters: sólo los que parecen tramas de líneas. */
 export function ameritaVerificarEstructura({miniatura,texto='',textos=0}={}){
  return !!miniatura&&miniatura.modo==='poster'&&
-  Number.isFinite(miniatura.cobertura)&&miniatura.cobertura>=0.30&&
+  Number.isFinite(miniatura.cobertura)&&miniatura.cobertura>=0.03&&
   Number.isFinite(miniatura.plenoContinuo)&&miniatura.plenoContinuo<=0.85&&
-  (evidenciaPlanoTecnico(texto)||textos>=30||
-   (miniatura.coberturaColor>=0.20&&miniatura.cobertura<=0.80));
+  (
+   // Letras de gran formato dibujadas como contornos: cobertura de color
+   // engañosa en miniatura, pero casi ninguna superficie realmente plena.
+   miniatura.plenoContinuo<=0.055||
+   (miniatura.cobertura>=0.30&&
+    (evidenciaPlanoTecnico(texto)||textos>=30||
+     (miniatura.coberturaColor>=0.20&&miniatura.cobertura<=0.80)))
+  );
 }
