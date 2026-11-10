@@ -3,7 +3,19 @@
  * vincula recibos SHA-256 verificados a la orden comercial existente.
  */
 import {verificarPedidoUniversalCobrable,estadoPagoUniversal} from './r2-universal-checkout-central.mjs';
-const ON='PRIVATE_TEST_ONLY',MIB=1048576;
+const ON='PRIVATE_TEST_ONLY',LIVE='GO_COMERCIAL_CONFIRMADO',MIB=1048576;
+const postpayEnabled=env=>{
+ const live=env?.SABER_ENTORNO==='produccion'&&
+  env?.CENTRAL_DB_ENV==='produccion'&&env?.MP_LIVE_GATE===LIVE&&
+  env?.CENTRAL_LIVE_BRIDGE_ENABLED===LIVE&&
+  env?.CENTRAL_LIVE_POSTPAY_GATE===LIVE&&env?.CENTRAL_LIVE_TUS_GATE===LIVE&&
+  env?.CENTRAL_R2_UNIVERSAL_TUS_ENABLED!==ON&&
+  env?.CENTRAL_R2_UNIVERSAL_POSTPAY_ENABLED!==ON;
+ const sandbox=env?.SABER_ENTORNO!=='produccion'&&
+  env?.CENTRAL_R2_UNIVERSAL_TUS_ENABLED===ON&&
+  env?.CENTRAL_R2_UNIVERSAL_POSTPAY_ENABLED===ON;
+ return {allowed:live||sandbox,live};
+};
 const ORDER=/^WEB-ENSAYO-[A-F0-9]{32}$/;
 const FILE=/^[A-Za-z0-9_-]{1,80}$/;
 const SHA=/^[a-f0-9]{64}$/;
@@ -64,9 +76,7 @@ async function resolve(env,meta,subtle){
 export async function autorizarTUSUniversalCentral(request,env,{
  readSigned,subtle=crypto.subtle
 }={}){
- if(env?.CENTRAL_R2_UNIVERSAL_TUS_ENABLED!==ON||
-    env?.CENTRAL_R2_UNIVERSAL_POSTPAY_ENABLED!==ON||
-    !env?.DB?.prepare)
+ if(!postpayEnabled(env).allowed||!env?.DB?.prepare)
   return respond({ok:false,error:'UNIVERSAL_TUS_OFF'},503);
  if(typeof readSigned!=='function')
   return respond({ok:false,error:'UNIVERSAL_TUS_FIRMA_OFF'},503);
@@ -91,9 +101,7 @@ export async function autorizarTUSUniversalCentral(request,env,{
 export async function recibirTUSUniversalCentral(request,env,{
  readSigned,subtle=crypto.subtle
 }={}){
- if(env?.CENTRAL_R2_UNIVERSAL_TUS_ENABLED!==ON||
-    env?.CENTRAL_R2_UNIVERSAL_POSTPAY_ENABLED!==ON||
-    !env?.DB?.prepare||!env?.DB?.batch)
+ if(!postpayEnabled(env).allowed||!env?.DB?.prepare||!env?.DB?.batch)
   return respond({ok:false,error:'UNIVERSAL_TUS_OFF'},503);
  if(typeof readSigned!=='function')
   return respond({ok:false,error:'UNIVERSAL_TUS_FIRMA_OFF'},503);
@@ -120,7 +128,8 @@ export async function recibirTUSUniversalCentral(request,env,{
  if(!result||!metricsEqual(p.metrics,result.expected))
   return respond({ok:false,error:'UNIVERSAL_TUS_PRECIO_O_MEDIDA_NO_CONCILIA'},409);
  const db=env.DB;
- await db.prepare(TUS_RECEIPT_TABLE).run();
+ // En producción la tabla debe estar migrada; no ejecutar DDL en cada recepción.
+ if(!postpayEnabled(env).live)await db.prepare(TUS_RECEIPT_TABLE).run();
  const lookup=()=>db.prepare('SELECT receipt_id,object_name,sha256,bytes,page_count '+
   'FROM central_r2_universal_tus_receipts WHERE web_order_id=? AND file_id=?')
   .bind(p.orderId,p.fileId).first();
