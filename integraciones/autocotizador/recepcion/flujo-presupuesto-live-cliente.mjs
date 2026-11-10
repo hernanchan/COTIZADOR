@@ -84,11 +84,13 @@ export function crearFlujoPresupuestoLive({
  async function iniciarPago(){
   if(state!=='presupuestado'||!order)throw Error('LIVE_FLUJO_PAGO_SIN_ORDEN');
   const {numeroOrden,...orden}=order;
-  const url=await iniciarCheckoutLiveCliente({orden,fetcher,storage,origin});
   if(!metas||metas.some(m=>!['bn','color'].includes(m.mode)||
     m.pages<1||m.pages>2000))throw Error('LIVE_METAS_POSTPAGO_INVALIDAS');
+  // Sin estos metadatos persistidos, no abrir Checkout: después del
+  // redirect habría pago sin posibilidad de verificar los PDF originales.
   storage.setItem('saber-live-archivos-v1',JSON.stringify({
    webOrderId,commercialOrderId:order.commercialOrderId,metas}));
+  const url=await iniciarCheckoutLiveCliente({orden,fetcher,storage,origin});
   setState('esperando_pago');
   return url;
  }
