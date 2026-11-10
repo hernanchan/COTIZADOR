@@ -132,7 +132,9 @@ test('función real del navegador: línea roja muy densa → CAD; póster raster
 test('UI del pedido hace explícito CAD/Póster sin abrir opciones',()=>{
  const code=readFileSync(new URL('./carga-unica-cliente.mjs',import.meta.url),'utf8');
  const css=readFileSync(new URL('./carga-unica-pagina.mjs',import.meta.url),'utf8');
- assert.match(code,/TIPO DETECTADO: /);
+ assert.match(code,/TIPO DE PLOTEO: /);
+ assert.match(code,/TAMAÑO MAYOR A A3 · CORRESPONDE A PLOTTER/);
+ assert.match(code,/PLENO · Póster/);
  assert.match(code,/CAD · Plano técnico/);
  assert.match(code,/PÓSTER \/ PLENO/);
  assert.match(css,/\.clasificacion-ploteo-visible/);
