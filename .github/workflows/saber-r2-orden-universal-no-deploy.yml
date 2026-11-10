@@ -12,6 +12,9 @@ on:
       - tests/r2-universal-checkout-postpago.test.mjs
       - tests/r2-universal-tus-mixto-postpago.test.mjs
       - tests/r2-universal-interfaz-compra-unica.test.mjs
+      - tests/ploteo-mayor-a3-eleccion-cad-pleno.test.mjs
+      - integraciones/autocotizador/recepcion/eleccion-ploteo-cad-pleno.mjs
+      - integraciones/autocotizador/recepcion/carga-unica-pagina.mjs
       - tests/r2-universal-paquete-operador.test.mjs
       - tests/zip-universal-stream.test.mjs
       - tests/r2-universal-borrado-mixto.test.mjs
@@ -56,7 +59,7 @@ jobs:
       - name: Pedido único, idempotencia y compatibilidad sin pagos
         run: |
           set -euo pipefail
-          node --test tests/r2-orden-universal-sin-cobro.test.mjs tests/r2-universal-checkout-postpago.test.mjs tests/r2-universal-tus-mixto-postpago.test.mjs tests/r2-universal-interfaz-compra-unica.test.mjs tests/r2-universal-paquete-operador.test.mjs tests/zip-universal-stream.test.mjs tests/r2-universal-borrado-mixto.test.mjs tests/r2-universal-purge-mixto.test.mjs tests/r2-universal-cola-borrado-d1.test.mjs tests/r2-universal-preprensa-central.test.mjs tests/r2-borrador-universal-central.test.mjs tests/r2-prepago-sin-archivo-central.test.mjs tests/r2-plan-universal-sin-subida.test.mjs
+          node --test tests/r2-orden-universal-sin-cobro.test.mjs tests/r2-universal-checkout-postpago.test.mjs tests/r2-universal-tus-mixto-postpago.test.mjs tests/r2-universal-interfaz-compra-unica.test.mjs tests/ploteo-mayor-a3-eleccion-cad-pleno.test.mjs integraciones/autocotizador/recepcion/decision-tamano-impresion.test.mjs tests/r2-universal-paquete-operador.test.mjs tests/zip-universal-stream.test.mjs tests/r2-universal-borrado-mixto.test.mjs tests/r2-universal-purge-mixto.test.mjs tests/r2-universal-cola-borrado-d1.test.mjs tests/r2-universal-preprensa-central.test.mjs tests/r2-borrador-universal-central.test.mjs tests/r2-prepago-sin-archivo-central.test.mjs tests/r2-plan-universal-sin-subida.test.mjs
           node --check integraciones/mercadopago/pruebas/worker.js
           node --check integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs
           echo 'NO_R2_UPLOAD_NO_MP_NO_PRODUCTION_NO_DEPLOY_NO_MAIN'
