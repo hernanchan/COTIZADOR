@@ -16,9 +16,9 @@ test('el cliente generado es JavaScript sintacticamente valido',()=>{
  assert.doesNotThrow(()=>new Script(built,{filename:'carga-inteligente.js'}));
 });
 
-test('cinco validaciones PDF incluyen prepago R2, alerta, carga y envío',()=>{
+test('cuatro validaciones PDF preservan la extensión sin excepción de ploteo grande',()=>{
  const patterns=[...source.matchAll(/\/([^\n/]*pdf\$)\/i\.test\((file\.name|e\.name)\)/g)];
- assert.equal(patterns.length,5,'Cuatro controles TUS originales más la comprobación R2 local');
+ assert.equal(patterns.length,4,'No agregar validaciones especiales por tamaño de impresión');
  for(const [,pattern] of patterns){
   assert.equal(pattern,String.raw`\.pdf$`,'Expresión de extensión inesperada');
   const rx=new RegExp(pattern,'i');
@@ -185,7 +185,7 @@ test('límite TUS: marca en rojo sólo el PDF que excede 40 MiB, no los otros',(
  const origin={pathname:'/prueba-v2/carga-inteligente'};
  const alertas=visual([a,b],FileSimulado,window,origin);
  assert.equal(alertas.size,1);
- assert.match(alertas.get(a),/Grande\.pdf.*41,0 MiB.*recepción especial/);
+ assert.match(alertas.get(a),/Grande\\.pdf.*41,0 MiB.*envío universal.*deshabilitado/);
  assert.equal(alertas.has(b),false,'El PDF permitido debe permanecer disponible');
  const c={name:'Segundo.pdf',archivoOriginal:new FileSimulado('Segundo.pdf',31*1024*1024)};
  const dos=visual([b,c],FileSimulado,window,origin);
@@ -253,4 +253,31 @@ test('PDF demasiado grande conserva contacto comercial sin simular pedido ni sub
  assert.match(source,/if\(advertenciaRecepcion\)/);
  const page=readFileSync(new URL('./carga-unica-pagina.mjs',import.meta.url),'utf8');
  assert.match(page,/\.archivo \.consulta-archivo-grande/);
+});
+
+test('A4 de 500 páginas y 100 MiB va a R2 universal, sin cambiar a plotter',()=>{
+ const marker="const prepararEnvioPrivado=()=>{";
+ const start=source.indexOf(marker);
+ const end=source.indexOf("\n };\n bridgeButton.hidden=true",start);
+ assert.ok(start>=0&&end>start);
+ const callback=new Function('leyendo','ultimoPresupuesto','entries','window','location','info','MAX_PDF_CARGA','paginasElegidas',
+  'const MAX_PDF_TUS_BYTES=40*1048576,MAX_PDF_R2_PREPAGO_BYTES=200*1048576,MAX_LOTE_TUS_BYTES=60*1048576,R2_UNIVERSAL_ENSAYO=true;'+
+  'const prepararLoteParcial=xs=>({archivos:xs.map(e=>({nombre:e.name,servicio:"auto",paginas:e.paginas,modo:e.modo}))});'+
+  source.slice(start+marker.length,end));
+ const pages=Array.from({length:500},(_,i)=>({numero:i+1,anchoCm:21,altoCm:29.7,modo:'sin-clasificar'}));
+ const file=new File([new Uint8Array([37,80,68,70,45])],'Apunte_500_paginas_A4.pdf',{type:'application/pdf'});
+ Object.defineProperty(file,'size',{value:100*1048576});
+ const entry={name:file.name,archivoOriginal:file,servicio:'auto',anillado:'ninguno',
+  paginas:pages,modo:'bn',copias:1};
+ const sent=[],info={textContent:'',classList:{remove(){},add(){}}};
+ const parent={postMessage:m=>sent.push(m)};
+ callback(false,{estado:'PRELIMINAR',total:10000,plan:[{indice:0,destino:'documentos'}],pendientes:[]},
+  [entry],{parent},{origin:'https://example.test'},info,10,e=>e.paginas);
+ assert.deepEqual(sent.map(x=>x.type),['SABER_SMART_UNIVERSAL_PDF','SABER_SMART_HANDOFF_READY'],
+  info.textContent);
+ assert.equal(sent[0].files[0],file);
+ assert.equal(sent[0].archivos[0].paginas.length,500);
+ assert.equal(sent[0].totalOrientativo,10000);
+ assert.equal(sent[1].cantidad,1);
+ assert.doesNotMatch(source,/SABER_SMART_R2_PREPAGO/,'No existe vía alternativa exclusiva de ploteo');
 });
