@@ -25,7 +25,7 @@ export function compararGeometriaR2(declaradas,medidas){
   const d=declaradas[i],m=medidas[i];
   if(!d||d.numero!==i+1||!Number.isFinite(d.anchoCm)||!Number.isFinite(d.altoCm)||
    d.anchoCm<=0||d.altoCm<=0||d.anchoCm>2000||d.altoCm>2000||
-   !['cad','poster'].includes(d.modo)||
+   !['cad','poster','sin-clasificar'].includes(d.modo)||
    !m||!Number.isFinite(m.anchoCm)||!Number.isFinite(m.altoCm))
    throw Error('R2_PREPRENSA_DECLARACION_INVALIDA');
   if(Math.abs(d.anchoCm-m.anchoCm)>limitCm||
