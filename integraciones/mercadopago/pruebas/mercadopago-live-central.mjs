@@ -185,6 +185,9 @@ export async function conciliarWebhookMPLive(request,env,{
    mpLive(env,'/v1/payments/'+id,{fetcher}),sellerLive(env,fetcher)]);
   if(String(pay.id)!==id||!UUID.test(pay.external_reference||''))
    return reply({received:true,registered:false,reason:'referencia_invalida'});
+  // Incluso un evento de reintegro exige pertenecer al vendedor LIVE.
+  if(pay.live_mode!==true||String(pay.collector_id)!==String(seller.id))
+   return reply({received:true,registered:false,reason:'vendedor_o_ambiente_incorrecto'});
   const order=await env.DB.prepare(
    'SELECT o.id,o.amount_ars,o.deposit_ars,o.status,o.preference_id,o.payment_id,r.state AS review_state FROM orders o LEFT JOIN payment_reviews r ON r.order_id=o.id WHERE o.id=?'
   ).bind(pay.external_reference).first();
