@@ -207,7 +207,17 @@ export async function conciliarWebhookMPLive(request,env,{
   if(duplicate)return reply({received:true,registered:false,reason:'pago_duplicado'});
   if(order.status==='paid')return reply({received:true,registered:true,idempotent:true});
   const update=await env.DB.prepare("UPDATE orders SET status='paid',payment_id=?,paid_at=datetime('now') WHERE id=? AND status='awaiting_payment' AND payment_id IS NULL AND preference_id=?").bind(id,order.id,order.preference_id);
-  const review=await env.DB.prepare("INSERT INTO payment_reviews(order_id,state,checked_at) VALUES(?,'verified',datetime('now')) ON CONFLICT(order_id) DO UPDATE SET state=CASE WHEN payment_reviews.state='revoked' THEN 'revoked' ELSE 'verified' END,checked_at=datetime('now')").bind(order.id);
+  // Verificar SOLO si la transacción anterior dejó el pedido pagado con
+  // ESTE payment_id. Una carrera/revocación no puede crear review=verified
+  // para un pedido que el UPDATE no haya confirmado.
+  const review=await env.DB.prepare(
+   "INSERT INTO payment_reviews(order_id,state,checked_at) "+
+   "SELECT id,'verified',datetime('now') FROM orders "+
+   "WHERE id=? AND status='paid' AND payment_id=? "+
+   "ON CONFLICT(order_id) DO UPDATE SET "+
+   "state=CASE WHEN payment_reviews.state='revoked' THEN 'revoked' ELSE 'verified' END,"+
+   "checked_at=datetime('now')"
+  ).bind(order.id,id);
   const rows=await env.DB.batch([update,review]); // transacción D1
   return reply({received:true,registered:Boolean(rows?.[0]?.meta?.changes)});
  }catch{
