@@ -167,3 +167,25 @@ test('A3 pesado y anillado conjunto TUS/R2 conservan desglose único',()=>{
  assert.equal(q.totalArs,q.archivos.reduce((sum,f)=>sum+f.importeArs,0)+q.armados[0].subtotal);
  assert.ok(q.armados[0].subtotal>0);
 });
+
+test('producción acepta 2 PDFs TUS sin R2, mismo criterio de tamaños; ensayo permanece separado',async()=>{
+ const pequeños=[a4('Notas A4.pdf'),{
+  ...a4('Plan A1 liviano.pdf'),paginas:[{
+   numero:1,anchoCm:59.4,altoCm:84.1,modo:'cad'
+  }]
+ }];
+ const metas=pequeños.map((a,i)=>({
+  fileId:'live_'+i,nombre:a.nombre,sha256:String(i+4).repeat(64),
+  bytes:[2*MIB,3*MIB][i]
+ }));
+ const livePrices={...tarifario,source:'production-d1-approved-only'};
+ const input={webOrderId,archivos:pequeños,manifiestos:metas,tarifario:livePrices,produccion:true};
+ const result=fichaPrearchivoUniversal(input);
+ assert.deepEqual(result.archivos.map(a=>a.transporte),['tus','tus']);
+ assert.deepEqual(result.archivos.map(a=>a.destino),['documentos','ploteos']);
+ assert.equal(result.pagoAutorizado,false);
+ const signed=await firmada(result);
+ await verificarFichaUniversal(signed,{subtle:webcrypto.subtle,allowTusOnly:true});
+ await assert.rejects(verificarFichaUniversal(signed,{subtle:webcrypto.subtle}),/UNIVERSAL_RUTA_INVALIDA/);
+ assert.throws(()=>fichaPrearchivoUniversal({...input,produccion:false}),/TARIFAS_NO_APROBADAS/);
+});
