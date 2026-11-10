@@ -21,7 +21,8 @@ function actualizarModoLote(){
  const campo=$('archivos');if(campo)campo.disabled=!modoLote;
 }
 
-const MAX_PDF_CARGA=location.pathname==='/prueba-v2/carga-inteligente'?10:30;
+const UNIVERSAL_COMPRADOR_LIVE=location.pathname==='/cotizar/archivos'&&window.parent!==window;
+const MAX_PDF_CARGA=(location.pathname==='/prueba-v2/carga-inteligente'||UNIVERSAL_COMPRADOR_LIVE)?10:30;
 const MAX_PDF_TUS_BYTES=LIMITE_TUS_PDF_BYTES;
 const MAX_PDF_R2_PREPAGO_BYTES=LIMITE_R2_PDF_BYTES;
 // El peso selecciona solo la vía de recepción. PDF >40 MiB: R2 universal,
@@ -52,14 +53,14 @@ let abierto=-1;
 let ultimoPresupuesto=null;
 function alertasRecepcionPDF(){
  const alertas=new Map();
- if(location.pathname!=='/prueba-v2/carga-inteligente'||window.parent===window)return alertas;
+ if((location.pathname!=='/prueba-v2/carga-inteligente'&&!UNIVERSAL_COMPRADOR_LIVE)||window.parent===window)return alertas;
  let acumulado=0;
  for(const e of entries){
   const file=e.archivoOriginal;
   if(!(file instanceof File))continue;
   const transporte=decidirTransportePDF(file.size);
   if(transporte.ruta==='r2'){
-   if(typeof R2_UNIVERSAL_ENSAYO!=='undefined'&&R2_UNIVERSAL_ENSAYO)continue;
+   if(R2_UNIVERSAL_ENSAYO||UNIVERSAL_COMPRADOR_LIVE)continue;
    alertas.set(e,'El PDF «'+file.name+'» pesa '+tamanoPdfMiB(file)+
     '. El envío universal de PDF grandes está temporalmente deshabilitado. '+
     'El presupuesto mantiene su tipo y precio; consultanos antes de enviar o pagar.');
@@ -857,7 +858,7 @@ async function cotizar(){
   }}
 }
 async function iniciar(){
- try{const r=await fetch('/api/ensayo-materiales-rapido',{cache:'no-store'});const x=await r.json();if(!r.ok||!x.ok||!x.materials)throw Error('Catálogo inaccesible');catalogo=x.materials;productosFoto=x.photos||[];variantesCorte=x.cutVariants||[];productosGrafica=x.graphicProducts||[];}
+ try{const r=await fetch(UNIVERSAL_COMPRADOR_LIVE?'/api/pedido/live/materiales':'/api/ensayo-materiales-rapido',{cache:'no-store'});const x=await r.json();if(!r.ok||!x.ok||!x.materials)throw Error('Catálogo inaccesible');catalogo=x.materials;productosFoto=x.photos||[];variantesCorte=x.cutVariants||[];productosGrafica=x.graphicProducts||[];}
  catch(_){catalogo={a4:[],a3:[]};productosFoto=[];variantesCorte=[];productosGrafica=[];$('estado').textContent='No se pudo cargar el catálogo comercial.';}
  render();if(entries.length)cotizar();
 }
@@ -867,7 +868,7 @@ iniciar();
 // El puente de recepción sólo existe dentro del portal privado autenticado.
 // La clasificación local sirve para cotizar; el servidor verifica cada PDF
 // nuevamente antes de generar una orden. Ningún ploteo se registra aquí.
-if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
+if((location.pathname==='/prueba-v2/carga-inteligente'||UNIVERSAL_COMPRADOR_LIVE)&&window.parent!==window){
  const bridgeButton=document.createElement('button');
  bridgeButton.type='button';bridgeButton.id='enviar-cotizacion-inteligente';
  bridgeButton.textContent='Agregar PDF al envío privado';
@@ -885,8 +886,8 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
       entries.length<1||entries.length>MAX_PDF_CARGA||
       ultimoPresupuesto.plan?.length!==entries.length)
     throw Error('Completá primero la cotización de todos los documentos.');
-   if(typeof R2_UNIVERSAL_ENSAYO!=='undefined'&&R2_UNIVERSAL_ENSAYO&&entries.some(e=>
-      e.archivoOriginal instanceof File&&e.archivoOriginal.size>MAX_PDF_TUS_BYTES)){
+   if(UNIVERSAL_COMPRADOR_LIVE||(R2_UNIVERSAL_ENSAYO&&entries.some(e=>
+      e.archivoOriginal instanceof File&&e.archivoOriginal.size>MAX_PDF_TUS_BYTES))){
     const lote=prepararLoteParcial(entries);
     if(lote.archivos.length!==entries.length||
        ultimoPresupuesto.pendientes?.length||
@@ -916,7 +917,7 @@ if(location.pathname==='/prueba-v2/carga-inteligente'&&window.parent!==window){
      archivos:lote.archivos,totalOrientativo:ultimoPresupuesto.total
     },location.origin);
     info.classList?.remove?.('estado-recepcion-error');
-    info.textContent='Pedido completo preparado. El servidor confirmará el precio; los PDF siguen en tu dispositivo hasta el pago de prueba.';
+    info.textContent=UNIVERSAL_COMPRADOR_LIVE?'Archivos preparados. El precio se validará con el servidor y ningún PDF se enviará antes del pago acreditado.':'Pedido completo preparado. El servidor confirmará el precio; los PDF siguen en tu dispositivo hasta el pago de prueba.';
     window.parent.postMessage({type:'SABER_SMART_HANDOFF_READY',cantidad:entries.length},location.origin);
     return;
    }
