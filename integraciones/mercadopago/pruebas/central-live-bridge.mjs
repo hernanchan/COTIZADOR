@@ -9,7 +9,8 @@ const routeSchema=new Map([
  ['/internal/central/live/checkout','saber-mp-live-checkout-v1'],
  ['/internal/central/live/status','saber-mp-live-status-v1'],
  ['/internal/central/live/order','saber-central-r2-universal-create-order-v1'],
- ['/internal/central/live/pricing','saber-price-snapshot-live-v1']
+ ['/internal/central/live/pricing','saber-price-snapshot-live-v1'],
+ ['/internal/central/live/draft','saber-r2-universal-draft-v1']
 ]);
 export async function leerFirmaInternaLive(request,env,{
  now=()=>Math.floor(Date.now()/1000),subtle=crypto.subtle
@@ -39,17 +40,24 @@ export async function leerFirmaInternaLive(request,env,{
     !Number.isSafeInteger(time)||Math.abs(time-Number(ts))>300)
    return {error:'Identidad o fecha LIVE inválida',status:401};
  const raw=await request.text();
- if(raw.length<40||raw.length>2000)
+ const draftRoute=url.pathname==='/internal/central/live/draft';
+ if(raw.length<40||raw.length>(draftRoute?512000:2000))
    return {error:'Tamaño LIVE inválido',status:413};
  let payload;try{payload=JSON.parse(raw)}catch{}
  const orderRoute=url.pathname==='/internal/central/live/order';
  const pricingRoute=url.pathname==='/internal/central/live/pricing';
- const keys=pricingRoute?'purpose,schema':orderRoute?'draftId,quoteHash,schema,telefono,webOrderId':
+ const keys=draftRoute?'archivos,armados,estado,pagoAutorizado,priceRevision,produccionAutorizada,quoteHash,schema,subidaAutorizada,totalArs,webOrderId':
+  pricingRoute?'purpose,schema':orderRoute?'draftId,quoteHash,schema,telefono,webOrderId':
   'commercialOrderId,schema,webOrderId';
  if(!payload||typeof payload!=='object'||Array.isArray(payload)||
     Object.keys(payload).sort().join(',')!==keys||
     payload.schema!==expectedSchema||
-    (pricingRoute?payload.purpose!=='quote-production-approved':
+    (draftRoute?!/^[a-f0-9]{64}$/.test(payload.quoteHash||'')||
+       !/^d1-approved-revision-[1-9]\d{0,7}$/.test(payload.priceRevision||'')||
+       payload.pagoAutorizado!==false||payload.subidaAutorizada!==false||
+       payload.produccionAutorizada!==false||
+       payload.estado!=='PRELIMINAR_SIN_ORIGINALES':
+     pricingRoute?payload.purpose!=='quote-production-approved':
      orderRoute?!UUID.test(payload.draftId||'')||
       !/^[a-f0-9]{64}$/.test(payload.quoteHash||'')||
       typeof payload.telefono!=='string'||
