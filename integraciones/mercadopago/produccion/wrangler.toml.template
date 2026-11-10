@@ -1,0 +1,19 @@
+# Central de pagos PRODUCCIÓN — preparación inaccesible, sin cobros.
+# El CI reemplaza __D1_PRODUCCION_UUID__ por UUID autenticado desde Cloudflare.
+# Nunca copiar DB id de pruebas ni habilitar URL workers.dev o cron.
+name = "saber-pagos-produccion"
+main = "../pruebas/worker.js"
+compatibility_date = "2026-10-17"
+workers_dev = false
+preview_urls = false
+keep_vars = false
+
+[vars]
+SABER_ENTORNO = "preparacion"
+CENTRAL_DB_ENV = "produccion"
+MP_LIVE_GATE = "NO_GO"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "saber-pagos-produccion"
+database_id = "__D1_PRODUCCION_UUID__"
