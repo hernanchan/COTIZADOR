@@ -1,0 +1,44 @@
+name: Saber - preview Pages comprobacion HTTP sin publicar
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-preview-pages-http-20261110.yml]
+permissions:
+  contents: read
+  statuses: write
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Accesibilidad portada, cotizador y compuerta del despliegue ya existente
+        shell: bash
+        run: |
+          set -euo pipefail
+          origin='https://227c8e6d.libreriasaber.pages.dev'
+          tmp=$(mktemp -d)
+          trap 'rm -rf "$tmp"' EXIT
+          for page in / /cotizar /portal-comercial.json; do
+            case "$page" in /) key=home;; /cotizar) key=quote;; *) key=gate;; esac
+            http=$(curl -sS -L --max-time 25 -o "$tmp/$key" -w '%{http_code}' "$origin$page" || true)
+            echo "PREVIEW_${key}_HTTP=$http"
+            test "$http" = 200 || exit 1
+          done
+          grep -Fq 'Librería Saber' "$tmp/home"
+          grep -Fq 'saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/pedido-cliente' "$tmp/quote"
+          jq -e '.enabled==false and .release=="NO_GO" and .buyerUrl==null' "$tmp/gate" > /dev/null
+          echo 'PAGES_PREVIEW_HOME_AND_QUOTE_OK_GATE_STILL_OFF'
+          echo 'NO_PRODUCTION_NO_MAIN_NO_PAYMENT_NO_R2'
+      - name: Registrar resultado
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        shell: bash
+        run: |
+          if [ "$RESULT" = success ]; then state=success; else state=failure; fi
+          jq -n --arg state "$state" --arg context 'saber/pages-preview-http' \
+            --arg description "Vista previa HTTP y gate comercial: $RESULT" \
+            --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/preview-status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/preview-status.json >/dev/null
