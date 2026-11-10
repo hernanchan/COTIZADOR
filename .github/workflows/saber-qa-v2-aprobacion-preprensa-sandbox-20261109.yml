@@ -36,3 +36,4 @@ jobs:
           node --check integraciones/autocotizador/recepcion/e2e-v2-aprobacion-qa-r2-sandbox.mjs
           node integraciones/autocotizador/recepcion/e2e-v2-aprobacion-qa-r2-sandbox.mjs
           echo 'QA_SANDBOX_APPROVED_ONLY_NOT_REAL_CUSTOMER_NOT_LIVE'
+# Reejecucion 2026-11-10: solo orden sintetica ya pagada, sin nuevas preferencias ni uploads
