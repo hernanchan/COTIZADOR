@@ -2412,7 +2412,8 @@ export default {
     if(page==='/api/pedido/live/r2/iniciar'||
        page==='/api/pedido/live/r2/parte'||
        page==='/api/pedido/live/r2/completar'||
-       page==='/api/pedido/live/r2/verificar'){
+       page==='/api/pedido/live/r2/verificar'||
+       page==='/api/pedido/live/r2/recuperar'){
       const buyer=await autorizadoCompradorLive(request,env);
       return manejarR2MultipartLive(request,env,{authorized:buyer});
     }
