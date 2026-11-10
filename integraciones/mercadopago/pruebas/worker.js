@@ -2581,6 +2581,11 @@ body.price-only #priceAdminFieldset summary{font-size:1.3rem}
 <details><summary>Otros pedidos pagados (<span id="count-other">0</span>)</summary><div id="orders"></div></details>
 </div></fieldset>
 <fieldset id="r2ReviewPanel"><legend>Ploteos grandes pagados · revisión de preprensa</legend><div class="toolbar"><button id="refreshR2Paid" class="outline">Consultar originales R2 pagados</button></div><p class="note">Pago acreditado y archivo recibido son etapas distintas. Las páginas, medidas y precio final deben verificarse antes de imprimir. Sin producción automática.</p><ol id="r2PaidReview"></ol></fieldset>
+<fieldset id="liveRecepcionPanel"><legend>Recepción LIVE de documentos · solo lectura</legend>
+<p class="note">Órdenes pagadas conciliadas con D1. Un R2 con SHA almacenado todavía requiere inspección del PDF. Este panel no habilita descarga, ZIP ni producción.</p>
+<div class="toolbar"><button id="refreshLiveRecepcion" class="outline" type="button">Consultar recepción LIVE</button></div>
+<p class="note" role="status" id="liveRecepcionStatus">Consulta manual pendiente.</p>
+<ol id="liveRecepcionList"></ol></fieldset>
 <fieldset id="priceAdminFieldset"><details id="pricingPanel" class="pricing-panel"><summary>Precios y promociones · administración privada</summary>
 <p class="price-note">Ensayo: estos valores provienen de un tarifario histórico del 21/08/2026 y de los cupones existentes. Guardar o aprobar aquí NO cambia los precios de la web pública, los pagos ni el cotizador. Primero hay que validar los precios comerciales reales y conectar un único tarifario al motor.</p>
 <div class="price-toolbar">
@@ -3302,6 +3307,48 @@ try{operatorInput.value=sessionStorage.getItem("saberProductionOperator")||""}ca
 operatorInput.addEventListener("change",()=>{
  try{sessionStorage.setItem("saberProductionOperator",operatorInput.value.trim())}catch(_){}
 });
+const liveRecepcionStatus=document.querySelector("#liveRecepcionStatus");
+const liveRecepcionList=document.querySelector("#liveRecepcionList");
+const liveRecepcionButton=document.querySelector("#refreshLiveRecepcion");
+async function actualizarRecepcionLive(){
+ liveRecepcionButton.disabled=true;
+ liveRecepcionStatus.textContent="Consultando recepción verificada…";
+ liveRecepcionList.replaceChildren();
+ try{
+  const data=await api("/admin/api/central/live-recepcion");
+  if(data.ok!==true||data.source!=="production-d1-verified-payments-only"||
+     !Array.isArray(data.orders)||data.productionAuthorized!==false||
+     data.downloadAuthorized!==false)throw Error("Respuesta LIVE inconsistente");
+  liveRecepcionStatus.textContent=data.orders.length?
+   data.orders.length+" pedido(s) pagos: verificar sus archivos y preprensa antes de producir.":
+   "No hay pedidos documentales LIVE pagados pendientes en esta consulta.";
+  const labels={
+   PAGADO_ESPERANDO_ORIGINALES:"Aún faltan PDF originales",
+   R2_ALMACENADO_PENDIENTE_ANALISIS_PDF:"R2 almacenado · falta analizar PDF",
+   ORIGINALES_RECIBIDOS_PREPRENSA_PENDIENTE:"Originales recibidos · preprensa pendiente"
+  };
+  for(const o of data.orders){
+   if(!/^[0-9]{3,}$/.test(o.numeroOrden||"")||
+      !Object.hasOwn(labels,o.estado)||
+      !Number.isSafeInteger(o.fileCount)||o.fileCount<1||
+      !Number.isSafeInteger(o.receivedCount)||o.receivedCount<0||
+      !Number.isSafeInteger(o.stagedR2Count)||o.stagedR2Count<0||
+      o.readyForProduction!==false||o.zipEnabled!==false)
+    throw Error("Pedido sin trazabilidad completa");
+   const li=document.createElement("li");
+   li.textContent="Orden "+o.numeroOrden+" · "+labels[o.estado]+
+    " · recibidos "+o.receivedCount+"/"+o.fileCount+
+    " · R2 pendiente de análisis "+o.stagedR2Count+
+    " · $"+Number(o.amountArs).toLocaleString("es-AR");
+   liveRecepcionList.append(li);
+  }
+ }catch(e){
+  liveRecepcionList.replaceChildren();
+  liveRecepcionStatus.textContent="No se pudo consultar recepción LIVE: "+
+   String(e.message||e).slice(0,110)+". No se habilita producción.";
+ }finally{liveRecepcionButton.disabled=false}
+}
+liveRecepcionButton.addEventListener("click",actualizarRecepcionLive);
 const lanes=["pendiente","en_preparacion","listo","en_espera","entregado"];
 let refreshingBoard=false;
 /** Edición operativa junto a la tarjeta. Nunca depender de un detalle lejano. */
