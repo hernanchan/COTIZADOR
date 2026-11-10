@@ -1,0 +1,60 @@
+name: Saber - validar ZIP real orden 026 desde Central privada
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-026-zip-e2e-20261110.yml]
+permissions: {contents: read, statuses: write}
+concurrency: {group: saber-026-zip-staff-no-payment, cancel-in-progress: false}
+jobs:
+  zip:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Descargar los dos PDF desde Central y generar hoja A4 + ZIP streaming
+        env:
+          SABER_V2_OPERATOR_PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+        run: |
+          set -euo pipefail
+          node --check integraciones/autocotizador/recepcion/piloto-026-zip-real-postpago-20261110.mjs
+          node integraciones/autocotizador/recepcion/piloto-026-zip-real-postpago-20261110.mjs
+      - name: Abrir el ZIP y verificar exactamente dos originales mas instrucciones A4
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s /tmp/SABER_ORDEN_026_POSTPAGO_TEST.zip
+          unzip -tq /tmp/SABER_ORDEN_026_POSTPAGO_TEST.zip
+          python3 - <<'PY'
+          import zipfile,hashlib
+          file='/tmp/SABER_ORDEN_026_POSTPAGO_TEST.zip'
+          with zipfile.ZipFile(file) as z:
+              names=z.namelist()
+              assert names==['PDF_01.pdf','PDF_02.pdf','ORDEN_026_INSTRUCCIONES.pdf'],names
+              sizes=[z.getinfo(n).file_size for n in names]
+              assert sizes[0]==441 and sizes[1]==62915011 and 400<sizes[2]<2*1048576,sizes
+              for name in names:
+                  with z.open(name) as f:
+                      assert f.read(5)==b'%PDF-',name
+              sheet=z.read(names[2])
+              assert b'/MediaBox [0 0 595 842]' in sheet
+              print('PILOT_026_ZIP_UNZIP_CRC_3_PDFS_SHA_VERIFIED_ON_WRITE')
+              print('PILOT_026_INSTRUCTIONS_A4_PDF_IN_ZIP')
+              print('PILOT_026_ORIGINAL_SIZES_MATCH_RECEIPTS')
+          PY
+          echo 'ZIP_COMPLETE_SYNTHETIC_QA_NO_MAIN_NO_PAYMENT_NO_PRINT_AUTH'
+      - name: Registrar resultado
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          if [ "$RESULT" = success ];then state=success;else state=failure;fi
+          jq -n --arg state "$state" --arg context 'saber/qa-026-real-zip' \
+           --arg description "ZIP TUS+R2+sheet paid order 026: $RESULT" \
+           --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+           '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/status.json >/dev/null
