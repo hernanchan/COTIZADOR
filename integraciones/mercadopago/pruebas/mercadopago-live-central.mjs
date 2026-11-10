@@ -102,6 +102,23 @@ export async function checkoutMPLiveCentral(request,env,{
  const fileCount=order&&order.status==='awaiting_payment'?
   await cantidadArchivosVinculados(env,order.id,p.webOrderId):null;
  if(!fileCount)return reply({ok:false,error:'MP_LIVE_ORDEN_NO_COBRABLE'},409);
+ // No entregar una preferencia de cobro para un PDF >40MiB si R2 productivo
+ // continúa cerrado. Leer transporte de la ficha inmutable en D1, no del navegador.
+ let transports;
+ try{
+  const rows=await env.DB.prepare(
+   'SELECT f.transport FROM central_r2_universal_files f '+
+   'JOIN central_r2_universal_order_links l ON l.web_order_id=f.web_order_id '+
+   'WHERE l.web_order_id=? AND l.commercial_order_id=? ORDER BY f.file_id'
+  ).bind(p.webOrderId,p.commercialOrderId).all();
+  transports=rows?.results;
+ }catch{return reply({ok:false,error:'MP_LIVE_TRANSPORTE_NO_DISPONIBLE'},503)}
+ if(!Array.isArray(transports)||transports.length!==fileCount||
+    transports.some(row=>!['tus','r2'].includes(row.transport)))
+  return reply({ok:false,error:'MP_LIVE_TRANSPORTE_INCONSISTENTE'},409);
+ if(transports.some(row=>row.transport==='r2')&&
+    env?.CENTRAL_LIVE_R2_GATE!=='GO_COMERCIAL_CONFIRMADO')
+  return reply({ok:false,error:'MP_LIVE_R2_NO_DISPONIBLE'},503);
  const age=now()-Date.parse(String(order.created_at).replace(' ','T')+'Z');
  if(!Number.isFinite(age)||age<0||age>=86400000)
   return reply({ok:false,error:'MP_LIVE_COTIZACION_VENCIDA'},409);
