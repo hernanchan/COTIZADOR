@@ -55,7 +55,7 @@ export async function leerFirmaInternaLive(request,env,{
  const orderRoute=url.pathname==='/internal/central/live/order';
  const pricingRoute=url.pathname==='/internal/central/live/pricing';
  const keys=r2Reserve?'bytes,fileId,name,objectKey,orderId,pages,schema,sha256':
-  r2Gate?'bytes,fileId,name,orderId,pages,schema,sha256':
+  const keys=r2Gate?'bytes,fileId,name,orderId,pages,schema,sha256':
   tusGate?'action,bytes,fileId,name,orderId,pages,schema,sha256':
   tusReceipt?'bytes,fileId,metrics,name,objectName,orderId,pages,receiptId,schema,sha256':
   draftRoute?'archivos,armados,estado,pagoAutorizado,priceRevision,produccionAutorizada,quoteHash,schema,subidaAutorizada,totalArs,webOrderId':
@@ -115,7 +115,7 @@ export async function leerFirmaInternaLive(request,env,{
       payload.telefono.replace(/\D/g,'').length<10||
       payload.telefono.replace(/\D/g,'').length>15:
       !UUID.test(payload.commercialOrderId||''))||
-    (!pricingRoute&&!tusGate&&!tusReceipt&&!r2Gate&&!WEB.test(payload.webOrderId||'')))
+    (!pricingRoute&&!tusGate&&!tusReceipt&&!r2Gate&&!r2Reserve&&!WEB.test(payload.webOrderId||'')))
    return {error:'Orden LIVE inválida',status:422};
  const key=await subtle.importKey('raw',new TextEncoder().encode(env.CENTRAL_BRIDGE_KEY),
   {name:'HMAC',hash:'SHA-256'},false,['verify']);
