@@ -2,9 +2,12 @@ name: Saber QA V2 - aprobar SOLO PDF sintetico sandbox tras cotejo y acceso auto
 on:
   push:
     branches: [integracion/tus-pedido-privado-20261101]
-    paths: [.github/workflows/saber-qa-v2-aprobacion-preprensa-sandbox-20261109.yml]
+    paths:
+      - .github/workflows/saber-qa-v2-aprobacion-preprensa-sandbox-20261109.yml
+      - integraciones/autocotizador/recepcion/e2e-v2-aprobacion-qa-r2-sandbox.mjs
 permissions:
   contents: read
+  statuses: write
 concurrency:
   group: saber-qa-r2-v2-72e9f66a-aprobar
   cancel-in-progress: false
@@ -36,4 +39,25 @@ jobs:
           node --check integraciones/autocotizador/recepcion/e2e-v2-aprobacion-qa-r2-sandbox.mjs
           node integraciones/autocotizador/recepcion/e2e-v2-aprobacion-qa-r2-sandbox.mjs
           echo 'QA_SANDBOX_APPROVED_ONLY_NOT_REAL_CUSTOMER_NOT_LIVE'
+      - name: Registrar resultado de aprobación sandbox sin exponer credenciales
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QA_RESULT: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          if [ "$QA_RESULT" = success ]; then
+            state=success
+            description="Preprensa del PDF sintetico sandbox aprobada en Central"
+          else
+            state=failure
+            description="Preprensa sandbox bloqueada: revisar diagnostico de credenciales o cotejo"
+          fi
+          jq -n --arg state "$state" --arg context 'saber/qa-preprensa-aprobacion-sandbox' \
+             --arg description "$description" \
+             --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+             '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/saber-qa-status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/saber-qa-status.json > /dev/null
+          echo "QA_SANDBOX_APPROVAL_WORKFLOW=$QA_RESULT"
 # Reejecucion 2026-11-10: solo orden sintetica ya pagada, sin nuevas preferencias ni uploads
