@@ -16,7 +16,7 @@ const env={
  CENTRAL_BRIDGE_KEY:'bridge-secret-very-long-for-testing-2026'
 };
 const NOW=1794320000, NONCE='123e4567-e89b-42d3-a456-426614174001';
-const resultStart={ok:true,orderId:UUID,amountArs:24500,
+const resultStart={ok:true,orderId:UUID,amountArs:24500,fileCount:1,
  checkoutUrl:'https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=a'};
 const resultStatus={ok:true,webOrderId:WEB,commercialOrderId:UUID,amountArs:24500,
  estado:'pagado_esperando_archivos',fileCount:1,pendingFiles:1,receivedFileIds:[],
@@ -55,6 +55,7 @@ test('start solo devuelve URL MP validada y envía firma HMAC para la misma orde
  assert.equal(r.response.status,200);
  assert.equal(r.data.commercialOrderId,UUID);
  assert.equal(r.data.amountArs,24500);
+ assert.equal(r.data.fileCount,1);
  assert.equal(r.data.uploadAuthorized,false);
  assert.equal(r.calls.length,1);
  assert.equal(r.calls[0].url,'https://pagos.libreriasaber.com.ar/internal/central/live/checkout');
@@ -89,7 +90,9 @@ test('rechaza URL MP extraña, respuesta de otra orden y errores Central',async(
  for(const bad of [
   {...resultStart,checkoutUrl:'https://evil.example/checkout'},
   {...resultStart,checkoutUrl:'http://www.mercadopago.com.ar/'},
-  {...resultStart,orderId:'123e4567-e89b-42d3-a456-426614174099'}
+  {...resultStart,orderId:'123e4567-e89b-42d3-a456-426614174099'},
+  {...resultStart,fileCount:undefined},
+  {...resultStart,fileCount:11}
  ]){
   const r=await run(request(),env,{out:bad});
   assert.equal(r.response.status,502);
