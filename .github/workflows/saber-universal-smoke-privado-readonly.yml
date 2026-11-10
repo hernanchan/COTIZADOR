@@ -38,12 +38,21 @@ jobs:
           test "$code" = 200 || { echo "R2_PDF_ANALYZER_JS_HTTP_$code";exit 1; }
           grep -Fq 'SABER_SMART_UNIVERSAL_PDF' "$dir/analizador.js" ||
             { echo 'R2_PDF_UNIVERSAL_HANDOFF_NOT_IN_JS';exit 1; }
+          grep -Fq 'eleccion-plotter-boton' "$dir/carga.html" ||
+            { echo 'PLOTTER_CAD_PLENO_STYLE_MISSING';exit 1; }
           echo 'REAL_PRIVATE_MULTI_PDF_ANALYZER_READY'
           code=$(curl -sS --max-time 25 -u "operador:$PASSWORD"             -o "$dir/flow.mjs" -w '%{http_code}' "$root/prueba-v2/flujo-universal.mjs")
           test "$code" = 200 || { echo "UNIVERSAL_JS_HTTP_$code";exit 1; }
           test "$(wc -c < "$dir/flow.mjs")" -gt 1000
           grep -Fq 'ensayo-r2-borrador-universal' "$dir/flow.mjs" ||
             { echo 'UNIVERSAL_PAYMENT_FLOW_MISSING';exit 1; }
+          grep -Fq 'TAMAÑO MAYOR A A3' "$dir/analizador.js" ||
+            { echo 'A3_PLOTTER_AUTO_NOTICE_MISSING';exit 1; }
+          grep -Fq 'CAD · Planos' "$dir/analizador.js" ||
+            { echo 'CAD_OPTION_NOT_VISIBLE_IN_LIVE_JS';exit 1; }
+          grep -Fq 'PLENO · Póster' "$dir/analizador.js" ||
+            { echo 'PLENO_OPTION_NOT_VISIBLE_IN_LIVE_JS';exit 1; }
+          echo 'REAL_PRIVATE_PLOTTER_CAD_PLENO_OPTION_PRESENT'
           echo 'REAL_PRIVATE_UNIVERSAL_JS_AVAILABLE'
           code=$(curl -sS --max-time 25 -u "operador:$PASSWORD"             -o "$dir/zip.html" -w '%{http_code}' "$root/prueba-v2/universal-paquete")
           test "$code" = 200 || { echo "UNIVERSAL_ZIP_HTTP_$code";exit 1; }
