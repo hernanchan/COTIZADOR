@@ -2,7 +2,7 @@ name: Saber - habilitar solo tablas universales faltantes en D1 de pruebas
 on:
   push:
     branches: [integracion/tus-pedido-privado-20261101]
-    paths: [.github/workflows/saber-instalar-tablas-universales-sandbox-20261110.yml]
+    paths: [.github/workflows/saber-instalar-tablas-universales-sandbox-20261110.yml, integraciones/publicacion/instalar-esquema-universal-sandbox-20261110.mjs]
 permissions:
   contents: read
   statuses: write
