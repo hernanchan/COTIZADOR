@@ -150,3 +150,49 @@ test('HMAC + MP pago/merchant/seller + D1 correctos marcan una sola vez',async()
  const twice=await conciliarWebhookMPLive(await signedWebhook(),f.env,{fetcher:f.mpFetch});
  assert.equal(twice.status,200);assert.equal((await twice.json()).idempotent,true);
 });
+
+test('el token sandbox no se puede usar como token LIVE aunque el gate diga GO',async()=>{
+ const f=fixture();
+ const env={...f.env,MP_LIVE_ACCESS_TOKEN:f.env.MP_TEST_ACCESS_TOKEN};
+ const r=await checkoutMPLiveCentral(new Request('https://pagos.libreriasaber.com.ar/internal/central/live/checkout',{method:'POST'}),env,{
+  readSigned:f.signed,fetcher:async()=>{throw Error('nunca pedir a MP')}
+ });
+ assert.equal(r.status,503);
+});
+test('vendedor test_user queda rechazado incluso con ID de seller coincidente',async()=>{
+ const f=fixture(),req=new Request('https://pagos.libreriasaber.com.ar/internal/central/live/checkout',{method:'POST'});
+ const fetcher=async (url,options)=>{
+  if(String(url).endsWith('/users/me'))return response({id:SELLER,tags:['test_user']});
+  return f.mpFetch(url,options);
+ };
+ const r=await checkoutMPLiveCentral(req,f.env,{readSigned:f.signed,fetcher});
+ assert.equal(r.status,503);
+ assert.equal(f.posts,0);
+});
+test('un webhook firmado con merchantOrder ajena no cambia D1',async()=>{
+ const f=fixture();f.o.preference_id='MP-LIVE-PREF-1';
+ const fetcher=async (url,options)=>{
+  if(String(url).includes('/merchant_orders/'))return response({...f.merchant,external_reference:'otra-orden'});
+  return f.mpFetch(url,options);
+ };
+ const r=await conciliarWebhookMPLive(await signedWebhook(),f.env,{fetcher});
+ assert.equal(r.status,200);
+ const result=await r.json();
+ assert.equal(result.registered,false);
+ assert.equal(f.o.status,'awaiting_payment');
+ assert.equal(f.review.state,null);
+});
+test('reembolso posterior revoca verificación y nunca vuelve a marcarla verificada',async()=>{
+ const f=fixture();f.o.preference_id='MP-LIVE-PREF-1';
+ let r=await conciliarWebhookMPLive(await signedWebhook(),f.env,{fetcher:f.mpFetch});
+ assert.equal((await r.json()).registered,true);
+ const refunded={...f.payment,transaction_amount_refunded:4400,status:'refunded'};
+ const fake=async (url,options)=>
+   String(url).includes('/v1/payments/')?response(refunded):f.mpFetch(url,options);
+ r=await conciliarWebhookMPLive(await signedWebhook(),f.env,{fetcher:fake});
+ assert.equal(r.status,200);assert.equal((await r.json()).reason,'pago_revocado');
+ assert.equal(f.review.state,'revoked');
+ r=await conciliarWebhookMPLive(await signedWebhook(),f.env,{fetcher:f.mpFetch});
+ assert.equal(r.status,200);assert.equal((await r.json()).registered,false);
+ assert.equal(f.review.state,'revoked');
+});
