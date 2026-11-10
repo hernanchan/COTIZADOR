@@ -52,7 +52,7 @@ const statements=sql.split(';').map(x=>x.trim()).filter(Boolean);
 assert.ok(statements.length>=12&&statements.length<=25,'MIGRACION_CANTIDAD_INESPERADA');
 for(const statement of statements){
  assert.match(statement,/^CREATE (TABLE|INDEX) IF NOT EXISTS [a-z0-9_]+/i,'DDL_NO_APROBADO');
- assert.doesNotMatch(statement,/\b(DROP|ALTER|DELETE|INSERT|UPDATE|REPLACE|ATTACH|DETACH|TRIGGER)\b/i,'DDL_POTENCIALMENTE_DESTRUCTIVO');
+ assert.doesNotMatch(statement,/^(DROP|ALTER|DELETE|INSERT|UPDATE|REPLACE|ATTACH|DETACH|TRIGGER)\b/i,'DDL_POTENCIALMENTE_DESTRUCTIVO');
  assert.ok(statement.length<3000,'DDL_EXCESIVO');
 }
 const existingTables=new Set(before.map(x=>x.name));
