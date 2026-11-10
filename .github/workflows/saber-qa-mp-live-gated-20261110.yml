@@ -7,6 +7,7 @@ on:
       - 'integraciones/mercadopago/pruebas/mercadopago-live-central.mjs'
       - 'integraciones/mercadopago/pruebas/mercadopago-live-central.test.mjs'
       - 'integraciones/mercadopago/pruebas/central-live-bridge.mjs'
+      - 'integraciones/mercadopago/pruebas/r2-universal-order-central.mjs'
       - 'integraciones/mercadopago/pruebas/central-live-bridge.test.mjs'
       - 'integraciones/mercadopago/pruebas/central-live-hmac-e2e.test.mjs'
       - 'integraciones/mercadopago/pruebas/worker.js'
@@ -42,6 +43,7 @@ jobs:
           node --test integraciones/autocotizador/recepcion/checkout-live-cliente.test.mjs
           node --check integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs
           node --test integraciones/autocotizador/recepcion/pago-live-universal-documentos.test.mjs
+          node --check integraciones/mercadopago/pruebas/r2-universal-order-central.mjs
           node --check integraciones/mercadopago/pruebas/worker.js
           node --check integraciones/mercadopago/pruebas/mercadopago-live-central.mjs
       - name: Compilación del Worker con módulos LIVE cerrados
