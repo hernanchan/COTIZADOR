@@ -56,6 +56,7 @@ import {cotizarDocumentos} from '../pruebas/cotizar-documentos.mjs';
 import {cotizarDocumentosIndividuales} from '../pruebas/cotizar-documentos-individuales.mjs';
 import preciosPiloto from '../../../precios-web.json';
 import {obtenerTarifarioD1Privado} from './obtener-tarifario-d1-privado.mjs';
+import {obtenerTarifarioD1Live} from './obtener-tarifario-d1-live.mjs';
 import {verificarPdfAlmacenado} from './verificacion-pdf-drive-servidor.mjs';
 import {tusPrivadoConfigurado,diagnosticarTUSPrivado,comprobarTUSAntesDeEnviar,iniciarTandaTUSPrivada,finalizarPedidoTUSPrivado,recuperarPedidoTUSPrivado,descargarPdfTUSPersonal} from './tus-pedido-worker.mjs';
 import {manejarR2GrandePrivado} from './r2-pdf-grandes-api-privada.mjs';
@@ -98,7 +99,9 @@ import {fichaR2Personal} from './r2-ficha-produccion-documentos.mjs';
  * Si falla la lectura D1, no sustituye el último precio sin avisar.
  */
 async function preciosPrivados(env,request){
- if(env?.DOCS_PRICE_ADMIN_D1_ENABLED!=='PRIVATE_TEST_ONLY')return preciosPiloto;
+ const live=env?.SABER_ENTORNO==='produccion';
+ // Nunca cotizar con precios históricos ni leer sandbox en producción.
+ if(!live&&env?.DOCS_PRICE_ADMIN_D1_ENABLED!=='PRIVATE_TEST_ONLY')return preciosPiloto;
  if(!(request instanceof Request))throw Error('Tarifario privado requiere una solicitud autorizada.');
  let staff=false;
  const secret=env?.DOCS_CENTRAL_ADMIN_KEY;
@@ -120,7 +123,8 @@ async function preciosPrivados(env,request){
     !(soloPresupuesto&&await autorizadoCotizadorCliente(request,env))&&
     !(precioComprador&&await autorizadoPedidoCliente(request,env)))
   throw Error('La versión de precios privada requiere sesión autorizada.');
- return (await obtenerTarifarioD1Privado(env)).prices;
+ return live?(await obtenerTarifarioD1Live(env)).prices:
+  (await obtenerTarifarioD1Privado(env)).prices;
 }
 
 const INTERNAL_ALLOW_UPLOADS = false;
