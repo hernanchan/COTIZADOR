@@ -1,0 +1,144 @@
+name: Saber universal - activar SOLO dos Workers privados con rollback comprobado
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths:
+      - .github/workflows/saber-universal-promover-solo-privados.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: saber-universal-private-safe-promotion
+  cancel-in-progress: false
+jobs:
+  private-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Gate: fuente de las versiones inactivas no cambió y tests básicos
+        shell: bash
+        run: |
+          set -euo pipefail
+          git cat-file -e 70e59f0b159e89072fceae5d82837ba2d06b4fe2^{commit}
+          git diff --name-only 70e59f0b159e89072fceae5d82837ba2d06b4fe2 HEAD > /tmp/saber-unstaged-change-list
+          if grep -Ev '^(tests/|\.github/workflows/)' /tmp/saber-unstaged-change-list; then
+            echo 'SOURCE_RUNTIME_CHANGED_SIN_VOLVER_A_STAGE_NO_DEPLOY'
+            exit 1
+          fi
+          npm install --no-save --no-audit --no-fund pdf-lib@1.17.1
+          node --test tests/r2-orden-universal-sin-cobro.test.mjs \
+            tests/r2-universal-checkout-postpago.test.mjs \
+            tests/r2-universal-tus-mixto-postpago.test.mjs \
+            tests/r2-universal-paquete-operador.test.mjs \
+            tests/r2-universal-cola-borrado-d1.test.mjs \
+            tests/r2-universal-preprensa-central.test.mjs \
+            tests/r2-universal-borrado-mixto.test.mjs \
+            tests/r2-universal-purge-mixto.test.mjs \
+            tests/zip-universal-stream.test.mjs
+          node --check integraciones/mercadopago/pruebas/worker.js
+          node --check integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs
+          echo 'RUNTIME_FROZEN_SIN_CAMBIOS_COMERCIALES_TESTS_GREEN'
+      - name: Check bindings + flags, promover PRIVADOS y rollback si falla smoke
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          docs='saber-documentos-pruebas'
+          central='saber-pagos-pruebas'
+          docs_old='ac404da2-da0c-49ec-9fe5-d7570b306cc6'
+          docs_new='bcfb592e-3673-4277-ab25-c56ae168bb4e'
+          central_old='a743bf4d-065d-41c3-82ed-f886f2d86e0f'
+          central_new='7d9e4e12-b4ab-4704-8c02-131b1d6a15ee'
+          api="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts"
+          auth="Authorization: Bearer $TOKEN"
+          dir=$(mktemp -d)
+          touched=0
+          rollback(){
+            rc=$?
+            trap - EXIT
+            if [ "$rc" -ne 0 ] && [ "$touched" = 1 ]; then
+              echo "REVERTIR_WORKERS_PRIVADOS_NO_PUBLICACION"
+              for worker in "$docs" "$central"; do
+                if [ "$worker" = "$docs" ]; then previous="$docs_old"; else previous="$central_old"; fi
+                jq -n --arg id "$previous" \
+                  '{strategy:"percentage",versions:[{version_id:$id,percentage:100}],annotations:{"workers/message":"Rollback automatico Saber universal privado"}}' > "$dir/revert.json"
+                if curl -fsS --max-time 70 -H "$auth" -H 'Content-Type: application/json' \
+                  --data-binary "@$dir/revert.json" "$api/$worker/deployments" > "$dir/revert-result.json" &&
+                   jq -e '.success==true' "$dir/revert-result.json" >/dev/null; then
+                  echo "$worker ROLLBACK_REQUESTED"
+                else echo "$worker CRITICAL_ROLLBACK_UNCONFIRMED"; fi
+              done
+              for worker in "$docs" "$central"; do
+                if [ "$worker" = "$docs" ]; then previous="$docs_old"; else previous="$central_old"; fi
+                curl -fsS --max-time 25 -H "$auth" "$api/$worker/deployments" > "$dir/restored.json" || true
+                restored=$(jq -r '.result.deployments[0].versions[]?|select(.percentage==100)|.version_id' "$dir/restored.json" | head -n1)
+                if [ "$restored" = "$previous" ]; then echo "$worker ROLLBACK_CONFIRMED"; else echo "$worker ROLLBACK_REQUIERE_REVISION"; fi
+              done
+            fi
+            rm -rf "$dir"
+            exit "$rc"
+          }
+          trap rollback EXIT
+          for worker in "$docs" "$central"; do
+            if [ "$worker" = "$docs" ]; then old="$docs_old"; candidate="$docs_new"; else old="$central_old"; candidate="$central_new"; fi
+            curl -fsS --max-time 25 -H "$auth" "$api/$worker/settings" > "$dir/settings.json"
+            curl -fsS --max-time 25 -H "$auth" "$api/$worker/deployments" > "$dir/before.json"
+            current=$(jq -er '.result.deployments[0].versions | if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$dir/before.json")
+            test "$current" = "$old" || { echo "$worker CONCURRENT_VERSION_CHANGED_ABORT";exit 1; }
+            jq -e '.success==true and (.result.bindings|type=="array")' "$dir/settings.json" >/dev/null
+            if [ "$worker" = "$docs" ]; then
+              flags='["DOCS_R2_UNIVERSAL_PURGE_ENABLED","DOCS_R2_UNIVERSAL_PURGE_SCOPE"]'
+            else
+              flags='["CENTRAL_R2_UNIVERSAL_PURGE_ENABLED","CENTRAL_R2_UNIVERSAL_PURGE_EXECUTE_ENABLED"]'
+            fi
+            jq -e --argjson names "$flags" \
+              'all($names[] as $n|(.result.bindings|map(select(.name==$n))|first); .==null or (.type=="plain_text" and .text=="OFF"))' \
+              "$dir/settings.json" >/dev/null || { echo "$worker DESTRUCTIVE_PURGE_FLAG_NOT_OFF";exit 1; }
+            for id in "$old" "$candidate"; do
+              curl -fsS --max-time 30 -H "$auth" "$api/$worker/versions/$id" > "$dir/$id.json"
+              jq -e --arg id "$id" '.success==true and .result.id==$id and (.result.resources.bindings|type=="array")' "$dir/$id.json" >/dev/null
+              jq -S '[.result.resources.bindings[]|if .type=="secret_text" then {name,type} else . end]|sort_by(.name)' "$dir/$id.json" > "$dir/$id.bindings"
+              jq -S '.result.resources.script_runtime|{compatibility_date,compatibility_flags,usage_model,limits,placement}' "$dir/$id.json" > "$dir/$id.runtime"
+            done
+            cmp -s "$dir/$old.bindings" "$dir/$candidate.bindings" || { echo "$worker BINDINGS_CHANGED_ABORT";exit 1; }
+            cmp -s "$dir/$old.runtime" "$dir/$candidate.runtime" || { echo "$worker RUNTIME_SETTINGS_CHANGED_ABORT";exit 1; }
+            echo "$worker READY_FOR_SAFE_PRIVATE_PROMOTION"
+          done
+          before_health='https://saber-pagos-pruebas.libreriasaber.workers.dev/health'
+          curl -fsS --max-time 25 "$before_health" > "$dir/health.json"
+          jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$dir/health.json" >/dev/null
+          test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' https://saber-pagos-pruebas.libreriasaber.workers.dev/admin/api/orders)" = 401
+          test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/)" = 401
+          echo 'LIVE_PRIVATE_PREFLIGHT_OK_NO_REAL_PAYMENT'
+          for worker in "$central" "$docs"; do
+            if [ "$worker" = "$docs" ]; then old="$docs_old"; candidate="$docs_new"; else old="$central_old"; candidate="$central_new"; fi
+            jq -n --arg id "$candidate" \
+              '{strategy:"percentage",versions:[{version_id:$id,percentage:100}],annotations:{"workers/message":"Saber universal nuevos PDF SOLO Workers privados; flags destructivas OFF"}}' > "$dir/promote.json"
+            touched=1
+            curl -fsS --max-time 70 -H "$auth" -H 'Content-Type: application/json' \
+              --data-binary "@$dir/promote.json" "$api/$worker/deployments" > "$dir/promote-result.json"
+            jq -e '.success==true' "$dir/promote-result.json" >/dev/null
+            curl -fsS --max-time 25 -H "$auth" "$api/$worker/deployments" > "$dir/check.json"
+            observed=$(jq -r '.result.deployments[0].versions[]?|select(.percentage==100)|.version_id' "$dir/check.json" | head -n1)
+            test "$observed" = "$candidate" || { echo "$worker POSTDEPLOY_VERSION_MISMATCH";exit 1; }
+            echo "$worker PROMOTED_PRIVATE_ONLY $candidate"
+          done
+          curl -fsS --max-time 30 "$before_health" > "$dir/health-after.json"
+          jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$dir/health-after.json" >/dev/null
+          test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' https://saber-pagos-pruebas.libreriasaber.workers.dev/admin/api/orders)" = 401
+          test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/)" = 401
+          test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/universal-paquete)" = 401
+          test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' https://saber-pagos-pruebas.libreriasaber.workers.dev/admin/api/central/r2-universal-prepress-approve)" = 401
+          echo 'PRIVATE_PROMOTION_VERIFIED_TWO_WORKERS_REAL_PAYMENTS_OFF_PUBLIC_MAIN_UNTOUCHED'
