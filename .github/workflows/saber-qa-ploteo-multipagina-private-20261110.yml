@@ -31,13 +31,14 @@ jobs:
           node --test tests/ploteo-grande-visual-limitado.test.mjs tests/ploteo-deteccion-automatica-sin-opcion-cad.test.mjs tests/ploteo-letras-contorno-cad-general.test.mjs integraciones/autocotizador/recepcion/discriminar-plano-denso.test.mjs
           cd integraciones/autocotizador/recepcion
           npm install --no-audit --no-fund
-          node --test ./carga-unica-pdf-regresion.test.mjs ../../../tests/destino-independiente-transporte-tus-r2.test.mjs
+          node --test ./carga-unica-pdf-regresion.test.mjs ../../../tests/destino-independiente-transporte-tus-r2.test.mjs ../../../tests/pdf-rangos-documento-500pag.test.mjs
           npm run build:unificado
           grep -Fq 'SABER_SMART_UNIVERSAL_PDF' carga-unica-cliente.txt
           if grep -Fq 'SABER_SMART_R2_PREPAGO' carga-unica-cliente.txt;then
             echo 'LEGACY_PLOTTER_ONLY_R2_BRANCH_FOUND';exit 1
           fi
           echo 'UNIVERSAL_R2_ANY_PRINT_SIZE_CLIENT_BUNDLE_VERIFIED'
+          echo 'PDF_RANGOS_500P_TESTED_BEFORE_PRIVATE_DEPLOY'
           node --check dist/saber-documentos-cotizador-fase4.mjs
           grep -Fq 'VISUAL_PDFJS_LIMITADO' dist/saber-documentos-cotizador-fase4.mjs
           grep -Fq 'cad_contornos_vectoriales_sin_relleno' dist/saber-documentos-cotizador-fase4.mjs
