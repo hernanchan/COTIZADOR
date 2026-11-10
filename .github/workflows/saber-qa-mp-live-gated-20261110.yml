@@ -29,6 +29,8 @@ on:
       - 'integraciones/autocotizador/recepcion/sesion-comprador-live.test.mjs'
       - 'integraciones/autocotizador/recepcion/pagina-cotizar-live.mjs'
       - 'integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs'
+      - 'integraciones/autocotizador/recepcion/tus-universal-live-puente-central.mjs'
+      - 'integraciones/autocotizador/recepcion/tus-universal-live-puente-central.test.mjs'
       - 'integraciones/autocotizador/recepcion/carga-unica-cliente.mjs'
       - 'integraciones/autocotizador/recepcion/solicitar-cotizacion-privada.mjs'
       - 'integraciones/autocotizador/recepcion/package.json'
@@ -69,6 +71,7 @@ jobs:
           node --test integraciones/autocotizador/recepcion/flujo-presupuesto-live-cliente.test.mjs
           node --test integraciones/autocotizador/recepcion/sesion-comprador-live.test.mjs
           node --test integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs
+          node --test integraciones/autocotizador/recepcion/tus-universal-live-puente-central.test.mjs
           node --test integraciones/autocotizador/recepcion/obtener-tarifario-d1-live.test.mjs
           node --test integraciones/autocotizador/recepcion/ordenes-universales-live-documentos.test.mjs
           node --test tests/r2-borrador-universal-central.test.mjs
