@@ -5,3 +5,5 @@ NO crear orden nueva, NO nueva preferencia MP, NO cambiar main, NO pagos reales.
 El workflow revalidará el pago verificado en D1 antes de R2 y verificará SHA del original y descarga del personal.
 
 2026-11-10 — Revalidación privada: D1 informa pagado_esperando_archivo, importe ARS 4400 y uploadAuthorized=true. Continuar idempotente, sin nuevas órdenes ni pagos reales.
+
+2026-11-10 — Worker privado corregido para separar staging de orden historica y lote universal (version cf043fba). Reintento idempotente: no duplicar R2 ni orden.
