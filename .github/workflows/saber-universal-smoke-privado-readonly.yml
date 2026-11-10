@@ -60,6 +60,11 @@ jobs:
             { echo 'AUTO_CLASSIFICATION_REVIEW_NOT_PRESENT';exit 1; }
           grep -Fq 'No se pudo determinar el tipo' "$dir/analizador.js" ||
             { echo 'UNCERTAIN_CLASSIFICATION_FALLBACK_NOT_PRESENT';exit 1; }
+          grep -Fq 'pleno_mosaico_raster_por_estructura_pdf' "$dir/analizador.js" ||
+            { echo 'BIG_PDF_RASTER_LOCAL_CLASSIFIER_NOT_DEPLOYED';exit 1; }
+          grep -Fq 'MOSAICO_RASTER_LOCAL' "$dir/analizador.js" ||
+            { echo 'BIG_PDF_CLASSIFIER_NOT_WIRED_TO_UI';exit 1; }
+          echo 'REAL_PRIVATE_BIG_PDF_RASTER_CLASSIFIER_AVAILABLE_WITHOUT_R2'
           echo 'REAL_PRIVATE_AUTO_PLENO_NO_CAD_OPTION_REVIEW_AVAILABLE'
           echo 'REAL_PRIVATE_PLOTTER_CAD_PLENO_OPTION_PRESENT'
           echo 'REAL_PRIVATE_UNIVERSAL_JS_AVAILABLE'
