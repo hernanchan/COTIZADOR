@@ -1,0 +1,75 @@
+name: Saber - cotizacion real 70x52 Pleno 80/130 solo lectura
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-parroquia-pleno-cotizacion-real-20261110.yml]
+permissions:
+  contents: read
+  statuses: write
+jobs:
+  cotizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Cotizar sin subir PDF, sin crear pedidos ni iniciar pagos
+        env:
+          PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const root='https://saber-documentos-pruebas.libreriasaber.workers.dev';
+          const password=process.env.PASSWORD;
+          assert.ok(typeof password==='string'&&password.length>=16,'AUTH_SECRET_REQUIRED');
+          const auth='Basic '+Buffer.from('operador:'+password).toString('base64');
+          const base={servicio:'auto',paginas:[{numero:1,anchoCm:70.1,altoCm:52.0,modo:'poster'}],
+           seleccion:'original',paginasSeleccionadas:'',copias:1,modo:'color',
+           caras:'simple',papelPoster:'obra80',anillado:'ninguno',
+           grupoAnillado:'',materialColor:''};
+          async function quote(nombre,papelPoster){
+           const r=await fetch(root+'/api/ensayo-carga-unica',{
+            method:'POST',redirect:'error',headers:{
+             Authorization:auth,Origin:root,'Content-Type':'application/json'
+            },body:JSON.stringify({archivos:[{...base,nombre,papelPoster}]}),
+            signal:AbortSignal.timeout(25000)
+           });
+           const data=await r.json().catch(()=>null);
+           console.log('QUOTE_HTTP='+r.status+' STATUS='+(data?.estado||data?.error||'unknown')+
+            ' PAPER='+papelPoster);
+           assert.equal(r.status,200,'QUOTE_ENDPOINT_MUST_RETURN_200');
+           assert.equal(data?.ok,true,'QUOTE_OK');
+           assert.equal(data?.estado,'PRELIMINAR','QUOTE_COMPLETE');
+           assert.equal(data?.paymentAuthorized,false,'NO_PAYMENT_AUTHORIZED');
+           assert.equal(data?.plan?.[0]?.destino,'ploteos');
+           assert.equal(data?.detallePloteos?.[0]?.paginas?.[0]?.modo,'poster');
+           assert.ok(Number.isSafeInteger(data?.total)&&data.total>0);
+           const page=data.detallePloteos[0].paginas[0];
+           assert.ok(Math.abs(page.anchoCm-70.1)<.01&&Math.abs(page.altoCm-52)<.01);
+           assert.equal(page.material,papelPoster==='obra80'?'rollo60':'rec60');
+           console.log('PAPER='+papelPoster+' PRICE_ARS='+data.total+
+            ' ROLLO='+page.material+' CLASS='+page.modo);
+           return data.total;
+          }
+          const a=await quote('QR PARROQUIA - VINILO BLANCO 50X70CM.pdf','obra80');
+          const b=await quote('archivo.pdf','obra80');
+          assert.equal(a,b,'FILENAME_MUST_NOT_SET_MATERIAL_OR_PRICE');
+          const c=await quote('QR PARROQUIA - VINILO BLANCO 50X70CM.pdf','recubierto');
+          assert.ok(c>a,'130G_MUST_HAVE_OWN_HIGHER_POSTER_RATE');
+          console.log('PARROQUIA_QUOTE_REAL_D1_GREEN NO_R2_UPLOAD NO_ORDER NO_PAYMENT NO_DEPLOY');
+          NODE
+      - name: Registrar resultado verificable
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_SHA: ${{ github.sha }}
+          RESULT: ${{ job.status }}
+        run: |
+          if [ "$RESULT" = success ]; then state=success; desc="Cotizacion Pleno 70x52: papeles 80/130, precios D1, sin envio"; else state=failure; desc="Fallo presupuesto Pleno 70x52 en Worker privado"; fi
+          jq -n --arg state "$state" --arg context "saber/parroquia-precio-privado" --arg description "$desc" --arg target_url "https://github.com/$GH_REPO/actions/runs/$GITHUB_RUN_ID" '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/status.json
+          gh api -X POST "repos/$GH_REPO/statuses/$GH_SHA" --input /tmp/status.json
