@@ -53,6 +53,17 @@ input:focus,select:focus{outline:3px solid #bedcf4;border-color:#2878ad}
 .acciones-archivo button{min-height:37px}
 .acciones-archivo button:disabled{opacity:.45;cursor:not-allowed}
 .fila-principal{min-width:0}.nombre{display:block;overflow-wrap:anywhere;font-size:16px;color:#143f62}
+.eleccion-plotter{margin:9px 0 7px;padding:12px;border:2px solid #39769c;background:#edf6fc;border-radius:10px}
+.eleccion-plotter>strong{display:block;font-size:14px;letter-spacing:.01em;color:#103e60}
+.archivo .eleccion-plotter p{font-size:13px;margin:5px 0;color:#214760;line-height:1.42}
+.eleccion-plotter-opciones{display:flex;flex-wrap:wrap;gap:9px;margin:9px 0}
+.eleccion-plotter-boton{flex:1 1 140px;min-height:46px;background:#fff;color:#125278;border:1px solid #8eb3ce;border-radius:8px;font-size:14px;font-weight:750;padding:9px 12px;cursor:pointer}
+.eleccion-plotter-boton.seleccionada{background:#114d75;color:#fff;border-color:#114d75}
+.eleccion-plotter-boton:focus-visible{outline:3px solid #e28b12;outline-offset:2px}
+.eleccion-plotter small{display:block;font-size:12px;line-height:1.4;color:#2b5470}
+.eleccion-plotter-papel{margin-top:9px;max-width:310px;font-size:13px}
+.eleccion-plotter-papel select{font-size:14px;min-height:40px;padding:7px 10px}
+@media(max-width:480px){.eleccion-plotter{padding:10px}.eleccion-plotter-boton{flex-basis:100%}}
 .clasificacion-ploteo-visible{display:block;width:max-content;max-width:100%;
 margin-top:6px;padding:5px 10px;border-radius:6px;border:1px solid #a9c4d5;
 background:#edf5fb;color:#103d60;font-size:14px;letter-spacing:.01em}
