@@ -14,6 +14,9 @@ export async function consultarPaqueteCentralLive(env,kind,data,{
  if(env?.SABER_ENTORNO!=='produccion'||env?.CENTRAL_DB_ENV!=='produccion'||
     env?.DOCS_MP_LIVE_GATE!==GO||env?.DOCS_LIVE_PACKAGE_GATE!==GO||
     env?.DOCS_LIVE_STAFF_GATE!==GO||
+    env?.DOCS_R2_UNIVERSAL_PACKAGE_ENABLED==='PRIVATE_TEST_ONLY'||
+    env?.DOCS_R2_UNIVERSAL_POSTPAY_ENABLED==='PRIVATE_TEST_ONLY'||
+    env?.DOCS_CENTRAL_SYNC_ENABLED==='PRIVATE_TEST_ONLY'||
     typeof service?.fetch!=='function'||
     typeof env?.CENTRAL_BRIDGE_KEY!=='string'||env.CENTRAL_BRIDGE_KEY.length<32||
     [env.DOCS_LIVE_STAFF_SECRET,env.DOCS_LIVE_TUS_SERVICE_KEY,
