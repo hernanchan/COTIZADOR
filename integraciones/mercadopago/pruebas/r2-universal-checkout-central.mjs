@@ -138,6 +138,7 @@ export async function checkoutUniversalSandboxCentral(request,env,{
    commercialOrderId:order.id,amountArs:checked.amountArs,estado:current,
    fileCount:checked.works.length,
    pendingFiles:checked.rows.filter(r=>r.received===0).length,
+   receivedFileIds:checked.rows.filter(r=>r.received===1).map(r=>r.file_id),
    uploadAuthorized:state.verified,checkoutEnabled:false,
    productionAuthorized:false},200);
  }
