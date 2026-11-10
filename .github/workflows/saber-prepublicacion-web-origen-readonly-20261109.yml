@@ -72,6 +72,8 @@ jobs:
                     "PAGES_CANONICAL_PRODUCTION_DEPLOYMENT_ID="+(.canonical_deployment.id//"none"),
                     "PAGES_CANONICAL_PRODUCTION_COMMIT="+(.canonical_deployment.deployment_trigger.metadata.commit_hash//"unknown"),
                     "PAGES_LATEST_DEPLOYMENT_ID="+(.latest_deployment.id//"none"),
+                    "PAGES_LATEST_PREVIEW_URL="+(.latest_deployment.url//""),
+                    "PAGES_CANONICAL_PRODUCTION_URL="+(.canonical_deployment.url//""),
                     "PAGES_REPO_TYPE="+(.source.type//"unknown"),
                     "PAGES_REPO_NAME="+(.source.config.repo_name//"unknown"),
                     "PAGES_BUILD_ROOT="+(.build_config.root_dir//""),
