@@ -74,6 +74,8 @@ import {pagoMPLiveComprador} from './mp-live-comprador.mjs';
 import {iniciarSesionCompradorLive,autorizadoCompradorLive,autorizadoOrdenLive,vinculoOrdenLive} from './sesion-comprador-live.mjs';
 import {guardarBorradorUniversalLive,crearOrdenUniversalLive} from './ordenes-universales-live-documentos.mjs';
 import {paginaRetornoLive} from './pagina-retorno-live.mjs';
+import {paginaCotizarLive} from './pagina-cotizar-live.mjs';
+import liveBuyerClientJs from './flujo-presupuesto-live-cliente.txt';
 import {checkoutR2PrepaidSandboxDocumentos} from './r2-prepago-checkout-documentos.mjs';
 import {descargarR2GrandePersonal} from './r2-pdf-grandes-descarga-personal.mjs';
 import {descargarR2PendientePorD1Personal} from './r2-pdf-descarga-d1-personal.mjs';
@@ -118,12 +120,15 @@ async function preciosPrivados(env,request){
  const quotePath=new URL(request.url).pathname;
  const soloPresupuesto=quotePath==='/api/ensayo-materiales-rapido'||
    quotePath==='/api/ensayo-carga-unica';
+ const consultaLive=live&&['/api/pedido/live/materiales','/api/pedido/live/cotizar'].includes(quotePath)&&
+   await autorizadoCompradorLive(request,env);
  const precioComprador=soloPresupuesto||quotePath==='/prueba-v2/precios-web.json'||
    quotePath==='/prueba-v2/api/ensayo-tus-registrar'||quotePath==='/api/ensayo-tus-registrar';
  if(!staff&&v2PrivateBrowserAuthorized(request,env)!=='allow'&&
     !(await v2SessionAuthorized(request,env))&&
     !(soloPresupuesto&&await autorizadoCotizadorCliente(request,env))&&
-    !(precioComprador&&await autorizadoPedidoCliente(request,env)))
+    !(precioComprador&&await autorizadoPedidoCliente(request,env))&&
+    !consultaLive)
   throw Error('La versión de precios privada requiere sesión autorizada.');
  return live?(await obtenerTarifarioD1Live(env)).prices:
   (await obtenerTarifarioD1Privado(env)).prices;
@@ -2304,6 +2309,60 @@ export default {
     // MP LIVE: separado de /prueba-v2 y del checkout sandbox.
     // Origen de producción, cookie de comprador vinculada y HMAC obligatorios.
     // Con compuerta cerrada: 503 sin consultar Central ni generar cobros.
+    // Cotizador comprador LIVE: usa el analizador consolidado, pero jamás rutas Sandbox.
+    if(page==='/cotizar'){
+      const buyer=await autorizadoCompradorLive(request,env);
+      return paginaCotizarLive(request,env,{authorized:buyer});
+    }
+    if(page==='/cotizar/archivos'||page==='/cotizar/archivos.js'||
+       page==='/cotizar/flujo-live.js'||page==='/api/pedido/live/materiales'||
+       page==='/api/pedido/live/cotizar'){
+      const live=env?.SABER_ENTORNO==='produccion'&&
+       env?.DOCS_LIVE_UI_GATE==='GO_COMERCIAL_CONFIRMADO'&&
+       env?.DOCS_MP_LIVE_GATE==='GO_COMERCIAL_CONFIRMADO'&&
+       env?.DOCS_LIVE_SESSION_GATE==='GO_COMERCIAL_CONFIRMADO'&&
+       new URL(request.url).origin==='https://pedidos.libreriasaber.com.ar';
+      if(!live||!await autorizadoCompradorLive(request,env))
+       return testResponse({ok:false,error:'LIVE_COTIZADOR_CERRADO'},503);
+      if(page==='/cotizar/archivos'&&request.method==='GET'){
+       const html=paginaCargaUnica()
+        .replace('Podés seleccionar varios a la vez (hasta 30).','Podés seleccionar varios a la vez (hasta 10).')
+        .replace('<script src="/prueba-carga-unica.js" defer></script>',
+         '<script src="/cotizar/archivos.js" defer></script>')
+        .replace(/href="\/prueba-cotizador-conjunto"/g,'href="/cotizar"')
+        .replace('</head><body>','<style>#prepararPedido{display:none}main>p:has(a[href="/cotizar"]){display:none}body{background:transparent}main{box-shadow:none;margin:0;padding:12px;max-width:none}</style></head><body>');
+       return new Response(html,{headers:{
+        'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store,private',
+        'Content-Security-Policy':"default-src 'none'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'",
+        'X-Content-Type-Options':'nosniff','X-Robots-Tag':'noindex,nofollow'}});
+      }
+      if(page==='/cotizar/archivos.js'&&request.method==='GET')
+       return new Response(cargaClienteJs,{headers:{
+        'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-store,private',
+        'X-Content-Type-Options':'nosniff'}});
+      if(page==='/cotizar/flujo-live.js'&&request.method==='GET')
+       return new Response(liveBuyerClientJs,{headers:{
+        'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-store,private',
+        'X-Content-Type-Options':'nosniff'}});
+      if(page==='/api/pedido/live/materiales'&&request.method==='GET')
+       return catalogoMaterialesRapido(request,env);
+      if(page==='/api/pedido/live/cotizar'){
+       if(request.method!=='POST')return closed();
+       const u=new URL(request.url);
+       if(request.headers.get('Origin')!==u.origin||
+        (request.headers.get('Sec-Fetch-Site')&&request.headers.get('Sec-Fetch-Site')!=='same-origin')||
+        !/^application\/json(?:;|$)/i.test(request.headers.get('Content-Type')||''))
+        return testResponse({ok:false,error:'Origen no autorizado',paymentAuthorized:false},403);
+       try{
+        const raw=await request.text();
+        if(raw.length>500000)return testResponse({ok:false,error:'Solicitud demasiado grande',paymentAuthorized:false},413);
+        const payload=JSON.parse(raw);
+        const prices=await preciosPrivados(env,request);
+        return testResponse(cotizarCargaUnica({...payload,precios:prices}));
+       }catch{return testResponse({ok:false,error:'Cotización LIVE indisponible o incompleta',paymentAuthorized:false},503)}
+      }
+      return closed();
+    }
     if(page==='/pedido/estado')return paginaRetornoLive(request,env);
     if(page==='/api/pedido/live/sesion')return iniciarSesionCompradorLive(request,env);
     if(page==='/api/pedido/live/borrador'){
