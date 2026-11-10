@@ -71,6 +71,7 @@ import {prepararOrdenUniversalSinCheckout} from './r2-orden-universal-documentos
 import {iniciarLoteTUSUniversal,confirmarLoteTUSUniversal} from './tus-universal-worker.mjs';
 import {iniciarTUSUniversalLive,confirmarTUSUniversalLive} from './tus-live-recepcion-documentos.mjs';
 import {preflightOriginalR2Live} from './r2-live-preflight-documentos.mjs';
+import {manejarR2MultipartLive} from './r2-live-multipart-documentos.mjs';
 import {pagoSandboxUniversalDocumentos} from './r2-universal-checkout-documentos.mjs';
 import {pagoMPLiveComprador} from './mp-live-comprador.mjs';
 import {iniciarSesionCompradorLive,autorizadoCompradorLive,autorizadoOrdenLive,vinculoOrdenLive} from './sesion-comprador-live.mjs';
@@ -2407,6 +2408,13 @@ export default {
       const linked=buyer&&await autorizadoOrdenLive(
        request,env,input?.webOrderId);
       return crearOrdenUniversalLive(request,env,{authorized:linked});
+    }
+    if(page==='/api/pedido/live/r2/iniciar'||
+       page==='/api/pedido/live/r2/parte'||
+       page==='/api/pedido/live/r2/completar'||
+       page==='/api/pedido/live/r2/verificar'){
+      const buyer=await autorizadoCompradorLive(request,env);
+      return manejarR2MultipartLive(request,env,{authorized:buyer});
     }
     if(page==='/api/pedido/live/r2/preflight'){
       const buyer=await autorizadoCompradorLive(request,env);
