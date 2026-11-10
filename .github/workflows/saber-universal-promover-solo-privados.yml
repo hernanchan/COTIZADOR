@@ -136,10 +136,18 @@ jobs:
             test "$observed" = "$candidate" || { echo "$worker POSTDEPLOY_VERSION_MISMATCH";exit 1; }
             echo "$worker PROMOTED_PRIVATE_ONLY $candidate"
           done
-          curl -fsS --max-time 30 "$before_health" > "$dir/health-after.json"
-          jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$dir/health-after.json" >/dev/null
-          test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' https://saber-pagos-pruebas.libreriasaber.workers.dev/admin/api/orders)" = 401
-          test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/)" = 401
-          test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/universal-paquete)" = 401
-          test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' https://saber-pagos-pruebas.libreriasaber.workers.dev/admin/api/central/r2-universal-prepress-approve)" = 401
+          curl -fsS --max-time 30 "$before_health" > "$dir/health-after.json" || { echo 'POSTDEPLOY_HEALTH_REQUEST_FAILED';exit 1; }
+          jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$dir/health-after.json" >/dev/null ||
+            { jq -c '{ok,databaseReady,paymentsEnabled}' "$dir/health-after.json"; echo 'POSTDEPLOY_HEALTH_STATE_FAILED';exit 1; }
+          echo 'POSTDEPLOY_HEALTH_OK'
+          check_status() {
+            label="$1";want="$2";shift 2
+            got=$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$@")
+            echo "POSTDEPLOY_${label}_HTTP_$got"
+            test "$got" = "$want" || exit 1
+          }
+          check_status CENTRAL_ADMIN 401 https://saber-pagos-pruebas.libreriasaber.workers.dev/admin/api/orders
+          check_status DOCUMENTOS_BASIC 401 https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/
+          check_status UNIVERSAL_PAQUETE_BASIC 401 https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/universal-paquete
+          check_status PREPRENSA_ADMIN 401 -X POST -H 'Content-Type: application/json' -d '{}' https://saber-pagos-pruebas.libreriasaber.workers.dev/admin/api/central/r2-universal-prepress-approve
           echo 'PRIVATE_PROMOTION_VERIFIED_TWO_WORKERS_REAL_PAYMENTS_OFF_PUBLIC_MAIN_UNTOUCHED'
