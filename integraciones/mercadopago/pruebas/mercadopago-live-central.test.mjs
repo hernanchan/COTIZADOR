@@ -253,3 +253,21 @@ test('status LIVE exige pedido propio, firma y gate; sin fallback sandbox',async
  assert.notEqual(bad.status,200);
  assert.equal(f.posts,0,'No se crea preferencia al consultar estado');
 });
+
+test('carrera D1 que cancela el pedido NO registra review verified',async()=>{
+ const f=fixture();f.o.preference_id='MP-LIVE-PREF-1';
+ const prepare=f.db.prepare.bind(f.db);
+ f.db.prepare=function(sql){
+  if(sql.startsWith("UPDATE orders SET status='paid'")){
+   return {bind(){return this},async run(){
+    f.o.status='cancelled';
+    return {meta:{changes:0}};
+   }};
+  }
+  return prepare(sql);
+ };
+ const r=await conciliarWebhookMPLive(await signedWebhook(),f.env,{fetcher:f.mpFetch});
+ assert.equal(r.status,200);
+ assert.equal((await r.json()).registered,false);
+ assert.equal(f.review.state,null);
+});
