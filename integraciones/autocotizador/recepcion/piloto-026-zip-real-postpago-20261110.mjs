@@ -49,7 +49,7 @@ const start=clientScript.indexOf('export function convertirTrabajoZIPUniversal('
 const end=clientScript.indexOf('async function obtenerArchivo(',start);
 assert.ok(start>=0&&end>start);
 const code=pdfScript+'\n'+
- "const name=i=>'PDF_'+String(i+1).padStart(2,'0')+'.pdf';\n"+
+ "const MiB=1048576; const name=i=>'PDF_'+String(i+1).padStart(2,'0')+'.pdf';\n"+
  clientScript.slice(start,end).replace('export function convertirTrabajoZIPUniversal','function convertirTrabajoZIPUniversal')+
  '\ninstruccionesPdf(manifest);';
 const instruction=vm.runInNewContext(code,{manifest,Blob,TextEncoder,console},{
