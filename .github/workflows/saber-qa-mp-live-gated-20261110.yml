@@ -76,13 +76,11 @@ jobs:
       - name: Compilar interfaz comprador y cotizador PDF sin desplegar
         run: |
           set -euo pipefail
-          npm install --no-save --no-fund --no-audit esbuild@0.25.12 pdf-lib@1.17.1
           cd integraciones/autocotizador/recepcion
-          ../../../node_modules/.bin/esbuild ./flujo-presupuesto-live-cliente.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --outfile=./flujo-presupuesto-live-cliente.txt
-          ../../../node_modules/.bin/esbuild ./carga-unica-cliente.mjs --bundle --minify --platform=browser --format=iife --target=es2022 --outfile=./carga-unica-cliente.txt
-          ../../../node_modules/.bin/esbuild ./worker-fase4-cotizador-unificado.mjs --bundle --platform=browser --format=esm --target=es2022 --loader:.html=text --outfile=/tmp/saber-docs-live-qa.mjs
-          grep -Fq '/api/pedido/live/borrador' /tmp/saber-docs-live-qa.mjs
-          grep -Fq '/cotizar/archivos' /tmp/saber-docs-live-qa.mjs
+          npm install --no-fund --no-audit
+          npm run build:unificado
+          grep -Fq '/api/pedido/live/borrador' ./dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq '/cotizar/archivos' ./dist/saber-documentos-cotizador-fase4.mjs
           echo 'LIVE_BUYER_QUOTE_BUNDLE_OK_NO_DEPLOY'
       - name: Compilación del Worker con módulos LIVE cerrados
         run: |
