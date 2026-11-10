@@ -1,0 +1,67 @@
+name: Saber - D1 auditoria R2 inspeccion sin datos
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-live-migrar-r2-inspeccion-20261110.yml]
+permissions:
+  contents: read
+  statuses: write
+concurrency:
+  group: saber-live-r2-inspection-schema-only
+  cancel-in-progress: false
+jobs:
+  r2-inspection-schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validación offline e idempotencia D1
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check integraciones/publicacion/aplicar-d1-produccion-r2-inspeccion.mjs
+          python3 - <<'PY'
+          import sqlite3,pathlib
+          ddl=pathlib.Path('integraciones/publicacion/d1-produccion-r2-inspeccion-v1.sql').read_text()
+          db=sqlite3.connect(':memory:')
+          db.execute('PRAGMA foreign_keys=ON')
+          db.execute('CREATE TABLE orders(id TEXT PRIMARY KEY)')
+          db.execute('CREATE TABLE central_r2_universal_files(web_order_id TEXT,file_id TEXT,PRIMARY KEY(web_order_id,file_id))')
+          db.executescript(ddl)
+          db.executescript(ddl)
+          assert db.execute('SELECT COUNT(*) FROM central_r2_live_inspections').fetchone()[0]==0
+          fk=db.execute('PRAGMA foreign_key_list(central_r2_live_inspections)').fetchall()
+          assert any(x[2]=='orders' for x in fk)
+          assert any(x[2]=='central_r2_universal_files' for x in fk)
+          print('R2_INSPECCION_DDL_IDEMPOTENTE_CERO_DATOS')
+          PY
+      - name: Crear exclusivamente tabla de auditoría R2 en D1 producción
+        shell: bash
+        env:
+          SABER_CF_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          SABER_CF_D1_WRITE_TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+        run: |
+          set -euo pipefail
+          node integraciones/publicacion/aplicar-d1-produccion-r2-inspeccion.mjs
+      - name: Informar validación de migración no comercial
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          if [ "$RESULT" = success ];then state=success;else state=failure;fi
+          jq -n --arg state "$state" --arg context "saber/live-r2-inspection-schema" \
+           --arg description "R2 inspección D1 sólo DDL, sin pagos: $RESULT" \
+           --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+           '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/r2-inspection-status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+           --input /tmp/r2-inspection-status.json >/dev/null
