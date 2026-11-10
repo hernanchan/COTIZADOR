@@ -4698,6 +4698,30 @@ export default {
   const url=new URL(req.url);
   // Solo con compuerta LIVE y credenciales de producción independientes.
   // En saber-pagos-pruebas quedan cerradas (HTTP 503).
+  if(url.pathname==='/internal/central/live/pricing'){
+   const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
+   const signed=await leerFirmaInternaLive(req,env);
+   if(signed.error)return json({ok:false,error:'LIVE_PRICING_FIRMA'},signed.status);
+   if(env?.CENTRAL_LIVE_PRICING_GATE!=='GO_COMERCIAL_CONFIRMADO'||
+      env?.CENTRAL_DB_ENV!=='produccion'||env?.SABER_ENTORNO!=='produccion'||
+      !env?.DB?.prepare)return json({ok:false,error:'LIVE_PRICING_OFF'},503);
+   try{
+    // Solo SELECT. No crear tablas ni sembrar tarifas antiguas automáticamente.
+    const head=await env.DB.prepare('SELECT approved_revision,approved_json FROM central_pricing_admin_head WHERE id=1').first();
+    if(!head?.approved_json||!Number.isSafeInteger(head.approved_revision)||head.approved_revision<1)
+     return json({ok:false,error:'LIVE_PRICING_NO_APPROVAL'},409);
+    const approval=await env.DB.prepare("SELECT created_at FROM central_pricing_admin_history WHERE revision=? AND action='approve' LIMIT 1")
+     .bind(head.approved_revision).first();
+    if(!/^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$/.test(approval?.created_at||''))
+     return json({ok:false,error:'LIVE_PRICING_NO_AUDIT'},409);
+    const snapshot=JSON.parse(head.approved_json);
+    if(!priceAdminValidatePayload(snapshot))return json({ok:false,error:'LIVE_PRICING_INVALID'},409);
+    return json({ok:true,schema:'saber-price-snapshot-v1',
+     approvedRevision:head.approved_revision,approvedAt:approval.created_at.replace(' ','T')+'Z',
+     prices:snapshot.prices,promotions:snapshot.promotions,
+     paymentAuthorized:false,commercialRelease:false,source:'production-d1-approved-only'});
+   }catch{return json({ok:false,error:'LIVE_PRICING_UNAVAILABLE'},503)}
+  }
   if(url.pathname==='/internal/central/live/order'){
    const {promoverPedidoUniversalD1}=await import('./r2-universal-order-central.mjs');
    const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
