@@ -46,15 +46,15 @@ jobs:
           done
           code=$(curl -sS --max-time 25 -u "operador:$PASSWORD" \
             -o "$tmp/buyer.html" -w '%{http_code}' \
-            'https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/pedido-cliente')
-          echo "PRIVATE_UNIVERSAL_BUYER_HTTP=$code"
+            'https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/')
+          echo "PRIVATE_UNIVERSAL_OPERATOR_HTTP=$code"
           test "$code" = 200
           grep -oE 'src="/prueba-v2/carga-inteligente[^"]*"' "$tmp/buyer.html" |
             head -n1 | sed 's/^/PRIVATE_SMART_IFRAME=/' || true
           if grep -Fq '/prueba-v2/carga-inteligente?universal=1' "$tmp/buyer.html";then
-            echo 'PRIVATE_BUYER_UNIVERSAL_IFRAME_ACTIVE'
+            echo 'PRIVATE_OPERATOR_UNIVERSAL_IFRAME_ACTIVE'
           else
-            echo 'PRIVATE_BUYER_UNIVERSAL_IFRAME_NOT_ACTIVE'
+            echo 'PRIVATE_OPERATOR_UNIVERSAL_IFRAME_NOT_ACTIVE'
             exit 1
           fi
           echo 'READ_ONLY_NO_R2_NO_MP_NO_D1_WRITE_NO_PUBLIC'
