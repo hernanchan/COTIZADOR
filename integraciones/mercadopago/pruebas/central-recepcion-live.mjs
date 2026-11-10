@@ -23,7 +23,12 @@ export async function listarRecepcionUniversalLive(request,env,{authorized=false
    'SUM(CASE WHEN f.received=1 THEN 1 ELSE 0 END) AS received_count,'+
    'SUM(CASE WHEN f.received=0 THEN 1 ELSE 0 END) AS pending_count,'+
    "SUM(CASE WHEN f.transport='tus' THEN 1 ELSE 0 END) AS tus_count,"+
-   "SUM(CASE WHEN f.transport='r2' THEN 1 ELSE 0 END) AS r2_count "+
+   "SUM(CASE WHEN f.transport='r2' THEN 1 ELSE 0 END) AS r2_count,"+
+   "SUM(CASE WHEN f.transport='r2' AND f.received=0 AND EXISTS ("+
+   "SELECT 1 FROM central_r2_large_pending r WHERE "+
+   "r.web_order_id=f.web_order_id AND r.file_id=f.file_id "+
+   "AND r.sha256=f.sha256 AND r.bytes=f.bytes "+
+   "AND r.status='awaiting_pdf_analysis') THEN 1 ELSE 0 END) AS staged_r2_count "+
    'FROM central_r2_universal_order_links l '+
    'JOIN central_r2_universal_drafts d ON d.web_order_id=l.web_order_id '+
    'JOIN central_r2_universal_files f ON f.web_order_id=l.web_order_id '+
@@ -47,6 +52,9 @@ export async function listarRecepcionUniversalLive(request,env,{authorized=false
      x.received_count+x.pending_count!==x.file_count||
      !Number.isSafeInteger(x.tus_count)||!Number.isSafeInteger(x.r2_count)||
      x.tus_count+x.r2_count!==x.file_count||
+     !Number.isSafeInteger(x.staged_r2_count)||x.staged_r2_count<0||
+     x.staged_r2_count>x.r2_count||
+     x.staged_r2_count>x.pending_count||
      !/^WEB-ENSAYO-[A-F0-9]{32}$/.test(x.web_order_id||'')||
      !/^[a-f0-9-]{36}$/i.test(x.order_id||'')||
      !Number.isSafeInteger(x.work_number)||x.work_number<1)
@@ -55,8 +63,12 @@ export async function listarRecepcionUniversalLive(request,env,{authorized=false
    numeroOrden:String(x.work_number).padStart(3,'0'),
    amountArs:x.total_ars,fileCount:x.file_count,
    receivedCount:x.received_count,pendingCount:x.pending_count,
-   tusCount:x.tus_count,r2Count:x.r2_count,paidAt:x.paid_at,
-   estado:x.pending_count>0?'PAGADO_ESPERANDO_ORIGINALES':'ORIGINALES_RECIBIDOS_PREPRENSA_PENDIENTE',
+   tusCount:x.tus_count,r2Count:x.r2_count,
+   stagedR2Count:x.staged_r2_count,paidAt:x.paid_at,
+   estado:x.pending_count===0?'ORIGINALES_RECIBIDOS_PREPRENSA_PENDIENTE':
+    x.pending_count===x.staged_r2_count?
+    'R2_ALMACENADO_PENDIENTE_ANALISIS_PDF':
+    'PAGADO_ESPERANDO_ORIGINALES',
    lane:'pendiente',readyForProduction:false,zipEnabled:false});
  }
  return reply({ok:true,orders:ready,source:'production-d1-verified-payments-only',
