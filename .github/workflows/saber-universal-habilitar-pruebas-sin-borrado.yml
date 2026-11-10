@@ -92,8 +92,9 @@ jobs:
             jq -e --slurpfile before "$dir/$w-before" --argjson flags "$flags" '
               .success==true and
               ([.result.bindings[].name]|sort)==([$before[0].result.bindings[].name,$flags[]]|sort) and
-              all($flags[] as $name; .result.bindings|
-                any(.[];.name==$name and .type=="plain_text" and .text=="PRIVATE_TEST_ONLY"))
+              ([.result.bindings[]|
+                select(.name as $name|($flags|index($name))!=null)|
+                select(.type=="plain_text" and .text=="PRIVATE_TEST_ONLY")]|length)==($flags|length)
             ' "$dir/$w-after" >/dev/null ||
               { echo "$w PRIVATE_FLAGS_CONFIRMATION_FAILED";exit 1; }
             echo "$w UNIVERSAL_NONDESTRUCTIVE_TEST_FLAGS_ENABLED"
