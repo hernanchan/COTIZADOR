@@ -1,0 +1,99 @@
+name: Saber - contrastar tarifas aprobadas D1 sin modificar produccion
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-precios-aprobados-d1-readonly-20261110.yml]
+permissions:
+  contents: read
+jobs:
+  comparar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Leer versiones aprobadas D1 de ensayo y produccion sin escribir
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import {readFile} from 'node:fs/promises';
+          import assert from 'node:assert/strict';
+          const account=process.env.ACCOUNT,token=process.env.TOKEN;
+          assert.match(account||'',/^[a-f0-9]{32}$/i);
+          assert.ok(typeof token==='string'&&token.length>15);
+          const root='https://api.cloudflare.com/client/v4/accounts/'+account+'/d1/database';
+          async function api(path,options={}){
+            const res=await fetch(root+path,{...options,headers:{
+              Authorization:'Bearer '+token,'Content-Type':'application/json'
+            },signal:AbortSignal.timeout(25000)});
+            const d=await res.json();
+            assert.equal(res.ok,true,'D1_HTTP_'+res.status);
+            assert.equal(d.success,true,'D1_API_DENIED');
+            return d.result;
+          }
+          const list=await api('');
+          const names=['saber-pagos-pruebas','saber-pagos-produccion'];
+          const results={};
+          for(const name of names){
+            const found=list.filter(d=>d.name===name);
+            assert.equal(found.length,1,'D1_NOMBRE_NO_UNICO_'+name);
+            const query=await api('/'+found[0].uuid+'/query',{
+              method:'POST',body:JSON.stringify({sql:
+                'SELECT revision,approved_revision,approved_json FROM central_pricing_admin_head WHERE id=1'})
+            });
+            assert.ok(Array.isArray(query)&&query[0]?.success===true);
+            results[name]=query[0]?.results?.[0]||null;
+            console.log('SABER_D1_'+name.toUpperCase().replaceAll('-','_')+
+              '_REVISION='+String(results[name]?.approved_revision||0));
+          }
+          const sandbox=results['saber-pagos-pruebas'];
+          const live=results['saber-pagos-produccion'];
+          console.log('LIVE_HAS_APPROVED_PRICES='+Boolean(live?.approved_json));
+          if(!sandbox?.approved_json){
+            console.log('SANDBOX_APPROVAL_NOT_FOUND_NO_PRICING_COPY');
+            process.exit(0);
+          }
+          const approved=JSON.parse(sandbox.approved_json);
+          const prices=approved.prices;
+          assert.ok(prices?.schema==='saber-web-prices-v1'&&Array.isArray(prices.bnA4?.scales));
+          const old=JSON.parse(await readFile('precios-web.json','utf8'));
+          const differences=[];
+          function compare(a,b,p=''){
+            if(typeof a==='number'&&typeof b==='number'){
+              if(a!==b)differences.push({path:p,repo:a,d1:b});
+              return;
+            }
+            if(Array.isArray(a)||Array.isArray(b)){
+              if(!Array.isArray(a)||!Array.isArray(b)||a.length!==b.length){
+                differences.push({path:p,repoType:Array.isArray(a)?a.length:typeof a,d1Type:Array.isArray(b)?b.length:typeof b});
+                return;
+              }
+              for(let i=0;i<b.length;i++)compare(a[i],b[i],p+'.'+i);
+              return;
+            }
+            if(a&&b&&typeof a==='object'&&typeof b==='object'){
+              for(const k of new Set([...Object.keys(a),...Object.keys(b)])){
+                if(!['generatedAt','source','priceVersion','note'].includes(k))compare(a[k],b[k],p?p+'.'+k:k);
+              }
+              return;
+            }
+            if(a!==b)differences.push({path:p,repo:a??null,d1:b??null});
+          }
+          compare(old,prices);
+          console.log('APPROVED_D1_DIFF_COUNT='+differences.length);
+          for(const d of differences.slice(0,125))
+            console.log('APPROVED_D1_DIFF='+JSON.stringify(d));
+          if(differences.length>125)console.log('APPROVED_D1_DIFF_TRUNCATED');
+          console.log('PRICING_READONLY_NO_PRODUCTION_WRITE_NO_APPROVAL_NO_DEPLOY');
+          NODE
