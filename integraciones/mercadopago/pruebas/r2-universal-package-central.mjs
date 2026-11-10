@@ -13,10 +13,21 @@ const RECEIPT=/^DOC-([a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f
 const R2KEY=/^r2-v1\/(WEB-ENSAYO-[A-F0-9]{32})\/([a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12})\.pdf$/i;
 const respond=(v,status=200)=>Response.json(v,{status,headers:{
  'Cache-Control':'no-store, private','X-Content-Type-Options':'nosniff'}});
+const GO='GO_COMERCIAL_CONFIRMADO';
+const liveEnabled=env=>env?.SABER_ENTORNO==='produccion'&&
+ env?.CENTRAL_DB_ENV==='produccion'&&
+ env?.MP_LIVE_GATE===GO&&env?.CENTRAL_LIVE_BRIDGE_ENABLED===GO&&
+ env?.CENTRAL_LIVE_POSTPAY_GATE===GO&&
+ env?.CENTRAL_LIVE_PACKAGE_GATE===GO&&
+ env?.CENTRAL_R2_UNIVERSAL_PACKAGE_ENABLED!==ON&&
+ env?.CENTRAL_R2_UNIVERSAL_POSTPAY_ENABLED!==ON&&
+ typeof env?.DB?.prepare==='function';
 function enabled(env){
- return env?.CENTRAL_R2_UNIVERSAL_PACKAGE_ENABLED===ON&&
+ return liveEnabled(env)||(
+  env?.SABER_ENTORNO!=='produccion'&&
+  env?.CENTRAL_R2_UNIVERSAL_PACKAGE_ENABLED===ON&&
   env?.CENTRAL_R2_UNIVERSAL_POSTPAY_ENABLED===ON&&
-  env?.DB?.prepare;
+  typeof env?.DB?.prepare==='function');
 }
 async function checkedOrder(env,webOrderId,subtle){
  const db=env.DB;
@@ -64,6 +75,20 @@ async function receipt(env,valid,row){
     r.status!=='awaiting_pdf_analysis'||r.reservation_state!=='reserved'||
     !Number.isSafeInteger(r.pages_claimed)||r.pages_claimed<1||r.pages_claimed>2000)
   throw Error('R2_RECEIPT');
+ if(liveEnabled(env)){
+  // A staged R2 object is NOT a received PDF until physical inspection
+  // has been signed, reviewed, and recorded for the same immutable quote.
+  const inspected=await db.prepare(
+   'SELECT receipt_id,commercial_order_id,quote_hash,sha256,bytes,report_hash '+
+   'FROM central_r2_live_inspections WHERE web_order_id=? AND file_id=? LIMIT 1'
+  ).bind(valid.webOrderId,row.file_id).first();
+  if(!inspected||inspected.receipt_id!==r.receipt_id||
+     inspected.commercial_order_id!==valid.commercialOrderId||
+     inspected.quote_hash!==valid.link.quote_hash||
+     inspected.sha256!==row.sha256||inspected.bytes!==row.bytes||
+     !SHA.test(inspected.report_hash||''))
+   throw Error('R2_PHYSICAL_INSPECTION_REQUIRED');
+ }
  return {receiptId:r.receipt_id,objectKey:r.object_key,pages:r.pages_claimed};
 }
 async function readRequest(request,env,readSigned,subtle,action){
