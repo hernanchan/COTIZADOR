@@ -2,6 +2,24 @@
 
 **Fecha:** 2026-11-10. **Ámbito:** cotización de impresión por plotter sobre papeles ofrecidos por Librería Saber; no prescribe un servicio de vinilo de corte. **No modifica tarifas aprobadas ni habilita pagos.**
 
+## Regla superior: dimensiones físicas ≠ peso del PDF ≠ clasificación CAD/Pleno
+
+Esta política se aplica **a todos los PDF y a todos los modos de recepción**. Nunca usar el tamaño en bytes del archivo para decidir impresora, plotter, clasificación CAD/Pleno, papel, rollo o tarifa.
+
+1. **Salida y precio:** calcular según medidas reales de **cada página** (MediaBox/CropBox visible, rotación y escala PDF) y tamaño final seleccionado por el comprador. Si cabe en los formatos documentales aprobados (A4/A3, incluidos A5 cuando corresponde), corresponde **impresión documental**. Si supera A3 y no se reduce expresamente, corresponde **plotter**. Para plotter, clasificar contenido CAD/Pleno y aplicar los papeles y rollos disponibles.
+2. **Transporte:** en una decisión distinta, aplicar exclusivamente **bytes del original por PDF**: hasta **40 MiB inclusive, TUS**; mayor a **40 MiB y hasta 200 MiB, R2** (tope vigente de interfaz). R2 exige pago confirmado **antes** de cargar el original. El umbral es de recepción, no de clasificación ni cotización.
+3. **Equivalencia:** idéntico PDF en contenido, medidas, selección y opciones debe conservar el **mismo servicio, destino y precio**, se reciba por TUS o R2. Solo cambia cómo se transfiere y almacena tras la autorización. El mismo criterio CAD/Pleno se aplica a PDF pequeños y grandes; las limitaciones de análisis deben producir **revisión explícita**, jamás reclasificar como CAD o Pleno por peso.
+4. **Multipágina:** decidir y cotizar página por página conforme a las medidas y opciones aplicables; el peso total del archivo no convierte 500 páginas A4 en un ploteo.
+
+| Caso ilustrativo | Salida comercial | Transporte |
+|---|---|---|
+| Apunte de 500 páginas A4, 100 MiB | Impresión documental A4 | R2, solo postpago |
+| Panel A0, 2 MiB | Plotter; CAD/Pleno depende del contenido | TUS |
+| Plano A1, 150 MiB | Plotter; CAD/Pleno depende del contenido | R2, solo postpago |
+| Apunte A4, 5 MiB | Impresión documental A4 | TUS |
+
+**Situación del código al 10/11/2026:** `seleccionar-transporte-pdf.mjs` y `plan-recepcion-universal-r2.mjs` separan correctamente estas decisiones. Sin embargo, la **ruta antigua de recepción grande** en `carga-unica-cliente.mjs` solo acepta ploteo individual R2 si no está habilitado el flujo universal; `flujo-universal-pdf-cliente.mjs` sí transporta PDF grandes con independencia de A4/A3/CAD/Pleno, pero está sujeto a compuertas sandbox. No confundir regla aprobada y módulo compilado con disponibilidad comercial de A4 grande en producción. No habilitar pagos reales hasta validar ese flujo.
+
 ## Reglas de decisión (en orden)
 
 1. **Destino por dimensión.** Si el tamaño final seleccionado excede A3, el trabajo pasa a plotter. La longitud de la hoja NO permite distinguir CAD de Pleno, ni el tipo de material de impresión. El rollo se selecciona con las medidas reales y las restricciones de impresión del equipo.
