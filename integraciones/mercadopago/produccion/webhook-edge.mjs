@@ -22,7 +22,8 @@ export async function manejarWebhookPublico(request,env,{service=env?.SABER_CENT
   return reply(503,'WEBHOOK_NO_HABILITADO');
  if(request.method!=='POST'||request.headers.has('Origin')||
     !/^application\/json(?:;|$)/i.test(request.headers.get('Content-Type')||'')||
-    !request.headers.has('x-signature')||!request.headers.has('x-request-id'))
+    !(request.headers.get('x-signature')||'').trim()||
+    !(request.headers.get('x-request-id')||'').trim())
   return reply(403,'SOLICITUD_INVALIDA');
  const size=request.headers.get('Content-Length');
  if(size!==null&&(!/^\d+$/.test(size)||Number(size)>16384))
