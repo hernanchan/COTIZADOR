@@ -18,6 +18,8 @@ on:
       - 'integraciones/autocotizador/recepcion/pagina-retorno-live.test.mjs'
       - 'integraciones/autocotizador/recepcion/checkout-live-cliente.mjs'
       - 'integraciones/autocotizador/recepcion/checkout-live-cliente.test.mjs'
+      - 'integraciones/autocotizador/recepcion/flujo-presupuesto-live-cliente.mjs'
+      - 'integraciones/autocotizador/recepcion/flujo-presupuesto-live-cliente.test.mjs'
       - 'integraciones/autocotizador/recepcion/obtener-tarifario-d1-live.mjs'
       - 'integraciones/autocotizador/recepcion/obtener-tarifario-d1-live.test.mjs'
       - 'integraciones/autocotizador/recepcion/ordenes-universales-live-documentos.mjs'
@@ -50,6 +52,7 @@ jobs:
           node --test integraciones/autocotizador/recepcion/mp-live-comprador.test.mjs
           node --test integraciones/autocotizador/recepcion/pagina-retorno-live.test.mjs
           node --test integraciones/autocotizador/recepcion/checkout-live-cliente.test.mjs
+          node --test integraciones/autocotizador/recepcion/flujo-presupuesto-live-cliente.test.mjs
           node --test integraciones/autocotizador/recepcion/obtener-tarifario-d1-live.test.mjs
           node --test integraciones/autocotizador/recepcion/ordenes-universales-live-documentos.test.mjs
           node --test tests/r2-borrador-universal-central.test.mjs
