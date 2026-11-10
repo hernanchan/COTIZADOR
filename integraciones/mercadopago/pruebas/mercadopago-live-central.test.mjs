@@ -1,0 +1,151 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {webcrypto} from 'node:crypto';
+import {checkoutMPLiveCentral,conciliarWebhookMPLive}
+ from './mercadopago-live-central.mjs';
+const ORDER='123e4567-e89b-42d3-a456-426614174000';
+const WEB='WEB-ENSAYO-'+'A'.repeat(32),SELLER='123456789';
+const envBase={
+ SABER_ENTORNO:'produccion',MP_LIVE_GATE:'GO_COMERCIAL_CONFIRMADO',
+ CENTRAL_DB_ENV:'produccion',MP_LIVE_ACCESS_TOKEN:'APP_USR-'+ 'x'.repeat(64),
+ MP_TEST_ACCESS_TOKEN:'TEST-'+ 'y'.repeat(60),MP_LIVE_SELLER_ID:SELLER,
+ MP_TEST_SELLER_ID:'987654321',MP_LIVE_WEBHOOK_SECRET:'w'.repeat(48),
+ CENTRAL_BRIDGE_KEY:'b'.repeat(48),
+ MP_LIVE_WEBHOOK_URL:'https://pagos.libreriasaber.com.ar/webhooks/mercadopago-live',
+ MP_LIVE_RETURN_URL:'https://libreriasaber.com.ar/pedido/estado'
+};
+const order=()=>({
+ id:ORDER,description:'Libreria Saber',amount_ars:4400,deposit_ars:4400,
+ status:'awaiting_payment',preference_id:null,payment_id:null,
+ created_at:new Date(Date.now()-60000).toISOString().slice(0,19).replace('T',' ')
+});
+const response=x=>({ok:true,status:200,json:async()=>x});
+function fixture(){
+ const o=order(),review={state:null};let attempts=0,posts=0;
+ const lock=new Set(),attemptSet=new Set();
+ const db={
+  prepare(sql){let args=[];return {
+    bind(...next){args=next;return this},
+    async first(){
+     if(sql.includes('FROM orders WHERE id=?'))return args[0]===ORDER?{...o}:null;
+     if(sql.includes('FROM central_r2_universal_order_links'))
+      return args[0]===WEB&&args[1]===ORDER?{commercial_order_id:ORDER}:null;
+     if(sql.includes('FROM central_document_manifests'))return null;
+     if(sql.includes('sqlite_master'))return null;
+     if(sql.includes('FROM orders o LEFT JOIN payment_reviews'))
+      return args[0]===ORDER?{...o,review_state:review.state}:null;
+     if(sql.includes('FROM orders WHERE payment_id=? AND id<>?'))return null;
+     return null
+    },
+    async all(){
+     if(sql.includes('FROM order_items'))return {results:[{line_total_ars:4400,quantity:1,unit_price_ars:4400}]};
+     return {results:[]};
+    },
+    async run(){
+     if(sql.startsWith('INSERT INTO live_checkout_locks')){if(lock.has(args[0]))return {meta:{changes:0}};lock.add(args[0]);return {meta:{changes:1}}}
+     if(sql.startsWith('DELETE FROM live_checkout_locks')){lock.delete(args[0]);return {meta:{changes:1}}}
+     if(sql.startsWith('INSERT OR IGNORE INTO live_checkout_attempts')){
+      if(attemptSet.has(args[0]))return{meta:{changes:0}};
+      attemptSet.add(args[0]);return{meta:{changes:1}};
+     }
+     if(sql.includes('UPDATE orders SET preference_id=')){
+      if(o.preference_id||o.status!=='awaiting_payment')return{meta:{changes:0}};
+      o.preference_id=args[0];return{meta:{changes:1}};
+     }
+     if(sql.includes("UPDATE orders SET status='paid'")){
+      if(o.status!=='awaiting_payment'||o.preference_id!==args[3])return{meta:{changes:0}};
+      o.status='paid';o.payment_id=args[0];return{meta:{changes:1}};
+     }
+     if(sql.includes("INSERT INTO payment_reviews")){review.state=review.state==='revoked'?'revoked':sql.includes("'revoked'")?'revoked':'verified';return{meta:{changes:1}}}
+     return {meta:{changes:1}};
+    }
+   }},
+  async batch(statements){let rows=[];for(const s of statements)rows.push(await s.run());return rows}
+ };
+ const preference=id=>({id,external_reference:ORDER,collector_id:SELLER,
+  items:[{currency_id:'ARS',quantity:1,unit_price:4400}],
+  init_point:'https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id='+id});
+ const payment={id:123456,order:{id:567890},external_reference:ORDER,
+  status:'approved',live_mode:true,currency_id:'ARS',transaction_amount:4400,
+  transaction_amount_refunded:0,collector_id:SELLER};
+ const merchant={id:567890,preference_id:'MP-LIVE-PREF-1',external_reference:ORDER,
+  payments:[{id:123456,status:'approved'}]};
+ const mpFetch=async (url,options={})=>{
+  const path=new URL(url).pathname;
+  if(path==='/users/me')return response({id:SELLER,tags:[]});
+  if(path==='/checkout/preferences'&&options.method==='POST'){
+   posts++;return response({id:'MP-LIVE-PREF-1'});
+  }
+  if(path.startsWith('/checkout/preferences/'))return response(preference(decodeURIComponent(path.split('/').at(-1))));
+  if(path.startsWith('/v1/payments/'))return response(payment);
+  if(path.startsWith('/merchant_orders/'))return response(merchant);
+  throw Error('MP unexpected path '+path);
+ };
+ const env={...envBase,DB:db};
+ const signed=async()=>({payload:{
+  schema:'saber-mp-live-checkout-v1',
+  commercialOrderId:ORDER,webOrderId:WEB
+ }});
+ return {env,db,o,payment,merchant,review,mpFetch,signed,
+  get posts(){return posts}};
+}
+async function signedWebhook(secret=envBase.MP_LIVE_WEBHOOK_SECRET){
+ const ts=String(Math.floor(Date.now()/1000)),rid='qa-live-hmac-12345',id='123456';
+ const message='id:'+id+';request-id:'+rid+';ts:'+ts+';';
+ const key=await webcrypto.subtle.importKey('raw',new TextEncoder().encode(secret),
+  {name:'HMAC',hash:'SHA-256'},false,['sign']);
+ const hex=Buffer.from(await webcrypto.subtle.sign('HMAC',key,new TextEncoder().encode(message))).toString('hex');
+ return new Request('https://pagos.libreriasaber.com.ar/webhooks/mercadopago-live?type=payment&data.id='+id,{
+  method:'POST',headers:{'x-signature':'ts='+ts+',v1='+hex,'x-request-id':rid,'Content-Type':'application/json'},
+  body:JSON.stringify({type:'payment',data:{id}})
+ });
+}
+test('nunca consulta MP ni D1 con compuerta de produccion cerrada',async()=>{
+ const f=fixture();let calls=0;
+ const off={...f.env,MP_LIVE_GATE:'NO_GO'};
+ const reply=await checkoutMPLiveCentral(new Request('https://pagos.libreriasaber.com.ar/internal/central/live/checkout',{method:'POST'}),off,{
+  readSigned:f.signed,fetcher:async()=>{calls++;throw Error('NO_MP')}
+ });
+ assert.equal(reply.status,503);assert.equal(calls,0);assert.equal(f.posts,0);
+ const wh=await conciliarWebhookMPLive(await signedWebhook(),off,{
+  fetcher:async()=>{calls++;throw Error('NO_MP')}
+ });
+ assert.equal(wh.status,503);assert.equal(calls,0);
+});
+test('checkout LIVE requiere HMAC de Central, orden asociada y vendedor real',async()=>{
+ const f=fixture(),req=new Request('https://pagos.libreriasaber.com.ar/internal/central/live/checkout',{method:'POST'});
+ assert.equal((await checkoutMPLiveCentral(req,f.env,{readSigned:async()=>({error:'bad',status:401}),fetcher:f.mpFetch})).status,401);
+ assert.equal(f.posts,0);
+ const bad={...f.env,MP_LIVE_SELLER_ID:'98765'};
+ const blocked=await checkoutMPLiveCentral(req,bad,{readSigned:f.signed,fetcher:f.mpFetch});
+ assert.equal(blocked.status,503);assert.equal(f.posts,0);
+ const ok=await checkoutMPLiveCentral(req,f.env,{readSigned:f.signed,fetcher:f.mpFetch});
+ assert.equal(ok.status,200,await ok.text().catch(()=>'')); 
+ const data=await ok.json().catch(()=>null);
+ assert.equal(data?.amountArs,4400);assert.equal(f.posts,1);
+ assert.equal(f.o.preference_id,'MP-LIVE-PREF-1');
+ const again=await checkoutMPLiveCentral(req,f.env,{readSigned:f.signed,fetcher:f.mpFetch});
+ assert.equal(again.status,200);assert.equal(f.posts,1,'un solo POST aunque repita el botón');
+});
+test('webhook LIVE no puede conciliar firma incorrecta, vendedor falso o monto distinto',async()=>{
+ const f=fixture();f.o.preference_id='MP-LIVE-PREF-1';
+ const bad=await signedWebhook('clave-incorrecta');
+ assert.equal((await conciliarWebhookMPLive(bad,f.env,{fetcher:f.mpFetch})).status,401);
+ assert.equal(f.o.status,'awaiting_payment');
+ const mismatched={...f.payment,transaction_amount:4100};
+ const wrong=async (url)=>String(url).includes('/v1/payments/')?response(mismatched):f.mpFetch(url);
+ const c=await conciliarWebhookMPLive(await signedWebhook(),f.env,{fetcher:wrong});
+ assert.equal(c.status,200);
+ assert.equal((await c.json()).registered,false);
+ assert.equal(f.o.status,'awaiting_payment');
+});
+test('HMAC + MP pago/merchant/seller + D1 correctos marcan una sola vez',async()=>{
+ const f=fixture();f.o.preference_id='MP-LIVE-PREF-1';
+ const one=await conciliarWebhookMPLive(await signedWebhook(),f.env,{fetcher:f.mpFetch});
+ assert.equal(one.status,200);
+ assert.equal((await one.json()).registered,true);
+ assert.equal(f.o.status,'paid');assert.equal(f.o.payment_id,'123456');
+ assert.equal(f.review.state,'verified');
+ const twice=await conciliarWebhookMPLive(await signedWebhook(),f.env,{fetcher:f.mpFetch});
+ assert.equal(twice.status,200);assert.equal((await twice.json()).idempotent,true);
+});
