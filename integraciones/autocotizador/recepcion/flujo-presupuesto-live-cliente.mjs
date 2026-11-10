@@ -38,7 +38,7 @@ export function crearFlujoPresupuestoLive({
   if(f.size<=40*MIB)totalTus+=f.size;
  }
  if(totalTus>60*MIB)throw Error('LIVE_FLUJO_TUS_EXCEDE_CUPO');
- let state='seleccionado',order=null;
+ let state='seleccionado',order=null,metas=null;
  const setState=s=>{state=s;onState(s)};
  async function preparar(){
   if(state!=='seleccionado')throw Error('LIVE_FLUJO_FASE_INVALIDA');
@@ -55,6 +55,9 @@ export function crearFlujoPresupuestoLive({
     if(!/^[A-Za-z0-9_-]{1,80}$/.test(fileId))throw Error('LIVE_FLUJO_FILE_ID');
     manifiestos.push({fileId,nombre:f.name,bytes:f.size,sha256:sha});
    }
+   metas=manifiestos.map((m,i)=>({fileId:m.fileId,name:m.nombre,bytes:m.bytes,sha256:m.sha256,
+    pages:archivos[i].paginas.length,mode:archivos[i].modo,
+    transport:m.bytes<=40*MIB?'tus':'r2'}));
    setState('registrando_borrador');
    const draft=await post(fetcher,'/api/pedido/live/borrador',{
     webOrderId,archivos,manifiestos});
@@ -82,6 +85,10 @@ export function crearFlujoPresupuestoLive({
   if(state!=='presupuestado'||!order)throw Error('LIVE_FLUJO_PAGO_SIN_ORDEN');
   const {numeroOrden,...orden}=order;
   const url=await iniciarCheckoutLiveCliente({orden,fetcher,storage,origin});
+  if(!metas||metas.some(m=>!['bn','color'].includes(m.mode)||
+    m.pages<1||m.pages>2000))throw Error('LIVE_METAS_POSTPAGO_INVALIDAS');
+  storage.setItem('saber-live-archivos-v1',JSON.stringify({
+   webOrderId,commercialOrderId:order.commercialOrderId,metas}));
   setState('esperando_pago');
   return url;
  }
