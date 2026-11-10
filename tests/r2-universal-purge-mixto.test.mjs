@@ -90,7 +90,7 @@ function fixture({paid=true,delivered=true,received=true,prepress=true,alteredEt
    if(sql.startsWith('INSERT INTO central_r2_universal_purge_audit')){events.push(this.args);return {meta:{changes:1}}}
    throw Error('Unknown run '+sql);
   }
- }};
+ }}};
  db.batch=async statements=>{
   for(const s of statements)await s.run();
   return statements.map(()=>({meta:{changes:1}}));
