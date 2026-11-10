@@ -21,7 +21,7 @@ const LINES="CREATE TABLE IF NOT EXISTS central_r2_universal_files ("+
  "PRIMARY KEY(web_order_id,file_id),UNIQUE(web_order_id,ordinal))";
 const digest=async(data,subtle=crypto.subtle)=>Array.from(new Uint8Array(
  await subtle.digest('SHA-256',new TextEncoder().encode(data))),x=>x.toString(16).padStart(2,'0')).join('');
-export async function verificarFichaUniversal(p,{subtle=crypto.subtle}={}){
+export async function verificarFichaUniversal(p,{subtle=crypto.subtle,allowTusOnly=false}={}){
  if(!p||typeof p!=='object'||Array.isArray(p)||!SHA.test(p.quoteHash||''))
   throw Error('UNIVERSAL_FICHA_INVALIDA');
  const {quoteHash,...ficha}=p;
@@ -60,7 +60,7 @@ export async function verificarFichaUniversal(p,{subtle=crypto.subtle}={}){
   ids.add(f.fileId);workIds.add(f.idTrabajo);subtotal+=f.importeArs;
   if(f.transporte==='r2')r2++;else tusBytes+=f.bytes;
  }
- if(!r2||tusBytes>60*1048576)throw Error('UNIVERSAL_RUTA_INVALIDA');
+ if((!allowTusOnly&&!r2)||tusBytes>60*1048576)throw Error('UNIVERSAL_RUTA_INVALIDA');
  for(const a of ficha.armados){
   if(!a||typeof a.grupo!=='string'||!Array.isArray(a.archivos)||
    a.archivos.length<2||!Number.isSafeInteger(a.subtotal)||a.subtotal<0||
