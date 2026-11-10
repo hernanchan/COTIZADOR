@@ -31,4 +31,4 @@ jobs:
           npm install --no-save --no-audit --no-fund pdf-lib@1.17.1
           node --check integraciones/autocotizador/recepcion/e2e-preprensa-v2-r2-real-20261109.mjs
           node integraciones/autocotizador/recepcion/e2e-preprensa-v2-r2-real-20261109.mjs
-          echo 'V2_R2_PDF_REAL_A1_PREPRENSA_INTEGRA_SIN_APROBACION'
+          echo 'V2_R2_PDF_REAL_A1_PREPRENSA_INTEGRA_SIN_APROBACION_NO_NUEVO_PEDIDO'
