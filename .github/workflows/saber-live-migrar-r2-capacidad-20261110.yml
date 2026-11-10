@@ -1,0 +1,62 @@
+name: Saber - migrar solo tablas R2 producción sin cargar archivos
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-live-migrar-r2-capacidad-20261110.yml]
+permissions:
+  contents: read
+  statuses: write
+concurrency:
+  group: saber-live-r2-capacity-schema
+  cancel-in-progress: false
+jobs:
+  schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validar esquema SQLite sin conexión ni datos
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check integraciones/publicacion/aplicar-d1-produccion-r2-capacidad.mjs
+          python3 - <<'PY'
+          import sqlite3,pathlib
+          db=sqlite3.connect(':memory:')
+          ddl=pathlib.Path('integraciones/publicacion/d1-produccion-r2-capacidad-v1.sql').read_text()
+          db.executescript(ddl)
+          db.executescript(ddl)
+          for name in ('central_r2_large_reservations','central_r2_large_pending'):
+            assert db.execute('SELECT COUNT(*) FROM '+name).fetchone()[0]==0
+          print('LIVE_R2_DDL_IDEMPOTENT_ZERO_ROWS')
+          PY
+      - name: Aplicar solo esquema R2 a D1 producción
+        shell: bash
+        env:
+          SABER_CF_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          SABER_CF_D1_WRITE_TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+        run: |
+          set -euo pipefail
+          node integraciones/publicacion/aplicar-d1-produccion-r2-capacidad.mjs
+      - name: Registrar control sin habilitar uploads
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          if [ "$RESULT" = success ];then state=success;else state=failure;fi
+          jq -n --arg state "$state" --arg context "saber/live-r2-capacity-schema" \
+           --arg description "R2 cuotas D1 sin datos/no-go: $RESULT" \
+           --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+           '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/r2-capacity-status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+           --input /tmp/r2-capacity-status.json >/dev/null
