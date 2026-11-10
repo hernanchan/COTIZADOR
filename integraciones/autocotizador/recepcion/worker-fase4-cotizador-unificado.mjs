@@ -77,6 +77,7 @@ import {guardarBorradorUniversalLive,crearOrdenUniversalLive} from './ordenes-un
 import {paginaRetornoLive} from './pagina-retorno-live.mjs';
 import {paginaCotizarLive} from './pagina-cotizar-live.mjs';
 import liveBuyerClientJs from './flujo-presupuesto-live-cliente.txt';
+import livePostpayTusJs from './recepcion-tus-live-cliente.txt';
 import {checkoutR2PrepaidSandboxDocumentos} from './r2-prepago-checkout-documentos.mjs';
 import {descargarR2GrandePersonal} from './r2-pdf-grandes-descarga-personal.mjs';
 import {descargarR2PendientePorD1Personal} from './r2-pdf-descarga-d1-personal.mjs';
@@ -2363,6 +2364,19 @@ export default {
        }catch{return testResponse({ok:false,error:'Cotización LIVE indisponible o incompleta',paymentAuthorized:false},503)}
       }
       return closed();
+    }
+    if(page==='/pedido/recepcion-tus.js'){
+      const allow=env?.SABER_ENTORNO==='produccion'&&
+        env?.DOCS_MP_LIVE_GATE==='GO_COMERCIAL_CONFIRMADO'&&
+        env?.DOCS_LIVE_RECEPCION_GATE==='GO_COMERCIAL_CONFIRMADO'&&
+        env?.DOCS_LIVE_TUS_GATE==='GO_COMERCIAL_CONFIRMADO'&&
+        new URL(request.url).origin==='https://pedidos.libreriasaber.com.ar'&&
+        await autorizadoCompradorLive(request,env);
+      if(!allow||request.method!=='GET')return closed();
+      return new Response(livePostpayTusJs,{headers:{
+        'Content-Type':'text/javascript; charset=utf-8',
+        'Cache-Control':'no-store,private','X-Content-Type-Options':'nosniff',
+        'X-Robots-Tag':'noindex,nofollow'}});
     }
     if(page==='/pedido/estado')return paginaRetornoLive(request,env);
     if(page==='/api/pedido/live/sesion')return iniciarSesionCompradorLive(request,env);
