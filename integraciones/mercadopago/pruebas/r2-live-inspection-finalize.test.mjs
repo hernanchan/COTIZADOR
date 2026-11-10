@@ -1,0 +1,109 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {webcrypto,createHmac} from 'node:crypto';
+import {finalizarInspeccionR2Live} from './r2-live-inspection-finalize.mjs';
+const GO='GO_COMERCIAL_CONFIRMADO',t=1794320000;
+const web='WEB-ENSAYO-'+'A'.repeat(32);
+const order='123e4567-e89b-42d3-a456-426614174000';
+const receipt='DOC-123e4567-e89b-42d3-a456-426614174001';
+const hash='a'.repeat(64),quote='b'.repeat(64),file='pdf_0';
+const key='CENTRAL_R2_INSPECTION_SECRET_DIFFERENT_1234';
+const proof={schema:'saber-r2-live-inspection-proof-v1',webOrderId:web,
+ commercialOrderId:order,fileId:file,receiptId:receipt,
+ quoteHash:quote,sha256:hash,bytes:60*1048576,issuedAt:t,
+ measuredDimensions:[{numero:1,anchoCm:59.4,altoCm:84.1}]};
+const sign=p=>createHmac('sha256',key).update(JSON.stringify(p)).digest('hex');
+const request=(p=proof,sig=sign(p))=>new Request(
+ 'https://pagos.libreriasaber.com.ar/admin/api/central/live-r2-inspection',{
+ method:'POST',headers:{Origin:'https://pagos.libreriasaber.com.ar',
+ 'Content-Type':'application/json'},
+ body:JSON.stringify({operator:'Preprensa Saber',confirmed:true,proof:p,signature:sig})
+});
+const envBase={SABER_ENTORNO:'produccion',CENTRAL_DB_ENV:'produccion',
+ MP_LIVE_GATE:GO,CENTRAL_LIVE_POSTPAY_GATE:GO,
+ CENTRAL_LIVE_R2_GATE:GO,CENTRAL_LIVE_R2_STAGING_GATE:GO,
+ CENTRAL_LIVE_R2_INSPECTION_GATE:GO,
+ CENTRAL_LIVE_R2_INSPECTION_KEY:key,
+ CENTRAL_BRIDGE_KEY:'DIFFERENT_CENTRAL_BRIDGE_KEY_12345'};
+function fixture({paid=true,geometry=59.4,received=0,pending=true}={}){
+ const queries=[],batches=[];
+ const db={
+  prepare(sql){queries.push(sql);let args=[];
+   return {bind(...a){args=a;return this},async first(){
+    if(sql.includes('FROM central_r2_large_pending')){
+     return pending?{receipt_id:receipt,web_order_id:web,file_id:file,
+      object_key:'r2-v1/'+web+'/'+receipt.slice(4)+'.pdf',
+      sha256:hash,bytes:proof.bytes,status:'awaiting_pdf_analysis'}:null;
+    }
+    if(sql.includes('FROM central_r2_large_reservations'))
+     return {web_order_id:web,file_id:file,sha256:hash,bytes:proof.bytes,state:'reserved'};
+    if(sql.includes('FROM central_r2_live_inspections'))return null;
+    throw Error('SQL inesperado '+sql);
+   }};
+  },
+  async batch(statements){batches.push(statements);return statements.map(()=>({meta:{changes:1}}))}
+ };
+ const env={...envBase,DB:db};
+ const verify=async()=>({ok:true,link:{quote_hash:quote},amountArs:4400,
+  rows:[{file_id:file,transport:'r2',sha256:hash,bytes:proof.bytes,received}],
+  works:[{fileId:file,configuracion:{paginas:[
+   {numero:1,anchoCm:geometry,altoCm:84.1}]}}]});
+ const payment=async()=>({verified:paid,revoked:false});
+ const opts={authorized:true,verify,payment,subtle:webcrypto.subtle,now:()=>t};
+ return {env,opts,queries,batches};
+}
+test('comprobante local válido + D1 pago, reserva y geometría: recibo registrado sin impresión',async()=>{
+ const f=fixture();
+ const r=await finalizarInspeccionR2Live(request(),f.env,f.opts);
+ assert.equal(r.status,201,JSON.stringify(await r.clone().json()));
+ const data=await r.json();
+ assert.equal(data.originalVerified,true);
+ assert.equal(data.productionAuthorized,false);
+ assert.equal(data.prepressApproved,false);
+ assert.equal(data.zipEnabled,false);
+ assert.equal(f.batches.length,1);
+ assert.equal(f.batches[0].length,2);
+ const all=f.queries.join(' ');
+ assert.match(all,/payment_reviews/ .source||'central_r2_live_inspections');
+ assert.match(all,/central_r2_live_inspections/);
+ assert.equal(f.batches[0].every(x=>x.bind),true);
+});
+test('prohibido sin operador, gates o firma confiable; ninguna escritura',async()=>{
+ for(const [change,authorized] of [[{CENTRAL_LIVE_R2_INSPECTION_GATE:'NO_GO'},true],
+  [{MP_LIVE_GATE:'NO_GO'},true],[{SABER_ENTORNO:'preparacion'},true],
+  [{CENTRAL_LIVE_R2_INSPECTION_KEY:envBase.CENTRAL_BRIDGE_KEY},true],
+  [{},false]]){
+  const f=fixture(),r=await finalizarInspeccionR2Live(request(),
+   {...f.env,...change},{...f.opts,authorized});
+  assert.equal(r.status,authorized?503:401);
+  assert.equal(f.batches.length,0);
+ }
+ const f=fixture();
+ const bad=await finalizarInspeccionR2Live(request(proof,'0'.repeat(64)),f.env,f.opts);
+ assert.equal(bad.status,401);assert.equal(f.batches.length,0);
+});
+test('pago no conciliado, original ajeno, geometría distinta y reserva ausente bloquean',async()=>{
+ for(const config of [{paid:false},{geometry:60.9},{pending:false}]){
+  const f=fixture(config);
+  const result=await finalizarInspeccionR2Live(request(),f.env,f.opts);
+  assert.ok([402,409].includes(result.status),JSON.stringify(config));
+  assert.equal(f.batches.length,0);
+ }
+ const f=fixture();
+ const modified={...proof,bytes:70*1048576};
+ const result=await finalizarInspeccionR2Live(
+  request(modified,sign(modified)),f.env,f.opts);
+ assert.equal(result.status,409);assert.equal(f.batches.length,0);
+});
+test('firma antigua, caducada y remitente remoto rechazados',async()=>{
+ const f=fixture();
+ const future={...proof,issuedAt:t+5};
+ const rejected=await finalizarInspeccionR2Live(request(future,sign(future)),f.env,f.opts);
+ assert.equal(rejected.status,409);
+ const remote=new Request('https://pagos.libreriasaber.com.ar/admin/api/central/live-r2-inspection',{
+  method:'POST',headers:{Origin:'https://other.example.com','Content-Type':'application/json'},
+  body:JSON.stringify({operator:'Preprensa Saber',confirmed:true,proof,signature:sign(proof)})
+ });
+ assert.equal((await finalizarInspeccionR2Live(remote,f.env,f.opts)).status,403);
+ assert.equal(f.batches.length,0);
+});
