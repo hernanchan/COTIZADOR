@@ -1,0 +1,168 @@
+name: Saber - actualizar Workers LIVE AISLADOS con ZIP sin activar cobros
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-stage-zip-live-no-go-20261110.yml]
+permissions:
+  contents: read
+  statuses: write
+concurrency:
+  group: saber-live-zip-staging-protegido
+  cancel-in-progress: false
+jobs:
+  etapa-zip:
+    runs-on: ubuntu-latest
+    timeout-minutes: 17
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Compilar artefactos ZIP y Central y validar cambios afectados
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-fund --no-audit esbuild@0.25.12 wrangler@4.55.0
+          cd integraciones/autocotizador/recepcion
+          npm install --no-fund --no-audit
+          npm run build:unificado
+          node --test paquete-live-operador.test.mjs
+          cd ../../..
+          node --test tests/central-live-recepcion-panel.test.mjs tests/zip-universal-stream.test.mjs
+          ./node_modules/.bin/esbuild integraciones/mercadopago/pruebas/worker.js \
+            --bundle --platform=browser --format=esm --target=es2022 \
+            --outfile=/tmp/saber-central-live-staged.mjs
+          node --check /tmp/saber-central-live-staged.mjs
+          echo STAGE_ZIP_LIVE_BUILD_OK
+      - name: Verificar Cloudflare D1 Worker, flags NO_GO y versiones anteriores
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          DEPLOY: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+          D1_TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$DEPLOY" && test -n "$D1_TOKEN"
+          tmp=/tmp/saber-live-zip-stage
+          mkdir -p "$tmp"
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT"
+          curl -fsS --max-time 30 -H "Authorization: Bearer $D1_TOKEN" \
+            "$root/d1/database" > "$tmp/d1.json"
+          jq -e '.success==true and (.result|type=="array")' "$tmp/d1.json" >/dev/null
+          prod=$(jq -r '[.result[]|select(.name=="saber-pagos-produccion")]|if length==1 then .[0].uuid else empty end' "$tmp/d1.json")
+          lab=$(jq -r '[.result[]|select(.name=="saber-pagos-pruebas")]|if length==1 then .[0].uuid else empty end' "$tmp/d1.json")
+          test -n "$prod" && test -n "$lab" && test "$prod" != "$lab"
+          echo "$prod" > "$tmp/prod-id"
+          for w in saber-pagos-produccion saber-documentos-produccion;do
+            url="$root/workers/scripts/$w"
+            curl -fsS --max-time 30 -H "Authorization: Bearer $DEPLOY" \
+              "$url/settings" > "$tmp/$w.json"
+            jq -e '.success==true and (.result.bindings|type=="array") and
+              (.result.bindings|any(.name=="SABER_ENTORNO" and .type=="plain_text" and .text=="preparacion")) and
+              (.result.bindings|any(.name=="CENTRAL_DB_ENV" and .type=="plain_text" and .text=="produccion"))' \
+              "$tmp/$w.json" >/dev/null
+            jq -e --arg v "$(test "$w" = saber-pagos-produccion && echo MP_LIVE_GATE || echo DOCS_MP_LIVE_GATE)" \
+              '.result.bindings|any(.name==$v and .type=="plain_text" and .text=="NO_GO")' \
+              "$tmp/$w.json" >/dev/null
+            jq -e '.result.bindings|all(if .type=="plain_text" and ((.name|test("LIVE.*GATE|PACKAGE_GATE|MP_LIVE_GATE")) or (.name=="DOCS_LIVE_STAFF_GATE")) then .text!="GO_COMERCIAL_CONFIRMADO" else true end)' \
+              "$tmp/$w.json" >/dev/null
+            curl -fsS --max-time 30 -H "Authorization: Bearer $DEPLOY" \
+              "$url/subdomain" > "$tmp/$w-subdomain.json"
+            jq -e '.success==true and .result.enabled==false and .result.previews_enabled==false' \
+              "$tmp/$w-subdomain.json" >/dev/null
+            jq -r '.result.bindings[].name' "$tmp/$w.json" | sort > "$tmp/$w-bindings-before"
+            curl -fsS --max-time 30 -H "Authorization: Bearer $DEPLOY" \
+              "$url/deployments" > "$tmp/$w-deployments-before.json"
+            jq -e '.success==true and (.result.deployments|length)>0' \
+              "$tmp/$w-deployments-before.json" >/dev/null
+          done
+          jq -e --arg id "$prod" '.result.bindings|any(.name=="DB" and .type=="d1" and ((.id//.database_id)==$id))' \
+             "$tmp/saber-pagos-produccion.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="SABER_CENTRAL" and .type=="service" and .service=="saber-pagos-produccion")' \
+             "$tmp/saber-documentos-produccion.json" >/dev/null
+          echo STAGE_LIVE_PREDEPLOY_GATES_CLOSED_D1_CORRECT_OLD_VERSIONS_KNOWN
+      - name: Actualizar Central y Documentos sin dominios ni habilitaciones comerciales
+        shell: bash
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          tmp=/tmp/saber-live-zip-stage
+          prod=$(cat "$tmp/prod-id")
+          central=integraciones/mercadopago/produccion/wrangler.toml
+          docs=integraciones/autocotizador/produccion/wrangler.toml
+          sed "s/__D1_PRODUCCION_UUID__/$prod/g" \
+            integraciones/mercadopago/produccion/wrangler.toml.template > "$central"
+          cp integraciones/autocotizador/produccion/wrangler.toml.template "$docs"
+          # Una actualización de código no debe borrar secretos ni variables existentes.
+          sed -i 's/^keep_vars = false$/keep_vars = true/' "$docs"
+          for file in "$central" "$docs";do
+            grep -Fxq 'workers_dev = false' "$file"
+            grep -Fxq 'preview_urls = false' "$file"
+            grep -Fxq 'keep_vars = true' "$file" || grep -Fq 'keep_vars = true  #' "$file"
+            grep -Fxq 'SABER_ENTORNO = "preparacion"' "$file"
+            ! grep -Eq '^routes?[[:space:]]*=' "$file"
+            ! grep -Eq '^crons[[:space:]]*=' "$file"
+          done
+          CI=true npx wrangler deploy --config "$central" > "$tmp/central-deploy.log" 2>&1 ||
+            { tail -n 18 "$tmp/central-deploy.log"; exit 1; }
+          echo CENTRAL_LIVE_CODE_UPDATED_STILL_NO_GO
+          CI=true npx wrangler deploy --config "$docs" > "$tmp/docs-deploy.log" 2>&1 ||
+            { tail -n 18 "$tmp/docs-deploy.log"; exit 1; }
+          echo DOCS_LIVE_ZIP_CODE_UPDATED_STILL_NO_GO
+      - name: Confirmar bindings, compuertas y continuidad tras despliegue
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          DEPLOY: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          tmp=/tmp/saber-live-zip-stage
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts"
+          for w in saber-pagos-produccion saber-documentos-produccion;do
+            curl -fsS --max-time 30 -H "Authorization: Bearer $DEPLOY" \
+              "$root/$w/settings" > "$tmp/$w-after.json"
+            jq -e '.success==true and (.result.bindings|any(.name=="SABER_ENTORNO" and .type=="plain_text" and .text=="preparacion")) and
+              (.result.bindings|any(.name=="CENTRAL_DB_ENV" and .type=="plain_text" and .text=="produccion"))' \
+              "$tmp/$w-after.json" >/dev/null
+            jq -e --arg flag "$(test "$w" = saber-pagos-produccion && echo MP_LIVE_GATE || echo DOCS_MP_LIVE_GATE)" \
+              '.result.bindings|any(.name==$flag and .type=="plain_text" and .text=="NO_GO")' \
+              "$tmp/$w-after.json" >/dev/null
+            jq -r '.result.bindings[].name' "$tmp/$w-after.json" | sort > "$tmp/$w-bindings-after"
+            comm -23 "$tmp/$w-bindings-before" "$tmp/$w-bindings-after" > "$tmp/$w-removed"
+            test ! -s "$tmp/$w-removed" || { echo "BINDINGS_MISSING_AFTER_STAGE_$w"; cat "$tmp/$w-removed"; exit 1; }
+            curl -fsS --max-time 30 -H "Authorization: Bearer $DEPLOY" \
+              "$root/$w/subdomain" > "$tmp/$w-subdomain-after.json"
+            jq -e '.success==true and .result.enabled==false and .result.previews_enabled==false' \
+              "$tmp/$w-subdomain-after.json" >/dev/null
+            curl -fsS --max-time 30 -H "Authorization: Bearer $DEPLOY" \
+              "$root/$w/deployments" > "$tmp/$w-deployments-after.json"
+            jq -e '.success==true and (.result.deployments|length)>0' \
+              "$tmp/$w-deployments-after.json" >/dev/null
+            echo "STAGED=$w NO_GO NO_PUBLIC_URL BINDINGS_PRESERVED"
+          done
+          jq -e '.result.bindings|any(.name=="SABER_CENTRAL" and .type=="service" and .service=="saber-pagos-produccion")' \
+            "$tmp/saber-documentos-produccion-after.json" >/dev/null
+          jq -e --arg id "$(cat "$tmp/prod-id")" '.result.bindings|any(.name=="DB" and .type=="d1" and ((.id//.database_id)==$id))' \
+            "$tmp/saber-pagos-produccion-after.json" >/dev/null
+          echo LIVE_ZIP_WORKERS_STAGE_VERIFIED_NO_GO_NO_LIVE_PAYMENTS_NO_MAIN_CHANGE
+      - name: Registrar resultado staging
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        shell: bash
+        run: |
+          if [ "$RESULT" = success ];then state=success;else state=failure;fi
+          jq -n --arg state "$state" --arg context "saber/stage-live-zip-no-go" \
+           --arg description "Zip LIVE staged isolated NO_GO: $RESULT" \
+           --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+           '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/zip-staging-status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+           --input /tmp/zip-staging-status.json >/dev/null
