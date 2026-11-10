@@ -40,8 +40,12 @@ try{
  page.on('request',req=>{
   const url=req.url();
   if(req.method()!=='GET'&&req.method()!=='HEAD'){
-   if(/\/api\/ensayo-carga-unica(?:\?|$)|\/api\/ensayo-materiales-rapido(?:\?|$)/.test(url))return;
-   blocked.push(req.method()+' '+new URL(url).pathname);
+   // Consultas y verificación anti-bots, sin carga de archivos ni cobro.
+   const pathname=new URL(url).pathname;
+   if(['/api/ensayo-carga-unica','/api/ensayo-materiales-rapido',
+       '/prueba-v2/api/ensayo-tus-comprobar'].includes(pathname)||
+      pathname.startsWith('/cdn-cgi/challenge-platform/'))return;
+   blocked.push(req.method()+' '+pathname);
   }
  });
  console.log('QA_ETAPA_5_ABRIR_PORTAL');
