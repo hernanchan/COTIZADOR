@@ -52,7 +52,7 @@ export async function leerFirmaInternaLive(request,env,{
       typeof payload.telefono!=='string'||
       !/^\+?[0-9 ()-]{10,26}$/.test(payload.telefono)||
       payload.telefono.replace(/\D/g,'').length<10||
-      payload.telefono.replace(/\\D/g,'').length>15:
+      payload.telefono.replace(/\D/g,'').length>15:
       !UUID.test(payload.commercialOrderId||''))||
     !WEB.test(payload.webOrderId||''))
    return {error:'Orden LIVE inválida',status:422};
