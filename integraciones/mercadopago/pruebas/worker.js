@@ -3340,6 +3340,16 @@ async function actualizarRecepcionLive(){
     " · recibidos "+o.receivedCount+"/"+o.fileCount+
     " · R2 pendiente de análisis "+o.stagedR2Count+
     " · $"+Number(o.amountArs).toLocaleString("es-AR");
+   if(o.estado==="ORIGINALES_RECIBIDOS_PREPRENSA_PENDIENTE"&&
+      o.pendingCount===0&&o.receivedCount===o.fileCount&&
+      /^WEB-ENSAYO-[A-F0-9]{32}$/.test(o.webOrderId||"")){
+    // Acceso a ZIP original para revisión humana; no autoriza imprimir.
+    const link=document.createElement("a");
+    link.href="https://pedidos.libreriasaber.com.ar/personal/paquete?webOrderId="+o.webOrderId;
+    link.textContent=" Abrir ZIP e instrucciones para preprensa (acceso personal)";
+    link.target="_blank";link.rel="noopener noreferrer";
+    li.append(link);
+   }
    liveRecepcionList.append(li);
   }
  }catch(e){
