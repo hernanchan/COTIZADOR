@@ -5,7 +5,7 @@ import {clasificarMosaicoRasterPDFGrande}
  from '../integraciones/autocotizador/recepcion/clasificar-ploteo-grande-raster-local.mjs';
 const txt=t=>new TextEncoder().encode(t);
 const MIB=1048576;
-function pdfVirtual({imagenes=16,texto=false,paginaUnica=true,xref=true}={}){
+function pdfVirtual({imagenes=16,texto=false,paginaUnica=true,xref=true,maquetaParroquia=false}={}){
  const virtual=72*MIB,segments=[],offsets={};
  function add(offset,bytes){segments.push({offset,bytes:bytes instanceof Uint8Array?bytes:txt(bytes)})}
  add(0,'%PDF-1.6\n%test\n');
@@ -18,18 +18,20 @@ function pdfVirtual({imagenes=16,texto=false,paginaUnica=true,xref=true}={}){
  obj(1,200,'<</Type/Catalog/Pages 2 0 R>>');
  obj(2,400,'<</Type/Pages/Count '+(paginaUnica?1:2)+'/Kids[3 0 R]>>');
  const resources=Array.from({length:imagenes},(_,i)=>'/Im'+i+' '+(i+5)+' 0 R').join('');
- obj(3,600,'<</Type/Page/Parent 2 0 R/MediaBox[0 0 1000 1000]/Contents 4 0 R/Resources<</XObject<<'+resources+'>>>>>>');
+ obj(3,600,'<</Type/Page/Parent 2 0 R/MediaBox[0 0 '+(maquetaParroquia?'1987.09 1474.02':'1000 1000')+']/Contents 4 0 R/Resources<</XObject<<'+resources+'>>>>>>');
  const statements=['q'];
  for(let i=0;i<imagenes;i++){
-  const x=(i%4)*250,y=Math.floor(i/4)*250;
-  statements.push('q\n240 0 0 240 '+x+' '+y+' cm\n/Im'+i+' Do\nQ');
+  const x=maquetaParroquia?37+(i%8)*241:(i%4)*250;
+  const y=maquetaParroquia?7+Math.floor(i/8)*184.25:Math.floor(i/4)*250;
+  const matrix=maquetaParroquia?'229.44 0 0 170.16':'240 0 0 240';
+  statements.push('q\n'+matrix+' '+x+' '+y+' cm\n/Im'+i+' Do\nQ');
  }
  if(texto)statements.push('BT\n/F1 12 Tf\n(Test) Tj\nET');
  statements.push('Q');
  const compressed=deflateSync(txt(statements.join('\n')));
  obj(4,30000,'<</Filter/FlateDecode/Length '+compressed.length+'>>',compressed);
  for(let i=0;i<imagenes;i++){
-  obj(i+5,2*MIB+i*2*MIB,
+  obj(i+5,2*MIB+i*8192,
    '<</Subtype/Image/Width 956/Height 709/Filter/FlateDecode/Length 762085>>');
  }
  if(xref){
@@ -41,7 +43,7 @@ function pdfVirtual({imagenes=16,texto=false,paginaUnica=true,xref=true}={}){
   table+='trailer\r\n<</Size '+count+'/Root 1 0 R>>\r\nstartxref\r\n'+xrefAt+'\r\n%%EOF\r\n';
   add(xrefAt,table);
  }
- const file={size:virtual,name:'plano_72MiB.pdf',readBytes:0,maxSlice:0,
+ const file={size:virtual,name:maquetaParroquia?'QR PARROQUIA- VINILO BLANCO + MEDIO CORTE- 50X70CM- 1 COPIA.pdf':'plano_72MiB.pdf',readBytes:0,maxSlice:0,
   slice(start,end){
    const len=end-start;
    assert.ok(start>=0&&end<=virtual&&len>0);
@@ -83,4 +85,18 @@ test('xref desconocido y archivos fuera de rango -> sin clasificación automáti
  assert.equal(await clasificarMosaicoRasterPDFGrande({
   size:201*MIB,name:'gigante.pdf',slice(){throw Error('No leer')}
  }),null);
+});
+
+test('plancha grande como el archivo de parroquia: 64 imagenes 8x8, dimensiones 70.1 x 52 cm, sin inferir vinilo del nombre',async()=>{
+ const file=pdfVirtual({imagenes:64,maquetaParroquia:true});
+ const result=await clasificarMosaicoRasterPDFGrande(file);
+ assert.equal(result?.modo,'poster',JSON.stringify(result));
+ assert.equal(result.altaConfianza,true);
+ assert.equal(result.imagenesPintadas,64);
+ assert.equal(result.imagenesDistintas,64);
+ assert.ok(result.coverage>=0.75,'La plancha cubre al menos el 75%');
+ assert.ok(file.readBytes<512*1024);
+ assert.equal(result.originalSubido,false);
+ assert.equal(result.permiteImprimirSinRevisar,false);
+ assert.equal(Object.hasOwn(result,'papelPoster'),false,'El clasificador no elige material ni vinilo');
 });
