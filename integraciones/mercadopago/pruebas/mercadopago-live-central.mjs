@@ -57,11 +57,18 @@ async function datosPedido(env,id){
    rows.reduce((sum,x)=>sum+x.line_total_ars,0)!==order.amount_ars)return null;
  return order;
 }
-async function enlacePedido(env,id,webOrderId){
- const r=await env.DB.prepare('SELECT commercial_order_id FROM central_r2_universal_order_links WHERE web_order_id=? AND commercial_order_id=?').bind(webOrderId,id).first();
- if(r)return true;
- const m=await env.DB.prepare('SELECT commercial_order_id FROM central_document_manifests WHERE web_order_id=? AND commercial_order_id=?').bind(webOrderId,id).first();
- return Boolean(m);
+async function cantidadArchivosVinculados(env,id,webOrderId){
+ // Solo se acepta cantidad validada en la ficha D1 de la misma orden.
+ const d=await env.DB.prepare(
+  'SELECT d.file_count FROM central_r2_universal_order_links l '+
+  'JOIN central_r2_universal_drafts d ON d.web_order_id=l.web_order_id '+
+  'WHERE l.web_order_id=? AND l.commercial_order_id=?'
+ ).bind(webOrderId,id).first();
+ const r=d||await env.DB.prepare(
+  'SELECT file_count FROM central_document_manifests WHERE web_order_id=? AND commercial_order_id=?'
+ ).bind(webOrderId,id).first();
+ return Number.isSafeInteger(r?.file_count)&&r.file_count>=1&&r.file_count<=10?
+  r.file_count:null;
 }
 async function verificarPref(env,order,id,{fetcher}){
  const [seller,pref]=await Promise.all([
@@ -92,8 +99,9 @@ export async function checkoutMPLiveCentral(request,env,{
     !UUID.test(p.commercialOrderId||'')||!WEB.test(p.webOrderId||''))
   return reply({ok:false,error:'MP_LIVE_PEDIDO_INVALIDO'},422);
  const order=await datosPedido(env,p.commercialOrderId);
- if(!order||order.status!=='awaiting_payment'||!await enlacePedido(env,order.id,p.webOrderId))
-  return reply({ok:false,error:'MP_LIVE_ORDEN_NO_COBRABLE'},409);
+ const fileCount=order&&order.status==='awaiting_payment'?
+  await cantidadArchivosVinculados(env,order.id,p.webOrderId):null;
+ if(!fileCount)return reply({ok:false,error:'MP_LIVE_ORDEN_NO_COBRABLE'},409);
  const age=now()-Date.parse(String(order.created_at).replace(' ','T')+'Z');
  if(!Number.isFinite(age)||age<0||age>=86400000)
   return reply({ok:false,error:'MP_LIVE_COTIZACION_VENCIDA'},409);
@@ -103,7 +111,7 @@ export async function checkoutMPLiveCentral(request,env,{
  try{
   if(order.preference_id){
    const checkout=await verificarPref(env,order,order.preference_id,{fetcher});
-   return reply({ok:true,orderId:order.id,amountArs:order.amount_ars,checkoutUrl:checkout,reused:true});
+   return reply({ok:true,orderId:order.id,amountArs:order.amount_ars,fileCount,checkoutUrl:checkout,reused:true});
   }
   // Exclusión de pestañas concurrentes; un intento remoto jamás se reintenta a ciegas.
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS live_checkout_locks(order_id TEXT PRIMARY KEY,expires_at TEXT NOT NULL)").run();
@@ -115,7 +123,7 @@ export async function checkoutMPLiveCentral(request,env,{
    if(check?.status!=='awaiting_payment')return reply({ok:false,error:'MP_LIVE_ESTADO_CAMBIO'},409);
    if(check.preference_id){
     const checkout=await verificarPref(env,order,check.preference_id,{fetcher});
-    return reply({ok:true,orderId:order.id,amountArs:order.amount_ars,checkoutUrl:checkout,reused:true});
+    return reply({ok:true,orderId:order.id,amountArs:order.amount_ars,fileCount,checkoutUrl:checkout,reused:true});
    }
    const attempt=await env.DB.prepare('INSERT OR IGNORE INTO live_checkout_attempts(order_id) VALUES(?)').bind(order.id).run();
    let prefId;
@@ -147,7 +155,7 @@ export async function checkoutMPLiveCentral(request,env,{
     const stored=await env.DB.prepare('SELECT preference_id FROM orders WHERE id=?').bind(order.id).first();
     if(stored?.preference_id!==prefId)return reply({ok:false,error:'MP_LIVE_PREFERENCIA_CONFLICTO'},409);
    }
-   return reply({ok:true,orderId:order.id,amountArs:order.amount_ars,checkoutUrl:checkout,reused:!attempt.meta?.changes});
+   return reply({ok:true,orderId:order.id,amountArs:order.amount_ars,fileCount,checkoutUrl:checkout,reused:!attempt.meta?.changes});
   }finally{await env.DB.prepare('DELETE FROM live_checkout_locks WHERE order_id=?').bind(order.id).run()}
  }catch{
   return reply({ok:false,error:'MP_LIVE_CHECKOUT_NO_VERIFICADO'},503);
