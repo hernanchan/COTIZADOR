@@ -53,14 +53,14 @@ let abierto=-1;
 let ultimoPresupuesto=null;
 function alertasRecepcionPDF(){
  const alertas=new Map();
- if((location.pathname!=='/prueba-v2/carga-inteligente'&&!UNIVERSAL_COMPRADOR_LIVE)||window.parent===window)return alertas;
+ if((location.pathname!=='/prueba-v2/carga-inteligente'&&!(typeof UNIVERSAL_COMPRADOR_LIVE!=='undefined'&&UNIVERSAL_COMPRADOR_LIVE))||window.parent===window)return alertas;
  let acumulado=0;
  for(const e of entries){
   const file=e.archivoOriginal;
   if(!(file instanceof File))continue;
   const transporte=decidirTransportePDF(file.size);
   if(transporte.ruta==='r2'){
-   if(R2_UNIVERSAL_ENSAYO||UNIVERSAL_COMPRADOR_LIVE)continue;
+   if((typeof R2_UNIVERSAL_ENSAYO!=='undefined'&&R2_UNIVERSAL_ENSAYO)||(typeof UNIVERSAL_COMPRADOR_LIVE!=='undefined'&&UNIVERSAL_COMPRADOR_LIVE))continue;
    alertas.set(e,'El PDF «'+file.name+'» pesa '+tamanoPdfMiB(file)+
     '. El envío universal de PDF grandes está temporalmente deshabilitado. '+
     'El presupuesto mantiene su tipo y precio; consultanos antes de enviar o pagar.');
@@ -886,7 +886,7 @@ if((location.pathname==='/prueba-v2/carga-inteligente'||UNIVERSAL_COMPRADOR_LIVE
       entries.length<1||entries.length>MAX_PDF_CARGA||
       ultimoPresupuesto.plan?.length!==entries.length)
     throw Error('Completá primero la cotización de todos los documentos.');
-   if(UNIVERSAL_COMPRADOR_LIVE||(R2_UNIVERSAL_ENSAYO&&entries.some(e=>
+   if((typeof UNIVERSAL_COMPRADOR_LIVE!=='undefined'&&UNIVERSAL_COMPRADOR_LIVE)||((typeof R2_UNIVERSAL_ENSAYO!=='undefined'&&R2_UNIVERSAL_ENSAYO)&&entries.some(e=>
       e.archivoOriginal instanceof File&&e.archivoOriginal.size>MAX_PDF_TUS_BYTES))){
     const lote=prepararLoteParcial(entries);
     if(lote.archivos.length!==entries.length||
@@ -917,7 +917,7 @@ if((location.pathname==='/prueba-v2/carga-inteligente'||UNIVERSAL_COMPRADOR_LIVE
      archivos:lote.archivos,totalOrientativo:ultimoPresupuesto.total
     },location.origin);
     info.classList?.remove?.('estado-recepcion-error');
-    info.textContent=UNIVERSAL_COMPRADOR_LIVE?'Archivos preparados. El precio se validará con el servidor y ningún PDF se enviará antes del pago acreditado.':'Pedido completo preparado. El servidor confirmará el precio; los PDF siguen en tu dispositivo hasta el pago de prueba.';
+    info.textContent=(typeof UNIVERSAL_COMPRADOR_LIVE!=='undefined'&&UNIVERSAL_COMPRADOR_LIVE)?'Archivos preparados. El precio se validará con el servidor y ningún PDF se enviará antes del pago acreditado.':'Pedido completo preparado. El servidor confirmará el precio; los PDF siguen en tu dispositivo hasta el pago de prueba.';
     window.parent.postMessage({type:'SABER_SMART_HANDOFF_READY',cantidad:entries.length},location.origin);
     return;
    }
