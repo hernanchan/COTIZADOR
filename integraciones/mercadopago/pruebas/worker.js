@@ -4712,7 +4712,7 @@ export default {
      return json({ok:false,error:'LIVE_PRICING_NO_APPROVAL'},409);
     const approval=await env.DB.prepare("SELECT created_at FROM central_pricing_admin_history WHERE revision=? AND action='approve' LIMIT 1")
      .bind(head.approved_revision).first();
-    if(!/^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$/.test(approval?.created_at||''))
+    if(!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(approval?.created_at||''))
      return json({ok:false,error:'LIVE_PRICING_NO_AUDIT'},409);
     const snapshot=JSON.parse(head.approved_json);
     if(!priceAdminValidatePayload(snapshot))return json({ok:false,error:'LIVE_PRICING_INVALID'},409);
