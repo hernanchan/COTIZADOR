@@ -4696,6 +4696,16 @@ export default {
  },
  async fetch(req,env,ctx){
   const url=new URL(req.url);
+  // Solo con compuerta LIVE y credenciales de producción independientes.
+  // En saber-pagos-pruebas quedan cerradas (HTTP 503).
+  if(url.pathname==='/internal/central/live/checkout'){
+   const {checkoutMPLiveCentral}=await import('./mercadopago-live-central.mjs');
+   return checkoutMPLiveCentral(req,env,{readSigned:centralReadSigned});
+  }
+  if(url.pathname==='/webhooks/mercadopago-live'){
+   const {conciliarWebhookMPLive}=await import('./mercadopago-live-central.mjs');
+   return conciliarWebhookMPLive(req,env);
+  }
   if(url.pathname==="/demo/polaroids"&&req.method==="GET")return new Response(polaroidDemoHtml,{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","referrer-policy":"no-referrer","x-robots-tag":"noindex,nofollow"}});
   if(url.pathname==="/demo"&&req.method==="GET")return new Response(demoHtml,{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store"}});
   if((url.pathname==="/admin"||url.pathname==="/admin/precios")&&req.method==="GET")return new Response(adminHtml,{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","referrer-policy":"no-referrer","x-robots-tag":"noindex,nofollow","x-content-type-options":"nosniff"}});
