@@ -1233,7 +1233,14 @@ r2Pagar?.addEventListener?.('click',async()=>{
 });
 r2Retry?.addEventListener?.('click',async()=>{
  if(universalFlujo){
-  await universalSubirPagados();
+  try{
+   const state=await universalFlujo.consultarPago();
+   if(state==='pagado')await universalSubirPagados();
+   else r2Informar('El pago no está confirmado. Conservá el comprobante; no vuelvas a pagar.');
+  }catch(e){
+   r2Informar('No pudimos verificar los archivos pagados: '+
+    String(e?.message||e).slice(0,140)+'. No vuelvas a pagar.');
+  }
   return;
  }
 
