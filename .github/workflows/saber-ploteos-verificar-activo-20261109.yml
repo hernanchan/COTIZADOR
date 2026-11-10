@@ -1,0 +1,59 @@
+name: Saber - comprobar ploteos privados activos y registrar resultado
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-ploteos-verificar-activo-20261109.yml]
+permissions:
+  contents: read
+  statuses: write
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Confirmar version Cloudflare, UX, acceso protegido y pagos desactivados
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+          PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN" && test -n "$PASSWORD"
+          worker=saber-documentos-pruebas
+          candidate=6a8581bb-0391-4de2-9e58-1123ce2341a3
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/$worker"
+          origin="https://saber-documentos-pruebas.libreriasaber.workers.dev"
+          curl -fsS --max-time 30 -H "Authorization: Bearer $TOKEN" "$root/deployments" >/tmp/deploy.json
+          jq -e --arg id "$candidate" '.success==true and (.result.deployments[0].versions|length==1) and .result.deployments[0].versions[0].percentage==100 and .result.deployments[0].versions[0].version_id==$id' /tmp/deploy.json >/dev/null || { echo "CANDIDATE_NOT_ACTIVE"; exit 1; }
+          echo "VERSION_ACTIVE $candidate"
+          code=$(curl -sS --max-time 25 -o /tmp/anon -w '%{http_code}' "$origin/prueba-v2/")
+          test "$code" = 401 || { echo "ANONYMOUS_ACCESS_NOT_BLOCKED"; exit 1; }
+          code=$(curl -sS --max-time 25 -u "operador:$PASSWORD" -o /tmp/client -w '%{http_code}' "$origin/prueba-v2/carga-inteligente.js")
+          test "$code" = 200 || { echo "SMART_JS_NOT_200"; exit 1; }
+          grep -Fq 'No pudimos identificar' /tmp/client || { echo "MISSING_SAFE_CLASSIFICATION_FALLBACK"; exit 1; }
+          grep -Fq 'Recubierto 130 g' /tmp/client || { echo "PAPER_130_NOT_VISIBLE"; exit 1; }
+          curl -fsS --max-time 30 https://saber-pagos-pruebas.libreriasaber.workers.dev/health >/tmp/payment-health.json
+          jq -e '.ok==true and .paymentsEnabled==false' /tmp/payment-health.json >/dev/null || { echo "PAYMENT_GATE_NOT_OFF"; exit 1; }
+          echo "PRIVATE_CAD_POSTER_80_130_ACTIVE_PAYMENT_REAL_OFF_PUBLIC_MAIN_UNTOUCHED"
+      - name: Registrar evidencia del Worker privado
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_SHA: ${{ github.sha }}
+          RESULT: ${{ job.status }}
+        run: |
+          if [ "$RESULT" = success ]; then
+            state=success
+            description="Ploteos 80/130 activos solo en Worker privado; pagos reales OFF"
+          else
+            state=failure
+            description="Verificar activacion privada ploteos y controles seguros"
+          fi
+          jq -n --arg state "$state" --arg context 'saber/ploteos-privados-activos' --arg description "$description" --arg target_url "https://github.com/$GH_REPO/actions/runs/$GITHUB_RUN_ID" '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/status.json
+          gh api -X POST "repos/$GH_REPO/statuses/$GH_SHA" --input /tmp/status.json
