@@ -29,8 +29,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git cat-file -e 418ede9d184160f9fc733f97399eaaa1f6b74171^{commit}
-          git diff --name-only 418ede9d184160f9fc733f97399eaaa1f6b74171 HEAD > /tmp/saber-unstaged-change-list
+          git cat-file -e 0cb15a56b213af4d268d48fcff76d495f317285b^{commit}
+          git diff --name-only 0cb15a56b213af4d268d48fcff76d495f317285b HEAD > /tmp/saber-unstaged-change-list
           if grep -Ev '^(tests/|\.github/workflows/)' /tmp/saber-unstaged-change-list; then
             echo 'SOURCE_RUNTIME_CHANGED_SIN_VOLVER_A_STAGE_NO_DEPLOY'
             exit 1
@@ -58,8 +58,8 @@ jobs:
           test -n "$ACCOUNT" && test -n "$TOKEN"
           docs='saber-documentos-pruebas'
           central='saber-pagos-pruebas'
-          docs_old='8f76fb7c-ec86-415a-8145-a08a02d1fe35'
-          docs_new='1a309975-22cd-483b-91a6-e885b05ff9a5'
+          docs_old='1a309975-22cd-483b-91a6-e885b05ff9a5'
+          docs_new='45a88b75-af19-48a7-996f-52cd45b100d0'
           central_old='c8cd56fb-8872-48e1-a4cd-41e63b737e78'
           central_new='4a30a48c-f14b-4a4a-b74d-b8f720a76bd1'
           api="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts"
