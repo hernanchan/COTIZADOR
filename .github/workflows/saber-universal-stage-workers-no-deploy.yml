@@ -1,4 +1,5 @@
 name: Saber universal - subir versiones inactivas Documentos y Central (SIN DEPLOY)
+# UI: si clasificador visual confirma PLENO no ofrecer cambio a CAD; re-review
 # Actualización UI A3+ CAD/pleno verificada: staging inactivo antes de promover.
 # Re-stage verified universal recovery 2026-11-09; nunca despliega ni cobra
 on:
