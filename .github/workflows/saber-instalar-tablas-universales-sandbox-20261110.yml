@@ -1,0 +1,47 @@
+name: Saber - habilitar solo tablas universales faltantes en D1 de pruebas
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-instalar-tablas-universales-sandbox-20261110.yml]
+permissions:
+  contents: read
+  statuses: write
+concurrency:
+  group: saber-sandbox-universal-schema-20261110
+  cancel-in-progress: false
+jobs:
+  schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Crear tres tablas vacias para pedido universal Sandbox (sin cobrar)
+        env:
+          SABER_CF_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          SABER_CF_D1_WRITE_TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+        run: |
+          set -euo pipefail
+          node --check integraciones/publicacion/instalar-esquema-universal-sandbox-20261110.mjs
+          node integraciones/publicacion/instalar-esquema-universal-sandbox-20261110.mjs
+      - name: Estado verificable
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          if [ "$RESULT" = success ];then state=success;else state=failure;fi
+          jq -n --arg state "$state" --arg context 'saber/sandbox-universal-schema' \
+           --arg description "Universal schema sandbox only: $RESULT" \
+           --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+           '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/schema-status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+           --input /tmp/schema-status.json >/dev/null
