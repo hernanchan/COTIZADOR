@@ -5,7 +5,9 @@ const client=readFileSync(new URL('../integraciones/autocotizador/recepcion/carg
 test('ploteo informa al cliente CAD/Postér y las medidas detectadas en centímetros',()=>{
  assert.match(client,/TIPO DE PLOTEO:/);
  assert.match(client,/TAMAÑO MAYOR A A3 · CORRESPONDE A PLOTTER/);
- assert.match(client,/¿Qué tipo de ploteo necesitás\?/);
+ assert.doesNotMatch(client,/¿Qué tipo de ploteo necesitás\?/);
+ assert.match(client,/No pudimos identificar automáticamente si este PDF es CAD o Pleno/);
+ assert.doesNotMatch(client,/elegirTipoPloteo\(e\.paginas/);
  assert.match(client,/MEDIDA DETECTADA:/);
  assert.match(client,/medida-ploteo-visible/);
  assert.match(client,/p\.anchoCm/);
