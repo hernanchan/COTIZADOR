@@ -1,0 +1,74 @@
+name: Saber QA - precio 3 páginas 47x31 cm sin subir archivo ni crear pedido
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-qa-cabanas-pleno-precio-20261110.yml]
+permissions:
+  contents: read
+  statuses: write
+jobs:
+  cotizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Consultar cotización D1 del formato real, solo estimación de prueba
+        shell: bash
+        env:
+          PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const root='https://saber-documentos-pruebas.libreriasaber.workers.dev';
+          const pass=process.env.PASSWORD;
+          assert.ok(typeof pass==='string'&&pass.length>=16,'STAFF_SECRET_MISSING');
+          const auth='Basic '+Buffer.from('operador:'+pass).toString('base64');
+          const paginas=[{numero:1,anchoCm:47.003,altoCm:31.001,modo:'poster'},
+           {numero:2,anchoCm:45.923,altoCm:31.001,modo:'poster'},
+           {numero:3,anchoCm:45.923,altoCm:31.001,modo:'poster'}];
+          const base={nombre:'archivo.pdf',servicio:'auto',paginas,
+           seleccion:'original',paginasSeleccionadas:'',copias:1,
+           modo:'color',caras:'simple',papelPoster:'obra80',anillado:'ninguno',
+           grupoAnillado:'',materialColor:''};
+          const cotizar=async papel=>{
+            const r=await fetch(root+'/api/ensayo-carga-unica',{
+             method:'POST',headers:{Authorization:auth,Origin:root,'Content-Type':'application/json'},
+             body:JSON.stringify({archivos:[{...base,papelPoster:papel}]}),
+             signal:AbortSignal.timeout(25000),redirect:'error'});
+            const x=await r.json().catch(()=>({}));
+            assert.equal(r.status,200,'QUOTE_HTTP_'+r.status+'_'+String(x.error));
+            assert.equal(x.ok,true);assert.equal(x.estado,'PRELIMINAR');
+            assert.equal(x.paymentAuthorized,false);
+            assert.equal(x.plan?.[0]?.destino,'ploteos');
+            assert.equal(x.detallePloteos?.[0]?.paginas?.length,3);
+            for(const [i,p] of x.detallePloteos[0].paginas.entries()){
+             assert.equal(p.modo,'poster');
+             assert.ok(Math.abs(p.anchoCm-paginas[i].anchoCm)<0.02);
+             assert.ok(Math.abs(p.altoCm-paginas[i].altoCm)<0.02);
+            }
+            assert.ok(Number.isSafeInteger(x.total)&&x.total>0);
+            console.log('PLOTTER_3_PAGES_47X31_PAPER='+papel+' TOTAL_ARS='+x.total+
+              ' ROLLS='+x.detallePloteos[0].paginas.map(p=>p.material).join(','));
+            return x.total;
+          };
+          const a=await cotizar('obra80');
+          const b=await cotizar('recubierto');
+          assert.ok(b>a,'130G_NOT_HIGHER_THAN_80G');
+          console.log('REAL_D1_QUOTE_3_PAGES_GREEN_NO_PDF_UPLOAD_NO_ORDER_NO_PAYMENT');
+          NODE
+      - name: Registrar resultado
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        shell: bash
+        run: |
+          if [ "$RESULT" = success ];then state=success;else state=failure;fi
+          jq -n --arg state "$state" --arg context 'saber/plotter-3pag-precio-real' \
+           --arg description "Cotización D1 tres páginas: $RESULT" \
+           --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+           '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/saber-test-status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/saber-test-status.json >/dev/null
