@@ -53,7 +53,7 @@ function fixture(){
       o.preference_id=args[0];return{meta:{changes:1}};
      }
      if(sql.includes("UPDATE orders SET status='paid'")){
-      if(o.status!=='awaiting_payment'||o.preference_id!==args[3])return{meta:{changes:0}};
+      if(o.status!=='awaiting_payment'||o.preference_id!==args[2])return{meta:{changes:0}};
       o.status='paid';o.payment_id=args[0];return{meta:{changes:1}};
      }
      if(sql.includes("INSERT INTO payment_reviews")){review.state=review.state==='revoked'?'revoked':sql.includes("'revoked'")?'revoked':'verified';return{meta:{changes:1}}}
@@ -116,12 +116,13 @@ test('checkout LIVE requiere HMAC de Central, orden asociada y vendedor real',as
  const f=fixture(),req=new Request('https://pagos.libreriasaber.com.ar/internal/central/live/checkout',{method:'POST'});
  assert.equal((await checkoutMPLiveCentral(req,f.env,{readSigned:async()=>({error:'bad',status:401}),fetcher:f.mpFetch})).status,401);
  assert.equal(f.posts,0);
- const bad={...f.env,MP_LIVE_SELLER_ID:'98765'};
- const blocked=await checkoutMPLiveCentral(req,bad,{readSigned:f.signed,fetcher:f.mpFetch});
- assert.equal(blocked.status,503);assert.equal(f.posts,0);
+ const mismatched=fixture();
+ const bad={...mismatched.env,MP_LIVE_SELLER_ID:'98765'};
+ const blocked=await checkoutMPLiveCentral(req,bad,{readSigned:mismatched.signed,fetcher:mismatched.mpFetch});
+ assert.equal(blocked.status,503);assert.equal(mismatched.posts,0);
  const ok=await checkoutMPLiveCentral(req,f.env,{readSigned:f.signed,fetcher:f.mpFetch});
- assert.equal(ok.status,200,await ok.text().catch(()=>'')); 
- const data=await ok.json().catch(()=>null);
+ assert.equal(ok.status,200);
+ const data=await ok.json();
  assert.equal(data?.amountArs,4400);assert.equal(f.posts,1);
  assert.equal(f.o.preference_id,'MP-LIVE-PREF-1');
  const again=await checkoutMPLiveCentral(req,f.env,{readSigned:f.signed,fetcher:f.mpFetch});
