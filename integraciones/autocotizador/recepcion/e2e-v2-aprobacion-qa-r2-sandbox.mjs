@@ -47,11 +47,16 @@ const creds=[
  ['SABER_CENTRAL_ADMIN_KEY',process.env.SABER_CENTRAL_ADMIN_KEY],
  ['SABER_DOCS_CENTRAL_ADMIN_KEY',process.env.SABER_DOCS_CENTRAL_ADMIN_KEY],
  ['SABER_V2_OPERATOR_PASSWORD',pass]
-].filter(([_,secret])=>typeof secret==='string'&&secret);
+];
+for(const [label,secret] of creds){
+ console.log('QA_ADMIN_SECRET_'+label+'='+(typeof secret==='string'&&secret.length?'PRESENT':'MISSING'));
+}
+const available=creds.filter(([_,secret])=>typeof secret==='string'&&secret);
 let authorization=null,reviews;
-for(const [label,key] of creds){
+for(const [label,key] of available){
  const r=await fetch(central+'/admin/api/central/r2-paid-review',{
   headers:{Authorization:'Bearer '+key},signal:AbortSignal.timeout(20000)});
+ console.log('QA_ADMIN_AUTH_'+label+'_HTTP_'+r.status);
  if(r.status===200){
   const obj=await r.json();if(obj.ok!==true)throw Error('QA_INVALID_REVIEW_LIST');
   authorization='Bearer '+key;reviews=obj;console.log('QA_CENTRAL_ADMIN_AUTHENTICATED_AS='+label);break;
