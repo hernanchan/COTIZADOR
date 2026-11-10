@@ -74,6 +74,11 @@ export async function pagoSandboxUniversalDocumentos(request,env,{
  }else{
   if(typeof x.pendingFiles!=='number'||!Number.isSafeInteger(x.pendingFiles)||
      x.pendingFiles<0||x.pendingFiles>x.fileCount||
+     !Array.isArray(x.receivedFileIds)||
+     x.receivedFileIds.length!==x.fileCount-x.pendingFiles||
+     new Set(x.receivedFileIds).size!==x.receivedFileIds.length||
+     x.receivedFileIds.some(v=>typeof v!=='string'||
+      !/^[A-Za-z0-9_-]{1,80}$/.test(v))||
      x.uploadAuthorized!==(x.estado==='pagado_esperando_archivos'))
    return reply({ok:false,error:'UNIVERSAL_PAGO_ESTADO_INCONSISTENTE'},502);
  }
@@ -81,6 +86,6 @@ export async function pagoSandboxUniversalDocumentos(request,env,{
   commercialOrderId:d.commercialOrderId,
   amountArs:x.amountArs,fileCount:x.fileCount,
   estado:x.estado,...(d.action==='start'?{checkoutUrl:x.checkoutUrl}:{}),
-  ...(d.action==='status'?{pendingFiles:x.pendingFiles}:{}),
+  ...(d.action==='status'?{pendingFiles:x.pendingFiles,receivedFileIds:x.receivedFileIds}:{}),
   uploadAuthorized:x.uploadAuthorized,productionAuthorized:false},200);
 }
