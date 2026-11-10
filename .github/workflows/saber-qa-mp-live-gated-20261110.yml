@@ -11,6 +11,8 @@ on:
       - 'integraciones/mercadopago/pruebas/r2-universal-tus-central.mjs'
       - 'integraciones/mercadopago/pruebas/r2-universal-live-gate-central.mjs'
       - 'integraciones/mercadopago/pruebas/r2-universal-live-gate-central.test.mjs'
+      - 'integraciones/mercadopago/pruebas/r2-universal-live-reserve-central.mjs'
+      - 'integraciones/mercadopago/pruebas/r2-universal-live-reserve-central.test.mjs'
       - 'integraciones/mercadopago/pruebas/r2-universal-checkout-central.mjs'
       - 'integraciones/mercadopago/pruebas/tus-live-pospago-aislado.test.mjs'
       - 'integraciones/mercadopago/pruebas/central-recepcion-live.mjs'
@@ -72,6 +74,7 @@ jobs:
           node --test integraciones/mercadopago/pruebas/central-live-bridge.test.mjs
           node --test integraciones/mercadopago/pruebas/tus-live-pospago-aislado.test.mjs
           node --test integraciones/mercadopago/pruebas/r2-universal-live-gate-central.test.mjs
+          node --test integraciones/mercadopago/pruebas/r2-universal-live-reserve-central.test.mjs
           node --test integraciones/mercadopago/pruebas/central-recepcion-live.test.mjs
           node --test integraciones/mercadopago/pruebas/pricing-live-admin.test.mjs
           node --test integraciones/mercadopago/pruebas/central-live-hmac-e2e.test.mjs
