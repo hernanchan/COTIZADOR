@@ -39,7 +39,7 @@ export function cotejarPagoRealMP({payment,merchantOrder,seller,order,sellerId}=
  if(!numericId(sellerId)||!numericId(seller.id)||!numericId(payment.collector_id)||
     String(seller.id)!==String(sellerId)||
     String(payment.collector_id)!==String(seller.id)||
-    Array.isArray(seller.tags)&&seller.tags.includes('test_user'))
+    seller.test_user===true||(Array.isArray(seller.tags)&&seller.tags.includes('test_user')))
   return fail('vendedor_incorrecto');
  if(payment.live_mode!==true||payment.status!=='approved'||
     payment.currency_id!=='ARS'||Number(payment.transaction_amount_refunded||0)!==0)
