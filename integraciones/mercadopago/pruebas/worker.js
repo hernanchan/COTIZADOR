@@ -4925,6 +4925,13 @@ export default {
     ).all();
     return json({orders:rows.results||[],payment_confirmed:false,production_enabled:false});
    }
+   if(url.pathname==="/admin/api/pricing-live"||
+      url.pathname==="/admin/api/pricing-live/draft"||
+      url.pathname==="/admin/api/pricing-live/approve"){
+    const {pricingLiveAdmin}=await import('./pricing-live-admin.mjs');
+    return pricingLiveAdmin(req,env,{authorized:tokenOK(req,env),
+      validate:priceAdminValidatePayload});
+   }
    if(url.pathname.startsWith("/admin/api/pricing"))
     return await priceAdminHandle(req,env,url.pathname);
    if(url.pathname==="/admin/api/central/production-status"&&req.method==="POST")
