@@ -4706,6 +4706,10 @@ export default {
    const {conciliarWebhookMPLive}=await import('./mercadopago-live-central.mjs');
    return conciliarWebhookMPLive(req,env);
   }
+  if(url.pathname==='/internal/central/live/status'){
+   const {estadoMPLiveCentral}=await import('./mercadopago-live-central.mjs');
+   return estadoMPLiveCentral(req,env,{readSigned:centralReadSigned});
+  }
   if(url.pathname==="/demo/polaroids"&&req.method==="GET")return new Response(polaroidDemoHtml,{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","referrer-policy":"no-referrer","x-robots-tag":"noindex,nofollow"}});
   if(url.pathname==="/demo"&&req.method==="GET")return new Response(demoHtml,{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store"}});
   if((url.pathname==="/admin"||url.pathname==="/admin/precios")&&req.method==="GET")return new Response(adminHtml,{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","referrer-policy":"no-referrer","x-robots-tag":"noindex,nofollow","x-content-type-options":"nosniff"}});
