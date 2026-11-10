@@ -54,17 +54,25 @@ export async function enviarPDFsTUSPagadosLive({
  if(tus.length===0)throw Error('LIVE_TUS_SIN_ARCHIVOS_CHICOS');
  if(selectedFiles.length!==tus.length)throw Error('LIVE_TUS_SELECCION_INCOMPLETA');
  let total=0;
- const work=[];
- for(const m of tus){
-  const matches=selectedFiles.filter(f=>f?.name===m.name&&f.size===m.bytes);
-  if(matches.length!==1)throw Error('LIVE_TUS_ARCHIVO_DISTINTO_O_REPETIDO');
-  const f=matches[0];
+ const work=[],verified=[];
+ // Puede haber dos PDF con el mismo nombre y tamaño en distintas carpetas.
+ // Emparejar por SHA y consumir cada selección una sola vez.
+ for(const f of selectedFiles){
+  if(!f||typeof f.slice!=='function'||!Number.isSafeInteger(f.size)||
+     !/\\.pdf$/i.test(f.name||''))throw Error('LIVE_TUS_NO_ES_PDF');
   const header=new Uint8Array(await f.slice(0,5).arrayBuffer());
   if(String.fromCharCode(...header)!=='%PDF-')throw Error('LIVE_TUS_NO_ES_PDF');
-  const hash=await hasher(f,{onProgress:p=>onProgress({phase:'hash',fileId:m.fileId,...p})});
-  if(hash!==m.sha256)throw Error('LIVE_TUS_SHA_DISTINTO');
-  total+=m.bytes;work.push({meta:m,file:f});
+  const hash=await hasher(f,{onProgress:p=>onProgress({phase:'hash',file:f.name,...p})});
+  if(!SHA.test(hash))throw Error('LIVE_TUS_SHA_INVALIDO');
+  verified.push({file:f,hash,used:false});
  }
+ for(const m of tus){
+  const match=verified.find(v=>!v.used&&v.file.name===m.name&&
+    v.file.size===m.bytes&&v.hash===m.sha256);
+  if(!match)throw Error('LIVE_TUS_SHA_DISTINTO');
+  match.used=true;total+=m.bytes;work.push({meta:m,file:match.file});
+ }
+ if(verified.some(v=>!v.used))throw Error('LIVE_TUS_ARCHIVO_EXTRA');
  if(total>60*MIB)throw Error('LIVE_TUS_CUPO_EXCEDIDO');
  // Esta respuesta procede de la conciliación en D1, nunca de parámetros MP.
  const status=await post(fetcher,'/api/pedido/live/checkout',{
