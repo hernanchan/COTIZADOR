@@ -5,10 +5,14 @@ on:
     paths: [.github/workflows/saber-central-r2-nuevos-smoke-20261109.yml]
 permissions:
   contents: read
+  statuses: write
 jobs:
   smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 4
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
     steps:
       - name: Comprobar HTML real, controles de acceso y pagos OFF sin modificar datos
         shell: bash
@@ -34,4 +38,44 @@ jobs:
           health=$(curl -fsS --max-time 25 "$base/health")
           echo "$health" | jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' >/dev/null
           echo 'LIVE_CENTRAL_PRIVATE_SECURITY_GUARDS_PAYMENT_OFF'
+
+      - name: Verificar UNA sola entrada en Nuevos tras aprobación D1, sin cambios
+        env:
+          DEMO_ADMIN_KEY: ${{ secrets.DEMO_ADMIN_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$DEMO_ADMIN_KEY"
+          tmp=$(mktemp)
+          trap 'rm -f "$tmp"' EXIT
+          code=$(curl -sS --max-time 30 -H "Authorization: Bearer $DEMO_ADMIN_KEY" \
+            -o "$tmp" -w '%{http_code}' \
+            'https://saber-pagos-pruebas.libreriasaber.workers.dev/admin/api/orders')
+          test "$code" = 200 || { echo "CENTRAL_ADMIN_ORDERS_HTTP_$code"; exit 1; }
+          jq -e '.orders | type=="array"' "$tmp" >/dev/null
+          jq -e --arg id '89608817-95b1-41bc-ac88-579da519d32c' \
+            '[.orders[]|select(.id==$id)] | length==1' "$tmp" >/dev/null || \
+              { echo 'R2_SANDBOX_ORDER_MISSING_OR_DUPLICATE_IN_BOARD'; exit 1; }
+          jq -e --arg id '89608817-95b1-41bc-ac88-579da519d32c' \
+            '[.orders[]|select(.id==$id)] | .[0] |
+             .amount_ars==4400 and .production_state=="pendiente" and
+             (.r2_receipt_id|type=="string") and
+             (.work_number!=null) and .web_order_id=="WEB-ENSAYO-72E9F66A8BC34CC9B25D70EF49C1A8D3"' "$tmp" >/dev/null || \
+              { echo 'R2_SANDBOX_ORDER_NOT_READY_IN_NEW_LANE';exit 1; }
+          echo 'R2_SANDBOX_ONE_ORDER_IN_NUEVOS_WITH_APPROVED_PREPRESS_AND_NUMBER'
+          echo 'NO_ORDER_CREATION_NO_D1_WRITE_NO_R2_UPLOAD_NO_PAYMENT'
+      - name: Registrar comprobación de Nuevos en GitHub
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$RESULT" = success ]; then state=success; else state=failure; fi
+          jq -n --arg state "$state" --arg context 'saber/r2-unico-en-nuevos' \
+            --arg description "Comprobacion contra Central privada: $RESULT" \
+            --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/saber-r2-nuevos-status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/saber-r2-nuevos-status.json >/dev/null
 # cierre 2026-11-10: revalidar sin modificar comercio ni producción
