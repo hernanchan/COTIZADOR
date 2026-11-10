@@ -13,19 +13,33 @@ export function paginaRetornoLive(request,env){
  const html=`<!doctype html><html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title>Estado del pedido | Librería Saber</title>
-<style>body{font-family:system-ui,Arial,sans-serif;background:#f5f8fc;color:#183650;margin:0;padding:24px}
+<style>section{margin-top:22px;padding-top:12px;border-top:1px solid #dae5ee}input{display:block;margin:12px 0;max-width:100%}body{font-family:system-ui,Arial,sans-serif;background:#f5f8fc;color:#183650;margin:0;padding:24px}
 main{max-width:540px;margin:7vh auto;background:white;border:1px solid #dae5ee;border-radius:16px;padding:30px}
 h1{font-size:24px}a{color:#075b91}button{font:inherit;padding:10px 16px;background:#113c69;color:#fff;border:0;border-radius:9px;cursor:pointer}
 small{color:#526579}#estado{line-height:1.6}</style></head><body><main>
 <h1>Volviste a Librería Saber</h1>
 <p id="estado" role="status" aria-live="polite">Estamos verificando el estado de tu pedido. Volver desde Mercado Pago no significa que el pago ya esté acreditado.</p>
 <button type="button" id="revisar">Consultar nuevamente</button>
+<section id="recibir" hidden>
+<h2>Enviar tus PDF después del pago</h2>
+<p>Volvé a seleccionar exactamente los archivos que presupuestaste. Verificaremos sus huellas digitales antes de subirlos.</p>
+<p id="indicacion"></p>
+<input type="file" id="originales" accept=".pdf,application/pdf" multiple>
+<button type="button" id="subir">Verificar y enviar PDF</button>
+<p id="avance" role="status" aria-live="polite"></p>
+</section>
 <p><a href="/cotizar">Volver al cotizador</a></p>
 <small>Si Mercado Pago confirma el pago pero todavía no aparece acreditado, conservá el comprobante. No realices otro pago por este aviso.</small>
-</main><script>
+</main><script type="module">
+import {leerPedidoPostpagoLive,enviarPDFsTUSPagadosLive} from '/pedido/recepcion-tus.js';
 (function(){
  const output=document.getElementById('estado');
  const button=document.getElementById('revisar');
+ const receiving=document.getElementById('recibir');
+ const input=document.getElementById('originales');
+ const send=document.getElementById('subir');
+ const progress=document.getElementById('avance');
+ const hint=document.getElementById('indicacion');
  async function revisar(){
   let order;
   try{order=JSON.parse(sessionStorage.getItem('saber-live-pedido-v1')||'null')}catch{}
@@ -42,7 +56,18 @@ small{color:#526579}#estado{line-height:1.6}</style></head><body><main>
    const data=await response.json();
    if(!response.ok||data?.ok!==true||data.webOrderId!==order.webOrderId||
      data.commercialOrderId!==order.commercialOrderId)throw Error('pendiente');
-   output.textContent=data.estado==='pagado_esperando_archivos'&&data.uploadAuthorized===true
+   const paid=data.estado==='pagado_esperando_archivos'&&data.uploadAuthorized===true;
+   if(paid){
+    try{
+     const saved=leerPedidoPostpagoLive(sessionStorage);
+     if(saved.order.webOrderId!==order.webOrderId)throw Error('identidad');
+     const small=saved.metas.filter(m=>m.transport==='tus');
+     const large=saved.metas.filter(m=>m.transport==='r2');
+     receiving.hidden=small.length===0;
+     hint.textContent=small.length+' PDF para enviar ahora'+(large.length?' y '+large.length+' archivo(s) grande(s) pendientes de R2.':'');
+    }catch{receiving.hidden=true;output.textContent='Pago acreditado, pero faltan las referencias de los PDF. Contactá a Librería Saber y no pagues nuevamente.';return}
+   }else receiving.hidden=true;
+   output.textContent=paid
     ?'Pago acreditado. Volvé al cotizador para completar la recepción de tus archivos.'
     :data.estado==='revocado'
     ?'El pago no se encuentra vigente. Comunicate con Librería Saber antes de continuar.'
@@ -50,10 +75,29 @@ small{color:#526579}#estado{line-height:1.6}</style></head><body><main>
   }catch{output.textContent='No pudimos consultar la acreditación en este momento. Conservá tu comprobante y probá nuevamente; no repitas el pago.'}
   finally{button.disabled=false}
  }
+ send.addEventListener('click',async()=>{
+  send.disabled=true;
+  progress.textContent='Comprobando tus PDF originales…';
+  try{
+   const result=await enviarPDFsTUSPagadosLive({
+    selectedFiles:[...input.files],
+    onProgress:p=>{progress.textContent=p.phase==='hash'
+     ?'Comprobando integridad local del PDF…'
+     :'Recibiendo y verificando documentos…'}
+   });
+   progress.textContent=result.pendingR2
+    ?'PDF pequeños verificados. Los archivos grandes todavía deben enviarse por el circuito R2.'
+    :'PDF recibidos y verificados. Librería Saber continuará con la preparación.';
+   input.disabled=true;
+  }catch{
+   progress.textContent='No se confirmó la recepción de todos los PDF. Conservá los originales y reintentá; no pagues nuevamente.';
+   send.disabled=false;
+  }
+ });
  button.addEventListener('click',revisar);revisar();
 })();
 </script></body></html>`;
  return new Response(html,{status:200,headers:{'Content-Type':'text/html; charset=utf-8',
-  'Cache-Control':'no-store, private','Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+  'Cache-Control':'no-store, private','Content-Security-Policy':"default-src 'none'; script-src 'self' 'unsafe-inline' https://releases.transloadit.com; style-src 'unsafe-inline'; connect-src 'self' https://*.storage.supabase.co; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
   'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','X-Robots-Tag':'noindex,nofollow'}});
 }
