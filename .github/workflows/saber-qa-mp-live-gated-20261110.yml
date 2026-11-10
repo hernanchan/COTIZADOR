@@ -8,6 +8,7 @@ on:
       - 'integraciones/mercadopago/pruebas/mercadopago-live-central.test.mjs'
       - 'integraciones/mercadopago/pruebas/central-live-bridge.mjs'
       - 'integraciones/mercadopago/pruebas/r2-universal-order-central.mjs'
+      - 'integraciones/mercadopago/pruebas/r2-lote-universal-central.mjs'
       - 'integraciones/mercadopago/pruebas/central-live-bridge.test.mjs'
       - 'integraciones/mercadopago/pruebas/central-live-hmac-e2e.test.mjs'
       - 'integraciones/mercadopago/pruebas/worker.js'
@@ -19,6 +20,8 @@ on:
       - 'integraciones/autocotizador/recepcion/checkout-live-cliente.test.mjs'
       - 'integraciones/autocotizador/recepcion/obtener-tarifario-d1-live.mjs'
       - 'integraciones/autocotizador/recepcion/obtener-tarifario-d1-live.test.mjs'
+      - 'integraciones/autocotizador/recepcion/ordenes-universales-live-documentos.mjs'
+      - 'integraciones/autocotizador/recepcion/ordenes-universales-live-documentos.test.mjs'
       - 'integraciones/publicacion/d1-produccion-tarifario-v1.sql'
       - 'integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs'
       - 'integraciones/autocotizador/recepcion/pago-live-universal-documentos.mjs'
@@ -45,9 +48,11 @@ jobs:
           node --test integraciones/autocotizador/recepcion/pagina-retorno-live.test.mjs
           node --test integraciones/autocotizador/recepcion/checkout-live-cliente.test.mjs
           node --test integraciones/autocotizador/recepcion/obtener-tarifario-d1-live.test.mjs
+          node --test integraciones/autocotizador/recepcion/ordenes-universales-live-documentos.test.mjs
           node --check integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs
           node --test integraciones/autocotizador/recepcion/pago-live-universal-documentos.test.mjs
           node --check integraciones/mercadopago/pruebas/r2-universal-order-central.mjs
+          node --check integraciones/mercadopago/pruebas/r2-lote-universal-central.mjs
           node --check integraciones/mercadopago/pruebas/worker.js
           node --check integraciones/mercadopago/pruebas/mercadopago-live-central.mjs
       - name: Compilación del Worker con módulos LIVE cerrados
