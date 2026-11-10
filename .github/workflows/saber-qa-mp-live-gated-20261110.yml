@@ -21,6 +21,9 @@ on:
       - 'integraciones/mercadopago/pruebas/r2-live-inspection-finalize.test.mjs'
       - 'integraciones/autocotizador/recepcion/firmar-inspeccion-r2-live-local.mjs'
       - 'integraciones/autocotizador/recepcion/firmar-inspeccion-r2-live-local.test.mjs'
+      - 'integraciones/autocotizador/recepcion/r2-live-inspeccion-cli.mjs'
+      - 'integraciones/publicacion/d1-produccion-r2-inspeccion-v1.sql'
+      - 'integraciones/publicacion/aplicar-d1-produccion-r2-inspeccion.mjs'
       - 'integraciones/autocotizador/recepcion/preprensa-r2-archivo-local.mjs'
       - 'tests/central-live-recepcion-panel.test.mjs'
       - 'integraciones/mercadopago/pruebas/pricing-live-admin.mjs'
@@ -130,6 +133,8 @@ jobs:
           node --test integraciones/autocotizador/recepcion/tus-live-recepcion-documentos.test.mjs
           node --test integraciones/autocotizador/recepcion/recepcion-tus-live-cliente.test.mjs
           node --test integraciones/autocotizador/recepcion/firmar-inspeccion-r2-live-local.test.mjs
+          node --check integraciones/autocotizador/recepcion/r2-live-inspeccion-cli.mjs
+          node --check integraciones/publicacion/aplicar-d1-produccion-r2-inspeccion.mjs
           node --test integraciones/autocotizador/recepcion/r2-live-preflight-documentos.test.mjs
           node --test integraciones/autocotizador/recepcion/r2-live-puente-central.test.mjs
           node --test integraciones/autocotizador/recepcion/r2-live-reserva-puente-central.test.mjs
