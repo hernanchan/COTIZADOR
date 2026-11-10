@@ -43,7 +43,7 @@ jobs:
           const matches=list.filter(x=>x.name==='saber-pagos-pruebas');
           assert.equal(matches.length,1);
           const db=matches[0].uuid;
-          const sql=\`SELECT l.web_order_id AS web_order_id, COUNT(*) AS files,
+          const sql=`SELECT l.web_order_id AS web_order_id, COUNT(*) AS files,
           SUM(CASE WHEN f.received=1 THEN 1 ELSE 0 END) AS received,
           MIN(o.status) AS status, MIN(p.state) AS payment_review,
           SUM(CASE WHEN f.transport='r2' THEN 1 ELSE 0 END) AS r2_count,
@@ -53,7 +53,7 @@ jobs:
           JOIN orders o ON o.id=l.commercial_order_id
           JOIN payment_reviews p ON p.order_id=o.id
           WHERE l.web_order_id LIKE 'WEB-ENSAYO-%' AND o.status='paid' AND p.state='verified'
-          GROUP BY l.web_order_id ORDER BY l.web_order_id DESC LIMIT 25\`;
+          GROUP BY l.web_order_id ORDER BY l.web_order_id DESC LIMIT 25`;
           const queries=await call('/'+db+'/query',{method:'POST',body:JSON.stringify({sql})});
           assert.ok(Array.isArray(queries)&&queries[0]?.success===true);
           const rows=queries[0].results||[];
