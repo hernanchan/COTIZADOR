@@ -29,7 +29,8 @@ jobs:
             curl -fsS --max-time 25 -H "Authorization: Bearer $TOKEN" "$root/$w/deployments" > "$tmp/deploy"
             jq -e '.success==true and (.result.bindings|type=="array")' "$tmp/settings" >/dev/null
             jq -e '.success==true and (.result.deployments|length)>0' "$tmp/deploy" >/dev/null
-            echo "PRIVATE_WORKER=$w HEALTH_OF_SETTINGS_OK"
+            active=$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/deploy")
+            echo "PRIVATE_WORKER=$w ACTIVE_VERSION=$active SETTINGS_OK"
             if [ "$w" = saber-documentos-pruebas ]; then
               flags='DOCS_R2_UNIVERSAL_DRAFT_ENABLED DOCS_R2_UNIVERSAL_ORDER_ENABLED DOCS_R2_UNIVERSAL_CHECKOUT_ENABLED DOCS_R2_UNIVERSAL_POSTPAY_ENABLED DOCS_R2_UNIVERSAL_TUS_ENABLED DOCS_R2_UNIVERSAL_PACKAGE_ENABLED DOCS_R2_BIG_ENABLED DOCS_R2_QUOTA_ENABLED DOCS_R2_STAGING_ENABLED DOCS_CLIENT_SANDBOX_CHECKOUT_ENABLED DOCS_CENTRAL_SYNC_ENABLED DOCS_PRICE_ADMIN_D1_ENABLED'
               destructive='DOCS_R2_UNIVERSAL_PURGE_ENABLED'
