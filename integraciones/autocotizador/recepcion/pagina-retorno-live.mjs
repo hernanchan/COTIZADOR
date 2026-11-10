@@ -86,8 +86,8 @@ small{color:#526579}#estado{line-height:1.6}</style></head><body><main>
       output.textContent='Pago acreditado. Algunas rutas de recepción están temporalmente desactivadas. Contactá a Librería Saber; no pagues nuevamente.';
     }catch{receiving.hidden=true;output.textContent='Pago acreditado. La recepción de archivos está temporalmente indisponible o faltan las referencias de los PDF. Contactá a Librería Saber; no pagues nuevamente.';return}
    }else{receiving.hidden=true;receivingR2.hidden=true;}
-   output.textContent=paid
-    ?'Pago acreditado. Volvé al cotizador para completar la recepción de tus archivos.'
+   if(!output.textContent.includes('temporalmente desactivadas'))output.textContent=paid
+    ?'Pago acreditado. Seleccioná los PDF en esta página para completar su recepción.'
     :data.estado==='revocado'
     ?'El pago no se encuentra vigente. Comunicate con Librería Saber antes de continuar.'
     :'El pago todavía está pendiente de acreditación. Podés consultar nuevamente.';
