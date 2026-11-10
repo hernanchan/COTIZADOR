@@ -64,7 +64,7 @@ test('comprobante local válido + D1 pago, reserva y geometría: recibo registra
  assert.equal(f.batches.length,1);
  assert.equal(f.batches[0].length,2);
  const all=f.queries.join(' ');
- assert.match(all,/payment_reviews/ .source||'central_r2_live_inspections');
+ assert.match(all,/payment_reviews/);
  assert.match(all,/central_r2_live_inspections/);
  assert.equal(f.batches[0].every(x=>x.bind),true);
 });
