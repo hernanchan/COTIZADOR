@@ -24,7 +24,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Gate: fuente de las versiones inactivas no cambió y tests básicos
+      - name: "Gate: fuente de las versiones inactivas no cambió y tests básicos"
         shell: bash
         run: |
           set -euo pipefail
