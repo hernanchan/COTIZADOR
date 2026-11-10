@@ -73,7 +73,17 @@ try{
  console.log('QA_ETAPA_9_ESPERAR_METADATOS');
  await iframe.locator('#lista .archivo').first().waitFor({state:'visible',timeout:60000});
  console.log('QA_ETAPA_10_ESPERAR_PRECIO');
- await iframe.locator('#presupuesto').getByText(/TOTAL PRELIMINAR/i).waitFor({state:'visible',timeout:65000});
+ try{
+  await iframe.locator('#presupuesto').getByText(/TOTAL PRELIMINAR/i).waitFor({state:'visible',timeout:35000});
+ }catch(error){
+  const estado=await iframe.locator('#estado').innerText({timeout:5000}).catch(()=>'(estado no disponible)');
+  const presupuesto=await iframe.locator('#presupuesto').innerText({timeout:5000}).catch(()=>'(presupuesto no disponible)');
+  const ficha=await iframe.locator('#lista').innerText({timeout:5000}).catch(()=>'(ficha no disponible)');
+  console.log('QA_FALLO_ESTADO='+estado.replace(/\\s+/g,' ').slice(0,280));
+  console.log('QA_FALLO_PRESUPUESTO='+presupuesto.replace(/\\s+/g,' ').slice(0,400));
+  console.log('QA_FALLO_FICHA='+ficha.replace(/\\s+/g,' ').slice(0,550));
+  throw error;
+ }
  console.log('QA_ETAPA_11_PRECIO_LISTO');
  const details=await iframe.locator('#lista .resumen-archivo').first().innerText();
  const quote=await iframe.locator('#presupuesto').innerText();
