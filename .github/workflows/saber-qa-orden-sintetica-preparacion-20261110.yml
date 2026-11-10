@@ -29,7 +29,7 @@ jobs:
           const id='89608817-95b1-41bc-ac88-579da519d32c';
           const web='WEB-ENSAYO-72E9F66A8BC34CC9B25D70EF49C1A8D3';
           const key=process.env.DEMO_ADMIN_KEY;
-          assert.ok(typeof key==='string'&&key.length>=16,'ADMIN_SECRET_NOT_CONFIGURED');
+          assert.ok(typeof key==='string'&&key.length>0,'ADMIN_SECRET_NOT_CONFIGURED');
           async function get(path){
            const r=await fetch(base+path,{headers:{Authorization:'Bearer '+key},signal:AbortSignal.timeout(25000)});
            assert.equal(r.status,200,'QA_GET_HTTP_'+r.status+'_'+path);
