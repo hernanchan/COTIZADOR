@@ -1,0 +1,120 @@
+name: Saber - instalar credenciales MP LIVE solo en Worker cerrado
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-mp-live-credenciales-preparar-no-go-20261110.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  statuses: write
+concurrency:
+  group: saber-mp-live-credenciales-closed
+  cancel-in-progress: false
+jobs:
+  instalar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Verificar cuenta vendedora sin crear pedidos ni cobrar
+        id: verificaciones
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          DEPLOY: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+          MP_TOKEN: ${{ secrets.SABER_MP_LIVE_ACCESS_TOKEN }}
+          MP_WEBHOOK_SECRET: ${{ secrets.SABER_MP_LIVE_WEBHOOK_SECRET }}
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$ACCOUNT" && test -n "$DEPLOY"
+          if [ -z "$MP_TOKEN" ] || [ -z "$MP_WEBHOOK_SECRET" ]; then
+            echo 'MP_LIVE_CREDENTIALS_NOT_YET_LOADED_IN_GITHUB_ENVIRONMENT'
+            exit 1
+          fi
+          test "${#MP_TOKEN}" -ge 25 && test "${#MP_WEBHOOK_SECRET}" -ge 32
+          case "$MP_TOKEN" in TEST-*|test-*|"" ) echo 'MP_LIVE_TOKEN_MUST_BE_PRODUCTION';exit 1;; esac
+          dir=$(mktemp -d);trap 'rm -rf "$dir"' EXIT
+          auth="Authorization: Bearer $DEPLOY"
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts"
+          central="$root/saber-pagos-produccion"
+          gateway="$root/saber-webhook-produccion"
+          curl -fsS --max-time 25 -H "$auth" "$central/settings" > "$dir/central.json"
+          curl -fsS --max-time 25 -H "$auth" "$gateway/settings" > "$dir/gateway.json"
+          jq -e '.success==true and
+            (.result.bindings|any(.name=="SABER_ENTORNO" and .text=="preparacion")) and
+            (.result.bindings|any(.name=="MP_LIVE_GATE" and .text=="NO_GO")) and
+            (.result.bindings|any(.name=="CENTRAL_BRIDGE_KEY" and .type=="secret_text")) and
+            (.result.bindings|any(.name=="DB" and .type=="d1"))' "$dir/central.json" >/dev/null
+          jq -e '.success==true and
+            (.result.bindings|any(.name=="WEBHOOK_EDGE_GATE" and .text=="NO_GO")) and
+            (.result.bindings|any(.name=="SABER_ENTORNO" and .text=="preparacion")) and
+            (.result.bindings|all(.type!="secret_text" and .type!="d1"))' "$dir/gateway.json" >/dev/null
+          curl -fsS --max-time 25 -H "$auth" "$root/../domains" > "$dir/domains.json"
+          jq -e '.success==true and
+            ([.result[]|select(.hostname=="pagos.libreriasaber.com.ar" and .service=="saber-webhook-produccion")]|length)==1' "$dir/domains.json" >/dev/null
+          if jq -e '.result.bindings|any(.name=="MP_LIVE_ACCESS_TOKEN" or .name=="MP_LIVE_WEBHOOK_SECRET" or .name=="MP_LIVE_SELLER_ID")' "$dir/central.json" >/dev/null;then
+            echo 'MP_LIVE_SECRET_ALREADY_EXISTS_STOP_MANUAL_REVIEW';exit 1
+          fi
+          # GET /users/me es de solo lectura; nunca POST /checkout/preferences.
+          code=$(curl -sS --max-time 30 -o "$dir/seller.json" -w '%{http_code}' \
+            -H "Authorization: Bearer $MP_TOKEN" \
+            -H 'Accept: application/json' \
+            'https://api.mercadopago.com/users/me')
+          if [ "$code" != 200 ];then
+            echo "MP_LIVE_SELLER_AUTH_HTTP=$code";exit 1
+          fi
+          seller=$(jq -er '.id|tostring|select(test("^[1-9][0-9]{3,19}$"))' "$dir/seller.json")
+          if jq -e '([.tags[]?|ascii_downcase]|index("test_user"))!=null or
+            ((.nickname//""|ascii_upcase)|startswith("TEST_USER"))' "$dir/seller.json" >/dev/null;then
+            echo 'MP_LIVE_TEST_SELLER_REJECTED';exit 1
+          fi
+          echo "::add-mask::$seller"
+          echo 'MP_LIVE_SELLER_API_VERIFIED_NOT_TEST_USER'
+          # Cloudflare mantiene MP_LIVE_GATE=NO_GO y SABER_ENTORNO=preparacion.
+          # El token solo se guarda en Worker Central, jamás en Docs ni webhook ni sandbox.
+          for name in MP_LIVE_ACCESS_TOKEN MP_LIVE_WEBHOOK_SECRET MP_LIVE_SELLER_ID MP_LIVE_WEBHOOK_URL;do
+            case "$name" in
+              MP_LIVE_ACCESS_TOKEN) value="$MP_TOKEN";;
+              MP_LIVE_WEBHOOK_SECRET) value="$MP_WEBHOOK_SECRET";;
+              MP_LIVE_SELLER_ID) value="$seller";;
+              MP_LIVE_WEBHOOK_URL) value="https://pagos.libreriasaber.com.ar/webhooks/mercadopago-live";;
+            esac
+            jq -n --arg name "$name" --arg text "$value" '{name:$name,text:$text,type:"secret_text"}' > "$dir/input.json"
+            code=$(curl -sS --max-time 35 -o "$dir/result-$name.json" -w '%{http_code}' \
+              -X PUT -H "$auth" -H 'Content-Type: application/json' \
+              --data-binary "@$dir/input.json" "$central/secrets")
+            rm -f "$dir/input.json"
+            if [ "$code" != 200 ] && [ "$code" != 201 ];then
+              echo "MP_LIVE_SECRET_INSTALL_${name}_HTTP=$code"
+              exit 1
+            fi
+            jq -e --arg name "$name" '.success==true and .result.name==$name' "$dir/result-$name.json" >/dev/null
+            echo "MP_LIVE_SECRET_INSTALLED_${name}=YES"
+          done
+          unset MP_TOKEN MP_WEBHOOK_SECRET seller
+          curl -fsS --max-time 25 -H "$auth" "$central/settings" > "$dir/verified.json"
+          jq -e '.success==true and
+            (.result.bindings|any(.name=="SABER_ENTORNO" and .text=="preparacion")) and
+            (.result.bindings|any(.name=="MP_LIVE_GATE" and .text=="NO_GO")) and
+            (.result.bindings|any(.name=="CENTRAL_BRIDGE_KEY" and .type=="secret_text")) and
+            (["MP_LIVE_ACCESS_TOKEN","MP_LIVE_WEBHOOK_SECRET","MP_LIVE_SELLER_ID","MP_LIVE_WEBHOOK_URL"]|
+             all(. as $n|any($ARGS.named.bindings[]; .name==$n and .type=="secret_text")))' \
+             --argjson bindings "$(jq '.result.bindings' "$dir/verified.json")" "$dir/verified.json" >/dev/null
+          echo 'MP_LIVE_SECRETS_PRESENT_ONLY_CENTRAL_PRODUCTION_NO_GO'
+          echo 'MP_LIVE_NO_CHECKOUT_CREATED_NO_PAYMENTS_NO_PUBLICATION'
+      - name: Registrar evidencia sin datos sensibles
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          if [ "$RESULT" = success ];then state=success;else state=failure;fi
+          jq -n --arg state "$state" --arg context 'saber/mp-live-creds-closed' \
+            --arg description "Credenciales MP LIVE aisladas con NO_GO: $RESULT" \
+            --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/cred-status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/cred-status.json >/dev/null
