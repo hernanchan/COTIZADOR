@@ -51,7 +51,7 @@ jobs:
           code=$(curl -sS --max-time 35 -H "$auth" -H 'Content-Type: application/json' \
              -o "$tmp/response.json" -w '%{http_code}' --data-binary "@$tmp/q.json" \
              "$root/d1/database/$db/query")
-          if [ "$code" = 403 ] && [ -n "${EDITOR_TOKEN:-}" ];then
+          if [ "$code" != 200 ] && [ -n "${EDITOR_TOKEN:-}" ];then
             echo 'D1_DEPLOY_TOKEN_READ_DENIED_USING_EXISTING_AUDIT_TOKEN'
             code=$(curl -sS --max-time 35 -H "Authorization: Bearer $EDITOR_TOKEN" \
               -H 'Content-Type: application/json' -o "$tmp/response.json" \
@@ -65,4 +65,5 @@ jobs:
           jq -c '.result[0].results//[]' "$tmp/response.json"
           echo 'D1_R2_STATES_REAL_VERIFIED_READONLY'
           echo 'NO_ADMIN_KEY_NO_PII_NO_MUTATIONS_NO_PAYMENTS'
+# 2026-11-10: usar token de auditoria nuevo ante cualquier denegacion deploy; SELECT solo lectura
 # cierre 2026-11-10: revalidar sin modificar comercio ni producción
