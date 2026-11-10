@@ -38,11 +38,19 @@ jobs:
               echo "PRIVATE_UNIVERSAL_FLAG_${flag}=NOT_ENABLED"
             fi
           done
+          for binding in SABER_CENTRAL SABER_R2_GRANDES;do
+            jq -r --arg k "$binding" '.result.bindings |
+              (map(select(.name==$k))|first) as $b |
+              if $b==null then "PRIVATE_RESOURCE_"+$k+"=MISSING"
+              else "PRIVATE_RESOURCE_"+$k+"="+($b.type//"UNKNOWN") end' "$tmp/settings.json"
+          done
           code=$(curl -sS --max-time 25 -u "operador:$PASSWORD" \
             -o "$tmp/buyer.html" -w '%{http_code}' \
             'https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/pedido-cliente')
           echo "PRIVATE_UNIVERSAL_BUYER_HTTP=$code"
           test "$code" = 200
+          grep -oE 'src="/prueba-v2/carga-inteligente[^"]*"' "$tmp/buyer.html" |
+            head -n1 | sed 's/^/PRIVATE_SMART_IFRAME=/' || true
           if grep -Fq '/prueba-v2/carga-inteligente?universal=1' "$tmp/buyer.html";then
             echo 'PRIVATE_BUYER_UNIVERSAL_IFRAME_ACTIVE'
           else
