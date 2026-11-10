@@ -9,7 +9,7 @@ const WEB=/^WEB-ENSAYO-[A-F0-9]{32}$/;
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 const SHA=/^[a-f0-9]{64}$/;
 const FILE=/^[A-Za-z0-9_-]{1,80}$/;
-const DOC=/^DOC-([a-f0-9-]{36})$/i;
+const DOC=/^DOC-([a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12})$/i;
 const respond=(value,status=200)=>Response.json(value,{status,headers:{
  'Cache-Control':'no-store,private','X-Content-Type-Options':'nosniff'}});
 const hex=b=>Array.from(b,x=>x.toString(16).padStart(2,'0')).join('');
@@ -18,13 +18,6 @@ function constantHex(a,b){
  let n=0;for(let i=0;i<64;i++)n|=a.charCodeAt(i)^b.charCodeAt(i);
  return n===0;
 }
-export const R2_LIVE_INSPECTION_SQL=
- "CREATE TABLE IF NOT EXISTS central_r2_live_inspections ("+
- "web_order_id TEXT NOT NULL,file_id TEXT NOT NULL,commercial_order_id TEXT NOT NULL,"+
- "receipt_id TEXT NOT NULL UNIQUE,quote_hash TEXT NOT NULL,sha256 TEXT NOT NULL,"+
- "bytes INTEGER NOT NULL,report_hash TEXT NOT NULL,operator TEXT NOT NULL,"+
- "measured_json TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT(datetime('now')),"+
- "PRIMARY KEY(web_order_id,file_id))";
 function validProof(p){
  return p&&typeof p==='object'&&!Array.isArray(p)&&
   Object.keys(p).sort().join(',')===
