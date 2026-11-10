@@ -1,4 +1,4 @@
-name: Saber - activar clasificacion ploteos SOLO Worker privado con rollback
+name: Saber - activar compatibilidad R2 SOLO Worker privado con rollback
 on:
   push:
     branches: [integracion/tus-pedido-privado-20261101]
@@ -25,8 +25,8 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$ACCOUNT" && test -n "$TOKEN" && test -n "$PASSWORD"
-          candidate="6a8581bb-0391-4de2-9e58-1123ce2341a3"
-          stage_sha="cb0edc7222123a8e80ad8338b4498d6ca627407a"
+          candidate="cf043fba-56bc-4718-a5c0-163ab80c3c29"
+          stage_sha="20be7b9a1c1c62a24aceb99b83bdaea39a32a991"
           worker="saber-documentos-pruebas"
           root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/$worker"
           origin="https://saber-documentos-pruebas.libreriasaber.workers.dev"
