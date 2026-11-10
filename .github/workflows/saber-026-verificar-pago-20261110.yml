@@ -1,0 +1,77 @@
+name: Saber - verificar pago MP TEST orden 026 sin acciones nuevas
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-026-verificar-pago-20261110.yml]
+permissions: {contents: read, statuses: write}
+jobs:
+  pago:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    steps:
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Consultar pedido 026 y conciliacion MP sandbox sin cobro nuevo
+        env:
+          PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const host='https://saber-documentos-pruebas.libreriasaber.workers.dev';
+          const central='https://saber-pagos-pruebas.libreriasaber.workers.dev';
+          const web='WEB-ENSAYO-2EFC2C991012D0829CB9427C7461757B';
+          const order='e552cf32-356d-40e3-9736-6fbb8fef5dca';
+          const pass=process.env.PASSWORD;assert.ok(pass?.length>=16);
+          const health=await fetch(central+'/health').then(r=>r.json());
+          assert.equal(health.ok,true);assert.equal(health.databaseReady,true);
+          assert.equal(health.paymentsEnabled,false);
+          const response=await fetch(host+'/prueba-v2/api/ensayo-r2-checkout-universal',{
+            method:'POST',headers:{Origin:host,'Content-Type':'application/json',
+             Authorization:'Basic '+Buffer.from('operador:'+pass).toString('base64')},
+            body:JSON.stringify({action:'status',webOrderId:web,commercialOrderId:order}),
+            signal:AbortSignal.timeout(30000),redirect:'manual'
+          });
+          const result=await response.json().catch(()=>({}));
+          assert.equal(response.status,200,'PILOT_026_STATUS_HTTP_'+response.status+'_'+result.error);
+          assert.equal(result.ok,true,'PILOT_026_BAD_STATUS');
+          assert.equal(result.webOrderId,web);assert.equal(result.commercialOrderId,order);
+          assert.equal(result.amountArs,4500);assert.equal(result.fileCount,2);
+          console.log('PILOT_026_MP_STATUS='+result.estado);
+          console.log('PILOT_026_UPLOAD_AUTHORIZED='+String(result.uploadAuthorized));
+          console.log('PILOT_026_PENDING_FILES='+String(result.pendingFiles));
+          if(result.estado!=='pagado_esperando_archivos'||result.uploadAuthorized!==true){
+            console.log('PILOT_026_PAYMENT_NOT_YET_VERIFIED_NO_UPLOAD');process.exit(0);
+          }
+          const account=process.env.ACCOUNT,token=process.env.TOKEN;
+          assert.match(account||'',/^[a-f0-9]{32}$/i);assert.ok(token?.length>15);
+          const root='https://api.cloudflare.com/client/v4/accounts/'+account+'/d1/database';
+          async function api(path,sql){
+            const r=await fetch(root+path,{method:sql?'POST':'GET',
+              headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
+              ...(sql?{body:JSON.stringify({sql})}:{}),signal:AbortSignal.timeout(30000)});
+            const d=await r.json();assert.equal(d.success,true,'PILOT_026_D1_API_'+r.status);
+            return d.result;
+          }
+          const list=await api('');
+          const dbs=list.filter(d=>d.name==='saber-pagos-pruebas');
+          assert.equal(dbs.length,1);
+          const data=await api('/'+dbs[0].uuid+'/query',
+           "SELECT o.status,o.amount_ars,p.state,l.web_order_id FROM orders o "+
+           "JOIN payment_reviews p ON p.order_id=o.id "+
+           "JOIN central_r2_universal_order_links l ON l.commercial_order_id=o.id "+
+           "WHERE o.id='"+order+"'");
+          assert.equal(data[0]?.success,true);
+          const rows=data[0]?.results||[];
+          assert.equal(rows.length,1,'PILOT_026_NOT_UNIQUE');
+          assert.equal(rows[0].web_order_id,web);
+          assert.equal(rows[0].amount_ars,4500);
+          assert.equal(rows[0].status,'paid');
+          assert.equal(rows[0].state,'verified');
+          console.log('PILOT_026_PAID_AND_VERIFIED_D1_UNIQUE_ORDER');
+          console.log('NO_NEW_PREFERENCE_NO_NEW_PAYMENT_NO_STORAGE_WRITES');
+          NODE
