@@ -1,0 +1,116 @@
+name: Saber - Worker Central PRODUCCION aislado sin cobros ni URL
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-live-worker-central-isolado-20261110.yml]
+permissions:
+  contents: read
+  statuses: write
+concurrency:
+  group: saber-live-worker-central-sin-publicar
+  cancel-in-progress: false
+jobs:
+  central:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validar plantilla segura y compilar Worker de Central sin modificar sandbox
+        shell: bash
+        run: |
+          set -euo pipefail
+          t=integraciones/mercadopago/produccion/wrangler.toml.template
+          grep -Fxq 'workers_dev = false' "$t"
+          grep -Fxq 'preview_urls = false' "$t"
+          grep -Fxq 'MP_LIVE_GATE = "NO_GO"' "$t"
+          grep -Fxq 'SABER_ENTORNO = "preparacion"' "$t"
+          grep -Fxq 'name = "saber-pagos-produccion"' "$t"
+          ! grep -Eq '^routes?[[:space:]]*=' "$t"
+          ! grep -Eq '^crons[[:space:]]*=' "$t"
+          npm install --no-save --no-fund --no-audit esbuild@0.25.12 wrangler@4.55.0
+          node --test integraciones/mercadopago/pruebas/mercadopago-live-central.test.mjs
+          ./node_modules/.bin/esbuild integraciones/mercadopago/pruebas/worker.js \
+             --bundle --format=esm --platform=browser --target=es2022 \
+             --outfile=/tmp/saber-central-live-ci.mjs
+          node --check /tmp/saber-central-live-ci.mjs
+          echo 'LIVE_WORKER_CODE_COMPILED_GATE_NO_GO'
+      - name: Obtener D1 real y desplegar Worker inalcanzable desde Internet
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          SABER_CF_D1_WRITE_TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN" && test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$SABER_CF_D1_WRITE_TOKEN"
+          tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+          root="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID"
+          curl -fsS --max-time 30 -H "Authorization: Bearer $SABER_CF_D1_WRITE_TOKEN" \
+            "$root/d1/database" > "$tmp/d1.json"
+          jq -e '.success==true and (.result|type=="array")' "$tmp/d1.json" >/dev/null
+          prod=$(jq -r '[.result[]|select(.name=="saber-pagos-produccion")]|if length==1 then .[0].uuid else empty end' "$tmp/d1.json")
+          test -n "$prod"
+          sandbox=$(jq -r '[.result[]|select(.name=="saber-pagos-pruebas")]|if length==1 then .[0].uuid else empty end' "$tmp/d1.json")
+          test -n "$sandbox" && test "$prod" != "$sandbox"
+          test "$prod" != '60124ac5-1941-44ba-96e5-ea3165b65ec9'
+          settings="$root/workers/scripts/saber-pagos-produccion/settings"
+          status=$(curl -sS --max-time 30 -o "$tmp/existing.json" -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$settings")
+          if [ "$status" = 200 ];then
+            echo 'LIVE_WORKER_ALREADY_EXISTS_NOT_OVERWRITING'
+            exit 1
+          fi
+          if [ "$status" != 404 ];then
+            echo "LIVE_WORKER_STATUS_UNKNOWN_HTTP=$status";exit 1
+          fi
+          t=integraciones/mercadopago/produccion/wrangler.toml
+          sed "s/__D1_PRODUCCION_UUID__/$prod/g" \
+            integraciones/mercadopago/produccion/wrangler.toml.template > "$t"
+          grep -Fq "database_id = \"$prod\"" "$t"
+          ! grep -Fq "$sandbox" "$t"
+          npx wrangler deploy --config "$t" --yes > "$tmp/deploy.log" 2>&1 ||
+            { tail -n 22 "$tmp/deploy.log";exit 1; }
+          echo 'LIVE_WORKER_DEPLOYED_NO_ROUTE'
+          curl -fsS --max-time 30 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "$settings" > "$tmp/settings.json"
+          jq -e '.success==true and ([.result.bindings[]|select(.name=="DB" and .type=="d1" and ((.id//.database_id)==$id))]|length)==1' \
+            --arg id "$prod" "$tmp/settings.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="MP_LIVE_GATE" and .type=="plain_text" and .text=="NO_GO")' \
+            "$tmp/settings.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="SABER_ENTORNO" and .type=="plain_text" and .text=="preparacion")' \
+            "$tmp/settings.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="CENTRAL_DB_ENV" and .type=="plain_text" and .text=="produccion")' \
+            "$tmp/settings.json" >/dev/null
+          if jq -e '.result.bindings|any(.name|test("MP_LIVE_ACCESS_TOKEN|MP_LIVE_WEBHOOK_SECRET|MP_TEST_ACCESS_TOKEN|MP_TEST_SELLER_ID"))' \
+            "$tmp/settings.json" >/dev/null;then
+            echo 'LIVE_WORKER_HAS_UNEXPECTED_PAYMENT_SECRETS';exit 1
+          fi
+          curl -fsS --max-time 30 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "$root/workers/scripts/saber-pagos-produccion/subdomain" > "$tmp/subdomain.json"
+          jq -e '.success==true and .result.enabled==false and .result.previews_enabled==false' \
+            "$tmp/subdomain.json" >/dev/null
+          echo 'LIVE_WORKER_DB_PRODUCTION_ONLY_NO_GO'
+          echo 'LIVE_WORKER_NO_PUBLIC_DOMAIN_NO_PREVIEW_NO_MP_CREDENTIALS'
+          echo 'LIVE_WORKER_NO_CRON_NO_PAYMENTS_NO_PUBLICATION'
+      - name: Registrar evidencia
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          if [ "$RESULT" = success ];then state=success;else state=failure;fi
+          jq -n --arg state "$state" --arg context 'saber/live-central-worker-isolated' \
+             --arg description "Worker LIVE inalcanzable y NO_GO: $RESULT" \
+             --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+             '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/live-worker-status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/live-worker-status.json >/dev/null
