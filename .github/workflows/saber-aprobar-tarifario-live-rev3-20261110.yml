@@ -1,0 +1,58 @@
+name: Saber - aprobacion titular tarifario D1 LIVE rev3 sin cobros
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths:
+      - .github/workflows/saber-aprobar-tarifario-live-rev3-20261110.yml
+      - integraciones/publicacion/aprobar-tarifario-live-rev3-20261110.mjs
+permissions:
+  contents: read
+  statuses: write
+concurrency:
+  group: saber-live-pricing-owner-approved-rev3
+  cancel-in-progress: false
+jobs:
+  aprobar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validar sintaxis y mantener pagos deshabilitados
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check integraciones/publicacion/aprobar-tarifario-live-rev3-20261110.mjs
+          grep -Fq 'SABER_LIVE_PAYMENTS_NOT_ENABLED_NO_DEPLOY_NO_MAIN_CHANGE' \
+            integraciones/publicacion/aprobar-tarifario-live-rev3-20261110.mjs
+          echo 'PRICING_OWNER_APPROVAL_SCRIPT_VALID'
+      - name: Aprobar solo snapshot D1 revision 3 y comprobar persistencia
+        env:
+          SABER_CF_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          SABER_CF_D1_WRITE_TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node integraciones/publicacion/aprobar-tarifario-live-rev3-20261110.mjs
+      - name: Registrar resultado del tarifario sin publicar
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$RESULT" = success ];then state=success;else state=failure;fi
+          jq -n --arg state "$state" --arg context 'saber/live-owner-approved-pricing' \
+           --arg description "D1 LIVE prices owner approved: $RESULT (no payments/deploy)" \
+           --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+           '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/price-approval-status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+           --input /tmp/price-approval-status.json >/dev/null
