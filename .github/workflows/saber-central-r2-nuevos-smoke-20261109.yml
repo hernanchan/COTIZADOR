@@ -34,3 +34,4 @@ jobs:
           health=$(curl -fsS --max-time 25 "$base/health")
           echo "$health" | jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' >/dev/null
           echo 'LIVE_CENTRAL_PRIVATE_SECURITY_GUARDS_PAYMENT_OFF'
+# cierre 2026-11-10: revalidar sin modificar comercio ni producción
