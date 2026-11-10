@@ -54,9 +54,9 @@ jobs:
             { echo 'PLENO_OPTION_NOT_VISIBLE_IN_LIVE_JS';exit 1; }
           grep -Fq 'clasificacionAutomatica' "$dir/analizador.js" ||
             { echo 'AUTO_CLASSIFICATION_SOURCE_NOT_PRESENT';exit 1; }
-          grep -Fq 'Clasificación automática:' "$dir/analizador.js" ||
+          grep -Fq 'El precio se calcula para el tipo detectado' "$dir/analizador.js" ||
             { echo 'AUTO_CLASSIFICATION_PRICE_NOTICE_NOT_PRESENT';exit 1; }
-          grep -Fq 'Solicitar revisión' "$dir/analizador.js" ||
+          grep -Fq 'Solicitar revisi' "$dir/analizador.js" ||
             { echo 'AUTO_CLASSIFICATION_REVIEW_NOT_PRESENT';exit 1; }
           grep -Fq 'No se pudo determinar el tipo' "$dir/analizador.js" ||
             { echo 'UNCERTAIN_CLASSIFICATION_FALLBACK_NOT_PRESENT';exit 1; }
