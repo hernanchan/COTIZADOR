@@ -29,7 +29,7 @@ function fixture(){
     async first(){
      if(sql.includes('FROM orders WHERE id=?'))return args[0]===ORDER?{...o}:null;
      if(sql.includes('FROM central_r2_universal_order_links'))
-      return args[0]===WEB&&args[1]===ORDER?{commercial_order_id:ORDER}:null;
+      return args[0]===WEB&&args[1]===ORDER?{file_count:1}:null;
      if(sql.includes('FROM central_document_manifests'))return null;
      if(sql.includes('sqlite_master'))return null;
      if(sql.includes('FROM orders o LEFT JOIN payment_reviews'))
@@ -131,10 +131,10 @@ test('checkout LIVE requiere HMAC de Central, orden asociada y vendedor real',as
  const ok=await checkoutMPLiveCentral(req,f.env,{readSigned:f.signed,fetcher:f.mpFetch});
  assert.equal(ok.status,200);
  const data=await ok.json();
- assert.equal(data?.amountArs,4400);assert.equal(f.posts,1);
+ assert.equal(data?.amountArs,4400);assert.equal(data?.fileCount,1);assert.equal(f.posts,1);
  assert.equal(f.o.preference_id,'MP-LIVE-PREF-1');
  const again=await checkoutMPLiveCentral(req,f.env,{readSigned:f.signed,fetcher:f.mpFetch});
- assert.equal(again.status,200);assert.equal(f.posts,1,'un solo POST aunque repita el botón');
+ assert.equal(again.status,200);assert.equal((await again.json()).fileCount,1);assert.equal(f.posts,1,'un solo POST aunque repita el botón');
 });
 test('webhook LIVE no puede conciliar firma incorrecta, vendedor falso o monto distinto',async()=>{
  const f=fixture();f.o.preference_id='MP-LIVE-PREF-1';
