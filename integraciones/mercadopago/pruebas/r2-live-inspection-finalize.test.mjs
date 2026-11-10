@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {webcrypto,createHmac} from 'node:crypto';
-import {finalizarInspeccionR2Live} from './r2-live-inspection-finalize.mjs';
+import {finalizarInspeccionR2Live,manifiestoInspeccionR2Live} from './r2-live-inspection-finalize.mjs';
 const GO='GO_COMERCIAL_CONFIRMADO',t=1794320000;
 const web='WEB-ENSAYO-'+'A'.repeat(32);
 const order='123e4567-e89b-42d3-a456-426614174000';
@@ -30,6 +30,7 @@ function fixture({paid=true,geometry=59.4,received=0,pending=true}={}){
  const db={
   prepare(sql){queries.push(sql);let args=[];
    return {bind(...a){args=a;return this},async first(){
+    if(sql.includes('FROM central_r2_universal_order_links'))return {commercial_order_id:order};
     if(sql.includes('FROM central_r2_large_pending')){
      return pending?{receipt_id:receipt,web_order_id:web,file_id:file,
       object_key:'r2-v1/'+web+'/'+receipt.slice(4)+'.pdf',
@@ -47,7 +48,7 @@ function fixture({paid=true,geometry=59.4,received=0,pending=true}={}){
  const verify=async()=>({ok:true,link:{quote_hash:quote},amountArs:4400,
   rows:[{file_id:file,transport:'r2',sha256:hash,bytes:proof.bytes,received}],
   works:[{fileId:file,configuracion:{paginas:[
-   {numero:1,anchoCm:geometry,altoCm:84.1}]}}]});
+   {numero:1,anchoCm:geometry,altoCm:84.1,modo:'sin-clasificar'}]}}]});
  const payment=async()=>({verified:paid,revoked:false});
  const opts={authorized:true,verify,payment,subtle:webcrypto.subtle,now:()=>t};
  return {env,opts,queries,batches};
@@ -106,4 +107,36 @@ test('firma antigua, caducada y remitente remoto rechazados',async()=>{
  });
  assert.equal((await finalizarInspeccionR2Live(remote,f.env,f.opts)).status,403);
  assert.equal(f.batches.length,0);
+});
+
+test('GET manifiesto D1 LIVE alimenta la preprensa sin token R2 ni pago navegador',async()=>{
+ const f=fixture();
+ const url='https://pagos.libreriasaber.com.ar/admin/api/central/live-r2-manifest'+
+  '?webOrderId='+web+'&fileId='+file;
+ const r=await manifiestoInspeccionR2Live(new Request(url),f.env,f.opts);
+ assert.equal(r.status,200,JSON.stringify(await r.clone().json()));
+ const data=await r.json();
+ assert.equal(data.manifest.schema,'saber-r2-live-inspection-manifest-v1');
+ assert.equal(data.manifest.expectedSha256,hash);
+ assert.equal(data.manifest.quoteHash,quote);
+ assert.equal(data.manifest.paginasDeclaradas[0].modo,'sin-clasificar');
+ assert.equal(data.manifest.quoteSnapshot,null);
+ assert.equal(data.downloadAuthorized,false);
+ assert.equal(data.productionAuthorized,false);
+ assert.equal(JSON.stringify(data).includes('objectKey'),false);
+ assert.equal(f.batches.length,0);
+});
+test('GET manifiesto cierra por identidad, pago pendiente y sesión operador',async()=>{
+ const endpoint='https://pagos.libreriasaber.com.ar/admin/api/central/live-r2-manifest'+
+  '?webOrderId='+web+'&fileId='+file;
+ for(const opt of [{paid:false},{pending:false}]){
+  const f=fixture(opt);
+  const r=await manifiestoInspeccionR2Live(new Request(endpoint),f.env,f.opts);
+  assert.ok([402,409].includes(r.status));
+ }
+ const f=fixture();
+ assert.equal((await manifiestoInspeccionR2Live(
+  new Request(endpoint),f.env,{...f.opts,authorized:false})).status,401);
+ assert.equal((await manifiestoInspeccionR2Live(
+  new Request(endpoint+'&fileId=pdf_1'),f.env,f.opts)).status,422);
 });
