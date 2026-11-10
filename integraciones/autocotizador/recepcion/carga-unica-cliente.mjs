@@ -7,6 +7,7 @@ import {seleccionarPaginas} from './seleccionar-paginas.mjs';
 import {decidirTamanoCliente} from './decision-tamano-impresion.mjs';
 import {clasificarPaginasPloteo} from './clasificar-paginas-ploteo.mjs';
 import {clasificarMosaicoRasterPDFGrande} from './clasificar-ploteo-grande-raster-local.mjs';
+import {clasificarPloteoGrandeVisualLimitado} from './clasificar-ploteo-grande-visual-limitado.mjs';
 import {prepararLoteParcial,recomponerLoteParcial} from './cotizar-lote-parcial.mjs';
 import {solicitarCotizacionPrivada} from './solicitar-cotizacion-privada.mjs';
 import {decidirTransportePDF,LIMITE_TUS_PDF_BYTES,LIMITE_R2_PDF_BYTES} from './seleccionar-transporte-pdf.mjs';
@@ -726,8 +727,9 @@ async function analizarArchivoPDF(e,file){
   e.tipoPloteoElegidoPorCliente=false;
   e.clasificacionAutomatica=false;
   e.metodoClasificacion=null;
-  // Para >40 MiB, detectar localmente sólo mosaicos raster muy claros
-  // usando rangos pequeños. No renderizar ni subir el PDF al servidor.
+  // PDF >40 MiB: preferir clasificación estructural por rangos (<512 KiB).
+  // Si no alcanza y el documento es pequeño en número de páginas y bytes,
+  // permitir miniaturas visuales LOCALES. Nunca subir un original sin pago.
   if(file.size>MAX_PDF_TUS_BYTES&&requiereClasificacionVisualPloteo(e.paginas)){
    const hallazgo=await clasificarMosaicoRasterPDFGrande(file);
    if(hallazgo?.altaConfianza===true&&hallazgo.modo==='poster'&&
@@ -735,6 +737,13 @@ async function analizarArchivoPDF(e,file){
     e.paginas[0].modo='poster';
     e.clasificacionAutomatica=true;
     e.metodoClasificacion='MOSAICO_RASTER_LOCAL';
+   }else{
+    const visual=await clasificarPloteoGrandeVisualLimitado(file,{paginas:e.paginas});
+    if(visual?.altaConfianza===true&&visual.paginas.length===e.paginas.length){
+     for(const pagina of visual.paginas)e.paginas[pagina.numero-1].modo=pagina.modo;
+     e.clasificacionAutomatica=e.paginas.every(p=>['cad','poster'].includes(p.modo));
+     if(e.clasificacionAutomatica)e.metodoClasificacion='VISUAL_PDFJS_LIMITADO';
+    }
    }
   }
   // Los PDF pequeños mantienen su clasificación visual completa.
