@@ -49,6 +49,6 @@ test('firma o método faltante, origin ajeno y errores de Central se rechazan',a
  assert.equal(count,1);
  assert.equal((await manejarWebhookPublico(req(URL,'GET'),config(),{service})).status,403);
  assert.equal((await manejarWebhookPublico(req(URL,'POST',{Origin:'https://evil.example'}),config(),{service})).status,403);
- assert.equal((await manejarWebhookPublico(req(URL,'POST',{'x-signature':''}),config(),{service})).status,401);
- assert.equal(count,2);
+ assert.equal((await manejarWebhookPublico(req(URL,'POST',{'x-signature':''}),config(),{service})).status,403);
+ assert.equal(count,1);
 });
