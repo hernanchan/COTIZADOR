@@ -1,7 +1,7 @@
 import {clasificarCoberturaPloteo} from './clasificar-cobertura-ploteo.mjs';
 import {contieneRotuloTecnico} from './refinar-tipo-plano.mjs';
 import {ajustarPlanoTecnicoPorPagina} from './regla-comercial-ploteos.mjs';
-import {evidenciaPlanoTecnico,esCadVectorialDenso,esCadPorEstructuraPDF,ameritaVerificarEstructura} from './discriminar-plano-denso.mjs';
+import {evidenciaPlanoTecnico,esCadVectorialDenso,esCadPorEstructuraPDF,esCadPorContornosVectoriales,ameritaVerificarEstructura} from './discriminar-plano-denso.mjs';
 // PDF.js fijado en una versión conocida; procesa las páginas localmente.
 // No enviar bytes ni capturas del PDF a servicios externos.
 const PDFJS_WORKER='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -47,7 +47,14 @@ export async function clasificarPaginasPloteo(file,{onProgreso=()=>{},maxPaginas
    if(ameritaVerificarEstructura({miniatura:clasificacion,texto,textos})){
     try{
      const operadores=await page.getOperatorList();
-     if(esCadPorEstructuraPDF({miniatura:clasificacion,
+     if(esCadPorContornosVectoriales({
+       fnArray:operadores.fnArray,OPS:pdfjs.OPS})){
+      // Contornos de letras, rótulos o logos dibujados solo como trazos.
+      // Sin imágenes ni rellenos: independientemente del largo del papel.
+      clasificada={...clasificada,modo:'cad',
+       regla:'cad_contornos_vectoriales_sin_relleno',
+       modoVisual:clasificacion.modo};
+     }else if(esCadPorEstructuraPDF({miniatura:clasificacion,
        fnArray:operadores.fnArray,OPS:pdfjs.OPS,texto})){
       clasificada={...clasificada,modo:'cad',
        regla:'cad_vectorial_sin_imagenes',
