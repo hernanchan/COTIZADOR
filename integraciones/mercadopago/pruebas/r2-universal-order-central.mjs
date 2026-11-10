@@ -29,8 +29,17 @@ export function validarPromocionUniversal(x){
 export async function promoverPedidoUniversalD1(request,env,{
  readSigned,uuid=()=>crypto.randomUUID(),subtle=crypto.subtle
 }={}){
- if(env?.CENTRAL_R2_UNIVERSAL_DRAFT_ENABLED!==ON||
-    env?.CENTRAL_R2_UNIVERSAL_ORDER_ENABLED!==ON||
+ const sandbox=env?.SABER_ENTORNO!=='produccion'&&
+  env?.CENTRAL_R2_UNIVERSAL_DRAFT_ENABLED===ON&&
+  env?.CENTRAL_R2_UNIVERSAL_ORDER_ENABLED===ON;
+ const live=env?.SABER_ENTORNO==='produccion'&&
+  env?.CENTRAL_DB_ENV==='produccion'&&
+  env?.CENTRAL_LIVE_ORDER_GATE==='GO_COMERCIAL_CONFIRMADO'&&
+  env?.CENTRAL_LIVE_BRIDGE_ENABLED==='GO_COMERCIAL_CONFIRMADO'&&
+  env?.MP_LIVE_GATE==='GO_COMERCIAL_CONFIRMADO'&&
+  env?.CENTRAL_R2_UNIVERSAL_DRAFT_ENABLED!==ON&&
+  env?.CENTRAL_R2_UNIVERSAL_ORDER_ENABLED!==ON;
+ if((!sandbox&&!live)||
     typeof env?.DB?.prepare!=='function'||typeof env?.DB?.batch!=='function')
   return response({ok:false,error:'UNIVERSAL_PROMOCION_NO_HABILITADA'},503);
  if(typeof readSigned!=='function')
