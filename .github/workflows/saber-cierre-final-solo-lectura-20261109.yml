@@ -27,7 +27,7 @@ jobs:
           npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.24.2
           node --test integraciones/autocotizador/pruebas/ploteo-papel-cad-recubierto.test.mjs tests/r2-borrado-entregado-central.test.mjs tests/r2-universal-cola-borrado-d1.test.mjs tests/r2-universal-preprensa-central.test.mjs
           echo 'TEST_CONTRACTS_GREEN_NO_D1_WRITES'
-      - name: Smoke real de accesos, tarifas, central y tienda: SOLO GET
+      - name: "Smoke real de accesos, tarifas, central y tienda - SOLO GET"
         shell: bash
         env:
           PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
