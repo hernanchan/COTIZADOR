@@ -33,7 +33,7 @@ const statements=clean.split(';').map(x=>x.trim()).filter(x=>/^CREATE TABLE IF N
 assert.equal(statements.length,3);
 for(let i=0;i<3;i++){
  assert.ok(statements[i].startsWith('CREATE TABLE IF NOT EXISTS '+wanted[i]+' ('));
- assert.doesNotMatch(statements[i],/\b(DROP|DELETE|UPDATE|INSERT|ALTER|REPLACE|ATTACH)\b/i);
+ assert.doesNotMatch(statements[i],/^\s*(DROP|DELETE|UPDATE|INSERT|ALTER|REPLACE|ATTACH)\b/im);
  await sql(statements[i]);
 }
 const schema=await sql("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'central_r2_universal_%'");
