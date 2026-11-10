@@ -80,7 +80,7 @@ body.estado-envio #smart,body.estado-registro #smart{display:none}
 <iframe id="smart" title="Análisis automático de PDF, tamaños, CAD y póster" src="/prueba-v2/carga-inteligente${universalEnabled?'?universal=1':r2PrepayEnabled?'?r2Prepago=1':''}" loading="eager"></iframe>
 </section>
 <details id="recepcion-avanzada" class="panel" style="margin-top:14px"><summary style="font-size:16px;font-weight:700;cursor:pointer;padding:5px 0">Detalles de la recepción y verificación (ensayo privado)</summary><div style="padding-top:12px">
-<div class="warning">Los PDF se verifican en Drive y la Central registra automáticamente el pedido. Sin cobros.</div>
+<div class="warning">Los archivos se reciben de forma privada, se comprueba su integridad y se revisan antes de iniciar la producción.</div>
 <div id="drop-pdf" style="display:none"><strong>Recuperación manual de PDF para trabajos antiguos</strong><input id="batch-files" type="file" accept=".pdf,application/pdf" multiple><p id="batch-status" class="state" role="status">Los PDF se asignan por nombre y tamaño al trabajo correspondiente. La recepción sigue protegida.</p></div>
 <div id="all" role="list" aria-label="Trabajos del cotizador"></div>
 <p id="state" role="status" aria-live="polite" class="state">Cotizá una impresión y agregala al pedido de prueba.</p>
