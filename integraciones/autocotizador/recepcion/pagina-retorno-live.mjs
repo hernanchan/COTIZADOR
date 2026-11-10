@@ -31,7 +31,7 @@ small{color:#526579}#estado{line-height:1.6}</style></head><body><main>
 <p><a href="/cotizar">Volver al cotizador</a></p>
 <small>Si Mercado Pago confirma el pago pero todavía no aparece acreditado, conservá el comprobante. No realices otro pago por este aviso.</small>
 </main><script type="module">
-import {leerPedidoPostpagoLive,enviarPDFsTUSPagadosLive} from '/pedido/recepcion-tus.js';
+// El estado del pago siempre se muestra, incluso si TUS está temporalmente cerrado.
 (function(){
  const output=document.getElementById('estado');
  const button=document.getElementById('revisar');
@@ -59,13 +59,14 @@ import {leerPedidoPostpagoLive,enviarPDFsTUSPagadosLive} from '/pedido/recepcion
    const paid=data.estado==='pagado_esperando_archivos'&&data.uploadAuthorized===true;
    if(paid){
     try{
+     const {leerPedidoPostpagoLive}=await import('/pedido/recepcion-tus.js');
      const saved=leerPedidoPostpagoLive(sessionStorage);
      if(saved.order.webOrderId!==order.webOrderId)throw Error('identidad');
      const small=saved.metas.filter(m=>m.transport==='tus');
      const large=saved.metas.filter(m=>m.transport==='r2');
      receiving.hidden=small.length===0;
      hint.textContent=small.length+' PDF para enviar ahora'+(large.length?' y '+large.length+' archivo(s) grande(s) pendientes de R2.':'');
-    }catch{receiving.hidden=true;output.textContent='Pago acreditado, pero faltan las referencias de los PDF. Contactá a Librería Saber y no pagues nuevamente.';return}
+    }catch{receiving.hidden=true;output.textContent='Pago acreditado. La recepción de archivos está temporalmente indisponible o faltan las referencias de los PDF. Contactá a Librería Saber; no pagues nuevamente.';return}
    }else receiving.hidden=true;
    output.textContent=paid
     ?'Pago acreditado. Volvé al cotizador para completar la recepción de tus archivos.'
@@ -79,6 +80,7 @@ import {leerPedidoPostpagoLive,enviarPDFsTUSPagadosLive} from '/pedido/recepcion
   send.disabled=true;
   progress.textContent='Comprobando tus PDF originales…';
   try{
+   const {enviarPDFsTUSPagadosLive}=await import('/pedido/recepcion-tus.js');
    const result=await enviarPDFsTUSPagadosLive({
     selectedFiles:[...input.files],
     onProgress:p=>{progress.textContent=p.phase==='hash'
