@@ -41,7 +41,7 @@ async function mpLive(env,path,{fetcher=fetch,method='GET',body=null,headers={}}
 async function sellerLive(env,fetcher){
  const seller=await mpLive(env,'/users/me',{fetcher});
  if(String(seller.id)!==String(env.MP_LIVE_SELLER_ID)||
-    Array.isArray(seller.tags)&&seller.tags.includes('test_user'))
+    seller.test_user===true||(Array.isArray(seller.tags)&&seller.tags.includes('test_user')))
   throw Error('MP_LIVE_VENDEDOR_INCORRECTO');
  return seller;
 }
