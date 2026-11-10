@@ -16,8 +16,8 @@ const arch=(name)=>({nombre:name,paginas:[{numero:1,anchoCm:21,altoCm:29.7,modo:
  seleccion:'original',servicio:'auto',copias:1,modo:'bn',caras:'simple',
  anillado:'ninguno',grupoAnillado:'',materialColor:'',papelPoster:'obra80'});
 const archivos=files.map(f=>arch(f.name));
-function setup(){
- const calls=[],state={paid:false};
+function setup({lostTUS=false}={}){
+ const calls=[],state={paid:false,receivedFileIds:[]};
  const fetcher=async(path,init)=>{
   const p=JSON.parse(init.body);
   calls.push({path,body:p});
@@ -50,7 +50,9 @@ function setup(){
    return Response.json({ok:true,webOrderId:ORDER,commercialOrderId:ID,
     amountArs:12500,fileCount:2,
     estado:state.paid?'pagado_esperando_archivos':'pendiente',
-    uploadAuthorized:state.paid,productionAuthorized:false,pendingFiles:2,receivedFileIds:[]});
+    uploadAuthorized:state.paid,productionAuthorized:false,
+    pendingFiles:2-state.receivedFileIds.length,
+    receivedFileIds:[...state.receivedFileIds]});
   }
   throw Error('unexpected API '+path);
  };
@@ -64,6 +66,10 @@ function setup(){
    tus++;
    assert.equal(args.trabajos.length,1);
    assert.equal(args.trabajos[0].meta.bytes,2*MiB);
+   if(lostTUS&&tus===1){
+    state.receivedFileIds=[args.trabajos[0].meta.fileId];
+    throw Error('TUS_ACK_LOST_AFTER_D1');
+   }
    return {ok:true,savedFiles:1,fileIds:args.trabajos.map(x=>x.meta.fileId)};
   },
   uploadR2:async args=>{
@@ -103,6 +109,22 @@ test('multi PDF, big A4 via R2, solo un precio D1 y ninguna carga antes del pago
  assert.equal(x.r2,1);assert.equal(x.tus,1);
  assert.equal(x.calls.filter(x=>x.path.endsWith('borrador-universal')).length,1);
  assert.equal(x.calls.filter(x=>x.path.endsWith('orden-universal')).length,1);
+});
+test('si TUS queda confirmado en D1 y se pierde el acuse, reintenta sólo el R2 pendiente',async()=>{
+ const x=setup({lostTUS:true});
+ await x.flow.preparar();
+ await x.flow.iniciarPagoSandbox();
+ x.state.paid=true;
+ assert.equal(await x.flow.consultarPago(),'pagado');
+ await assert.rejects(x.flow.subirArchivosPagados(),/TUS_ACK_LOST_AFTER_D1/);
+ assert.equal(x.flow.phase,'subida_parcial');
+ assert.equal(x.tus,1);assert.equal(x.r2,0);
+ assert.equal(await x.flow.consultarPago(),'pagado');
+ const result=await x.flow.subirArchivosPagados();
+ assert.equal(result.ok,true);
+ assert.equal(x.tus,1,'No repetir TUS ya recibido');
+ assert.equal(x.r2,1);
+ assert.equal(x.calls.filter(y=>y.path.endsWith('orden-universal')).length,1);
 });
 test('origen de importe adulterado no genera checkout ni subida',async()=>{
  const x=setup();
