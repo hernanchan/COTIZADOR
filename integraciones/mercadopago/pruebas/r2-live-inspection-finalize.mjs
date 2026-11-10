@@ -172,3 +172,68 @@ export async function finalizarInspeccionR2Live(req,env,{
   webOrderId:p.webOrderId,fileId:p.fileId,originalVerified:true,
   productionAuthorized:false,prepressApproved:false,zipEnabled:false},201);
 }
+
+/** Manifiesto de preprensa generado desde D1; evita inventar medidas o precios
+ * para que la estación local pueda cotejar el PDF grande.
+ * No incluye token de descarga ni URL del bucket.
+ */
+export async function manifiestoInspeccionR2Live(req,env,{
+ authorized=false,verify=verificarPedidoUniversalCobrable,
+ payment=estadoPagoUniversal,subtle=crypto.subtle
+}={}){
+ const u=new URL(req.url);
+ if(req.method!=='GET'||u.origin!=='https://pagos.libreriasaber.com.ar'||
+  u.pathname!=='/admin/api/central/live-r2-manifest')
+  return respond({ok:false,error:'LIVE_R2_MANIFEST_RUTA'},405);
+ if(!authorized)return respond({ok:false,error:'LIVE_R2_MANIFEST_OPERADOR'},401);
+ if(env?.SABER_ENTORNO!=='produccion'||env?.CENTRAL_DB_ENV!=='produccion'||
+  env?.MP_LIVE_GATE!==GO||env?.CENTRAL_LIVE_POSTPAY_GATE!==GO||
+  env?.CENTRAL_LIVE_R2_GATE!==GO||env?.CENTRAL_LIVE_R2_STAGING_GATE!==GO||
+  env?.CENTRAL_LIVE_R2_INSPECTION_GATE!==GO||!env?.DB?.prepare)
+  return respond({ok:false,error:'LIVE_R2_MANIFEST_OFF'},503);
+ if([...u.searchParams.keys()].sort().join(',')!=='fileId,webOrderId')
+  return respond({ok:false,error:'LIVE_R2_MANIFEST_PARAMS'},422);
+ const webOrderId=u.searchParams.get('webOrderId'),fileId=u.searchParams.get('fileId');
+ if(!WEB.test(webOrderId||'')||!FILE.test(fileId||''))
+  return respond({ok:false,error:'LIVE_R2_MANIFEST_IDENTIDAD'},422);
+ try{
+  const db=env.DB;
+  const link=await db.prepare(
+   'SELECT commercial_order_id FROM central_r2_universal_order_links WHERE web_order_id=?'
+  ).bind(webOrderId).first();
+  if(!UUID.test(link?.commercial_order_id||''))
+   return respond({ok:false,error:'LIVE_R2_MANIFEST_ORDEN'},404);
+  const valid=await verify(env,link.commercial_order_id,{webOrderId,subtle});
+  if(!valid?.ok)return respond({ok:false,error:'LIVE_R2_MANIFEST_FICHA'},409);
+  const pay=await payment(env,link.commercial_order_id);
+  if(!pay?.verified||pay.revoked)
+   return respond({ok:false,error:'LIVE_R2_MANIFEST_PAGO'},402);
+  const row=valid.rows.find(x=>x.file_id===fileId);
+  const work=valid.works.find(x=>x.fileId===fileId);
+  const pages=work?.configuracion?.paginas;
+  if(!row||!work||row.transport!=='r2'||row.received!==0||
+    !Array.isArray(pages)||!pages.length||pages.length>2000||
+    pages.some((p,i)=>p.numero!==i+1||
+      !Number.isFinite(p.anchoCm)||!Number.isFinite(p.altoCm)||
+      !['cad','poster','sin-clasificar'].includes(p.modo)))
+   return respond({ok:false,error:'LIVE_R2_MANIFEST_ARCHIVO'},409);
+  const stage=await db.prepare(
+   'SELECT receipt_id,sha256,bytes,status FROM central_r2_large_pending '+
+   'WHERE web_order_id=? AND file_id=?'
+  ).bind(webOrderId,fileId).first();
+  if(!stage||!DOC.test(stage.receipt_id||'')||
+   stage.sha256!==row.sha256||stage.bytes!==row.bytes||
+   stage.status!=='awaiting_pdf_analysis')
+   return respond({ok:false,error:'LIVE_R2_MANIFEST_STAGE'},409);
+  return respond({ok:true,manifest:{
+   schema:'saber-r2-live-inspection-manifest-v1',
+   webOrderId,commercialOrderId:link.commercial_order_id,
+   fileId,receiptId:stage.receipt_id,
+   expectedSha256:row.sha256,expectedBytes:row.bytes,
+   paginasDeclaradas:pages.map(x=>({numero:x.numero,
+    anchoCm:x.anchoCm,altoCm:x.altoCm,modo:x.modo})),
+   quoteHash:valid.link.quote_hash,amountArs:valid.amountArs,
+   quoteSnapshot:null,productionAuthorized:false
+  },downloadAuthorized:false,productionAuthorized:false});
+ }catch{return respond({ok:false,error:'LIVE_R2_MANIFEST_D1'},503)}
+}
