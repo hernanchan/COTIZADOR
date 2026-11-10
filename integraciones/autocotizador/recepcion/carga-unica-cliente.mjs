@@ -496,7 +496,24 @@ function render(){
      bloque.append(aclaracion);
      bloque.append(texto('p','Medidas originales: '+unicas.join(' / ')+
       '. Se presupuestará al tamaño real, sin reducir el plano.'));
-     bloque.append(texto('p','¿Qué tipo de ploteo necesitás?'));
+     const clasificacionConfirmada=e.clasificacionAutomatica===true&&
+      elegidas.every(p=>['cad','poster'].includes(p.modo));
+     if(clasificacionConfirmada){
+      const clase=eleccion.variasClases?'MIXTO CAD Y PLENO':
+       eleccion.tipo==='cad'?'CAD · Plano técnico':'PLENO · Póster';
+      bloque.append(texto('p','Clasificación automática: '+clase+
+       '. El precio se calcula para el tipo detectado.'));
+      const revisar=document.createElement('a');
+      revisar.className='consulta-clasificacion-ploteo';
+      const consulta='Hola, Librería Saber. Quiero que revisen la clasificación del PDF «'+
+       e.name+'» ('+unicas.join(' / ')+'). El sistema detectó '+clase+
+       '. Considero que podría ser otro tipo de ploteo. Solicito revisión antes de pagar.';
+      revisar.href='https://wa.me/'+WHATSAPP_CONSULTAS_SABER+'?text='+encodeURIComponent(consulta);
+      revisar.target='_blank';revisar.rel='noopener noreferrer';
+      revisar.textContent='¿No coincide? Solicitar revisión';
+      bloque.append(revisar);
+     }else{
+      bloque.append(texto('p','No se pudo determinar el tipo con seguridad. ¿Qué tipo de ploteo necesitás?'));
      const opciones=document.createElement('div');
      opciones.className='eleccion-plotter-opciones';
      for(const [v,titulo,descripcion] of [
@@ -522,7 +539,8 @@ function render(){
        'Elegiste '+(eleccion.tipo==='cad'?'CAD':'PLENO')+'. Se calculará ese precio.':
        'Sugerencia del análisis automático: '+
        (eleccion.tipo==='cad'?'CAD':'PLENO')+'. Podés cambiarla.'));
-     }else bloque.append(texto('small','Seleccioná CAD o PLENO para completar el presupuesto. No se cobra sin confirmar el tipo.'));
+     }else bloque.append(texto('small','Seleccioná CAD o PLENO para completar el presupuesto. El original se revisará antes de imprimir.'));
+     }
      if(eleccion.tipo==='poster'){
       const papel=valor('Papel para pleno',[
        ['obra80','Obra 80 g'],['recubierto','Recubierto 130 g']
@@ -616,7 +634,7 @@ function render(){
      $('estado').textContent='Elegí un PDF válido, de hasta 250 MB.';return;
     }
     leyendo=true;version++;ultimoPresupuesto=null;
-    e.name=file.name;e.archivoOriginal=file;e.error=null;e.paginas=null;e.tipoPloteoElegidoPorCliente=false;
+    e.name=file.name;e.archivoOriginal=file;e.error=null;e.paginas=null;e.tipoPloteoElegidoPorCliente=false;e.clasificacionAutomatica=false;
     e.seleccion='sin-confirmar';e.paginasSeleccionadas='';
     render();
     try{await analizarArchivoPDF(e,file);aplicarConfiguracionComunAlDocumento(e)}
@@ -691,8 +709,10 @@ function render(){
     const tipo=opcionesTipoPloteo(paginas,e.seleccion);
     if(tipo.mostrar){
      panel.append(texto('p','El tamaño mayor a A3 corresponde a plotter. '+
-      'Elegí o corregí CAD / PLENO en la ficha principal, sobre el precio. '+
-      'La cotización preliminar se confirma al verificar el original.'));
+      (e.clasificacionAutomatica?
+       'El tipo CAD/PLENO se detectó automáticamente; si no coincide, solicitá revisión antes de pagar.':
+       'Elegí CAD o PLENO en la ficha principal si la clasificación automática no estuvo disponible.')+
+      ' La cotización preliminar se confirma al verificar el original.'));
      if(e.archivoOriginal?.size>MAX_PDF_TUS_BYTES)
       panel.append(texto('p','Este PDF se inspecciona localmente; no se envía a R2 hasta confirmar el pago.'));
     }else if(paginas.some(p=>!['cad','poster'].includes(p.modo)))
@@ -719,6 +739,7 @@ async function analizarArchivoPDF(e,file){
   const x=await leerMedidasPloteo(file,{maxPaginas:2000});
   e.paginas=x.paginas.map(p=>({...p,modo:'sin-clasificar'}));
   e.tipoPloteoElegidoPorCliente=false;
+  e.clasificacionAutomatica=false;
   // Para A4/A3 y documentos pequeños no hace falta renderizar cada página.
   // Para ploteos sí se mantiene el clasificador CAD/Póster por página.
   if(file.size<=MAX_PDF_TUS_BYTES&&requiereClasificacionVisualPloteo(e.paginas)){
@@ -728,6 +749,10 @@ async function analizarArchivoPDF(e,file){
      if(['cad','poster'].includes(item.modo)&&e.paginas[item.numero-1])
       e.paginas[item.numero-1].modo=item.modo;
     }
+    // Solo el clasificador visual real puede habilitar un tipo automático:
+    // ni el nombre del PDF ni una elección del comprador cuentan como detección.
+    e.clasificacionAutomatica=clases.length===e.paginas.length&&
+     e.paginas.every(p=>['cad','poster'].includes(p.modo));
    }catch(_){/* Sin clase confirmada, el ploteo no obtiene precio final. */}
   }
   const decision=decidirTamanoCliente(e.paginas);
