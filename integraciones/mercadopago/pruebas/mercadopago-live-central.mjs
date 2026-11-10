@@ -16,7 +16,7 @@ function urlSegura(value,kind){
  if(kind==='webhook')return (u.hostname==='pagos.libreriasaber.com.ar'||
   u.hostname==='libreriasaber.com.ar')&&
   u.pathname==='/webhooks/mercadopago-live'&&!u.search;
- return ['libreriasaber.com.ar','www.libreriasaber.com.ar'].includes(u.hostname)&&
+ return ['libreriasaber.com.ar','www.libreriasaber.com.ar','pedidos.libreriasaber.com.ar'].includes(u.hostname)&&
   /^\/(pedido|seguimiento)(\/|$)/.test(u.pathname)&&!u.search;
 }
 const productionOn=env=>compuertaMPProduccion(env)&&
