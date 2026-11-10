@@ -1,0 +1,69 @@
+name: Saber - crear D1 produccion aislada SIN activar pagos ni publicacion
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-live-create-isolated-d1-20261110.yml]
+permissions:
+  contents: read
+  statuses: write
+concurrency:
+  group: saber-crear-d1-produccion-aislada
+  cancel-in-progress: false
+jobs:
+  d1-aislada:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Crear si falta D1 vacía e INDEPENDIENTE de pruebas; NO ejecutar migraciones
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          EDITOR: ${{ secrets.SABER_CF_EDITOR_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$EDITOR"
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/d1/database"
+          tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+          curl -fsS --max-time 40 -H "Authorization: Bearer $EDITOR" "$root" > "$tmp/list.json"
+          jq -e '.success==true and (.result|type=="array")' "$tmp/list.json" >/dev/null
+          count=$(jq '[.result[]|select(.name=="saber-pagos-produccion")]|length' "$tmp/list.json")
+          test "$count" -le 1
+          if [ "$count" = 1 ];then
+            echo 'LIVE_D1_EXISTS_IDEMPOTENT'
+          else
+            echo 'LIVE_D1_WILL_CREATE_DISCONNECTED'
+            jq -n '{name:"saber-pagos-produccion"}' > "$tmp/create.json"
+            status=$(curl -sS --max-time 45 -o "$tmp/new.json" -w '%{http_code}' \
+              -H "Authorization: Bearer $EDITOR" -H 'Content-Type: application/json' \
+              --data-binary "@$tmp/create.json" "$root")
+            if [ "$status" != 200 ] && [ "$status" != 201 ];then
+              echo "LIVE_D1_CREATE_HTTP=$status"
+              jq -c '{errors:[.errors[]?|{code,message}]}' "$tmp/new.json" || true
+              exit 1
+            fi
+            jq -e '.success==true and (.result.uuid|type=="string")' "$tmp/new.json" >/dev/null
+            echo 'LIVE_D1_CREATED_NO_SCHEMA_NO_DATA'
+          fi
+          curl -fsS --max-time 40 -H "Authorization: Bearer $EDITOR" "$root" > "$tmp/verify.json"
+          jq -e '.success==true and ([.result[]|select(.name=="saber-pagos-produccion")]|length)==1' "$tmp/verify.json" >/dev/null
+          sandbox=$(jq -r '.result[]|select(.name=="saber-pagos-pruebas")|.uuid' "$tmp/verify.json")
+          production=$(jq -r '.result[]|select(.name=="saber-pagos-produccion")|.uuid' "$tmp/verify.json")
+          test -n "$sandbox" && test -n "$production" && test "$sandbox" != "$production"
+          echo 'LIVE_D1_UNIQUE_AND_SEPARATE_FROM_SANDBOX'
+          echo 'LIVE_D1_NO_DATA_NO_WRITES_NO_ROUTES_NO_WORKER_NO_CHECKOUT_NO_PAYMENTS'
+      - name: Registrar verificación de aislamiento
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          if [ "$RESULT" = success ];then state=success;else state=failure;fi
+          jq -n --arg state "$state" --arg context 'saber/live-d1-isolated' \
+            --arg description "D1 independiente sin datos ni cobros: $RESULT" \
+            --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/d1-status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/d1-status.json >/dev/null
