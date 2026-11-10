@@ -5,6 +5,7 @@ on:
     paths: [.github/workflows/saber-r2-tablero-d1-diagnostico-20261109.yml]
 permissions:
   contents: read
+  statuses: write
 jobs:
   diagnostico-r2:
     runs-on: ubuntu-latest
@@ -66,4 +67,17 @@ jobs:
           echo 'D1_R2_STATES_REAL_VERIFIED_READONLY'
           echo 'NO_ADMIN_KEY_NO_PII_NO_MUTATIONS_NO_PAYMENTS'
 # 2026-11-10: usar token de auditoria nuevo ante cualquier denegacion deploy; SELECT solo lectura
+      - name: Registrar resultado sin credenciales
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STATUS: ${{ job.status }}
+        shell: bash
+        run: |
+          if [ "$STATUS" = success ]; then state=success; else state=failure; fi
+          jq -n --arg state "$state" --arg context 'saber/d1-readonly' \
+            --arg description 'D1 lectura chequeo privado: '${STATUS} \
+            --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/saber-result-status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/saber-result-status.json >/dev/null
 # cierre 2026-11-10: revalidar sin modificar comercio ni producción
