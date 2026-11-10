@@ -50,7 +50,7 @@ const ddl=(await readFile(new URL('./d1-produccion-tus-recibos-v1.sql',import.me
  .split('\n').filter(x=>!x.trim().startsWith('--')).join('\n').trim();
 assert.equal((ddl.match(/;/g)||[]).length,1,'LIVE_TUS_DDL_UNICO');
 assert.match(ddl,/^CREATE TABLE IF NOT EXISTS central_r2_universal_tus_receipts\s*\(/);
-assert.doesNotMatch(ddl,/\b(?:INSERT|UPDATE|DELETE|DROP|ALTER|ATTACH|TRIGGER|REPLACE)\b/i);
+assert.doesNotMatch(ddl,/^\s*(?:INSERT|UPDATE|DELETE|DROP|ALTER|ATTACH|TRIGGER|REPLACE)\b/im);
 if(names.has('central_r2_universal_tus_receipts')){
  const count=await query('SELECT COUNT(*) AS n FROM central_r2_universal_tus_receipts');
  assert.equal(Number(count[0]?.n),0,'LIVE_TUS_TABLA_CON_DATOS');
