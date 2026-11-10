@@ -6,6 +6,7 @@ on:
       - '.github/workflows/saber-qa-browser-universal-noenvio-20261110.yml'
       - 'integraciones/autocotizador/recepcion/ui-universal-browser-noenvio.mjs'
       - 'integraciones/autocotizador/recepcion/medidas-pdf-grande-rangos.mjs'
+      - 'integraciones/autocotizador/recepcion/qa-generar-a4-500-100mib.py'
 permissions:
   contents: read
   statuses: write
@@ -34,11 +35,22 @@ jobs:
           npm install --no-audit --no-fund --no-save playwright-core@1.57.0
           node --check ui-universal-browser-noenvio.mjs
           command -v google-chrome-stable || command -v google-chrome || command -v chromium
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Crear PDF real de 500 páginas A4 y JPEG (100 MiB) solo en runner
+        working-directory: integraciones/autocotizador/recepcion
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --quiet 'PyMuPDF==1.26.5' 'Pillow==11.1.0' 'numpy==2.2.1'
+          python qa-generar-a4-500-100mib.py /tmp/saber-qa-a4-500-100mib.pdf
       - name: Cotizar 500 paginas A4 100MiB sin enviar ni pagar
         shell: bash
         working-directory: integraciones/autocotizador/recepcion
         env:
           SABER_OPERATOR_PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+          QA_PDF_INPUT: /tmp/saber-qa-a4-500-100mib.pdf
         run: |
           set -euo pipefail
           node ./ui-universal-browser-noenvio.mjs
