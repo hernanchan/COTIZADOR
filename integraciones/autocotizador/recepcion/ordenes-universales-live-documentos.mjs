@@ -43,7 +43,7 @@ async function signedService(service,env,path,payload,{subtle,now,nonce}){
 }
 export async function guardarBorradorUniversalLive(req,env,{
  authorized=false,service=env?.SABER_CENTRAL,
- priceLoader=obtenerTarifarioD1Live,
+ priceLoader=obtenerTarifarioD1Live,quoteBuilder=fichaPrearchivoUniversal,
  subtle=crypto.subtle,now=()=>Math.floor(Date.now()/1000),
  nonce=()=>crypto.randomUUID()
 }={}){
@@ -56,7 +56,7 @@ export async function guardarBorradorUniversalLive(req,env,{
   Object.keys(input).sort().join(',')!=='archivos,manifiestos,webOrderId'||
   !WEB.test(input.webOrderId||''))return reply({ok:false,error:'LIVE_DRAFT_INPUT'},422);
  let ficha;
- try{ficha=fichaPrearchivoUniversal({...input,tarifario:await priceLoader(env)})}
+ try{ficha=quoteBuilder({...input,tarifario:await priceLoader(env)})}
  catch{return reply({ok:false,error:'LIVE_DRAFT_NO_QUOTE'},422)}
  const hash=hex(new Uint8Array(await subtle.digest('SHA-256',
   new TextEncoder().encode(JSON.stringify(ficha)))));
