@@ -73,8 +73,16 @@ export async function verificarFichaUniversal(p,{subtle=crypto.subtle}={}){
 export async function registrarFichaUniversalD1(request,env,{
  readSigned,uuid=()=>crypto.randomUUID(),subtle=crypto.subtle
 }={}){
- if(env?.CENTRAL_R2_UNIVERSAL_DRAFT_ENABLED!=='PRIVATE_TEST_ONLY'||
-    !env?.DB?.prepare||!env?.DB?.batch)
+ const live=env?.SABER_ENTORNO==='produccion'&&
+  env?.CENTRAL_DB_ENV==='produccion'&&
+  env?.CENTRAL_LIVE_DRAFT_GATE==='GO_COMERCIAL_CONFIRMADO'&&
+  env?.CENTRAL_LIVE_PRICING_GATE==='GO_COMERCIAL_CONFIRMADO'&&
+  env?.CENTRAL_LIVE_BRIDGE_ENABLED==='GO_COMERCIAL_CONFIRMADO'&&
+  env?.MP_LIVE_GATE==='GO_COMERCIAL_CONFIRMADO'&&
+  env?.CENTRAL_R2_UNIVERSAL_DRAFT_ENABLED!=='PRIVATE_TEST_ONLY';
+ const sandbox=env?.SABER_ENTORNO!=='produccion'&&
+  env?.CENTRAL_R2_UNIVERSAL_DRAFT_ENABLED==='PRIVATE_TEST_ONLY';
+ if((!sandbox&&!live)||!env?.DB?.prepare||!env?.DB?.batch)
   return reply({ok:false,error:'UNIVERSAL_OFF'},503);
  if(typeof readSigned!=='function')return reply({ok:false,error:'UNIVERSAL_HMAC_OFF'},503);
  const signed=await readSigned(request,env);
@@ -82,7 +90,22 @@ export async function registrarFichaUniversalD1(request,env,{
  let ficha;try{ficha=await verificarFichaUniversal(signed.payload,{subtle})}
  catch{return reply({ok:false,error:'UNIVERSAL_FICHA_RECHAZADA'},422)}
  const db=env.DB;
- await db.prepare(MASTER).run();await db.prepare(LINES).run();
+ if(live){
+  // El presupuesto nunca puede usar revisión no aprobada o vencida.
+  // No crear esquema, importar baseline ni generar pedido por esta comprobación.
+  let approved;
+  try{approved=await db.prepare(
+   'SELECT approved_revision,approved_json FROM central_pricing_admin_head WHERE id=1'
+  ).first()}catch{return reply({ok:false,error:'LIVE_DRAFT_PRICING_UNAVAILABLE'},503)}
+  if(!approved?.approved_json||
+     ficha.priceRevision!=='d1-approved-revision-'+approved.approved_revision)
+   return reply({ok:false,error:'LIVE_DRAFT_PRICING_REVISION_CHANGED'},409);
+  let approvedData;try{approvedData=JSON.parse(approved.approved_json)}catch{}
+  if(approvedData?.prices?.schema!=='saber-web-prices-v1')
+   return reply({ok:false,error:'LIVE_DRAFT_PRICING_INVALID'},409);
+ }else{
+  await db.prepare(MASTER).run();await db.prepare(LINES).run();
+ }
  const find=()=>db.prepare('SELECT draft_id,quote_hash,total_ars,file_count,state FROM central_r2_universal_drafts WHERE web_order_id=?')
   .bind(ficha.webOrderId).first();
  const answer=(prior)=>prior&&prior.quote_hash===signed.payload.quoteHash&&
