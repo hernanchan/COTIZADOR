@@ -7,6 +7,8 @@ on:
       - 'integraciones/mercadopago/pruebas/mercadopago-live-central.mjs'
       - 'integraciones/mercadopago/pruebas/mercadopago-live-central.test.mjs'
       - 'integraciones/mercadopago/pruebas/central-live-bridge.mjs'
+      - 'integraciones/mercadopago/pruebas/r2-universal-package-central.mjs'
+      - 'tests/r2-universal-paquete-operador.test.mjs'
       - 'integraciones/mercadopago/pruebas/r2-universal-order-central.mjs'
       - 'integraciones/mercadopago/pruebas/r2-universal-tus-central.mjs'
       - 'integraciones/mercadopago/pruebas/r2-universal-live-gate-central.mjs'
@@ -97,6 +99,7 @@ jobs:
           set -euo pipefail
           node --test integraciones/mercadopago/pruebas/mercadopago-live-central.test.mjs
           node --test integraciones/mercadopago/pruebas/central-live-bridge.test.mjs
+          node --test tests/r2-universal-paquete-operador.test.mjs
           node --test integraciones/mercadopago/pruebas/tus-live-pospago-aislado.test.mjs
           node --test integraciones/mercadopago/pruebas/r2-universal-live-gate-central.test.mjs
           node --test integraciones/mercadopago/pruebas/r2-universal-live-reserve-central.test.mjs
