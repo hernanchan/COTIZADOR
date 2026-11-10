@@ -42,3 +42,8 @@
 - La rama de integración despliega automáticamente en `preview`, no en producción. El público aún sirve `/cotizar` heredado.
 - Bloqueo comercial real aún abierto: `vidriera/portal-comercial.json` sigue `enabled:false` / `NO_GO`; `vidriera/cotizar.html` solo redirige a sandbox en preview y exige endpoint público `pedidos.libreriasaber.com.ar/cotizar` para producción. La existencia y operatividad de dicho endpoint **no están comprobadas**. El módulo `integraciones/publicacion/mercadopago-live-preflight.mjs` declara expresamente ser validador puro, **no pasarela ni endpoint** de pago real. Por tanto, acceso a Pages no autoriza ni valida el lanzamiento.
 - Próximos controles obligatorios: inspección comercial de preview, confirmar backend de cobro REAL y seguridad, definir alcance mínimo de release sin fusionar rama gigante, efectuar publicación acotada + smoke con rollback a baseline.
+
+## Evidencia adicional de preview HTTP
+- URL verificada vía Pages API del despliegue de preview: `https://227c8e6d.libreriasaber.pages.dev`.
+- Smoke no autenticado GET portada/cotizador/JSON compuerta: HTTP 200 en los tres; el HTML de cotizador aún apunta al Worker sandbox y el JSON sigue en `NO_GO` ([CI](https://github.com/hernanchan/COTIZADOR/actions/runs/42826413107)).
+- Este smoke demuestra accesibilidad HTTP y compuerta cerrada; **no demuestra interacción móvil, fotos correctas, carrito funcional ni cobro en vivo**.
