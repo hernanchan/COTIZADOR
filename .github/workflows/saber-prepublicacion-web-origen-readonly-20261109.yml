@@ -65,9 +65,26 @@ jobs:
                 echo "MATCHED_PAGES_PRODUCTION_BRANCH=$production"
                 echo "MATCHED_PAGES_SUBDOMAIN=$subdomain"
                 echo "MATCHED_PAGES_DOMAINS=$domains"
-                status_d=$(curl -sS --max-time 25 -H "$auth" -o "$temp/deployments.json" -w '%{http_code}' "$base/projects/$name/deployments?per_page=8")
+                status_p=$(curl -sS --max-time 25 -H "$auth" -o "$temp/project.json" -w '%{http_code}' "$base/projects/$name")
+                echo "MATCHED_PAGES_PROJECT_GET_HTTP=$status_p"
+                if [ "$status_p" = 200 ]; then
+                  jq -r '.result |
+                    "PAGES_CANONICAL_PRODUCTION_DEPLOYMENT_ID="+(.canonical_deployment.id//"none"),
+                    "PAGES_CANONICAL_PRODUCTION_COMMIT="+(.canonical_deployment.deployment_trigger.metadata.commit_hash//"unknown"),
+                    "PAGES_LATEST_DEPLOYMENT_ID="+(.latest_deployment.id//"none"),
+                    "PAGES_REPO_TYPE="+(.source.type//"unknown"),
+                    "PAGES_REPO_NAME="+(.source.config.repo_name//"unknown"),
+                    "PAGES_BUILD_ROOT="+(.build_config.root_dir//""),
+                    "PAGES_BUILD_DEST="+(.build_config.destination_dir//"")' "$temp/project.json"
+                fi
+                status_d=$(curl -sS --max-time 25 -H "$auth" -o "$temp/deployments.json" -w '%{http_code}' "$base/projects/$name/deployments")
                 echo "MATCHED_PAGES_DEPLOYMENTS_HTTP=$status_d"
                 if [ "$status_d" = 200 ]; then
+                  jq -c '[.result[] | {id,environment,created_on,
+                    branch:(.deployment_trigger.metadata.branch//null),
+                    commit:(.deployment_trigger.metadata.commit_hash//null),
+                    status:(.latest_stage.status//null)}] | .[:8]' "$temp/deployments.json" |
+                    sed 's/^/PAGES_RECENT_DEPLOYMENTS_SAFE=/'
                   jq -r --arg branch "$production" '.result | map(select(.deployment_trigger.metadata.branch == $branch)) | .[0] // {} | ["PAGES_LAST_PRODUCTION_DEPLOYMENT_ID="+(.id // "none"), "PAGES_LAST_PRODUCTION_COMMIT="+(.deployment_trigger.metadata.commit_hash // "unknown")] | .[]' "$temp/deployments.json"
                 fi
               done < "$temp/matched.tsv"
