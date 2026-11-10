@@ -13,6 +13,8 @@ on:
       - 'integraciones/mercadopago/pruebas/tus-live-pospago-aislado.test.mjs'
       - 'integraciones/mercadopago/pruebas/central-recepcion-live.mjs'
       - 'integraciones/mercadopago/pruebas/central-recepcion-live.test.mjs'
+      - 'integraciones/mercadopago/pruebas/pricing-live-admin.mjs'
+      - 'integraciones/mercadopago/pruebas/pricing-live-admin.test.mjs'
       - 'integraciones/mercadopago/pruebas/r2-lote-universal-central.mjs'
       - 'integraciones/mercadopago/pruebas/central-live-bridge.test.mjs'
       - 'integraciones/mercadopago/pruebas/central-live-hmac-e2e.test.mjs'
@@ -64,6 +66,7 @@ jobs:
           node --test integraciones/mercadopago/pruebas/central-live-bridge.test.mjs
           node --test integraciones/mercadopago/pruebas/tus-live-pospago-aislado.test.mjs
           node --test integraciones/mercadopago/pruebas/central-recepcion-live.test.mjs
+          node --test integraciones/mercadopago/pruebas/pricing-live-admin.test.mjs
           node --test integraciones/mercadopago/pruebas/central-live-hmac-e2e.test.mjs
           node --test integraciones/autocotizador/recepcion/mp-live-comprador.test.mjs
           node --test integraciones/autocotizador/recepcion/pagina-retorno-live.test.mjs
