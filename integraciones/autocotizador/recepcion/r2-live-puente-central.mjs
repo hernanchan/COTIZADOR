@@ -48,6 +48,10 @@ export async function consultarPagoArchivoR2Live(env,meta,{
   data.fileId!==meta.fileId||data.sha256!==meta.sha256||
   data.bytes!==meta.bytes||data.pages!==meta.pages||
   data.transport!=='r2'||data.paymentVerified!==true||
+  !['bn','color'].includes(data.mode)||
+  !Array.isArray(data.expectedMetrics)||data.expectedMetrics.length!==meta.pages||
+  data.expectedMetrics.some(m=>!Number.isFinite(m.anchoCm)||
+    !Number.isFinite(m.altoCm)||m.anchoCm<=0||m.altoCm<=0)||
   data.uploadAuthorized!==false||data.productionAuthorized!==false)
   throw Error('LIVE_R2_CENTRAL_NO_COINCIDE');
  return data;
