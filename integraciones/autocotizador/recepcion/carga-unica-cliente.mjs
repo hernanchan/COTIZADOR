@@ -1,5 +1,6 @@
 import {leerMedidasPloteo,requiereClasificacionVisualPloteo} from './medidas-local-pdf.mjs';
 import {clasificarDestino} from './destino-impresion.mjs';
+import {opcionesTipoPloteo,elegirTipoPloteo} from './eleccion-ploteo-cad-pleno.mjs';
 import {prepararBorradorPedido} from './preparar-borrador-pedido.mjs';
 import {componerCarritoPreliminar} from './componer-carrito-preliminar.mjs';
 import {seleccionarPaginas} from './seleccionar-paginas.mjs';
@@ -473,7 +474,7 @@ function render(){
     const tipo=cad===elegidas.length?'CAD · Plano técnico':
      poster===elegidas.length?'PÓSTER / PLENO':
      cad+poster===elegidas.length?'MIXTO · CAD y PÓSTER':'Tipo pendiente de análisis';
-    const marca=texto('strong','TIPO DETECTADO: '+tipo);
+    const marca=texto('strong','TIPO DE PLOTEO: '+tipo);
     marca.className='clasificacion-ploteo-visible';
     principal.append(marca);
     const medidas=elegidas.map(p=>Number(p.anchoCm).toLocaleString('es-AR',{maximumFractionDigits:2})+
@@ -485,6 +486,52 @@ function render(){
       :unicas.join(' / '))));
     medidaVisible.className='medida-ploteo-visible';
     principal.append(medidaVisible);
+    const eleccion=opcionesTipoPloteo(elegidas,e.seleccion);
+    if(eleccion.mostrar){
+     const bloque=document.createElement('div');
+     bloque.className='eleccion-plotter';
+     bloque.setAttribute('role','group');
+     bloque.setAttribute('aria-label','Tipo de ploteo para '+e.name);
+     const aclaracion=texto('strong','TAMAÑO MAYOR A A3 · CORRESPONDE A PLOTTER');
+     bloque.append(aclaracion);
+     bloque.append(texto('p','Medidas originales: '+unicas.join(' / ')+
+      '. Se presupuestará al tamaño real, sin reducir el plano.'));
+     bloque.append(texto('p','¿Qué tipo de ploteo necesitás?'));
+     const opciones=document.createElement('div');
+     opciones.className='eleccion-plotter-opciones';
+     for(const [v,titulo,descripcion] of [
+      ['cad','CAD · Planos','Líneas y dibujos técnicos, sin fondos plenos'],
+      ['poster','PLENO · Póster','Fotografías, imágenes o fondos de color']
+     ]){
+      const btn=document.createElement('button');
+      btn.type='button';
+      btn.className='eleccion-plotter-boton'+(eleccion.tipo===v?' seleccionada':'');
+      btn.setAttribute('aria-pressed',String(eleccion.tipo===v));
+      btn.textContent=titulo;
+      btn.title=descripcion;
+      btn.onclick=()=>{
+       elegirTipoPloteo(e.paginas,e.seleccion,v);
+       e.tipoPloteoElegidoPorCliente=true;
+       cambio();
+      };
+      opciones.append(btn);
+     }
+     bloque.append(opciones);
+     if(eleccion.confirmado){
+      bloque.append(texto('small',e.tipoPloteoElegidoPorCliente?
+       'Elegiste '+(eleccion.tipo==='cad'?'CAD':'PLENO')+'. Se calculará ese precio.':
+       'Sugerencia del análisis automático: '+
+       (eleccion.tipo==='cad'?'CAD':'PLENO')+'. Podés cambiarla.'));
+     }else bloque.append(texto('small','Seleccioná CAD o PLENO para completar el presupuesto. No se cobra sin confirmar el tipo.'));
+     if(eleccion.tipo==='poster'){
+      const papel=valor('Papel para pleno',[
+       ['obra80','Obra 80 g'],['recubierto','Recubierto 130 g']
+      ],e.papelPoster,v=>{e.papelPoster=v;cambio()});
+      papel.className='eleccion-plotter-papel';
+      bloque.append(papel);
+     }
+     principal.append(bloque);
+    }
    }
   }
   if(e.paginas&&e.servicio==='auto'){
@@ -569,7 +616,7 @@ function render(){
      $('estado').textContent='Elegí un PDF válido, de hasta 250 MB.';return;
     }
     leyendo=true;version++;ultimoPresupuesto=null;
-    e.name=file.name;e.archivoOriginal=file;e.error=null;e.paginas=null;
+    e.name=file.name;e.archivoOriginal=file;e.error=null;e.paginas=null;e.tipoPloteoElegidoPorCliente=false;
     e.seleccion='sin-confirmar';e.paginasSeleccionadas='';
     render();
     try{await analizarArchivoPDF(e,file);aplicarConfiguracionComunAlDocumento(e)}
@@ -639,25 +686,17 @@ function render(){
     if(e.anillado==='grupo')controles.append(valor('Grupo de anillado',[['1','Grupo 1'],['2','Grupo 2'],['3','Grupo 3'],['4','Grupo 4'],['5','Grupo 5']],e.grupoAnillado,v=>{e.grupoAnillado=v;cambio()}));
     if(e.anillado==='grupo')panel.append(texto('p','Los PDF del grupo deben tener igual tamaño final y cantidad de copias.'));
    }else{
-    // Cotizar localmente antes de almacenar 100–150 MB en R2.
-    // El tipo lo declara el cliente: precio orientativo, sujeto a
-    // verificación real del servidor después del pago.
-    if(e.archivoOriginal?.size>MAX_PDF_TUS_BYTES){
-     const todos=e.paginas.every(p=>p.modo==='cad')?'cad':
-      e.paginas.every(p=>p.modo==='poster')?'poster':'sin-clasificar';
-     controles.append(valor('Para cotizar: ¿qué contiene el archivo?',[
-      ['sin-clasificar','Seleccioná el tipo de trabajo'],
-      ['cad','Plano CAD: líneas y dibujos técnicos'],
-      ['poster','Póster: fotos, imágenes o fondos plenos']
-     ],todos,v=>{for(const p of e.paginas)p.modo=v;cambio()}));
-     panel.append(texto('p',
-      'Archivo grande: las medidas se leen en este dispositivo, SIN subir el PDF a R2. '+
-      'El precio es orientativo según el tipo indicado. '+
-      'El original sólo podrá enviarse después de confirmar el pago.'));
+    // CAD/pleno y el papel se eligen en la tarjeta visible, sin abrir detalles.
+    // Las dimensiones físicas se detectan localmente incluso si el PDF supera 40 MiB.
+    const tipo=opcionesTipoPloteo(paginas,e.seleccion);
+    if(tipo.mostrar){
+     panel.append(texto('p','El tamaño mayor a A3 corresponde a plotter. '+
+      'Elegí o corregí CAD / PLENO en la ficha principal, sobre el precio. '+
+      'La cotización preliminar se confirma al verificar el original.'));
+     if(e.archivoOriginal?.size>MAX_PDF_TUS_BYTES)
+      panel.append(texto('p','Este PDF se inspecciona localmente; no se envía a R2 hasta confirmar el pago.'));
     }else if(paginas.some(p=>!['cad','poster'].includes(p.modo)))
      panel.append(texto('p','Análisis CAD/Póster pendiente: requiere revisión, sin precio.'));
-    if(e.paginas.some(p=>p.modo==='poster'))
-     controles.append(valor('Papel para póster', [['obra80','Obra 80 g'],['recubierto','Recubierto 130 g']],e.papelPoster,v=>{e.papelPoster=v;cambio()}));
    }
   }else {const n=texto('p','Elegí el tamaño de impresión para continuar.');n.className='advertencia';panel.append(n)}
   panel.append(controles);
@@ -679,6 +718,7 @@ async function analizarArchivoPDF(e,file){
  try{
   const x=await leerMedidasPloteo(file,{maxPaginas:2000});
   e.paginas=x.paginas.map(p=>({...p,modo:'sin-clasificar'}));
+  e.tipoPloteoElegidoPorCliente=false;
   // Para A4/A3 y documentos pequeños no hace falta renderizar cada página.
   // Para ploteos sí se mantiene el clasificador CAD/Póster por página.
   if(file.size<=MAX_PDF_TUS_BYTES&&requiereClasificacionVisualPloteo(e.paginas)){
