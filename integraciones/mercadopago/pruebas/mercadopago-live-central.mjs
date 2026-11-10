@@ -116,8 +116,16 @@ export async function checkoutMPLiveCentral(request,env,{
  if(!Array.isArray(transports)||transports.length!==fileCount||
     transports.some(row=>!['tus','r2'].includes(row.transport)))
   return reply({ok:false,error:'MP_LIVE_TRANSPORTE_INCONSISTENTE'},409);
- if(transports.some(row=>row.transport==='r2')&&
-    env?.CENTRAL_LIVE_R2_GATE!=='GO_COMERCIAL_CONFIRMADO')
+ // Un gate R2 aislado no garantiza que se pueda reservar capacidad
+ // ni registrar el original. No cobrar si falta alguna compuerta de Central.
+ const r2Present=transports.some(row=>row.transport==='r2');
+ const GO='GO_COMERCIAL_CONFIRMADO';
+ if(r2Present&&[
+    'CENTRAL_LIVE_R2_GATE',
+    'CENTRAL_LIVE_R2_QUOTA_GATE',
+    'CENTRAL_LIVE_R2_STAGING_GATE',
+    'CENTRAL_LIVE_POSTPAY_GATE'
+   ].some(key=>env?.[key]!==GO))
   return reply({ok:false,error:'MP_LIVE_R2_NO_DISPONIBLE'},503);
  const age=now()-Date.parse(String(order.created_at).replace(' ','T')+'Z');
  if(!Number.isFinite(age)||age<0||age>=86400000)
