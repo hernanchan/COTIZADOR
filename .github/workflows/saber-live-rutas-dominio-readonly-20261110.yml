@@ -1,0 +1,67 @@
+name: Saber - comprobar rutas DNS y Worker custom domains sin modificar
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-live-rutas-dominio-readonly-20261110.yml]
+permissions:
+  contents: read
+  statuses: write
+jobs:
+  read:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Examinar rutas y subdominios EXACTOS sin escribir ni publicar
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          dir=$(mktemp -d);trap 'rm -rf "$dir"' EXIT
+          auth="Authorization: Bearer $TOKEN"
+          root="https://api.cloudflare.com/client/v4"
+          curl -fsS --max-time 25 -H "$auth" "$root/accounts/$ACCOUNT/workers/domains" > "$dir/domains.json"
+          jq -e '.success==true and (.result|type=="array")' "$dir/domains.json" >/dev/null
+          jq -r '[.result[]?|select(.hostname=="pedidos.libreriasaber.com.ar" or
+           .hostname=="pagos.libreriasaber.com.ar")|(.hostname+"=>"+(.service//"unknown"))]|
+           if length==0 then "LIVE_WORKER_CUSTOM_DOMAINS=NONE" else .[] end' "$dir/domains.json"
+          curl -fsS --max-time 25 -H "$auth" "$root/zones?name=libreriasaber.com.ar" > "$dir/zone.json"
+          zone=$(jq -r '[.result[]|select(.name=="libreriasaber.com.ar")]|if length==1 then .[0].id else empty end' "$dir/zone.json")
+          test -n "$zone"
+          code=$(curl -sS --max-time 25 -o "$dir/routes.json" -w '%{http_code}' \
+           -H "$auth" "$root/zones/$zone/workers/routes")
+          echo "LIVE_WORKER_ROUTES_READ_HTTP=$code"
+          if [ "$code" = 200 ];then
+            jq -r '[.result[]?|select(
+             (.pattern//""|test("pedidos\\.libreriasaber\\.com\\.ar|pagos\\.libreriasaber\\.com\\.ar"))
+             )|(.pattern+"=>"+(.script//"unassigned"))]|
+             if length==0 then "LIVE_WORKER_ROUTES_TARGET=NONE" else .[] end' "$dir/routes.json"
+          fi
+          for host in pedidos.libreriasaber.com.ar pagos.libreriasaber.com.ar;do
+            for typ in A AAAA CNAME;do
+              if dig +short "$host" "$typ"|grep -q .;then
+                echo "LIVE_DNS_${host}_${typ}=PRESENT"
+              else
+                echo "LIVE_DNS_${host}_${typ}=ABSENT"
+              fi
+            done
+          done
+          echo 'LIVE_DOMAIN_AUDIT_READ_ONLY_NO_ROUTES_CHANGED_NO_DNS_CHANGED_NO_MP'
+      - name: Estado de consulta
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          if [ "$RESULT" = success ];then state=success;else state=failure;fi
+          jq -n --arg state "$state" --arg context 'saber/live-domain-readonly' \
+           --arg description "Cloudflare rutas y DNS sin cambios: $RESULT" \
+           --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+           '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/status.json >/dev/null
