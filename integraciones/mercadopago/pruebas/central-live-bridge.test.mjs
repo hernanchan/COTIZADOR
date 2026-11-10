@@ -81,3 +81,21 @@ test('solo origen service binding; navegador, GET y puerto alternativo no habili
  const port=await make(undefined,undefined,{host:'https://pagos.libreriasaber.com.ar:444'});
  assert.equal((await read(port)).status,403);
 });
+
+test('orden productiva exige firma propia y rechaza mezclar checkout o payloads extra',async()=>{
+ const payload={schema:'saber-central-r2-universal-create-order-v1',
+  webOrderId:WEB,draftId:ORDER,quoteHash:'a'.repeat(64),
+  telefono:'351 1234567'};
+ const accepted=await read(await make('/internal/central/live/order',payload));
+ assert.equal(accepted.error,undefined);
+ assert.equal(accepted.payload.webOrderId,WEB);
+ assert.equal((await read(await make('/internal/central/live/checkout',payload))).status,422);
+ assert.equal((await read(await make('/internal/central/live/order',
+  {...payload,amountArs:100}))).status,422);
+ assert.equal((await read(await make('/internal/central/live/order',
+  {...payload,telefono:'abc'}))).status,422);
+ assert.equal((await read(await make('/internal/central/live/order',
+  {...payload,quoteHash:'z'.repeat(64)}))).status,422);
+ assert.equal((await read(await make('/internal/central/live/order',payload),
+  {...env,MP_LIVE_GATE:'NO_GO'})).status,503);
+});
