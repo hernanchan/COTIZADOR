@@ -56,7 +56,7 @@ export async function guardarBorradorUniversalLive(req,env,{
   Object.keys(input).sort().join(',')!=='archivos,manifiestos,webOrderId'||
   !WEB.test(input.webOrderId||''))return reply({ok:false,error:'LIVE_DRAFT_INPUT'},422);
  let ficha;
- try{ficha=quoteBuilder({...input,tarifario:await priceLoader(env)})}
+ try{ficha=quoteBuilder({...input,tarifario:await priceLoader(env),produccion:true})}
  catch{return reply({ok:false,error:'LIVE_DRAFT_NO_QUOTE'},422)}
  const hash=hex(new Uint8Array(await subtle.digest('SHA-256',
   new TextEncoder().encode(JSON.stringify(ficha)))));
