@@ -1,0 +1,54 @@
+name: Saber QA - navegador A4 500 paginas 100MiB sin carga ni pago
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-qa-browser-universal-noenvio-20261110.yml]
+permissions:
+  contents: read
+  statuses: write
+concurrency:
+  group: saber-qa-browser-universal-readonly
+  cancel-in-progress: false
+jobs:
+  browser-privado:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Preparar Chrome y Playwright sin despliegue
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd integraciones/autocotizador/recepcion
+          npm install --no-audit --no-fund --no-save playwright-core@1.57.0
+          node --check ui-universal-browser-noenvio.mjs
+          command -v google-chrome-stable || command -v google-chrome || command -v chromium
+      - name: Cotizar 500 paginas A4 100MiB sin enviar ni pagar
+        shell: bash
+        working-directory: integraciones/autocotizador/recepcion
+        env:
+          SABER_OPERATOR_PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+        run: |
+          set -euo pipefail
+          node ./ui-universal-browser-noenvio.mjs
+      - name: Registrar evidencia de QA
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          if [ "$RESULT" = success ];then state=success;else state=failure;fi
+          jq -n --arg state "$state" --arg context 'saber/qa-browser-a4-100mib' \
+            --arg description "Navegador A4 500 pags 100MiB sin pedido: $RESULT" \
+            --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/qa-browser-status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/qa-browser-status.json >/dev/null
