@@ -66,23 +66,23 @@ function render(){
    card.append(dato('p','Clasificación automática: '+cad+' CAD · '+poster+' Póster'));
    if(d.paginas.length<=15)card.append(dato('p',d.paginas.map(p=>'Pág. '+p.numero+': '+(p.modo==='cad'?'CAD':p.modo==='poster'?'Póster':'Revisión Librería Saber')).join(' · ')));
    
-   if(poster>0){
-    form.append(selector('Papel para póster',
+   if(cad+poster>0){
+    form.append(selector('Papel para ploteo',
       [['obra80','Obra 80 g'],['recubierto','Recubierto 130 g']],
       d.papelPoster||'obra80',v=>{d.papelPoster=v;}));
    }
    const seleccionado=soportesCompatibles(d)[0];
    if(!seleccionado){card.append(dato('p','Ningún rollo estándar admite el ancho de este PDF. Requiere revisión de Librería Saber.'))}
    else {
-    const recubierto=poster>0&&d.papelPoster==='recubierto';
+    const recubierto=d.papelPoster==='recubierto';
     if(!recubierto||cad>0)card.append(dato('p',(recubierto?'Rollo obra para páginas CAD: ':'Rollo obra asignado automáticamente: ')+seleccionado.name+' ('+seleccionado.widthCm+' cm)'));
     if(recubierto){
-     const mayores=d.paginas.filter(p=>p.modo==='poster').map(p=>Math.min(p.anchoCm,p.altoCm));
+     const mayores=d.paginas.map(p=>Math.min(p.anchoCm,p.altoCm));
      const soporteRec=catalogo.filter(x=>/^rec\\d+$/.test(x.id)&&mayores.every(ancho=>ancho<=x.widthCm+0.03)).sort((a,b)=>a.widthCm-b.widthCm)[0];
      if(soporteRec)card.append(dato('p','Rollo para páginas Póster: '+soporteRec.name+' ('+soporteRec.widthCm+' cm)'));
     }
    }
-   if(poster>0&&d.papelPoster==='recubierto'){
+   if(cad+poster>0&&d.papelPoster==='recubierto'){
     const recubiertos=catalogo.filter(x=>/^rec\d+$/.test(x.id));
     const falta=d.paginas.filter(p=>p.modo==='poster'&&!recubiertos.some(r=>
       Math.min(p.anchoCm,p.altoCm)<=r.widthCm+0.03));
