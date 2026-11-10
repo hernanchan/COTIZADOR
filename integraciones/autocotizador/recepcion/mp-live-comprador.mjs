@@ -75,6 +75,7 @@ export async function pagoMPLiveComprador(request,env,{
  const result=await upstream.json().catch(()=>null);
  if(!result||result.ok!==true||!Number.isSafeInteger(result.amountArs)||
     result.amountArs<1||result.amountArs>50000000||
+    !Number.isSafeInteger(result.fileCount)||result.fileCount<1||result.fileCount>10||
     (isStart?result.orderId!==p.commercialOrderId:
      result.webOrderId!==p.webOrderId||
      result.commercialOrderId!==p.commercialOrderId))
@@ -84,7 +85,7 @@ export async function pagoMPLiveComprador(request,env,{
    return reply({ok:false,error:'MP_LIVE_CHECKOUT_URL_INVALIDA'},502);
   return reply({ok:true,webOrderId:p.webOrderId,
    commercialOrderId:p.commercialOrderId,amountArs:result.amountArs,
-   estado:'pendiente',checkoutUrl:result.checkoutUrl,
+   fileCount:result.fileCount,estado:'pendiente',checkoutUrl:result.checkoutUrl,
    uploadAuthorized:false,productionAuthorized:false},200);
  }
  const statuses=['pendiente','pagado_esperando_archivos','revocado'];
