@@ -62,7 +62,7 @@ test('la elección comercial modifica el precio y destino del MISMO original, no
  assert.deepEqual(paginas,[{numero:1,anchoCm:59.4,altoCm:84.1,modo:'poster'}]);
  assert.equal(pleno.paymentAuthorized,false);
 });
-test('el cliente ve la pregunta CAD/PLENO inmediatamente, sin abrir Más opciones',()=>{
+test('el cliente ve ploteo mayor A3 sin preguntas CAD/PLENO, o revisión si falla',()=>{
  const source=readFileSync(new URL('../integraciones/autocotizador/recepcion/carga-unica-cliente.mjs',import.meta.url),'utf8');
  const page=readFileSync(new URL('../integraciones/autocotizador/recepcion/carga-unica-pagina.mjs',import.meta.url),'utf8');
  const beg=source.indexOf("if(destino.confirmado&&destino.destino==='ploteo'){");
@@ -71,15 +71,18 @@ test('el cliente ve la pregunta CAD/PLENO inmediatamente, sin abrir Más opcione
  const card=source.slice(beg,end);
  assert.match(card,/TAMAÑO MAYOR A A3 · CORRESPONDE A PLOTTER/);
  assert.match(card,/Medidas originales:/);
- assert.match(card,/¿Qué tipo de ploteo necesitás\?/);
- assert.match(card,/CAD · Planos/);
- assert.match(card,/PLENO · Póster/);
- assert.match(card,/elegirTipoPloteo\(e.paginas,e.seleccion,v\)/);
+ assert.doesNotMatch(card,/¿Qué tipo de ploteo necesitás\?/);
+ assert.doesNotMatch(card,/elegirTipoPloteo\(e.paginas,e.seleccion,v\)/);
+ assert.match(card,/No pudimos identificar automáticamente/);
+ assert.match(card,/Solicitar revisión del PDF/);
+ assert.match(card,/Papel para ploteo/);
  assert.match(card,/principal\.append\(bloque\)/);
  assert.match(page,/\.eleccion-plotter-boton\.seleccionada/);
  assert.match(page,/\.eleccion-plotter-boton:focus-visible/);
  assert.match(source,/file\.size<=MAX_PDF_TUS_BYTES&&requiereClasificacionVisualPloteo/,
-  'PDF pesados deben pedir elegir CAD o pleno, nunca analizar 150MB en canvas');
+  'Los PDF de hasta 40 MiB utilizan análisis visual local');
+ assert.match(source,/file\.size>MAX_PDF_TUS_BYTES&&requiereClasificacionVisualPloteo/,
+  'Los PDF mayores a 40 MiB utilizan análisis local por rangos');
  assert.doesNotMatch(source,/controles\.append\(valor\('Para cotizar: ¿qué contiene/,
   'No volver a preguntar el tipo dentro de Más opciones');
 });
