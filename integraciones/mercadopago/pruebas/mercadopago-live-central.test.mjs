@@ -57,7 +57,14 @@ function fixture(){
       if(o.status!=='awaiting_payment'||o.preference_id!==args[2])return{meta:{changes:0}};
       o.status='paid';o.payment_id=args[0];return{meta:{changes:1}};
      }
-     if(sql.includes("INSERT INTO payment_reviews")){review.state=review.state==='revoked'?'revoked':sql.includes("VALUES(?,'revoked'")?'revoked':'verified';return{meta:{changes:1}}}
+     if(sql.includes("INSERT INTO payment_reviews")){
+      if(sql.includes("SELECT id,'verified'")&&
+         (o.status!=='paid'||String(o.payment_id)!==String(args[1])))
+       return {meta:{changes:0}};
+      review.state=review.state==='revoked'?'revoked':
+       sql.includes("VALUES(?,'revoked'")?'revoked':'verified';
+      return{meta:{changes:1}};
+     }
      return {meta:{changes:1}};
     }
    }},
