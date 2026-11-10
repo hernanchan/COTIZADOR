@@ -104,16 +104,15 @@ test('ZIP personal LIVE: descarga TUS verificada desde D1, no acepta cookie comp
   objectKey:'v2/'+WEB+'/'+UUID+'.pdf',receiptId:'DOC-'+UUID,
   bytes:bytes.length,sha256:hash
  });
- const request=documentReq();
- const r=await descargarUniversalPersonal(request,env,{
+ const r=await descargarUniversalPersonal(documentReq(),env,{
   authorized:true,lookup:async()=>d,readTUS:async()=>bytes,subtle:webcrypto.subtle});
  assert.equal(r.status,200,await r.clone().text());
  assert.deepEqual(new Uint8Array(await r.arrayBuffer()),bytes);
- const other=await descargarUniversalPersonal(request,env,{
+ const other=await descargarUniversalPersonal(documentReq(),env,{
   authorized:true,lookup:async()=>d,readTUS:async()=>new Uint8Array(bytes.length),
   subtle:webcrypto.subtle});
  assert.equal(other.status,409);
- const noAuth=await descargarUniversalPersonal(request,env,{
+ const noAuth=await descargarUniversalPersonal(documentReq(),env,{
   authorized:false,lookup:async()=>d,readTUS:async()=>bytes,
   subtle:webcrypto.subtle});
  assert.equal(noAuth.status,403);
