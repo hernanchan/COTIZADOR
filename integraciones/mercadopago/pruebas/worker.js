@@ -4958,6 +4958,10 @@ export default {
     const {listarR2PagadosRevision}=await import("./r2-prepago-revision-central.mjs");
     return await listarR2PagadosRevision(req,env,{authorized:true});
    }
+   if(url.pathname==="/admin/api/central/live-recepcion"){
+    const {listarRecepcionUniversalLive}=await import('./central-recepcion-live.mjs');
+    return listarRecepcionUniversalLive(req,env,{authorized:tokenOK(req,env)});
+   }
    if(url.pathname==="/admin/api/orders"&&req.method==="GET"){
     if(!tokenOK(req,env))return json({error:"No autorizado"},401);
     await ensurePaymentReviews(env);
