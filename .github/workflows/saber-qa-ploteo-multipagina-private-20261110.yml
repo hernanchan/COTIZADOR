@@ -28,12 +28,13 @@ jobs:
         run: |
           set -euo pipefail
           npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.25.12
-          node --test tests/ploteo-grande-visual-limitado.test.mjs tests/ploteo-deteccion-automatica-sin-opcion-cad.test.mjs
+          node --test tests/ploteo-grande-visual-limitado.test.mjs tests/ploteo-deteccion-automatica-sin-opcion-cad.test.mjs tests/ploteo-letras-contorno-cad-general.test.mjs integraciones/autocotizador/recepcion/discriminar-plano-denso.test.mjs
           cd integraciones/autocotizador/recepcion
           npm install --no-audit --no-fund
           npm run build:unificado
           node --check dist/saber-documentos-cotizador-fase4.mjs
           grep -Fq 'VISUAL_PDFJS_LIMITADO' dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq 'cad_contornos_vectoriales_sin_relleno' dist/saber-documentos-cotizador-fase4.mjs
           grep -Fq 'No pudimos identificar' dist/saber-documentos-cotizador-fase4.mjs
           grep -Fq 'Recubierto 130 g' dist/saber-documentos-cotizador-fase4.mjs
           echo 'MULTIPAGE_PLOTTER_BUILD_TEST_GREEN'
@@ -117,6 +118,7 @@ jobs:
           test "$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$docs/prueba-v2/")" = 401
           test "$(curl -sS --max-time 30 -u "operador:$PASSWORD" -o "$tmp/new.js" -w '%{http_code}' "$docs/prueba-v2/carga-inteligente.js")" = 200
           grep -Fq 'VISUAL_PDFJS_LIMITADO' "$tmp/new.js"
+          grep -Fq 'cad_contornos_vectoriales_sin_relleno' "$tmp/new.js"
           grep -Fq 'Recubierto 130 g' "$tmp/new.js"
           curl -fsS --max-time 25 "$central/health" > "$tmp/health-after.json"
           jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$tmp/health-after.json" >/dev/null
