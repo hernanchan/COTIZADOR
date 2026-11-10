@@ -4727,6 +4727,11 @@ export default {
    const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
    return registrarFichaUniversalD1(req,env,{readSigned:leerFirmaInternaLive});
   }
+  if(url.pathname==='/internal/central/live/r2-stage'){
+   const {registrarR2LivePendiente}=await import('./r2-universal-live-stage-central.mjs');
+   const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
+   return registrarR2LivePendiente(req,env,{readSigned:leerFirmaInternaLive});
+  }
   if(url.pathname==='/internal/central/live/r2-reserve'){
    const {reservarR2Live}=await import('./r2-universal-live-reserve-central.mjs');
    const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
