@@ -63,6 +63,23 @@ export async function promoverPedidoUniversalD1(request,env,{
    ' WHERE web_order_id=? LIMIT 1').bind(p.webOrderId).first();
   if(used)return response({ok:false,error:'UNIVERSAL_PROMOCION_PEDIDO_REUTILIZADO'},409);
  }
+ if(live){
+  // Impedir pagar un presupuesto de una revisión que dejó de estar aprobada.
+  // Si cambia el tarifario entre cotizar y crear la orden, recalcular y aceptar otra vez.
+  let approved;
+  try{approved=await db.prepare(
+   'SELECT approved_revision,approved_json FROM central_pricing_admin_head WHERE id=1'
+  ).first()}catch{return response({ok:false,error:'LIVE_ORDER_TARIFARIO_INDISPONIBLE'},503)}
+  if(!approved?.approved_json||!Number.isSafeInteger(approved.approved_revision)||
+     approved.approved_revision<1)
+   return response({ok:false,error:'LIVE_ORDER_TARIFARIO_NO_APROBADO'},409);
+  const current='d1-approved-revision-'+approved.approved_revision;
+  const saved=await db.prepare(
+   'SELECT price_revision FROM central_r2_universal_drafts WHERE web_order_id=? LIMIT 1'
+  ).bind(p.webOrderId).first();
+  if(!saved||saved.price_revision!==current)
+   return response({ok:false,error:'LIVE_ORDER_PRECIO_CAMBIO'},409);
+ }
  const d=await db.prepare('SELECT web_order_id,draft_id,quote_hash,price_revision,'+
   'total_ars,file_count,armados_json,state FROM central_r2_universal_drafts '+
   'WHERE web_order_id=? LIMIT 1').bind(p.webOrderId).first();
