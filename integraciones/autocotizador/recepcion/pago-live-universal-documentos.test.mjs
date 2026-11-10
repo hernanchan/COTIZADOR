@@ -4,7 +4,7 @@ import {pagoLiveUniversalDocumentos} from './pago-live-universal-documentos.mjs'
 const ORDER='123e4567-e89b-42d3-a456-426614174000';
 const WEB='WEB-ENSAYO-'+'A'.repeat(32);
 const BASE='https://pedidos.libreriasaber.com.ar/api/pedido/mp-live';
-const mockRequest=(action='start',origin=BASE)=>new Request(BASE,{
+const mockRequest=(action='start',origin=new URL(BASE).origin)=>new Request(BASE,{
  method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},
  body:JSON.stringify({action,webOrderId:WEB,commercialOrderId:ORDER})
 });
