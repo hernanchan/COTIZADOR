@@ -119,7 +119,15 @@ export async function checkoutMPLiveCentral(request,env,{
  // Un gate R2 aislado no garantiza que se pueda reservar capacidad
  // ni registrar el original. No cobrar si falta alguna compuerta de Central.
  const r2Present=transports.some(row=>row.transport==='r2');
+ const tusPresent=transports.some(row=>row.transport==='tus');
  const GO='GO_COMERCIAL_CONFIRMADO';
+ // También debe existir recepción TUS pospago: de otro modo una orden
+ // TUS-only podría cobrarse sin posibilidad de registrar los originales.
+ if(tusPresent&&[
+   'CENTRAL_LIVE_TUS_GATE',
+   'CENTRAL_LIVE_POSTPAY_GATE'
+  ].some(key=>env?.[key]!==GO))
+  return reply({ok:false,error:'MP_LIVE_TUS_NO_DISPONIBLE'},503);
  if(r2Present&&[
     'CENTRAL_LIVE_R2_GATE',
     'CENTRAL_LIVE_R2_QUOTA_GATE',
