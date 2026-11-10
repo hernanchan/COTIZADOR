@@ -5,6 +5,7 @@ import {opcionesTipoPloteo,elegirTipoPloteo} from '../integraciones/autocotizado
 import {cotizarCargaUnica} from '../integraciones/autocotizador/recepcion/cotizar-carga-unica.mjs';
 const src=readFileSync(new URL('../integraciones/autocotizador/recepcion/carga-unica-cliente.mjs',import.meta.url),'utf8');
 const prices=JSON.parse(readFileSync(new URL('../precios-web.json',import.meta.url),'utf8'));
+const cotizar=e=>cotizarCargaUnica({archivos:[Object.fromEntries(Object.entries(e).filter(([key])=>!['clasificacionAutomatica','tipoPloteoElegidoPorCliente'].includes(key)))],precios:prices});
 function ui(e){
  const begin=src.indexOf('    const eleccion=opcionesTipoPloteo(elegidas,e.seleccion);');
  const end=src.indexOf("     principal.append(bloque);\n    }",begin);
@@ -37,7 +38,7 @@ const documento=modo=>({
 });
 test('un póster visualmente detectado NO ofrece botón CAD ni modifica su tarifa',()=>{
  const e=documento('poster');
- const antes=cotizarCargaUnica({archivos:[e],precios:prices});
+ const antes=cotizar(e);
  assert.equal(antes.plan[0].destino,'ploteos');
  const result=ui(e);
  assert.equal(result.all.filter(x=>x.tag==='button').length,0);
@@ -47,7 +48,7 @@ test('un póster visualmente detectado NO ofrece botón CAD ni modifica su tarif
  assert.match(review.textContent,/Solicitar revisión/);
  assert.match(new URL(review.href).searchParams.get('text'),/El sistema detectó PLENO/);
  assert.equal(e.paginas[0].modo,'poster');
- assert.equal(cotizarCargaUnica({archivos:[e],precios:prices}).total,antes.total);
+ assert.equal(cotizar(e).total,antes.total);
 });
 test('un CAD detectado tampoco ofrece pleno: conserva cotización CAD automática',()=>{
  const e=documento('cad'),r=ui(e);
@@ -58,7 +59,7 @@ test('un CAD detectado tampoco ofrece pleno: conserva cotización CAD automátic
 test('si clasificación NO se pudo hacer, pregunta CAD/pleno y no inventa detección',()=>{
  const e=documento('sin-clasificar');
  e.clasificacionAutomatica=false;
- assert.equal(cotizarCargaUnica({archivos:[e],precios:prices}).estado,'INCOMPLETO');
+ assert.equal(cotizar(e).estado,'INCOMPLETO');
  const r=ui(e);
  const buttons=r.all.filter(x=>x.tag==='button');
  assert.deepEqual(buttons.map(b=>b.textContent),['CAD · Planos','PLENO · Póster']);
@@ -67,7 +68,7 @@ test('si clasificación NO se pudo hacer, pregunta CAD/pleno y no inventa detecc
  assert.equal(e.paginas[0].modo,'cad');
  assert.equal(e.tipoPloteoElegidoPorCliente,true);
  assert.equal(r.changes,1);
- assert.equal(cotizarCargaUnica({archivos:[e],precios:prices}).estado,'PRELIMINAR');
+ assert.equal(cotizar(e).estado,'PRELIMINAR');
 });
 test('clasificación por páginas mixta verificada no permite forzar un tipo barato',()=>{
  const e=documento('poster');
