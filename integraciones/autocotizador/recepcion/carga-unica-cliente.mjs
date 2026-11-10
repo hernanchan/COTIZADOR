@@ -1,6 +1,6 @@
 import {leerMedidasPloteo,requiereClasificacionVisualPloteo} from './medidas-local-pdf.mjs';
 import {clasificarDestino} from './destino-impresion.mjs';
-import {opcionesTipoPloteo,elegirTipoPloteo} from './eleccion-ploteo-cad-pleno.mjs';
+import {opcionesTipoPloteo} from './eleccion-ploteo-cad-pleno.mjs';
 import {prepararBorradorPedido} from './preparar-borrador-pedido.mjs';
 import {componerCarritoPreliminar} from './componer-carrito-preliminar.mjs';
 import {seleccionarPaginas} from './seleccionar-paginas.mjs';
@@ -517,35 +517,16 @@ function render(){
       revisar.textContent='¿No coincide? Solicitar revisión';
       bloque.append(revisar);
      }else{
-      bloque.append(texto('p','No se pudo determinar el tipo con seguridad. ¿Qué tipo de ploteo necesitás?'));
-     const opciones=document.createElement('div');
-     opciones.className='eleccion-plotter-opciones';
-     for(const [v,titulo,descripcion] of [
-      ['cad','CAD · Planos','Líneas y dibujos técnicos, sin fondos plenos'],
-      ['poster','PLENO · Póster','Fotografías, imágenes o fondos de color']
-     ]){
-      const btn=document.createElement('button');
-      btn.type='button';
-      btn.className='eleccion-plotter-boton'+(eleccion.tipo===v?' seleccionada':'');
-      btn.setAttribute('aria-pressed',String(eleccion.tipo===v));
-      btn.textContent=titulo;
-      btn.title=descripcion;
-      btn.onclick=()=>{
-       elegirTipoPloteo(e.paginas,e.seleccion,v);
-       e.tipoPloteoElegidoPorCliente=true;
-       cambio();
-      };
-      opciones.append(btn);
+      bloque.append(texto('p','No pudimos identificar automáticamente si este PDF es CAD o Pleno. Solicitá revisión para presupuestarlo.'));
+      const consultaManual=document.createElement('a');
+      consultaManual.className='consulta-clasificacion-ploteo';
+      consultaManual.href='https://wa.me/'+WHATSAPP_CONSULTAS_SABER+'?text='+
+       encodeURIComponent('Hola, Librería Saber. Necesito revisar la clasificación del PDF «'+e.name+'» para cotizar un ploteo.');
+      consultaManual.target='_blank';consultaManual.rel='noopener noreferrer';
+      consultaManual.textContent='Solicitar revisión del PDF';
+      bloque.append(consultaManual);
      }
-     bloque.append(opciones);
-     if(eleccion.confirmado){
-      bloque.append(texto('small',e.tipoPloteoElegidoPorCliente?
-       'Elegiste '+(eleccion.tipo==='cad'?'CAD':'PLENO')+'. Se calculará ese precio.':
-       'Sugerencia del análisis automático: '+
-       (eleccion.tipo==='cad'?'CAD':'PLENO')+'. Podés cambiarla.'));
-     }else bloque.append(texto('small','Seleccioná CAD o PLENO para completar el presupuesto. El original se revisará antes de imprimir.'));
-     }
-     if(eleccion.confirmado){
+     if(clasificacionConfirmada){
       const papel=valor('Papel para ploteo',[
        ['obra80','Obra 80 g'],['recubierto','Recubierto 130 g']
       ],e.papelPoster,v=>{e.papelPoster=v;cambio()});
