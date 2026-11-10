@@ -8,7 +8,7 @@
 import {R2_BIG_LIMITS} from './r2-pdf-grandes-privado.mjs';
 const BASE='/prueba-v2/api/ensayo-r2';
 const pattern=/^WEB-[A-Za-z0-9_-]{5,80}$/;
-function keyFor(orderId,m){return 'saber-r2-test-v1:'+orderId+':'+m.fileId+':'+m.sha256+':'+m.bytes}
+function keyFor(orderId,m,mode){return (mode==='live'?'saber-r2-live-v1:':'saber-r2-test-v1:')+orderId+':'+m.fileId+':'+m.sha256+':'+m.bytes}
 function bytesFor(total,partNo,partSize){return Math.min(partSize,total-(partNo-1)*partSize)}
 function safeRead(storage,key){
  try{
@@ -32,8 +32,8 @@ function validateSession(s,m){
   throw Error('R2_SESION_NO_CONFIABLE');
  return s;
 }
-async function post(fetcher,route,data,signal){
- const r=await fetcher(BASE+route,{method:'POST',credentials:'same-origin',
+async function post(fetcher,route,data,signal,base=BASE){
+ const r=await fetcher(base+route,{method:'POST',credentials:'same-origin',
   headers:{'Content-Type':'application/json'},
   body:JSON.stringify(data),signal,redirect:'error'});
  const json=await r.json().catch(()=>null);
@@ -50,7 +50,8 @@ export async function enviarArchivoR2Grande({
  file,orderId,meta,fetcher=fetch,
  storage=typeof sessionStorage==='undefined'?null:sessionStorage,
  onProgress=()=>{},signal,retries=2,concurrency=3,
- requireCentralStaging=false
+ requireCentralStaging=false,mode='sandbox',
+ origin=typeof location==='undefined'?null:location.origin
 }={}){
  if(!pattern.test(orderId||'')||!file||typeof file.slice!=='function'||
   !Number.isSafeInteger(file.size)||!meta||meta.bytes!==file.size||
@@ -60,13 +61,18 @@ export async function enviarArchivoR2Grande({
   !Number.isInteger(retries)||retries<0||retries>4||
   typeof onProgress!=='function'||typeof requireCentralStaging!=='boolean')
   throw Error('R2_ARCHIVO_NO_ADMITIDO');
- const key=keyFor(orderId,meta);
+ if(!['sandbox','live'].includes(mode)||
+    (mode==='live'&&(origin!=='https://pedidos.libreriasaber.com.ar'||
+      !requireCentralStaging||file.size>200*1024*1024)))
+  throw Error('R2_LIVE_FLUJO_NO_AUTORIZADO');
+ const base=mode==='live'?'/api/pedido/live/r2':BASE;
+ const key=keyFor(orderId,meta,mode);
  let state=safeRead(storage,key);
  if(!state&&requireCentralStaging){
   // La pestaña puede haber perdido sessionStorage o el proof haber vencido.
   // Consultar D1/R2 ANTES de reservar otra cuota o iniciar otro multipart.
   onProgress({phase:'recuperacion-servidor',percent:0});
-  const resume=await post(fetcher,'/recuperar',{orderId,meta},signal);
+  const resume=await post(fetcher,'/recuperar',{orderId,meta},signal,base);
   if(resume.state==='stored_and_staged'&&resume.alreadyStored===true){
    const r=resume.result;
    if(r?.sha256Verificado!==true||r?.sha256!==meta.sha256||
@@ -87,7 +93,9 @@ export async function enviarArchivoR2Grande({
  }
  if(!state){
   onProgress({phase:'autorizacion',percent:0});
-  const started=await post(fetcher,'/iniciar',{orderId,meta},signal);
+  const started=await post(fetcher,'/iniciar',{orderId,meta},signal,base);
+  if(mode==='live'&&(started.quotaReserved!==true||started.storageReady!==false))
+   throw Error('R2_LIVE_CUPO_NO_CONFIRMADO');
   const session=validateSession(started.session,meta);
   state={v:1,session,parts:{}};
   store(storage,key,state);
@@ -116,7 +124,7 @@ export async function enviarArchivoR2Grande({
    let success=false,lastError=null;
    for(let attempt=0;attempt<=retries&&!success;attempt++){
     try{
-     const r=await fetcher(BASE+'/parte?n='+n,{method:'PUT',credentials:'same-origin',
+     const r=await fetcher(base+'/parte?n='+n,{method:'PUT',credentials:'same-origin',
       headers:{'X-Saber-R2-Proof':session.proof},
       body:chunk,signal,redirect:'error'});
      const data=await r.json().catch(()=>null);
@@ -143,7 +151,7 @@ export async function enviarArchivoR2Grande({
  onProgress({phase:'verificacion-almacenamiento',bytesUploaded:file.size,
   totalBytes:file.size,percent:100});
  if(state.completed!==true){
-  const finalized=await post(fetcher,'/completar',{proof:session.proof,uploadedParts},signal);
+  const finalized=await post(fetcher,'/completar',{proof:session.proof,uploadedParts},signal,base);
   if(finalized.result?.storageReady!==true||
    finalized.result.sha256Verificado!==false||
    finalized.result.paymentAuthorized!==false||
@@ -156,7 +164,7 @@ export async function enviarArchivoR2Grande({
  }
  onProgress({phase:'verificando-integridad',bytesUploaded:file.size,
   totalBytes:file.size,percent:100});
- const verified=await post(fetcher,'/verificar',{proof:session.proof},signal);
+ const verified=await post(fetcher,'/verificar',{proof:session.proof},signal,base);
  if(verified.result?.sha256Verificado!==true||
   verified.result?.contenidoPdfVerificado!==false||
   verified.result?.paymentAuthorized!==false||
