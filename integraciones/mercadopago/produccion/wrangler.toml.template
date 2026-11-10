@@ -6,7 +6,7 @@ main = "../pruebas/worker.js"
 compatibility_date = "2026-10-17"
 workers_dev = false
 preview_urls = false
-keep_vars = false
+keep_vars = true  # conservar CENTRAL_BRIDGE_KEY provisionada de forma segura
 
 [vars]
 SABER_ENTORNO = "preparacion"
