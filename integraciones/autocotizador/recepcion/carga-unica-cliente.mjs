@@ -59,7 +59,7 @@ function alertasRecepcionPDF(){
   if(!(file instanceof File))continue;
   const transporte=decidirTransportePDF(file.size);
   if(transporte.ruta==='r2'){
-   if(R2_UNIVERSAL_ENSAYO)continue;
+   if(typeof R2_UNIVERSAL_ENSAYO!=='undefined'&&R2_UNIVERSAL_ENSAYO)continue;
    alertas.set(e,'El PDF «'+file.name+'» pesa '+tamanoPdfMiB(file)+
     '. El envío universal de PDF grandes está temporalmente deshabilitado. '+
     'El presupuesto mantiene su tipo y precio; consultanos antes de enviar o pagar.');
