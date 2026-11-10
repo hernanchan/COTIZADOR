@@ -1,0 +1,54 @@
+name: Saber universal - smoke real portal privado (SOLO LECTURA)
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-universal-smoke-privado-readonly.yml]
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Abrir cotizador mixto real con Basic sin pedidos ni pagos
+        env:
+          PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$PASSWORD"
+          root='https://saber-documentos-pruebas.libreriasaber.workers.dev'
+          central='https://saber-pagos-pruebas.libreriasaber.workers.dev'
+          dir=$(mktemp -d)
+          trap 'rm -rf "$dir"' EXIT
+          curl -fsS --max-time 30 -u "operador:$PASSWORD" "$root/prueba-v2/" > "$dir/portal.html"
+          grep -Fq 'UNIVERSAL_R2_UI_ENABLED=true' "$dir/portal.html" ||
+            { echo 'UI_UNIVERSAL_NOT_ACTIVE';exit 1; }
+          grep -Fq 'carga-inteligente?universal=1' "$dir/portal.html" ||
+            { echo 'IFRAME_UNIVERSAL_NOT_ACTIVE';exit 1; }
+          echo 'REAL_PRIVATE_UNIVERSAL_PORTAL_AUTHENTICATED_HTTP_200'
+          code=$(curl -sS --max-time 25 -u "operador:$PASSWORD"             -o "$dir/carga.html" -w '%{http_code}' "$root/prueba-v2/carga-inteligente?universal=1")
+          test "$code" = 200 || { echo "UNIVERSAL_ANALYZER_HTTP_$code";exit 1; }
+          grep -Fq "R2_UNIVERSAL_ENSAYO" "$dir/carga.html" ||
+            { echo 'R2_PDF_LARGE_ANALYZER_NOT_FOUND';exit 1; }
+          echo 'REAL_PRIVATE_MULTI_PDF_ANALYZER_READY'
+          code=$(curl -sS --max-time 25 -u "operador:$PASSWORD"             -o "$dir/flow.mjs" -w '%{http_code}' "$root/prueba-v2/flujo-universal.mjs")
+          test "$code" = 200 || { echo "UNIVERSAL_JS_HTTP_$code";exit 1; }
+          test "$(wc -c < "$dir/flow.mjs")" -gt 1000
+          grep -Fq 'ensayo-r2-borrador-universal' "$dir/flow.mjs" ||
+            { echo 'UNIVERSAL_PAYMENT_FLOW_MISSING';exit 1; }
+          echo 'REAL_PRIVATE_UNIVERSAL_JS_AVAILABLE'
+          code=$(curl -sS --max-time 25 -u "operador:$PASSWORD"             -o "$dir/zip.html" -w '%{http_code}' "$root/prueba-v2/universal-paquete")
+          test "$code" = 200 || { echo "UNIVERSAL_ZIP_HTTP_$code";exit 1; }
+          grep -Fq 'PREPRENSA PENDIENTE' "$dir/zip.html" ||
+            { echo 'UNIVERSAL_ZIP_SCREEN_MISSING';exit 1; }
+          echo 'REAL_PRIVATE_ZIP_SCREEN_AVAILABLE'
+          test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$root/prueba-v2/")" = 401
+          test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$root/prueba-v2/universal-paquete")" = 401
+          test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$central/admin/api/orders")" = 401
+          curl -fsS --max-time 20 "$central/health" > "$dir/health"
+          jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$dir/health" >/dev/null
+          echo 'REAL_PRIVATE_SMOKE_PASS_NO_ORDERS_NO_UPLOAD_NO_MP_NO_DELETE_NO_PUBLIC'
