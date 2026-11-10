@@ -33,3 +33,12 @@
 - Mismo pedido sintético avanzó a `en_preparacion` con ETA manual persistida en D1, verificados GET pedido y GET tablero: [QA operacional](https://github.com/hernanchan/COTIZADOR/actions/runs/42820358898).
 - **No se verificó todavía** descarga del ZIP ni transición `listo -> entregado` ni borrado R2. El PDF sintético se conserva hasta asegurar el control de eliminación.
 - Siguiente dependencia externa: identificar Cloudflare Pages público, credenciales Cloudflare con permisos mínimos, rollback; sin publicar/activar MP real antes de controles.
+
+## Actualización 10/11 — acceso Cloudflare Pages y D1 confirmado
+- Nuevo `SABER_CF_EDITOR_TOKEN`: **D1 SELECT autorizado** ([GitHub Actions](https://github.com/hernanchan/COTIZADOR/actions/runs/42824963801)).
+- API Pages GET **HTTP 200** con token editor ([GitHub Actions](https://github.com/hernanchan/COTIZADOR/actions/runs/42825117959)); error anterior HTTP 400 provenía de `per_page` inválido, no de credenciales.
+- Proyecto: `libreriasaber`; dominio público y www asociados; Pages GitHub `COTIZADOR`, rama producción `main`, salida `vidriera`.
+- Baseline producción confirmado mediante GET del proyecto ([GitHub Actions](https://github.com/hernanchan/COTIZADOR/actions/runs/42825518809)): deployment canónico `978d582b-b1a4-4943-a5ff-e1bc0fa928c3`, commit `864eb12272f6b8dfb2ca7eaee1be5326632e7bf3`. Anotar como punto de restauración; **no se ejecutó rollback**.
+- La rama de integración despliega automáticamente en `preview`, no en producción. El público aún sirve `/cotizar` heredado.
+- Bloqueo comercial real aún abierto: `vidriera/portal-comercial.json` sigue `enabled:false` / `NO_GO`; `vidriera/cotizar.html` solo redirige a sandbox en preview y exige endpoint público `pedidos.libreriasaber.com.ar/cotizar` para producción. La existencia y operatividad de dicho endpoint **no están comprobadas**. El módulo `integraciones/publicacion/mercadopago-live-preflight.mjs` declara expresamente ser validador puro, **no pasarela ni endpoint** de pago real. Por tanto, acceso a Pages no autoriza ni valida el lanzamiento.
+- Próximos controles obligatorios: inspección comercial de preview, confirmar backend de cobro REAL y seguridad, definir alcance mínimo de release sin fusionar rama gigante, efectuar publicación acotada + smoke con rollback a baseline.
