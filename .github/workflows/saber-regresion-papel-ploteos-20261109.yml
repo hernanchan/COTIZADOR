@@ -1,0 +1,37 @@
+name: Saber - regresion papeles CAD pleno 80 130
+on:
+  push:
+    branches:
+      - integracion/tus-pedido-privado-20261101
+    paths:
+      - '.github/workflows/saber-regresion-papel-ploteos-20261109.yml'
+      - 'integraciones/autocotizador/pruebas/cotizar-ploteos-rapido.mjs'
+      - 'integraciones/autocotizador/pruebas/ploteo-papel-cad-recubierto.test.mjs'
+      - 'integraciones/autocotizador/recepcion/carga-unica-cliente.mjs'
+      - 'integraciones/autocotizador/recepcion/ploteos-rapido-cliente.mjs'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test de tarifas y nombre de archivo
+        run: node --test integraciones/autocotizador/pruebas/ploteo-papel-cad-recubierto.test.mjs
+      - name: Compilar interfaces privadas sin desplegar
+        working-directory: integraciones/autocotizador/recepcion
+        run: |
+          npm install --no-audit --no-fund
+          npm run build:intake-client
+          npm run build:plot-client
+      - name: Revisar opcion de papeles en interfaz compilada
+        working-directory: integraciones/autocotizador/recepcion
+        run: |
+          grep -Fq 'Recubierto 130 g' carga-unica-cliente.txt
+          grep -Fq 'Recubierto 130 g' ploteos-rapido-cliente.txt
+          echo 'PAPEL_80_130_PRESENTE'
