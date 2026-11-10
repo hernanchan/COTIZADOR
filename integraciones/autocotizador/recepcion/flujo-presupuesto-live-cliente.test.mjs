@@ -6,7 +6,7 @@ const webOrderId='WEB-ENSAYO-'+'A'.repeat(32);
 const draftId='123e4567-e89b-42d3-a456-426614174000';
 const commercialOrderId='123e4567-e89b-42d3-a456-426614174001';
 const file={name:'apunte.pdf',size:15,slice:()=>({arrayBuffer:async()=>new TextEncoder().encode('%PDF-').buffer})};
-const archivos=[{nombre:'apunte.pdf',paginas:[{numero:1,anchoCm:21,altoCm:29.7}]}];
+const archivos=[{nombre:'apunte.pdf',modo:'bn',paginas:[{numero:1,anchoCm:21,altoCm:29.7}]}];
 const sha='f'.repeat(64),quoteHash='a'.repeat(64);
 const draft={ok:true,webOrderId,fileCount:1,draftId,quoteHash,totalArs:5000,
  paymentAuthorized:false,checkoutEnabled:false};
