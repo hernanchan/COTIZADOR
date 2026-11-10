@@ -15,8 +15,11 @@ const base='https://saber-documentos-pruebas.libreriasaber.workers.dev';
 const pass=process.env.SABER_OPERATOR_PASSWORD;
 assert.ok(pass,'Falta secreto de operador para QA');
 const tmp=await mkdtemp(path.join(tmpdir(),'saber-qa-noenvio-'));
+const watchdog=setTimeout(()=>{console.error('QA_WATCHDOG_NAVEGADOR_140S');process.exit(124)},140000);
+watchdog.unref();
 let browser;
 try{
+ console.log('QA_ETAPA_1_GENERAR_PDF_500P');
  const doc=await PDFDocument.create();
  const font=await doc.embedFont(StandardFonts.Helvetica);
  for(let i=0;i<500;i++){
@@ -24,6 +27,7 @@ try{
    p.drawText('APUNTE A4 - PAGINA '+(i+1),{x:45,y:798,size:11,font});
  }
  const original=Buffer.from(await doc.save({useObjectStreams:false}));
+ console.log('QA_ETAPA_2_PDF_500P_LISTO');
  const marker=Buffer.from('startxref','ascii');
  const ix=original.lastIndexOf(marker);
  assert.ok(ix>0);
@@ -35,8 +39,10 @@ try{
  assert.equal(file.length,target);
  const filename=path.join(tmp,'APUNTE_500PAG_A4_100MiB.pdf');
  await writeFile(filename,file);
+ console.log('QA_ETAPA_3_PDF_100MIB_ESCRITO');
  console.log('BROWSER_QA_FIXTURE_A4_500_PAGES_100MiB_VALID_STRUCTURE');
  const chrome=process.env.CHROME_PATH||'/usr/bin/google-chrome';
+ console.log('QA_ETAPA_4_INICIAR_CHROME');
  browser=await chromium.launch({headless:true,executablePath:chrome,args:['--no-sandbox','--disable-dev-shm-usage']});
  const context=await browser.newContext({
   httpCredentials:{username:'operador',password:pass},
@@ -44,6 +50,8 @@ try{
   acceptDownloads:false
  });
  const page=await context.newPage();
+ page.on('pageerror',e=>console.error('QA_BROWSER_PAGEERROR='+String(e.message).slice(0,160)));
+ page.on('crash',()=>console.error('QA_BROWSER_CRASH'));
  page.setDefaultTimeout(45000);
  const blocked=[];
  page.on('request',req=>{
@@ -53,13 +61,20 @@ try{
    blocked.push(req.method()+' '+new URL(url).pathname);
   }
  });
- await page.goto(base+'/prueba-v2/',{waitUntil:'domcontentloaded',timeout:45000});
+ console.log('QA_ETAPA_5_ABRIR_PORTAL');
+ await page.goto(base+'/prueba-v2/',{waitUntil:'domcontentloaded',timeout:30000});
+ console.log('QA_ETAPA_6_PORTAL_CARGADO');
  const iframe=page.frameLocator('#smart');
  await iframe.locator('input[name="modoImpresionLote"][value="individual"]').check();
- await iframe.locator('#archivos').setInputFiles(filename);
+ console.log('QA_ETAPA_7_SELECCIONAR_PDF');
+ await iframe.locator('#archivos').setInputFiles(filename,{timeout:60000});
+ console.log('QA_ETAPA_8_ARCHIVO_SELECCIONADO');
  // El archivo se analiza LOCALMENTE. No hacer clic en «Enviar mi pedido».
- await iframe.locator('#lista .archivo').first().waitFor({state:'visible',timeout:75000});
- await iframe.locator('#presupuesto').getByText(/TOTAL PRELIMINAR/i).waitFor({state:'visible',timeout:120000});
+ console.log('QA_ETAPA_9_ESPERAR_METADATOS');
+ await iframe.locator('#lista .archivo').first().waitFor({state:'visible',timeout:60000});
+ console.log('QA_ETAPA_10_ESPERAR_PRECIO');
+ await iframe.locator('#presupuesto').getByText(/TOTAL PRELIMINAR/i).waitFor({state:'visible',timeout:65000});
+ console.log('QA_ETAPA_11_PRECIO_LISTO');
  const details=await iframe.locator('#lista .resumen-archivo').first().innerText();
  const quote=await iframe.locator('#presupuesto').innerText();
  console.log('BROWSER_QA_CLASSIFICATION='+details.replace(/\s+/g,' ').slice(0,190));
@@ -87,7 +102,7 @@ try{
   });
   iframe.contentWindow.postMessage({type:'SABER_SMART_PREPARAR_ENVIO'},location.origin);
  });
- await page.waitForFunction(()=>window.__qaHandoff?.length>0,{timeout:30000});
+ await page.waitForFunction(()=>window.__qaHandoff?.length>0,null,{timeout:12000});
  const [msg]=await page.evaluate(()=>window.__qaHandoff);
  console.log('BROWSER_QA_HANDOFF='+JSON.stringify(msg));
  assert.equal(msg.type,'SABER_SMART_UNIVERSAL_PDF');
@@ -102,7 +117,7 @@ try{
  const width=await iframe.locator('body').evaluate(el=>({scroll:el.scrollWidth,client:el.clientWidth}));
  console.log('BROWSER_QA_MOBILE_WIDTH='+JSON.stringify(width));
  assert.ok(width.scroll<=width.client+16,'Desborde horizontal en cotizador móvil');
- await page.screenshot({path:path.join(tmp,'evidencia-cotizador-movil.png'),fullPage:true});
+ // No generar capturas de archivos locales de prueba ni gastar memoria extra.
  console.log('BROWSER_QA_OK_A4_500PAGES_100MIB_R2_UNIVERSAL_NO_UPLOAD_NO_PAYMENT');
 }finally{
  if(browser)await browser.close().catch(()=>{});
