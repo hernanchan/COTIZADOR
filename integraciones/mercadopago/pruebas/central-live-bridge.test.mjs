@@ -131,3 +131,22 @@ test('TUS LIVE HMAC firma gate y recibo de la orden, sin mezclar rutas ni campos
  assert.equal((await read(await make('/internal/central/live/tus-received',proof),
   {...env,MP_LIVE_GATE:'NO_GO'})).status,503);
 });
+
+test('paquete LIVE manifiesto y archivo usan rutas HMAC propias y no abren Sandbox',async()=>{
+ const manifest={schema:'saber-central-r2-universal-package-manifest-v1',
+  webOrderId:WEB};
+ const file={schema:'saber-central-r2-universal-package-file-v1',
+  webOrderId:WEB,fileId:'pdf_0'};
+ assert.equal((await read(await make('/internal/central/live/package-manifest',manifest))).error,undefined);
+ assert.equal((await read(await make('/internal/central/live/package-file',file))).error,undefined);
+ for(const [path,payload] of [
+  ['/internal/central/live/package-file',manifest],
+  ['/internal/central/live/package-manifest',file],
+  ['/internal/central/live/package-manifest',{...manifest,productionAuthorized:true}],
+  ['/internal/central/live/package-file',{...file,fileId:'../test'}],
+  ['/internal/central/live/package-file',{...file,webOrderId:'WEB-ENSAYO-'+'B'.repeat(31)}]
+ ])assert.equal((await read(await make(path,payload))).status,422,path);
+ assert.equal((await read(await make('/internal/central/r2-universal-package-manifest',manifest))).status,403);
+ assert.equal((await read(await make('/internal/central/live/package-manifest',manifest),
+  {...env,CENTRAL_LIVE_BRIDGE_ENABLED:'NO_GO'})).status,503);
+});
