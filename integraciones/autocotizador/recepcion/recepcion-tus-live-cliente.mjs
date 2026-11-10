@@ -59,7 +59,7 @@ export async function enviarPDFsTUSPagadosLive({
  // Emparejar por SHA y consumir cada selección una sola vez.
  for(const f of selectedFiles){
   if(!f||typeof f.slice!=='function'||!Number.isSafeInteger(f.size)||
-     !/\\.pdf$/i.test(f.name||''))throw Error('LIVE_TUS_NO_ES_PDF');
+     !String(f.name||'').toLowerCase().endsWith('.pdf'))throw Error('LIVE_TUS_NO_ES_PDF');
   const header=new Uint8Array(await f.slice(0,5).arrayBuffer());
   if(String.fromCharCode(...header)!=='%PDF-')throw Error('LIVE_TUS_NO_ES_PDF');
   const hash=await hasher(f,{onProgress:p=>onProgress({phase:'hash',file:f.name,...p})});
