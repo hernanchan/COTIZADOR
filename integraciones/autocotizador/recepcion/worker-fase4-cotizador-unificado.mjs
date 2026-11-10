@@ -71,6 +71,7 @@ import {prepararOrdenUniversalSinCheckout} from './r2-orden-universal-documentos
 import {iniciarLoteTUSUniversal,confirmarLoteTUSUniversal} from './tus-universal-worker.mjs';
 import {pagoSandboxUniversalDocumentos} from './r2-universal-checkout-documentos.mjs';
 import {pagoMPLiveComprador} from './mp-live-comprador.mjs';
+import {iniciarSesionCompradorLive,autorizadoCompradorLive,autorizadoOrdenLive,vinculoOrdenLive} from './sesion-comprador-live.mjs';
 import {guardarBorradorUniversalLive,crearOrdenUniversalLive} from './ordenes-universales-live-documentos.mjs';
 import {paginaRetornoLive} from './pagina-retorno-live.mjs';
 import {checkoutR2PrepaidSandboxDocumentos} from './r2-prepago-checkout-documentos.mjs';
@@ -2304,10 +2305,11 @@ export default {
     // Origen de producción, cookie de comprador vinculada y HMAC obligatorios.
     // Con compuerta cerrada: 503 sin consultar Central ni generar cobros.
     if(page==='/pedido/estado')return paginaRetornoLive(request,env);
+    if(page==='/api/pedido/live/sesion')return iniciarSesionCompradorLive(request,env);
     if(page==='/api/pedido/live/borrador'){
       if(env?.SABER_ENTORNO!=='produccion')
        return testResponse({ok:false,error:'LIVE_BORRADOR_CERRADO'},503);
-      const buyer=await autorizadoPedidoCliente(request,env);
+      const buyer=await autorizadoCompradorLive(request,env);
       const input=buyer&&request.method==='POST'?
        await request.clone().json().catch(()=>null):null;
       const created=await guardarBorradorUniversalLive(request,env,{authorized:buyer});
@@ -2316,7 +2318,7 @@ export default {
       if(!data||data.webOrderId!==input?.webOrderId||
          data.checkoutEnabled!==false||data.paymentAuthorized!==false)
        return testResponse({ok:false,error:'LIVE_BORRADOR_NO_VINCULADO'},502);
-      const cookie=await cookiePedidoClienteVinculado(request,env,data.webOrderId);
+      const cookie=await vinculoOrdenLive(request,env,data.webOrderId);
       if(!cookie)return testResponse({ok:false,error:'LIVE_SESION_NO_VINCULADA'},503);
       const headers=new Headers(created.headers);headers.append('Set-Cookie',cookie);
       return new Response(created.body,{status:created.status,headers});
@@ -2324,20 +2326,20 @@ export default {
     if(page==='/api/pedido/live/orden'){
       if(env?.SABER_ENTORNO!=='produccion')
        return testResponse({ok:false,error:'LIVE_ORDEN_CERRADA'},503);
-      const buyer=await autorizadoPedidoCliente(request,env);
+      const buyer=await autorizadoCompradorLive(request,env);
       const input=buyer&&request.method==='POST'?
        await request.clone().json().catch(()=>null):null;
-      const linked=buyer&&await autorizadoPedidoClienteVinculado(
+      const linked=buyer&&await autorizadoOrdenLive(
        request,env,input?.webOrderId);
       return crearOrdenUniversalLive(request,env,{authorized:linked});
     }
     if(page==='/api/pedido/live/checkout'){
       if(env?.SABER_ENTORNO!=='produccion')
        return testResponse({ok:false,error:'MP LIVE no habilitado'},503);
-      const buyer=await autorizadoPedidoCliente(request,env);
+      const buyer=await autorizadoCompradorLive(request,env);
       const payload=buyer&&request.method==='POST'?
        await request.clone().json().catch(()=>null):null;
-      const linked=buyer&&await autorizadoPedidoClienteVinculado(
+      const linked=buyer&&await autorizadoOrdenLive(
        request,env,payload?.webOrderId);
       return pagoMPLiveComprador(request,env,{authorized:linked});
     }
