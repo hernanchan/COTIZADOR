@@ -5032,6 +5032,10 @@ export default {
     const {listarR2PagadosRevision}=await import("./r2-prepago-revision-central.mjs");
     return await listarR2PagadosRevision(req,env,{authorized:true});
    }
+   if(url.pathname==="/admin/api/central/live-r2-manifest"){
+    const {manifiestoInspeccionR2Live}=await import('./r2-live-inspection-finalize.mjs');
+    return manifiestoInspeccionR2Live(req,env,{authorized:tokenOK(req,env)});
+   }
    if(url.pathname==="/admin/api/central/live-r2-inspection"){
     const {finalizarInspeccionR2Live}=await import('./r2-live-inspection-finalize.mjs');
     return finalizarInspeccionR2Live(req,env,{authorized:tokenOK(req,env)});
