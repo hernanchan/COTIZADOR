@@ -1,0 +1,90 @@
+name: Saber - clave HMAC interna LIVE sin cobros ni sitios publicos
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-live-internal-hmac-secure-20261110.yml]
+permissions:
+  contents: read
+  statuses: write
+concurrency:
+  group: saber-live-hmac-production-closed
+  cancel-in-progress: false
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Verificar ambos Workers producción aislados e instalar secreto HMAC único
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          umask 077
+          dir=$(mktemp -d)
+          trap 'rm -rf "$dir"' EXIT
+          base="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts"
+          auth="Authorization: Bearer $TOKEN"
+          for worker in saber-documentos-produccion saber-pagos-produccion;do
+            curl -fsS --max-time 35 -H "$auth" "$base/$worker/settings" > "$dir/$worker.json"
+            jq -e '.success==true and (.result.bindings|type=="array")' "$dir/$worker.json" >/dev/null
+            jq -e '.result.bindings|any(.name=="SABER_ENTORNO" and .type=="plain_text" and .text=="preparacion")' "$dir/$worker.json" >/dev/null
+            curl -fsS --max-time 35 -H "$auth" "$base/$worker/subdomain" > "$dir/$worker-subdomain.json"
+            jq -e '.success==true and .result.enabled==false and .result.previews_enabled==false' "$dir/$worker-subdomain.json" >/dev/null
+            if jq -e '.result.bindings|any(.name=="CENTRAL_BRIDGE_KEY")' "$dir/$worker.json" >/dev/null;then
+              echo "LIVE_HMAC_ALREADY_PRESENT_IN_$worker"
+              exit 1
+            fi
+          done
+          jq -e '.result.bindings|any(.name=="SABER_CENTRAL" and .type=="service" and .service=="saber-pagos-produccion")' "$dir/saber-documentos-produccion.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="DOCS_MP_LIVE_GATE" and .type=="plain_text" and .text=="NO_GO")' "$dir/saber-documentos-produccion.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="MP_LIVE_GATE" and .type=="plain_text" and .text=="NO_GO")' "$dir/saber-pagos-produccion.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="CENTRAL_DB_ENV" and .type=="plain_text" and .text=="produccion")' "$dir/saber-pagos-produccion.json" >/dev/null
+          bridge=$(openssl rand -hex 48)
+          echo "::add-mask::$bridge"
+          jq -n --arg secret "$bridge" '{name:"CENTRAL_BRIDGE_KEY",text:$secret,type:"secret_text"}' > "$dir/secret.json"
+          status=$(curl -sS --max-time 45 -o "$dir/write-doc.json" -w '%{http_code}' \
+            -X PUT -H "$auth" -H 'Content-Type: application/json' \
+            --data-binary "@$dir/secret.json" "$base/saber-documentos-produccion/secrets")
+          if [ "$status" != 200 ] && [ "$status" != 201 ];then
+            echo "LIVE_HMAC_DOCUMENTS_WRITE_HTTP=$status";exit 1
+          fi
+          jq -e '.success==true and .result.name=="CENTRAL_BRIDGE_KEY"' "$dir/write-doc.json" >/dev/null
+          status=$(curl -sS --max-time 45 -o "$dir/write-central.json" -w '%{http_code}' \
+            -X PUT -H "$auth" -H 'Content-Type: application/json' \
+            --data-binary "@$dir/secret.json" "$base/saber-pagos-produccion/secrets")
+          if [ "$status" != 200 ] && [ "$status" != 201 ];then
+            echo "LIVE_HMAC_CENTRAL_WRITE_HTTP=$status"
+            curl -sS --max-time 35 -X DELETE -H "$auth" \
+              "$base/saber-documentos-produccion/secrets/CENTRAL_BRIDGE_KEY" > "$dir/rollback.json" || true
+            echo 'LIVE_HMAC_ROLLBACK_DOCUMENTS_ATTEMPTED';exit 1
+          fi
+          jq -e '.success==true and .result.name=="CENTRAL_BRIDGE_KEY"' "$dir/write-central.json" >/dev/null
+          unset bridge
+          rm -f "$dir/secret.json"
+          for worker in saber-documentos-produccion saber-pagos-produccion;do
+            curl -fsS --max-time 35 -H "$auth" "$base/$worker/settings" > "$dir/check-$worker.json"
+            jq -e '.success==true and
+              (.result.bindings|any(.name=="CENTRAL_BRIDGE_KEY" and .type=="secret_text")) and
+              (.result.bindings|any(.name=="SABER_ENTORNO" and .type=="plain_text" and .text=="preparacion"))' "$dir/check-$worker.json" >/dev/null
+          done
+          echo 'LIVE_HMAC_SHARED_ON_BOTH_WORKERS_SECRET_NOT_EXPOSED'
+          echo 'LIVE_WORKERS_ISOLATED_GATES_NO_GO_NO_MP_LIVE_NO_PUBLICATION'
+      - name: Registrar verificación sin secretos
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        shell: bash
+        run: |
+          if [ "$RESULT" = success ];then state=success;else state=failure;fi
+          jq -n --arg state "$state" --arg context 'saber/live-bridge-key-safe' \
+             --arg description "Clave HMAC LIVE Workers aislados: $RESULT" \
+             --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+             '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/status.json >/dev/null
