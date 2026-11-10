@@ -47,3 +47,12 @@
 - URL verificada vía Pages API del despliegue de preview: `https://227c8e6d.libreriasaber.pages.dev`.
 - Smoke no autenticado GET portada/cotizador/JSON compuerta: HTTP 200 en los tres; el HTML de cotizador aún apunta al Worker sandbox y el JSON sigue en `NO_GO` ([CI](https://github.com/hernanchan/COTIZADOR/actions/runs/42826413107)).
 - Este smoke demuestra accesibilidad HTTP y compuerta cerrada; **no demuestra interacción móvil, fotos correctas, carrito funcional ni cobro en vivo**.
+
+## Incidencia PDF real «DCTO CABAÑAS POSE» — corrección privada (10/11)
+- Archivo inspeccionado LOCALMENTE sin enviarlo al repositorio ni a Cloudflare: 45.655.680 bytes = 43,54 MiB; tres páginas (47,003×31,001 cm; 45,923×31,001 cm; 45,923×31,001 cm), cada una con una imagen raster a página completa. Cobertura visual reducida: aprox. 84–87 %, clase **PÓSTER / PLENO**. El nombre no determina clasificación ni papel.
+- Causa: UI `carga-unica-cliente.mjs` omitía clasificación visual para PDF >40 MiB, salvo mosaicos estructurales de **una** página con ≥12 imágenes. Este PDF (3 páginas, una imagen por página, xref stream) quedaba en `sin-clasificar`.
+- Corrección limitada a navegador: fallback visual PDF.js solo para archivos >40 y ≤48 MiB y hasta 4 páginas, cuando no confirma la clasificación rápida por rangos. Si falta una clase segura, conserva revisión manual. No sube ni cobra por clasificar.
+- Nuevas pruebas + regresión compiladas: [CI](https://github.com/hernanchan/COTIZADOR/actions/runs/42829413421), 16 tests sin fallas.
+- Worker privado `saber-documentos-pruebas` actualizado con rollback configurado: baseline `cf043fba-56bc-4718-a5c0-163ab80c3c29`, versión nueva `b498f405-6305-431b-b633-916b008ff8be`; activo, acceso Basic y compuertas pagos reales comprobados: [CI](https://github.com/hernanchan/COTIZADOR/actions/runs/42829677182). Ninguna modificación a Pages público, main, MP ni R2.
+- Cotización D1 directa con las tres medidas y `modo=poster` (solo POST de presupuesto, **sin subir PDF ni crear pedido**): 80 g `$9.100`, 3 × `rollo42`; recubierto 130 g `$26.000`, 3 × `rec60`: [CI](https://github.com/hernanchan/COTIZADOR/actions/runs/42830119494).
+- **Pendiente de comprobación en navegador con archivo original**: que el comprador efectivamente vea PÓSTER/PLENO y ambos materiales/precios; aplicar recarga completa y volver a elegir PDF. No está validada todavía recepción de los 43,54 MiB tras pago ni publicación en producción.
