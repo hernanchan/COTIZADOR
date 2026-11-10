@@ -51,7 +51,7 @@ jobs:
             curl -fsS --max-time 25 -H "$auth" "$root/$w/deployments" > "$dir/$w-deploy"
             jq -e '.success==true and (.result.bindings|type=="array")' "$dir/$w-before" >/dev/null
             if [ "$w" = saber-pagos-pruebas ];then
-              expected='2e5d2d59-b707-44ea-9dd2-bd1051e9a5a9'
+              expected='0c12ce03-cbd9-4797-b6b1-1ab9f800aeaa'
               flags='["CENTRAL_R2_UNIVERSAL_DRAFT_ENABLED","CENTRAL_R2_UNIVERSAL_ORDER_ENABLED","CENTRAL_R2_UNIVERSAL_CHECKOUT_ENABLED","CENTRAL_R2_UNIVERSAL_POSTPAY_ENABLED","CENTRAL_R2_UNIVERSAL_TUS_ENABLED","CENTRAL_R2_UNIVERSAL_PACKAGE_ENABLED","CENTRAL_R2_UNIVERSAL_PREPRESS_ENABLED"]'
               required='["DB","CENTRAL_BRIDGE_KEY","MP_TEST_ACCESS_TOKEN","DEMO_ADMIN_KEY","SABER_DOCUMENTOS","SABER_R2_GRANDES","DOCS_SANDBOX_CHECKOUT_ENABLED"]'
               forbidden='["CENTRAL_R2_UNIVERSAL_PURGE_ENABLED","CENTRAL_R2_UNIVERSAL_PURGE_EXECUTE_ENABLED"]'
