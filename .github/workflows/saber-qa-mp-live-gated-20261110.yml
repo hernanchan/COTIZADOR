@@ -28,6 +28,7 @@ on:
       - 'integraciones/autocotizador/recepcion/r2-universal-paquete-personal.mjs'
       - 'integraciones/autocotizador/recepcion/paquete-universal-cliente.mjs'
       - 'integraciones/autocotizador/recepcion/paquete-live-operador.test.mjs'
+      - 'tests/zip-universal-stream.test.mjs'
       - 'integraciones/publicacion/d1-produccion-r2-inspeccion-v1.sql'
       - 'integraciones/publicacion/aplicar-d1-produccion-r2-inspeccion.mjs'
       - 'integraciones/autocotizador/recepcion/preprensa-r2-archivo-local.mjs'
@@ -141,6 +142,7 @@ jobs:
           node --test tests/r2-universal-paquete-operador.test.mjs
           node --test integraciones/autocotizador/recepcion/firmar-inspeccion-r2-live-local.test.mjs
           node --test integraciones/autocotizador/recepcion/paquete-live-operador.test.mjs
+          node --test tests/zip-universal-stream.test.mjs
           node --check integraciones/autocotizador/recepcion/r2-live-inspeccion-cli.mjs
           node --check integraciones/publicacion/aplicar-d1-produccion-r2-inspeccion.mjs
           node --test integraciones/autocotizador/recepcion/r2-live-preflight-documentos.test.mjs
