@@ -1,0 +1,15 @@
+# Entrada mínima exclusiva para webhook MP LIVE.
+# Sin dominio, sin pagos, sin acceso D1 ni tokens de Mercado Pago.
+name = "saber-webhook-produccion"
+main = "webhook-edge.mjs"
+compatibility_date = "2026-10-17"
+workers_dev = false
+preview_urls = false
+
+[vars]
+SABER_ENTORNO = "preparacion"
+WEBHOOK_EDGE_GATE = "NO_GO"
+
+[[services]]
+binding = "SABER_CENTRAL_LIVE"
+service = "saber-pagos-produccion"
