@@ -15,7 +15,8 @@ const routeSchema=new Map([
  ['/internal/central/live/tus-received','saber-central-r2-universal-tus-received-v1'],
  ['/internal/central/live/r2-gate','saber-central-r2-universal-live-gate-v1'],
  ['/internal/central/live/r2-reserve','saber-central-r2-universal-live-reserve-v1'],
- ['/internal/central/live/r2-stage','saber-central-r2-grande-pendiente-v1']
+ ['/internal/central/live/r2-stage','saber-central-r2-grande-pendiente-v1'],
+ ['/internal/central/live/r2-recover','saber-central-r2-universal-recovery-v1']
 ]);
 export async function leerFirmaInternaLive(request,env,{
  now=()=>Math.floor(Date.now()/1000),subtle=crypto.subtle
@@ -51,12 +52,14 @@ export async function leerFirmaInternaLive(request,env,{
  const r2Gate=url.pathname==='/internal/central/live/r2-gate';
  const r2Reserve=url.pathname==='/internal/central/live/r2-reserve';
  const r2Stage=url.pathname==='/internal/central/live/r2-stage';
+ const r2Recover=url.pathname==='/internal/central/live/r2-recover';
  if(raw.length<40||raw.length>(draftRoute?512000:tusReceipt?140000:2000))
    return {error:'Tamaño LIVE inválido',status:413};
  let payload;try{payload=JSON.parse(raw)}catch{}
  const orderRoute=url.pathname==='/internal/central/live/order';
  const pricingRoute=url.pathname==='/internal/central/live/pricing';
- const keys=r2Stage?'bytes,contenidoPdfVerificado,etag,fileId,listoParaProducir,name,objectKey,orderId,pagesDeclaradas,paymentAuthorized,receiptId,registeredInD1,schema,sha256,sha256Verificado':
+ const keys=r2Recover?'bytes,fileId,name,orderId,pages,schema,sha256':
+  r2Stage?'bytes,contenidoPdfVerificado,etag,fileId,listoParaProducir,name,objectKey,orderId,pagesDeclaradas,paymentAuthorized,receiptId,registeredInD1,schema,sha256,sha256Verificado':
   r2Reserve?'bytes,fileId,name,objectKey,orderId,pages,schema,sha256':
   r2Gate?'bytes,fileId,name,orderId,pages,schema,sha256':
   tusGate?'action,bytes,fileId,name,orderId,pages,schema,sha256':
@@ -67,7 +70,15 @@ export async function leerFirmaInternaLive(request,env,{
  if(!payload||typeof payload!=='object'||Array.isArray(payload)||
     Object.keys(payload).sort().join(',')!==keys||
     payload.schema!==expectedSchema||
-    (r2Stage?(!WEB.test(payload.orderId||'')||
+    (r2Recover?(!WEB.test(payload.orderId||'')||
+       !/^[A-Za-z0-9_-]{1,80}$/.test(payload.fileId||'')||
+       !/^[a-f0-9]{64}$/.test(payload.sha256||'')||
+       typeof payload.name!=='string'||payload.name.length<1||payload.name.length>120||
+       !payload.name.toLowerCase().endsWith('.pdf')||
+       !Number.isSafeInteger(payload.bytes)||payload.bytes<=40*1048576||
+       payload.bytes>200*1048576||
+       !Number.isSafeInteger(payload.pages)||payload.pages<1||payload.pages>2000):
+     r2Stage?(!WEB.test(payload.orderId||'')||
        typeof payload.fileId!=='string'||payload.fileId.length<1||
        !/^[A-Za-z0-9_-]{1,80}$/.test(payload.fileId)||
        !/^[a-f0-9]{64}$/.test(payload.sha256||'')||
@@ -127,7 +138,7 @@ export async function leerFirmaInternaLive(request,env,{
       payload.telefono.replace(/\D/g,'').length<10||
       payload.telefono.replace(/\D/g,'').length>15:
       !UUID.test(payload.commercialOrderId||''))||
-    (!pricingRoute&&!tusGate&&!tusReceipt&&!r2Gate&&!r2Reserve&&!r2Stage&&!WEB.test(payload.webOrderId||'')))
+    (!pricingRoute&&!tusGate&&!tusReceipt&&!r2Gate&&!r2Reserve&&!r2Stage&&!r2Recover&&!WEB.test(payload.webOrderId||'')))
    return {error:'Orden LIVE inválida',status:422};
  const key=await subtle.importKey('raw',new TextEncoder().encode(env.CENTRAL_BRIDGE_KEY),
   {name:'HMAC',hash:'SHA-256'},false,['verify']);
