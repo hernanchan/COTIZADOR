@@ -239,3 +239,30 @@
 - Pruebas unitarias del lector, incluida falta de autorización y respuesta corrupta, incorporadas a `saber-qa-mp-live-gated-20261110.yml`; **CI pendiente de confirmación**, no afirmar ejecución exitosa.
 - Cambios en rama: [HMAC pricing](https://github.com/hernanchan/COTIZADOR/commit/724c392cfe33af0ec0389a25775bcc579793116a), [Central GET firmado](https://github.com/hernanchan/COTIZADOR/commit/4bfe187623cd55bd0d18cb1f5332ca5c50ffa5a8), [loader](https://github.com/hernanchan/COTIZADOR/commit/7e469281424a13ab4839bae3d2f9d5d05ec1f9b2), [migración SQL](https://github.com/hernanchan/COTIZADOR/commit/826fa138ceffd293ecaf4860f53421a560cf9a67), [CI](https://github.com/hernanchan/COTIZADOR/commit/c6f7efb32b65972ec998c5067503aa8fe56cbc65).
 - **Bloqueos de publicación**: migración y aprobación reales de precios sobre D1 producción, conexiones productivas de borrador y orden LIVE, host comprador, recepción TUS/R2 productiva y verificación de pago webhook/ZIP; todo separado de sandbox. `NO_GO`, sin modificar `main`, web pública ni compuertas.
+
+## 10/11 — avance sin pausas: flujo de presupuesto / orden LIVE conectado en rama privada
+
+### Código incorporado
+
+1. `worker-fase4-cotizador-unificado.mjs` — `preciosPrivados` en `SABER_ENTORNO=produccion` llama al lector `obtenerTarifarioD1Live`, **sin fallback a `preciosPiloto` ni a snapshot Sandbox**. En ensayo sigue la lectura D1 privada como antes.
+2. `central-live-bridge.mjs` — admite HMAC independiente `/internal/central/live/draft` (hasta 512k de JSON firmado; validación estricta de firma, esquema y payload). `worker.js` monta esta ruta y `registrarFichaUniversalD1` únicamente con `CENTRAL_LIVE_DRAFT_GATE=GO_COMERCIAL_CONFIRMADO`, `CENTRAL_LIVE_PRICING_GATE=GO_COMERCIAL_CONFIRMADO`, `MP_LIVE_GATE=GO_COMERCIAL_CONFIRMADO`, entorno y DB productivos. No habilitado.
+3. `r2-lote-universal-central.mjs` — antes de guardar borrador LIVE exige que la `priceRevision` declarada coincida con el `approved_revision` presente en D1 producción, sin crear automáticamente tablas ni sembrar precios. Mantiene transacción e idempotencia originales para Sandbox.
+4. `ordenes-universales-live-documentos.mjs` — endpoints comprador `POST /api/pedido/live/borrador` y `POST /api/pedido/live/orden`: sólo HTTPS `pedidos.libreriasaber.com.ar`, origen igual, sesión comprador, cookies vinculadas antes de crear orden, HMAC vía Service Binding a Central LIVE, JSON con campos exactos, sin permisos de subir originales ni producción. El segundo exige ficha firmada `draftId+quoteHash` de la primera etapa. Enrutados en Worker, pero **sin host comprador público habilitado ni frontend LIVE conectado aún**.
+5. Corrección transportes: `prepararPlanRecepcionUniversal`, `fichaPrearchivoUniversal` y `verificarFichaUniversal` aceptan lotes formados **solo por TUS** en modo productivo; en Sandbox se mantiene el modo histórico que exigía un PDF R2. El transporte se decide exclusivamente por bytes (≤40 MiB TUS; >40 y ≤200 MiB R2), jamás por nombre ni por clasificación de impresión; la clasificación A4/A3/CAD/Póster se conserva independiente. **Sigue vigente el límite previo de 60 MiB agregados para TUS y 10 archivos**, pendiente validar contra casos reales sin cambiarlo arbitrariamente.
+
+### Pruebas reales de GitHub Actions (sin despliegue ni pagos)
+
+- Workflow `Saber QA - pasarela LIVE aislada y firma HMAC, sin pago real`: **success** para commit `562ced1462f978c0b5d7ee4a10b59d15e6f0cde4`, [ejecución 42890706972](https://github.com/hernanchan/COTIZADOR/actions/runs/42890706972).
+- Workflow `Verificar integración TUS privada (SIN despliegue)`: **success** en mismo commit, [ejecución 42890707118](https://github.com/hernanchan/COTIZADOR/actions/runs/42890707118).
+- Regresión nueva `tests/r2-borrador-universal-central.test.mjs`: un A4 pequeño y un A1 CAD pequeño quedan TUS + TUS, con clasificación distinta, sin pago ni carga, manteniendo exclusión de TUS-only en sandbox.
+- La compilación del Worker Central se probó en QA; **no equivale a despliegue** ni a validación de pedido real.
+
+### Estado y pasos pendientes sin abrir compuertas
+
+**NO_GO**. Sin cambios en `main`, sin modificación de Pages público, sin cobros ni webhooks productivos habilitados. Priorizar:
+1. Migración real D1 de tablas de tarifario, aprobación efectiva de precios comerciales y lectura LIVE con ambiente controlado.
+2. Portal comprador productivo (hoy flujo browser en `/prueba-v2`), creación de borrador/orden con nuevos endpoints y uso de `checkout-live-cliente.mjs`. No cambiar enlace de Sandbox por LIVE sin migrar creación de pedido.
+3. Integración recepción postpago TUS/R2 **en producción** y revalidación de archivos, seguro de no almacenar R2 antes de pago.
+4. Estado de pago y webhook real conciliado, Central Nuevos + ZIP + hoja de instrucciones + borrado Entregado, UX/carrito/productos, piloto comercial autorizado.
+
+Último lote: [ruta comprador](https://github.com/hernanchan/COTIZADOR/commit/b9ab91dd70c2428ee49f3e3722d24178e9c22f30), [TUS-only](https://github.com/hernanchan/COTIZADOR/commit/65c2f1337ded1e5b7aadeeeef47cdf5da1ed47ac), [QA](https://github.com/hernanchan/COTIZADOR/commit/562ced1462f978c0b5d7ee4a10b59d15e6f0cde4).
