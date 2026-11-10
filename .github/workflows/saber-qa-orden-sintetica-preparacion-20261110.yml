@@ -1,0 +1,93 @@
+name: Saber QA - preparar orden sintetica existente sin borrar ni publicar
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-qa-orden-sintetica-preparacion-20261110.yml]
+permissions:
+  contents: read
+  statuses: write
+concurrency:
+  group: saber-qa-existing-synthetic-order-production-89608817
+  cancel-in-progress: false
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Mover SOLO la orden sintetica aprobada a preparacion y registrar ETA
+        shell: bash
+        env:
+          DEMO_ADMIN_KEY: ${{ secrets.DEMO_ADMIN_KEY }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const base='https://saber-pagos-pruebas.libreriasaber.workers.dev';
+          const id='89608817-95b1-41bc-ac88-579da519d32c';
+          const web='WEB-ENSAYO-72E9F66A8BC34CC9B25D70EF49C1A8D3';
+          const key=process.env.DEMO_ADMIN_KEY;
+          assert.ok(typeof key==='string'&&key.length>=16,'ADMIN_SECRET_NOT_CONFIGURED');
+          async function get(path){
+           const r=await fetch(base+path,{headers:{Authorization:'Bearer '+key},signal:AbortSignal.timeout(25000)});
+           assert.equal(r.status,200,'QA_GET_HTTP_'+r.status+'_'+path);
+           return r.json();
+          }
+          async function post(path,body){
+           const r=await fetch(base+path,{method:'POST',headers:{Authorization:'Bearer '+key,
+            'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(25000)});
+           const data=await r.json().catch(()=>({}));
+           if(r.status!==200||data.saved!==true)throw Error('QA_POST_FAILED_'+r.status+'_'+String(data.error||path));
+           return data;
+          }
+          const health=await fetch(base+'/health').then(r=>r.json());
+          assert.equal(health.databaseReady,true);
+          assert.equal(health.paymentsEnabled,false);
+          const before=await get('/admin/api/order?id='+id);
+          assert.equal(before.order.id,id);assert.equal(before.order.amount_ars,4400);
+          assert.equal(before.order.status,'paid');
+          assert.equal(before.produccion?.r2Preprensa?.webOrderId,web);
+          const track=before.produccion?.seguimiento,estimate=before.produccion?.preparacionEstimada;
+          assert.ok(track&&estimate,'QA_NOT_PRODUCTION_ELIGIBLE');
+          assert.equal(track.state,'pendiente','QA_ORDER_ALREADY_ADVANCED_STOP_NO_RETRY');
+          assert.ok(track.allowed.includes('en_preparacion'));
+          const started=await post('/admin/api/central/production-status',{
+            order_id:id,from:'pendiente',to:'en_preparacion',version:track.version,
+            operator:'QA SANDBOX',reason:'Ensayo de inicio de preparacion',confirmed:false
+          });
+          assert.equal(started.production?.state,'en_preparacion');
+          console.log('QA_SYNTHETIC_ORDER_STARTED_PREPARATION');
+          const eta=new Date(Date.now()+2*3600000).toISOString();
+          const saved=await post('/admin/api/central/preparation-estimate',{
+            order_id:id,expected_version:estimate.version,ready_at:eta,
+            operator:'QA SANDBOX',reason:'',confirmed:true
+          });
+          assert.equal(saved.estimate?.ready_at,eta);
+          console.log('QA_SYNTHETIC_ETA_SAVED_IN_D1');
+          const after=await get('/admin/api/order?id='+id);
+          assert.equal(after.produccion?.seguimiento?.state,'en_preparacion');
+          assert.equal(after.produccion?.preparacionEstimada?.ready_at,eta);
+          assert.equal(after.produccion?.r2Preprensa?.webOrderId,web);
+          const board=await get('/admin/api/orders');
+          const match=(board.orders||[]).filter(x=>x.id===id);
+          assert.equal(match.length,1,'QA_ORDER_MISSING_OR_DUPLICATED');
+          assert.equal(match[0].production_state,'en_preparacion');
+          assert.equal(match[0].estimated_ready_at,eta);
+          console.log('QA_SYNTHETIC_ORDER_ONE_IN_PREPARATION_WITH_ETA');
+          console.log('NO_REAL_ORDERS_NO_NEW_PAYMENT_NO_R2_UPLOAD_NO_DELETE_NO_MAIN');
+          NODE
+      - name: Registrar resultado aislado
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          if [ "$RESULT" = success ]; then state=success; else state=failure; fi
+          jq -n --arg state "$state" --arg context 'saber/qa-sandbox-preparacion-eta' \
+             --arg description "Prueba unicamente de orden sintetica existente: $RESULT" \
+             --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+             '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/saber-qa-prod-status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/saber-qa-prod-status.json >/dev/null
