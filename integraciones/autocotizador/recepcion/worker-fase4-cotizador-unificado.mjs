@@ -1763,6 +1763,27 @@ async function apiPrepararDocumentosV2Lote(request,env){
  * interruptor desactivado por defecto y contraseña independiente HTTP Basic.
  * Las rutas públicas de documentos y la web comercial NO se alteran.
  */
+/** Acceso exclusivo personal LIVE por Basic; no acepta cookies de comprador ni ensayos. */
+function staffLiveAuthorized(request,env){
+ const GO='GO_COMERCIAL_CONFIRMADO';
+ if(env?.SABER_ENTORNO!=='produccion'||env?.CENTRAL_DB_ENV!=='produccion'||
+    env?.DOCS_MP_LIVE_GATE!==GO||env?.DOCS_LIVE_STAFF_GATE!==GO||
+    env?.DOCS_LIVE_PACKAGE_GATE!==GO||
+    typeof env?.DOCS_LIVE_STAFF_SECRET!=='string'||
+    !/^[A-Za-z0-9_-]{32,128}$/.test(env.DOCS_LIVE_STAFF_SECRET)||
+    [env.CENTRAL_BRIDGE_KEY,env.DOCS_V2_PRIVATE_UI_SECRET,
+     env.DOCS_LIVE_TUS_SERVICE_KEY,env.DOCS_LIVE_R2_RECEIPT_KEY]
+     .includes(env.DOCS_LIVE_STAFF_SECRET))
+  return 'off';
+ const auth=request.headers.get('Authorization')||'';
+ if(!auth.startsWith('Basic ')||auth.length>400)return 'deny';
+ let provided;try{provided=atob(auth.slice(6))}catch{return 'deny'}
+ const expected='operador:'+env.DOCS_LIVE_STAFF_SECRET;
+ if(provided.length!==expected.length)return 'deny';
+ let diff=0;for(let i=0;i<expected.length;i++)
+  diff|=provided.charCodeAt(i)^expected.charCodeAt(i);
+ return diff===0?'allow':'deny';
+}
 function v2PrivateBrowserAuthorized(request,env){
  if(env?.DOCS_V2_PRIVATE_UI_ENABLED!=='PRIVATE_TEST_ONLY'||
    typeof env.DOCS_V2_PRIVATE_UI_SECRET!=='string'||
@@ -2382,6 +2403,29 @@ export default {
        'Content-Type':'text/javascript; charset=utf-8',
        'Cache-Control':'no-store,private','X-Content-Type-Options':'nosniff',
        'X-Robots-Tag':'noindex,nofollow'}});
+    }
+    if(page==='/personal/paquete'||
+       page==='/personal/api/live-paquete'||
+       page==='/personal/api/live-descargar'){
+      if(new URL(request.url).origin!=='https://pedidos.libreriasaber.com.ar')
+       return closed();
+      const auth=staffLiveAuthorized(request,env);
+      if(auth==='off')return closed();
+      if(auth!=='allow')
+       return new Response('Acceso exclusivo de personal de Librería Saber',
+        {status:401,headers:{'Cache-Control':'no-store',
+         'WWW-Authenticate':'Basic realm="Libreria Saber Personal LIVE", charset="UTF-8"'}});
+      if(page==='/personal/paquete'){
+       if(request.method!=='GET')return closed();
+       return new Response(paginaPaqueteUniversalPersonal(),{
+        headers:{'Content-Type':'text/html; charset=utf-8',
+         'Cache-Control':'no-store, private','X-Robots-Tag':'noindex,nofollow',
+         'Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"}});
+      }
+      if(request.method!=='POST')return closed();
+      return page==='/personal/api/live-paquete'?
+       consultarPaqueteUniversalPersonal(request,env,{authorized:true}):
+       descargarUniversalPersonal(request,env,{authorized:true});
     }
     if(page==='/pedido/recepcion-tus.js'){
       const allow=env?.SABER_ENTORNO==='produccion'&&
