@@ -1,0 +1,89 @@
+name: Saber - puerta webhook LIVE aislada NO_GO sin dominio
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-live-webhook-edge-isolated-20261110.yml]
+permissions:
+  contents: read
+  statuses: write
+jobs:
+  webhook:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validar gateway webhook sin acceso a datos ni cobros
+        shell: bash
+        run: |
+          set -euo pipefail
+          t=integraciones/mercadopago/produccion/wrangler-webhook-edge.toml
+          grep -Fxq 'workers_dev = false' "$t"
+          grep -Fxq 'preview_urls = false' "$t"
+          grep -Fxq 'WEBHOOK_EDGE_GATE = "NO_GO"' "$t"
+          grep -Fxq 'SABER_ENTORNO = "preparacion"' "$t"
+          grep -Fxq 'service = "saber-pagos-produccion"' "$t"
+          ! grep -q '^\[\[d1_databases\]\]' "$t"
+          ! grep -q '^\[\[r2_buckets\]\]' "$t"
+          ! grep -Eq '^routes?[[:space:]]*=' "$t"
+          node --test integraciones/mercadopago/produccion/webhook-edge.test.mjs
+          node --check integraciones/mercadopago/produccion/webhook-edge.mjs
+          npm install --no-save --no-fund --no-audit wrangler@4.55.0
+          echo 'LIVE_WEBHOOK_GATEWAY_TESTED_NO_GO'
+      - name: Desplegar Worker webhook SIN URL pública ni pagos y comprobarlo
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN" && test -n "$CLOUDFLARE_ACCOUNT_ID"
+          dir=$(mktemp -d);trap 'rm -rf "$dir"' EXIT
+          root="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID"
+          auth="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          central="$root/workers/scripts/saber-pagos-produccion/settings"
+          curl -fsS --max-time 30 -H "$auth" "$central" > "$dir/central.json"
+          jq -e '.success==true and
+            (.result.bindings|any(.name=="MP_LIVE_GATE" and .type=="plain_text" and .text=="NO_GO"))' "$dir/central.json" >/dev/null
+          status=$(curl -sS --max-time 30 -o "$dir/check.json" -w '%{http_code}' \
+            -H "$auth" "$root/workers/scripts/saber-webhook-produccion/settings")
+          test "$status" = 404 || { echo "LIVE_WEBHOOK_EXISTING_SCRIPT_STOP_HTTP=$status";exit 1; }
+          CI=true ./node_modules/.bin/wrangler deploy \
+            --config integraciones/mercadopago/produccion/wrangler-webhook-edge.toml \
+            > "$dir/deploy.log" 2>&1 ||
+            { tail -n 18 "$dir/deploy.log";exit 1; }
+          echo 'LIVE_WEBHOOK_GATEWAY_WORKER_CREATED_NO_ROUTE'
+          target="$root/workers/scripts/saber-webhook-produccion"
+          curl -fsS --max-time 30 -H "$auth" "$target/settings" > "$dir/settings.json"
+          jq -e '.success==true and
+           (.result.bindings|any(.name=="SABER_CENTRAL_LIVE" and .type=="service" and .service=="saber-pagos-produccion")) and
+           (.result.bindings|any(.name=="WEBHOOK_EDGE_GATE" and .type=="plain_text" and .text=="NO_GO")) and
+           (.result.bindings|any(.name=="SABER_ENTORNO" and .type=="plain_text" and .text=="preparacion")) and
+           (.result.bindings|all(.type!="d1" and .type!="r2_bucket" and .type!="secret_text"))' "$dir/settings.json" >/dev/null
+          curl -fsS --max-time 30 -H "$auth" "$target/subdomain" > "$dir/subdomain.json"
+          jq -e '.success==true and .result.enabled==false and .result.previews_enabled==false' "$dir/subdomain.json" >/dev/null
+          curl -fsS --max-time 30 -H "$auth" "$root/workers/domains" > "$dir/domains.json"
+          jq -e '.success==true and
+             ([.result[]?|select(.hostname=="pagos.libreriasaber.com.ar")]|length)==0' "$dir/domains.json" >/dev/null
+          echo 'LIVE_WEBHOOK_GATEWAY_SERVICE_BINDING_VERIFIED_NO_DB'
+          echo 'LIVE_WEBHOOK_GATEWAY_NO_PUBLIC_DNS_NO_PREVIEW_NO_MP'
+      - name: Registrar verificación privada
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          if [ "$RESULT" = success ];then state=success;else state=failure;fi
+          jq -n --arg state "$state" --arg context 'saber/live-webhook-gateway-closed' \
+            --arg description "Gateway webhook privado, NO_GO: $RESULT" \
+            --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/status.json >/dev/null
