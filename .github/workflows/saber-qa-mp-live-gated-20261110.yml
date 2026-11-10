@@ -22,6 +22,11 @@ on:
       - 'integraciones/autocotizador/recepcion/flujo-presupuesto-live-cliente.test.mjs'
       - 'integraciones/autocotizador/recepcion/sesion-comprador-live.mjs'
       - 'integraciones/autocotizador/recepcion/sesion-comprador-live.test.mjs'
+      - 'integraciones/autocotizador/recepcion/pagina-cotizar-live.mjs'
+      - 'integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs'
+      - 'integraciones/autocotizador/recepcion/carga-unica-cliente.mjs'
+      - 'integraciones/autocotizador/recepcion/solicitar-cotizacion-privada.mjs'
+      - 'integraciones/autocotizador/recepcion/package.json'
       - 'integraciones/autocotizador/recepcion/obtener-tarifario-d1-live.mjs'
       - 'integraciones/autocotizador/recepcion/obtener-tarifario-d1-live.test.mjs'
       - 'integraciones/autocotizador/recepcion/ordenes-universales-live-documentos.mjs'
@@ -56,6 +61,7 @@ jobs:
           node --test integraciones/autocotizador/recepcion/checkout-live-cliente.test.mjs
           node --test integraciones/autocotizador/recepcion/flujo-presupuesto-live-cliente.test.mjs
           node --test integraciones/autocotizador/recepcion/sesion-comprador-live.test.mjs
+          node --test integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs
           node --test integraciones/autocotizador/recepcion/obtener-tarifario-d1-live.test.mjs
           node --test integraciones/autocotizador/recepcion/ordenes-universales-live-documentos.test.mjs
           node --test tests/r2-borrador-universal-central.test.mjs
@@ -67,6 +73,17 @@ jobs:
           node --check integraciones/autocotizador/recepcion/ficha-prearchivo-universal.mjs
           node --check integraciones/mercadopago/pruebas/worker.js
           node --check integraciones/mercadopago/pruebas/mercadopago-live-central.mjs
+      - name: Compilar interfaz comprador y cotizador PDF sin desplegar
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-fund --no-audit esbuild@0.25.12 pdf-lib@1.17.1
+          cd integraciones/autocotizador/recepcion
+          ../../../node_modules/.bin/esbuild ./flujo-presupuesto-live-cliente.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --outfile=./flujo-presupuesto-live-cliente.txt
+          ../../../node_modules/.bin/esbuild ./carga-unica-cliente.mjs --bundle --minify --platform=browser --format=iife --target=es2022 --outfile=./carga-unica-cliente.txt
+          ../../../node_modules/.bin/esbuild ./worker-fase4-cotizador-unificado.mjs --bundle --platform=browser --format=esm --target=es2022 --loader:.html=text --outfile=/tmp/saber-docs-live-qa.mjs
+          grep -Fq '/api/pedido/live/borrador' /tmp/saber-docs-live-qa.mjs
+          grep -Fq '/cotizar/archivos' /tmp/saber-docs-live-qa.mjs
+          echo 'LIVE_BUYER_QUOTE_BUNDLE_OK_NO_DEPLOY'
       - name: Compilación del Worker con módulos LIVE cerrados
         run: |
           set -euo pipefail
