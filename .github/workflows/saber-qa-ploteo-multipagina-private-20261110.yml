@@ -115,11 +115,25 @@ jobs:
           curl -fsS --max-time 30 -H "$auth" "$root/deployments" > "$tmp/check-after.json"
           current=$(jq -er '.result.deployments[0].versions | if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/check-after.json")
           test "$current" = "$candidate" || { echo 'PLOTTER_NEW_VERSION_NOT_ACTIVE';exit 1; }
-          test "$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$docs/prueba-v2/")" = 401
-          test "$(curl -sS --max-time 30 -u "operador:$PASSWORD" -o "$tmp/new.js" -w '%{http_code}' "$docs/prueba-v2/carga-inteligente.js")" = 200
-          grep -Fq 'VISUAL_PDFJS_LIMITADO' "$tmp/new.js"
-          grep -Fq 'cad_contornos_vectoriales_sin_relleno' "$tmp/new.js"
-          grep -Fq 'Recubierto 130 g' "$tmp/new.js"
+          echo 'PLOTTER_PRIVATE_DEPLOYMENT_API_MATCHES_CANDIDATE'
+          anonymous=$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$docs/prueba-v2/" || true)
+          echo "PLOTTER_PRIVATE_ANON_HTTP=$anonymous"
+          test "$anonymous" = 401 || { echo 'PRIVATE_ACCESS_FAILED';exit 1; }
+          propagated=0
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            code=$(curl -sS --max-time 30 -u "operador:$PASSWORD" \
+              -H 'Cache-Control: no-cache' -o "$tmp/new.js" -w '%{http_code}' \
+              "$docs/prueba-v2/carga-inteligente.js?qa=$(date +%s)-$i" || true)
+            if [ "$code" = 200 ] && grep -Fq 'VISUAL_PDFJS_LIMITADO' "$tmp/new.js" &&
+               grep -Fq 'cad_contornos_vectoriales_sin_relleno' "$tmp/new.js" &&
+               grep -Fq 'Recubierto 130 g' "$tmp/new.js"; then
+              propagated=1; break
+            fi
+            echo "PLOTTER_PRIVATE_SMOKE_RETRY=$i HTTP=$code MARKER=$(grep -Fc 'cad_contornos_vectoriales_sin_relleno' "$tmp/new.js" || true)"
+            sleep 2
+          done
+          test "$propagated" = 1 || { echo 'PRIVATE_WORKER_JS_NEW_MARKERS_NOT_VISIBLE';exit 1; }
+          echo 'PLOTTER_PRIVATE_JS_MARKERS_CONFIRMED'
           curl -fsS --max-time 25 "$central/health" > "$tmp/health-after.json"
           jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$tmp/health-after.json" >/dev/null
           echo "PLOTTER_PRIVATE_VERSION_ACTIVE=$candidate"
