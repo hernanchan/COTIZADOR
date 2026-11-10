@@ -333,3 +333,31 @@ test('LIVE no emite checkout MP para PDF R2 con transporte sin habilitar',async(
  assert.equal(mpCalls,0);
  assert.equal(f.posts,0);
 });
+
+test('R2 LIVE exige juntas las cuatro compuertas, sin enviar cobro parcial',async()=>{
+ const gates=['CENTRAL_LIVE_R2_GATE','CENTRAL_LIVE_R2_QUOTA_GATE',
+  'CENTRAL_LIVE_R2_STAGING_GATE','CENTRAL_LIVE_POSTPAY_GATE'];
+ const allOn=Object.fromEntries(gates.map(g=>[g,'GO_COMERCIAL_CONFIRMADO']));
+ for(const disabled of gates){
+  const f=fixture();f.setTransport('r2');let mpCalls=0;
+  const env={...f.env,...allOn,[disabled]:'NO_GO'};
+  const r=await checkoutMPLiveCentral(new Request(
+   'https://pagos.libreriasaber.com.ar/internal/central/live/checkout',
+   {method:'POST'}),env,{readSigned:f.signed,fetcher:async()=>{
+     mpCalls++;throw Error('MP_NO_DEBE_ABRIRSE')
+   }});
+  assert.equal(r.status,503,disabled);
+  assert.equal((await r.json()).error,'MP_LIVE_R2_NO_DISPONIBLE');
+  assert.equal(mpCalls,0);
+  assert.equal(f.posts,0);
+ }
+ // Con todas las compuertas autorizadas, sigue exigiendo D1 y vendedor real.
+ const good=fixture();good.setTransport('r2');
+ const response=await checkoutMPLiveCentral(new Request(
+  'https://pagos.libreriasaber.com.ar/internal/central/live/checkout',
+  {method:'POST'}),{...good.env,...allOn},{
+   readSigned:good.signed,fetcher:good.mpFetch
+  });
+ assert.equal(response.status,200);
+ assert.equal(good.posts,1);
+});
