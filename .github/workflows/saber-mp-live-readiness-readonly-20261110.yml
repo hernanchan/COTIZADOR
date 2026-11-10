@@ -1,0 +1,57 @@
+name: Saber - MP LIVE prepublicacion credenciales SOLO presencia
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-mp-live-readiness-readonly-20261110.yml]
+permissions:
+  contents: read
+  statuses: write
+jobs:
+  solo-lectura:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Leer configuracion del Worker existente sin publicar claves
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          tmp=$(mktemp -d);trap 'rm -rf "$tmp"' EXIT
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-pagos-pruebas"
+          code=$(curl -sS --max-time 30 -H "Authorization: Bearer $TOKEN" \
+            -o "$tmp/settings.json" -w '%{http_code}' "$root/settings")
+          echo "MP_SANDBOX_CENTRAL_SETTINGS_HTTP=$code"
+          test "$code" = 200
+          jq -e '.success==true and (.result.bindings|type=="array")' "$tmp/settings.json" >/dev/null
+          for name in SABER_ENTORNO MP_LIVE_GATE CENTRAL_DB_ENV \
+            MP_LIVE_ACCESS_TOKEN MP_LIVE_SELLER_ID MP_LIVE_WEBHOOK_SECRET \
+            MP_LIVE_WEBHOOK_URL MP_LIVE_RETURN_URL \
+            MP_TEST_ACCESS_TOKEN MP_TEST_SELLER_ID MP_WEBHOOK_SECRET;do
+            jq -r --arg name "$name" '.result.bindings|
+             if any(.name==$name) then "CENTRAL_BINDING_"+$name+"=PRESENT"
+             else "CENTRAL_BINDING_"+$name+"=MISSING" end' "$tmp/settings.json"
+          done
+          jq -r '.result.bindings[] | select(.name=="SABER_ENTORNO" or .name=="MP_LIVE_GATE" or .name=="CENTRAL_DB_ENV") |
+            "LIVE_GATE_"+.name+"="+(if .type=="plain_text" and .text=="produccion" then "PRODUCTION" else
+             if .type=="plain_text" and .text=="GO_COMERCIAL_CONFIRMADO" then "GO"
+             else "NOT_PRODUCTION" end end)' "$tmp/settings.json"
+          echo 'READ_ONLY_NO_MP_API_NO_DB_WRITE_NO_PUBLICATION'
+      - name: Registrar evidencia
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          if [ "$RESULT" = success ];then state=success;else state=failure;fi
+          jq -n --arg state "$state" --arg context 'saber/mp-live-cloudflare-readiness' \
+           --arg description "Lectura flags de pagos: $RESULT" \
+           --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+           '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/status.json >/dev/null
