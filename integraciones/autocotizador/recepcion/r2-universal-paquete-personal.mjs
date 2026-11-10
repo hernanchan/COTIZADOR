@@ -40,7 +40,7 @@ function tusLiveConfig(env){
  let u;try{u=new URL(env.DOCS_LIVE_TUS_PROJECT_URL)}catch{}
  const bucket=env?.DOCS_LIVE_TUS_BUCKET;
  if(!u||u.protocol!=='https:'||u.pathname!=='/'||u.port||
-    !/^[a-z0-9]{15,30}\\.storage\\.supabase\\.co$/.test(u.hostname)||
+    !/^[a-z0-9]{15,30}\.storage\.supabase\.co$/.test(u.hostname)||
     u.hostname==='qkbbqzbannyhuanngjpw.storage.supabase.co'||
     !/^[a-z0-9][a-z0-9_-]{3,45}$/.test(bucket||'')||
     ['saber-tus-lab','saber-tus-pruebas'].includes(bucket))
@@ -50,7 +50,7 @@ function tusLiveConfig(env){
 /** Solo para acceso staff: leer originales del bucket TUS LIVE privado. */
 export async function leerObjetoTUSLive(env,objectName,{fetcher=fetch}={}){
  const config=tusLiveConfig(env);
- if(!config||typeof objectName!=='string'||!/^v2\\/WEB-ENSAYO-[A-F0-9]{32}\\/[a-f0-9-]{36}\\.pdf$/.test(objectName))
+ if(!config||typeof objectName!=='string'||!/^v2\/WEB-ENSAYO-[A-F0-9]{32}\/[a-f0-9-]{36}\.pdf$/.test(objectName))
   throw Error('LIVE_PACKAGE_TUS_STORAGE_OFF');
  const url=config.origin+'/storage/v1/object/'+config.bucket+'/'+
   objectName.split('/').map(encodeURIComponent).join('/');
