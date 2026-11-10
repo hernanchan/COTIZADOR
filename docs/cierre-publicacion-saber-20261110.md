@@ -266,3 +266,11 @@
 4. Estado de pago y webhook real conciliado, Central Nuevos + ZIP + hoja de instrucciones + borrado Entregado, UX/carrito/productos, piloto comercial autorizado.
 
 Último lote: [ruta comprador](https://github.com/hernanchan/COTIZADOR/commit/b9ab91dd70c2428ee49f3e3722d24178e9c22f30), [TUS-only](https://github.com/hernanchan/COTIZADOR/commit/65c2f1337ded1e5b7aadeeeef47cdf5da1ed47ac), [QA](https://github.com/hernanchan/COTIZADOR/commit/562ced1462f978c0b5d7ee4a10b59d15e6f0cde4).
+
+## 10/11 — D1 tarifas producción: migración aplicada y comprobada en GitHub Actions
+
+- Se creó `integraciones/publicacion/aplicar-d1-produccion-tarifario.mjs` con controles estrictos de Cloudflare Account, D1 producción por nombre y UUID distinto de sandbox, núcleo de pedidos presente, **cero órdenes**, DDL permitido exclusivamente `CREATE TABLE IF NOT EXISTS` y cero datos tarifarios antes/después.
+- Workflow aislado `.github/workflows/saber-live-migrar-tarifario-d1-20261110.yml` en environment `saber-cloudflare-pruebas`, usando `SABER_CF_D1_WRITE_TOKEN`, solo esquema sin precios, pagos ni Worker/publicación.
+- **EJECUTADO y VERIFICADO**: [GitHub Actions run 42891309981](https://github.com/hernanchan/COTIZADOR/actions/runs/42891309981), commit `4165c8e1ecc8219ed82879b056306cd43b6f2e7f`, estado `completed`, conclusión `success`. Paso «Aplicar solo esquema tarifario D1 productivo, sin publicar» `success`. Las tablas `central_pricing_admin_head` y `central_pricing_admin_history` se crearon/verificaron **vacías**; no hay precio comercial aprobado aún.
+- Los precios de ensayo NO se copiaron ni se habilitó autorización para cobrar. Para finalizar etapa tarifaria falta **seleccionar, validar y aprobar** snapshot completo de precios de venta/promociones reales sobre D1 producción, preservando historial, antes de habilitar cotización comercial.
+- El deployment aislado `saber-documentos-produccion` puede seguir con build anterior: cambios de código en rama y CI no constituyen despliegue del nuevo bundle. Conservar `NO_GO` y no hacer deploy que elimine secrets o abra routes.
