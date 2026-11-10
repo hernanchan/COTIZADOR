@@ -31,8 +31,8 @@ export const REGLAS_RECEPCION_UNIVERSAL=Object.freeze({
  * El precio no se recibe de la UI. Si hay un PDF sin cotizar o fuera de cupo,
  * NO se genera borrador que pueda terminar pagándose parcialmente.
  */
-export function prepararPlanRecepcionUniversal({archivos,manifiestos,tarifario}={}){
- if(!tarifario||tarifario.source!=='private-d1-approved-only'||
+export function prepararPlanRecepcionUniversal({archivos,manifiestos,tarifario,produccion=false}={}){
+ if(!tarifario||tarifario.source!==(produccion?'production-d1-approved-only':'private-d1-approved-only')||
     !Number.isSafeInteger(tarifario.revision)||tarifario.revision<1||
     tarifario.prices?.priceVersion!=='d1-approved-revision-'+tarifario.revision)
   invalid('TARIFAS_NO_APROBADAS');
@@ -79,7 +79,7 @@ export function prepararPlanRecepcionUniversal({archivos,manifiestos,tarifario}=
     paginasElegidas:plan.paginasElegidas.slice(),
     estado:'PENDIENTE_DE_ORIGINAL_VERIFICADO'});
  });
- if(!lines.some(l=>l.transporte==='r2'))
+ if(!produccion&&!lines.some(l=>l.transporte==='r2'))
   invalid('SIN_ARCHIVOS_GRANDES');
  return Object.freeze({
   schema:'saber-r2-plan-multifamilia-v1',
