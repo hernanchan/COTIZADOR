@@ -185,7 +185,7 @@ test('límite TUS: marca en rojo sólo el PDF que excede 40 MiB, no los otros',(
  const origin={pathname:'/prueba-v2/carga-inteligente'};
  const alertas=visual([a,b],FileSimulado,window,origin);
  assert.equal(alertas.size,1);
- assert.match(alertas.get(a),/Grande\\.pdf.*41,0 MiB.*envío universal.*deshabilitado/);
+ assert.match(alertas.get(a),/Grande\.pdf.*41,0 MiB.*envío universal.*deshabilitado/);
  assert.equal(alertas.has(b),false,'El PDF permitido debe permanecer disponible');
  const c={name:'Segundo.pdf',archivoOriginal:new FileSimulado('Segundo.pdf',31*1024*1024)};
  const dos=visual([b,c],FileSimulado,window,origin);
