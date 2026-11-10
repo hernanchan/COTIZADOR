@@ -80,7 +80,7 @@ function fixture({paid=true,delivered=true,received=true,prepress=true,alteredEt
    if(sql.startsWith('UPDATE central_r2_universal_purge_files SET state=')){
     const [order_id,file_id]=this.args,x=queue.find(x=>x.order_id===order_id&&x.file_id===file_id);
     if(!x)return {meta:{changes:0}};
-    if(sql.includes("'processing'")){
+    if(sql.includes("SET state='processing'")){
      if(x.state==='deleted')return {meta:{changes:0}};
      x.state='processing';x.attempts++;return {meta:{changes:1}};
     }
