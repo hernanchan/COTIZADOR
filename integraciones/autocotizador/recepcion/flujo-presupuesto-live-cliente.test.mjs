@@ -1,0 +1,83 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {crearFlujoPresupuestoLive} from './flujo-presupuesto-live-cliente.mjs';
+const origin='https://pedidos.libreriasaber.com.ar';
+const webOrderId='WEB-ENSAYO-'+'A'.repeat(32);
+const draftId='123e4567-e89b-42d3-a456-426614174000';
+const commercialOrderId='123e4567-e89b-42d3-a456-426614174001';
+const file={name:'apunte.pdf',size:15,slice:()=>({arrayBuffer:async()=>new TextEncoder().encode('%PDF-').buffer})};
+const archivos=[{nombre:'apunte.pdf',paginas:[{numero:1,anchoCm:21,altoCm:29.7}]}];
+const sha='f'.repeat(64),quoteHash='a'.repeat(64);
+const draft={ok:true,webOrderId,fileCount:1,draftId,quoteHash,totalArs:5000,
+ paymentAuthorized:false,checkoutEnabled:false};
+const order={ok:true,webOrderId,commercialOrderId,numeroOrden:'018',
+ totalArs:5000,fileCount:1,checkoutEnabled:false,paymentAuthorized:false,
+ uploadAuthorized:false,productionAuthorized:false};
+const checkout={ok:true,webOrderId,commercialOrderId,amountArs:5000,fileCount:1,
+ uploadAuthorized:false,productionAuthorized:false,
+ checkoutUrl:'https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=abc'};
+function fixture({originOverride=origin,draftOverride={},orderOverride={}}={}){
+ const calls=[],store=new Map(),state=[];
+ const fetcher=async(path,opts)=>{
+  calls.push({path,opts});
+  if(path.endsWith('/borrador'))return Response.json({...draft,...draftOverride});
+  if(path.endsWith('/orden'))return Response.json({...order,...orderOverride});
+  if(path.endsWith('/checkout')){
+   const request=JSON.parse(opts.body);
+   return Response.json(request.action==='start'?checkout:{
+    ...checkout,estado:'pagado_esperando_archivos',uploadAuthorized:true
+   });
+  }
+  throw Error('RUTA_NO_ESPERADA');
+ };
+ const build=()=>crearFlujoPresupuestoLive({
+  origin:originOverride,files:[file],archivos,webOrderId,telefono:'351 5554444',
+  fetcher,hasher:async()=>sha,uuid:()=>draftId,
+  storage:{setItem:(key,val)=>store.set(key,val)},
+  onState:v=>state.push(v)
+ });
+ return {calls,store,state,build};
+}
+test('LIVE presupuestar y crear orden sin transmitir originales',async()=>{
+ const f=fixture(),flow=f.build();
+ const r=await flow.preparar();
+ assert.equal(r.amountArs,5000);
+ assert.equal(r.numeroOrden,'018');
+ assert.deepEqual(f.calls.map(c=>c.path),[
+  '/api/pedido/live/borrador','/api/pedido/live/orden']);
+ for(const c of f.calls){
+  assert.equal(c.opts.credentials,'same-origin');
+  assert.equal(c.opts.body.includes('%PDF-'),false);
+  assert.equal(c.opts.body.includes('apunte.pdf'),c.path.endsWith('/borrador'));
+ }
+ assert.equal(flow.estado,'presupuestado');
+ assert.equal(f.store.size,0);
+});
+test('checkout solo después de orden productiva y conservación antes del retorno',async()=>{
+ const f=fixture(),flow=f.build();
+ await assert.rejects(flow.iniciarPago(),/SIN_ORDEN/);
+ await flow.preparar();
+ const url=await flow.iniciarPago();
+ assert.match(url,/mercadopago.com.ar/);
+ assert.equal(f.store.has('saber-live-pedido-v1'),true);
+ assert.equal(f.calls.length,3);
+ assert.equal(flow.estado,'esperando_pago');
+ assert.equal(await flow.consultarPago(),'pagado');
+ assert.equal(flow.estado,'pagado');
+ assert.equal(f.calls.length,4);
+});
+test('falla cerrado ante cambio de precio o identidad y no llega a cobrar',async()=>{
+ for(const option of [{draftOverride:{totalArs:-1}},
+  {orderOverride:{totalArs:1}},{orderOverride:{webOrderId:'WEB-ENSAYO-'+'B'.repeat(32)}}]){
+  const f=fixture(option),flow=f.build();
+  await assert.rejects(flow.preparar());
+  assert.equal(flow.estado,'error');
+  assert.equal(f.calls.some(c=>c.path.endsWith('/checkout')),false);
+  assert.equal(f.store.size,0);
+ }
+});
+test('no ejecuta solicitudes LIVE desde sandbox',()=>{
+ const f=fixture({originOverride:'https://saber-documentos-pruebas.workers.dev'});
+ assert.throws(f.build,/LIVE_FLUJO_IDENTIDAD_INVALIDA/);
+ assert.equal(f.calls.length,0);
+});
