@@ -11,6 +11,7 @@ on:
       - 'integraciones/autocotizador/recepcion/clasificar-ploteo-grande-visual-limitado.mjs'
       - 'tests/ploteo-grande-visual-limitado.test.mjs'
       - 'tests/ploteo-letras-contorno-cad-general.test.mjs'
+      - 'tests/destino-independiente-transporte-tus-r2.test.mjs'
       - 'integraciones/autocotizador/recepcion/discriminar-plano-denso.mjs'
       - 'integraciones/autocotizador/recepcion/clasificar-paginas-ploteo.mjs'
 
@@ -30,7 +31,7 @@ jobs:
           node-version: '22'
       - name: Test tarifas y PDF original 43,54 MiB sin leer ni subir el PDF
         run: |
-          node --test integraciones/autocotizador/pruebas/ploteo-papel-cad-recubierto.test.mjs tests/ploteo-grande-visual-limitado.test.mjs tests/ploteo-deteccion-automatica-sin-opcion-cad.test.mjs tests/ploteo-grande-mosaico-raster-local.test.mjs tests/ploteo-letras-contorno-cad-general.test.mjs integraciones/autocotizador/recepcion/discriminar-plano-denso.test.mjs
+          node --test integraciones/autocotizador/pruebas/ploteo-papel-cad-recubierto.test.mjs tests/ploteo-grande-visual-limitado.test.mjs tests/ploteo-deteccion-automatica-sin-opcion-cad.test.mjs tests/ploteo-grande-mosaico-raster-local.test.mjs tests/ploteo-letras-contorno-cad-general.test.mjs integraciones/autocotizador/recepcion/discriminar-plano-denso.test.mjs tests/destino-independiente-transporte-tus-r2.test.mjs
       - name: Compilar interfaces privadas sin desplegar
         working-directory: integraciones/autocotizador/recepcion
         run: |
