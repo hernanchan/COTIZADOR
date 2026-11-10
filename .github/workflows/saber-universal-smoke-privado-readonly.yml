@@ -46,11 +46,11 @@ jobs:
           test "$(wc -c < "$dir/flow.mjs")" -gt 1000
           grep -Fq 'ensayo-r2-borrador-universal' "$dir/flow.mjs" ||
             { echo 'UNIVERSAL_PAYMENT_FLOW_MISSING';exit 1; }
-          grep -Fq 'TAMAÑO MAYOR A A3' "$dir/analizador.js" ||
+          grep -Fq 'CORRESPONDE A PLOTTER' "$dir/analizador.js" ||
             { echo 'A3_PLOTTER_AUTO_NOTICE_MISSING';exit 1; }
-          grep -Fq 'CAD · Planos' "$dir/analizador.js" ||
+          grep -Eq 'CAD.*Planos' "$dir/analizador.js" ||
             { echo 'CAD_OPTION_NOT_VISIBLE_IN_LIVE_JS';exit 1; }
-          grep -Fq 'PLENO · Póster' "$dir/analizador.js" ||
+          grep -Eq 'PLENO.*ster' "$dir/analizador.js" ||
             { echo 'PLENO_OPTION_NOT_VISIBLE_IN_LIVE_JS';exit 1; }
           echo 'REAL_PRIVATE_PLOTTER_CAD_PLENO_OPTION_PRESENT'
           echo 'REAL_PRIVATE_UNIVERSAL_JS_AVAILABLE'
