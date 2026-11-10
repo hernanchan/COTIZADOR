@@ -120,8 +120,20 @@ test('nunca consulta MP ni D1 con compuerta de produccion cerrada',async()=>{
  });
  assert.equal(wh.status,503);assert.equal(calls,0);
 });
-test('retorno HTTPS admite comprador productivo y rechaza URL insegura sin crear pago',async()=>{
+test('retorno HTTPS admite comprador productivo y rechaza URL insegura sin crear pago real',async()=>{
  const f=fixture();let calls=0;
+ const accepted='https://pedidos.libreriasaber.com.ar/pedido/estado';
+ const req=new Request('https://pagos.libreriasaber.com.ar/internal/central/live/checkout',{method:'POST'});
+ const observed=[];
+ const fetcher=async(url,options)=>{
+  if(new URL(url).pathname==='/checkout/preferences'&&options?.method==='POST')
+   observed.push(JSON.parse(options.body).back_urls);
+  return f.mpFetch(url,options);
+ };
+ const approved=await checkoutMPLiveCentral(req,{...f.env,MP_LIVE_RETURN_URL:accepted},{readSigned:f.signed,fetcher});
+ assert.equal(approved.status,200);
+ assert.deepEqual(observed,[{success:accepted,pending:accepted,failure:accepted}]);
+ assert.equal(f.posts,1,'solo simulacion local de la preferencia');
  for(const returnUrl of [
   'https://pedidos.libreriasaber.com.ar/pedido/estado',
   'https://pedidos.libreriasaber.com.ar/seguimiento/estado'
@@ -145,7 +157,7 @@ test('retorno HTTPS admite comprador productivo y rechaza URL insegura sin crear
   assert.equal(out.status,503,returnUrl);
  }
  assert.equal(calls,0);
- assert.equal(f.posts,0);
+ assert.equal(f.posts,1);
 });
 test('checkout LIVE requiere HMAC de Central, orden asociada y vendedor real',async()=>{
  const f=fixture(),req=new Request('https://pagos.libreriasaber.com.ar/internal/central/live/checkout',{method:'POST'});
