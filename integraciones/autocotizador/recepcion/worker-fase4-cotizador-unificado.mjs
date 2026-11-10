@@ -69,6 +69,7 @@ import {guardarBorradorUniversal} from './r2-borrador-universal-documentos.mjs';
 import {prepararOrdenUniversalSinCheckout} from './r2-orden-universal-documentos.mjs';
 import {iniciarLoteTUSUniversal,confirmarLoteTUSUniversal} from './tus-universal-worker.mjs';
 import {pagoSandboxUniversalDocumentos} from './r2-universal-checkout-documentos.mjs';
+import {pagoMPLiveComprador} from './mp-live-comprador.mjs';
 import {checkoutR2PrepaidSandboxDocumentos} from './r2-prepago-checkout-documentos.mjs';
 import {descargarR2GrandePersonal} from './r2-pdf-grandes-descarga-personal.mjs';
 import {descargarR2PendientePorD1Personal} from './r2-pdf-descarga-d1-personal.mjs';
@@ -2292,6 +2293,19 @@ export default {
       return prepararOrdenUniversalSinCheckout(request,env,{
        authorized:staff||belongs
       });
+    }
+    // MP LIVE: separado de /prueba-v2 y del checkout sandbox.
+    // Origen de producción, cookie de comprador vinculada y HMAC obligatorios.
+    // Con compuerta cerrada: 503 sin consultar Central ni generar cobros.
+    if(page==='/api/pedido/live/checkout'){
+      if(env?.SABER_ENTORNO!=='produccion')
+       return testResponse({ok:false,error:'MP LIVE no habilitado'},503);
+      const buyer=await autorizadoPedidoCliente(request,env);
+      const payload=buyer&&request.method==='POST'?
+       await request.clone().json().catch(()=>null):null;
+      const linked=buyer&&await autorizadoPedidoClienteVinculado(
+       request,env,payload?.webOrderId);
+      return pagoMPLiveComprador(request,env,{authorized:linked});
     }
     if(page==='/prueba-v2/api/ensayo-r2-checkout-universal'){
       const staff=v2PrivateBrowserAuthorized(request,env)==='allow'||
