@@ -2,7 +2,10 @@ name: Saber QA - navegador A4 500 paginas 100MiB sin carga ni pago
 on:
   push:
     branches: [integracion/tus-pedido-privado-20261101]
-    paths: [.github/workflows/saber-qa-browser-universal-noenvio-20261110.yml]
+    paths:
+      - '.github/workflows/saber-qa-browser-universal-noenvio-20261110.yml'
+      - 'integraciones/autocotizador/recepcion/ui-universal-browser-noenvio.mjs'
+      - 'integraciones/autocotizador/recepcion/medidas-pdf-grande-rangos.mjs'
 permissions:
   contents: read
   statuses: write
@@ -12,7 +15,7 @@ concurrency:
 jobs:
   browser-privado:
     runs-on: ubuntu-latest
-    timeout-minutes: 16
+    timeout-minutes: 5
     environment:
       name: saber-cloudflare-pruebas
       deployment: false
