@@ -4,7 +4,8 @@
  */
 import {validarMetaR2,iniciarR2Grande,leerReciboR2,
  subirParteR2Grande,completarR2Grande} from './r2-pdf-grandes-privado.mjs';
-import {verificarIntegridadR2Grande} from './r2-pdf-integridad-stream.mjs';
+import {verificarIntegridadR2Grande,verificarObjetoR2Reservado} from './r2-pdf-integridad-stream.mjs';
+import {consultarReservaR2Live} from './r2-live-recovery-puente-central.mjs';
 import {consultarPagoArchivoR2Live} from './r2-live-puente-central.mjs';
 import {reservarCapacidadR2Live} from './r2-live-reserva-puente-central.mjs';
 import {informarR2LivePendiente} from './r2-live-stage-puente-central.mjs';
@@ -51,6 +52,7 @@ const expected=claim=>({orderId:claim.orderId,fileId:claim.fileId,
 export async function manejarR2MultipartLive(req,env,{
  authorized=false,verify=consultarPagoArchivoR2Live,
  reserve=reservarCapacidadR2Live,stage=informarR2LivePendiente,
+ recover=consultarReservaR2Live,
  buyer=autorizadoOrdenLive,subtle=crypto.subtle,now=()=>Math.floor(Date.now()/1000),
  uuid=()=>crypto.randomUUID(),digestFactory
 }={}){
@@ -58,7 +60,7 @@ export async function manejarR2MultipartLive(req,env,{
  const action=u.pathname.startsWith(ROOT)?u.pathname.slice(ROOT.length):'';
  const config=storage(env);
  if(!authorized||!config||!origin(req)||
-  !['iniciar','parte','completar','verificar'].includes(action))
+  !['iniciar','parte','completar','verificar','recuperar'].includes(action))
   return respond({ok:false,error:'LIVE_R2_MULTIPART_OFF'},503);
  const method=action==='parte'?'PUT':'POST';
  if(req.method!==method||
@@ -68,6 +70,50 @@ export async function manejarR2MultipartLive(req,env,{
   return respond({ok:false,error:'LIVE_R2_MULTIPART_METODO'},405);
  const settings={bucket:config.bucket,secret:config.secret,subtle,now};
  try{
+  if(action==='recuperar'){
+   const input=await json(req);
+   if(!input||Object.keys(input).sort().join(',')!=='meta,orderId'||
+    !/^WEB-ENSAYO-[A-F0-9]{32}$/.test(input.orderId||''))
+    return respond({ok:false,error:'LIVE_R2_RECOVERY_INPUT'},422);
+   validarMetaR2(input.meta);
+   if(input.meta.bytes>200*1048576)
+    return respond({ok:false,error:'LIVE_R2_LIMITE'},422);
+   if(!await buyer(req,env,input.orderId))
+    return respond({ok:false,error:'LIVE_R2_COMPRADOR_AJENO'},403);
+   const m={orderId:input.orderId,fileId:input.meta.fileId,
+    name:input.meta.name,bytes:input.meta.bytes,
+    sha256:input.meta.sha256,pages:input.meta.pages};
+   const paid=await verify(env,m);
+   if(paid.paymentVerified!==true||paid.mode!==input.meta.mode)
+    return respond({ok:false,error:'LIVE_R2_RECOVERY_PAGO'},402);
+   const saved=await recover(env,m);
+   if(saved.found===false&&saved.state==='not_started')
+    return respond({ok:true,state:'not_started',alreadyStored:false,
+     uploadPossible:true});
+   if(saved.found!==true||!['reserved','staged'].includes(saved.state)||
+     saved.sha256!==m.sha256||saved.bytes!==m.bytes)
+    return respond({ok:false,error:'LIVE_R2_RECOVERY_CONFLICTO'},409);
+   const head=await config.bucket.head(saved.objectKey);
+   if(!head)return respond({ok:true,state:'multipart_incomplete',
+    alreadyStored:false,uploadPossible:false,productionAuthorized:false});
+   if(head.size!==m.bytes)
+    return respond({ok:false,error:'LIVE_R2_RECOVERY_TAMANO'},409);
+   const verified=await verificarObjetoR2Reservado({
+    bucket:config.bucket,reserva:{found:true,objectKey:saved.objectKey,
+     orderId:m.orderId,fileId:m.fileId,sha256:m.sha256,bytes:m.bytes},
+    ...(digestFactory?{digestFactory}:{})
+   });
+   const claim={...m,mode:input.meta.mode,key:saved.objectKey};
+   const staged=await stage(env,claim,verified);
+   if(staged?.stagedForCentral!==true||
+      staged.orderId!==m.orderId||staged.fileId!==m.fileId)
+    throw Error('LIVE_R2_RECOVERY_STAGE');
+   return respond({ok:true,state:'stored_and_staged',
+    alreadyStored:true,uploadPossible:false,result:{
+     sha256Verificado:true,sha256:m.sha256,bytes:m.bytes,
+     contenidoPdfVerificado:false,registeredInD1:false,
+     stagedForCentral:true,productionAuthorized:false}});
+  }
   if(action==='iniciar'){
    const input=await json(req);
    if(!input||Object.keys(input).sort().join(',')!=='meta,orderId'||
