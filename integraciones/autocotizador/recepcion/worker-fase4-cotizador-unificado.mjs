@@ -69,6 +69,7 @@ import {cotizarPlanUniversalSinSubida} from './r2-plan-universal-api-privada.mjs
 import {guardarBorradorUniversal} from './r2-borrador-universal-documentos.mjs';
 import {prepararOrdenUniversalSinCheckout} from './r2-orden-universal-documentos.mjs';
 import {iniciarLoteTUSUniversal,confirmarLoteTUSUniversal} from './tus-universal-worker.mjs';
+import {iniciarTUSUniversalLive,confirmarTUSUniversalLive} from './tus-live-recepcion-documentos.mjs';
 import {pagoSandboxUniversalDocumentos} from './r2-universal-checkout-documentos.mjs';
 import {pagoMPLiveComprador} from './mp-live-comprador.mjs';
 import {iniciarSesionCompradorLive,autorizadoCompradorLive,autorizadoOrdenLive,vinculoOrdenLive} from './sesion-comprador-live.mjs';
@@ -2391,6 +2392,17 @@ export default {
       const linked=buyer&&await autorizadoOrdenLive(
        request,env,input?.webOrderId);
       return crearOrdenUniversalLive(request,env,{authorized:linked});
+    }
+    if(page==='/api/pedido/live/tus/iniciar'||
+       page==='/api/pedido/live/tus/confirmar'){
+      const buyer=await autorizadoCompradorLive(request,env);
+      const input=buyer&&request.method==='POST'?
+       await request.clone().json().catch(()=>null):null;
+      const linked=buyer&&await autorizadoOrdenLive(
+       request,env,input?.orderId);
+      return page==='/api/pedido/live/tus/iniciar'?
+       iniciarTUSUniversalLive(request,env,{authorized:linked}):
+       confirmarTUSUniversalLive(request,env,{authorized:linked});
     }
     if(page==='/api/pedido/live/checkout'){
       if(env?.SABER_ENTORNO!=='produccion')
