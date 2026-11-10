@@ -47,10 +47,10 @@ jobs:
           test -n "$ACCOUNT" && test -n "$TOKEN"
           base="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/pages"
           auth="Authorization: Bearer $TOKEN"
-          status=$(curl -sS --max-time 25 -H "$auth" -o "$temp/projects.json" -w '%{http_code}' "$base/projects?per_page=20")
+          status=$(curl -sS --max-time 25 -H "$auth" -o "$temp/projects.json" -w '%{http_code}' "$base/projects")
           echo "CLOUDFLARE_PAGES_LIST_DEPLOY_TOKEN_HTTP=$status"
           if [ "$status" != 200 ] && [ -n "${EDITOR_TOKEN:-}" ]; then
-            status=$(curl -sS --max-time 25 -H "Authorization: Bearer $EDITOR_TOKEN" -o "$temp/projects.json" -w '%{http_code}' "$base/projects?per_page=20")
+            status=$(curl -sS --max-time 25 -H "Authorization: Bearer $EDITOR_TOKEN" -o "$temp/projects.json" -w '%{http_code}' "$base/projects")
             echo "CLOUDFLARE_PAGES_LIST_EDITOR_TOKEN_HTTP=$status"
             if [ "$status" = 200 ]; then auth="Authorization: Bearer $EDITOR_TOKEN"; fi
           fi
