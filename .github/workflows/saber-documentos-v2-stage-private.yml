@@ -24,6 +24,9 @@ jobs:
         run: |
           npm install --no-audit --no-fund
           node --test medidas-local-pdf-rescate.test.mjs lectura-local-pdf.test.mjs
+          node --test ../../../tests/r2-stage-compatible-clasico-universal.test.mjs
+          grep -Fq 'stage:stageR2Compatible' worker-fase4-cotizador-unificado.mjs
+          echo 'STAGE_COMPATIBILITY_R2_CLASSIC_UNIVERSAL_VERIFIED'
           npm run build:unificado
           grep -q 'ensayo-preparar-documentos-v2-lote' dist/saber-documentos-cotizador-fase4.mjs
           grep -Fq 'batch-files' dist/saber-documentos-cotizador-fase4.mjs
