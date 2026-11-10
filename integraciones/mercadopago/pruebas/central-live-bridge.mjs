@@ -62,14 +62,14 @@ export async function leerFirmaInternaLive(request,env,{
        !/^[A-Za-z0-9_-]{1,80}$/.test(payload.fileId||'')||
        !/^[a-f0-9]{64}$/.test(payload.sha256||'')||
        typeof payload.name!=='string'||payload.name.length<1||payload.name.length>120||
-       !/\\.pdf$/i.test(payload.name)||
+       !/\.pdf$/i.test(payload.name)||
        !Number.isSafeInteger(payload.bytes)||payload.bytes<5||payload.bytes>40*1048576||
        !Number.isSafeInteger(payload.pages)||payload.pages<1||payload.pages>2000):
      tusReceipt?(!WEB.test(payload.orderId||'')||
        !/^[A-Za-z0-9_-]{1,80}$/.test(payload.fileId||'')||
        !/^[a-f0-9]{64}$/.test(payload.sha256||'')||
        typeof payload.name!=='string'||payload.name.length<1||payload.name.length>120||
-       !/\\.pdf$/i.test(payload.name)||
+       !/\.pdf$/i.test(payload.name)||
        !Number.isSafeInteger(payload.bytes)||payload.bytes<5||payload.bytes>40*1048576||
        !Number.isSafeInteger(payload.pages)||payload.pages<1||payload.pages>2000||
        !Array.isArray(payload.metrics)||payload.metrics.length!==payload.pages||
