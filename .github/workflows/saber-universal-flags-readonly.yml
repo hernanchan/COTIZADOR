@@ -1,0 +1,57 @@
+name: Saber universal - auditoria flags privadas (SOLO LECTURA)
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-universal-flags-readonly.yml]
+permissions:
+  contents: read
+jobs:
+  settings:
+    runs-on: ubuntu-latest
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    timeout-minutes: 5
+    steps:
+      - name: Verificar Worker privados y compuertas sin leer valores secretos
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts"
+          tmp=$(mktemp -d)
+          trap 'rm -rf "$tmp"' EXIT
+          for w in saber-documentos-pruebas saber-pagos-pruebas; do
+            curl -fsS --max-time 25 -H "Authorization: Bearer $TOKEN" "$root/$w/settings" > "$tmp/settings"
+            curl -fsS --max-time 25 -H "Authorization: Bearer $TOKEN" "$root/$w/deployments" > "$tmp/deploy"
+            jq -e '.success==true and (.result.bindings|type=="array")' "$tmp/settings" >/dev/null
+            jq -e '.success==true and (.result.deployments|length)>0' "$tmp/deploy" >/dev/null
+            echo "PRIVATE_WORKER=$w HEALTH_OF_SETTINGS_OK"
+            if [ "$w" = saber-documentos-pruebas ]; then
+              flags='DOCS_R2_UNIVERSAL_DRAFT_ENABLED DOCS_R2_UNIVERSAL_ORDER_ENABLED DOCS_R2_UNIVERSAL_CHECKOUT_ENABLED DOCS_R2_UNIVERSAL_POSTPAY_ENABLED DOCS_R2_UNIVERSAL_TUS_ENABLED DOCS_R2_UNIVERSAL_PACKAGE_ENABLED DOCS_R2_BIG_ENABLED DOCS_R2_QUOTA_ENABLED DOCS_R2_STAGING_ENABLED DOCS_CLIENT_SANDBOX_CHECKOUT_ENABLED DOCS_CENTRAL_SYNC_ENABLED DOCS_PRICE_ADMIN_D1_ENABLED'
+              destructive='DOCS_R2_UNIVERSAL_PURGE_ENABLED'
+              bindings='SABER_CENTRAL SABER_R2_GRANDES DOCS_TUS_SUPABASE_SERVICE_KEY DOCS_TUS_RECEIPT_KEY DOCS_TUS_PUBLISHABLE_KEY CENTRAL_BRIDGE_KEY DOCS_V2_PRIVATE_UI_SECRET'
+            else
+              flags='CENTRAL_R2_UNIVERSAL_DRAFT_ENABLED CENTRAL_R2_UNIVERSAL_ORDER_ENABLED CENTRAL_R2_UNIVERSAL_CHECKOUT_ENABLED CENTRAL_R2_UNIVERSAL_POSTPAY_ENABLED CENTRAL_R2_UNIVERSAL_TUS_ENABLED CENTRAL_R2_UNIVERSAL_PACKAGE_ENABLED CENTRAL_R2_UNIVERSAL_PREPRESS_ENABLED CENTRAL_R2_STAGING_ENABLED CENTRAL_R2_QUOTA_ENABLED DOCS_SANDBOX_CHECKOUT_ENABLED'
+              destructive='CENTRAL_R2_UNIVERSAL_PURGE_ENABLED CENTRAL_R2_UNIVERSAL_PURGE_EXECUTE_ENABLED'
+              bindings='DB SABER_DOCUMENTOS SABER_R2_GRANDES CENTRAL_BRIDGE_KEY MP_TEST_ACCESS_TOKEN'
+            fi
+            for flag in $flags; do
+              status=$(jq -r --arg name "$flag" '.result.bindings|map(select(.name==$name))|first|if .==null then "ABSENT" elif .type=="plain_text" and .text=="PRIVATE_TEST_ONLY" then "ENABLED" else "OFF_OR_OTHER" end' "$tmp/settings")
+              echo "$w $flag=$status"
+            done
+            for flag in $destructive; do
+              status=$(jq -r --arg name "$flag" '.result.bindings|map(select(.name==$name))|first|if .==null then "ABSENT" elif .type=="plain_text" and .text=="PRIVATE_TEST_ONLY" then "ENABLED_CAUTION" else "OFF_OR_OTHER" end' "$tmp/settings")
+              echo "$w $flag=$status"
+            done
+            for name in $bindings; do
+              status=$(jq -r --arg name "$name" '.result.bindings|map(select(.name==$name))|first|if .==null then "MISSING" else "PRESENT" end' "$tmp/settings")
+              echo "$w BINDING_$name=$status"
+            done
+          done
+          curl -fsS --max-time 25 https://saber-pagos-pruebas.libreriasaber.workers.dev/health > "$tmp/health"
+          jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$tmp/health" >/dev/null
+          echo 'PRIVATE_HEALTH_OK_REAL_PAYMENTS_OFF_READONLY_NO_STORAGE_ACCESS'
