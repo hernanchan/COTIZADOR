@@ -4774,6 +4774,15 @@ export default {
    const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
    return registrarFichaUniversalD1(req,env,{readSigned:leerFirmaInternaLive});
   }
+  if(url.pathname==='/internal/central/live/package-manifest'||
+     url.pathname==='/internal/central/live/package-file'){
+   const {consultarPaqueteUniversalCentral,consultarArchivoUniversalCentral}=
+    await import('./r2-universal-package-central.mjs');
+   const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
+   return url.pathname.endsWith('package-manifest')?
+    consultarPaqueteUniversalCentral(req,env,{readSigned:leerFirmaInternaLive}):
+    consultarArchivoUniversalCentral(req,env,{readSigned:leerFirmaInternaLive});
+  }
   if(url.pathname==='/internal/central/live/r2-recover'){
    const {consultarRecuperacionR2Live}=await import('./r2-universal-live-recovery-central.mjs');
    const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
