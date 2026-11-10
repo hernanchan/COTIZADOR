@@ -8,7 +8,8 @@ export async function solicitarCotizacionPrivada(archivos,{
  pausa=ms=>new Promise(resolve=>setTimeout(resolve,ms))
 }={}){
  const payload=JSON.stringify({archivos});
- const endpoint='/api/ensayo-carga-unica';
+ const endpoint=typeof location!=='undefined'&&location.pathname==='/cotizar/archivos'?
+  '/api/pedido/live/cotizar':'/api/ensayo-carga-unica';
  for(let intento=0;intento<2;intento++){
   let response;
   try{
