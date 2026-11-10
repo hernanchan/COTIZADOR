@@ -56,19 +56,19 @@ test('un CAD detectado tampoco ofrece pleno: conserva cotización CAD automátic
  assert.match(r.all.find(x=>x.textContent?.includes('Clasificación automática:'))?.textContent||'',/CAD/);
  assert.equal(e.paginas[0].modo,'cad');
 });
-test('si clasificación NO se pudo hacer, pregunta CAD/pleno y no inventa detección',()=>{
+test('si falla clasificación, no inventa CAD/Pleno ni permite cotizar sin revisión',()=>{
  const e=documento('sin-clasificar');
  e.clasificacionAutomatica=false;
  assert.equal(cotizar(e).estado,'INCOMPLETO');
  const r=ui(e);
- const buttons=r.all.filter(x=>x.tag==='button');
- assert.deepEqual(buttons.map(b=>b.textContent),['CAD · Planos','PLENO · Póster']);
- assert.equal(r.all.some(x=>x.tag==='a'),false);
- buttons[0].onclick();
- assert.equal(e.paginas[0].modo,'cad');
- assert.equal(e.tipoPloteoElegidoPorCliente,true);
- assert.equal(r.changes,1);
- assert.equal(cotizar(e).estado,'PRELIMINAR');
+ assert.equal(r.all.filter(x=>x.tag==='button').length,0);
+ const revisar=r.all.find(x=>x.tag==='a');
+ assert.ok(revisar);
+ assert.match(revisar.textContent,/Solicitar revisión del PDF/);
+ assert.match(new URL(revisar.href).searchParams.get('text'),/revisar la clasificación/);
+ assert.equal(e.paginas[0].modo,'sin-clasificar');
+ assert.equal(r.changes,0);
+ assert.equal(cotizar(e).estado,'INCOMPLETO');
 });
 test('clasificación por páginas mixta verificada no permite forzar un tipo barato',()=>{
  const e=documento('poster');
