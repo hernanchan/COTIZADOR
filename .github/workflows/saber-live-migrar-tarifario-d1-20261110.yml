@@ -1,0 +1,64 @@
+name: Saber - migrar D1 tarifario produccion sin precios ni cobros
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-live-migrar-tarifario-d1-20261110.yml]
+permissions:
+  contents: read
+  statuses: write
+concurrency:
+  group: saber-live-pricing-schema-no-go
+  cancel-in-progress: false
+jobs:
+  pricing-schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verificar DDL idempotente en SQLite sin precio
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check integraciones/publicacion/aplicar-d1-produccion-tarifario.mjs
+          python3 - <<'PY'
+          import sqlite3,pathlib
+          db=sqlite3.connect(':memory:')
+          ddl=pathlib.Path('integraciones/publicacion/d1-produccion-tarifario-v1.sql').read_text()
+          db.executescript(ddl)
+          db.executescript(ddl)
+          names={x[0] for x in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+          assert 'central_pricing_admin_head' in names
+          assert 'central_pricing_admin_history' in names
+          assert db.execute('SELECT COUNT(*) FROM central_pricing_admin_head').fetchone()[0]==0
+          assert db.execute('SELECT COUNT(*) FROM central_pricing_admin_history').fetchone()[0]==0
+          print('LIVE_PRICING_DDL_OFFLINE_IDEMPOTENT_ZERO_DATA')
+          PY
+      - name: Aplicar solo esquema tarifario D1 productivo, sin publicar
+        shell: bash
+        env:
+          SABER_CF_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          SABER_CF_D1_WRITE_TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+        run: |
+          set -euo pipefail
+          node integraciones/publicacion/aplicar-d1-produccion-tarifario.mjs
+      - name: Registrar resultado sin pagos
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        shell: bash
+        run: |
+          if [ "$RESULT" = success ];then state=success;else state=failure;fi
+          jq -n --arg state "$state" --arg context "saber/live-pricing-schema-d1" \
+             --arg description "Tarifario D1 sin datos/no-go: $RESULT" \
+             --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+             '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/pricing-status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/pricing-status.json >/dev/null
