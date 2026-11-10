@@ -77,7 +77,7 @@ jobs:
             integraciones/mercadopago/produccion/wrangler.toml.template > "$t"
           grep -Fq "database_id = \"$prod\"" "$t"
           ! grep -Fq "$sandbox" "$t"
-          npx wrangler deploy --config "$t" --yes > "$tmp/deploy.log" 2>&1 ||
+          CI=true npx wrangler deploy --config "$t" > "$tmp/deploy.log" 2>&1 ||
             { tail -n 22 "$tmp/deploy.log";exit 1; }
           echo 'LIVE_WORKER_DEPLOYED_NO_ROUTE'
           curl -fsS --max-time 30 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
