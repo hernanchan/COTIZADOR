@@ -3,6 +3,7 @@
  * solo después de verificar pago y reservar cuota en Central D1.
  */
 import {leerPedidoPostpagoLive} from './recepcion-tus-live-cliente.mjs';
+export {leerPedidoPostpagoLive} from './recepcion-tus-live-cliente.mjs';
 import {sha256PdfLocalPorFragmentos} from './sha256-pdf-local-fragmentos.mjs';
 import {enviarArchivoR2Grande} from './r2-pdf-grandes-cliente.mjs';
 const ORIGIN='https://pedidos.libreriasaber.com.ar';
