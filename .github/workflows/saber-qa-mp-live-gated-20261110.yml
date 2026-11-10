@@ -12,6 +12,8 @@ on:
       - 'integraciones/mercadopago/pruebas/worker.js'
       - 'integraciones/autocotizador/recepcion/mp-live-comprador.mjs'
       - 'integraciones/autocotizador/recepcion/mp-live-comprador.test.mjs'
+      - 'integraciones/autocotizador/recepcion/pagina-retorno-live.mjs'
+      - 'integraciones/autocotizador/recepcion/pagina-retorno-live.test.mjs'
       - 'integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs'
       - 'integraciones/autocotizador/recepcion/pago-live-universal-documentos.mjs'
       - 'integraciones/autocotizador/recepcion/pago-live-universal-documentos.test.mjs'
@@ -34,6 +36,7 @@ jobs:
           node --test integraciones/mercadopago/pruebas/central-live-bridge.test.mjs
           node --test integraciones/mercadopago/pruebas/central-live-hmac-e2e.test.mjs
           node --test integraciones/autocotizador/recepcion/mp-live-comprador.test.mjs
+          node --test integraciones/autocotizador/recepcion/pagina-retorno-live.test.mjs
           node --check integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs
           node --test integraciones/autocotizador/recepcion/pago-live-universal-documentos.test.mjs
           node --check integraciones/mercadopago/pruebas/worker.js
