@@ -1,0 +1,48 @@
+name: Saber - piloto mixto sandbox A4+ A1, una orden y checkout TEST
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths:
+      - .github/workflows/saber-piloto-mixto-sandbox-20261110.yml
+permissions:
+  contents: read
+  statuses: write
+concurrency:
+  group: saber-qa-pedido-mixto-once-20261110
+  cancel-in-progress: false
+jobs:
+  pedido:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Crear cotizacion D1 privada y checkout MP TEST, no enviar archivos impagos
+        shell: bash
+        env:
+          SABER_V2_OPERATOR_PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+        run: |
+          set -euo pipefail
+          node --check integraciones/autocotizador/recepcion/piloto-mixto-sandbox-20261110.mjs
+          node integraciones/autocotizador/recepcion/piloto-mixto-sandbox-20261110.mjs
+      - name: Registrar estado sin habilitar pagos reales
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        shell: bash
+        run: |
+          if [ "$RESULT" = success ];then state=success;else state=failure;fi
+          jq -n --arg state "$state" --arg context 'saber/sandbox-mixed-pilot-checkout' \
+           --arg description "Pilot A4+A1 MP test: $RESULT" \
+           --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+           '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/saber-mixed-pilot.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+           --input /tmp/saber-mixed-pilot.json >/dev/null
