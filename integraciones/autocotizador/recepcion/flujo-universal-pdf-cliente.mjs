@@ -135,6 +135,15 @@ export function crearFlujoUniversalPDF({
   if(r.webOrderId!==webOrderId||r.commercialOrderId!==commercialOrderId||
      r.amountArs!==totalArs||r.fileCount!==files.length)
    throw Error('UNIVERSAL_ESTADO_PAGO_AJENO');
+  if(!Array.isArray(r.receivedFileIds)||r.receivedFileIds.length>plan.length||
+     r.receivedFileIds.length!==files.length-r.pendingFiles||
+     new Set(r.receivedFileIds).size!==r.receivedFileIds.length||
+     r.receivedFileIds.some(id=>!plan.some(p=>p.fileId===id)))
+   throw Error('UNIVERSAL_RECIBOS_D1_NO_COINCIDEN');
+  // D1 is authoritative even after network failure or a retried TUS batch.
+  uploadComplete=new Set(r.receivedFileIds);
+  pendingTUS=false;
+  emit();
   if(r.estado==='revocado'&&r.uploadAuthorized===false){
    transition('revocado');return 'revocado';
   }
