@@ -75,16 +75,16 @@ function render(){
    if(!seleccionado){card.append(dato('p','Ningún rollo estándar admite el ancho de este PDF. Requiere revisión de Librería Saber.'))}
    else {
     const recubierto=d.papelPoster==='recubierto';
-    if(!recubierto||cad>0)card.append(dato('p',(recubierto?'Rollo obra para páginas CAD: ':'Rollo obra asignado automáticamente: ')+seleccionado.name+' ('+seleccionado.widthCm+' cm)'));
+    if(!recubierto)card.append(dato('p','Rollo obra asignado automáticamente: '+seleccionado.name+' ('+seleccionado.widthCm+' cm)'));
     if(recubierto){
      const mayores=d.paginas.map(p=>Math.min(p.anchoCm,p.altoCm));
      const soporteRec=catalogo.filter(x=>/^rec\\d+$/.test(x.id)&&mayores.every(ancho=>ancho<=x.widthCm+0.03)).sort((a,b)=>a.widthCm-b.widthCm)[0];
-     if(soporteRec)card.append(dato('p','Rollo para páginas Póster: '+soporteRec.name+' ('+soporteRec.widthCm+' cm)'));
+     if(soporteRec)card.append(dato('p','Rollo recubierto para el ploteo: '+soporteRec.name+' ('+soporteRec.widthCm+' cm)'));
     }
    }
    if(cad+poster>0&&d.papelPoster==='recubierto'){
     const recubiertos=catalogo.filter(x=>/^rec\d+$/.test(x.id));
-    const falta=d.paginas.filter(p=>p.modo==='poster'&&!recubiertos.some(r=>
+    const falta=d.paginas.filter(p=>!recubiertos.some(r=>
       Math.min(p.anchoCm,p.altoCm)<=r.widthCm+0.03));
     if(falta.length)card.append(dato('p','El papel recubierto no admite las páginas '+falta.map(x=>x.numero).join(', ')+'. Requiere revisión.'));
    }
@@ -105,7 +105,7 @@ async function cotizar(){
  const n=version,ac=new AbortController();controlador=ac;
  const trabajos=lista.map((d,i)=>({id:'pl'+(i+1),nombre:d.nombre,modo:d.modo,
   material:d.material,copias:d.copias,paginas:d.paginas,
-  ...(d.paginas.some(p=>p.modo==='poster')?{papelPoster:d.papelPoster||'obra80'}:{})}));
+  papelPoster:d.papelPoster||'obra80'}));
  estado('Calculando el presupuesto preliminar…');
  try{
   const r=await fetch('/api/ensayo-ploteos-rapido',{method:'POST',
