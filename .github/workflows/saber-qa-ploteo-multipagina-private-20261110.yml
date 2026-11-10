@@ -31,7 +31,13 @@ jobs:
           node --test tests/ploteo-grande-visual-limitado.test.mjs tests/ploteo-deteccion-automatica-sin-opcion-cad.test.mjs tests/ploteo-letras-contorno-cad-general.test.mjs integraciones/autocotizador/recepcion/discriminar-plano-denso.test.mjs
           cd integraciones/autocotizador/recepcion
           npm install --no-audit --no-fund
+          node --test ./carga-unica-pdf-regresion.test.mjs ../../../tests/destino-independiente-transporte-tus-r2.test.mjs
           npm run build:unificado
+          grep -Fq 'SABER_SMART_UNIVERSAL_PDF' carga-unica-cliente.txt
+          if grep -Fq 'SABER_SMART_R2_PREPAGO' carga-unica-cliente.txt;then
+            echo 'LEGACY_PLOTTER_ONLY_R2_BRANCH_FOUND';exit 1
+          fi
+          echo 'UNIVERSAL_R2_ANY_PRINT_SIZE_CLIENT_BUNDLE_VERIFIED'
           node --check dist/saber-documentos-cotizador-fase4.mjs
           grep -Fq 'VISUAL_PDFJS_LIMITADO' dist/saber-documentos-cotizador-fase4.mjs
           grep -Fq 'cad_contornos_vectoriales_sin_relleno' dist/saber-documentos-cotizador-fase4.mjs
@@ -126,6 +132,8 @@ jobs:
               "$docs/prueba-v2/carga-inteligente.js?qa=$(date +%s)-$i" || true)
             if [ "$code" = 200 ] && grep -Fq 'VISUAL_PDFJS_LIMITADO' "$tmp/new.js" &&
                grep -Fq 'cad_contornos_vectoriales_sin_relleno' "$tmp/new.js" &&
+               grep -Fq 'SABER_SMART_UNIVERSAL_PDF' "$tmp/new.js" &&
+               ! grep -Fq 'SABER_SMART_R2_PREPAGO' "$tmp/new.js" &&
                grep -Fq 'Recubierto 130 g' "$tmp/new.js"; then
               propagated=1; break
             fi
