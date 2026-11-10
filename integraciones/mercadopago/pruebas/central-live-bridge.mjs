@@ -10,7 +10,9 @@ const routeSchema=new Map([
  ['/internal/central/live/status','saber-mp-live-status-v1'],
  ['/internal/central/live/order','saber-central-r2-universal-create-order-v1'],
  ['/internal/central/live/pricing','saber-price-snapshot-live-v1'],
- ['/internal/central/live/draft','saber-r2-universal-draft-v1']
+ ['/internal/central/live/draft','saber-r2-universal-draft-v1'],
+ ['/internal/central/live/tus-gate','saber-central-r2-universal-tus-gate-v1'],
+ ['/internal/central/live/tus-received','saber-central-r2-universal-tus-received-v1']
 ]);
 export async function leerFirmaInternaLive(request,env,{
  now=()=>Math.floor(Date.now()/1000),subtle=crypto.subtle
@@ -41,18 +43,41 @@ export async function leerFirmaInternaLive(request,env,{
    return {error:'Identidad o fecha LIVE inválida',status:401};
  const raw=await request.text();
  const draftRoute=url.pathname==='/internal/central/live/draft';
- if(raw.length<40||raw.length>(draftRoute?512000:2000))
+ const tusReceipt=url.pathname==='/internal/central/live/tus-received';
+ const tusGate=url.pathname==='/internal/central/live/tus-gate';
+ if(raw.length<40||raw.length>(draftRoute?512000:tusReceipt?140000:2000))
    return {error:'Tamaño LIVE inválido',status:413};
  let payload;try{payload=JSON.parse(raw)}catch{}
  const orderRoute=url.pathname==='/internal/central/live/order';
  const pricingRoute=url.pathname==='/internal/central/live/pricing';
- const keys=draftRoute?'archivos,armados,estado,pagoAutorizado,priceRevision,produccionAutorizada,quoteHash,schema,subidaAutorizada,totalArs,webOrderId':
+ const keys=tusGate?'action,bytes,fileId,name,orderId,pages,schema,sha256':
+  tusReceipt?'bytes,fileId,metrics,name,objectName,orderId,pages,receiptId,schema,sha256':
+  draftRoute?'archivos,armados,estado,pagoAutorizado,priceRevision,produccionAutorizada,quoteHash,schema,subidaAutorizada,totalArs,webOrderId':
   pricingRoute?'purpose,schema':orderRoute?'draftId,quoteHash,schema,telefono,webOrderId':
   'commercialOrderId,schema,webOrderId';
  if(!payload||typeof payload!=='object'||Array.isArray(payload)||
     Object.keys(payload).sort().join(',')!==keys||
     payload.schema!==expectedSchema||
-    (draftRoute?!/^[a-f0-9]{64}$/.test(payload.quoteHash||'')||
+    (tusGate?(!['start','finish'].includes(payload.action)||!WEB.test(payload.orderId||'')||
+       !/^[A-Za-z0-9_-]{1,80}$/.test(payload.fileId||'')||
+       !/^[a-f0-9]{64}$/.test(payload.sha256||'')||
+       typeof payload.name!=='string'||payload.name.length<1||payload.name.length>120||
+       !/\\.pdf$/i.test(payload.name)||
+       !Number.isSafeInteger(payload.bytes)||payload.bytes<5||payload.bytes>40*1048576||
+       !Number.isSafeInteger(payload.pages)||payload.pages<1||payload.pages>2000):
+     tusReceipt?(!WEB.test(payload.orderId||'')||
+       !/^[A-Za-z0-9_-]{1,80}$/.test(payload.fileId||'')||
+       !/^[a-f0-9]{64}$/.test(payload.sha256||'')||
+       typeof payload.name!=='string'||payload.name.length<1||payload.name.length>120||
+       !/\\.pdf$/i.test(payload.name)||
+       !Number.isSafeInteger(payload.bytes)||payload.bytes<5||payload.bytes>40*1048576||
+       !Number.isSafeInteger(payload.pages)||payload.pages<1||payload.pages>2000||
+       !Array.isArray(payload.metrics)||payload.metrics.length!==payload.pages||
+       payload.metrics.some(m=>!m||!Number.isFinite(m.anchoCm)||!Number.isFinite(m.altoCm)||
+          m.modo!=='sin-clasificar')||
+       typeof payload.receiptId!=='string'||!/^DOC-[a-f0-9-]{36}$/i.test(payload.receiptId)||
+       typeof payload.objectName!=='string'||payload.objectName.length>150):
+     draftRoute?!/^[a-f0-9]{64}$/.test(payload.quoteHash||'')||
        !/^d1-approved-revision-[1-9]\d{0,7}$/.test(payload.priceRevision||'')||
        payload.pagoAutorizado!==false||payload.subidaAutorizada!==false||
        payload.produccionAutorizada!==false||
@@ -65,7 +90,7 @@ export async function leerFirmaInternaLive(request,env,{
       payload.telefono.replace(/\D/g,'').length<10||
       payload.telefono.replace(/\D/g,'').length>15:
       !UUID.test(payload.commercialOrderId||''))||
-    (!pricingRoute&&!WEB.test(payload.webOrderId||'')))
+    (!pricingRoute&&!tusGate&&!tusReceipt&&!WEB.test(payload.webOrderId||'')))
    return {error:'Orden LIVE inválida',status:422};
  const key=await subtle.importKey('raw',new TextEncoder().encode(env.CENTRAL_BRIDGE_KEY),
   {name:'HMAC',hash:'SHA-256'},false,['verify']);
