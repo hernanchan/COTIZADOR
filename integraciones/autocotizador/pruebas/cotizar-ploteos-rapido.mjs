@@ -37,11 +37,10 @@ export function cotizarPloteosRapido({trabajos,precios}){
   if(!soporte)throw Error('Material de ploteo no disponible.');
   if(!Array.isArray(paginas)||paginas.length<1||paginas.length>2000)
    throw Error('Número de páginas inválido.');
-  // El cliente elige solamente el acabado de las páginas clasificadas como Póster.
-  // CAD siempre usa obra estándar. El rollo y la tarifa los define el servidor.
+  // El cliente elige obra 80 g o recubierto 130 g para el ploteo,
+  // independientemente de CAD/Póster. El rollo y la tarifa los define el servidor.
   const papelPoster=t.papelPoster===undefined?'obra80':t.papelPoster;
-  if(!['obra80','recubierto'].includes(papelPoster)||
-     (papelPoster==='recubierto'&&!paginas.some(p=>p.modo==='poster')))
+  if(!['obra80','recubierto'].includes(papelPoster))
    throw Error('Papel de póster inválido.');
   let metros=0,subtotalBruto=0;const detailPages=[];
   const minimo=Number(config.minMeters||0),redondeo=Number(config.roundTo||1);
@@ -58,7 +57,7 @@ export function cotizarPloteosRapido({trabajos,precios}){
    const modoPagina=p.modo||t.modo;
    if(!['cad','poster'].includes(modoPagina))throw Error('Tipo de ploteo inválido.');
    let rolloPagina=soporte;
-   if(nuevo&&modoPagina==='poster'&&papelPoster==='recubierto'){
+   if(nuevo&&papelPoster==='recubierto'){
     rolloPagina=config.supports.filter(s=>/^rec\d+$/.test(s.id))
       .sort((a,b)=>Number(a.widthCm)-Number(b.widthCm))
       .find(s=>ancho<=Number(s.widthCm)+0.03);
@@ -69,7 +68,7 @@ export function cotizarPloteosRapido({trabajos,precios}){
    metros+=largo/100;subtotalBruto+=largo/100*tarifaPagina;
    detailPages.push({numero:p.numero,anchoCm:p.anchoCm,altoCm:p.altoCm,modo:modoPagina,
      material:rolloPagina.id,materialNombre:rolloPagina.name,
-     papel:modoPagina==='poster'&&papelPoster==='recubierto'?'recubierto':'obra80',
+     papel:papelPoster==='recubierto'?'recubierto':'obra80',
      anchoEnRolloCm:ancho,largoEnRolloCm:largo});
   }
   const tarifa=Number(t.modo==='cad'?soporte.cadPerMeter:soporte.posterPerMeter);
