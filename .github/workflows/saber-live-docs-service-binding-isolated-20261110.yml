@@ -1,0 +1,105 @@
+name: Saber - Documentos PRODUCCION aislado con service binding privado
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-live-docs-service-binding-isolated-20261110.yml]
+permissions:
+  contents: read
+  statuses: write
+concurrency:
+  group: saber-live-docs-no-go-aislado
+  cancel-in-progress: false
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validar compuertas y construir cotizador SIN publicarlo
+        shell: bash
+        run: |
+          set -euo pipefail
+          t=integraciones/autocotizador/produccion/wrangler.toml.template
+          grep -Fxq 'name = "saber-documentos-produccion"' "$t"
+          grep -Fxq 'workers_dev = false' "$t"
+          grep -Fxq 'preview_urls = false' "$t"
+          grep -Fxq 'SABER_ENTORNO = "preparacion"' "$t"
+          grep -Fxq 'DOCS_MP_LIVE_GATE = "NO_GO"' "$t"
+          grep -Fxq 'binding = "SABER_CENTRAL"' "$t"
+          grep -Fxq 'service = "saber-pagos-produccion"' "$t"
+          ! grep -Eq '^routes?[[:space:]]*=' "$t"
+          ! grep -Eq '^crons[[:space:]]*=' "$t"
+          npm install --no-save --no-fund --no-audit pdf-lib@1.17.1 esbuild@0.25.12 wrangler@4.55.0
+          cd integraciones/autocotizador/recepcion
+          npm install --no-audit --no-fund
+          npm run build:unificado
+          node --test mp-live-comprador.test.mjs
+          grep -Fq '/api/pedido/live/checkout' dist/saber-documentos-cotizador-fase4.mjs
+          cd ../../../
+          echo 'LIVE_DOCS_BUNDLE_TESTS_OK_PAYMENT_GATE_NO_GO'
+      - name: Desplegar SOLO Worker interno sin ruta pública y verificar binding
+        shell: bash
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_ACCOUNT_ID" && test -n "$CLOUDFLARE_API_TOKEN"
+          tmp=$(mktemp -d);trap 'rm -rf "$tmp"' EXIT
+          root="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID"
+          docs="$root/workers/scripts/saber-documentos-produccion"
+          central="$root/workers/scripts/saber-pagos-produccion/settings"
+          curl -fsS --max-time 30 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+             "$central" > "$tmp/central.json"
+          jq -e '.success==true and
+            (.result.bindings|any(.name=="MP_LIVE_GATE" and .type=="plain_text" and .text=="NO_GO")) and
+            (.result.bindings|any(.name=="SABER_ENTORNO" and .type=="plain_text" and .text=="preparacion"))' \
+              "$tmp/central.json" >/dev/null
+          code=$(curl -sS --max-time 30 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+             -o "$tmp/docsexisting.json" -w '%{http_code}' "$docs/settings")
+          if [ "$code" = 200 ];then echo 'LIVE_DOCUMENTS_ALREADY_EXISTS_NOT_OVERWRITING';exit 1;fi
+          if [ "$code" != 404 ];then echo "LIVE_DOCUMENTS_UNKNOWN_HTTP=$code";exit 1;fi
+          cfg=integraciones/autocotizador/produccion/wrangler.toml
+          cp integraciones/autocotizador/produccion/wrangler.toml.template "$cfg"
+          CI=true npx wrangler deploy --config "$cfg" > "$tmp/deploy.log" 2>&1 ||
+             { tail -n 20 "$tmp/deploy.log";exit 1; }
+          echo 'LIVE_DOCUMENTS_ISOLATED_DEPLOY_CREATED'
+          curl -fsS --max-time 30 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+             "$docs/settings" > "$tmp/docs.json"
+          jq -e '.success==true and
+             (.result.bindings|any(.name=="SABER_CENTRAL" and .type=="service" and .service=="saber-pagos-produccion")) and
+             (.result.bindings|any(.name=="DOCS_MP_LIVE_GATE" and .type=="plain_text" and .text=="NO_GO")) and
+             (.result.bindings|any(.name=="SABER_ENTORNO" and .type=="plain_text" and .text=="preparacion"))' \
+              "$tmp/docs.json" >/dev/null
+          if jq -e '.result.bindings|any(.name|test("MP_LIVE_ACCESS_TOKEN|MP_TEST_ACCESS_TOKEN|DOCS_TUS_SUPABASE_SERVICE_ROLE|CENTRAL_BRIDGE_KEY"))' \
+              "$tmp/docs.json" >/dev/null;then
+             echo 'LIVE_DOCUMENTS_UNEXPECTED_SECRET_OR_TEST_CREDENTIAL';exit 1
+          fi
+          curl -fsS --max-time 30 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              "$docs/subdomain" > "$tmp/subdomain.json"
+          jq -e '.success==true and .result.enabled==false and .result.previews_enabled==false' \
+              "$tmp/subdomain.json" >/dev/null
+          echo 'LIVE_DOCUMENTS_SERVICE_BINDING_TO_CENTRAL_PRODUCTION_VERIFIED'
+          echo 'LIVE_DOCUMENTS_NO_PUBLIC_URL_NO_PREVIEW_NO_CREDENTIALS'
+          echo 'LIVE_DOCUMENTS_NO_MP_NO_PAYMENTS_NO_PUBLICATION'
+      - name: Registrar control de seguridad
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          if [ "$RESULT" = success ];then state=success;else state=failure;fi
+          jq -n --arg state "$state" --arg context 'saber/live-docs-internal-binding' \
+            --arg description "Docs LIVE interno, central vinculada, NO_GO: $RESULT" \
+            --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/binding-status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/binding-status.json >/dev/null
