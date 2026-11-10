@@ -130,7 +130,7 @@ export async function revisarPdfR2Local({
  return Object.freeze({
   schema:'saber-r2-informe-preprensa-local-v1',
   webOrderId,commercialOrderId,receiptId,
-  sha256Verificado:true,bytesVerificados:expectedBytes,
+  sha256Verificado:true,sha256Original:expectedSha256,bytesVerificados:expectedBytes,
   declaredPages:paginasDeclaradas.length,measuredPages:measured.pageCount,
   measuredDimensions:paginas,
   geometryMatchesQuote:geometry.coinciden&&(!quoteSnapshot||cotejo.geometryMatchesQuote),
