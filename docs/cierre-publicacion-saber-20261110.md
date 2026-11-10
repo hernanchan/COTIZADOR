@@ -328,3 +328,13 @@
 3. Tarifario productivo aprobado explícitamente y circuitos web y MP LIVE conciliados; habilitar compuertas y publicación SOLO tras aprobación comercial y piloto de pedido completo.
 
 Se mantienen `main`, Pages público y cobros/productos LIVE **sin cambios**, todos los gates `NO_GO`.
+
+## 10/11 — etapa 1: administración independiente de precios LIVE sin aprobación automática
+
+- Identificado bloqueo real: la D1 de producción tenía esquema `central_pricing_admin_*` pero la administración `/admin/api/pricing` era exclusiva de Sandbox (`PRICE_ADMIN_PRIVATE_ENABLED=PRIVATE_TEST_ONLY`) y usaba baseline histórico que NO es apto para aprobación automática. En particular, los precios de referencia históricos NO deben convertirse en precios productivos sin validación comercial.
+- Agregado `pricing-live-admin.mjs` y rutas exclusivas de Central `/admin/api/pricing-live` (GET), `/admin/api/pricing-live/draft` y `/admin/api/pricing-live/approve` (POST). Requieren autenticación administrativa existente `tokenOK`, entorno/DB producción y compuerta **independiente** `CENTRAL_LIVE_PRICING_ADMIN_GATE=GO_COMERCIAL_CONFIRMADO`. No activar sin revisión de permisos y despliegue aislado.
+- Guardar propuesta exige snapshot COMPLETO válido por `priceAdminValidatePayload`, `confirmed:true`, responsable y revisión D1 exacta; no se copia baseline, no se inserta ningún importe automáticamente. El servidor devuelve SHA256 y revisión de borrador. Aprobar requiere otra solicitud manual con el hash exacto, `confirmed:true`, revisión actual y operador. La D1 actualiza `approved_json`, `approved_revision` e historial con `DB.batch`/control de concurrencia. El GET es read-only y muestra borrador/historial; ningún endpoint activa pagos ni publica.
+- El encabezado de D1 `id=1` se crea vacío únicamente cuando se presenta una propuesta completa y validada; no se rellena con tarifas históricas.
+- Nueva regresión `pricing-live-admin.test.mjs` para falta de gate, operador, propuesta inválida, colisión de revisión, hash distinto, trazabilidad de aprobación y ausencia de activación de checkout.
+- **CI comprobado:** [GitHub Actions 42898939799](https://github.com/hernanchan/COTIZADOR/actions/runs/42898939799), commit `1a882b8f76cc606a0b0f3b87f8bb0cf61cc4ab8f`, `completed/success` con compilación completa. Ninguna aprobación efectiva en D1 ni cambio de entorno o `main`.
+- **Etapa 1 aún abierta:** hace falta cargar propuesta con precios de venta reales y obtener aprobación comercial explícita. **Etapa 2 aún abierta:** cotizador desarrollado pero no desplegado/ensayado E2E en producción; la recepción de originales postpago TUS/R2 y la conciliación siguen bloqueadas. Mantener `NO_GO`.
