@@ -378,3 +378,20 @@ Se mantienen `main`, Pages público y cobros/productos LIVE **sin cambios**, tod
 2. Mantener en MP LIVE rechazo de toda orden con R2 mientras la recepción R2 productiva no esté integrada y auditada. Solo entonces considerar compuertas con autorización de titular.
 3. Etapas 1/2 todavía abiertas por tarifa comercial no aprobada y E2E sin deploy. Etapa 4 pendiente integración visual Central Nuevos, ZIP+instrucciones, seguimiento, ETA, borrado al Entregado. **No declarar 1-4 terminadas ni publicar todavía.**
 
+
+## 10/11 — auditoría de compuertas antes de cobrar y estados de recepción Central
+
+- Se comprobó en la rama que R2 LIVE ya contaba con `r2-live-multipart-documentos.mjs`, puentes HMAC de pago/cuota/staging, cliente de subida `recepcion-r2-live-cliente.mjs` y pantalla pospago. **No duplicar el desarrollo** ni reemplazarlo por ensayo: las piezas existen, quedan pruebas LIVE de almacenamiento y aprobación comercial.
+- `mercadopago-live-central.mjs` ahora inspecciona los transportes **de la ficha D1 vinculada**, y antes de llamar a Mercado Pago exige simultáneamente:
+  - Para cada orden con TUS: `CENTRAL_LIVE_TUS_GATE` + `CENTRAL_LIVE_POSTPAY_GATE` en `GO_COMERCIAL_CONFIRMADO`.
+  - Si incluye R2: `CENTRAL_LIVE_R2_GATE`, `CENTRAL_LIVE_R2_QUOTA_GATE`, `CENTRAL_LIVE_R2_STAGING_GATE`, `CENTRAL_LIVE_POSTPAY_GATE` en `GO_COMERCIAL_CONFIRMADO`.
+  - Si falla cualquiera: **HTTP 503, cero solicitudes MP y ninguna preferencia creada**.
+- Tests `mercadopago-live-central.test.mjs` agregados para cada compuerta TUS/R2 individual, incluyendo control positivo con gates habilitados y mocks, sin cobro real. **QA success** [run 42910151110](https://github.com/hernanchan/COTIZADOR/actions/runs/42910151110), commit `ed4c157fc4b72a8ab26a33b80cc35d87663eba14`.
+- `central-recepcion-live.mjs` ahora consulta con `EXISTS` los originales R2 cuyo SHA ya está en `central_r2_large_pending` con estado `awaiting_pdf_analysis`. Añade `stagedR2Count` y distingue:
+  1. `PAGADO_ESPERANDO_ORIGINALES` cuando aún hay TUS/R2 sin registrar ni colocar en staging.
+  2. `R2_ALMACENADO_PENDIENTE_ANALISIS_PDF` si todos los originales pendientes ya están en staging R2 pero falta inspección del contenido.
+  3. `ORIGINALES_RECIBIDOS_PREPRENSA_PENDIENTE` cuando todos están marcados recibidos.
+- El panel **no habilita ZIP ni preparación por estos estados** (`zipEnabled=false`, `readyForProduction=false`). Si la tabla de staging falta, D1 es inconsistente o las cantidades no concilian, devuelve error cerrado.
+- Tests `central-recepcion-live.test.mjs` cubren staging válido, un PDF TUS adicional sin enviar, cantidades imposibles y bloqueo de producción.
+- Verificación **CI LIVE completed/success**: [42910400039](https://github.com/hernanchan/COTIZADOR/actions/runs/42910400039), commit `284b4e8f2d933fb3d05ffda0e176713e47f5e664`. El control de integración TUS también se ejecutó en el mismo commit; revisar estado en Actions si es necesario.
+- Sigue **NO_GO**: no se autorizaron tarifas, no se modificó `main`, no hubo despliegue a web pública, ni preferencias reales ni originales subidos. Para cerrar etapa 3 hace falta E2E real sobre bucket R2 de producción (incluyendo un archivo >40 MiB) y completar el análisis físico R2 en Central antes de liberar descarga/ZIP.
