@@ -29,8 +29,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git cat-file -e 8f98373eba8e975141fe9eb2838acd79be3787cb^{commit}
-          git diff --name-only 8f98373eba8e975141fe9eb2838acd79be3787cb HEAD > /tmp/saber-unstaged-change-list
+          git cat-file -e 45edc8ae95a71fe66f31f4a7410cf13524377eb4^{commit}
+          git diff --name-only 45edc8ae95a71fe66f31f4a7410cf13524377eb4 HEAD > /tmp/saber-unstaged-change-list
           if grep -Ev '^(tests/|\.github/workflows/)' /tmp/saber-unstaged-change-list; then
             echo 'SOURCE_RUNTIME_CHANGED_SIN_VOLVER_A_STAGE_NO_DEPLOY'
             exit 1
@@ -58,10 +58,10 @@ jobs:
           test -n "$ACCOUNT" && test -n "$TOKEN"
           docs='saber-documentos-pruebas'
           central='saber-pagos-pruebas'
-          docs_old='ac404da2-da0c-49ec-9fe5-d7570b306cc6'
-          docs_new='999a0b9f-d02d-46ef-8b57-72215bc9e13b'
-          central_old='a743bf4d-065d-41c3-82ed-f886f2d86e0f'
-          central_new='2e5d2d59-b707-44ea-9dd2-bd1051e9a5a9'
+          docs_old='518e6f62-849b-43cb-947c-3e23d0ebe338'
+          docs_new='8f76fb7c-ec86-415a-8145-a08a02d1fe35'
+          central_old='c8cd56fb-8872-48e1-a4cd-41e63b737e78'
+          central_new='4a30a48c-f14b-4a4a-b74d-b8f720a76bd1'
           api="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts"
           auth="Authorization: Bearer $TOKEN"
           dir=$(mktemp -d)
