@@ -82,3 +82,11 @@
 - `vidriera/portal-comercial.json` sigue `enabled:false, release:NO_GO, buyerUrl:null`.
 - Por tanto las pruebas unitarias y de Worker privado **NO** equivalen a capacidad de cobrar en producción. No activar pagos reales ni publicar el cotizador hasta que exista implementación segura y comprobada del checkout y webhook LIVE, manteniendo la reversión del sitio vigente.
 - La rama de integración ya no discrimina por peso para definir destino A4/A3/CAD/Pleno; el nuevo browser QA simula 500 páginas A4 de 100 MiB, **sin crear pedido ni subir archivos** (workflow `saber-qa-browser-universal-noenvio-20261110.yml`, resultado independiente de esta nota).
+
+## Control de navegador de 500 páginas A4 / 100 MiB — estado de prueba
+
+- Workflow de QA diseñado en la rama: `.github/workflows/saber-qa-browser-universal-noenvio-20261110.yml`, script `integraciones/autocotizador/recepcion/ui-universal-browser-noenvio.mjs`.
+- Prueba no destructiva: genera un PDF sintético de 500 páginas A4 y 100 MiB, intenta cotización en Chrome/Worker privado y captura handoff universal **sin llamar a endpoints de orden, pago, TUS ni R2**.
+- [Ejecución 42840193862](https://github.com/hernanchan/COTIZADOR/actions/runs/42840193862), iniciada 2026-11-10 15:02 UTC; a las 15:19 UTC seguía `in_progress` en el paso de navegador. **No atribuir éxito** ni inferir una falla comercial definitiva sin logs finales; el PDF de QA contiene un bloque de padding de texto artificial, que puede no representar un PDF de apunte real.
+- La prueba no cambia el criterio de destino comercial: A4 es impresión documental por dimensión; R2 se selecciona solo por peso. Las pruebas unitarias de ese criterio y del handoff universal permanecen verdes.
+- La referencia obsoleta a Google Drive en `pantalla-cotizador-v2-prueba-privada.mjs` se sustituyó por descripción neutral de recepción privada, **todavía sin afirmar que esa modificación esté desplegada**.
