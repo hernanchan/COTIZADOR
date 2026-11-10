@@ -1,0 +1,74 @@
+name: Saber - inventario read-only infraestructura MP LIVE y publicacion
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-live-infra-audit-readonly-20261110.yml]
+permissions:
+  contents: read
+  statuses: write
+jobs:
+  inventario:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Listar recursos Cloudflare sin leer contenido ni crear servicios
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          DEPLOY: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+          EDITOR: ${{ secrets.SABER_CF_EDITOR_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$DEPLOY"
+          tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+          token="$EDITOR"; if [ -z "$token" ];then token="$DEPLOY";fi
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT"
+          inspect(){
+            label="$1"; path="$2"
+            code=$(curl -sS --max-time 30 -H "Authorization: Bearer $token" \
+              -o "$tmp/$label.json" -w '%{http_code}' "$root$path" || echo 000)
+            echo "LIVE_AUDIT_${label}_HTTP=$code"
+            if [ "$code" != 200 ];then
+              jq -r '.errors[]?.code|tostring' "$tmp/$label.json" 2>/dev/null |
+                head -n 3 | sed "s/^/LIVE_AUDIT_${label}_API_ERROR_CODE=/"
+            fi
+          }
+          inspect workers /workers/scripts
+          if jq -e '.success==true and (.result|type=="array")' "$tmp/workers.json" >/dev/null 2>&1;then
+            jq -r '.result[]?.id|select(test("saber|documentos|pagos|produccion";"i"))' "$tmp/workers.json" |
+              sed 's/^/LIVE_AUDIT_WORKER_NAME=/' || true
+          fi
+          inspect d1 /d1/database
+          if jq -e '.success==true and (.result|type=="array")' "$tmp/d1.json" >/dev/null 2>&1;then
+            jq -r '.result[]?|select((.name//"")|test("saber|prod|central";"i"))|
+                .name+" ("+(.uuid//"no-id")+")"' "$tmp/d1.json" |
+              sed 's/^/LIVE_AUDIT_D1_NAME=/' || true
+          fi
+          inspect domains /workers/domains
+          if jq -e '.success==true and (.result|type=="array")' "$tmp/domains.json" >/dev/null 2>&1;then
+            jq -r '.result[]?|select((.hostname//"")|test("libreriasaber.com.ar"))|
+                .hostname+" => "+(.service//"unknown")' "$tmp/domains.json" |
+              sed 's/^/LIVE_AUDIT_WORKER_DOMAIN=/' || true
+          fi
+          for url in https://pagos.libreriasaber.com.ar/health https://pedidos.libreriasaber.com.ar/health;do
+            host=$(echo "$url"|cut -d/ -f3)
+            code=$(curl -sS --max-time 12 -o /dev/null -w '%{http_code}' "$url" || echo UNREACHABLE)
+            echo "LIVE_AUDIT_HOST_${host}_HTTP=$code"
+          done
+          echo 'LIVE_AUDIT_READ_ONLY_NO_D1_WRITE_NO_MP_NO_DEPLOY_NO_PUBLIC_CHANGE'
+      - name: Resultado verificación de infraestructura
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        shell: bash
+        run: |
+          if [ "$RESULT" = success ];then state=success;else state=failure;fi
+          jq -n --arg state "$state" --arg context 'saber/live-infra-readonly' \
+             --arg description "Inventario Cloudflare LIVE sin cambios: $RESULT" \
+             --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+             '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/status.json >/dev/null
