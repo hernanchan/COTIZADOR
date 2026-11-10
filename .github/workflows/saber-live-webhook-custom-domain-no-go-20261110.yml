@@ -1,0 +1,119 @@
+name: Saber - habilitar SOLO subdominio pagos como webhook NO_GO
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-live-webhook-custom-domain-no-go-20261110.yml]
+permissions:
+  contents: read
+  statuses: write
+concurrency:
+  group: saber-webhook-custom-domain-no-go
+  cancel-in-progress: false
+jobs:
+  domain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probar denegación de cobros y exposición de rutas
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test integraciones/mercadopago/produccion/webhook-edge.test.mjs
+          node --check integraciones/mercadopago/produccion/webhook-edge.mjs
+          test "$(grep -c '^WEBHOOK_EDGE_GATE = "NO_GO"$' integraciones/mercadopago/produccion/wrangler-webhook-edge.toml)" = 1
+          test "$(grep -c '^SABER_ENTORNO = "preparacion"$' integraciones/mercadopago/produccion/wrangler-webhook-edge.toml)" = 1
+          echo 'WEBHOOK_DOMAIN_SAFE_CODE_TESTS_OK'
+      - name: Preflight estricto y asociar SOLO pagos.libreriasaber.com.ar al gateway
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          dir=$(mktemp -d);trap 'rm -rf "$dir"' EXIT
+          root="https://api.cloudflare.com/client/v4"
+          auth="Authorization: Bearer $TOKEN"
+          host='pagos.libreriasaber.com.ar'
+          worker='saber-webhook-produccion'
+          # Comprobar que no se publica Central ni una versión abierta del webhook.
+          curl -fsS --max-time 25 -H "$auth" "$root/accounts/$ACCOUNT/workers/scripts/$worker/settings" > "$dir/gateway.json"
+          jq -e '.success==true and
+            (.result.bindings|any(.name=="WEBHOOK_EDGE_GATE" and .type=="plain_text" and .text=="NO_GO")) and
+            (.result.bindings|any(.name=="SABER_ENTORNO" and .type=="plain_text" and .text=="preparacion")) and
+            (.result.bindings|any(.name=="SABER_CENTRAL_LIVE" and .type=="service" and .service=="saber-pagos-produccion")) and
+            (.result.bindings|all(.type!="d1" and .type!="r2_bucket" and .type!="secret_text"))' "$dir/gateway.json" >/dev/null
+          curl -fsS --max-time 25 -H "$auth" "$root/accounts/$ACCOUNT/workers/scripts/saber-pagos-produccion/settings" > "$dir/central.json"
+          jq -e '.success==true and
+            (.result.bindings|any(.name=="MP_LIVE_GATE" and .type=="plain_text" and .text=="NO_GO")) and
+            (.result.bindings|any(.name=="SABER_ENTORNO" and .type=="plain_text" and .text=="preparacion"))' "$dir/central.json" >/dev/null
+          curl -fsS --max-time 25 -H "$auth" "$root/accounts/$ACCOUNT/workers/scripts/$worker/subdomain" > "$dir/sub.json"
+          jq -e '.success==true and .result.enabled==false and .result.previews_enabled==false' "$dir/sub.json" >/dev/null
+          curl -fsS --max-time 25 -H "$auth" "$root/zones?name=libreriasaber.com.ar" > "$dir/zones.json"
+          zone=$(jq -er '[.result[]|select(.name=="libreriasaber.com.ar" and .status=="active")]|if length==1 then .[0].id else empty end' "$dir/zones.json")
+          curl -fsS --max-time 25 -H "$auth" "$root/accounts/$ACCOUNT/workers/domains" > "$dir/before.json"
+          jq -e '.success==true and (.result|type=="array")' "$dir/before.json" >/dev/null
+          jq -e --arg host "$host" '(.result|all(.hostname!=$host or (.service=="saber-webhook-produccion" and .enabled==true and .previews_enabled==false)))' "$dir/before.json" >/dev/null
+          count=$(jq -r --arg host "$host" '[.result[]|select(.hostname==$host)]|length' "$dir/before.json")
+          test "$count" -le 1
+          # NO cambiar el Worker central, main, rutas del sitio principal ni DNS ajenos.
+          if [ "$count" = 0 ];then
+            jq -n --arg hostname "$host" --arg service "$worker" --arg zone "$zone"               '{hostname:$hostname,service:$service,enabled:true,previews_enabled:false,zone_id:$zone,zone_name:"libreriasaber.com.ar"}' > "$dir/attach.json"
+            code=$(curl -sS --max-time 45 -o "$dir/attached.json" -w '%{http_code}'               -X PUT -H "$auth" -H 'Content-Type: application/json'               --data-binary "@$dir/attach.json" "$root/accounts/$ACCOUNT/workers/domains")
+            echo "WEBHOOK_DOMAIN_ATTACH_HTTP=$code"
+            if [ "$code" != 200 ] && [ "$code" != 201 ];then
+              jq -c '{errors:[.errors[]?|{code,message}]}' "$dir/attached.json" || true
+              exit 1
+            fi
+            jq -e --arg host "$host" --arg worker "$worker"               '.success==true and .result.hostname==$host and .result.service==$worker' "$dir/attached.json" >/dev/null
+            echo 'WEBHOOK_DOMAIN_CREATED_GATE_NO_GO'
+          else
+            echo 'WEBHOOK_DOMAIN_ALREADY_ATTACHED_TO_CORRECT_GATEWAY'
+          fi
+          curl -fsS --max-time 25 -H "$auth" "$root/accounts/$ACCOUNT/workers/domains" > "$dir/after.json"
+          jq -e --arg host "$host" --arg worker "$worker"             '.success==true and ([.result[]|select(.hostname==$host and .service==$worker and .enabled==true and .previews_enabled==false)]|length)==1' "$dir/after.json" >/dev/null
+          jq -r --arg host "$host" '.result[]|select(.hostname==$host)|
+            "WEBHOOK_DOMAIN_CERTIFICATE_ID_PRESENT="+(if ((.cert_id//"")|length)>0 then "YES" else "PENDING" end)' "$dir/after.json"
+          echo 'WEBHOOK_DOMAIN_BOUND_ONLY_TO_PAYMENT_WEBHOOK_NO_GO'
+          echo 'WEBHOOK_DOMAIN_PUBLIC_BUT_CHECKOUT_AND_ORDERS_DISABLED'
+      - name: Smoke test DNS y HTTPS; certificado puede estar propagándose
+        shell: bash
+        run: |
+          set -euo pipefail
+          host='pagos.libreriasaber.com.ar'
+          for attempt in 1 2 3 4 5 6;do
+            code=$(curl -sS --max-time 12 -o /dev/null -w '%{http_code}' "https://$host/admin" 2>/dev/null || true)
+            if [ "$code" = 404 ];then
+              echo 'WEBHOOK_DOMAIN_HTTPS_ADMIN_DENIED_404'
+              break
+            fi
+            echo "WEBHOOK_DOMAIN_TLS_DNS_PENDING_ATTEMPT=$attempt"
+            sleep 5
+          done
+          if [ "${code:-}" = 404 ];then
+            status=$(curl -sS --max-time 12 -o /dev/null -w '%{http_code}'               "https://$host/webhooks/mercadopago-live?type=payment&data.id=123456" || true)
+            test "$status" = 503
+            echo 'WEBHOOK_DOMAIN_HTTPS_GATE_NO_GO_503'
+          else
+            echo 'WEBHOOK_DOMAIN_API_ATTACHED_BUT_TLS_OR_DNS_PENDING_INDEPENDENT_CHECK_REQUIRED'
+          fi
+          echo 'WEBHOOK_DOMAIN_NO_REAL_PAYMENTS_NO_PUBLIC_STORE_CHANGE'
+      - name: Registrar estado de dominio creado
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          if [ "$RESULT" = success ];then state=success;else state=failure;fi
+          jq -n --arg state "$state" --arg context 'saber/webhook-domain-no-go'             --arg description "Dominio pagos vinculado solo a webhook cerrado: $RESULT"             --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"             '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/domain-status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/domain-status.json >/dev/null
