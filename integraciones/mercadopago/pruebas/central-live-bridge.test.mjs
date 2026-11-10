@@ -99,3 +99,35 @@ test('orden productiva exige firma propia y rechaza mezclar checkout o payloads 
  assert.equal((await read(await make('/internal/central/live/order',payload),
   {...env,MP_LIVE_GATE:'NO_GO'})).status,503);
 });
+
+test('TUS LIVE HMAC firma gate y recibo de la orden, sin mezclar rutas ni campos',async()=>{
+ const gate={schema:'saber-central-r2-universal-tus-gate-v1',
+  action:'start',orderId:WEB,fileId:'pdf_0',name:'Apuntes.pdf',
+  sha256:'a'.repeat(64),bytes:2000,pages:2};
+ const accepted=await read(await make('/internal/central/live/tus-gate',gate));
+ assert.equal(accepted.error,undefined);
+ assert.equal(accepted.payload.orderId,WEB);
+ assert.equal((await read(await make('/internal/central/live/checkout',gate))).status,422);
+ assert.equal((await read(await make('/internal/central/live/tus-gate',
+   {...gate,paymentVerified:true}))).status,422);
+ assert.equal((await read(await make('/internal/central/live/tus-gate',
+   {...gate,orderId:'WEB-ENSAYO-'+'B'.repeat(31)}))).status,422);
+ assert.equal((await read(await make('/internal/central/live/tus-gate',
+   {...gate,bytes:41*1048576}))).status,422);
+ const proof={schema:'saber-central-r2-universal-tus-received-v1',
+  orderId:WEB,fileId:'pdf_0',receiptId:'DOC-'+ORDER,
+  objectName:'v2/'+WEB+'/'+ORDER+'.pdf',name:'Apuntes.pdf',
+  sha256:'a'.repeat(64),bytes:2000,pages:2,
+  metrics:[{anchoCm:21,altoCm:29.7,modo:'sin-clasificar'},
+   {anchoCm:21,altoCm:29.7,modo:'sin-clasificar'}]};
+ assert.equal((await read(await make('/internal/central/live/tus-received',proof))).error,undefined);
+ assert.equal((await read(await make('/internal/central/live/tus-gate',proof))).status,422);
+ assert.equal((await read(await make('/internal/central/live/tus-received',
+  {...proof,metrics:[proof.metrics[0]]}))).status,422);
+ assert.equal((await read(await make('/internal/central/live/tus-received',
+  {...proof,metrics:[{...proof.metrics[0],modo:'poster'},proof.metrics[1]]}))).status,422);
+ assert.equal((await read(await make('/internal/central/live/tus-received',
+  {...proof,uploadAuthorized:true}))).status,422);
+ assert.equal((await read(await make('/internal/central/live/tus-received',proof),
+  {...env,MP_LIVE_GATE:'NO_GO'})).status,503);
+});
