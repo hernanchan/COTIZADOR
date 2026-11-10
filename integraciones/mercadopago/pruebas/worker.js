@@ -4698,6 +4698,11 @@ export default {
   const url=new URL(req.url);
   // Solo con compuerta LIVE y credenciales de producción independientes.
   // En saber-pagos-pruebas quedan cerradas (HTTP 503).
+  if(url.pathname==='/internal/central/live/order'){
+   const {promoverPedidoUniversalD1}=await import('./r2-universal-order-central.mjs');
+   const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
+   return promoverPedidoUniversalD1(req,env,{readSigned:leerFirmaInternaLive});
+  }
   if(url.pathname==='/internal/central/live/checkout'){
    const {checkoutMPLiveCentral}=await import('./mercadopago-live-central.mjs');
    const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
