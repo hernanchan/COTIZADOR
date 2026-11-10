@@ -78,7 +78,7 @@ function render(){
     if(!recubierto)card.append(dato('p','Rollo obra asignado automáticamente: '+seleccionado.name+' ('+seleccionado.widthCm+' cm)'));
     if(recubierto){
      const mayores=d.paginas.map(p=>Math.min(p.anchoCm,p.altoCm));
-     const soporteRec=catalogo.filter(x=>/^rec\\d+$/.test(x.id)&&mayores.every(ancho=>ancho<=x.widthCm+0.03)).sort((a,b)=>a.widthCm-b.widthCm)[0];
+     const soporteRec=catalogo.filter(x=>/^rec\d+$/.test(x.id)&&mayores.every(ancho=>ancho<=x.widthCm+0.03)).sort((a,b)=>a.widthCm-b.widthCm)[0];
      if(soporteRec)card.append(dato('p','Rollo recubierto para el ploteo: '+soporteRec.name+' ('+soporteRec.widthCm+' cm)'));
     }
    }
