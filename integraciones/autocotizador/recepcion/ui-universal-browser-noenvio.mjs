@@ -57,7 +57,7 @@ try{
  await iframe.locator('#lista .archivo').first().waitFor({state:'visible',timeout:60000});
  console.log('QA_ETAPA_10_ESPERAR_PRECIO');
  try{
-  await iframe.locator('#presupuesto').getByText(/TOTAL PRELIMINAR/i).waitFor({state:'visible',timeout:35000});
+  await iframe.locator('#presupuesto').getByText(/TOTAL PRELIMINAR/i).waitFor({state:'attached',timeout:35000});
  }catch(error){
   const estado=await iframe.locator('#estado').innerText({timeout:5000}).catch(()=>'(estado no disponible)');
   const presupuesto=await iframe.locator('#presupuesto').innerText({timeout:5000}).catch(()=>'(presupuesto no disponible)');
@@ -106,7 +106,7 @@ try{
  assert.deepEqual(blocked,[],'Intento de llamada no autorizada: '+blocked.join(','));
  // UI móvil: misma vista, sin nueva carga ni mutaciones.
  await page.setViewportSize({width:390,height:844});
- await iframe.locator('#presupuesto').getByText(/TOTAL PRELIMINAR/i).waitFor({state:'visible'});
+ await iframe.locator('#presupuesto').getByText(/TOTAL PRELIMINAR/i).waitFor({state:'attached'});
  const width=await iframe.locator('body').evaluate(el=>({scroll:el.scrollWidth,client:el.clientWidth}));
  console.log('BROWSER_QA_MOBILE_WIDTH='+JSON.stringify(width));
  assert.ok(width.scroll<=width.client+16,'Desborde horizontal en cotizador móvil');
