@@ -135,3 +135,62 @@ test('descarga TUS personal: SHA verificado; negación por alteración y sin Bas
  assert.equal((await descargarUniversalPersonal(request(),env,{
   ...opts,authorized:false})).status,403);
 });
+
+test('LIVE: paquete pagado exige inspección física R2 aprobada y misma ficha D1',async()=>{
+ const {env,f}=make();
+ Object.assign(env,{
+  SABER_ENTORNO:'produccion',CENTRAL_DB_ENV:'produccion',
+  MP_LIVE_GATE:'GO_COMERCIAL_CONFIRMADO',
+  CENTRAL_LIVE_BRIDGE_ENABLED:'GO_COMERCIAL_CONFIRMADO',
+  CENTRAL_LIVE_POSTPAY_GATE:'GO_COMERCIAL_CONFIRMADO',
+  CENTRAL_LIVE_ORDER_GATE:'GO_COMERCIAL_CONFIRMADO',
+  CENTRAL_LIVE_PRICING_GATE:'GO_COMERCIAL_CONFIRMADO',
+  CENTRAL_LIVE_PACKAGE_GATE:'GO_COMERCIAL_CONFIRMADO'
+ });
+ for(const k of ['CENTRAL_R2_UNIVERSAL_DRAFT_ENABLED',
+  'CENTRAL_R2_UNIVERSAL_ORDER_ENABLED','CENTRAL_R2_UNIVERSAL_CHECKOUT_ENABLED',
+  'CENTRAL_R2_UNIVERSAL_POSTPAY_ENABLED','CENTRAL_R2_UNIVERSAL_PACKAGE_ENABLED',
+  'DOCS_SANDBOX_CHECKOUT_ENABLED'])delete env[k];
+ const original=env.DB.prepare.bind(env.DB);
+ let inspection=null,inspectionQueries=0;
+ env.DB.prepare=(sql)=>{
+  if(sql.includes('FROM central_r2_live_inspections')){
+   inspectionQueries++;
+   return {bind(){return this},first:async()=>inspection};
+  }
+  return original(sql);
+ };
+ const p={schema:'saber-central-r2-universal-package-manifest-v1',webOrderId:WEB};
+ const before=await consultarPaqueteUniversalCentral(req(p),env,{
+  readSigned:signed,subtle:webcrypto.subtle});
+ assert.equal(before.status,409);
+ assert.equal((await before.json()).error,'PAQUETE_RECIBO_NO_VERIFICADO');
+ assert.equal(inspectionQueries,1);
+ inspection={
+  receipt_id:'DOC-'+R2,commercial_order_id:ID,
+  quote_hash:hash(JSON.stringify(f)),sha256:'b'.repeat(64),
+  bytes:70*M,report_hash:'c'.repeat(64)
+ };
+ const approved=await consultarPaqueteUniversalCentral(req(p),env,{
+  readSigned:signed,subtle:webcrypto.subtle});
+ assert.equal(approved.status,200,JSON.stringify(await approved.clone().json()));
+ const result=await approved.json();
+ assert.equal(result.totalArchivos,2);
+ assert.equal(result.productionAuthorized,false);
+ assert.equal(result.preprensaPendiente,true);
+ assert.equal(result.trabajos[1].transporte,'r2');
+ const lookup={schema:'saber-central-r2-universal-package-file-v1',
+  webOrderId:WEB,fileId:'large'};
+ const fileRes=await consultarArchivoUniversalCentral(req(lookup),env,{
+  readSigned:signed,subtle:webcrypto.subtle});
+ assert.equal(fileRes.status,200);
+ assert.equal((await fileRes.json()).sha256,'b'.repeat(64));
+ inspection={...inspection,quote_hash:'d'.repeat(64)};
+ const forged=await consultarPaqueteUniversalCentral(req(p),env,{
+  readSigned:signed,subtle:webcrypto.subtle});
+ assert.equal(forged.status,409);
+ delete env.CENTRAL_LIVE_PACKAGE_GATE;
+ const off=await consultarPaqueteUniversalCentral(req(p),env,{
+  readSigned:signed,subtle:webcrypto.subtle});
+ assert.equal(off.status,503);
+});
