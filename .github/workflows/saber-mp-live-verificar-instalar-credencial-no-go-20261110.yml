@@ -1,0 +1,76 @@
+name: Saber - validar token MP LIVE e instalarlo solo en Central NO_GO
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-mp-live-verificar-instalar-credencial-no-go-20261110.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  statuses: write
+concurrency:
+  group: saber-mp-live-provision-gate-cerrado
+  cancel-in-progress: false
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verificar módulo de instalación cerrada y contenido NO_GO
+        run: |
+          set -euo pipefail
+          node --check integraciones/mercadopago/produccion/instalar-live-credenciales-cerradas.mjs
+          grep -q "MP_LIVE_GATE = \"NO_GO\"" integraciones/mercadopago/produccion/wrangler.toml.template
+          grep -q 'workers_dev = false' integraciones/mercadopago/produccion/wrangler.toml.template
+          echo 'MP_LIVE_CREDENTIALS_PROVISIONER_SAFE_CODE_OK'
+      - name: Comprobar si el titular ya cargó la credencial
+        id: ready
+        shell: bash
+        env:
+          MP_TOKEN: ${{ secrets.SABER_MP_LIVE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "$MP_TOKEN" ];then
+            echo 'available=no' >> "$GITHUB_OUTPUT"
+            echo 'MP_LIVE_CREDENTIALS_WAITING_FOR_OWNER_SECRET'
+            echo 'MP LIVE pendiente: falta secreto SABER_MP_LIVE_ACCESS_TOKEN. No hay cambios ni cobros.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'available=yes' >> "$GITHUB_OUTPUT"
+            echo 'MP_LIVE_CREDENTIALS_OWNER_SECRET_PRESENT_NO_VALUE_PRINTED'
+          fi
+      - name: Consultar vendedor MP real y guardar secreto solo en Worker LIVE cerrado
+        if: steps.ready.outputs.available == 'yes'
+        env:
+          SABER_CF_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          SABER_CF_DEPLOY_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+          SABER_MP_LIVE_ACCESS_TOKEN: ${{ secrets.SABER_MP_LIVE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          node integraciones/mercadopago/produccion/instalar-live-credenciales-cerradas.mjs
+      - name: Registrar resultado sin datos sensibles
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+          READY: ${{ steps.ready.outputs.available }}
+        run: |
+          if [ "$RESULT" = success ];then state=success;else state=failure;fi
+          if [ "$READY" != yes ];then
+            description='MP LIVE pendiente de credencial del titular; no hay cobros'
+          else
+            description="MP LIVE instalación segura cerrada: $RESULT"
+          fi
+          jq -n --arg state "$state" --arg context 'saber/mp-live-credential-setup' \
+            --arg description "$description" \
+            --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/mp-status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/mp-status.json >/dev/null
