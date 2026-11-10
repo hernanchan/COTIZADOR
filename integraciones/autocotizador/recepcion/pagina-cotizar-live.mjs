@@ -85,13 +85,14 @@ window.addEventListener('message',event=>{
   if(Number.isSafeInteger(data.total)&&data.total>0)price.textContent='Presupuesto orientativo: '+money(data.total);
   else price.textContent='Precio pendiente';
   if(data.blockReason)status.textContent=data.blockReason;
-  action.disabled=!enabled||!data.sendable||!pending||working;
+  action.disabled=!enabled||!data.sendable||working;
  }
  if(data.type==='SABER_SMART_UNIVERSAL_PDF'){
   if(working)return;
   pending={files:data.files,archivos:data.archivos};
   action.disabled=!enabled;
-  status.textContent=enabled?'Archivos preparados. Podés confirmar el presupuesto.':'Presupuesto preparado. El pago y el envío todavía no están habilitados.';
+  status.textContent=enabled?'Archivos preparados, validando el presupuesto…':'Presupuesto preparado. El pago y el envío todavía no están habilitados.';
+  if(enabled)action.click();
  }
  if(data.type==='SABER_SMART_HANDOFF_ERROR'){
   pending=null;action.disabled=true;
@@ -99,7 +100,13 @@ window.addEventListener('message',event=>{
  }
 });
 action.addEventListener('click',async()=>{
- if(!enabled||!pending||working)return;
+ if(!enabled||working)return;
+ if(!pending){
+  action.disabled=true;
+  status.textContent='Verificando los PDF y opciones elegidas…';
+  iframe.contentWindow.postMessage({type:'SABER_SMART_PREPARAR_ENVIO'},location.origin);
+  return;
+ }
  working=true;action.disabled=true;
  try{
   flow=crearFlujoPresupuestoLive({
