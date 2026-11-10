@@ -2,9 +2,9 @@ import {prepararPlanRecepcionUniversal} from './plan-recepcion-universal-r2.mjs'
 import {cotizarCargaUnica} from './cotizar-carga-unica.mjs';
 // Ficha interna previa a originales. No autoriza cobros ni producción.
 const NAME=/^WEB-ENSAYO-[A-F0-9]{32}$/;
-export function fichaPrearchivoUniversal({webOrderId,archivos,manifiestos,tarifario}={}){
+export function fichaPrearchivoUniversal({webOrderId,archivos,manifiestos,tarifario,produccion=false}={}){
  if(!NAME.test(webOrderId||''))throw Error('UNIVERSAL_ORDEN_INVALIDA');
- const plan=prepararPlanRecepcionUniversal({archivos,manifiestos,tarifario});
+ const plan=prepararPlanRecepcionUniversal({archivos,manifiestos,tarifario,produccion});
  const quote=cotizarCargaUnica({archivos,precios:tarifario.prices});
  if(quote.estado!=='PRELIMINAR'||quote.paymentAuthorized!==false||
     quote.total!==plan.totalArs||quote.plan.length!==archivos.length)
