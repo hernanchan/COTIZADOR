@@ -36,13 +36,22 @@ jobs:
            const r=await fetch(root+path,{...options,headers:{
             Authorization:'Bearer '+token,'Content-Type':'application/json'
            },signal:AbortSignal.timeout(25000)});
-           const x=await r.json();assert.equal(x.success,true,'CLOUDFLARE_D1_'+r.status);
+           const x=await r.json();if(!x.success)console.log('D1_QUERY_DIAGNOSTIC='+JSON.stringify((x.errors||[]).map(e=>({code:e.code,message:String(e.message||'').slice(0,160)}))));assert.equal(x.success,true,'CLOUDFLARE_D1_'+r.status);
            return x.result;
           }
           const list=await call('');
           const matches=list.filter(x=>x.name==='saber-pagos-pruebas');
           assert.equal(matches.length,1);
           const db=matches[0].uuid;
+          const schema=await call('/'+db+'/query',{method:'POST',body:JSON.stringify({
+            sql:"SELECT name FROM sqlite_master WHERE type='table' AND name IN ('central_r2_universal_order_links','central_r2_universal_files','orders','payment_reviews')"
+          })});
+          assert.ok(Array.isArray(schema)&&schema[0]?.success===true);
+          const names=new Set((schema[0].results||[]).map(x=>x.name));
+          const needed=['central_r2_universal_order_links','central_r2_universal_files','orders','payment_reviews'];
+          const missing=needed.filter(n=>!names.has(n));
+          console.log('PILOT_SANDBOX_SCHEMA_PRESENT='+[...names].sort().join(','));
+          if(missing.length){console.log('PILOT_BLOCKER_MISSING_TABLES='+missing.join(','));process.exit(0)}
           const sql=`SELECT l.web_order_id AS web_order_id, COUNT(*) AS files,
           SUM(CASE WHEN f.received=1 THEN 1 ELSE 0 END) AS received,
           MIN(o.status) AS status, MIN(p.state) AS payment_review,
