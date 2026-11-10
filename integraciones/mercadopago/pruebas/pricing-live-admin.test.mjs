@@ -30,29 +30,27 @@ function db(){
    };
   },
   async batch(commands){
-   const actions=[];
    for(const q of commands){
     statements.push(q.sql);
     if(q.sql.startsWith('INSERT INTO central_pricing_admin_head')){
      if(head)throw Error('duplicate');
-     actions.push(()=>{head={revision:0,approved_revision:0,draft_json:null,approved_json:null}});
+     head={revision:0,approved_revision:0,draft_json:null,approved_json:null};
     }else if(q.sql.startsWith('UPDATE central_pricing_admin_head')){
      if(q.sql.includes('approved_json=draft_json')){
       const [newRevision,next,expected,payload]=q.data;
       if(!head||head.revision!==expected||head.draft_json!==payload)throw Error('conflict');
-      actions.push(()=>{head={...head,revision:next,approved_revision:newRevision,
-       approved_json:head.draft_json,draft_json:null}});
+      head={...head,revision:next,approved_revision:newRevision,
+       approved_json:head.draft_json,draft_json:null};
      }else{
       const [next,json,expected]=q.data;
       if((head?.revision||0)!==expected)throw Error('conflict');
-      actions.push(()=>{head={...head,revision:next,draft_json:json}});
+      head={...head,revision:next,draft_json:json};
      }
     }else if(q.sql.startsWith('INSERT INTO central_pricing_admin_history')){
      const [revision,operator,json]=q.data;
-     actions.push(()=>history.push({revision,operator,payload_json:json,action:revision===2?'approve':'draft'}));
+     history.push({revision,operator,payload_json:json,action:revision===2?'approve':'draft'});
     }else throw Error('SQL inesperado: '+q.sql);
    }
-   actions.forEach(a=>a());
    return commands.map(()=>({meta:{changes:1}}));
   }
  };
