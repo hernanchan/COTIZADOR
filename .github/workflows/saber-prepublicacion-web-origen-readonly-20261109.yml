@@ -75,3 +75,4 @@ jobs:
           fi
           echo 'ONLY_GET_NO_MAIN_WRITE_NO_CF_DEPLOY_NO_PAYMENT_NO_ORDERS_NO_R2_DELETE'
           echo 'PRODUCTION_NOT_AUTHORIZED_BY_THIS_PREFLIGHT'
+# cierre 2026-11-10: revalidar sin modificar comercio ni producción
