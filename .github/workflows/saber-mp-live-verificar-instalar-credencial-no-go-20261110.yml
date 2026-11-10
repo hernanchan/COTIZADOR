@@ -74,3 +74,5 @@ jobs:
             --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
             '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/mp-status.json
           gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/mp-status.json >/dev/null
+
+# Revalidacion tras carga segura de token MP LIVE del titular (10-11-2026)
