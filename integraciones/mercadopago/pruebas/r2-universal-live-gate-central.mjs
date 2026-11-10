@@ -34,7 +34,7 @@ export async function autorizarOriginalR2Live(request,env,{readSigned,subtle=cry
   !Number.isSafeInteger(p.bytes)||p.bytes<=40*M||p.bytes>200*M||
   !Number.isSafeInteger(p.pages)||p.pages<1||p.pages>2000)
   return respond({ok:false,error:'LIVE_R2_FICHA_INVALIDA',uploadAuthorized:false},422);
- let result,paid;
+ let result,paid,mode,expectedMetrics;
  try{
   const link=await env.DB.prepare(
    'SELECT commercial_order_id FROM central_r2_universal_order_links WHERE web_order_id=?'
@@ -48,14 +48,23 @@ export async function autorizarOriginalR2Live(request,env,{readSigned,subtle=cry
    x.bytes===p.bytes&&x.received===0);
   const work=result.works.find(x=>x.fileId===p.fileId);
   if(entries.length!==1||!work||!Array.isArray(work.configuracion?.paginas)||
-    work.configuracion.paginas.length!==p.pages)
+    work.configuracion.paginas.length!==p.pages||
+    !['bn','color'].includes(work.configuracion.modo)||
+    work.configuracion.paginas.some((page,i)=>page.numero!==i+1||
+      !Number.isFinite(page.anchoCm)||!Number.isFinite(page.altoCm)||
+      page.anchoCm<=0||page.altoCm<=0))
    return respond({ok:false,error:'LIVE_R2_ARCHIVO_NO_COINCIDE',uploadAuthorized:false},409);
+  mode=work.configuracion.modo;
+  expectedMetrics=work.configuracion.paginas.map(x=>({
+   anchoCm:x.anchoCm,altoCm:x.altoCm
+  }));
   paid=await estadoPagoUniversal(env,link.commercial_order_id);
   if(!paid.verified||paid.revoked)
    return respond({ok:false,error:'LIVE_R2_PAGO_NO_CONCILIADO',uploadAuthorized:false},402);
  }catch{return respond({ok:false,error:'LIVE_R2_D1_INDISPONIBLE',uploadAuthorized:false},503)}
  return respond({ok:true,webOrderId:p.orderId,fileId:p.fileId,
   sha256:p.sha256,bytes:p.bytes,pages:p.pages,transport:'r2',
+  mode,expectedMetrics,
   paymentVerified:true,uploadAuthorized:false,productionAuthorized:false,
   next:'reserve-capacity-before-multipart'});
 }
