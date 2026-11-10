@@ -1,4 +1,4 @@
-name: Saber universal - activar SOLO dos Workers privados con rollback comprobado
+name: Saber universal - desplegar SOLO Documentos privados (CAD/pleno A3+) con rollback
 on:
   push:
     branches: [integracion/tus-pedido-privado-20261101]
@@ -71,7 +71,7 @@ jobs:
             trap - EXIT
             if [ "$rc" -ne 0 ] && [ "$touched" = 1 ]; then
               echo "REVERTIR_WORKERS_PRIVADOS_NO_PUBLICACION"
-              for worker in "$docs" "$central"; do
+              for worker in "$docs"; do
                 if [ "$worker" = "$docs" ]; then previous="$docs_old"; else previous="$central_old"; fi
                 jq -n --arg id "$previous" \
                   '{strategy:"percentage",versions:[{version_id:$id,percentage:100}],annotations:{"workers/message":"Rollback automatico Saber universal privado"}}' > "$dir/revert.json"
@@ -81,7 +81,7 @@ jobs:
                   echo "$worker ROLLBACK_REQUESTED"
                 else echo "$worker CRITICAL_ROLLBACK_UNCONFIRMED"; fi
               done
-              for worker in "$docs" "$central"; do
+              for worker in "$docs"; do
                 if [ "$worker" = "$docs" ]; then previous="$docs_old"; else previous="$central_old"; fi
                 curl -fsS --max-time 25 -H "$auth" "$api/$worker/deployments" > "$dir/restored.json" || true
                 restored=$(jq -r '.result.deployments[0].versions[]?|select(.percentage==100)|.version_id' "$dir/restored.json" | head -n1)
@@ -92,7 +92,7 @@ jobs:
             exit "$rc"
           }
           trap rollback EXIT
-          for worker in "$docs" "$central"; do
+          for worker in "$docs"; do
             if [ "$worker" = "$docs" ]; then old="$docs_old"; candidate="$docs_new"; else old="$central_old"; candidate="$central_new"; fi
             curl -fsS --max-time 25 -H "$auth" "$api/$worker/settings" > "$dir/settings.json"
             curl -fsS --max-time 25 -H "$auth" "$api/$worker/deployments" > "$dir/before.json"
@@ -123,7 +123,7 @@ jobs:
           test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' https://saber-pagos-pruebas.libreriasaber.workers.dev/admin/api/orders)" = 401
           test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/)" = 401
           echo 'LIVE_PRIVATE_PREFLIGHT_OK_NO_REAL_PAYMENT'
-          for worker in "$central" "$docs"; do
+          for worker in "$docs"; do
             if [ "$worker" = "$docs" ]; then old="$docs_old"; candidate="$docs_new"; else old="$central_old"; candidate="$central_new"; fi
             jq -n --arg id "$candidate" \
               '{strategy:"percentage",versions:[{version_id:$id,percentage:100}],annotations:{"workers/message":"Saber universal nuevos PDF SOLO Workers privados; flags destructivas OFF"}}' > "$dir/promote.json"
@@ -150,4 +150,4 @@ jobs:
           check_status DOCUMENTOS_BASIC 401 https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/
           check_status UNIVERSAL_PAQUETE_BASIC 401 https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/universal-paquete
           check_status PREPRENSA_ADMIN 401 -X POST -H 'Content-Type: application/json' -d '{}' https://saber-pagos-pruebas.libreriasaber.workers.dev/admin/api/central/r2-universal-prepress-approve
-          echo 'PRIVATE_PROMOTION_VERIFIED_TWO_WORKERS_REAL_PAYMENTS_OFF_PUBLIC_MAIN_UNTOUCHED'
+          echo 'PRIVATE_PROMOTION_VERIFIED_DOCUMENTOS_ONLY_REAL_PAYMENTS_OFF_PUBLIC_MAIN_UNTOUCHED'
