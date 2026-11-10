@@ -319,8 +319,8 @@ function controlesComunes(grupo,global=false){
   barra.append(accionComun('Páginas por cara para todos',[['1','1 página'],['2','2 páginas'],['4','4 páginas'],['9','9 páginas']],v=>aplicar('paginasPorHoja',Number(v)),global?String(configuracionComun.paginasPorHoja||''):''));
   barra.append(accionComun('Anillado para todos',[['ninguno','Sin anillado'],['individual','Individual por archivo'],...Array.from({length:5},(_,i)=>['grupo:'+(i+1),'Juntos · Grupo '+(i+1)])],v=>aplicar('anillado',v),global?(configuracionComun.anillado||''):''));
  }
- if(['poster','mixtos'].includes(grupo.id))
-  barra.append(accionComun('Papel de póster',[['obra80','Obra 80 g'],['recubierto','Recubierto 130 g']],v=>aplicar('papelPoster',v)));
+ if(['cad','poster','mixtos'].includes(grupo.id))
+  barra.append(accionComun('Papel para ploteos',[['obra80','Obra 80 g'],['recubierto','Recubierto 130 g']],v=>aplicar('papelPoster',v)));
  return barra;
 }
 let anilladosAbierto=false;
@@ -545,8 +545,8 @@ function render(){
        (eleccion.tipo==='cad'?'CAD':'PLENO')+'. Podés cambiarla.'));
      }else bloque.append(texto('small','Seleccioná CAD o PLENO para completar el presupuesto. El original se revisará antes de imprimir.'));
      }
-     if(eleccion.tipo==='poster'){
-      const papel=valor('Papel para pleno',[
+     if(eleccion.confirmado){
+      const papel=valor('Papel para ploteo',[
        ['obra80','Obra 80 g'],['recubierto','Recubierto 130 g']
       ],e.papelPoster,v=>{e.papelPoster=v;cambio()});
       papel.className='eleccion-plotter-papel';
