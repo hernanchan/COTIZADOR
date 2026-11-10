@@ -45,6 +45,7 @@ if(!sellerResponse.ok)fail('MERCH_ID_NO_AUTORIZADO_HTTP_'+sellerResponse.status)
 const seller=await sellerResponse.json().catch(()=>null);
 const id=String(seller?.id??'');
 if(!/^[1-9][0-9]{3,19}$/.test(id)||seller?.site_id!=='MLA'||
+  seller?.test_user===true||
   (Array.isArray(seller?.tags)&&seller.tags.includes('test_user')))
  fail('MP_LIVE_VENDEDOR_NO_VALIDADO');
 console.log('MP_LIVE_SELLER_REAL_ARGENTINA_VALIDADO_SIN_EXPOSICION_DE_DATOS');
