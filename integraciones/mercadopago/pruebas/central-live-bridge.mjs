@@ -50,8 +50,8 @@ export async function leerFirmaInternaLive(request,env,{
     (orderRoute?!UUID.test(payload.draftId||'')||
       !/^[a-f0-9]{64}$/.test(payload.quoteHash||'')||
       typeof payload.telefono!=='string'||
-      !/^\\+?[0-9 ()-]{10,26}$/.test(payload.telefono)||
-      payload.telefono.replace(/\\D/g,'').length<10||
+      !/^\+?[0-9 ()-]{10,26}$/.test(payload.telefono)||
+      payload.telefono.replace(/\D/g,'').length<10||
       payload.telefono.replace(/\\D/g,'').length>15:
       !UUID.test(payload.commercialOrderId||''))||
     !WEB.test(payload.webOrderId||''))
