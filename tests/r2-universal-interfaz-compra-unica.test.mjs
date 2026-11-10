@@ -50,7 +50,7 @@ function setup(){
    return Response.json({ok:true,webOrderId:ORDER,commercialOrderId:ID,
     amountArs:12500,fileCount:2,
     estado:state.paid?'pagado_esperando_archivos':'pendiente',
-    uploadAuthorized:state.paid,productionAuthorized:false,pendingFiles:2});
+    uploadAuthorized:state.paid,productionAuthorized:false,pendingFiles:2,receivedFileIds:[]});
   }
   throw Error('unexpected API '+path);
  };
