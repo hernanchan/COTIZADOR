@@ -47,6 +47,10 @@ on:
       - 'integraciones/autocotizador/recepcion/r2-live-puente-central.test.mjs'
       - 'integraciones/autocotizador/recepcion/r2-live-reserva-puente-central.mjs'
       - 'integraciones/autocotizador/recepcion/r2-live-reserva-puente-central.test.mjs'
+      - 'integraciones/autocotizador/recepcion/r2-live-stage-puente-central.mjs'
+      - 'integraciones/autocotizador/recepcion/r2-live-multipart-documentos.mjs'
+      - 'integraciones/autocotizador/recepcion/r2-live-multipart-documentos.test.mjs'
+      - 'integraciones/mercadopago/pruebas/r2-universal-live-stage-central.mjs'
       - 'integraciones/autocotizador/recepcion/carga-unica-cliente.mjs'
       - 'integraciones/autocotizador/recepcion/solicitar-cotizacion-privada.mjs'
       - 'integraciones/autocotizador/recepcion/package.json'
@@ -113,6 +117,7 @@ jobs:
           node --test integraciones/autocotizador/recepcion/r2-live-preflight-documentos.test.mjs
           node --test integraciones/autocotizador/recepcion/r2-live-puente-central.test.mjs
           node --test integraciones/autocotizador/recepcion/r2-live-reserva-puente-central.test.mjs
+          node --test integraciones/autocotizador/recepcion/r2-live-multipart-documentos.test.mjs
 
           cd integraciones/autocotizador/recepcion
           grep -Fq '/api/pedido/live/borrador' ./dist/saber-documentos-cotizador-fase4.mjs
