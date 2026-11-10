@@ -70,6 +70,7 @@ import {prepararOrdenUniversalSinCheckout} from './r2-orden-universal-documentos
 import {iniciarLoteTUSUniversal,confirmarLoteTUSUniversal} from './tus-universal-worker.mjs';
 import {pagoSandboxUniversalDocumentos} from './r2-universal-checkout-documentos.mjs';
 import {pagoMPLiveComprador} from './mp-live-comprador.mjs';
+import {paginaRetornoLive} from './pagina-retorno-live.mjs';
 import {checkoutR2PrepaidSandboxDocumentos} from './r2-prepago-checkout-documentos.mjs';
 import {descargarR2GrandePersonal} from './r2-pdf-grandes-descarga-personal.mjs';
 import {descargarR2PendientePorD1Personal} from './r2-pdf-descarga-d1-personal.mjs';
@@ -2297,6 +2298,7 @@ export default {
     // MP LIVE: separado de /prueba-v2 y del checkout sandbox.
     // Origen de producción, cookie de comprador vinculada y HMAC obligatorios.
     // Con compuerta cerrada: 503 sin consultar Central ni generar cobros.
+    if(page==='/pedido/estado')return paginaRetornoLive(request,env);
     if(page==='/api/pedido/live/checkout'){
       if(env?.SABER_ENTORNO!=='produccion')
        return testResponse({ok:false,error:'MP LIVE no habilitado'},503);
