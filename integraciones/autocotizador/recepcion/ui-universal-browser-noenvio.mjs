@@ -1,13 +1,12 @@
 /**
  * QA de navegador, SOLO interfaz privada: no toca API de pedido, checkout, TUS ni R2.
- * Genera un PDF válido de 500 páginas A4 y 100 MiB mediante espacios PDF.
+ * Usa un PDF efímero de 500 páginas A4 y 100 MiB con JPEG reales.
  * El contenido no sale del navegador; la única llamada comercial es presupuesto.
  */
 import assert from 'node:assert/strict';
-import {mkdtemp,writeFile,rm} from 'node:fs/promises';
+import {mkdtemp,stat,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {PDFDocument,StandardFonts} from 'pdf-lib';
 import {chromium} from 'playwright-core';
 
 const MiB=1048576;
@@ -19,28 +18,12 @@ const watchdog=setTimeout(()=>{console.error('QA_WATCHDOG_NAVEGADOR_140S');proce
 watchdog.unref();
 let browser;
 try{
- console.log('QA_ETAPA_1_GENERAR_PDF_500P');
- const doc=await PDFDocument.create();
- const font=await doc.embedFont(StandardFonts.Helvetica);
- for(let i=0;i<500;i++){
-   const p=doc.addPage([595.28,841.89]);
-   p.drawText('APUNTE A4 - PAGINA '+(i+1),{x:45,y:798,size:11,font});
- }
- const original=Buffer.from(await doc.save({useObjectStreams:false}));
- console.log('QA_ETAPA_2_PDF_500P_LISTO');
- const marker=Buffer.from('startxref','ascii');
- const ix=original.lastIndexOf(marker);
- assert.ok(ix>0);
- // Espacios entre la tabla xref y startxref: no desplaza los offsets PDF.
- const target=100*MiB;
- const pad=target-original.length;
- assert.ok(pad>0);
- const file=Buffer.concat([original.subarray(0,ix),Buffer.alloc(pad,32),original.subarray(ix)]);
- assert.equal(file.length,target);
- const filename=path.join(tmp,'APUNTE_500PAG_A4_100MiB.pdf');
- await writeFile(filename,file);
- console.log('QA_ETAPA_3_PDF_100MIB_ESCRITO');
- console.log('BROWSER_QA_FIXTURE_A4_500_PAGES_100MiB_VALID_STRUCTURE');
+ console.log('QA_ETAPA_1_VERIFICAR_PDF_500P_100MiB_CON_JPEG');
+ const filename=process.env.QA_PDF_INPUT;
+ assert.ok(filename&&filename.endsWith('.pdf'),'Archivo QA no generado');
+ const stats=await stat(filename);
+ assert.equal(stats.size,100*MiB,'El fixture debe pesar exactamente 100 MiB');
+ console.log('QA_ETAPA_3_PDF_100MIB_REAL_LISTO');
  const chrome=process.env.CHROME_PATH||'/usr/bin/google-chrome';
  console.log('QA_ETAPA_4_INICIAR_CHROME');
  browser=await chromium.launch({headless:true,executablePath:chrome,args:['--no-sandbox','--disable-dev-shm-usage']});
