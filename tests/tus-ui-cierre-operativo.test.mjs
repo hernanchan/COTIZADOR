@@ -11,7 +11,8 @@ const portal=paginaCotizadorV2PruebaPrivada('sitekey-ensayo-privado',true);
 const script=portal.match(/<script type="module">([\s\S]*?)<\/script>/)?.[1];
 
 test('UI TUS: exactamente diez PDF, sin cambiar el límite del clasificador independiente',()=>{
- assert.match(client,/MAX_PDF_CARGA=location\.pathname==='\/prueba-v2\/carga-inteligente'\?10:30/);
+ assert.match(client,/MAX_PDF_CARGA=\(location\.pathname==='\/prueba-v2\/carga-inteligente'\|\|UNIVERSAL_COMPRADOR_LIVE\)\?10:30/);
+ assert.match(client,/UNIVERSAL_COMPRADOR_LIVE=location\.pathname==='\/cotizar\/archivos'/);
  assert.match(client,/entries\.length\+files\.length>MAX_PDF_CARGA/);
  assert.match(client,/entries\.length>MAX_PDF_CARGA/);
  assert.ok(paginaCargaUnica().includes('Podés seleccionar varios a la vez (hasta 30).'));
