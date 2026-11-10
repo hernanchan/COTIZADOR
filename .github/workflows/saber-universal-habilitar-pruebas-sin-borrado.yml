@@ -1,0 +1,106 @@
+name: Saber universal - habilitar cotizador y pago SOLO PRIVADO sin borrados
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-universal-habilitar-pruebas-sin-borrado.yml]
+permissions:
+  contents: read
+concurrency:
+  group: saber-universal-private-settings-change
+  cancel-in-progress: false
+jobs:
+  activate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Activar únicamente 13 compuertas universales de ensayo con rollback
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts"
+          auth="Authorization: Bearer $TOKEN"
+          dir=$(mktemp -d)
+          changed=''
+          rollback(){
+            rc=$?
+            trap - EXIT
+            if [ "$rc" -ne 0 ] && [ -n "$changed" ];then
+              echo 'ROLLBACK_UNIVERSAL_FLAGS_NONDESTRUCTIVE'
+              for w in $changed;do
+                http=$(curl -sS --max-time 45 -o "$dir/$w-revert-result" -w '%{http_code}' -X PATCH                   -H "$auth" -F "settings=@$dir/$w-revert.json;type=application/json" "$root/$w/settings") || true
+                if [ "$http" = 200 ] && jq -e '.success==true' "$dir/$w-revert-result" >/dev/null;then
+                  curl -fsS --max-time 25 -H "$auth" "$root/$w/settings" > "$dir/$w-after-rollback"
+                  jq -e --slurpfile pre "$dir/$w-before"                     '([.result.bindings[].name]|sort)==([$pre[0].result.bindings[].name]|sort)'                     "$dir/$w-after-rollback" >/dev/null &&
+                    echo "$w SETTINGS_ROLLBACK_CONFIRMED"
+                else echo "$w SETTINGS_ROLLBACK_NEEDS_REVIEW";fi
+              done
+            fi
+            rm -rf "$dir"
+            exit "$rc"
+          }
+          trap rollback EXIT
+          for w in saber-pagos-pruebas saber-documentos-pruebas;do
+            curl -fsS --max-time 25 -H "$auth" "$root/$w/settings" > "$dir/$w-before"
+            curl -fsS --max-time 25 -H "$auth" "$root/$w/deployments" > "$dir/$w-deploy"
+            jq -e '.success==true and (.result.bindings|type=="array")' "$dir/$w-before" >/dev/null
+            if [ "$w" = saber-pagos-pruebas ];then
+              expected='2e5d2d59-b707-44ea-9dd2-bd1051e9a5a9'
+              flags='["CENTRAL_R2_UNIVERSAL_DRAFT_ENABLED","CENTRAL_R2_UNIVERSAL_ORDER_ENABLED","CENTRAL_R2_UNIVERSAL_CHECKOUT_ENABLED","CENTRAL_R2_UNIVERSAL_POSTPAY_ENABLED","CENTRAL_R2_UNIVERSAL_TUS_ENABLED","CENTRAL_R2_UNIVERSAL_PACKAGE_ENABLED","CENTRAL_R2_UNIVERSAL_PREPRESS_ENABLED"]'
+              required='["DB","CENTRAL_BRIDGE_KEY","MP_TEST_ACCESS_TOKEN","DEMO_ADMIN_KEY","SABER_DOCUMENTOS","SABER_R2_GRANDES","DOCS_SANDBOX_CHECKOUT_ENABLED"]'
+              forbidden='["CENTRAL_R2_UNIVERSAL_PURGE_ENABLED","CENTRAL_R2_UNIVERSAL_PURGE_EXECUTE_ENABLED"]'
+            else
+              expected='999a0b9f-d02d-46ef-8b57-72215bc9e13b'
+              flags='["DOCS_R2_UNIVERSAL_DRAFT_ENABLED","DOCS_R2_UNIVERSAL_ORDER_ENABLED","DOCS_R2_UNIVERSAL_CHECKOUT_ENABLED","DOCS_R2_UNIVERSAL_POSTPAY_ENABLED","DOCS_R2_UNIVERSAL_TUS_ENABLED","DOCS_R2_UNIVERSAL_PACKAGE_ENABLED"]'
+              required='["SABER_CENTRAL","SABER_R2_GRANDES","CENTRAL_BRIDGE_KEY","CENTRAL_TEST_URL","DOCS_TUS_SUPABASE_SERVICE_KEY","DOCS_TUS_RECEIPT_KEY","DOCS_TUS_PUBLISHABLE_KEY","DOCS_V2_PRIVATE_UI_SECRET","DOCS_CLIENT_SANDBOX_CHECKOUT_ENABLED"]'
+              forbidden='["DOCS_R2_UNIVERSAL_PURGE_ENABLED"]'
+            fi
+            observed=$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$dir/$w-deploy")
+            test "$observed" = "$expected" || { echo "$w ACTIVE_PRIVATE_VERSION_CHANGED_ABORT";exit 1; }
+            jq -e --argjson flags "$flags" --argjson required "$required" --argjson forbidden "$forbidden" '
+              .result.bindings as $b|
+              all($required[]; . as $name|any($b[];.name==$name)) and
+              all($flags[];. as $name|all($b[];.name!=$name)) and
+              all($forbidden[];. as $name|all($b[];.name!=$name or .type!="plain_text" or .text!="PRIVATE_TEST_ONLY"))
+            ' "$dir/$w-before" >/dev/null ||
+              { echo "$w REQUIRED_BINDING_MISSING_OR_FLAG_ALREADY_PRESENT";exit 1; }
+            jq -n --argjson flags "$flags" --slurpfile original "$dir/$w-before"               '{bindings:([$original[0].result.bindings[]|{name,type:"inherit"}]+
+                [$flags[]|{name:.,type:"plain_text",text:"PRIVATE_TEST_ONLY"}])}'               > "$dir/$w-patch.json"
+            jq -n --slurpfile original "$dir/$w-before"               '{bindings:[$original[0].result.bindings[]|{name,type:"inherit"}]}'               > "$dir/$w-revert.json"
+            echo "$w VERIFIED_SAFE_TO_ENABLE_PRIVATE_UNIVERSAL_ONLY"
+          done
+          curl -fsS --max-time 25 https://saber-pagos-pruebas.libreriasaber.workers.dev/health > "$dir/health"
+          jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$dir/health" >/dev/null
+          test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/)" = 401
+          for w in saber-pagos-pruebas saber-documentos-pruebas;do
+            changed="$w $changed"
+            http=$(curl -sS --max-time 50 -o "$dir/$w-result" -w '%{http_code}' -X PATCH -H "$auth"               -F "settings=@$dir/$w-patch.json;type=application/json" "$root/$w/settings")
+            test "$http" = 200 || { echo "$w PATCH_REJECTED_HTTP_$http";exit 1; }
+            jq -e '.success==true' "$dir/$w-result" >/dev/null
+            curl -fsS --max-time 25 -H "$auth" "$root/$w/settings" > "$dir/$w-after"
+            if [ "$w" = saber-pagos-pruebas ];then
+              flags='["CENTRAL_R2_UNIVERSAL_DRAFT_ENABLED","CENTRAL_R2_UNIVERSAL_ORDER_ENABLED","CENTRAL_R2_UNIVERSAL_CHECKOUT_ENABLED","CENTRAL_R2_UNIVERSAL_POSTPAY_ENABLED","CENTRAL_R2_UNIVERSAL_TUS_ENABLED","CENTRAL_R2_UNIVERSAL_PACKAGE_ENABLED","CENTRAL_R2_UNIVERSAL_PREPRESS_ENABLED"]'
+            else
+              flags='["DOCS_R2_UNIVERSAL_DRAFT_ENABLED","DOCS_R2_UNIVERSAL_ORDER_ENABLED","DOCS_R2_UNIVERSAL_CHECKOUT_ENABLED","DOCS_R2_UNIVERSAL_POSTPAY_ENABLED","DOCS_R2_UNIVERSAL_TUS_ENABLED","DOCS_R2_UNIVERSAL_PACKAGE_ENABLED"]'
+            fi
+            jq -e --slurpfile before "$dir/$w-before" --argjson flags "$flags" '
+              .success==true and
+              ([.result.bindings[].name]|sort)==([$before[0].result.bindings[].name,$flags[]]|sort) and
+              all($flags[] as $name; .result.bindings|
+                any(.[];.name==$name and .type=="plain_text" and .text=="PRIVATE_TEST_ONLY"))
+            ' "$dir/$w-after" >/dev/null ||
+              { echo "$w PRIVATE_FLAGS_CONFIRMATION_FAILED";exit 1; }
+            echo "$w UNIVERSAL_NONDESTRUCTIVE_TEST_FLAGS_ENABLED"
+          done
+          curl -fsS --max-time 25 https://saber-pagos-pruebas.libreriasaber.workers.dev/health > "$dir/post-health"
+          jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$dir/post-health" >/dev/null ||
+            { echo 'REAL_PAYMENT_MODE_CHANGED_ABORT';exit 1; }
+          test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/)" = 401 ||
+            { echo 'PRIVATE_UI_UNPROTECTED_ABORT';exit 1; }
+          echo 'PRIVATE_UNIVERSAL_ENABLED_REAL_PAYMENT_OFF_DELETION_DISABLED_PUBLIC_UNTOUCHED'
