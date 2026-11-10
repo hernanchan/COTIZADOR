@@ -17,6 +17,11 @@ on:
       - 'integraciones/mercadopago/pruebas/tus-live-pospago-aislado.test.mjs'
       - 'integraciones/mercadopago/pruebas/central-recepcion-live.mjs'
       - 'integraciones/mercadopago/pruebas/central-recepcion-live.test.mjs'
+      - 'integraciones/mercadopago/pruebas/r2-live-inspection-finalize.mjs'
+      - 'integraciones/mercadopago/pruebas/r2-live-inspection-finalize.test.mjs'
+      - 'integraciones/autocotizador/recepcion/firmar-inspeccion-r2-live-local.mjs'
+      - 'integraciones/autocotizador/recepcion/firmar-inspeccion-r2-live-local.test.mjs'
+      - 'integraciones/autocotizador/recepcion/preprensa-r2-archivo-local.mjs'
       - 'tests/central-live-recepcion-panel.test.mjs'
       - 'integraciones/mercadopago/pruebas/pricing-live-admin.mjs'
       - 'integraciones/mercadopago/pruebas/pricing-live-admin.test.mjs'
@@ -93,6 +98,7 @@ jobs:
           node --test integraciones/mercadopago/pruebas/r2-universal-live-gate-central.test.mjs
           node --test integraciones/mercadopago/pruebas/r2-universal-live-reserve-central.test.mjs
           node --test integraciones/mercadopago/pruebas/central-recepcion-live.test.mjs
+          node --test integraciones/mercadopago/pruebas/r2-live-inspection-finalize.test.mjs
           node --test tests/central-live-recepcion-panel.test.mjs
           node --test integraciones/mercadopago/pruebas/pricing-live-admin.test.mjs
           node --test integraciones/mercadopago/pruebas/central-live-hmac-e2e.test.mjs
@@ -121,7 +127,9 @@ jobs:
           npm install --no-fund --no-audit
           npm run build:unificado
           cd ../../..
-          node --test integraciones/autocotizador/recepcion/tus-live-recepcion-documentos.test.mjs          node --test integraciones/autocotizador/recepcion/recepcion-tus-live-cliente.test.mjs
+          node --test integraciones/autocotizador/recepcion/tus-live-recepcion-documentos.test.mjs
+          node --test integraciones/autocotizador/recepcion/recepcion-tus-live-cliente.test.mjs
+          node --test integraciones/autocotizador/recepcion/firmar-inspeccion-r2-live-local.test.mjs
           node --test integraciones/autocotizador/recepcion/r2-live-preflight-documentos.test.mjs
           node --test integraciones/autocotizador/recepcion/r2-live-puente-central.test.mjs
           node --test integraciones/autocotizador/recepcion/r2-live-reserva-puente-central.test.mjs
