@@ -74,3 +74,11 @@
 - [Auditoría real de flag vía panel privado de operador](https://github.com/hernanchan/COTIZADOR/actions/runs/42839353486): las 11 banderas `PRIVATE_TEST_ONLY` del universal están OK, `SABER_CENTRAL=service`, `SABER_R2_GRANDES=r2_bucket`; HTML privado (HTTP 200) contiene `src="/prueba-v2/carga-inteligente?universal=1"`. El endpoint comprador sin cookie Turnstile devuelve correctamente el formulario de acceso; no tratarlo como flag faltante.
 - **Pruebas NO realizadas**: no se ha enviado PDF real de 100 MiB, no se ha pagado checkout nuevo, no se ha simulado un nuevo pedido, no se ha validado recepción R2 de ese apunte de 500 páginas en un navegador real. Las pruebas son de programación, compilación, API de configuración y presencia real de UI.
 - El lanzamiento **sigue NO_GO** hasta verificar funcionamiento visual completo, MP real seguro, productos y reversión comercial. Mantener pagos reales desactivados.
+
+## 10/11 — bloqueo de cobro real confirmado por revisión de código
+
+- `integraciones/publicacion/mercadopago-live-preflight.mjs` declara expresamente ser una **función pura**, no pasarela ni endpoint. Sus validaciones exigen pago MP `live_mode=true`, vendedor LIVE coincidente y distinto de comprador de ensayo, `merchant_order`, orden D1 y monto íntegro, con webhook firmado. **No realiza** GET autenticados a MP ni persistencia en D1, ni crea preferencia.
+- `integraciones/mercadopago/pruebas/worker.js` expone los checkout documentales revisados en modo sandbox; pagos reales no autorizados.
+- `vidriera/portal-comercial.json` sigue `enabled:false, release:NO_GO, buyerUrl:null`.
+- Por tanto las pruebas unitarias y de Worker privado **NO** equivalen a capacidad de cobrar en producción. No activar pagos reales ni publicar el cotizador hasta que exista implementación segura y comprobada del checkout y webhook LIVE, manteniendo la reversión del sitio vigente.
+- La rama de integración ya no discrimina por peso para definir destino A4/A3/CAD/Pleno; el nuevo browser QA simula 500 páginas A4 de 100 MiB, **sin crear pedido ni subir archivos** (workflow `saber-qa-browser-universal-noenvio-20261110.yml`, resultado independiente de esta nota).
