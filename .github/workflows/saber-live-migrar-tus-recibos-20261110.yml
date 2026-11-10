@@ -28,6 +28,7 @@ jobs:
         run: |
           set -euo pipefail
           node --check integraciones/publicacion/aplicar-d1-produccion-tus-recibos.mjs
+          grep -Fq 'ON DELETE RESTRICT' integraciones/publicacion/d1-produccion-tus-recibos-v1.sql
           python3 - <<'PY'
           import sqlite3,pathlib
           ddl=pathlib.Path('integraciones/publicacion/d1-produccion-tus-recibos-v1.sql').read_text()
