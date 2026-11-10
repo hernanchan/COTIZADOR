@@ -6,12 +6,12 @@
  * 3.11.174 con PDFDataRangeTransport. Sólo obtiene número y medidas; NO
  * renderiza una página ni acredita precio o PDF imprimible.
  *
- * Política: hasta 35 rangos adicionales, máximo 8 MiB leídos acumulados,
+ * Política: hasta 700 rangos adicionales, máximo 48 MiB leídos acumulados,
  * y 2.000 páginas. Si falla lectura o el parser, NO COTIZAR.
  */
 const INITIAL_BYTES=65536;
-const MAX_BYTES_READ=8*1024*1024;
-const MAX_CALLS=35;
+const MAX_BYTES_READ=48*1024*1024;
+const MAX_CALLS=700;
 export const BIG_PDF_METADATA_LIMITS=Object.freeze({
  initialBytes:INITIAL_BYTES,maxReadBytes:MAX_BYTES_READ,maxCalls:MAX_CALLS,
  maxPages:2000
