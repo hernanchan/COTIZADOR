@@ -6,6 +6,7 @@ import {componerCarritoPreliminar} from './componer-carrito-preliminar.mjs';
 import {seleccionarPaginas} from './seleccionar-paginas.mjs';
 import {decidirTamanoCliente} from './decision-tamano-impresion.mjs';
 import {clasificarPaginasPloteo} from './clasificar-paginas-ploteo.mjs';
+import {clasificarMosaicoRasterPDFGrande} from './clasificar-ploteo-grande-raster-local.mjs';
 import {prepararLoteParcial,recomponerLoteParcial} from './cotizar-lote-parcial.mjs';
 import {solicitarCotizacionPrivada} from './solicitar-cotizacion-privada.mjs';
 import {decidirTransportePDF,LIMITE_TUS_PDF_BYTES,LIMITE_R2_PDF_BYTES} from './seleccionar-transporte-pdf.mjs';
@@ -503,6 +504,9 @@ function render(){
        eleccion.tipo==='cad'?'CAD · Plano técnico':'PLENO · Póster';
       bloque.append(texto('p','Clasificación automática: '+clase+
        '. El precio se calcula para el tipo detectado.'));
+      if(e.metodoClasificacion==='MOSAICO_RASTER_LOCAL')
+       bloque.append(texto('small','El PDF contiene una plancha de imágenes rasterizadas. '+
+        'El análisis local es preliminar; se revisará el original antes de imprimir.'));
       const revisar=document.createElement('a');
       revisar.className='consulta-clasificacion-ploteo';
       const consulta='Hola, Librería Saber. Quiero que revisen la clasificación del PDF «'+
@@ -740,8 +744,19 @@ async function analizarArchivoPDF(e,file){
   e.paginas=x.paginas.map(p=>({...p,modo:'sin-clasificar'}));
   e.tipoPloteoElegidoPorCliente=false;
   e.clasificacionAutomatica=false;
-  // Para A4/A3 y documentos pequeños no hace falta renderizar cada página.
-  // Para ploteos sí se mantiene el clasificador CAD/Póster por página.
+  e.metodoClasificacion=null;
+  // Para >40 MiB, detectar localmente sólo mosaicos raster muy claros
+  // usando rangos pequeños. No renderizar ni subir el PDF al servidor.
+  if(file.size>MAX_PDF_TUS_BYTES&&requiereClasificacionVisualPloteo(e.paginas)){
+   const hallazgo=await clasificarMosaicoRasterPDFGrande(file);
+   if(hallazgo?.altaConfianza===true&&hallazgo.modo==='poster'&&
+      e.paginas.length===1){
+    e.paginas[0].modo='poster';
+    e.clasificacionAutomatica=true;
+    e.metodoClasificacion='MOSAICO_RASTER_LOCAL';
+   }
+  }
+  // Los PDF pequeños mantienen su clasificación visual completa.
   if(file.size<=MAX_PDF_TUS_BYTES&&requiereClasificacionVisualPloteo(e.paginas)){
    try{
     const clases=await clasificarPaginasPloteo(file);
@@ -753,6 +768,7 @@ async function analizarArchivoPDF(e,file){
     // ni el nombre del PDF ni una elección del comprador cuentan como detección.
     e.clasificacionAutomatica=clases.length===e.paginas.length&&
      e.paginas.every(p=>['cad','poster'].includes(p.modo));
+    if(e.clasificacionAutomatica)e.metodoClasificacion='VISUAL_PDFJS';
    }catch(_){/* Sin clase confirmada, el ploteo no obtiene precio final. */}
   }
   const decision=decidirTamanoCliente(e.paginas);
