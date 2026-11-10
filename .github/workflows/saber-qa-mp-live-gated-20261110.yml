@@ -24,6 +24,7 @@ on:
       - 'integraciones/autocotizador/recepcion/ordenes-universales-live-documentos.test.mjs'
       - 'integraciones/autocotizador/recepcion/plan-recepcion-universal-r2.mjs'
       - 'integraciones/autocotizador/recepcion/ficha-prearchivo-universal.mjs'
+      - 'tests/r2-borrador-universal-central.test.mjs'
       - 'integraciones/publicacion/d1-produccion-tarifario-v1.sql'
       - 'integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs'
       - 'integraciones/autocotizador/recepcion/pago-live-universal-documentos.mjs'
@@ -51,6 +52,7 @@ jobs:
           node --test integraciones/autocotizador/recepcion/checkout-live-cliente.test.mjs
           node --test integraciones/autocotizador/recepcion/obtener-tarifario-d1-live.test.mjs
           node --test integraciones/autocotizador/recepcion/ordenes-universales-live-documentos.test.mjs
+          node --test tests/r2-borrador-universal-central.test.mjs
           node --check integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs
           node --test integraciones/autocotizador/recepcion/pago-live-universal-documentos.test.mjs
           node --check integraciones/mercadopago/pruebas/r2-universal-order-central.mjs
