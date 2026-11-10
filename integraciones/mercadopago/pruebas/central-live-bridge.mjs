@@ -57,7 +57,7 @@ export async function leerFirmaInternaLive(request,env,{
  const orderRoute=url.pathname==='/internal/central/live/order';
  const pricingRoute=url.pathname==='/internal/central/live/pricing';
  const keys=r2Stage?'bytes,contenidoPdfVerificado,etag,fileId,listoParaProducir,name,objectKey,orderId,pagesDeclaradas,paymentAuthorized,receiptId,registeredInD1,schema,sha256,sha256Verificado':
-  const keys=r2Reserve?'bytes,fileId,name,objectKey,orderId,pages,schema,sha256':
+  r2Reserve?'bytes,fileId,name,objectKey,orderId,pages,schema,sha256':
   r2Gate?'bytes,fileId,name,orderId,pages,schema,sha256':
   tusGate?'action,bytes,fileId,name,orderId,pages,schema,sha256':
   tusReceipt?'bytes,fileId,metrics,name,objectName,orderId,pages,receiptId,schema,sha256':
