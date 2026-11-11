@@ -115,3 +115,15 @@ test('abrir enlace del cotizador con parámetros de origen no provoca 404',async
   assert.doesNotMatch(html,/utm_source|utm_medium|ref=whatsapp/i);
  }
 });
+
+test('móvil: el iframe no tiene alto mínimo fijo ni desplazamiento anidado',async()=>{
+ const response=paginaCotizarLive(new Request(url),env,{authorized:true});
+ const html=await response.text();
+ assert.match(html,/scrolling="no"/);
+ assert.match(html,/SABER_SMART_RESIZE/);
+ assert.match(html,/iframe\.style\.height=target\+'px'/);
+ assert.match(html,/#pdf\{height:960px;min-height:0\}/);
+ assert.match(html,/grid-template-columns:1fr/);
+ assert.ok(html.indexOf('id="precio-entrega"')<html.indexOf('id="pdf"'));
+ assert.ok(html.indexOf('id="pdf"')<html.indexOf('id="nombre"'));
+});
