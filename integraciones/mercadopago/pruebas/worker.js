@@ -2523,7 +2523,7 @@ body.price-only #priceAdminFieldset summary{font-size:1.3rem}
 <button id="deliveryPlanSave" type="button" disabled>Guardar previsión</button></div>
 <p id="deliveryPlanStatus" role="status" aria-live="polite" class="note">Consultá primero la previsión guardada.</p>
 </fieldset>
-<fieldset id="bankTransfersArea"><legend>Transferencias por verificar · <strong id="transferCount">0 pendientes</strong></legend><p class="note">Los pendientes se cargan solos y se actualizan cada 30 segundos. Comprobar el ingreso en el banco: un comprobante del cliente no acredita el pago. Operación limitada al ENSAYO privado.</p><p id="transferPanelStatus" class="transfer-feedback" role="status" aria-live="polite">Ingresá la clave privada para consultar las transferencias.</p><ol id="transferPending"></ol><details><summary style="cursor:pointer;color:#174b8f">Actualización manual de transferencias</summary><button id="refreshTransfers" class="outline" type="button">Actualizar ahora</button></details></fieldset>
+<fieldset id="bankTransfersArea"><legend>Transferencias por verificar · <strong id="transferCount">0 pendientes</strong></legend><p class="note">Los pendientes se cargan solos y se actualizan cada 30 segundos. Comprobar el ingreso en el banco: un comprobante del cliente no acredita el pago. Operación limitada al ENSAYO privado.</p><p id="transferPanelStatus" class="transfer-feedback" role="status" aria-live="polite">Ingresá la clave privada para consultar las transferencias.</p><ol id="transferPending"></ol><section id="transferLiveArea" hidden><h4>Transferencias bancarias reales · verificá el banco antes de aprobar</h4><p id="transferLiveStatus" class="transfer-feedback" role="status" aria-live="polite"></p><ol id="transferLivePending"></ol></section><details><summary style="cursor:pointer;color:#174b8f">Actualización manual de transferencias</summary><button id="refreshTransfers" class="outline" type="button">Actualizar ahora</button></details></fieldset>
 <fieldset id="productionBoardArea"><legend>Tablero de producción · pedidos pagos</legend>
 <p class="note">Cada pedido avanza de columna al registrar su estado. Descargar el ZIP no cambia el seguimiento. Actualización automática cada 30 segundos mientras el panel esté abierto.</p>
 <div class="board" id="productionBoard">
@@ -3325,6 +3325,8 @@ try{operatorInput.value=sessionStorage.getItem("saberProductionOperator")||""}ca
 operatorInput.addEventListener("change",()=>{
  try{sessionStorage.setItem("saberProductionOperator",operatorInput.value.trim())}catch(_){}
 });
+setInterval(()=>refreshLiveTransfers(),30000);
+refreshLiveTransfers();
 const liveRecepcionStatus=document.querySelector("#liveRecepcionStatus");
 const liveRecepcionList=document.querySelector("#liveRecepcionList");
 const liveRecepcionButton=document.querySelector("#refreshLiveRecepcion");
@@ -3933,6 +3935,61 @@ async function refreshTransfers({silent=false,force=false}={}){
  }finally{refreshingTransfers=false}
 }
 document.querySelector("#refreshTransfers").addEventListener("click",()=>refreshTransfers({force:true}));
+let liveTransferRefreshing=false;
+async function refreshLiveTransfers(){
+ if(liveTransferRefreshing||!secret.value.trim())return;
+ liveTransferRefreshing=true;
+ const area=document.querySelector("#transferLiveArea"),
+  list=document.querySelector("#transferLivePending"),
+  message=document.querySelector("#transferLiveStatus");
+ try{
+  const result=await api("/admin/api/central/live-transfers/pending");
+  if(result.ok!==true||!Array.isArray(result.pending))throw Error("Respuesta de Central inconsistente");
+  area.hidden=false;list.replaceChildren();
+  if(!result.pending.length){
+   message.textContent="No hay transferencias reales esperando acreditación.";
+  }else{
+   message.textContent=result.pending.length+" transferencia(s) REAL(ES) pendientes. Confirmar únicamente el movimiento en el banco.";
+   for(const t of result.pending){
+    if(!/^[a-f0-9-]{36}$/i.test(t.order_id||"")||
+       !Number.isSafeInteger(t.amount_ars)||t.amount_ars<1)continue;
+    const li=node("li","Orden "+(t.numero_orden||t.order_id)+" · "+money(t.amount_ars));
+    li.append(node("p","Cliente: "+(t.nombre||"No informado")+
+     " · Teléfono: "+(t.telefono||"No informado")+
+     " · Dirección: "+(t.direccion||"No informada · retiro en local")));
+    const operator=node("input","");operator.placeholder="Nombre del responsable";operator.maxLength=60;
+    const reference=node("input","");reference.placeholder="Referencia REAL del banco";reference.maxLength=80;
+    const approve=node("button","Confirmar acreditación bancaria REAL");approve.type="button";
+    approve.addEventListener("click",async()=>{
+     const op=operator.value.trim(),ref=reference.value.trim().toUpperCase().replace(/\s+/g," ");
+     if(op.length<2||op.length>60||!/^[A-Z0-9][A-Z0-9._/ -]{5,79}$/.test(ref)){
+      message.textContent="Ingresá operador y referencia verificable del banco.";return;
+     }
+     if(!confirm("¿Verificaste EN EL BANCO la acreditación REAL de "+money(t.amount_ars)+
+      " para esta orden? El comprobante del cliente NO alcanza."))return;
+     approve.disabled=true;
+     try{
+      const saved=await apiPost("/admin/api/central/live-transfers/approve",{
+       order_id:t.order_id,amount_ars:t.amount_ars,bank_reference:ref,operator:op,confirmed:true
+      });
+      if(saved.ok!==true||saved.paymentVerified!==true||saved.productionAuthorized!==false)
+       throw Error("Acreditación no confirmada.");
+      message.textContent="Acreditación real registrada. Pedido disponible en recepción LIVE.";
+      await refresh();
+      await actualizarRecepcionLive();
+      await refreshLiveTransfers();
+     }catch(e){approve.disabled=false;message.textContent=String(e.message||"Revisión no registrada").slice(0,145)}
+    });
+    li.append(node("p","Operador responsable"),operator,node("p","Referencia bancaria"),reference,approve);
+    list.append(li);
+   }
+  }
+ }catch(e){
+  // En entorno de ensayo o sin compuerta comercial no se muestra esta sección.
+  area.hidden=true;list.replaceChildren();
+ }finally{liveTransferRefreshing=false}
+}
+
 document.querySelector("#refreshUnpaid").addEventListener("click",async()=>{
  const list=document.querySelector("#unpaidDocs");
  try{
