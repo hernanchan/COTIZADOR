@@ -2181,6 +2181,10 @@ export default {
         r2PrepagoUiConfigurado(env),universalUiConfigurado(env)):null
       });
     // Cotizador quote-only histórico: su cookie nunca autoriza TUS.
+    if(page==='/prueba-v2/api/plazo-produccion'){
+      const {plazoProduccionCliente}=await import('./plazo-produccion-cliente.mjs');
+      return plazoProduccionCliente(request,env);
+    }
     if(page==='/prueba-v2/cotizar-cliente')
       return manejarCotizadorCliente(request,env,{paginaCotizacion:paginaCargaUnica()});
     // DEMOSTRACIÓN VISUAL ANÓNIMA, SEPARADA DEL PORTAL PRIVADO.
@@ -2340,6 +2344,10 @@ export default {
     if(page==='/cotizar'){
       const buyer=await autorizadoCompradorLive(request,env);
       return paginaCotizarLive(request,env,{authorized:buyer});
+    }
+    if(page==='/api/pedido/plazo'){
+      const {plazoProduccionCliente}=await import('./plazo-produccion-cliente.mjs');
+      return plazoProduccionCliente(request,env);
     }
     if(page==='/cotizar/archivos'||page==='/cotizar/archivos.js'||
        page==='/cotizar/flujo-live.js'||page==='/api/pedido/live/materiales'||
