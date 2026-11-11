@@ -1,0 +1,118 @@
+name: Saber - Central Sandbox Fotos y descuentos aprobados (rollback)
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-central-fotos-promos-privado-20261111.yml]
+permissions: {contents: read, statuses: write}
+concurrency: {group: saber-central-private-deploy, cancel-in-progress: false}
+jobs:
+  central-sandbox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Regresión hash y descuentos + compilar Central
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.25.12
+          node --test tests/r2-universal-fotos-promociones-cobro.test.mjs tests/r2-borrador-universal-central.test.mjs tests/r2-orden-universal-sin-cobro.test.mjs tests/r2-universal-checkout-postpago.test.mjs tests/r2-universal-preprensa-central.test.mjs
+          npx esbuild integraciones/mercadopago/pruebas/worker.js --bundle --format=esm --platform=browser --target=es2022 --outfile=/tmp/saber-central-fotos-promos.mjs
+          node --check /tmp/saber-central-fotos-promos.mjs
+          test -s /tmp/saber-central-fotos-promos.mjs
+          grep -Fq 'UNIVERSAL_COTIZACION_FUERA_DE_CONTRATO' /tmp/saber-central-fotos-promos.mjs
+          echo CENTRAL_FOTOS_PROMO_BUILD_OK
+      - name: Promover SOLO Central de pruebas conservando toda su configuración y rollback
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-pagos-pruebas"
+          base='https://saber-pagos-pruebas.libreriasaber.workers.dev'
+          auth="Authorization: Bearer $TOKEN"
+          tmp="$(mktemp -d)"
+          chmod 700 "$tmp"
+          previous='' modified=0
+          cleanup(){
+            rc=$?
+            trap - EXIT
+            if [ "$rc" -ne 0 ] && [ "$modified" = 1 ] && [ -n "$previous" ];then
+              echo CENTRAL_FOTOS_PROMO_ROLLBACK_SOLICITADO
+              jq -n --arg id "$previous" '{strategy:"percentage",versions:[{version_id:$id,percentage:100}],annotations:{"workers/message":"Rollback Central privada Fotos y promos"}}' > "$tmp/rollback.json"
+              if curl -fsS --max-time 60 -H "$auth" -H 'Content-Type: application/json' --data-binary "@$tmp/rollback.json" "$root/deployments" > "$tmp/rollback-response.json" &&
+                 jq -e '.success==true' "$tmp/rollback-response.json" >/dev/null;then
+                 echo CENTRAL_FOTOS_PROMO_ROLLBACK_CONFIRMADO
+              else echo CENTRAL_FOTOS_PROMO_ROLLBACK_REQUIERE_REVISION;fi
+            fi
+            rm -rf "$tmp"
+            exit "$rc"
+          }
+          trap cleanup EXIT
+          curl -fsS --max-time 30 -H "$auth" "$root/settings" > "$tmp/before-settings.json"
+          jq -e '.success==true and (.result.bindings|type=="array") and
+            (.result.bindings|any(.name=="DB" and (.type=="d1" or .type=="d1_database"))) and
+            (.result.bindings|any(.name=="DEMO_ADMIN_KEY" and .type=="secret_text")) and
+            (.result.bindings|any(.name=="CENTRAL_BRIDGE_KEY" and .type=="secret_text")) and
+            (.result.bindings|any(.name=="MP_TEST_ACCESS_TOKEN" and .type=="secret_text")) and
+            (.result.bindings|any(.name=="CENTRAL_R2_UNIVERSAL_DRAFT_ENABLED" and .text=="PRIVATE_TEST_ONLY")) and
+            (.result.bindings|any(.name=="CENTRAL_R2_UNIVERSAL_ORDER_ENABLED" and .text=="PRIVATE_TEST_ONLY")) and
+            (.result.bindings|any(.name=="CENTRAL_R2_UNIVERSAL_CHECKOUT_ENABLED" and .text=="PRIVATE_TEST_ONLY")) and
+            (.result.bindings|any(.name=="SABER_ENTORNO" and .text=="produccion")|not)' "$tmp/before-settings.json" >/dev/null
+          jq -S '[.result.bindings[]|if .type=="secret_text" then {name,type} else . end]|sort_by(.name)' "$tmp/before-settings.json" > "$tmp/before-bindings.json"
+          curl -fsS --max-time 25 -H "$auth" "$root/deployments" > "$tmp/before-deploy.json"
+          previous="$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/before-deploy.json")"
+          curl -fsS --max-time 25 "$base/health" > "$tmp/health-before.json"
+          jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$tmp/health-before.json" >/dev/null
+          test "$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$base/admin/api/orders")" = 401
+          jq -n --arg sha "$GITHUB_SHA" --slurpfile s "$tmp/before-settings.json" '{main_module:"index.mjs",annotations:{"workers/message":"Fotos y descuentos D1 en Central SOLO sandbox","workers/commit_sha":$sha},bindings:[$s[0].result.bindings[]|{name,type:"inherit"}]}' > "$tmp/meta.json"
+          curl -fsS --max-time 120 -H "$auth" \
+            -F "metadata=@$tmp/meta.json;type=application/json" \
+            -F "index.mjs=@/tmp/saber-central-fotos-promos.mjs;filename=index.mjs;type=application/javascript+module" \
+            "$root/versions?bindings_inherit=strict" > "$tmp/version.json"
+          jq -e '.success==true and (.result.id|type=="string")' "$tmp/version.json" >/dev/null
+          candidate="$(jq -er '.result.id' "$tmp/version.json")"
+          for id in "$previous" "$candidate";do
+            curl -fsS --max-time 30 -H "$auth" "$root/versions/$id" > "$tmp/$id.json"
+            jq -S '[.result.resources.bindings[]|if .type=="secret_text" then {name,type} else . end]|sort_by(.name)' "$tmp/$id.json" > "$tmp/$id-bindings"
+            jq -S '.result.resources.script_runtime|{compatibility_date,compatibility_flags,usage_model,limits,placement}' "$tmp/$id.json" > "$tmp/$id-runtime"
+          done
+          cmp "$tmp/$previous-bindings" "$tmp/$candidate-bindings"
+          cmp "$tmp/$previous-runtime" "$tmp/$candidate-runtime"
+          curl -fsS --max-time 25 -H "$auth" "$root/deployments" > "$tmp/predeploy.json"
+          test "$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/predeploy.json")" = "$previous"
+          jq -n --arg id "$candidate" '{strategy:"percentage",versions:[{version_id:$id,percentage:100}],annotations:{"workers/message":"Solo Central Sandbox Fotos descuentos, seguridad conservada"}}' > "$tmp/promote.json"
+          modified=1
+          curl -fsS --max-time 60 -H "$auth" -H 'Content-Type: application/json' --data-binary "@$tmp/promote.json" "$root/deployments" > "$tmp/promoted.json"
+          jq -e '.success==true' "$tmp/promoted.json" >/dev/null
+          curl -fsS --max-time 30 -H "$auth" "$root/deployments" > "$tmp/verify.json"
+          test "$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/verify.json")" = "$candidate"
+          curl -fsS --max-time 25 -H "$auth" "$root/settings" > "$tmp/after-settings.json"
+          jq -S '[.result.bindings[]|if .type=="secret_text" then {name,type} else . end]|sort_by(.name)' "$tmp/after-settings.json" > "$tmp/after-bindings.json"
+          cmp "$tmp/before-bindings.json" "$tmp/after-bindings.json"
+          healthy=0
+          for attempt in 1 2 3 4 5 6;do
+            curl -fsS --max-time 25 "$base/health" > "$tmp/health-after.json" || true
+            status="$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$base/admin/api/orders" || true)"
+            if [ "$status" = 401 ] && jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$tmp/health-after.json" >/dev/null 2>&1;then
+              healthy=1;break
+            fi
+            sleep 2
+          done
+          test "$healthy" = 1
+          echo CENTRAL_SANDBOX_FOTOS_PROMOS_ACTIVA_BINDINGS_IDENTICOS_DB_LISTA_PAGOS_REALES_OFF
+          modified=0
+      - name: Registrar estado
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STATUS: ${{ job.status }}
+        run: |
+          if [ "$STATUS" = success ];then state=success;description="Central Sandbox Fotos promociones activo; seguridad intacta";else state=failure;description="Central Sandbox sin validar o revertida";fi
+          jq -n --arg state "$state" --arg context 'saber/central-fotos-promos-privada' --arg description "$description" --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/central-fotos-promo.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/central-fotos-promo.json >/dev/null
