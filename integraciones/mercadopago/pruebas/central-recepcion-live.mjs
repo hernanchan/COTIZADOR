@@ -56,7 +56,7 @@ export async function listarRecepcionUniversalLive(request,env,{authorized=false
    "WHERE o.status='paid' AND o.paid_at IS NOT NULL "+
    'AND o.amount_ars=o.deposit_ars AND o.amount_ars=l.amount_ars '+
    paymentClause+
-   'GROUP BY l.commercial_order_id,l.web_order_id,n.number,'+
+   'GROUP BY l.commercial_order_id,l.web_order_id,n.number'+
    (hasPhone?',c.phone':'')+(hasCustomer?',k.name,k.address':'')+','+
    'd.file_count,d.total_ars,o.paid_at '+
    'ORDER BY o.paid_at DESC LIMIT 100'
