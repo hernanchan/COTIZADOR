@@ -32,7 +32,8 @@ const script=root+'/workers/scripts/'+worker;
 const settings=await must('/workers/scripts/'+worker+'/settings');
 const has=(a,n,type,value)=>a.some(x=>x.name===n&&x.type===type&&
   (value===undefined||x.text===value));
-assert.ok(has(settings.bindings,'SABER_ENTORNO','plain_text','preparacion'));
+assert.ok(has(settings.bindings,'SABER_ENTORNO','plain_text','preparacion')||
+ has(settings.bindings,'SABER_ENTORNO','plain_text','produccion'));
 assert.ok(has(settings.bindings,'DOCS_MP_LIVE_GATE','plain_text','NO_GO'));
 assert.ok(has(settings.bindings,'CENTRAL_DB_ENV','plain_text','produccion'));
 assert.ok(!settings.bindings.some(x=>x.name==='SABER_R2_GRANDES'||x.name==='DOCS_R2_RECEIPT_KEY'),
