@@ -37,11 +37,61 @@ test('plazo se lee de la Central SIN modificar tablas ni estado de pedidos',asyn
  const x=await res.json();
  assert.equal(x.mode,'hoy_tarde');
  assert.equal(x.guaranteed,false);
- assert.equal(seen.length,1);
+ assert.equal(seen.length,3);
  assert.match(seen[0],/^SELECT mode FROM central_delivery_plan/);
+ assert.match(seen[1],/^SELECT weekly_json,closed_json FROM central_eta_calendar/);
+ assert.match(seen[2],/^SELECT approved_json FROM central_pricing_admin_head/);
 });
 test('sin configuración devuelve pendiente por confirmar y no inventa promesas',async()=>{
  const env={DB:{prepare(){return {first:async()=>{throw Error('no table')}}}}};
  const res=await plazoPublicoCentral(request(),env,{now:()=>wednesday});
  assert.equal((await res.json()).mode,'por_confirmar');
+});
+
+
+const calendar={
+ weekly:{mon:'07:00-13:30,16:30-20:00',tue:'07:00-13:30,16:30-20:00',
+ wed:'07:00-13:30,16:30-20:00',thu:'07:00-13:30,16:30-20:00',
+ fri:'07:00-13:30,16:30-20:00',sat:'',sun:''},
+ closedDates:[]
+};
+test('fecha visible del día de hoy desde agenda Córdoba verificada',()=>{
+ const x=plazoInformativo('hoy',wednesday,calendar);
+ assert.equal(x.mode,'hoy');
+ assert.equal(x.estimatedDeadlineDate,'2026-11-11');
+ assert.equal(x.guaranteed,false);
+});
+test('próximo día respeta fines de semana y feriado editable',()=>{
+ const viernes=Date.parse('2026-11-13T14:00:00Z');
+ const x=plazoInformativo('proximo_dia',viernes,{...calendar,
+  closedDates:['2026-11-16']});
+ assert.equal(x.estimatedDeadlineDate,'2026-11-17');
+});
+test('si la Central no configuró agenda no se inventa fecha',()=>{
+ const x=plazoInformativo('hoy',wednesday,null);
+ assert.equal(x.estimatedDeadlineDate,null);
+});
+test('no prometer fecha de feriado o cierre informado',()=>{
+ const x=plazoInformativo('hoy',wednesday,{...calendar,closedDates:['2026-11-11']});
+ assert.equal(x.estimatedDeadlineDate,null);
+ assert.equal(x.mode,'por_confirmar');
+});
+test('promo semanal solo informativa y nunca aplicada a un importe cobrado',async()=>{
+ const snapshot={promotions:{enabled:true,weekly:[
+  {day:3,title:'Miércoles de fotos',summary:'Premium al precio normal',enabled:true}
+ ]}};
+ const env={DB:{prepare(sql){return {first:async()=>{
+  if(sql.includes('central_delivery_plan'))return {mode:'hoy'};
+  if(sql.includes('central_eta_calendar'))return {
+   weekly_json:JSON.stringify(calendar.weekly),closed_json:'[]'};
+  if(sql.includes('central_pricing_admin_head'))
+   return {approved_json:JSON.stringify(snapshot)};
+  throw Error('unexpected');
+ }}}}};
+ const res=await plazoPublicoCentral(request(),env,{now:()=>wednesday});
+ const x=await res.json();
+ assert.equal(x.estimatedDeadlineDate,'2026-11-11');
+ assert.equal(x.dayPromotion.title,'Miércoles de fotos');
+ assert.equal(x.dayPromotion.appliedToQuote,false);
+ assert.equal(x.dayPromotion.informationalOnly,true);
 });
