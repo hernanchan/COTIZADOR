@@ -15,7 +15,7 @@ async function post(fetcher,path,body){
  return data;
 }
 export function crearFlujoPresupuestoLive({
- files,archivos,webOrderId,telefono,origin=location.origin,
+ files,archivos,webOrderId,telefono,nombre,direccion='',origin=location.origin,
  fetcher=fetch,hasher=sha256PdfLocalPorFragmentos,uuid=()=>crypto.randomUUID(),
  storage=typeof sessionStorage==='undefined'?null:sessionStorage,
  onProgress=()=>{},onState=()=>{}
@@ -23,6 +23,9 @@ export function crearFlujoPresupuestoLive({
  if(origin!=='https://pedidos.libreriasaber.com.ar'||!WEB.test(webOrderId||'')||
   !/^\+?[0-9 ()-]{10,26}$/.test(telefono||'')||
   telefono.replace(/\D/g,'').length<10||
+  telefono.replace(/\D/g,'').length>15||
+  typeof nombre!=='string'||nombre.trim().length<2||nombre.trim().length>100||/[<>]/.test(nombre)||
+  typeof direccion!=='string'||direccion.trim().length>180||/[<>]/.test(direccion)||
   !Array.isArray(files)||!Array.isArray(archivos)||
   files.length<1||files.length>10||files.length!==archivos.length||
   typeof fetcher!=='function'||typeof hasher!=='function'||
@@ -68,7 +71,8 @@ export function crearFlujoPresupuestoLive({
     throw Error('LIVE_FLUJO_BORRADOR_INCONSISTENTE');
    setState('registrando_orden');
    const result=await post(fetcher,'/api/pedido/live/orden',{
-    webOrderId,draftId:draft.draftId,quoteHash:draft.quoteHash,telefono});
+    webOrderId,draftId:draft.draftId,quoteHash:draft.quoteHash,
+    telefono:telefono.trim(),nombre:nombre.trim(),direccion:direccion.trim()});
    if(result.webOrderId!==webOrderId||!UUID.test(result.commercialOrderId||'')||
       !/^\d{3,}$/.test(result.numeroOrden||'')||
       result.totalArs!==draft.totalArs||result.fileCount!==files.length||
