@@ -1,4 +1,4 @@
-name: Saber - corregir checkout MP real pedido 001 y textos de prueba
+name: Saber - recuperar pedido 001 en la misma pestaña sin repetir pago
 on:
   push:
     branches: [integracion/tus-pedido-privado-20261101]
