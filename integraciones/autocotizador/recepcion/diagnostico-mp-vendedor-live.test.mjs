@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {diagnosticarVendedorMPLive} from '../../mercadopago/pruebas/mercadopago-live-central.mjs';
+import {leerFirmaInternaLive} from '../../mercadopago/pruebas/central-live-bridge.mjs';
 import {diagnosticarVendedorMPDesdeDocs} from './diagnostico-mp-vendedor-live.mjs';
 const secret='1'.repeat(64);
 const docEnv={SABER_ENTORNO:'produccion',DOCS_MP_LIVE_GATE:'GO_COMERCIAL_CONFIRMADO',
@@ -42,4 +43,32 @@ test('diagnóstico Central no puede consultar MP sin firmar ni crear pedidos',as
   fetcher:async()=>{called++;throw Error('never')}
  });
  assert.equal(r.status,503);assert.equal(called,0);
+});
+
+test('puente HMAC real firma petición temporal hasta /users/me, nunca crea preferencia',async()=>{
+ const urls=[];
+ const central={
+  SABER_ENTORNO:'produccion',CENTRAL_DB_ENV:'produccion',
+  MP_LIVE_GATE:'GO_COMERCIAL_CONFIRMADO',
+  CENTRAL_LIVE_BRIDGE_ENABLED:'GO_COMERCIAL_CONFIRMADO',
+  CENTRAL_BRIDGE_KEY:docEnv.CENTRAL_BRIDGE_KEY,
+  MP_LIVE_ACCESS_TOKEN:'APP_USR-'+'x'.repeat(64),
+  MP_LIVE_SELLER_ID:'123456789',MP_LIVE_WEBHOOK_SECRET:'w'.repeat(48),
+  MP_LIVE_WEBHOOK_URL:'https://pagos.libreriasaber.com.ar/webhooks/mercadopago-live',
+  MP_LIVE_RETURN_URL:'https://pedidos.libreriasaber.com.ar/pedido/estado',
+  DB:{prepare:()=>({})}
+ };
+ const service={fetch:async request=>diagnosticarVendedorMPLive(request,central,{
+  readSigned:leerFirmaInternaLive,
+  fetcher:async(url,options)=>{
+   urls.push({path:new URL(url).pathname,method:options?.method||'GET'});
+   return Response.json({id:'123456789',test_user:false,tags:[]});
+  }
+ })};
+ const res=await diagnosticarVendedorMPDesdeDocs(new Request(url,{
+  method:'POST',headers:{'x-saber-mp-diag':secret}
+ }),docEnv,{service});
+ assert.equal(res.status,200,JSON.stringify(await res.clone().json()));
+ assert.deepEqual(await res.json(),{ok:true,code:'MP_LIVE_VENDEDOR_VALIDADO'});
+ assert.deepEqual(urls,[{path:'/users/me',method:'GET'}]);
 });
