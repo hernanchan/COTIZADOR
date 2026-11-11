@@ -69,3 +69,15 @@ test('si la precarga falla, el botón permite diagnosticar sin saltar controles 
  assert.match(script,/if\(razon\)\{[\s\S]*?return;/);
  assert.ok(script.indexOf('const razon=motivoBloqueoEnvio()')<script.indexOf('if(!nombreValido())'));
 });
+
+
+test('la pantalla declara cada contacto ANTES de instalar listeners y activar envío',()=>{
+ const telefono=script.indexOf("const telefonoContacto=document.getElementById('cliente-telefono');");
+ const nombre=script.indexOf("const nombreCliente=document.getElementById('cliente-nombre');");
+ const direccion=script.indexOf("const direccionCliente=document.getElementById('cliente-direccion');");
+ const listener=script.indexOf("telefonoContacto.addEventListener('input'");
+ const enviar=script.indexOf("sendAllButton.addEventListener('click'");
+ assert.ok(telefono>0&&nombre>0&&direccion>0,'Falta referencia DOM obligatoria; se rompe todo el módulo');
+ assert.ok(listener>telefono&&enviar>listener,'Referencia de teléfono debe existir antes de utilizarse');
+ assert.match(script,/const telefonoError=document.getElementById\\('cliente-telefono-error'\\)/);
+});
