@@ -1,0 +1,62 @@
+name: Saber - comprobar preview del paquete de publicación V3 SIN GO
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [docs/COMPROBAR-RELEASE-CANDIDATE-V3-20261111.trigger]
+permissions: {contents: read}
+jobs:
+  prepublicacion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Contratos de navegación y separación de carritos aprobados
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test tests/v3-publicacion-carrito-separado.test.mjs tests/v3-cotizar-preview-nuevo.test.mjs
+      - name: Verificar Pages preview del PR de publicación SIN desplegar
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          EDITOR_TOKEN: ${{ secrets.SABER_CF_EDITOR_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$EDITOR_TOKEN"
+          base="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/pages/projects/libreriasaber"
+          dir=$(mktemp -d); trap 'rm -rf "$dir"' EXIT
+          deployed=""
+          status=""
+          for i in 1 2 3 4 5 6; do
+            curl -fsS --max-time 30 -H "Authorization: Bearer $EDITOR_TOKEN" "$base/deployments" > "$dir/deployments.json"
+            jq -e '.success==true and (.result | type == "array")' "$dir/deployments.json" >/dev/null
+            jq -c --arg branch 'publicacion/candidata-web-saber-20261111' '[.result[]|select(.deployment_trigger.metadata.branch==$branch)]|sort_by(.created_on)|reverse|.[0] // {}' "$dir/deployments.json" > "$dir/preview.json"
+            deployed=$(jq -r '.id//empty' "$dir/preview.json")
+            status=$(jq -r '.latest_stage.status//"unknown"' "$dir/preview.json")
+            if [ -n "$deployed" ] && [ "$status" = success ];then break;fi
+            sleep 8
+          done
+          test -n "$deployed" || { echo 'RELEASE_CANDIDATE_PREVIEW_DEPLOYMENT_NOT_FOUND';exit 1; }
+          test "$status" = success || { echo "RELEASE_CANDIDATE_PREVIEW_NOT_COMPLETE_$status";exit 1; }
+          url=$(jq -r '.url//empty' "$dir/preview.json")
+          branch=$(jq -r '.deployment_trigger.metadata.branch//empty' "$dir/preview.json")
+          test "$branch" = 'publicacion/candidata-web-saber-20261111'
+          case "$url" in https://*.libreriasaber.pages.dev) ;; *) echo 'RELEASE_CANDIDATE_INVALID_PREVIEW_URL';exit 1;; esac
+          for item in '' 'ofertas.html' 'cotizar.html' 'portal-comercial.json'; do
+            file="root"
+            [ -n "$item" ] && file=$(basename "$item")
+            http=$(curl -sS -L --max-time 25 -w '%{http_code}' -o "$dir/$file" "$url/$item")
+            [ "$http" = 200 ] || { echo "RELEASE_CANDIDATE_HTTP_FAILED_$file=$http";exit 1; }
+          done
+          grep -Fq 'Tu librería del barrio' "$dir/root"
+          grep -Fq 'Consultar artículos por WhatsApp' "$dir/ofertas.html"
+          grep -Fq 'portal-comercial.json' "$dir/cotizar.html"
+          jq -e '.enabled==false and .release=="NO_GO" and .buyerUrl==null' "$dir/portal-comercial.json" >/dev/null
+          echo "RELEASE_CANDIDATE_PAGES_PREVIEW_URL=$url"
+          echo "RELEASE_CANDIDATE_PAGES_PREVIEW_ID=$deployed"
+          echo 'RELEASE_CANDIDATE_PREVIEW_SAFE_NO_GO_VALIDATED'
+          echo 'NO_MAIN_NO_PUBLIC_SITE_NO_LIVE_PAYMENTS_NO_D1_WRITES'
