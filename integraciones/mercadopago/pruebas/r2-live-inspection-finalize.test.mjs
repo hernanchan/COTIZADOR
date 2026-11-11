@@ -25,7 +25,7 @@ const envBase={SABER_ENTORNO:'produccion',CENTRAL_DB_ENV:'produccion',
  CENTRAL_LIVE_R2_INSPECTION_GATE:GO,
  CENTRAL_LIVE_R2_INSPECTION_KEY:key,
  CENTRAL_BRIDGE_KEY:'DIFFERENT_CENTRAL_BRIDGE_KEY_12345'};
-function fixture({paid=true,geometry=59.4,received=0,pending=true}={}){
+function fixture({paid=true,geometry=59.4,received=0,pending=true,method='mercadopago'}={}){
  const queries=[],batches=[];
  const db={
   prepare(sql){queries.push(sql);let args=[];
@@ -49,7 +49,7 @@ function fixture({paid=true,geometry=59.4,received=0,pending=true}={}){
   rows:[{file_id:file,transport:'r2',sha256:hash,bytes:proof.bytes,received}],
   works:[{fileId:file,configuracion:{paginas:[
    {numero:1,anchoCm:geometry,altoCm:84.1,modo:'sin-clasificar'}]}}]});
- const payment=async()=>({verified:paid,revoked:false});
+ const payment=async()=>({verified:paid,revoked:false,method});
  const opts={authorized:true,verify,payment,subtle:webcrypto.subtle,now:()=>t};
  return {env,opts,queries,batches};
 }
@@ -68,6 +68,13 @@ test('comprobante local válido + D1 pago, reserva y geometría: recibo registra
  assert.match(all,/payment_reviews/);
  assert.match(all,/central_r2_live_inspections/);
  assert.equal(f.batches[0].every(x=>x.bind),true);
+});
+test('transferencia bancaria auditada admite inspección y exige pago D1 en SQL',async()=>{
+ const f=fixture({method:'transferencia'});
+ const r=await finalizarInspeccionR2Live(request(),f.env,f.opts);
+ assert.equal(r.status,201,JSON.stringify(await r.clone().json()));
+ assert.ok(f.queries.join(' ').includes('central_live_bank_accreditations'));
+ assert.equal(f.batches.length,1);
 });
 test('prohibido sin operador, gates o firma confiable; ninguna escritura',async()=>{
  for(const [change,authorized] of [[{CENTRAL_LIVE_R2_INSPECTION_GATE:'NO_GO'},true],
