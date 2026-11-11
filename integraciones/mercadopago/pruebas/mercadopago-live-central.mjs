@@ -35,7 +35,15 @@ async function mpLive(env,path,{fetcher=fetch,method='GET',body=null,headers={}}
    'Content-Type':'application/json',...headers},
   ...(body?{body:JSON.stringify(body)}:{})
  });
- if(!r.ok)throw Error('MP_LIVE_HTTP_'+r.status);
+ if(!r.ok){
+  // Código público de Mercado Pago, sin reproducir mensajes ni datos del cliente.
+  let failure;
+  try{const body=await r.json();failure=body?.error||body?.cause?.[0]?.code}
+  catch{}
+  const code=typeof failure==='string'&&/^[a-z0-9_-]{1,60}$/i.test(failure)?
+   failure:'sin_detalle';
+  throw Error('MP_LIVE_HTTP_'+r.status+'_'+code);
+ }
  return r.json();
 }
 async function sellerLive(env,fetcher){
@@ -150,6 +158,7 @@ export async function checkoutMPLiveCentral(request,env,{
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS live_checkout_locks(order_id TEXT PRIMARY KEY,expires_at TEXT NOT NULL)").run();
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS live_checkout_attempts(order_id TEXT PRIMARY KEY,started_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
   const lock=await env.DB.prepare("INSERT INTO live_checkout_locks(order_id,expires_at) VALUES(?,datetime('now','+90 seconds')) ON CONFLICT(order_id) DO UPDATE SET expires_at=excluded.expires_at WHERE live_checkout_locks.expires_at<datetime('now')").bind(order.id).run();
+  let etapa='obtener_pedido';
   if(!lock.meta?.changes)return reply({ok:false,error:'MP_LIVE_CHECKOUT_EN_PREPARACION'},409);
   try{
    const check=await env.DB.prepare('SELECT status,preference_id FROM orders WHERE id=?').bind(order.id).first();
@@ -158,28 +167,51 @@ export async function checkoutMPLiveCentral(request,env,{
     const checkout=await verificarPref(env,order,check.preference_id,{fetcher});
     return reply({ok:true,orderId:order.id,amountArs:order.amount_ars,fileCount,checkoutUrl:checkout,reused:true});
    }
+   etapa='verificar_intento';
    const attempt=await env.DB.prepare('INSERT OR IGNORE INTO live_checkout_attempts(order_id) VALUES(?)').bind(order.id).run();
    let prefId;
+   const nuevaPreferencia=()=>mpLive(env,'/checkout/preferences',{fetcher,method:'POST',
+    headers:{'X-Idempotency-Key':order.id},
+    body:{items:[{id:order.id,title:String(order.description||'Librería Saber').slice(0,120),
+     quantity:1,currency_id:'ARS',unit_price:order.amount_ars}],
+     external_reference:order.id,
+     notification_url:env.MP_LIVE_WEBHOOK_URL,
+     back_urls:{success:env.MP_LIVE_RETURN_URL,pending:env.MP_LIVE_RETURN_URL,
+      failure:env.MP_LIVE_RETURN_URL},
+     expires:true,expiration_date_to:new Date(now()+Math.max(1000,86400000-age)).toISOString(),
+     metadata:{purpose:'libreria_saber_produccion',payment_mode:'full'}}
+   });
    if(attempt.meta?.changes){
-    await sellerLive(env,fetcher); // no crear preferencia con vendedor de pruebas
-    const pref=await mpLive(env,'/checkout/preferences',{fetcher,method:'POST',
-     headers:{'X-Idempotency-Key':order.id},
-     body:{items:[{id:order.id,title:String(order.description||'Librería Saber').slice(0,120),
-      quantity:1,currency_id:'ARS',unit_price:order.amount_ars}],
-      external_reference:order.id,
-      notification_url:env.MP_LIVE_WEBHOOK_URL,
-      back_urls:{success:env.MP_LIVE_RETURN_URL,pending:env.MP_LIVE_RETURN_URL,
-       failure:env.MP_LIVE_RETURN_URL},
-      expires:true,expiration_date_to:new Date(now()+Math.max(1000,86400000-age)).toISOString(),
-      metadata:{purpose:'libreria_saber_produccion',payment_mode:'full'}}
-    });
+    etapa='verificar_vendedor';
+    await sellerLive(env,fetcher);
+    etapa='crear_preferencia';
+    const pref=await nuevaPreferencia();
     prefId=pref.id;
    }else{
+    // Recuperar el intento original sin crear una segunda orden D1.
+    // Primero buscar en MP: un POST previo puede haber sido exitoso aunque su respuesta se perdiera.
+    etapa='verificar_vendedor_recuperacion';
+    await sellerLive(env,fetcher);
+    etapa='buscar_preferencia';
     const found=await mpLive(env,'/checkout/preferences/search?'+new URLSearchParams({external_reference:order.id}),{fetcher});
     const exact=(found.elements||[]).filter(x=>x.external_reference===order.id&&x.id);
-    if(exact.length!==1)return reply({ok:false,error:'MP_LIVE_RECONCILIACION_MANUAL'},409);
-    prefId=exact[0].id;
+    if(exact.length>1)return reply({ok:false,error:'MP_LIVE_RECONCILIACION_MANUAL'},409);
+    if(exact.length===1)prefId=exact[0].id;
+    else{
+     // Solo un reintento tardío por ventana temporal, con lock D1 y clave idempotente igual.
+     // La preferencia no existe en la búsqueda del vendedor autenticado.
+     etapa='autorizar_reintento_unico';
+     const retry=await env.DB.prepare(
+      "UPDATE live_checkout_attempts SET started_at=datetime('now') WHERE order_id=? AND started_at<datetime('now','-3 minutes')"
+     ).bind(order.id).run();
+     if(!retry.meta?.changes)
+      return reply({ok:false,error:'MP_LIVE_VERIFICACION_PENDIENTE'},409);
+     etapa='reintentar_preferencia';
+     const pref=await nuevaPreferencia();
+     prefId=pref.id;
+    }
    }
+   etapa='validar_preferencia';
    if(typeof prefId!=='string'||!prefId||prefId.length>150)
     return reply({ok:false,error:'MP_LIVE_PREFERENCIA_SIN_ID'},502);
    const checkout=await verificarPref(env,order,prefId,{fetcher});
@@ -190,8 +222,14 @@ export async function checkoutMPLiveCentral(request,env,{
    }
    return reply({ok:true,orderId:order.id,amountArs:order.amount_ars,fileCount,checkoutUrl:checkout,reused:!attempt.meta?.changes});
   }finally{await env.DB.prepare('DELETE FROM live_checkout_locks WHERE order_id=?').bind(order.id).run()}
- }catch{
-  return reply({ok:false,error:'MP_LIVE_CHECKOUT_NO_VERIFICADO'},503);
+ }catch(error){
+  const codigo=String(error?.message||'sin_detalle');
+  // Nunca incluir secretos, URLs privadas, datos de comprador ni payload MP.
+  const causa=/^(?:MP_LIVE_HTTP_[0-9]{3}_[A-Za-z0-9_-]{1,60}|MP_LIVE_VENDEDOR_INCORRECTO|MP_LIVE_PREFERENCIA_INCOMPATIBLE)$/.test(codigo)?
+   codigo:'FALLO_INTERNO';
+  console.warn('saber_mp_live_checkout_fallo',{etapa,codigo:causa});
+  return reply({ok:false,error:'MP_LIVE_CHECKOUT_NO_VERIFICADO',
+   etapa,codigo:causa},503);
  }
 }
 async function webhookFirmaValida(request,url,secret,{now=()=>Date.now(),subtle=crypto.subtle}={}){
