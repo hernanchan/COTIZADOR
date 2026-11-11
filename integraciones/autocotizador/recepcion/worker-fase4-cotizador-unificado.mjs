@@ -2503,6 +2503,17 @@ export default {
       const {diagnosticarVendedorMPDesdeDocs}=await import('./diagnostico-mp-vendedor-live.mjs');
       return diagnosticarVendedorMPDesdeDocs(request,env);
     }
+    if(page==='/api/pedido/live/transfer'){
+      if(env?.SABER_ENTORNO!=='produccion')
+       return testResponse({ok:false,error:'TRANSFER_LIVE_CERRADA'},503);
+      const buyer=await autorizadoCompradorLive(request,env);
+      const payload=buyer&&request.method==='POST'?
+       await request.clone().json().catch(()=>null):null;
+      const linked=buyer&&await autorizadoOrdenLive(
+       request,env,payload?.webOrderId);
+      const {transferenciaLiveComprador}=await import('./transferencia-live-comprador.mjs');
+      return transferenciaLiveComprador(request,env,{authorized:linked});
+    }
     if(page==='/api/pedido/live/checkout'){
       if(env?.SABER_ENTORNO!=='produccion')
        return testResponse({ok:false,error:'MP LIVE no habilitado'},503);
