@@ -24,8 +24,10 @@ async function central(env,kind,payload,{
  now=()=>Math.floor(Date.now()/1000),nonce=()=>crypto.randomUUID(),
  subtle=crypto.subtle
 }={}){
- const route=kind==='source'?'source':'confirm';
- const body=JSON.stringify({schema:'saber-central-r2-inspection-'+route+'-v1',...payload});
+ const route=kind==='board'?'staff-board':kind==='source'?'source':'confirm';
+ const schema=kind==='board'?'saber-central-r2-live-staff-board-v1':
+  'saber-central-r2-inspection-'+route+'-v1';
+ const body=JSON.stringify({schema,...payload});
  const id=nonce(),ts=now();
  if(!/^[a-f0-9-]{36}$/i.test(id)||!Number.isSafeInteger(ts))
   throw Error('INSPECCION_STAFF_FIRMA');
@@ -47,11 +49,25 @@ export async function inspeccionR2PersonalLive(request,env,{authorized=false}={}
  if(!authorized)return respond({ok:false,error:'STAFF_R2_NO_AUTORIZADO'},401);
  if(!enabled(env))return respond({ok:false,error:'STAFF_R2_NO_CONFIGURADO'},503);
  const u=new URL(request.url);
- const path=u.pathname,source=path.endsWith('/live-r2-inspection-source');
+ const path=u.pathname,board=path.endsWith('/live-r2-board'),
+  source=path.endsWith('/live-r2-inspection-source');
  const original=path.endsWith('/live-r2-inspection-original');
  const confirm=path.endsWith('/live-r2-inspection-confirm');
- if(u.origin!==HOST||(!source&&!original&&!confirm))
+ if(u.origin!==HOST||(!board&&!source&&!original&&!confirm))
   return respond({ok:false,error:'STAFF_R2_RUTA'},404);
+ if(board){
+  if(request.method!=='GET'||u.search)
+   return respond({ok:false,error:'STAFF_R2_TABLERO_RUTA'},405);
+  try{
+   const result=await central(env,'board',{purpose:'listar-pedidos-entrantes'});
+   if(!result.ok)return respond({ok:false,error:result.error},result.status);
+   const d=result.data;
+   if(!Array.isArray(d.orders)||d.source!=='production-d1-verified-payments-only'||
+      d.productionAuthorized!==false)
+    return respond({ok:false,error:'STAFF_R2_TABLERO_INCONSISTENTE'},502);
+   return respond({ok:true,orders:d.orders,productionAuthorized:false});
+  }catch{return respond({ok:false,error:'STAFF_R2_TABLERO_INDISPONIBLE'},503)}
+ }
  let p;
  if(source||original){
   if(request.method!=='GET'||[...u.searchParams.keys()].sort().join(',')!=='fileId,webOrderId')
