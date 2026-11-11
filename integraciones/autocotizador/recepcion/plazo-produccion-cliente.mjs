@@ -32,11 +32,22 @@ export async function plazoProduccionCliente(request,env,{service=env?.SABER_CEN
   if(data?.ok!==true||data.source!=='central-delivery-plan-readonly'||
      !allowedModes.has(data.mode)||data.guaranteed!==false||
      data.exactReadyAt!==null||data.productionAuthorized!==false||
+   !(data.estimatedDeadlineDate===null||
+     /^20\d\d-\d\d-\d\d$/.test(data.estimatedDeadlineDate))||
+   !(data.dayPromotion===null||(
+     typeof data.dayPromotion==='object'&&
+     data.dayPromotion?.informationalOnly===true&&
+     data.dayPromotion?.appliedToQuote===false&&
+     typeof data.dayPromotion?.title==='string'&&
+     typeof data.dayPromotion?.summary==='string'&&
+     data.dayPromotion.title.length<=90&&data.dayPromotion.summary.length<=180))||
      data.heading!=='Plazo máximo orientativo de preparación'||
      typeof data.label!=='string'||data.label.length>100||
      typeof data.notice!=='string'||data.notice.length>650)
    return reply({ok:false,error:'PLAZO_CLIENTE_CENTRAL_INCONSISTENTE'},502);
   return reply({ok:true,heading:data.heading,label:data.label,
-   notice:data.notice,mode:data.mode,guaranteed:false,exactReadyAt:null});
+   notice:data.notice,mode:data.mode,
+   estimatedDeadlineDate:data.estimatedDeadlineDate,
+   dayPromotion:data.dayPromotion,guaranteed:false,exactReadyAt:null});
  }catch{return reply({ok:false,error:'PLAZO_CLIENTE_CENTRAL_INDISPONIBLE'},503)}
 }
