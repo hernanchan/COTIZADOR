@@ -1,0 +1,3 @@
+RELEASE_CANDIDATE_BRANCH=publicacion/candidata-web-saber-20261111
+PAGES_PROJECT=libreriasaber
+ONLY_READ_NO_PUBLISH_NO_MAIN
