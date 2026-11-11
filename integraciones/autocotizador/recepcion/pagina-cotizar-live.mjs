@@ -139,6 +139,16 @@ window.addEventListener('message',event=>{
  if(data.type==='SABER_SMART_PRICE_STATE'){
   if(Number.isSafeInteger(data.total)&&data.total>0)price.textContent='Presupuesto orientativo: '+money(data.total);
   else price.textContent='Precio pendiente';
+  if(data.estado==='listo'&&data.promocion&&
+     typeof data.promocion.titulo==='string'&&data.promocion.titulo.length<=90&&
+     Number.isSafeInteger(data.promocion.descuento)&&data.promocion.descuento>0&&
+     Number.isSafeInteger(data.promocion.totalAnterior)&&
+     data.promocion.totalAnterior-data.promocion.descuento===data.total){
+   promo.hidden=false;
+   promo.textContent='Promoción aplicada: '+data.promocion.titulo+
+    ' · Antes '+money(data.promocion.totalAnterior)+' · Descuento −'+
+    money(data.promocion.descuento)+' · Total '+money(data.total);
+  }
   if(data.blockReason)status.textContent=data.blockReason;
   action.disabled=!enabled||!data.sendable||working;
  }
