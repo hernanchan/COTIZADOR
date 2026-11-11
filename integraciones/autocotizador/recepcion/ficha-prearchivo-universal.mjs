@@ -1,15 +1,18 @@
 import {prepararPlanRecepcionUniversal} from './plan-recepcion-universal-r2.mjs';
 import {cotizarCargaUnica} from './cotizar-carga-unica.mjs';
+import {repartirPromocionFicha} from './repartir-promocion-ficha.mjs';
 // Ficha interna previa a originales. No autoriza cobros ni producción.
 const NAME=/^WEB-ENSAYO-[A-F0-9]{32}$/;
-export function fichaPrearchivoUniversal({webOrderId,archivos,manifiestos,tarifario,produccion=false}={}){
+export function fichaPrearchivoUniversal({webOrderId,archivos,manifiestos,tarifario,produccion=false,ahora=Date.now()}={}){
  if(!NAME.test(webOrderId||''))throw Error('UNIVERSAL_ORDEN_INVALIDA');
- const plan=prepararPlanRecepcionUniversal({archivos,manifiestos,tarifario,produccion});
- const quote=cotizarCargaUnica({archivos,precios:tarifario.prices});
+ const plan=prepararPlanRecepcionUniversal({archivos,manifiestos,tarifario,produccion,ahora});
+ const quote=cotizarCargaUnica({archivos,precios:tarifario.prices,promociones:tarifario.promotions,ahora});
  if(quote.estado!=='PRELIMINAR'||quote.paymentAuthorized!==false||
     quote.total!==plan.totalArs||quote.plan.length!==archivos.length)
   throw Error('UNIVERSAL_PRECIO_INCONSISTENTE');
- const collections={documentos:'detalleImpresiones',ploteos:'detallePloteos'};
+ const collections={documentos:'detalleImpresiones',ploteos:'detallePloteos',
+  fotos:'detalleFotos',stickers:'detalleStickers',
+  corte:'detalleCortes',grafica:'detalleGraficas'};
  const trabajos=plan.archivos.map((f,i)=>{
   const item=quote.plan.find(p=>p.indice===i);
   if(!item||!collections[item.destino]||item.destino!==f.destino)
@@ -25,10 +28,12 @@ export function fichaPrearchivoUniversal({webOrderId,archivos,manifiestos,tarifa
    originalRecibido:false,integridadVerificada:false,preprensaAprobada:false};
  });
  const armados=quote.detalleArmados.map(a=>({...a}));
- const sum=trabajos.reduce((n,x)=>n+x.importeArs,0)+armados.reduce((n,a)=>n+a.subtotal,0);
- if(sum!==plan.totalArs||!Number.isSafeInteger(sum))throw Error('UNIVERSAL_TOTAL_NO_CONCILIA');
+ const cobro=repartirPromocionFicha({quote,trabajos,armados,precios:tarifario.prices});
+ if(cobro.totalArs!==plan.totalArs||!Number.isSafeInteger(cobro.totalArs))
+  throw Error('UNIVERSAL_TOTAL_NO_CONCILIA');
  return {schema:'saber-r2-universal-draft-v1',webOrderId,
-  priceRevision:plan.priceRevision,totalArs:sum,archivos:trabajos,armados,
+  priceRevision:plan.priceRevision,totalArs:cobro.totalArs,
+  archivos:cobro.trabajos,armados:cobro.armados,
   pagoAutorizado:false,subidaAutorizada:false,produccionAutorizada:false,
   estado:'PRELIMINAR_SIN_ORIGINALES'};
 }
