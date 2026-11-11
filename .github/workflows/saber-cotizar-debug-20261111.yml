@@ -39,3 +39,4 @@ jobs:
               ' BODY='+body.replace(/\s+/g,' ').slice(0,220));
           }
           NODE
+# POST_DEPLOY_VERIFICATION=7a43983c
