@@ -141,7 +141,7 @@ export async function leerFirmaInternaLive(request,env,{
        payload.pagoAutorizado!==false||payload.subidaAutorizada!==false||
        payload.produccionAutorizada!==false||
        payload.estado!=='PRELIMINAR_SIN_ORIGINALES':
-     pricingRoute?payload.purpose!=='quote-production-approved':
+     (pricingRoute||sellerDiag)?payload.purpose!==(sellerDiag?'verificar-cuenta-solo-lectura':'quote-production-approved'):
      orderRoute?!UUID.test(payload.draftId||'')||
       !/^[a-f0-9]{64}$/.test(payload.quoteHash||'')||
       typeof payload.telefono!=='string'||
@@ -149,7 +149,7 @@ export async function leerFirmaInternaLive(request,env,{
       payload.telefono.replace(/\D/g,'').length<10||
       payload.telefono.replace(/\D/g,'').length>15:
       !UUID.test(payload.commercialOrderId||''))||
-    (!pricingRoute&&!tusGate&&!tusReceipt&&!r2Gate&&!r2Reserve&&!r2Stage&&!r2Recover&&!WEB.test(payload.webOrderId||'')))
+    (!pricingRoute&&!sellerDiag&&!tusGate&&!tusReceipt&&!r2Gate&&!r2Reserve&&!r2Stage&&!r2Recover&&!WEB.test(payload.webOrderId||'')))
    return {error:'Orden LIVE inválida',status:422};
  const key=await subtle.importKey('raw',new TextEncoder().encode(env.CENTRAL_BRIDGE_KEY),
   {name:'HMAC',hash:'SHA-256'},false,['verify']);
