@@ -122,6 +122,33 @@ export async function consultarPaqueteUniversalCentral(request,env,{
   'WHERE commercial_order_id=?').bind(valid.commercialOrderId).first();
  if(!Number.isSafeInteger(number?.number)||number.number<1)
   return respond({ok:false,error:'PAQUETE_NUMERO_NO_VERIFICADO'},409);
+ // Datos privados de la orden de trabajo: solo llegan a staff por HMAC.
+ // Pedidos anteriores sin esta información conservan valor "no informado".
+ let nombreCliente=null,telefonoContacto=null,direccionCliente=null;
+ if(liveEnabled(env)){
+  try{
+   const existing=(await db.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('central_order_contacts','central_order_customer_details')"
+   ).all()).results||[];
+   const names=new Set(existing.map(x=>x.name));
+   if(names.has('central_order_contacts')){
+    const phone=await db.prepare('SELECT phone FROM central_order_contacts WHERE order_id=?')
+     .bind(valid.commercialOrderId).first();
+    telefonoContacto=typeof phone?.phone==='string'?phone.phone:null;
+   }
+   if(names.has('central_order_customer_details')){
+    const details=await db.prepare(
+     'SELECT name,address FROM central_order_customer_details WHERE order_id=?'
+    ).bind(valid.commercialOrderId).first();
+    nombreCliente=typeof details?.name==='string'?details.name:null;
+    direccionCliente=typeof details?.address==='string'?details.address:null;
+   }
+   if((telefonoContacto!==null&&telefonoContacto.length>26)||
+      (nombreCliente!==null&&(nombreCliente.length<2||nombreCliente.length>100))||
+      (direccionCliente!==null&&direccionCliente.length>180))
+    return respond({ok:false,error:'PAQUETE_CONTACTO_INVALIDO'},409);
+  }catch{return respond({ok:false,error:'PAQUETE_CONTACTO_D1_NO_DISPONIBLE'},503)}
+ }
  const trabajos=[];
  for(const row of valid.rows){
   let r;
@@ -144,6 +171,7 @@ export async function consultarPaqueteUniversalCentral(request,env,{
  return respond({ok:true,schema:'saber-central-r2-universal-package-manifest-v1',
   webOrderId:p.webOrderId,numeroOrden:String(number.number).padStart(3,'0'),
   importe:valid.amountArs,estadoPago:'PAGADO_VERIFICADO',pagoVerificado:true,
+  nombreCliente,telefonoContacto,direccionCliente,
   totalArchivos:trabajos.length,trabajos,armados,
   listoParaProducir:false,productionAuthorized:false,preprensaPendiente:true},200);
 }
