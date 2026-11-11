@@ -56,7 +56,11 @@ export function plazoInformativo(mode,instant=Date.now(),calendar=null){
  let effective=modes.has(mode)?mode:'por_confirmar';
  if(!withinDay&&['hoy','hoy_tarde'].includes(effective))
   effective='por_confirmar';
- const promisedDate=proximaFechaDeAtencion(effective,instant,calendar);
+ // Si el operador seleccionó explícitamente "hoy", esa previsión es la
+ // fuente comercial. Mostrar el día local incluso si falta la agenda D1;
+ // nunca inventar una hora ni un "próximo día" sin calendario verificado.
+ const promisedDate=(!calendar&&['hoy','hoy_tarde'].includes(effective))?
+  fechaLocal(instant):proximaFechaDeAtencion(effective,instant,calendar);
  if((effective==='hoy'||effective==='hoy_tarde')&&calendar&&promisedDate===null)
   effective='por_confirmar';
  const labels={
