@@ -4828,6 +4828,11 @@ export default {
    const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
    return promoverPedidoUniversalD1(req,env,{readSigned:leerFirmaInternaLive});
   }
+  if(url.pathname==='/internal/central/live/diag-seller'){
+   const {diagnosticarVendedorMPLive}=await import('./mercadopago-live-central.mjs');
+   const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
+   return diagnosticarVendedorMPLive(req,env,{readSigned:leerFirmaInternaLive});
+  }
   if(url.pathname==='/internal/central/live/checkout'){
    const {checkoutMPLiveCentral}=await import('./mercadopago-live-central.mjs');
    const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
