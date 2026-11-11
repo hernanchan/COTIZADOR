@@ -56,6 +56,7 @@ body.estado-envio #smart,body.estado-registro #smart{display:none}
 </style></head><body>
 <header><h1>LIBRERÍA SABER · Cotizador V2 en ensayo privado</h1><small style="color:#d5e3f0">${sandboxEnabled?'Solo pagos con usuarios de prueba; sin cobros reales ni publicación comercial.':'Sin cobros, sin órdenes de producción y sin publicación comercial.'}</small></header>
 <div id="acciones-pedido"><div id="precio-smart" role="status" aria-live="polite">Presupuesto preliminar: todavía sin cotizar · No autoriza cobro</div>
+<p id="plazo-produccion-orientativo" class="contacto-ayuda" role="status" aria-live="polite">Plazo máximo orientativo de preparación: consultando previsión de la Central…</p>
 <div class="contacto-datos" role="group" aria-label="Datos de contacto del pedido">
 <label id="cliente-nombre-label" for="cliente-nombre">Nombre y apellido o responsable *
 <input id="cliente-nombre" type="text" autocomplete="name" maxlength="100" placeholder="Nombre de quien retira" required aria-describedby="cliente-nombre-error"></label>
@@ -106,6 +107,19 @@ body.estado-envio #smart,body.estado-registro #smart{display:none}
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 <script type="module">
 import {subirYVincularPdfCotizadorV2,ejecutarRecepcionParalela,fileIdParaReferencia} from '/prueba-v2/subir-vincular-pdf.mjs';
+const plazoInfo=document.getElementById('plazo-produccion-orientativo');
+(async()=>{
+ try{
+  const r=await fetch('/prueba-v2/api/plazo-produccion',{method:'GET',cache:'no-store'});
+  const d=await r.json();
+  if(!r.ok||d?.ok!==true||d.guaranteed!==false||
+     typeof d.label!=='string'||typeof d.notice!=='string')
+   throw Error('Sin previsión vigente');
+  plazoInfo.textContent=d.heading+': '+d.label+'. '+d.notice;
+ }catch{
+  plazoInfo.textContent='Plazo máximo orientativo de preparación: a confirmar por Librería Saber antes de acordar el retiro. Cuando iniciemos el trabajo, se informará una hora estimada.';
+ }
+})();
 import {prepararManifiestoDocumentalV2} from '/prueba-v2/preparar-manifiesto.mjs';
 const list=document.getElementById('all'),status=document.getElementById('state'),
  frame=document.getElementById('base'),smart=document.getElementById('smart'),
