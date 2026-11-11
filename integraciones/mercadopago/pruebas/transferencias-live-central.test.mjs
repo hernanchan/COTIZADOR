@@ -1,0 +1,152 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {manejarTransferenciaLiveCentral,aprobarTransferenciaLiveCentral,
+ listarTransferenciasLiveCentral} from './transferencias-live-central.mjs';
+const GO='GO_COMERCIAL_CONFIRMADO';
+const id='123e4567-e89b-42d3-a456-426614174000';
+const web='WEB-ENSAYO-'+'A'.repeat(32);
+const amount=2500;
+const base={
+ SABER_ENTORNO:'produccion',CENTRAL_DB_ENV:'produccion',MP_LIVE_GATE:GO,
+ CENTRAL_LIVE_BRIDGE_ENABLED:GO,CENTRAL_LIVE_ORDER_GATE:GO,
+ CENTRAL_LIVE_POSTPAY_GATE:GO,CENTRAL_LIVE_TUS_GATE:GO,
+ CENTRAL_LIVE_TRANSFER_GATE:GO,CENTRAL_LIVE_TRANSFER_APPROVAL_GATE:GO,
+ CENTRAL_LIVE_TRANSFER_ALIAS:'SABER.CORDOBA'
+};
+const request=(path='transfer-start',payload={})=>new Request(
+ 'https://pagos.libreriasaber.com.ar/'+(path.startsWith('admin/')?path:'internal/central/live/'+path),
+ {method:'POST',headers:{'Content-Type':'application/json',
+  Origin:path.startsWith('admin/')?'https://pagos.libreriasaber.com.ar':undefined},
+  body:JSON.stringify(payload)});
+const order={ok:true,amountArs:amount,commercialOrderId:id,
+ link:{id,status:'awaiting_payment',created_at:'2026-11-11 10:00:00',
+  amount_ars:amount,deposit_ars:amount,payment_id:null,preference_id:null},
+ rows:[{transport:'tus',bytes:100000}]};
+const readSigned=async()=>({payload:{schema:'saber-central-live-transfer-start-v1',
+ webOrderId:web,commercialOrderId:id}});
+const verifyOrder=async()=>order;
+function mockDb({withMpAttempt=false,state='awaiting_payment',paid=false,priorBank=false}={}){
+ const sql=[];
+ const db={
+  prepare(q){
+   sql.push(q);
+   return {
+    bind(){return this},
+    async run(){return {meta:{changes:1}}},
+    async first(){
+     if(q.includes("name='live_checkout_attempts'"))return withMpAttempt?{name:'live_checkout_attempts'}:null;
+     if(q.includes('FROM live_checkout_attempts WHERE'))return withMpAttempt?{order_id:id}:null;
+     if(q.includes('FROM central_live_transfer_requests t JOIN orders o'))
+      return {amount_ars:amount,state:'awaiting_bank_verification',
+       status:state,payment_id:null,preference_id:null};
+     if(q.includes('FROM central_live_bank_accreditations WHERE'))return priorBank?{order_id:id}:null;
+     if(q.includes('FROM payment_reviews WHERE'))return null;
+     if(q.includes('FROM orders o LEFT JOIN payment_reviews'))
+      return {status:state,paid_at:paid?'2026-11-11 10:05:00':null,
+       amount_ars:amount,deposit_ars:amount,payment_id:null,preference_id:null,
+       review_state:paid?'verified':null,bank_amount:paid?amount:null};
+     if(q.includes('FROM orders o JOIN central_r2_universal_order_links'))
+      return {web_order_id:web,id,status:state,amount_ars:amount,
+       deposit_ars:amount,transfer_amount:amount,payment_id:null,preference_id:null};
+     return null;
+    },
+    async all(){return {results:[]}}
+   };
+  },
+  async batch(queries){sql.push('BATCH');return queries.map(()=>({meta:{changes:1}}))}
+ };
+ return {db,sql};
+}
+const signedPayload=(kind)=>async()=>({payload:{
+ schema:'saber-central-live-transfer-'+kind+'-v1',webOrderId:web,commercialOrderId:id}});
+test('SIN compuerta LIVE no escribe D1 ni acredita pagos',async()=>{
+ const f=mockDb();
+ const res=await manejarTransferenciaLiveCentral(request(),{...base,
+  CENTRAL_LIVE_TRANSFER_GATE:'NO_GO',DB:f.db},{readSigned,verifyOrder});
+ assert.equal(res.status,503);
+ assert.equal(f.sql.length,0);
+ const approve=await aprobarTransferenciaLiveCentral(request('admin/api/central/live-transfers/approve',{
+  order_id:id,amount_ars:amount,confirmed:true,operator:'Ana Pérez',bank_reference:'BANK-123456'}),
+  {...base,CENTRAL_LIVE_TRANSFER_APPROVAL_GATE:'NO_GO',DB:f.db},
+  {authorized:true,verifyOrder});
+ assert.equal(approve.status,503);
+ assert.equal(f.sql.length,0);
+});
+test('solicitar transferencia no marca pagado ni habilita originales',async()=>{
+ const f=mockDb();
+ const res=await manejarTransferenciaLiveCentral(request(),{...base,DB:f.db},
+  {readSigned,verifyOrder,now:()=>Date.parse('2026-11-11T10:05:00Z')});
+ assert.equal(res.status,200);
+ const data=await res.json();
+ assert.equal(data.estado,'transferencia_pendiente');
+ assert.equal(data.paymentVerified,false);
+ assert.equal(data.uploadAuthorized,false);
+ assert.equal(data.productionAuthorized,false);
+ assert.equal(data.alias,'SABER.CORDOBA');
+ assert.ok(f.sql.some(q=>q.includes('INSERT OR IGNORE INTO central_live_transfer_requests')));
+ assert.ok(!f.sql.some(q=>q.includes("UPDATE orders SET status='paid'")));
+});
+test('con inicio MP previo la solicitud bancaria no se registra',async()=>{
+ const f=mockDb({withMpAttempt:true});
+ const res=await manejarTransferenciaLiveCentral(request(),{...base,DB:f.db},
+  {readSigned,verifyOrder,now:()=>Date.parse('2026-11-11T10:05:00Z')});
+ assert.equal(res.status,409);
+ assert.ok(!f.sql.some(q=>q.includes('INSERT OR IGNORE INTO central_live_transfer_requests')));
+});
+test('no ofrecer transferencia a R2 >40 MiB aún cerrado',async()=>{
+ const f=mockDb();
+ const res=await manejarTransferenciaLiveCentral(request(),{...base,DB:f.db},
+  {readSigned,verifyOrder:async()=>({...order,rows:[{transport:'r2',bytes:60*1048576}]})});
+ assert.equal(res.status,409);
+ assert.equal(f.sql.length,0);
+});
+test('solo un asiento D1 auditado permite informar pagado al comprador',async()=>{
+ const f=mockDb({state:'paid',paid:true});
+ const res=await manejarTransferenciaLiveCentral(request('transfer-status'),{...base,DB:f.db},
+  {readSigned:signedPayload('status'),verifyOrder});
+ assert.equal(res.status,200);
+ const data=await res.json();
+ assert.equal(data.estado,'pagado_esperando_archivos');
+ assert.equal(data.paymentVerified,true);
+ assert.equal(data.uploadAuthorized,true);
+ assert.equal(data.productionAuthorized,false);
+ const unverified=mockDb({state:'awaiting_payment',paid:false});
+ const pending=await manejarTransferenciaLiveCentral(request('transfer-status'),
+  {...base,DB:unverified.db},{readSigned:signedPayload('status'),verifyOrder});
+ assert.equal((await pending.json()).estado,'transferencia_pendiente');
+});
+test('no se acredita sin una confirmación humana estricta y referencia bancaria',async()=>{
+ const f=mockDb();
+ for(const payload of [
+  {order_id:id,amount_ars:amount,confirmed:false,operator:'Ana',bank_reference:'BANK-123456'},
+  {order_id:id,amount_ars:amount,confirmed:true,operator:'A',bank_reference:'BANK-123456'},
+  {order_id:id,amount_ars:amount,confirmed:true,operator:'Ana',bank_reference:'ticket.pdf'}
+ ]){
+  const r=await aprobarTransferenciaLiveCentral(request('admin/api/central/live-transfers/approve',payload),
+   {...base,DB:f.db},{authorized:true,verifyOrder});
+  assert.equal(r.status,422);
+ }
+ assert.equal(f.sql.length,0);
+});
+test('acreditación real exige operador y realiza 3 escrituras D1 atómicas',async()=>{
+ const f=mockDb();
+ const payload={order_id:id,amount_ars:amount,confirmed:true,operator:'Ana Pérez',
+  bank_reference:'BANK-123456'};
+ const r=await aprobarTransferenciaLiveCentral(request('admin/api/central/live-transfers/approve',payload),
+  {...base,DB:f.db},{authorized:true,verifyOrder});
+ assert.equal(r.status,200);
+ const data=await r.json();
+ assert.equal(data.paymentVerified,true);
+ assert.equal(data.productionAuthorized,false);
+ assert.ok(f.sql.some(q=>q.includes('INSERT INTO central_live_bank_accreditations')));
+ assert.ok(f.sql.some(q=>q.includes("UPDATE orders SET status='paid'")));
+ assert.ok(f.sql.some(q=>q.includes('INSERT INTO payment_reviews')));
+ assert.ok(f.sql.includes('BATCH'));
+});
+test('sin sesión administrativa, no exponer transferencias reales',async()=>{
+ const f=mockDb();
+ const req=new Request('https://pagos.libreriasaber.com.ar/admin/api/central/live-transfers/pending');
+ const res=await listarTransferenciasLiveCentral(req,{...base,DB:f.db},{authorized:false});
+ assert.equal(res.status,401);
+ assert.equal(f.sql.length,0);
+});
