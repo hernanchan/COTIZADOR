@@ -34,7 +34,7 @@ export async function plazoProduccionCliente(request,env,{service=env?.SABER_CEN
      data.exactReadyAt!==null||data.productionAuthorized!==false||
    !(data.estimatedDeadlineDate===null||
      /^20\d\d-\d\d-\d\d$/.test(data.estimatedDeadlineDate))||
-   !(data.dayPromotion===null||(
+   !(data.dayPromotion==null||(
      typeof data.dayPromotion==='object'&&
      data.dayPromotion?.informationalOnly===true&&
      data.dayPromotion?.appliedToQuote===false&&
