@@ -115,11 +115,30 @@ export async function estadoPagoUniversal(env,orderId,db=env.DB){
    'FROM orders WHERE id=?').bind(orderId).first(),
   db.prepare('SELECT state FROM payment_reviews WHERE order_id=?').bind(orderId).first()
  ]);
- const verified=fresh?.status==='paid'&&Boolean(fresh.paid_at)&&
-  fresh.deposit_ars===fresh.amount_ars&&review?.state==='verified'&&
-  fresh.payment_id!==null&&fresh.payment_id!==undefined&&
+ const base=fresh?.status==='paid'&&Boolean(fresh.paid_at)&&
+  Number.isSafeInteger(fresh.amount_ars)&&fresh.amount_ars>0&&
+  fresh.deposit_ars===fresh.amount_ars&&review?.state==='verified';
+ const mp=base&&fresh.payment_id!==null&&fresh.payment_id!==undefined&&
   fresh.preference_id!==null&&fresh.preference_id!==undefined;
- return {fresh,verified,revoked:review?.state==='revoked'};
+ let bank=false;
+ if(base&&!mp&&env?.SABER_ENTORNO==='produccion'&&
+    fresh.payment_id==null&&fresh.preference_id==null){
+  // Solo una acreditación bancaria auditada por Central y por importe exacto.
+  // No confiar jamás en constancias o banderas provistas por el comprador.
+  try{
+   const table=await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='central_live_bank_accreditations'").first();
+   if(table){
+    const row=await db.prepare(
+     'SELECT amount_ars,bank_reference,operator FROM central_live_bank_accreditations WHERE order_id=?'
+    ).bind(orderId).first();
+    bank=row?.amount_ars===fresh.amount_ars&&
+     typeof row.bank_reference==='string'&&row.bank_reference.length>=6&&
+     typeof row.operator==='string'&&row.operator.length>=2;
+   }
+  }catch{bank=false}
+ }
+ return {fresh,verified:Boolean(mp||bank),method:bank?'transferencia':mp?'mercadopago':null,
+  revoked:review?.state==='revoked'};
 }
 export async function checkoutUniversalSandboxCentral(request,env,{
  readSigned,dispatch,reconcile,now=()=>Date.now(),subtle=crypto.subtle
