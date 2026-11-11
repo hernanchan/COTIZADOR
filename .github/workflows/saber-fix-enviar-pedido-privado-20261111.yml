@@ -31,8 +31,8 @@ jobs:
           npm --prefix integraciones/autocotizador/recepcion install --no-audit --no-fund
           npm --prefix integraciones/autocotizador/recepcion run build:unificado
           node --check integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
-          grep -Fq 'El pedido todavía no se puede enviar:' integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
-          grep -Fq 'verificarDisponibilidadTUS' integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
+          node --test tests/tus-boton-envio-borrador-anterior.test.mjs
+          echo 'BUTTON_BUILD_TESTS_PASSED'
       - name: Desplegar SOLO Documentos de pruebas con rollback
         shell: bash
         env:
