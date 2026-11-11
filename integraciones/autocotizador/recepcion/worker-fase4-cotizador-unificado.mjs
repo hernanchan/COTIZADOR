@@ -2499,6 +2499,10 @@ export default {
        iniciarTUSUniversalLive(request,env,{authorized:linked}):
        confirmarTUSUniversalLive(request,env,{authorized:linked});
     }
+    if(page==='/api/pedido/live/diagnostico-mp'){
+      const {diagnosticarVendedorMPDesdeDocs}=await import('./diagnostico-mp-vendedor-live.mjs');
+      return diagnosticarVendedorMPDesdeDocs(request,env);
+    }
     if(page==='/api/pedido/live/checkout'){
       if(env?.SABER_ENTORNO!=='produccion')
        return testResponse({ok:false,error:'MP LIVE no habilitado'},503);
