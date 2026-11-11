@@ -8,7 +8,12 @@ const source=readFileSync(new URL('../integraciones/autocotizador/recepcion/carg
 
 test('el portal muestra el precio preliminar en su propio encabezado fijo',()=>{
  assert.match(html, /id="precio-smart"/);
- assert.match(html, /#precio-smart\{position:sticky;top:0/);
+ assert.match(html, /#acciones-pedido\{position:sticky;top:0/);
+ assert.match(html, /id="resumen-precio-entrega"/);
+ assert.match(html, /FECHA MÁXIMA ESTIMADA DE ENTREGA/);
+ assert.match(html, /font-size:clamp\(20px,2\.3vw,27px\)/);
+ assert.match(html, /id="promocion-dia-resumen"/);
+ assert.match(html, /No descontada de este presupuesto/);
  assert.match(html, /Total preliminar:/);
  assert.match(html, /Sin cobro autorizado/);
 });
