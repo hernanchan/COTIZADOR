@@ -3,20 +3,27 @@
  */
 import assert from 'node:assert/strict';
 const account=process.env.SABER_CF_ACCOUNT_ID,token=process.env.SABER_CF_DEPLOY_TOKEN;
+const editor=process.env.SABER_CF_EDITOR_TOKEN;
 assert.match(account||'',/^[a-f0-9]{32}$/i);assert.ok(token?.length>15);
+const credentials=[token,editor].filter(x=>typeof x==='string'&&x.length>15);
 const root='https://api.cloudflare.com/client/v4';
 const acct=root+'/accounts/'+account;
 async function cf(url,{method='GET',body,raw=false}={}){
- const h={Authorization:'Bearer '+token};
- if(body&&!raw)h['Content-Type']='application/json';
- const res=await fetch(url,{method,headers:h,...(body?{body:raw?body:JSON.stringify(body)}:{}),
- signal:AbortSignal.timeout(45000)});
- const v=await res.json().catch(()=>null);
- if(!res.ok||v?.success!==true){
-  console.log('CF_SETUP_FAILED_HTTP_'+res.status+'_ERROR_CODES_'+(v?.errors||[]).map(x=>x.code).join(','));
-  throw Error('CF_SETUP_NOT_APPROVED_'+res.status);
+ let last='NO_HTTP',reason='';
+ for(let i=0;i<credentials.length;i++){
+  const h={Authorization:'Bearer '+credentials[i]};
+  if(body&&!raw)h['Content-Type']='application/json';
+  const res=await fetch(url,{method,headers:h,...(body?{body:raw?body:JSON.stringify(body)}:{}),
+   signal:AbortSignal.timeout(45000)});
+  const v=await res.json().catch(()=>null);
+  if(res.ok&&v?.success===true)return v.result;
+  last='HTTP_'+res.status;reason=(v?.errors||[]).map(x=>x.code).join(',');
+  // Check the other credential only if this one lacks permission; avoid
+  // retrying mutations on ambiguous 5xx errors.
+  if(![401,403].includes(res.status))break;
  }
- return v.result;
+ console.log('CF_SETUP_UNAUTHORIZED_'+last+'_ERROR_CODES_'+reason);
+ throw Error('CF_SETUP_NOT_APPROVED_'+last);
 }
 async function bindings(name){return await cf(acct+'/workers/scripts/'+name+'/settings')}
 function gate(w,name,value='NO_GO'){return w?.bindings?.some(b=>b.name===name&&b.type==='plain_text'&&b.text===value)}
