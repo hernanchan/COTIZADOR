@@ -2366,9 +2366,10 @@ export default {
        return testResponse({ok:false,error:'LIVE_COTIZADOR_CERRADO'},503);
       if(page==='/cotizar/archivos'&&request.method==='GET'){
        const html=paginaCargaUnica()
-        .replace('<strong>Prueba privada de clasificación.</strong> Seleccioná varios PDF sin elegir de antemano entre impresiones y ploteos. Confirmá en qué tamaño querés imprimir cada archivo: el original puede ser A2, aunque quieras A4. Sin envío de originales, pedidos ni pagos. Presupuestos orientativos sin validez comercial hasta verificar los archivos. La clasificación CAD/Póster y las tarifas existentes no se modifican.',
-          'Seleccioná tus PDF y elegí el tamaño final de impresión. Confirmaremos el importe antes de pagar. Los archivos originales se envían únicamente después de acreditar el pago.')
-        .replace('Podés seleccionar varios a la vez (hasta 30).','Podés seleccionar varios a la vez (hasta 10).')
+        .replace(/<p class="nota">[\s\S]*?<\/p>/,
+          '<p class="nota"><strong>Elegí tus archivos.</strong> PDF, JPG o PNG. Las medidas se detectan por el contenido y podés elegir el tamaño final de impresión. El importe se confirma antes del pago; tus archivos originales se envían en forma privada solamente después de acreditarlo.</p>')
+        .replace('Podés seleccionar varios a la vez (hasta 30).',
+          'Podés seleccionar hasta 10 PDF o hasta 30 imágenes JPG/PNG.')
         .replace('<script src="/prueba-carga-unica.js" defer></script>',
          '<script src="/cotizar/archivos.js" defer></script>')
         .replace(/href="\/prueba-cotizador-conjunto"/g,'href="/cotizar"')
