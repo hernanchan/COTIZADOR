@@ -10,11 +10,14 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {revisarPdfR2Local} from './preprensa-r2-archivo-local.mjs';
 import {firmarInformeR2LiveLocal} from './firmar-inspeccion-r2-live-local.mjs';
+import {derivarClaveInspeccionR2Live} from './clave-inspeccion-r2-live.mjs';
 const [manifestPath,filePath,outPath,operator]=process.argv.slice(2);
 if(!manifestPath||!filePath||!outPath||typeof operator!=='string'||
  operator.trim().length<2||operator.trim().length>60)
  throw Error('R2_CLI_ARGUMENTOS: manifiesto.json original.pdf evidencia.json operador');
-const key=process.env.SABER_R2_INSPECTION_KEY;
+const key=process.env.SABER_R2_INSPECTION_KEY||
+ (process.env.SABER_R2_OPERATOR_PASSWORD?
+  derivarClaveInspeccionR2Live(process.env.SABER_R2_OPERATOR_PASSWORD):null);
 if(typeof key!=='string'||key.length<32)
  throw Error('R2_CLI_CLAVE_LOCAL_NO_CONFIGURADA');
 const raw=await readFile(manifestPath,'utf8');
