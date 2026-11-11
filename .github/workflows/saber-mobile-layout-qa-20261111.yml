@@ -20,3 +20,4 @@ jobs:
           node --check integraciones/autocotizador/recepcion/pagina-archivos-live.mjs
           node --check integraciones/publicacion/qa-cotizador-mobile-layout-20261111.mjs
           node integraciones/publicacion/qa-cotizador-mobile-layout-20261111.mjs
+# Rerun con handshake de altura y diagnóstico de Chrome.
