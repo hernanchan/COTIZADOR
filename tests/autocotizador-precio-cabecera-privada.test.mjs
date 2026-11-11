@@ -23,7 +23,7 @@ test('acepta información de precio solo desde iframe confiable y mismo origen',
  assert.match(html,/Number\.isSafeInteger\(price\)&&price>0/);
 });
 test('la carga descarta el precio viejo al cambiar y no autoriza cobros',()=>{
- assert.match(source,/function informarPrecioPrivado\(estado,total=null\)/);
+ assert.match(source,/function informarPrecioPrivado\(estado,total=null,motivo=''\)/);
  assert.match(source,/window\.parent\.postMessage\(\{type:'SABER_SMART_PRICE_STATE'/);
  assert.match(source,/informarPrecioPrivado\('calculando'\)/);
  assert.match(source,/informarPrecioPrivado\(d\.estado==='PRELIMINAR'\?'listo':'incompleto',d\.total\)/);
