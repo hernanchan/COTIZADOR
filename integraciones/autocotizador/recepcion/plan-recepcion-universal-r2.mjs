@@ -59,7 +59,7 @@ export function prepararPlanRecepcionUniversal({archivos,manifiestos,tarifario,p
  });
  if(tusBytes>MAX_TUS_BATCH)invalid('LOTE_TUS_EXCEDIDO');
  let quote;
- try{quote=cotizarCargaUnica({archivos,precios:tarifario.prices})}
+ try{quote=cotizarCargaUnica({archivos,precios:tarifario.prices,promociones:tarifario.promotions})}
  catch{invalid('COTIZACION_INVALIDA')}
  if(quote.estado!=='PRELIMINAR'||quote.paymentAuthorized!==false||
     quote.pendientes?.length||!Array.isArray(quote.plan)||
