@@ -96,6 +96,17 @@ test('orden productiva exige firma propia y rechaza mezclar checkout o payloads 
   {...payload,telefono:'abc'}))).status,422);
  assert.equal((await read(await make('/internal/central/live/order',
   {...payload,quoteHash:'z'.repeat(64)}))).status,422);
+ const full={...payload,nombre:'María Pérez',direccion:'Poeta Lugones 123'};
+ const acceptedContact=await read(await make('/internal/central/live/order',full));
+ assert.equal(acceptedContact.error,undefined);
+ assert.equal(acceptedContact.payload.nombre,'María Pérez');
+ for(const bad of [
+  {...full,nombre:''},{...full,nombre:'X'},{...full,nombre:'<img>'},
+  {...full,direccion:'x'.repeat(181)},{...payload,direccion:'Calle 123'},
+  {...full,importe:0}
+ ]){
+  assert.equal((await read(await make('/internal/central/live/order',bad))).status,422);
+ }
  assert.equal((await read(await make('/internal/central/live/order',payload),
   {...env,MP_LIVE_GATE:'NO_GO'})).status,503);
 });
