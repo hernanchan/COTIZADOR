@@ -45,7 +45,7 @@ export async function verificarFichaUniversal(p,{subtle=crypto.subtle,allowTusOn
    !SHA.test(f.sha256||'')||!Number.isSafeInteger(f.bytes)||
    decidirTransportePDF(f.bytes).ruta!==f.transporte||
    typeof f.nombre!=='string'||f.nombre.length<1||f.nombre.length>120||
-   !/\.pdf$/i.test(f.nombre)||!['documentos','ploteos'].includes(f.destino)||
+   !/\.pdf$/i.test(f.nombre)||!['documentos','ploteos','fotos','stickers','corte','grafica'].includes(f.destino)||
    typeof f.idTrabajo!=='string'||!f.idTrabajo||
    workIds.has(f.idTrabajo)||!Array.isArray(f.paginasElegidas)||!f.paginasElegidas.length||
    f.paginasElegidas.length>2000||
