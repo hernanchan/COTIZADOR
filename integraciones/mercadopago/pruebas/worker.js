@@ -4881,6 +4881,15 @@ export default {
     consultarPaqueteUniversalCentral(req,env,{readSigned:leerFirmaInternaLive}):
     consultarArchivoUniversalCentral(req,env,{readSigned:leerFirmaInternaLive});
   }
+  if(url.pathname==='/internal/central/live/r2-staff-board'){
+   const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
+   const signed=await leerFirmaInternaLive(req,env);
+   if(signed?.error)return json({ok:false,error:'LIVE_BOARD_FIRMA'},signed.status||401);
+   const {listarRecepcionUniversalLive}=await import('./central-recepcion-live.mjs');
+   return listarRecepcionUniversalLive(
+    new Request('https://pagos.libreriasaber.com.ar/admin/api/central/live-recepcion'),
+    env,{authorized:true});
+  }
   if(url.pathname==='/internal/central/live/r2-inspection-source'||
      url.pathname==='/internal/central/live/r2-inspection-confirm'){
    const {operarInspeccionR2LiveInterna}=await import('./r2-live-personal-inspection-bridge.mjs');
