@@ -52,6 +52,7 @@ for(const k of ['DOCS_LIVE_TURNSTILE_SITE_KEY','DOCS_LIVE_TUS_BUCKET',
 for(const k of ['DOCS_LIVE_TURNSTILE_SECRET','DOCS_LIVE_SESSION_KEY',
  'DOCS_LIVE_TUS_SERVICE_KEY','DOCS_LIVE_R2_RECEIPT_KEY'])
  assert.ok(s.bindings.some(x=>x.name===k&&x.type==='secret_text'),'DOC_SECRET_MISSING_'+k);
+console.log('CANARY_R2_BINDINGS='+JSON.stringify(s.bindings.filter(x=>x.name.includes('R2')).map(x=>({name:x.name,type:x.type,bucket_name:x.bucket_name||null}))));
 assert.ok(s.bindings.some(x=>x.name==='SABER_R2_GRANDES_LIVE'&&x.type==='r2_bucket'));
 assert.ok(c.bindings.some(x=>x.name==='DB'&&x.type==='d1'));
 const prod=list.filter(x=>x.name==='saber-pagos-produccion');
