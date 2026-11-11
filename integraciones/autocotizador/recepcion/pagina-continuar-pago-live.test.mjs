@@ -27,7 +27,7 @@ test('pantalla para retomar mismo pedido nunca crea orden y verifica acreditacio
   assert.doesNotMatch(html,/\/api\/pedido\/live\/(borrador|orden)/);
   const nonce=html.match(/<script nonce="([a-f0-9]{32})">/)?.[1];
   assert.ok(nonce);
-  const script=html.match(/<script nonce="[a-f0-9]{32}">([\\s\\S]*?)<\\/script>/)?.[1];
+  const script=html.split('<script nonce="'+nonce+'">')[1]?.split('</script>')[0];
   assert.ok(script);
   assert.doesNotThrow(()=>new Function(script),'JavaScript servido debe ser sintácticamente válido');
   assert.ok(res.headers.get('Content-Security-Policy').includes("'nonce-"+nonce+"'"));
