@@ -67,7 +67,7 @@ async function patch(worker,settings,keys,value){
  const b=settings.bindings;
  const update=new FormData();
  update.append('settings',new Blob([JSON.stringify({bindings:[
-  ...b.filter(item=>!keys.includes(item.name)).map(x=>({name:x.name,type:'inherit'})),
+  ...b.filter(item=>!keys.includes(item.name)).map(x=>x.type==='r2_bucket'?{name:x.name,type:'r2_bucket',bucket_name:x.bucket_name}:{name:x.name,type:'inherit'}),
   ...keys.map(name=>({name,type:'plain_text',text:value}))
  ]})],{type:'application/json'}),'settings.json');
  await api('/workers/scripts/'+worker+'/settings',deploy,{method:'PATCH',form:update});
@@ -75,6 +75,7 @@ async function patch(worker,settings,keys,value){
  for(const key of keys)assert.ok(has(after,key,value),'CANARY_SETTING_NOT_SAVED_'+key);
  for(const old of b)assert.ok(after.bindings.some(x=>x.name===old.name),
   'CANARY_LOST_EXISTING_BINDING_'+old.name);
+ if(worker==='saber-documentos-produccion')assert.ok(after.bindings.some(x=>x.name==='SABER_R2_GRANDES_LIVE'&&x.type==='r2_bucket'&&x.bucket_name==='saber-documentos-produccion-privado'),'CANARY_R2_BINDING_DROPPED');
  return after;
 }
 const changed=[];
