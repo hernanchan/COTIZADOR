@@ -1,0 +1,38 @@
+name: Saber QA real JPG PNG promoción miércoles, móvil y PC (sin crear pedidos)
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths:
+      - .github/workflows/saber-qa-jpg-png-promos-browser-20261111.yml
+permissions: {contents: read, statuses: write}
+concurrency: {group: saber-qa-imagenes-precio-browser, cancel-in-progress: false}
+jobs:
+  navegador:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Preparar navegador real sin modificar Cloudflare
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund playwright@1.56.1
+          node --check integraciones/publicacion/qa-imagenes-promociones-browser-20261111.mjs
+          command -v google-chrome || command -v google-chrome-stable
+      - name: Cargar JPG PNG y comprobar promoción real en Chrome PC y móvil
+        env:
+          SABER_OPERATOR_TEST_PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+        run: |
+          set -euo pipefail
+          node integraciones/publicacion/qa-imagenes-promociones-browser-20261111.mjs
+      - name: Registrar resultado
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          if [ "$RESULT" = success ]; then state=success; description="Navegador JPG PNG Luster y promo real móvil PC: success"; else state=failure; description="QA navegador JPG PNG o promoción pendiente de reparación"; fi
+          jq -n --arg state "$state" --arg context 'saber/qa-browser-imagenes-promos' --arg description "$description" --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/qa-imagenes.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/qa-imagenes.json >/dev/null
