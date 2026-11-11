@@ -17,7 +17,7 @@ for (const [name,html] of [['portada',home],['ofertas',offers]]){
   assert.doesNotMatch(rendered,/onclick=|onerror=/i);
   assert.doesNotMatch(rendered,/href="cotizar\.html"/);
   if(name==='portada'){
-   assert.match(rendered,/href="https:\/\/libreriasaber\.com\.ar\/cotizar"/);
+   assert.doesNotMatch(rendered,/href="https:\/\/libreriasaber\.com\.ar\/cotizar"/);
    assert.match(rendered,/Acceso del personal/);
    assert.match(rendered,/href="\/prueba-v2\/cotizar-cliente"/);
    assert.match(rendered,/los artículos y los trabajos de impresión se consultan por separado/i);
@@ -121,7 +121,7 @@ test('V3 enlaza el mismo TUS sólo si el portal comprador está habilitado',()=>
  assert.match(enabled,/Probar envío completo de PDF/);
  assert.match(enabled,/impresiones con pedido, pago Sandbox y seguimiento/);
  assert.doesNotMatch(enabled,/href="https:\/\/libreriasaber\.com\.ar\/cotizar"/);
- assert.match(disabled,/href="https:\/\/libreriasaber\.com\.ar\/cotizar"/);
+ assert.match(disabled,/href="\/prueba-v2\/cotizar-cliente"/);
  assert.doesNotMatch(disabled,/href="\/prueba-v2\/pedido-cliente"/);
  assert.match(enabled,/data-demo-drawer/);
  assert.match(enabled,/\/prueba-v2\/diseno-sin-clave\/catalogo\.json/);
