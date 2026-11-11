@@ -11,7 +11,7 @@ export function paginaContinuarPagoLive(request,env,{authorized=false}={}){
   return new Response('No disponible',{status:404,headers:{'Cache-Control':'no-store'}});
  if(!authorized)return new Response('Sesión de compra vencida. No crees otro pedido; contactá a Librería Saber.',{
    status:401,headers:{'Cache-Control':'no-store,private','X-Robots-Tag':'noindex,nofollow'}});
- const nonce=crypto.randomUUID().replaceAll('-');
+ const nonce=crypto.randomUUID().replaceAll('-','');
  const html='<!doctype html><html lang="es"><head><meta charset="utf-8">'+
  '<meta name="viewport" content="width=device-width,initial-scale=1">'+
  '<title>Continuar pedido · Librería Saber</title><style>'+
