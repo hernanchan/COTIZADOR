@@ -22,10 +22,13 @@ jobs:
           npm install --no-save --no-fund --no-audit esbuild@0.25.12 wrangler@4.55.0
           node --check integraciones/mercadopago/pruebas/mercadopago-live-central.mjs
           node --check integraciones/autocotizador/recepcion/checkout-live-cliente.mjs
+          node --check integraciones/autocotizador/recepcion/pagina-continuar-pago-live.mjs
           node --test \
             integraciones/mercadopago/pruebas/mercadopago-live-central.test.mjs \
             integraciones/autocotizador/recepcion/checkout-live-cliente.test.mjs \
             integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs \
+            integraciones/autocotizador/recepcion/pagina-continuar-pago-live.test.mjs \
+            integraciones/autocotizador/recepcion/mp-live-comprador.test.mjs \
             integraciones/mercadopago/pruebas/central-live-bridge.test.mjs \
             integraciones/mercadopago/produccion/webhook-edge.test.mjs
           cd integraciones/autocotizador/recepcion
@@ -57,7 +60,6 @@ jobs:
           jq -e '.success==true and (.result[0].results|length)==1 and
            (.result[0].results[0].status=="awaiting_payment") and
            (.result[0].results[0].amount_ars==200) and
-           (.result[0].results[0].preference_id==null) and
            (.result[0].results[0].payment_id==null)' "$tmp/orders.json" >/dev/null
           for w in saber-pagos-produccion saber-documentos-produccion;do
            curl -fsS --max-time 25 -H "Authorization: Bearer $TOKEN" "$root/workers/scripts/$w/settings" > "$tmp/$w-before.json"
@@ -145,12 +147,14 @@ jobs:
           curl -fsS --max-time 25 -H "Authorization: Bearer $D1_TOKEN" -H 'Content-Type: application/json' \
            -d '{"sql":"SELECT status,amount_ars,preference_id,payment_id FROM orders ORDER BY created_at DESC LIMIT 3"}' \
            "$root/d1/database/$(cat "$tmp/db-id")/query" > "$tmp/orders-after.json"
-          jq -e '.result[0].results|length==1 and .[0].status=="awaiting_payment" and .[0].amount_ars==200 and .[0].preference_id==null and .[0].payment_id==null' "$tmp/orders-after.json" >/dev/null
+          jq -e '.result[0].results|length==1 and .[0].status=="awaiting_payment" and .[0].amount_ars==200 and .[0].payment_id==null' "$tmp/orders-after.json" >/dev/null
           code=$(curl -sS --max-time 18 -o /dev/null -w '%{http_code}' 'https://pedidos.libreriasaber.com.ar/cotizar')
           test "$code" = 200
           code=$(curl -sS --max-time 18 -o /dev/null -w '%{http_code}' 'https://pedidos.libreriasaber.com.ar/personal/paquete')
           test "$code" = 401
-          echo SABER_LIVE_ORDER_001_PENDING_RECOVERY_READY_NO_EXTRA_CHARGE_NO_MAIN_CHANGE
+          code=$(curl -sS --max-time 18 -o /dev/null -w '%{http_code}' 'https://pedidos.libreriasaber.com.ar/pedido/continuar')
+          test "$code" = 401
+          echo SABER_LIVE_ORDER_001_RESUME_ROUTE_AVAILABLE_SAFE_TO_ENTER_SAME_TAB
       - name: Registrar resultado
         if: always()
         shell: bash
