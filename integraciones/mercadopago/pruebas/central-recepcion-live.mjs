@@ -16,10 +16,28 @@ export async function listarRecepcionUniversalLive(request,env,{authorized=false
   return reply({ok:false,error:'LIVE_LISTA_OFF'},503);
  let rows;
  try{
+  const existing=(await env.DB.prepare(
+   "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('central_live_bank_accreditations','central_order_contacts','central_order_customer_details')"
+  ).all()).results||[];
+  const names=new Set(existing.map(v=>v.name));
+  const bank=names.has('central_live_bank_accreditations');
+  const hasPhone=names.has('central_order_contacts');
+  const hasCustomer=names.has('central_order_customer_details');
+  const paymentClause=bank?
+   "AND ((o.payment_id IS NOT NULL AND o.preference_id IS NOT NULL) OR "+
+   "(o.payment_id IS NULL AND o.preference_id IS NULL AND EXISTS "+
+   "(SELECT 1 FROM central_live_bank_accreditations b WHERE b.order_id=o.id "+
+   "AND b.amount_ars=o.amount_ars))) ":
+   'AND o.payment_id IS NOT NULL AND o.preference_id IS NOT NULL ';
+  const selectContact=(hasPhone?'c.phone':'NULL')+" AS telefono_contacto,"+
+   (hasCustomer?'k.name':'NULL')+" AS nombre_cliente,"+
+   (hasCustomer?'k.address':'NULL')+" AS direccion_cliente,";
+  const joinContact=(hasPhone?'LEFT JOIN central_order_contacts c ON c.order_id=o.id ':'')+
+   (hasCustomer?'LEFT JOIN central_order_customer_details k ON k.order_id=o.id ':'');
   rows=await env.DB.prepare(
    'SELECT l.commercial_order_id AS order_id,l.web_order_id AS web_order_id,'+
    'n.number AS work_number,d.file_count AS file_count,d.total_ars AS total_ars,'+
-   'o.paid_at AS paid_at,'+
+   'o.paid_at AS paid_at,'+selectContact+
    'SUM(CASE WHEN f.received=1 THEN 1 ELSE 0 END) AS received_count,'+
    'SUM(CASE WHEN f.received=0 THEN 1 ELSE 0 END) AS pending_count,'+
    "SUM(CASE WHEN f.transport='tus' THEN 1 ELSE 0 END) AS tus_count,"+
@@ -34,11 +52,12 @@ export async function listarRecepcionUniversalLive(request,env,{authorized=false
    'JOIN central_r2_universal_files f ON f.web_order_id=l.web_order_id '+
    'JOIN orders o ON o.id=l.commercial_order_id '+
    "JOIN payment_reviews p ON p.order_id=o.id AND p.state='verified' "+
-   'LEFT JOIN central_work_order_numbers n ON n.commercial_order_id=o.id '+
+   'LEFT JOIN central_work_order_numbers n ON n.commercial_order_id=o.id '+joinContact+
    "WHERE o.status='paid' AND o.paid_at IS NOT NULL "+
    'AND o.amount_ars=o.deposit_ars AND o.amount_ars=l.amount_ars '+
-   'AND o.payment_id IS NOT NULL AND o.preference_id IS NOT NULL '+
+   paymentClause+
    'GROUP BY l.commercial_order_id,l.web_order_id,n.number,'+
+   (hasPhone?',c.phone':'')+(hasCustomer?',k.name,k.address':'')+','+
    'd.file_count,d.total_ars,o.paid_at '+
    'ORDER BY o.paid_at DESC LIMIT 100'
   ).all();
@@ -65,6 +84,8 @@ export async function listarRecepcionUniversalLive(request,env,{authorized=false
    receivedCount:x.received_count,pendingCount:x.pending_count,
    tusCount:x.tus_count,r2Count:x.r2_count,
    stagedR2Count:x.staged_r2_count,paidAt:x.paid_at,
+   nombreCliente:x.nombre_cliente||null,telefonoContacto:x.telefono_contacto||null,
+   direccionCliente:x.direccion_cliente||null,
    estado:x.pending_count===0?'ORIGINALES_RECIBIDOS_PREPRENSA_PENDIENTE':
     x.pending_count===x.staged_r2_count?
     'R2_ALMACENADO_PENDIENTE_ANALISIS_PDF':
