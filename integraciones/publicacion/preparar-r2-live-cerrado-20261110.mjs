@@ -4,18 +4,24 @@
 import {randomBytes} from 'node:crypto';
 import assert from 'node:assert/strict';
 const account=process.env.SABER_CF_ACCOUNT_ID,token=process.env.SABER_CF_DEPLOY_TOKEN;
+const credentials=[token,process.env.SABER_CF_EDITOR_TOKEN].filter(x=>x?.length>15);
 assert.match(account||'',/^[a-f0-9]{32}$/i);assert.ok(token?.length>15);
 const root='https://api.cloudflare.com/client/v4/accounts/'+account;
 const bucket='saber-documentos-produccion-privado';
 const worker='saber-documentos-produccion',name='SABER_R2_GRANDES_LIVE';
 async function request(path,{method='GET',data,multipart}={}){
- const res=await fetch(root+path,{method,headers:{
-  Authorization:'Bearer '+token,...(data?{'Content-Type':'application/json'}:{})
- },...(data?{body:JSON.stringify(data)}:multipart?{body:multipart}:{}),
- signal:AbortSignal.timeout(45000)});
- const d=await res.json().catch(()=>null);
- if((res.ok&&d?.success===true))return {status:res.status,data:d.result};
- return {status:res.status,codes:(d?.errors||[]).map(x=>x.code).slice(0,3)};
+ let last={status:0,codes:[]};
+ for(const secret of credentials){
+  const res=await fetch(root+path,{method,headers:{
+   Authorization:'Bearer '+secret,...(data?{'Content-Type':'application/json'}:{})
+  },...(data?{body:JSON.stringify(data)}:multipart?{body:multipart}:{}),
+  signal:AbortSignal.timeout(45000)});
+  const d=await res.json().catch(()=>null);
+  if(res.ok&&d?.success===true)return {status:res.status,data:d.result};
+  last={status:res.status,codes:(d?.errors||[]).map(x=>x.code).slice(0,3)};
+  if(![401,403].includes(res.status))break;
+ }
+ return last;
 }
 async function must(path,opts={}){
  const r=await request(path,opts);
