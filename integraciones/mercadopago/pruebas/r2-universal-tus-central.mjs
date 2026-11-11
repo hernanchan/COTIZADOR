@@ -142,13 +142,23 @@ export async function recibirTUSUniversalCentral(request,env,{
   respond({ok:false,error:'UNIVERSAL_TUS_RECIBO_DUPLICADO'},409);
  if(result.row.received!==0)
   return respond({ok:false,error:'UNIVERSAL_TUS_RECEPCION_INCOMPATIBLE'},409);
+ // La recepción TUS exige acreditación auténtica en el mismo UPDATE D1:
+ // MP con ambos IDs, o transferencia con asiento bancario único y mismo importe.
+ const bankTable=postpayEnabled(env).live?await db.prepare(
+  "SELECT name FROM sqlite_master WHERE type='table' AND name='central_live_bank_accreditations'"
+ ).first():null;
+ const verifiedPayment=bankTable?
+  "((o.payment_id IS NOT NULL AND o.preference_id IS NOT NULL) OR "+
+  "(o.payment_id IS NULL AND o.preference_id IS NULL AND EXISTS ("+
+  "SELECT 1 FROM central_live_bank_accreditations b "+
+  "WHERE b.order_id=o.id AND b.amount_ars=o.amount_ars)))":
+  "(o.payment_id IS NOT NULL AND o.preference_id IS NOT NULL)";
  const payWhere="EXISTS (SELECT 1 FROM central_r2_universal_order_links l "+
  "JOIN orders o ON o.id=l.commercial_order_id "+
  "JOIN payment_reviews rev ON rev.order_id=o.id "+
  "WHERE l.web_order_id=central_r2_universal_files.web_order_id "+
  "AND o.status='paid' AND o.paid_at IS NOT NULL AND o.deposit_ars=o.amount_ars "+
- "AND o.payment_id IS NOT NULL AND o.preference_id IS NOT NULL "+
- "AND rev.state='verified')";
+ "AND "+verifiedPayment+" AND rev.state='verified')";
  try{
   const a=await db.batch([
    db.prepare('INSERT INTO central_r2_universal_tus_receipts '+
