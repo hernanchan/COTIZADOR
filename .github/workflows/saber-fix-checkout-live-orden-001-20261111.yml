@@ -2,7 +2,10 @@ name: Saber - recuperar orden 001 con validación completa de pantalla
 on:
   push:
     branches: [integracion/tus-pedido-privado-20261101]
-    paths: [.github/workflows/saber-fix-checkout-live-orden-001-20261111.yml]
+    paths:
+      - .github/workflows/saber-fix-checkout-live-orden-001-20261111.yml
+      - integraciones/autocotizador/recepcion/pagina-continuar-pago-live.mjs
+      - integraciones/autocotizador/recepcion/pagina-continuar-pago-live.test.mjs
 permissions: {contents: read, statuses: write}
 concurrency: {group: saber-checkout-live-fix-pilot-001, cancel-in-progress: false}
 jobs:
