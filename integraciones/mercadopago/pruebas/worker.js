@@ -2500,8 +2500,9 @@ body.price-only #priceAdminFieldset summary{font-size:1.3rem}
 <fieldset id="privateAccess"><legend>Acceso privado</legend><div class="toolbar">
 <input type="password" autocomplete="off" id="secret" placeholder="Clave privada del panel" aria-label="Clave privada">
 <input type="text" id="productionOperator" maxlength="60" placeholder="Responsable del cambio" aria-label="Nombre de responsable" autocomplete="off">
-<button id="refresh">Consultar pedidos</button><button type="button" id="goR2Paid" class="outline">Ver ploteos R2 para aprobar</button><button id="sync" class="outline">Verificar pagos pendientes</button><button id="openPricing" class="outline" type="button">Editar precios y promociones</button>
-<button id="mobileInviteCreate" class="outline" type="button">Acceso temporal al celular</button>
+<details id="centralExtraTools" style="flex:1 1 100%;margin-top:6px"><summary style="cursor:pointer;color:#174b8f;font-weight:700">Herramientas adicionales (normalmente no hacen falta)</summary>
+<div class="toolbar" style="margin-top:10px"><button id="refresh" class="outline">Actualizar tablero manualmente</button><button type="button" id="goR2Paid" class="outline">Revisar ploteos R2</button><button id="sync" class="outline">Sincronizar Mercado Pago (solo incidencias)</button><button id="openPricing" class="outline" type="button">Editar precios y promociones</button>
+<button id="mobileInviteCreate" class="outline" type="button">Acceso temporal al celular</button></div></details>
 </div><p id="status" role="status" aria-live="polite"></p>
 <div id="mobileInviteArea" hidden>
 <p class="note">Enlace privado de un solo uso. Vence en 3 minutos. Copialo y abrilo en tu celular; no lo compartas con terceros.</p>
@@ -2522,7 +2523,20 @@ body.price-only #priceAdminFieldset summary{font-size:1.3rem}
 <button id="deliveryPlanSave" type="button" disabled>Guardar previsión</button></div>
 <p id="deliveryPlanStatus" role="status" aria-live="polite" class="note">Consultá primero la previsión guardada.</p>
 </fieldset>
-<fieldset id="bankTransfersArea"><legend>Transferencias por verificar · <strong id="transferCount">0 pendientes</strong></legend><p class="note">Los pendientes se cargan solos y se actualizan cada 30 segundos. Comprobar el ingreso en el banco: un comprobante del cliente no acredita el pago. Operación limitada al ENSAYO privado.</p><p id="transferPanelStatus" class="transfer-feedback" role="status" aria-live="polite">Ingresá la clave privada para consultar las transferencias.</p><ol id="transferPending"></ol><button id="refreshTransfers" class="outline" type="button">Actualizar ahora</button></fieldset>
+<fieldset id="bankTransfersArea"><legend>Transferencias por verificar · <strong id="transferCount">0 pendientes</strong></legend><p class="note">Los pendientes se cargan solos y se actualizan cada 30 segundos. Comprobar el ingreso en el banco: un comprobante del cliente no acredita el pago. Operación limitada al ENSAYO privado.</p><p id="transferPanelStatus" class="transfer-feedback" role="status" aria-live="polite">Ingresá la clave privada para consultar las transferencias.</p><ol id="transferPending"></ol><details><summary style="cursor:pointer;color:#174b8f">Actualización manual de transferencias</summary><button id="refreshTransfers" class="outline" type="button">Actualizar ahora</button></details></fieldset>
+<fieldset id="productionBoardArea"><legend>Tablero de producción · pedidos pagos</legend>
+<p class="note">Cada pedido avanza de columna al registrar su estado. Descargar el ZIP no cambia el seguimiento. Actualización automática cada 30 segundos mientras el panel esté abierto.</p>
+<div class="board" id="productionBoard">
+<section class="board-lane" aria-label="Pedidos nuevos pagados"><h3>Nuevos · pagos confirmados <span class="board-count" id="count-pendiente">0</span></h3><div class="board-cards" id="lane-pendiente"></div></section>
+<section class="board-lane" aria-label="Trabajos en preparación"><h3>En preparación <span class="board-count" id="count-en_preparacion">0</span></h3><div class="board-cards" id="lane-en_preparacion"></div></section>
+<section class="board-lane" aria-label="Trabajos listos"><h3>Listos para retirar <span class="board-count" id="count-listo">0</span></h3><div class="board-cards" id="lane-listo"></div></section>
+<section class="board-lane" aria-label="Trabajos en espera"><h3>En espera <span class="board-count" id="count-en_espera">0</span></h3><div class="board-cards" id="lane-en_espera"></div></section>
+</div>
+<div class="board-footer">
+<details><summary>Entregados · historial (<span id="count-entregado">0</span>)</summary><div class="board-cards" id="lane-entregado"></div></details>
+<details><summary>Otros pedidos pagados (<span id="count-other">0</span>)</summary><div id="orders"></div></details>
+</div></fieldset>
+<details id="centralLegacyAdmin" style="margin:16px 0"><summary style="cursor:pointer;padding:13px 16px;background:#eef3f8;border:1px solid #d9e0ec;border-radius:9px;color:#174b8f;font-weight:700">Configuración avanzada de horarios, capacidad y estadísticas</summary>
 <fieldset id="etaAdminArea"><legend>Información histórica de producción y horarios</legend>
 <p class="note">La entrega que se comunica al cliente se elige únicamente en «Entrega general» y, al iniciar, en «Definir hora de entrega». Los tiempos anteriores de tres horas y cupos no se utilizan para prometer retiros.</p>
 <details id="etaLegacyPanel"><summary>Configuración anterior de demora · no utilizada para entregar</summary>
@@ -2584,18 +2598,7 @@ body.price-only #priceAdminFieldset summary{font-size:1.3rem}
 <div id="etaSamplesHistory" class="note" aria-live="polite"></div>
 </details>
 </fieldset>
-<fieldset id="productionBoardArea"><legend>Tablero de producción · pedidos pagos</legend>
-<p class="note">Cada pedido avanza de columna al registrar su estado. Descargar el ZIP no cambia el seguimiento. Actualización automática cada 30 segundos mientras el panel esté abierto.</p>
-<div class="board" id="productionBoard">
-<section class="board-lane" aria-label="Pedidos nuevos pagados"><h3>Nuevos · pagos confirmados <span class="board-count" id="count-pendiente">0</span></h3><div class="board-cards" id="lane-pendiente"></div></section>
-<section class="board-lane" aria-label="Trabajos en preparación"><h3>En preparación <span class="board-count" id="count-en_preparacion">0</span></h3><div class="board-cards" id="lane-en_preparacion"></div></section>
-<section class="board-lane" aria-label="Trabajos listos"><h3>Listos para retirar <span class="board-count" id="count-listo">0</span></h3><div class="board-cards" id="lane-listo"></div></section>
-<section class="board-lane" aria-label="Trabajos en espera"><h3>En espera <span class="board-count" id="count-en_espera">0</span></h3><div class="board-cards" id="lane-en_espera"></div></section>
-</div>
-<div class="board-footer">
-<details><summary>Entregados · historial (<span id="count-entregado">0</span>)</summary><div class="board-cards" id="lane-entregado"></div></details>
-<details><summary>Otros pedidos pagados (<span id="count-other">0</span>)</summary><div id="orders"></div></details>
-</div></fieldset>
+</details>
 <fieldset id="r2ReviewPanel"><legend>Ploteos grandes pagados · revisión de preprensa</legend><div class="toolbar"><button id="refreshR2Paid" class="outline">Consultar originales R2 pagados</button></div><p class="note">Pago acreditado y archivo recibido son etapas distintas. Las páginas, medidas y precio final deben verificarse antes de imprimir. Sin producción automática.</p><ol id="r2PaidReview"></ol></fieldset>
 <fieldset id="liveRecepcionPanel"><legend>Recepción LIVE de documentos · solo lectura</legend>
 <p class="note">Órdenes pagadas conciliadas con D1. Un R2 con SHA almacenado todavía requiere inspección del PDF. Este panel no habilita descarga, ZIP ni producción.</p>
@@ -3869,6 +3872,8 @@ async function refreshTransfers({silent=false,force=false}={}){
    for(const t of pending){
     const orderLabel=t.numero_orden?"Orden N.º "+String(t.numero_orden).padStart(3,"0"):"Pedido sin número comercial";
     const item=node("li",orderLabel+" · "+money(t.amount_ars)+" · PENDIENTE");
+    item.append(node("p","Cliente: "+(t.customer_name||"No informado")+" · Teléfono: "+(t.customer_phone||"No informado")));
+    item.append(node("p","Dirección: "+(t.customer_address||"No informada · retiro en local")));
     item.append(node("p","Solicitada: "+t.created_at+" · Pago NO verificado · NO imprimir"));
     const label=node("label","Referencia de operación bancaria (obligatoria):");
     const reference=node("input","");
@@ -5029,7 +5034,7 @@ export default {
     if(!exists)return json({orders:[],payment_confirmed:false,production_enabled:false});
     await centralTables(env); // La numeración ya asignada se consulta sin crear números nuevos.
     const rows=await env.DB.prepare(
-     "SELECT t.order_id,t.amount_ars,t.created_at,o.description,o.created_at AS order_created_at,n.number AS numero_orden FROM transfer_requests t JOIN orders o ON o.id=t.order_id LEFT JOIN central_work_order_numbers n ON n.commercial_order_id=t.order_id WHERE t.status='awaiting_bank_verification' AND o.status='awaiting_payment' AND o.deposit_ars=o.amount_ars AND t.amount_ars=o.amount_ars ORDER BY t.created_at ASC LIMIT 100"
+     "SELECT t.order_id,t.amount_ars,t.created_at,o.description,o.created_at AS order_created_at,n.number AS numero_orden,c.phone AS customer_phone,d.name AS customer_name,d.address AS customer_address FROM transfer_requests t JOIN orders o ON o.id=t.order_id LEFT JOIN central_work_order_numbers n ON n.commercial_order_id=t.order_id LEFT JOIN central_order_contacts c ON c.order_id=t.order_id LEFT JOIN central_order_customer_details d ON d.order_id=t.order_id WHERE t.status='awaiting_bank_verification' AND o.status='awaiting_payment' AND o.deposit_ars=o.amount_ars AND t.amount_ars=o.amount_ars ORDER BY t.created_at ASC LIMIT 100"
     ).all();
     return json({orders:rows.results||[],payment_confirmed:false,production_enabled:false});
    }
