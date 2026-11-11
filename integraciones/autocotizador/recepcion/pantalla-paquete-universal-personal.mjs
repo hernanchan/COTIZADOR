@@ -33,6 +33,8 @@ directamente al disco, sin acumularlo en memoria. Solo personal autorizado.</sma
 <section id="r2Inspeccion" style="margin-top:24px;border-top:2px solid #d0dae5;padding-top:18px" hidden>
 <h2>Inspección R2 pendiente</h2>
 <p>Para habilitar el ZIP primero revisá el PDF grande original. El pago acreditado no autoriza imprimir sin preprensa.</p>
+<p><button type="button" id="r2Recargar">Ver pedidos pagados</button></p>
+<div id="r2Lista" role="status" aria-live="polite"></div>
 <label>Referencia web <input id="r2Order" style="width:100%;padding:9px" placeholder="WEB-ENSAYO-…" /></label>
 <label>Identificador de archivo <input id="r2FileId" style="width:100%;padding:9px" placeholder="pdf_0" /></label>
 <p><button type="button" id="r2Consultar">Consultar original pendiente</button></p>
