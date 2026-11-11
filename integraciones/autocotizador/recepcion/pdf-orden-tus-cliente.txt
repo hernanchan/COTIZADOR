@@ -78,7 +78,15 @@ function generarPdfOrdenTrabajo(d,filasDeTrabajo){
   if(body.length)pages.push(body.join('\n')+'\n');
   body=[];y=798;
   write('LIBRERÍA SABER  |  ORDEN DE TRABAJO N.º '+d.numeroOrden,15,true);y-=25;
-  write('Pedido: '+String(d.webOrderId||'NO CONSTA'),8,false);y-=18;
+  write('Pedido: '+String(d.webOrderId||'NO CONSTA'),8,false);y-=16;
+  for(const item of [
+   'Cliente: '+String(d.nombreCliente||'NO INFORMADO'),
+   'Teléfono: '+String(d.telefonoContacto||'NO INFORMADO'),
+   'Dirección: '+String(d.direccionCliente||'No informada (retiro en local)')
+  ]){
+   for(const line of pdfOrdenLineas(item,9,maxX)){write(line,9);y-=12;}
+  }
+  y-=4;
   write('Documentos: '+d.trabajos.length+'  |  Total documentos: $ '+d.importe+' ARS',10,true);y-=20;
   const status=verified?'PAGO VERIFICADO EN CENTRAL - PREPARACIÓN PENDIENTE':
    'SIN PAGO CONFIRMADO - NO IMPRIMIR NI ENTREGAR';
