@@ -151,6 +151,21 @@ jobs:
             "$tmp/saber-documentos-produccion-after.json" >/dev/null
           jq -e --arg id "$(cat "$tmp/prod-id")" '.result.bindings|any(.name=="DB" and .type=="d1" and ((.id//.database_id)==$id))' \
             "$tmp/saber-pagos-produccion-after.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="DOCS_LIVE_TURNSTILE_SITE_KEY" and .type=="plain_text")' \
+            "$tmp/saber-documentos-produccion-after.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="DOCS_LIVE_TURNSTILE_SECRET" and .type=="secret_text")' \
+            "$tmp/saber-documentos-produccion-after.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="DOCS_LIVE_TUS_SERVICE_KEY" and .type=="secret_text")' \
+            "$tmp/saber-documentos-produccion-after.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="SABER_R2_GRANDES_LIVE" and .type=="r2_bucket" and .bucket_name=="saber-documentos-produccion-privado")' \
+            "$tmp/saber-documentos-produccion-after.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="DOCS_LIVE_TUS_BUCKET" and .type=="plain_text" and .text=="saber-tus-produccion")' \
+            "$tmp/saber-documentos-produccion-after.json" >/dev/null
+          for gate in DOCS_LIVE_PRICING_GATE DOCS_LIVE_ORDER_GATE DOCS_LIVE_UI_GATE DOCS_LIVE_SESSION_GATE DOCS_LIVE_RECEPCION_GATE DOCS_LIVE_TUS_GATE DOCS_LIVE_R2_GATE DOCS_LIVE_R2_UPLOAD_GATE DOCS_LIVE_R2_STAGING_GATE DOCS_LIVE_STAFF_GATE DOCS_LIVE_PACKAGE_GATE;do
+            jq -e --arg gate "$gate" '.result.bindings|any(.name==$gate and .type=="plain_text" and .text=="NO_GO")' \
+             "$tmp/saber-documentos-produccion-after.json" >/dev/null
+          done
+          echo LIVE_TURNSTILE_SUPABASE_R2_AND_11_DOCUMENTS_GATES_PRESERVED
           echo LIVE_ZIP_WORKERS_STAGE_VERIFIED_NO_GO_NO_LIVE_PAYMENTS_NO_MAIN_CHANGE
       - name: Registrar resultado staging
         if: always()
