@@ -36,7 +36,8 @@ async function central(env,kind,payload,{
   {name:'HMAC',hash:'SHA-256'},false,['sign']);
  const signature=hex(new Uint8Array(await subtle.sign('HMAC',secret,
   new TextEncoder().encode(ts+'\n'+id+'\n'+body))));
- const r=await env.SABER_CENTRAL.fetch(new Request(CENTRAL+route,{
+ const target=kind==='board'?'https://pagos.libreriasaber.com.ar/internal/central/live/r2-staff-board':CENTRAL+route;
+ const r=await env.SABER_CENTRAL.fetch(new Request(target,{
   method:'POST',headers:{'Content-Type':'application/json',
    'x-saber-ts':String(ts),'x-saber-request-id':id,
    'x-saber-signature':signature},body}));
