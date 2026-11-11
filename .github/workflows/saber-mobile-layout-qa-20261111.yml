@@ -1,0 +1,22 @@
+name: Saber QA - layout móvil cotizador sin cobros
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-mobile-layout-qa-20261111.yml]
+permissions: {contents: read}
+jobs:
+  mobile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Probar Chrome 360, 390, 768 y 1366 sin Cloudflare ni pagos
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund playwright@1.56.0
+          node --check integraciones/autocotizador/recepcion/pagina-archivos-live.mjs
+          node --check integraciones/publicacion/qa-cotizador-mobile-layout-20261111.mjs
+          node integraciones/publicacion/qa-cotizador-mobile-layout-20261111.mjs
