@@ -122,7 +122,7 @@ test('seguimiento muestra previsión al pagar y al iniciar, luego fecha y hora p
  }]));
  const doc={getElementById:id=>els[id],createElement:()=>({textContent:'',className:''})};
  const run=vm.runInNewContext(
-  'const labels=["Pedido recibido","Pago confirmado","En preparación","Listo para retirar","Entregado"];'+
+  'const el=id=>document.getElementById(id);const labels=["Pedido recibido","Pago confirmado","En preparación","Listo para retirar","Entregado"];'+
   script.slice(start,end)+';render',
   {document:doc,Intl,Date}
  );
