@@ -17,12 +17,15 @@ const response=(v,s=200)=>Response.json(v,{status:s,headers:{
  'Cache-Control':'no-store,private','X-Content-Type-Options':'nosniff'}});
 export function validarPromocionUniversal(x){
  if(!x||typeof x!=='object'||Array.isArray(x)||
-    Object.keys(x).sort().join(',')!=='draftId,quoteHash,schema,telefono,webOrderId'||
+    !Object.keys(x).every(k=>['draftId','quoteHash','schema','telefono','webOrderId','nombre','direccion'].includes(k))||
+    !['draftId','quoteHash','schema','telefono','webOrderId'].every(k=>Object.hasOwn(x,k))||
     x.schema!=='saber-central-r2-universal-create-order-v1'||
     !WEB.test(x.webOrderId||'')||!UUID.test(x.draftId||'')||
     !SHA.test(x.quoteHash||'')||
     typeof x.telefono!=='string'||!/^\+?[0-9 ()-]{10,26}$/.test(x.telefono)||
-    x.telefono.replace(/\D/g,'').length<10||x.telefono.replace(/\D/g,'').length>15)
+    x.telefono.replace(/\D/g,'').length<10||x.telefono.replace(/\D/g,'').length>15||
+    (x.nombre!==undefined&&(typeof x.nombre!=='string'||x.nombre.trim().length<2||x.nombre.trim().length>100||/[<>]/.test(x.nombre)))||
+    (x.direccion!==undefined&&(typeof x.direccion!=='string'||x.direccion.trim().length>180||/[<>]/.test(x.direccion))))
   throw Error('UNIVERSAL_PROMOCION_IDENTIDAD_INVALIDA');
  return x;
 }
@@ -124,11 +127,13 @@ export async function promoverPedidoUniversalD1(request,env,{
   armadosCount:armados.length,prepressPending:true,originalsReceived:false
  });
  await db.prepare(LINK_SQL).run();
+ if(p.nombre)await db.prepare("CREATE TABLE IF NOT EXISTS central_order_customer_details (order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE RESTRICT,name TEXT NOT NULL CHECK(length(name) BETWEEN 2 AND 100),address TEXT NOT NULL DEFAULT '' CHECK(length(address)<=180),created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
  const find=()=>db.prepare('SELECT commercial_order_id,quote_hash,amount_ars '+
   'FROM central_r2_universal_order_links WHERE web_order_id=?').bind(p.webOrderId).first();
  async function confirmed(link,idempotent){
   if(!link||link.quote_hash!==p.quoteHash||link.amount_ars!==total)return null;
   const id=link.commercial_order_id;
+  const details=p.nombre?await db.prepare('SELECT name,address FROM central_order_customer_details WHERE order_id=?').bind(id).first():null;
   const [order,line,count,number,contact]=await Promise.all([
    db.prepare('SELECT status,amount_ars,deposit_ars FROM orders WHERE id=?').bind(id).first(),
    db.prepare('SELECT sku,quantity,line_total_ars,detail_json,file_references_json '+
@@ -142,6 +147,7 @@ export async function promoverPedidoUniversalD1(request,env,{
      line.quantity!==1||line.line_total_ars!==total||
      line.detail_json!==detail||line.file_references_json!==JSON.stringify(ids)||
      count?.total!==1||contact?.phone!==p.telefono||
+     (p.nombre&&(details?.name!==p.nombre.trim()||details?.address!==(p.direccion||'').trim()))||
      !Number.isSafeInteger(number?.number)||number.number<1)
    return null;
   return response({ok:true,webOrderId:p.webOrderId,commercialOrderId:id,
@@ -156,7 +162,7 @@ export async function promoverPedidoUniversalD1(request,env,{
  const id=uuid();
  if(!UUID.test(id))return response({ok:false,error:'UNIVERSAL_PROMOCION_UUID'},503);
  try{
-  const result=await db.batch([
+  const requests=[
    db.prepare('INSERT INTO orders(id,description,amount_ars,deposit_ars) VALUES(?,?,?,?)')
     .bind(id,'Librería Saber · PDFs TUS/R2 pendientes de originales',total,total),
    db.prepare('INSERT INTO order_items(order_id,line_number,item_type,sku,title,quantity,'+
@@ -169,8 +175,10 @@ export async function promoverPedidoUniversalD1(request,env,{
     .bind(p.webOrderId,id,p.quoteHash,total),
    db.prepare('INSERT INTO central_work_order_numbers(commercial_order_id) VALUES(?)').bind(id),
    db.prepare('INSERT INTO central_order_contacts(order_id,phone) VALUES(?,?)').bind(id,p.telefono)
-  ]);
-  if(result?.length!==5||result.some(x=>x?.meta?.changes!==1))
+  ];
+  if(p.nombre)requests.push(db.prepare('INSERT INTO central_order_customer_details(order_id,name,address) VALUES(?,?,?)').bind(id,p.nombre.trim(),(p.direccion||'').trim()));
+  const result=await db.batch(requests);
+  if(result?.length!==requests.length||result.some(x=>x?.meta?.changes!==1))
    return response({ok:false,error:'UNIVERSAL_PROMOCION_TRANSACCION_NO_CONFIRMADA'},503);
  }catch{
   return await confirmed(await find().catch(()=>null),true)||
