@@ -1,3 +1,5 @@
+> **CONTINUIDAD VIGENTE 11/11/2026 (LIVE y R2):** leer primero `docs/ESTADO-COTIZADOR-LIVE-20261111.md`. Cambios de interfaz LIVE desplegados en Worker de producción con rollback (Actions 43119086294 SUCCESS), inspección R2 preparada y clave instalada; cobro R2 grande permanece NO_GO. No repetir las pruebas ya aprobadas, no tocar `main` ni afirmar publicación comercial completa.
+
 # PROYECTO INTEGRAL NUEVA WEB — PROMPT BASE PERMANENTE
 
 **Uso:** copiar este texto al comienzo de cualquier nuevo chat relacionado con Librería Saber. No es una lista de tareas nuevas, sino un procedimiento que debe repetirse en **todos** los chats.
