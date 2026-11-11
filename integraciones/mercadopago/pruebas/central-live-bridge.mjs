@@ -73,10 +73,13 @@ export async function leerFirmaInternaLive(request,env,{
   tusGate?'action,bytes,fileId,name,orderId,pages,schema,sha256':
   tusReceipt?'bytes,fileId,metrics,name,objectName,orderId,pages,receiptId,schema,sha256':
   draftRoute?'archivos,armados,estado,pagoAutorizado,priceRevision,produccionAutorizada,quoteHash,schema,subidaAutorizada,totalArs,webOrderId':
-  (pricingRoute||sellerDiag)?'purpose,schema':orderRoute?'draftId,quoteHash,schema,telefono,webOrderId':
+  (pricingRoute||sellerDiag)?'purpose,schema':orderRoute?null:
   'commercialOrderId,schema,webOrderId';
  if(!payload||typeof payload!=='object'||Array.isArray(payload)||
-    Object.keys(payload).sort().join(',')!==keys||
+    (orderRoute?
+      (!Object.keys(payload).every(k=>['draftId','quoteHash','schema','telefono','webOrderId','nombre','direccion'].includes(k))||
+       !['draftId','quoteHash','schema','telefono','webOrderId'].every(k=>Object.hasOwn(payload,k))):
+      Object.keys(payload).sort().join(',')!==keys)||
     payload.schema!==expectedSchema||
     (packageManifest?!WEB.test(payload.webOrderId||''):
      packageFile?(!WEB.test(payload.webOrderId||'')||
@@ -147,7 +150,12 @@ export async function leerFirmaInternaLive(request,env,{
       typeof payload.telefono!=='string'||
       !/^\+?[0-9 ()-]{10,26}$/.test(payload.telefono)||
       payload.telefono.replace(/\D/g,'').length<10||
-      payload.telefono.replace(/\D/g,'').length>15:
+      payload.telefono.replace(/\D/g,'').length>15||
+      (payload.nombre!==undefined&&(typeof payload.nombre!=='string'||
+       payload.nombre.trim().length<2||payload.nombre.trim().length>100||/[<>]/.test(payload.nombre)))||
+      (payload.direccion!==undefined&&(typeof payload.direccion!=='string'||
+       payload.direccion.trim().length>180||/[<>]/.test(payload.direccion)||
+       payload.nombre===undefined)):
       !UUID.test(payload.commercialOrderId||''))||
     (!pricingRoute&&!sellerDiag&&!tusGate&&!tusReceipt&&!r2Gate&&!r2Reserve&&!r2Stage&&!r2Recover&&!WEB.test(payload.webOrderId||'')))
    return {error:'Orden LIVE inválida',status:422};
