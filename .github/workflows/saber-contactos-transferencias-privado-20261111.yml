@@ -43,9 +43,10 @@ jobs:
         env:
           ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
           TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+          PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
         run: |
           set -euo pipefail
-          test -n "$ACCOUNT" && test -n "$TOKEN"
+          test -n "$ACCOUNT" && test -n "$TOKEN" && test -n "$PASSWORD"
           tmp=$(mktemp -d)
           chmod 700 "$tmp"
           auth="Authorization: Bearer $TOKEN"
@@ -128,12 +129,14 @@ jobs:
           for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
             c=$(curl -sS --max-time 25 -o "$tmp/admin.html" -w '%{http_code}' "$origin_central/admin" || true)
             b=$(curl -sS --max-time 25 -o "$tmp/buyer.html" -w '%{http_code}' "$origin_docs/prueba-v2/pedido-cliente" || true)
-            mc=0; mn=0; md=0
+            st=$(curl -sS --max-time 25 --user "operador:$PASSWORD" -o "$tmp/staff.html" -w '%{http_code}' "$origin_docs/prueba-v2/" || true)
+            mc=0; mn=0; md=0; gate=0
             grep -Fq 'id="centralExtraTools"' "$tmp/admin.html" && mc=1 || true
-            grep -Fq 'id="cliente-nombre"' "$tmp/buyer.html" && mn=1 || true
-            grep -Fq 'id="cliente-direccion"' "$tmp/buyer.html" && md=1 || true
-            echo "CONTACTOS_HTML_PROBE attempt=$i central_http=$c buyer_http=$b central_marker=$mc name_marker=$mn address_marker=$md central_bytes=$(wc -c < "$tmp/admin.html") buyer_bytes=$(wc -c < "$tmp/buyer.html")"
-            if [ "$c" = 200 ] && [ "$b" = 200 ] && [ "$mc" = 1 ] && [ "$mn" = 1 ] && [ "$md" = 1 ]; then passed=1; break; fi
+            grep -Fq 'id="cliente-nombre"' "$tmp/staff.html" && mn=1 || true
+            grep -Fq 'id="cliente-direccion"' "$tmp/staff.html" && md=1 || true
+            grep -Fq 'cf-turnstile' "$tmp/buyer.html" && gate=1 || true
+            echo "CONTACTOS_HTML_PROBE attempt=$i central_http=$c buyer_http=$b staff_http=$st central_marker=$mc name_marker=$mn address_marker=$md buyer_turnstile_gate=$gate"
+            if [ "$c" = 200 ] && [ "$b" = 200 ] && [ "$st" = 200 ] && [ "$mc" = 1 ] && [ "$mn" = 1 ] && [ "$md" = 1 ] && [ "$gate" = 1 ]; then passed=1; break; fi
             sleep 2
           done
           test "$passed" = 1 || { echo 'CONTACTOS_HTML_MISSING_ROLLBACK'; exit 1; }
