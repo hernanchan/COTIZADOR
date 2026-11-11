@@ -1,0 +1,40 @@
+name: Saber - diagnostico ruta /cotizar LIVE sin cambios
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-cotizar-debug-20261111.yml]
+permissions: {contents: read}
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+    steps:
+      - name: Estado HTTP y entorno sin secretos
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          const root='https://api.cloudflare.com/client/v4/accounts/'+process.env.ACCOUNT;
+          const res=await fetch(root+'/workers/scripts/saber-documentos-produccion/settings',{
+            headers:{Authorization:'Bearer '+process.env.TOKEN},
+            signal:AbortSignal.timeout(15000)});
+          const json=await res.json();
+          if(!res.ok||json.success!==true)throw Error('CLOUDFLARE_SETTINGS_UNAVAILABLE');
+          const bindings=json.result?.bindings||[];
+          for(const name of ['SABER_ENTORNO','CENTRAL_DB_ENV','DOCS_LIVE_UI_GATE','DOCS_MP_LIVE_GATE','DOCS_LIVE_SESSION_GATE']){
+            const b=bindings.find(x=>x.name===name);
+            console.log('DIAG_'+name+'='+(b?.type==='plain_text'?b.text:b?'REDACTED':'ABSENT'));
+          }
+          for(const url of ['https://pedidos.libreriasaber.com.ar/cotizar',
+                            'https://pedidos.libreriasaber.com.ar/pedido/estado']){
+            const r=await fetch(url,{redirect:'manual',signal:AbortSignal.timeout(20000)});
+            const body=await r.text();
+            console.log('DIAG_URL='+new URL(url).pathname+' STATUS='+r.status+
+              ' TYPE='+r.headers.get('content-type')+
+              ' LOCATION='+((r.headers.get('location')||'').startsWith('/')?r.headers.get('location'):'none')+
+              ' BODY='+body.replace(/\s+/g,' ').slice(0,220));
+          }
+          NODE
