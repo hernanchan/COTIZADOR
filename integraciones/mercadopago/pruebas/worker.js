@@ -3325,8 +3325,6 @@ try{operatorInput.value=sessionStorage.getItem("saberProductionOperator")||""}ca
 operatorInput.addEventListener("change",()=>{
  try{sessionStorage.setItem("saberProductionOperator",operatorInput.value.trim())}catch(_){}
 });
-setInterval(()=>refreshLiveTransfers(),30000);
-refreshLiveTransfers();
 const liveRecepcionStatus=document.querySelector("#liveRecepcionStatus");
 const liveRecepcionList=document.querySelector("#liveRecepcionList");
 const liveRecepcionButton=document.querySelector("#refreshLiveRecepcion");
@@ -3989,6 +3987,8 @@ async function refreshLiveTransfers(){
   area.hidden=true;list.replaceChildren();
  }finally{liveTransferRefreshing=false}
 }
+setInterval(()=>refreshLiveTransfers(),30000);
+refreshLiveTransfers();
 
 document.querySelector("#refreshUnpaid").addEventListener("click",async()=>{
  const list=document.querySelector("#unpaidDocs");
