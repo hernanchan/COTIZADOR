@@ -14,12 +14,12 @@ import {decidirTransportePDF,LIMITE_TUS_PDF_BYTES,LIMITE_R2_PDF_BYTES} from './s
 import {normalizarArchivosImpresion} from './imagenes-a-pdf-local.mjs';
 const $=id=>document.getElementById(id);
 const entries=[];
-let modoLote=null; // El usuario elige antes de cargar: común o individual.
+let modoLote='individual'; // Predeterminado móvil: la carga está siempre disponible.
 const configuracionComun={}; // Opciones comunes persistentes para nuevos PDF compatibles.
 function actualizarModoLote(){
- const zona=$('zonaArchivos');if(zona)zona.hidden=!modoLote;
+ const zona=$('zonaArchivos');if(zona)zona.hidden=false;
  const aviso=$('modoAviso');if(aviso)aviso.textContent=modoLote==='comun'?'Configuración común: las medidas y las páginas se revisan para cada PDF.':modoLote==='individual'?'Cada archivo conserva sus propias opciones, dentro del mismo pedido.':'Elegí una opción antes de subir archivos.';
- const campo=$('archivos');if(campo)campo.disabled=!modoLote;
+ const campo=$('archivos');if(campo)campo.disabled=false;
 }
 
 const UNIVERSAL_COMPRADOR_LIVE=location.pathname==='/cotizar/archivos'&&window.parent!==window;
