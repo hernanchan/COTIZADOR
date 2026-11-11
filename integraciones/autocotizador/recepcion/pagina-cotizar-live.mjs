@@ -69,6 +69,7 @@ window.saberIngresoLive=async token=>{
 <label for="direccion">Dirección (opcional si retirás en el local)</label>
 <input id="direccion" autocomplete="street-address" maxlength="180" placeholder="Calle y número">
 <p id="precio" aria-live="polite">Precio pendiente</p>
+<p id="plazo-orientativo" role="status" aria-live="polite">Plazo máximo orientativo de preparación: consultando la previsión de la Central…</p>
 <p id="estado" role="status" aria-live="polite">Seleccioná tus archivos para comenzar.</p>
 <button type="button" id="continuar" disabled>${enabled?'Confirmar presupuesto':'Recepción de pedidos temporalmente desactivada'}</button>
 <p><small>La confirmación de pago se verifica en Librería Saber. No se envía ningún original por cotizar.</small></p>
@@ -81,6 +82,19 @@ const nombreCliente=document.getElementById('nombre');
 const direccionCliente=document.getElementById('direccion');
 const status=document.getElementById('estado');
 const price=document.getElementById('precio');
+const plazo=document.getElementById('plazo-orientativo');
+(async()=>{
+ try{
+  const r=await fetch('/api/pedido/plazo',{method:'GET',cache:'no-store'});
+  const p=await r.json();
+  if(!r.ok||p?.ok!==true||p.guaranteed!==false||
+    typeof p.label!=='string'||typeof p.notice!=='string')
+   throw Error('No hay previsión disponible');
+  plazo.textContent=p.heading+': '+p.label+'. '+p.notice;
+ }catch{
+  plazo.textContent='Plazo máximo orientativo: a confirmar con Librería Saber. Antes del pago informamos el plazo esperado; una vez iniciado el trabajo indicaremos una hora más precisa.';
+ }
+})();
 const action=document.getElementById('continuar');
 const iframe=document.getElementById('pdf');
 const enabled=${enabled},bankEnabled=${bankEnabled};
