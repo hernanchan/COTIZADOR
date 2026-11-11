@@ -136,7 +136,7 @@ test('el módulo JavaScript comercial generado compila con teléfonos argentinos
  const html=await res.text();
  const match=html.match(/<script type="module" nonce="[a-f0-9]{32}">([\s\S]*?)<\/script>/);
  assert.ok(match,'Falta script comprador');
- const body=match[1].replace(/^import .*?;\s*/,'');
+ const body=match[1].replace(/^\s*import[\s\S]*?;\s*/,'');
  assert.doesNotThrow(()=>new Function(body),'La pantalla tiene JS inválido y no responde a controles');
  assert.match(body,/\/\^\\\+\?\[0-9 \(\)-\]\{10,26\}\$\//);
  assert.match(body,/replace\(\/\\D\/g/);
