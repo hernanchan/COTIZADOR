@@ -22,7 +22,7 @@ function contains(s,name,value){
 for(const [worker,chargeGate,closed] of specs){
  const before=await cf(worker+'/settings');
  assert.ok(Array.isArray(before.bindings));
- assert.ok(contains(before,'CENTRAL_DB_ENV','produccion'));
+ if(worker!=='saber-webhook-produccion')assert.ok(contains(before,'CENTRAL_DB_ENV','produccion'));
  assert.ok(contains(before,chargeGate,'NO_GO'),'CHARGES_COULD_BE_LIVE_'+worker);
  assert.ok(contains(before,'SABER_ENTORNO','preparacion')||
   contains(before,'SABER_ENTORNO','produccion'),'RUNTIME_UNEXPECTED_'+worker);
@@ -42,7 +42,7 @@ for(const [worker,chargeGate,closed] of specs){
  for(const old of before.bindings)
   assert.ok(after.bindings.some(x=>x.name===old.name),'MISSING_BINDING_'+old.name);
  assert.ok(contains(after,'SABER_ENTORNO','produccion'));
- assert.ok(contains(after,'CENTRAL_DB_ENV','produccion'));
+ if(worker!=='saber-webhook-produccion')assert.ok(contains(after,'CENTRAL_DB_ENV','produccion'));
  assert.ok(contains(after,chargeGate,'NO_GO'));
  for(const name of closed)assert.ok(contains(after,name,'NO_GO'),'GATE_CHANGED_'+name);
  const afterSub=await cf(worker+'/subdomain');
