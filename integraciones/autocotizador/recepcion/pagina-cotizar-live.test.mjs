@@ -104,3 +104,14 @@ test('cotizador comercial prioriza precio, carga PDF JPG PNG y después identifi
  assert.match(html,/id="promo-dia"/);
  assert.match(html,/id="plazo-orientativo"/);
 });
+
+test('abrir enlace del cotizador con parámetros de origen no provoca 404',async()=>{
+ for(const suffix of ['?utm_source=chatgpt.com','?utm_medium=referral','?ref=whatsapp']){
+  const res=paginaCotizarLive(new Request(url+suffix),env,{authorized:false});
+  assert.equal(res.status,200,'URL con parámetro '+suffix+' bloqueada');
+  const html=await res.text();
+  assert.match(html,/Cotizá tus impresiones y ploteos/);
+  assert.match(html,/saber_pedido_live/);
+  assert.doesNotMatch(html,/utm_source|utm_medium|ref=whatsapp/i);
+ }
+});
