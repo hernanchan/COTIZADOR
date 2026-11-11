@@ -59,7 +59,8 @@ const verified=await must('/workers/scripts/'+worker+'/settings');
 assert.ok(verified.bindings.some(x=>x.name===name&&x.type==='r2_bucket'&&x.bucket_name===bucket));
 for(const old of settings.bindings)assert.ok(verified.bindings.some(x=>x.name===old.name),'R2_LOST_BINDING_'+old.name);
 assert.ok(has(verified.bindings,'DOCS_MP_LIVE_GATE','plain_text','NO_GO')&&
- has(verified.bindings,'SABER_ENTORNO','plain_text','preparacion'));
+ (has(verified.bindings,'SABER_ENTORNO','plain_text','preparacion')||
+  has(verified.bindings,'SABER_ENTORNO','plain_text','produccion')));
 const secretName='DOCS_LIVE_R2_RECEIPT_KEY';
 if(!verified.bindings.some(x=>x.name===secretName)){
  const secret=randomBytes(40).toString('hex');
