@@ -1,0 +1,122 @@
+name: Saber - alistamiento piloto real sin abrir cobros
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-piloto-real-preflight-20261111.yml]
+permissions: {contents: read, statuses: write}
+jobs:
+  confirmar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    steps:
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Comprobar dependencias reales del piloto comercial sin ejecutar cargos
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          assert.match(process.env.ACCOUNT||'',/^[a-f0-9]{32}$/i);
+          const root='https://api.cloudflare.com/client/v4/accounts/'+process.env.ACCOUNT;
+          async function call(path){
+            const res=await fetch(root+path,{headers:{Authorization:'Bearer '+process.env.TOKEN},
+              signal:AbortSignal.timeout(22000)});
+            const json=await res.json().catch(()=>null);
+            assert.ok(res.ok&&json?.success,'CLOUDFLARE_READ_'+res.status);
+            return json.result;
+          }
+          const [docs,central,edge,domains]=await Promise.all([
+            call('/workers/scripts/saber-documentos-produccion/settings'),
+            call('/workers/scripts/saber-pagos-produccion/settings'),
+            call('/workers/scripts/saber-webhook-produccion/settings'),
+            call('/workers/domains')
+          ]);
+          const on='GO_COMERCIAL_CONFIRMADO',off='NO_GO';
+          const has=(w,k,t,v)=>w.bindings?.some(x=>x.name===k&&x.type===t&&
+            (v===undefined||x.text===v));
+          let ready=0;
+          function required(label,yes){
+            console.log((yes?'PILOT_READY ':'PILOT_BLOCKER ')+label);
+            if(yes)ready++;
+            else process.exitCode=1;
+          }
+          required('BUYER_ORIGIN',
+            domains.some(x=>x.hostname==='pedidos.libreriasaber.com.ar'&&
+              x.service==='saber-documentos-produccion'&&x.enabled===true));
+          required('MP_WEBHOOK_ORIGIN',
+            domains.some(x=>x.hostname==='pagos.libreriasaber.com.ar'&&
+              x.service==='saber-webhook-produccion'&&x.enabled===true));
+          required('DOCS_RUNTIME_PRODUCCION',has(docs,'SABER_ENTORNO','plain_text','produccion'));
+          required('CENTRAL_RUNTIME_PRODUCCION',has(central,'SABER_ENTORNO','plain_text','produccion'));
+          required('WEBHOOK_RUNTIME_PRODUCCION',has(edge,'SABER_ENTORNO','plain_text','produccion'));
+          required('DOCS_PREORDER_GATES_STAGED',[
+            'DOCS_LIVE_ORDER_GATE','DOCS_LIVE_RECEPCION_GATE','DOCS_LIVE_TUS_GATE',
+            'DOCS_LIVE_R2_GATE','DOCS_LIVE_R2_UPLOAD_GATE','DOCS_LIVE_R2_STAGING_GATE'
+           ].every(k=>has(docs,k,'plain_text',off)));
+          required('CENTRAL_PAYMENT_DEPENDENCIES_STAGED',[
+            'CENTRAL_LIVE_ORDER_GATE','CENTRAL_LIVE_TUS_GATE',
+            'CENTRAL_LIVE_POSTPAY_GATE','CENTRAL_LIVE_R2_GATE',
+            'CENTRAL_LIVE_R2_QUOTA_GATE','CENTRAL_LIVE_R2_STAGING_GATE'
+           ].every(k=>has(central,k,'plain_text',off)));
+          required('WEBHOOK_STAGED_CLOSED',has(edge,'WEBHOOK_EDGE_GATE','plain_text',off));
+          required('DOCS_LIVE_BUYER_UI',[
+            'DOCS_MP_LIVE_GATE','DOCS_LIVE_UI_GATE',
+            'DOCS_LIVE_SESSION_GATE','DOCS_LIVE_PRICING_GATE'
+           ].every(k=>has(docs,k,'plain_text',on)));
+          required('CENTRAL_LIVE_INTERNAL_PRICING',[
+            'MP_LIVE_GATE','CENTRAL_LIVE_BRIDGE_ENABLED','CENTRAL_LIVE_PRICING_GATE'
+           ].every(k=>has(central,k,'plain_text',on)));
+          required('STAFF_PACKAGE_READY',[
+            'DOCS_LIVE_STAFF_GATE','DOCS_LIVE_PACKAGE_GATE'
+           ].every(k=>has(docs,k,'plain_text',on))&&
+           has(central,'CENTRAL_LIVE_PACKAGE_GATE','plain_text',on)&&
+           has(docs,'DOCS_LIVE_STAFF_SECRET','secret_text'));
+          required('DOCS_LIVE_BRIDGE_KEY_SECRET',has(docs,'CENTRAL_BRIDGE_KEY','secret_text'));
+          required('CENTRAL_LIVE_BRIDGE_KEY_SECRET',has(central,'CENTRAL_BRIDGE_KEY','secret_text'));
+          required('DOCS_LIVE_CENTRAL_BINDING',docs.bindings.some(x=>
+            x.name==='SABER_CENTRAL'&&x.type==='service'&&x.service==='saber-pagos-produccion'));
+          required('DOCS_LIVE_CHECKOUT_CENTRAL_URL',has(docs,'CENTRAL_LIVE_URL',
+            'plain_text','https://pagos.libreriasaber.com.ar/internal/central/live/checkout'));
+          required('MP_LIVE_WEBHOOK_URL',has(central,'MP_LIVE_WEBHOOK_URL',
+            'plain_text','https://pagos.libreriasaber.com.ar/webhooks/mercadopago-live'));
+          required('MP_LIVE_RETURN_URL',has(central,'MP_LIVE_RETURN_URL',
+            'plain_text','https://pedidos.libreriasaber.com.ar/pedido/estado'));
+          required('MP_LIVE_PRIVATE_SELLER',[
+            'MP_LIVE_ACCESS_TOKEN','MP_LIVE_SELLER_ID','MP_LIVE_WEBHOOK_SECRET'
+           ].every(k=>central.bindings.some(x=>x.name===k&&
+             (x.type==='secret_text'||k==='MP_LIVE_SELLER_ID'&&x.type==='plain_text'))));
+          required('TURNSTILE_LIVE',has(docs,'DOCS_LIVE_TURNSTILE_SITE_KEY','plain_text')&&
+            has(docs,'DOCS_LIVE_TURNSTILE_SECRET','secret_text')&&
+            has(docs,'DOCS_LIVE_SESSION_KEY','secret_text'));
+          required('SUPABASE_LIVE_PRIVATE',has(docs,'DOCS_LIVE_TUS_PROJECT_URL','plain_text',
+            'https://sqjamuqiolwizzzzwxjy.storage.supabase.co/')&&
+            has(docs,'DOCS_LIVE_TUS_BUCKET','plain_text','saber-tus-produccion')&&
+            has(docs,'DOCS_LIVE_TUS_SERVICE_KEY','secret_text')&&
+            has(docs,'DOCS_LIVE_TUS_RECEIPT_KEY','secret_text')&&
+            has(docs,'DOCS_LIVE_TUS_PUBLISHABLE_KEY','plain_text'));
+          required('R2_LIVE_PRIVATE',docs.bindings.some(x=>
+            x.name==='SABER_R2_GRANDES_LIVE'&&x.type==='r2_bucket'&&
+            x.bucket_name==='saber-documentos-produccion-privado')&&
+            has(docs,'DOCS_LIVE_R2_RECEIPT_KEY','secret_text'));
+          console.log('SABER_PILOT_INFRA_READY_COUNT='+ready);
+          console.log('SABER_PILOT_PAYMENT_STILL_CLOSED=true');
+          console.log('SABER_PILOT_NO_MP_TRANSACTION_OR_D1_WRITE');
+          if(process.exitCode)throw Error('SABER_PILOT_PRECONDITIONS_INCOMPLETE');
+          NODE
+      - name: Publicar resultado de alistamiento
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          if [ "$RESULT" = success ];then state=success;else state=failure;fi
+          jq -n --arg state "$state" --arg context 'saber/live-pilot-preflight-no-charge' \
+            --arg description "Preflight live pilot, no MP charges: $RESULT" \
+            --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/status.json >/dev/null
