@@ -87,7 +87,8 @@ export async function registrarFichaUniversalD1(request,env,{
  if(typeof readSigned!=='function')return reply({ok:false,error:'UNIVERSAL_HMAC_OFF'},503);
  const signed=await readSigned(request,env);
  if(signed?.error)return reply({ok:false,error:'UNIVERSAL_FIRMA'},signed.status||401);
- let ficha;try{ficha=await verificarFichaUniversal(signed.payload,{subtle,allowTusOnly:live})}
+ let ficha;try{ficha=await verificarFichaUniversal(signed.payload,{subtle,
+  allowTusOnly:live||(sandbox&&signed.payload?.archivos?.some(f=>f.destino==='fotos'))})}
  catch{return reply({ok:false,error:'UNIVERSAL_FICHA_RECHAZADA'},422)}
  const db=env.DB;
  if(live){
