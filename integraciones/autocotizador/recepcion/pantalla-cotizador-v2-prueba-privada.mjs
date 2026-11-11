@@ -44,7 +44,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 #resumen-precio-entrega .resumen-aviso{display:block;grid-column:1 / -1;font-size:15px;line-height:1.45;color:#43566a;font-weight:500;margin:0;padding:10px 5px 0;border-top:1px solid #d9e6ef}
 #promocion-dia-resumen:not([hidden]){display:block;grid-column:1 / -1;font-size:15px;font-weight:650;margin:0;padding:5px;color:#76420b}
 @media(max-width:650px){#resumen-precio-entrega{grid-template-columns:1fr;gap:8px}#resumen-precio-entrega .resumen-aviso,#promocion-dia-resumen:not([hidden]){grid-column:1}}
-#acciones-pedido{position:sticky;top:0;z-index:30;background:#eaf3fa;border-bottom:2px solid #aecce5;padding:8px max(15px,calc((100vw - 1110px)/2));box-shadow:0 3px 9px #0a315812;display:flex;align-items:center;gap:12px;flex-wrap:wrap}#precio-smart{flex:1;font-size:16px;font-weight:750;color:#0a3158}#send-all-pdf{font-weight:750;background:#095985;white-space:nowrap;min-height:43px}#batch-progress{flex-basis:100%;margin:0;font-size:12px;line-height:1.2}#batch-progress.error-recepcion{background:#fee8e6;border-left:4px solid #b42318;border-radius:6px;color:#8f1d1d;padding:9px 12px;font-weight:750}#recepcion-avanzada>summary{font-size:13px!important;color:#536475}#seguridad-privada{max-width:1110px;margin:7px auto 0;padding:0 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}#seguridad-privada .cf-turnstile{margin:0} @media(max-width:600px){#acciones-pedido{padding:8px 12px}#send-all-pdf{width:100%}}
+#acciones-pedido{position:static;top:auto;z-index:auto;background:#eaf3fa;border-bottom:2px solid #aecce5;padding:8px max(15px,calc((100vw - 1110px)/2));box-shadow:0 3px 9px #0a315812;display:flex;align-items:center;gap:12px;flex-wrap:wrap}#precio-smart{flex:1;font-size:16px;font-weight:750;color:#0a3158}#send-all-pdf{font-weight:750;background:#095985;white-space:nowrap;min-height:43px}#batch-progress{flex-basis:100%;margin:0;font-size:12px;line-height:1.2}#batch-progress.error-recepcion{background:#fee8e6;border-left:4px solid #b42318;border-radius:6px;color:#8f1d1d;padding:9px 12px;font-weight:750}#recepcion-avanzada>summary{font-size:13px!important;color:#536475}#seguridad-privada{max-width:1110px;margin:7px auto 0;padding:0 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}#seguridad-privada .cf-turnstile{margin:0} @media(max-width:600px){#acciones-pedido{padding:8px 12px}#send-all-pdf{width:100%}}
 .cf-turnstile{margin:15px 0}
 #vista-estado-pedido{background:#fff;border-radius:12px;padding:24px;margin:12px 0;border:1px solid #bad2e7}
 #vista-estado-pedido strong{display:block;font-size:21px;margin-bottom:8px}
@@ -63,6 +63,27 @@ body.estado-envio #smart,body.estado-registro #smart{display:none}
 @media(max-width:840px){main{display:block}.panel{margin-bottom:14px}iframe{min-height:740px}}
 </style></head><body>
 <header><h1>LIBRERÍA SABER · Cotizador V2 en ensayo privado</h1><small style="color:#d5e3f0">${sandboxEnabled?'Solo pagos con usuarios de prueba; sin cobros reales ni publicación comercial.':'Sin cobros, sin órdenes de producción y sin publicación comercial.'}</small></header>
+<section id="r2-prepago-panel" hidden style="max-width:850px;margin:12px auto;padding:18px;background:white;border:1px solid #bed5e7;border-radius:12px" role="status" aria-live="polite">
+<h2 style="font-size:18px;margin:0 0 8px">Ploteo grande · pago antes de enviar</h2>
+<p id="r2-prepago-mensaje">El PDF sigue en tu dispositivo. No enviamos nada a R2 mientras el pago esté pendiente.</p>
+<p id="r2-prepago-total" style="font-size:20px;font-weight:700"></p>
+<button type="button" id="r2-prepago-pagar" hidden>Pagar con Mercado Pago (prueba)</button>
+<a id="r2-prepago-link" hidden target="_blank" rel="noopener noreferrer">Abrir Mercado Pago de prueba</a>
+<button type="button" id="r2-prepago-reintentar" hidden>Reintentar envío del PDF pagado</button>
+<div id="r2-prepago-recuperacion" hidden>
+<label for="r2-prepago-recuperar-file">Para continuar tu pedido, seleccioná el mismo PDF original.</label>
+<input id="r2-prepago-recuperar-file" type="file" accept=".pdf,application/pdf">
+</div>
+</section>
+<section role="alert" class="warning" style="margin:12px auto;max-width:1110px" ${tusBloqueado?'':'hidden'}>Supabase/TUS no está operativo. El envío está BLOQUEADO para evitar volver a Google Drive. Revisar: ${fallas.join(', ')||'configuración privada'}. No vuelvas a subir PDF todavía.</section>
+<div id="seguridad-privada"><small>Verificación de seguridad para el envío:</small><div class="cf-turnstile" data-sitekey="${sitekey}" data-action="documentos"></div></div>
+<div style="max-width:1140px;margin:18px auto 0;padding:0 14px">
+<section style="padding:8px 3px 4px"><h2 style="margin:0 0 5px;font-size:22px;color:#123852">Cargá tus archivos una sola vez</h2><p style="margin:0;color:#52677a">Elegí PDF, JPG o PNG desde tu dispositivo. Revisá el presupuesto, las promociones y la entrega antes de completar tus datos y enviar el pedido.</p></section></div>
+<main><section class="panel" style="padding:0;border:0;background:transparent">
+<section id="vista-estado-pedido" hidden role="status" aria-live="polite"></section>
+<output id="rendimiento-privado" hidden style="display:block;margin:8px 0;padding:11px 14px;background:#f9fcff;border:1px solid #cbd5e1;border-radius:10px;font-size:13px;white-space:pre-wrap" aria-label="Tiempos del ensayo"></output>
+<iframe id="smart" title="Análisis automático de PDF, tamaños, CAD y póster" src="/prueba-v2/carga-inteligente${universalEnabled?'?universal=1':r2PrepayEnabled?'?r2Prepago=1':''}" loading="eager"></iframe>
+</section>
 <div id="acciones-pedido"><div id="resumen-precio-entrega" aria-label="Resumen del precio y la fecha de entrega">
 <div><span class="resumen-titulo">TU PRECIO A PAGAR</span><div id="precio-smart" role="status" aria-live="polite">Pendiente de cotización</div></div>
 <div><span class="resumen-titulo">FECHA MÁXIMA ESTIMADA DE ENTREGA</span><p id="plazo-produccion-orientativo" role="status" aria-live="polite">Consultando…</p></div>
@@ -80,27 +101,7 @@ body.estado-envio #smart,body.estado-registro #smart{display:none}
 <p id="cliente-telefono-error" class="contacto-error" role="alert" aria-live="polite"></p>
 <p id="cliente-direccion-error" class="contacto-error" role="alert" aria-live="polite"></p>
 <p id="batch-progress" class="state" role="status" aria-live="polite">Cargá tus PDF y revisá las opciones.</p></div>
-<section id="r2-prepago-panel" hidden style="max-width:850px;margin:12px auto;padding:18px;background:white;border:1px solid #bed5e7;border-radius:12px" role="status" aria-live="polite">
-<h2 style="font-size:18px;margin:0 0 8px">Ploteo grande · pago antes de enviar</h2>
-<p id="r2-prepago-mensaje">El PDF sigue en tu dispositivo. No enviamos nada a R2 mientras el pago esté pendiente.</p>
-<p id="r2-prepago-total" style="font-size:20px;font-weight:700"></p>
-<button type="button" id="r2-prepago-pagar" hidden>Pagar con Mercado Pago (prueba)</button>
-<a id="r2-prepago-link" hidden target="_blank" rel="noopener noreferrer">Abrir Mercado Pago de prueba</a>
-<button type="button" id="r2-prepago-reintentar" hidden>Reintentar envío del PDF pagado</button>
-<div id="r2-prepago-recuperacion" hidden>
-<label for="r2-prepago-recuperar-file">Para continuar tu pedido, seleccioná el mismo PDF original.</label>
-<input id="r2-prepago-recuperar-file" type="file" accept=".pdf,application/pdf">
-</div>
-</section>
-<section role="alert" class="warning" style="margin:12px auto;max-width:1110px" ${tusBloqueado?'':'hidden'}>Supabase/TUS no está operativo. El envío está BLOQUEADO para evitar volver a Google Drive. Revisar: ${fallas.join(', ')||'configuración privada'}. No vuelvas a subir PDF todavía.</section>
-<div id="seguridad-privada"><small>Verificación de seguridad para el envío:</small><div class="cf-turnstile" data-sitekey="${sitekey}" data-action="documentos"></div></div>
-<div style="max-width:1140px;margin:18px auto 0;padding:0 14px">
-<section style="padding:8px 3px 4px"><h2 style="margin:0 0 5px;font-size:22px;color:#123852">Cargá tus archivos una sola vez</h2><p style="margin:0;color:#52677a">Arrastrá todos los PDF juntos. La web reconoce tamaños y ploteos automáticamente. Revisá el precio y pulsá «Enviar mi pedido» una sola vez.</p></section></div>
-<main><section class="panel" style="padding:0;border:0;background:transparent">
-<section id="vista-estado-pedido" hidden role="status" aria-live="polite"></section>
-<output id="rendimiento-privado" hidden style="display:block;margin:8px 0;padding:11px 14px;background:#f9fcff;border:1px solid #cbd5e1;border-radius:10px;font-size:13px;white-space:pre-wrap" aria-label="Tiempos del ensayo"></output>
-<iframe id="smart" title="Análisis automático de PDF, tamaños, CAD y póster" src="/prueba-v2/carga-inteligente${universalEnabled?'?universal=1':r2PrepayEnabled?'?r2Prepago=1':''}" loading="eager"></iframe>
-</section>
+
 <details id="recepcion-avanzada" class="panel" style="margin-top:14px"><summary style="font-size:16px;font-weight:700;cursor:pointer;padding:5px 0">Detalles de la recepción y verificación (ensayo privado)</summary><div style="padding-top:12px">
 <div class="warning">Los archivos se reciben de forma privada, se comprueba su integridad y se revisan antes de iniciar la producción.</div>
 <div id="drop-pdf" style="display:none"><strong>Recuperación manual de PDF para trabajos antiguos</strong><input id="batch-files" type="file" accept=".pdf,application/pdf" multiple><p id="batch-status" class="state" role="status">Los PDF se asignan por nombre y tamaño al trabajo correspondiente. La recepción sigue protegida.</p></div>
