@@ -89,7 +89,12 @@ if(documents){
  checked('DOCS_LIVE_SUPABASE_SERVICE_KEY',n.has('DOCS_LIVE_TUS_SERVICE_KEY'));
  checked('DOCS_LIVE_R2_BUCKET',binds(documents).some(x=>x.name==='SABER_R2_GRANDES_LIVE'&&x.type==='r2_bucket'));
  checked('DOCS_LIVE_TURNSTILE',n.has('DOCS_LIVE_TURNSTILE_SECRET')||n.has('DOCS_TURNSTILE_SECRET'));
- checked('DOCS_LIVE_BUYER_SESSION',n.has('DOCS_LIVE_BUYER_SECRET')||n.has('DOCS_BUYER_SESSION_SECRET'));
+ checked('DOCS_LIVE_BUYER_SESSION',has(documents,'DOCS_LIVE_SESSION_KEY','secret_text'));
+ checked('DOCS_LIVE_TURNSTILE_SITE',has(documents,'DOCS_LIVE_TURNSTILE_SITE_KEY','plain_text'));
+ checked('DOCS_LIVE_TURNSTILE_SECRET',has(documents,'DOCS_LIVE_TURNSTILE_SECRET','secret_text'));
+ checked('DOCS_LIVE_TUS_PUBLISHABLE_KEY',has(documents,'DOCS_LIVE_TUS_PUBLISHABLE_KEY','plain_text'));
+ checked('DOCS_LIVE_TUS_RECEIPT_KEY',has(documents,'DOCS_LIVE_TUS_RECEIPT_KEY','secret_text'));
+ checked('DOCS_LIVE_R2_RECEIPT_KEY',has(documents,'DOCS_LIVE_R2_RECEIPT_KEY','secret_text'));
 }
 if(webhook)checked('WEBHOOK_SERVICE_CENTRAL',binds(webhook).some(x=>x.name==='SABER_CENTRAL_LIVE'&&x.type==='service'&&x.service==='saber-pagos-produccion'));
 if(domains){
