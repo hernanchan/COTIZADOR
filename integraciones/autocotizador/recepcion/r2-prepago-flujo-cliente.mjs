@@ -27,7 +27,7 @@ async function postJson(fetcher,route,body){
  return payload;
 }
 export function crearFlujoR2PagoAntesDeCarga({
- file,archivos,webOrderId,fetcher=fetch,
+ file,archivos,webOrderId,nombre,telefono,direccion,fetcher=fetch,
  uploader=enviarArchivoR2Grande,
  hasher=sha256PdfLocalPorFragmentos,
  onProgress=()=>{},onState=()=>{},
@@ -46,6 +46,12 @@ export function crearFlujoR2PagoAntesDeCarga({
   typeof hasher!=='function'||typeof onProgress!=='function'||
   typeof onState!=='function')
   throw Error('PREPAGO_PLOTEO_GRANDE_NO_VALIDO');
+ if(nombre!==undefined&&(typeof nombre!=='string'||nombre.trim().length<2||nombre.trim().length>100||/[<>]/.test(nombre)))
+  throw Error('PREPAGO_NOMBRE_INVALIDO');
+ if(telefono!==undefined&&(typeof telefono!=='string'||!/^[+]?[0-9 ()-]{10,26}$/.test(telefono.trim())||telefono.replace(/\D/g,'').length<10||telefono.replace(/\D/g,'').length>15))
+  throw Error('PREPAGO_TELEFONO_INVALIDO');
+ if(direccion!==undefined&&(typeof direccion!=='string'||direccion.trim().length>180||/[<>]/.test(direccion)))
+  throw Error('PREPAGO_DIRECCION_INVALIDA');
  if(restaurarPago!==null&&(!restaurarPago||
     !/^[a-f0-9-]{36}$/i.test(restaurarPago.commercialOrderId||'')||
     !Number.isSafeInteger(restaurarPago.amountArs)||restaurarPago.amountArs<1||
@@ -94,7 +100,10 @@ export function crearFlujoR2PagoAntesDeCarga({
     throw Error('PREPAGO_SHA256_INVALIDO');
    transition('registrando_presupuesto');
    const saved=await postJson(fetcher,quotePath,{webOrderId,
-    fileId,bytes:file.size,sha256,archivos});
+    fileId,bytes:file.size,sha256,archivos,
+    ...(nombre!==undefined?{nombre:nombre.trim()}:{}),
+    ...(telefono!==undefined?{telefono:telefono.trim()}:{}),
+    ...(direccion!==undefined?{direccion:direccion.trim()}:{})});
    if(saved.webOrderId!==webOrderId||saved.filesUploaded!==false||
       saved.paymentAuthorized!==false||saved.uploadAuthorized!==false||
       saved.quoteState!=='PRELIMINAR_SIN_ARCHIVO'||
