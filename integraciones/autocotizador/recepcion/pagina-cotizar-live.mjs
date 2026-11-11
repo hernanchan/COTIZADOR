@@ -16,7 +16,14 @@ h1{font-size:25px;margin:0 0 10px}h2{font-size:18px;margin:0 0 10px}p{margin:9px
 label{font-weight:600}input{font:inherit;width:100%;max-width:330px;padding:12px;border:1px solid #aabcca;border-radius:9px;display:block;margin:8px 0 15px}
 button{font:inherit;border:0;background:#0c5688;color:white;border-radius:9px;padding:13px 17px;font-weight:700;cursor:pointer}
 button:disabled{opacity:.47;cursor:not-allowed}#estado{min-height:25px}small{color:#586c7e}
-#pdf{width:100%;min-height:850px;border:0}#precio{font-size:23px;color:#123e66}
+#pdf{width:100%;min-height:850px;border:0}
+#precio-entrega{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:15px 0}
+#precio-entrega>div{border:1px solid #c3d9ea;background:#f4f9fe;border-radius:12px;padding:16px}
+#precio-entrega strong{display:block;color:#23506f;font-size:15px}
+#precio-entrega #precio,#precio-entrega #plazo-orientativo{font-size:clamp(22px,2.4vw,28px);font-weight:850;line-height:1.25;overflow-wrap:anywhere}
+#plazo-explicacion{font-size:14px;color:#536579}
+#promo-dia{font-size:15px;font-weight:650;color:#69420b}
+@media(max-width:650px){#precio-entrega{grid-template-columns:1fr}}
 @media(max-width:700px){section{padding:15px}main{padding:0 9px}#pdf{min-height:1100px}}`;
 export function paginaCotizarLive(req,env,{authorized=false}={}){
  const u=new URL(req.url);
@@ -68,8 +75,12 @@ window.saberIngresoLive=async token=>{
 <input id="telefono" inputmode="tel" autocomplete="tel" maxlength="26" placeholder="351 555 5555" required>
 <label for="direccion">Dirección (opcional si retirás en el local)</label>
 <input id="direccion" autocomplete="street-address" maxlength="180" placeholder="Calle y número">
-<p id="precio" aria-live="polite">Precio pendiente</p>
-<p id="plazo-orientativo" role="status" aria-live="polite">Plazo máximo orientativo de preparación: consultando la previsión de la Central…</p>
+<div id="precio-entrega" aria-label="Precio y fecha de entrega">
+<div><strong>TU PRECIO A PAGAR</strong><p id="precio" aria-live="polite">Pendiente de cotización</p></div>
+<div><strong>FECHA MÁXIMA ESTIMADA DE ENTREGA</strong><p id="plazo-orientativo" role="status" aria-live="polite">Consultando…</p></div>
+</div>
+<p id="plazo-explicacion">Fecha orientativa desde la acreditación del pago, sujeta a disponibilidad, trabajo, horario y feriados. Al iniciar tu trabajo, en el seguimiento verás una fecha y hora más precisas.</p>
+<p id="promo-dia" hidden></p>
 <p id="estado" role="status" aria-live="polite">Seleccioná tus archivos para comenzar.</p>
 <button type="button" id="continuar" disabled>${enabled?'Confirmar presupuesto':'Recepción de pedidos temporalmente desactivada'}</button>
 <p><small>La confirmación de pago se verifica en Librería Saber. No se envía ningún original por cotizar.</small></p>
@@ -83,6 +94,11 @@ const direccionCliente=document.getElementById('direccion');
 const status=document.getElementById('estado');
 const price=document.getElementById('precio');
 const plazo=document.getElementById('plazo-orientativo');
+const promo=document.getElementById('promo-dia');
+const formatDate=s=>{
+ if(!/^20\\d{2}-\\d{2}-\\d{2}$/.test(s||''))return null;
+ const [year,month,day]=s.split('-');return day+'/'+month+'/'+year;
+};
 (async()=>{
  try{
   const r=await fetch('/api/pedido/plazo',{method:'GET',cache:'no-store'});
@@ -90,9 +106,18 @@ const plazo=document.getElementById('plazo-orientativo');
   if(!r.ok||p?.ok!==true||p.guaranteed!==false||
     typeof p.label!=='string'||typeof p.notice!=='string')
    throw Error('No hay previsión disponible');
-  plazo.textContent=p.heading+': '+p.label+'. '+p.notice;
+  plazo.textContent=formatDate(p.estimatedDeadlineDate)||'Fecha a confirmar';
+  plazo.setAttribute('title',p.label);
+  if(p.dayPromotion?.informationalOnly===true&&
+     p.dayPromotion?.appliedToQuote===false&&
+     typeof p.dayPromotion.title==='string'&&typeof p.dayPromotion.summary==='string'){
+   promo.hidden=false;promo.textContent='Promoción del día (informativa): '+
+    p.dayPromotion.title+' · '+p.dayPromotion.summary+
+    '. No descontada de este presupuesto.';
+  }else{promo.hidden=true;promo.textContent=''}
+
  }catch{
-  plazo.textContent='Plazo máximo orientativo: a confirmar con Librería Saber. Antes del pago informamos el plazo esperado; una vez iniciado el trabajo indicaremos una hora más precisa.';
+  plazo.textContent='Fecha a confirmar';
  }
 })();
 const action=document.getElementById('continuar');
