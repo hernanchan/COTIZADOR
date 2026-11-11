@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {webcrypto} from 'node:crypto';
 import {paginaContinuarPagoLive} from './pagina-continuar-pago-live.mjs';
 const url='https://pedidos.libreriasaber.com.ar/pedido/continuar';
 const env={SABER_ENTORNO:'produccion',DOCS_MP_LIVE_GATE:'GO_COMERCIAL_CONFIRMADO',
@@ -17,8 +16,6 @@ test('retomar no expone orden ajena, producción inactiva ni URL externa',()=>{
  }
 });
 test('pantalla para retomar mismo pedido nunca crea orden y verifica acreditacion primero',async()=>{
- const old=globalThis.crypto;globalThis.crypto=webcrypto;
- try{
   const res=paginaContinuarPagoLive(new Request(url),env,{authorized:true});
   assert.equal(res.status,200);
   const html=await res.text();
@@ -33,5 +30,4 @@ test('pantalla para retomar mismo pedido nunca crea orden y verifica acreditacio
   assert.ok(res.headers.get('Content-Security-Policy').includes("'nonce-"+nonce+"'"));
   assert.equal(res.headers.get('Cache-Control'),'no-store,private');
   assert.match(html,/No se va a generar otro pedido/);
- }finally{globalThis.crypto=old}
 });
