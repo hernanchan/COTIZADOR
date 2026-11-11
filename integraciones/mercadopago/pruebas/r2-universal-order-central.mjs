@@ -114,7 +114,7 @@ export async function promoverPedidoUniversalD1(request,env,{
    archivos:f,armados,pagoAutorizado:false,subidaAutorizada:false,
    produccionAutorizada:false,estado:'PRELIMINAR_SIN_ORIGINALES',
    quoteHash:d.quote_hash
-  },{subtle,allowTusOnly:live});
+  },{subtle,allowTusOnly:live||f.some(w=>w.destino==='fotos')});
  }catch{return response({ok:false,error:'UNIVERSAL_PROMOCION_FICHA_INVALIDA'},409)}
  // One aggregate positive line avoids zero-priced anillado work items;
  // individual detailed sheets remain in central_r2_universal_files.
