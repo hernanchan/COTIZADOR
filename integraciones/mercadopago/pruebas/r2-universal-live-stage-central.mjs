@@ -68,6 +68,20 @@ export async function registrarR2LivePendiente(request,env,{
     stagedForCentral:true,registeredInD1:false,productionAuthorized:false}):
     respond({ok:false,error:'LIVE_R2_STAGE_CONFLICTO'},409);
   }
+  // Usar el método bancario auditado o MP confirmado: no bloquear un R2
+  // legítimamente pagado por transferencia con la condición exclusiva de MP.
+  const bank=paid.method==='transferencia';
+  if(bank){
+   const table=await db.prepare("SELECT name FROM sqlite_master WHERE type='table' "+
+    "AND name='central_live_bank_accreditations'").first();
+   if(!table)return respond({ok:false,error:'LIVE_R2_STAGE_BANCO_SIN_AUDITORIA'},409);
+  }
+  const paymentCondition=bank?
+   'AND o.payment_id IS NULL AND o.preference_id IS NULL '+
+   'AND EXISTS (SELECT 1 FROM central_live_bank_accreditations a WHERE '+
+   'a.order_id=o.id AND a.amount_ars=o.amount_ars '+
+   'AND length(a.bank_reference)>=6 AND length(a.operator)>=2)':
+   'AND o.payment_id IS NOT NULL AND o.preference_id IS NOT NULL';
   const sql='INSERT INTO central_r2_large_pending '+
    '(receipt_id,web_order_id,file_id,object_key,sha256,etag,bytes,name,pages_claimed) '+
    'SELECT ?,?,?,?,?,?,?,?,? WHERE '+
@@ -79,7 +93,7 @@ export async function registrarR2LivePendiente(request,env,{
    'JOIN payment_reviews pr ON pr.order_id=o.id '+
    "WHERE l.web_order_id=? AND o.status='paid' AND o.paid_at IS NOT NULL "+
    "AND pr.state='verified' AND o.amount_ars=o.deposit_ars "+
-   'AND o.payment_id IS NOT NULL AND o.preference_id IS NOT NULL)';
+   paymentCondition+')';
   const write=await db.prepare(sql).bind(p.receiptId,p.orderId,p.fileId,
    p.objectKey,p.sha256,p.etag,p.bytes,p.name,p.pagesDeclaradas,
    p.objectKey,p.orderId,p.fileId,p.sha256,p.bytes,p.orderId).run();
