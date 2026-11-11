@@ -4,8 +4,9 @@
  * comprobante del cliente. Acreditación: operador privado + referencia bancaria
  * única verificada contra la cuenta de Librería Saber.
  *
- * Compatible exclusivamente con pedidos TUS (R2 LIVE continúa NO_GO).
- * No se habilita sin tres compuertas nuevas de valor GO_COMERCIAL_CONFIRMADO.
+ * TUS y R2 usan el mismo circuito de cobro; R2 solo se ofrece cuando
+ * sus compuertas de recepción, reserva y staging están habilitadas.
+ * La acreditación requiere confirmación bancaria del operador.
  */
 import {verificarPedidoUniversalCobrable} from './r2-universal-checkout-central.mjs';
 const GO='GO_COMERCIAL_CONFIRMADO',MIB=1048576;
@@ -25,6 +26,20 @@ const gate=(env,approval=false)=>env?.SABER_ENTORNO==='produccion'&&
  typeof env?.DB?.prepare==='function';
 const validAlias=env=>typeof env?.CENTRAL_LIVE_TRANSFER_ALIAS==='string'&&
  /^[A-Za-z0-9._-]{6,50}$/.test(env.CENTRAL_LIVE_TRANSFER_ALIAS);
+// La autoridad del transporte son las líneas D1; una declaración del cliente no
+// habilita pago de R2 si la infraestructura no puede recibir el archivo.
+export function transportesTransferenciaLiveHabilitados(rows,env){
+ if(!Array.isArray(rows)||rows.length<1||rows.length>10)return false;
+ const tus=rows.some(f=>f?.transport==='tus');
+ const r2=rows.some(f=>f?.transport==='r2');
+ if(!rows.every(f=>f&&Number.isSafeInteger(f.bytes)&&f.bytes>0&&
+   (f.transport==='tus'?f.bytes<=40*MIB:
+    f.transport==='r2'?f.bytes>40*MIB&&f.bytes<=200*MIB:false)))return false;
+ if(tus&&env?.CENTRAL_LIVE_TUS_GATE!==GO)return false;
+ return !r2||['CENTRAL_LIVE_R2_GATE','CENTRAL_LIVE_R2_QUOTA_GATE',
+  'CENTRAL_LIVE_R2_STAGING_GATE','CENTRAL_LIVE_POSTPAY_GATE']
+  .every(name=>env?.[name]===GO);
+}
 export async function ensureLiveBankTables(db){
  await db.prepare("CREATE TABLE IF NOT EXISTS central_live_transfer_requests (order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE RESTRICT,amount_ars INTEGER NOT NULL CHECK(amount_ars>0),state TEXT NOT NULL CHECK(state='awaiting_bank_verification'),created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
  await db.prepare("CREATE TABLE IF NOT EXISTS central_live_bank_accreditations (order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE RESTRICT,amount_ars INTEGER NOT NULL CHECK(amount_ars>0),operator TEXT NOT NULL,bank_reference TEXT NOT NULL UNIQUE,recorded_at TEXT NOT NULL DEFAULT(datetime('now')))").run();
@@ -57,8 +72,8 @@ export async function manejarTransferenciaLiveCentral(request,env,{readSigned,ve
  try{checked=await verifyOrder(env,p.commercialOrderId,{webOrderId:p.webOrderId})}
  catch{return respond({ok:false,error:'TRANSFER_LIVE_D1_NO_DISPONIBLE'},503)}
  if(!checked?.ok)return respond({ok:false,error:'TRANSFER_LIVE_FICHA_NO_CONCILIADA'},409);
- if(checked.rows?.some(f=>f.transport!=='tus'||f.bytes>40*MIB))
-  return respond({ok:false,error:'TRANSFER_LIVE_R2_PENDIENTE_VALIDACION'},409);
+ if(!transportesTransferenciaLiveHabilitados(checked.rows,env))
+  return respond({ok:false,error:'TRANSFER_LIVE_RECEPCION_NO_HABILITADA'},409);
  try{
   if(action==='start'){
    const order=checked.link;
@@ -165,7 +180,7 @@ export async function aprobarTransferenciaLiveCentral(request,env,{
    return respond({ok:false,error:'TRANSFER_LIVE_ORDEN_NO_APROBABLE'},409);
   const checked=await verifyOrder(env,order.id,{webOrderId:order.web_order_id});
   if(!checked?.ok||checked.amountArs!==p.amount_ars||
-     checked.rows?.some(f=>f.transport!=='tus'))
+     !transportesTransferenciaLiveHabilitados(checked.rows,env))
    return respond({ok:false,error:'TRANSFER_LIVE_FICHA_NO_CONCILIADA'},409);
   const [review,prior]=await Promise.all([
    env.DB.prepare('SELECT state FROM payment_reviews WHERE order_id=?').bind(order.id).first(),
