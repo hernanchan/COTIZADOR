@@ -1,0 +1,37 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {webcrypto} from 'node:crypto';
+import {paginaContinuarPagoLive} from './pagina-continuar-pago-live.mjs';
+const url='https://pedidos.libreriasaber.com.ar/pedido/continuar';
+const env={SABER_ENTORNO:'produccion',DOCS_MP_LIVE_GATE:'GO_COMERCIAL_CONFIRMADO',
+ DOCS_LIVE_SESSION_GATE:'GO_COMERCIAL_CONFIRMADO'};
+test('retomar no expone orden ajena, producción inactiva ni URL externa',()=>{
+ for(const [u,e,a] of [
+  [url,env,false],
+  [url,{...env,DOCS_MP_LIVE_GATE:'NO_GO'},true],
+  ['https://saber-documentos-pruebas.workers.dev/pedido/continuar',env,true],
+  [url+'?clave=123',env,true]
+ ]){
+  const r=paginaContinuarPagoLive(new Request(u),e,{authorized:a});
+  assert.ok([401,404].includes(r.status));
+ }
+});
+test('pantalla para retomar mismo pedido nunca crea orden y verifica acreditacion primero',async()=>{
+ const old=globalThis.crypto;globalThis.crypto=webcrypto;
+ try{
+  const res=paginaContinuarPagoLive(new Request(url),env,{authorized:true});
+  assert.equal(res.status,200);
+  const html=await res.text();
+  assert.match(html,/sessionStorage\.getItem\("saber-live-archivos-v1"\)/);
+  assert.match(html,/post\("status",saved\)/);
+  assert.match(html,/post\("start",order\)/);
+  assert.match(html,/sessionStorage\.setItem\("saber-live-pedido-v1"/);
+  assert.match(html,/\/pedido\/estado/);
+  assert.doesNotMatch(html,/\/api\/pedido\/live\/(borrador|orden)/);
+  const nonce=html.match(/<script nonce="([a-f0-9]{32})">/)?.[1];
+  assert.ok(nonce);
+  assert.ok(res.headers.get('Content-Security-Policy').includes("'nonce-"+nonce+"'"));
+  assert.equal(res.headers.get('Cache-Control'),'no-store,private');
+  assert.match(html,/No se va a generar otro pedido/);
+ }finally{globalThis.crypto=old}
+});
