@@ -7,6 +7,7 @@ const WEB=/^WEB-ENSAYO-[A-F0-9]{32}$/;
 const GATE='GO_COMERCIAL_CONFIRMADO';
 const routeSchema=new Map([
  ['/internal/central/live/checkout','saber-mp-live-checkout-v1'],
+ ['/internal/central/live/diag-seller','saber-mp-live-seller-diagnostic-v1'],
  ['/internal/central/live/status','saber-mp-live-status-v1'],
  ['/internal/central/live/order','saber-central-r2-universal-create-order-v1'],
  ['/internal/central/live/pricing','saber-price-snapshot-live-v1'],
@@ -62,6 +63,7 @@ export async function leerFirmaInternaLive(request,env,{
  let payload;try{payload=JSON.parse(raw)}catch{}
  const orderRoute=url.pathname==='/internal/central/live/order';
  const pricingRoute=url.pathname==='/internal/central/live/pricing';
+ const sellerDiag=url.pathname==='/internal/central/live/diag-seller';
  const keys=packageManifest?'schema,webOrderId':
   packageFile?'fileId,schema,webOrderId':
   r2Recover?'bytes,fileId,name,orderId,pages,schema,sha256':
@@ -71,7 +73,7 @@ export async function leerFirmaInternaLive(request,env,{
   tusGate?'action,bytes,fileId,name,orderId,pages,schema,sha256':
   tusReceipt?'bytes,fileId,metrics,name,objectName,orderId,pages,receiptId,schema,sha256':
   draftRoute?'archivos,armados,estado,pagoAutorizado,priceRevision,produccionAutorizada,quoteHash,schema,subidaAutorizada,totalArs,webOrderId':
-  pricingRoute?'purpose,schema':orderRoute?'draftId,quoteHash,schema,telefono,webOrderId':
+  (pricingRoute||sellerDiag)?'purpose,schema':orderRoute?'draftId,quoteHash,schema,telefono,webOrderId':
   'commercialOrderId,schema,webOrderId';
  if(!payload||typeof payload!=='object'||Array.isArray(payload)||
     Object.keys(payload).sort().join(',')!==keys||
