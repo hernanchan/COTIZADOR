@@ -60,8 +60,12 @@ window.saberIngresoLive=async token=>{
 <header><strong>Librería Saber · Impresiones y ploteos</strong></header>
 <main><section><h1>Prepará tus PDF</h1>
 <p>Elegí los archivos y sus opciones de impresión. Las medidas y el tipo de trabajo se calculan por el contenido del PDF, no por el nombre ni por su peso.</p>
-<label for="telefono">Teléfono de contacto (con código de área)</label>
-<input id="telefono" inputmode="tel" autocomplete="tel" placeholder="351 555 5555" required>
+<label for="nombre">Nombre y apellido o responsable *</label>
+<input id="nombre" autocomplete="name" maxlength="100" placeholder="Nombre de quien retira" required>
+<label for="telefono">Teléfono de contacto (con código de área) *</label>
+<input id="telefono" inputmode="tel" autocomplete="tel" maxlength="26" placeholder="351 555 5555" required>
+<label for="direccion">Dirección (opcional si retirás en el local)</label>
+<input id="direccion" autocomplete="street-address" maxlength="180" placeholder="Calle y número">
 <p id="precio" aria-live="polite">Precio pendiente</p>
 <p id="estado" role="status" aria-live="polite">Seleccioná tus archivos para comenzar.</p>
 <button type="button" id="continuar" disabled>${enabled?'Confirmar presupuesto':'Recepción de pedidos temporalmente desactivada'}</button>
@@ -71,6 +75,8 @@ window.saberIngresoLive=async token=>{
 </section></main><script type="module" nonce="${scriptNonce}">
 import {crearFlujoPresupuestoLive} from '/cotizar/flujo-live.js';
 const phone=document.getElementById('telefono');
+const nombreCliente=document.getElementById('nombre');
+const direccionCliente=document.getElementById('direccion');
 const status=document.getElementById('estado');
 const price=document.getElementById('precio');
 const action=document.getElementById('continuar');
@@ -102,6 +108,25 @@ window.addEventListener('message',event=>{
 });
 action.addEventListener('click',async()=>{
  if(!enabled||working)return;
+ const nombre=nombreCliente.value.trim();
+ const telefono=phone.value.trim();
+ const direccion=direccionCliente.value.trim();
+ if(nombre.length<2||nombre.length>100||/[<>]/.test(nombre)){
+  status.textContent='Ingresá el nombre y apellido o responsable del pedido.';
+  nombreCliente.focus();
+  return;
+ }
+ if(!/^\+?[0-9 ()-]{10,26}$/.test(telefono)||telefono.replace(/\D/g,'').length<10||
+    telefono.replace(/\D/g,'').length>15){
+  status.textContent='Ingresá un teléfono válido con código de área.';
+  phone.focus();
+  return;
+ }
+ if(direccion.length>180||/[<>]/.test(direccion)){
+  status.textContent='Corregí la dirección del pedido.';
+  direccionCliente.focus();
+  return;
+ }
  if(!pending){
   action.disabled=true;
   status.textContent='Verificando los PDF y opciones elegidas…';
@@ -111,7 +136,7 @@ action.addEventListener('click',async()=>{
  working=true;action.disabled=true;
  try{
   flow=crearFlujoPresupuestoLive({
-   ...pending,webOrderId:orderId(),telefono:phone.value.trim(),
+   ...pending,webOrderId:orderId(),telefono,nombre,direccion,
    onProgress:p=>{status.textContent='Identificando PDF '+p.index+' · '+(p.porcentaje||0)+' %';}
   });
   status.textContent='Validando precio y registrando orden…';
