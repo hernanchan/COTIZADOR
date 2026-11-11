@@ -100,6 +100,49 @@ test('no ofrecer transferencia a R2 >40 MiB aún cerrado',async()=>{
  assert.equal(res.status,409);
  assert.equal(f.sql.length,0);
 });
+test('R2 de producción no genera transferencia sin compuertas de cuota y staging',async()=>{
+ const large={...order,rows:[{transport:'r2',bytes:60*1048576}]};
+ for(const missing of ['CENTRAL_LIVE_R2_GATE','CENTRAL_LIVE_R2_QUOTA_GATE',
+  'CENTRAL_LIVE_R2_STAGING_GATE']){
+  const f=mockDb();
+  const gates={...base,CENTRAL_LIVE_R2_GATE:GO,
+   CENTRAL_LIVE_R2_QUOTA_GATE:GO,CENTRAL_LIVE_R2_STAGING_GATE:GO,[missing]:'NO_GO'};
+  const res=await manejarTransferenciaLiveCentral(request(),{...gates,DB:f.db},
+   {readSigned,verifyOrder:async()=>large,now:()=>Date.parse('2026-11-11T10:05:00Z')});
+  assert.equal(res.status,409);
+  assert.equal(f.sql.length,0);
+ }
+});
+test('R2 con todos los gates GO puede solicitar transferencia sin acreditar ni subir',async()=>{
+ const f=mockDb();
+ const gates={...base,CENTRAL_LIVE_R2_GATE:GO,
+  CENTRAL_LIVE_R2_QUOTA_GATE:GO,CENTRAL_LIVE_R2_STAGING_GATE:GO};
+ const large={...order,rows:[{transport:'r2',bytes:60*1048576}]};
+ const res=await manejarTransferenciaLiveCentral(request(),{...gates,DB:f.db},
+  {readSigned,verifyOrder:async()=>large,
+   now:()=>Date.parse('2026-11-11T10:05:00Z')});
+ assert.equal(res.status,200);
+ const body=await res.json();
+ assert.equal(body.estado,'transferencia_pendiente');
+ assert.equal(body.paymentVerified,false);
+ assert.equal(body.uploadAuthorized,false);
+ const receipt=mockDb();
+ const approval=await aprobarTransferenciaLiveCentral(request('admin/api/central/live-transfers/approve',{
+  order_id:id,amount_ars:amount,confirmed:true,
+  operator:'Ana Pérez',bank_reference:'BANK-R2-123456'}),
+  {...gates,DB:receipt.db},{authorized:true,verifyOrder:async()=>large});
+ assert.equal(approval.status,200);
+ assert.equal((await approval.json()).paymentVerified,true);
+});
+test('un R2 mayor al límite comercial no se cobra aunque los gates estén abiertos',async()=>{
+ const f=mockDb();
+ const gates={...base,CENTRAL_LIVE_R2_GATE:GO,
+  CENTRAL_LIVE_R2_QUOTA_GATE:GO,CENTRAL_LIVE_R2_STAGING_GATE:GO};
+ const tooLarge={...order,rows:[{transport:'r2',bytes:220*1048576}]};
+ const res=await manejarTransferenciaLiveCentral(request(),{...gates,DB:f.db},
+  {readSigned,verifyOrder:async()=>tooLarge});
+ assert.equal(res.status,409);assert.equal(f.sql.length,0);
+});
 test('solo un asiento D1 auditado permite informar pagado al comprador',async()=>{
  const f=mockDb({state:'paid',paid:true});
  const res=await manejarTransferenciaLiveCentral(request('transfer-status'),{...base,DB:f.db},
