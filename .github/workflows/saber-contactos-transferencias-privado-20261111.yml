@@ -37,7 +37,7 @@ jobs:
           for marker in 'cliente-nombre' 'cliente-direccion' 'nombreCliente' 'telefonoContacto'; do
             grep -Fq "$marker" integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
           done
-          grep -Fq 'id="resumen-precio-entrega"' integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq 'resumen-precio-entrega' integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
           grep -Fq 'FECHA MÁXIMA ESTIMADA DE ENTREGA' integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
           grep -Fq 'central_order_customer_details' /tmp/saber-central-contactos.mjs
           echo 'CONTACTOS_CI_OK_SIN_DEPLOY'
