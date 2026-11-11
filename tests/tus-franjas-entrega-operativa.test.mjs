@@ -108,3 +108,32 @@ test('confirmación, seguimiento y Central usan la franja sin inventar tiempos',
  assert.doesNotMatch(customer,/etaForQueue|etaOperatingFinish|etaResourceQueueForOrder/);
  assert.doesNotMatch(tracking,/customer_phone|bank_reference|DEMO_ADMIN_KEY/);
 });
+
+
+test('seguimiento muestra previsión al pagar y al iniciar, luego fecha y hora precisas',()=>{
+ const html=vm.runInContext('clientTrackingHtml',ctx);
+ const script=html.slice(html.indexOf('<script>')+8,html.indexOf('</script>'));
+ const start=script.indexOf('function render(d){');
+ const end=script.indexOf('let busy=false;');
+ assert.ok(start>0&&end>start);
+ const els=Object.fromEntries(['order','stage','steps','eta'].map(k=>[k,{
+  textContent:'',children:[],replaceChildren(){this.children=[]},
+  append(child){this.children.push(child)}
+ }]));
+ const doc={getElementById:id=>els[id],createElement:()=>({textContent:'',className:''})};
+ const run=vm.runInNewContext(
+  'const labels=["Pedido recibido","Pago confirmado","En preparación","Listo para retirar","Entregado"];'+
+  script.slice(start,end)+';render',
+  {document:doc,Intl,Date}
+ );
+ run({payment:'pagado',stage:'pendiente',phase:'Pago confirmado',deliveryPlan:'hoy',estimate:null});
+ assert.match(els.eta.textContent,/durante el día de hoy/);
+ run({payment:'pagado',stage:'en_preparacion',phase:'En preparación',
+  deliveryPlan:'hoy',estimate:null});
+ assert.match(els.eta.textContent,/previsión general es durante el día de hoy/);
+ assert.match(els.eta.textContent,/hora más precisas/);
+ run({payment:'pagado',stage:'en_preparacion',phase:'En preparación',
+  deliveryPlan:'hoy',estimate:{type:'manual',readyAt:'2026-11-11T17:00:00.000Z'}});
+ assert.match(els.eta.textContent,/14:00/);
+ assert.doesNotMatch(els.eta.textContent,/en breve/i);
+});
