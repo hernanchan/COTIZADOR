@@ -1,0 +1,2 @@
+PREVIEW=https://8f7acc45.libreriasaber.pages.dev/
+ONLY_BROWSER_READ_CART_LOCAL_NO_PURCHASE_NO_ORDER
