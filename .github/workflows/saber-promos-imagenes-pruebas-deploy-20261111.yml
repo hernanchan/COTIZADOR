@@ -2,7 +2,11 @@ name: Saber - actualizar SOLO Documentos pruebas con imágenes y promociones
 on:
   push:
     branches: [integracion/tus-pedido-privado-20261101]
-    paths: [.github/workflows/saber-promos-imagenes-pruebas-deploy-20261111.yml]
+    paths:
+      - .github/workflows/saber-promos-imagenes-pruebas-deploy-20261111.yml
+      - integraciones/autocotizador/recepcion/carga-unica-pagina.mjs
+      - integraciones/autocotizador/recepcion/carga-unica-cliente.mjs
+      - tests/tus-ux-modo-configuracion.test.mjs
 permissions: {contents: read, statuses: write}
 concurrency: {group: saber-promos-imagenes-solo-pruebas, cancel-in-progress: false}
 jobs:
@@ -19,7 +23,7 @@ jobs:
         run: |
           set -euo pipefail
           npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.25.12
-          node --test integraciones/autocotizador/recepcion/promociones-semanales-cotizacion.test.mjs integraciones/autocotizador/recepcion/imagenes-a-pdf-local.test.mjs
+          node --test integraciones/autocotizador/recepcion/promociones-semanales-cotizacion.test.mjs integraciones/autocotizador/recepcion/imagenes-a-pdf-local.test.mjs tests/tus-ux-modo-configuracion.test.mjs tests/tus-ui-cierre-operativo.test.mjs
           cd integraciones/autocotizador/recepcion
           npm install --no-audit --no-fund
           npm run build:unificado
@@ -82,6 +86,10 @@ jobs:
           code="$(curl -sS --max-time 30 -u "operador:$PASSWORD" -o "$tmp/page.html" -w '%{http_code}' "$base/prueba-v2/carga-inteligente")"
           test "$code" = 200
           echo PRUEBAS_PAGINA_HTTP_200
+          grep -Eq 'id="zonaArchivos">' "$tmp/page.html"
+          grep -Fq 'name="modoImpresionLote" value="individual" checked' "$tmp/page.html"
+          grep -Fq 'image/jpeg,image/png' "$tmp/page.html"
+          echo PRUEBAS_MOVIL_CARGADOR_VISIBLE_DESDE_INICIO
           code="$(curl -sS --max-time 30 -u "operador:$PASSWORD" -o "$tmp/client.js" -w '%{http_code}' "$base/prueba-v2/carga-inteligente.js")"
           test "$code" = 200
           echo PRUEBAS_JS_HTTP_200
