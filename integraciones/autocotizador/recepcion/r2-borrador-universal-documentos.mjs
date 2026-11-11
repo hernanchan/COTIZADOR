@@ -26,7 +26,8 @@ export async function guardarBorradorUniversal(request,env,{
  let data;try{data=JSON.parse(raw)}catch{}
  if(!data||Object.keys(data).sort().join(',')!=='archivos,manifiestos,webOrderId')
   return reply({ok:false,error:'UNIVERSAL_DATOS'},422);
- let ficha;try{ficha=fichaPrearchivoUniversal({...data,tarifario:await priceLoader(env)})}
+ let ficha;try{ficha=fichaPrearchivoUniversal({...data,tarifario:await priceLoader(env),
+  admitirFotosTusPruebas:env?.DOCS_R2_UNIVERSAL_TUS_ENABLED==='PRIVATE_TEST_ONLY'})}
  catch{return reply({ok:false,error:'UNIVERSAL_COTIZACION'},422)}
  const hash=hex(new Uint8Array(await subtle.digest('SHA-256',
    new TextEncoder().encode(JSON.stringify(ficha)))));
