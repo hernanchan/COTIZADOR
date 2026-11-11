@@ -36,13 +36,13 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .contacto-ayuda,.contacto-error{flex-basis:100%;font-size:12px;line-height:1.2;margin:0}
 .contacto-ayuda{color:#52677a}.contacto-error{color:#a12828;font-weight:700}
 .contacto-error:empty{display:none}
-#resumen-precio-entrega{display:grid;grid-template-columns:minmax(180px,1fr) minmax(210px,1fr);gap:14px;flex:1 1 100%;align-items:start}
-#resumen-precio-entrega>div{border-radius:10px;background:white;border:1px solid #bdd2e4;padding:12px 14px;min-width:0}
+#resumen-precio-entrega{display:grid;grid-template-columns:minmax(180px,1fr) minmax(210px,1fr);gap:12px;flex:1 1 100%;align-items:start;background:#fff;border:2px solid #9ebfd8;border-radius:12px;padding:15px}
+#resumen-precio-entrega>div{min-width:0;padding:3px 5px}
 #resumen-precio-entrega .resumen-titulo{display:block;color:#183f62;font-size:15px;font-weight:750;line-height:1.25}
 #resumen-precio-entrega #precio-smart{font-size:clamp(21px,2.3vw,27px);font-weight:850;line-height:1.25;overflow-wrap:anywhere}
 #resumen-precio-entrega #plazo-produccion-orientativo{font-size:clamp(20px,2.3vw,27px);font-weight:850;color:#0c4671;line-height:1.25;margin:3px 0}
-#resumen-precio-entrega .resumen-aviso{display:block;grid-column:1 / -1;font-size:14px;line-height:1.4;color:#43566a;font-weight:500}
-#promocion-dia-resumen:not([hidden]){display:block;grid-column:1 / -1;font-size:15px;font-weight:650;background:#fff7e8;border-radius:8px;padding:9px 12px;color:#76420b}
+#resumen-precio-entrega .resumen-aviso{display:block;grid-column:1 / -1;font-size:15px;line-height:1.45;color:#43566a;font-weight:500;margin:0;padding:10px 5px 0;border-top:1px solid #d9e6ef}
+#promocion-dia-resumen:not([hidden]){display:block;grid-column:1 / -1;font-size:15px;font-weight:650;margin:0;padding:5px;color:#76420b}
 @media(max-width:650px){#resumen-precio-entrega{grid-template-columns:1fr;gap:8px}#resumen-precio-entrega .resumen-aviso,#promocion-dia-resumen:not([hidden]){grid-column:1}}
 #acciones-pedido{position:sticky;top:0;z-index:30;background:#eaf3fa;border-bottom:2px solid #aecce5;padding:8px max(15px,calc((100vw - 1110px)/2));box-shadow:0 3px 9px #0a315812;display:flex;align-items:center;gap:12px;flex-wrap:wrap}#precio-smart{flex:1;font-size:16px;font-weight:750;color:#0a3158}#send-all-pdf{font-weight:750;background:#095985;white-space:nowrap;min-height:43px}#batch-progress{flex-basis:100%;margin:0;font-size:12px;line-height:1.2}#batch-progress.error-recepcion{background:#fee8e6;border-left:4px solid #b42318;border-radius:6px;color:#8f1d1d;padding:9px 12px;font-weight:750}#recepcion-avanzada>summary{font-size:13px!important;color:#536475}#seguridad-privada{max-width:1110px;margin:7px auto 0;padding:0 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}#seguridad-privada .cf-turnstile{margin:0} @media(max-width:600px){#acciones-pedido{padding:8px 12px}#send-all-pdf{width:100%}}
 .cf-turnstile{margin:15px 0}
@@ -132,8 +132,10 @@ const localDate=date=>{
   if(!r.ok||d?.ok!==true||d.guaranteed!==false||
      typeof d.label!=='string'||typeof d.notice!=='string')
    throw Error('Sin previsión vigente');
-  plazoInfo.textContent=localDate(d.estimatedDeadlineDate)||'Fecha a confirmar';
+  const fecha=localDate(d.estimatedDeadlineDate);
+  plazoInfo.textContent=fecha?((d.mode==='hoy'||d.mode==='hoy_tarde'?'Hoy · ':'')+fecha):d.label;
   plazoInfo.setAttribute('title',d.label);
+  document.getElementById('aclaracion-plazo').textContent=d.notice;
   if(d.dayPromotion?.informationalOnly===true&&
      d.dayPromotion?.appliedToQuote===false&&
      typeof d.dayPromotion.title==='string'&&
@@ -144,7 +146,9 @@ const localDate=date=>{
   }else{promoInfo.hidden=true;promoInfo.textContent=''}
 
  }catch{
-  plazoInfo.textContent='Fecha a confirmar';
+  plazoInfo.textContent='Previsión no disponible';
+  document.getElementById('aclaracion-plazo').textContent=
+   'No pudimos consultar la previsión de la Central. La fecha de entrega no está confirmada; consultanos antes de pagar.';
  }
 })();
 import {prepararManifiestoDocumentalV2} from '/prueba-v2/preparar-manifiesto.mjs';
