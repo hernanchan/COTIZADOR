@@ -31,7 +31,7 @@ button:disabled{opacity:.47;cursor:not-allowed}#estado{min-height:25px}small{col
 export function paginaCotizarLive(req,env,{authorized=false}={}){
  const u=new URL(req.url);
  if(req.method!=='GET'||u.protocol!=='https:'||u.hostname!==HOST||
-    u.pathname!=='/cotizar'||u.search||u.hash||
+    u.pathname!=='/cotizar'||
     env?.SABER_ENTORNO!=='produccion'||env?.DOCS_LIVE_UI_GATE!==ON||
     env?.DOCS_MP_LIVE_GATE!==ON||env?.DOCS_LIVE_SESSION_GATE!==ON)
   return new Response('No disponible',{status:404,headers:{'Cache-Control':'no-store'}});
