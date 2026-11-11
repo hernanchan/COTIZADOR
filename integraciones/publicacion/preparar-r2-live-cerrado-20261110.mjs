@@ -41,18 +41,10 @@ const already=settings.bindings.find(x=>x.name===name);
 if(already)assert.equal(already.bucket_name,bucket,'R2_LIVE_BUCKET_ALREADY_BOUND_ELSEWHERE');
 const sub=await must('/workers/scripts/'+worker+'/subdomain');
 assert.equal(sub.enabled,false);assert.equal(sub.previews_enabled,false);
-const existing=await request('/r2/buckets/'+bucket);
-if(existing.status===404){
- const created=await must('/r2/buckets',{method:'POST',data:{name:bucket,storageClass:'Standard'}});
- assert.equal(created?.name,bucket,'R2_BUCKET_CREATE_INCONSISTENT');
- console.log('LIVE_R2_PRIVATE_EMPTY_BUCKET_CREATED_STANDARD');
-}else{
- if(existing.status!==200)throw Error('R2_BUCKET_LOOKUP_NOT_AUTHORIZED_'+existing.status);
- assert.equal(existing.data?.name,bucket);
- console.log('LIVE_R2_PRIVATE_EMPTY_BUCKET_ALREADY_EXISTS');
-}
-const present=await must('/r2/buckets/'+bucket);
-assert.equal(present.name,bucket);
+// Titular creó el bucket en Cloudflare. El token de Workers carece de R2 Read
+// (HTTP 403) y no debe solicitar permisos adicionales. El binding es una
+// referencia que Cloudflare rechaza si el bucket no existe.
+console.log('LIVE_R2_BUCKET_CREATION_CONFIRMED_BY_OWNER_NO_R2_API_ACCESS');
 if(!already){
  const newSettings=new FormData();
  newSettings.append('settings',new Blob([JSON.stringify({bindings:[
@@ -80,5 +72,5 @@ assert.ok(has(after.bindings,secretName,'secret_text'));
 assert.ok(has(after.bindings,'DOCS_MP_LIVE_GATE','plain_text','NO_GO'));
 const afterSub=await must('/workers/scripts/'+worker+'/subdomain');
 assert.equal(afterSub.enabled,false);assert.equal(afterSub.previews_enabled,false);
-console.log('R2_LIVE_STORAGE_READY_ZERO_FILES_GATE_NO_GO');
-console.log('NO_MAIN_NO_MP_NO_ORDER_NO_UPLOAD_NO_CUSTOMER_STORAGE_COST');
+console.log('R2_LIVE_STORAGE_BINDING_AND_RECEIPT_KEY_VERIFIED_GATE_NO_GO');
+console.log('NO_MAIN_NO_MP_NO_ORDER_NO_UPLOAD_NO_CUSTOMER_STORAGE_WRITES');
