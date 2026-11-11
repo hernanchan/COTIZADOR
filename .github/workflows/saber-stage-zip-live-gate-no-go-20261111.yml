@@ -1,0 +1,38 @@
+name: Saber - stage ZIP LIVE privado cerrado sin pagos
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths:
+      - .github/workflows/saber-stage-zip-live-gate-no-go-20261111.yml
+      - integraciones/publicacion/stage-zip-live-gate-cerrado-20261111.mjs
+permissions: {contents: read, statuses: write}
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Registrar compuerta independiente del ZIP en Central sin habilitarla
+        env:
+          SABER_CF_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          SABER_CF_DEPLOY_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          node --check integraciones/publicacion/stage-zip-live-gate-cerrado-20261111.mjs
+          node integraciones/publicacion/stage-zip-live-gate-cerrado-20261111.mjs
+      - name: Registrar estado
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          if [ "$RESULT" = success ];then state=success;else state=failure;fi
+          jq -n --arg state "$state" --arg context 'saber/live-staff-package-gated' \
+           --arg description "Central staff ZIP gate NO_GO: $RESULT" \
+           --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+           '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/state.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/state.json >/dev/null
