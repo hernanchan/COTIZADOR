@@ -1,0 +1,58 @@
+name: Saber - diagnostico checkout pedido 001 sin datos sensibles
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-diagnostico-live-orden-001-20261111.yml]
+permissions: {contents: read}
+jobs:
+  diagnosticar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    steps:
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Leer estado de orden 001, intento MP y variables de gate sin exponer credenciales
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          D1_TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+          CF_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const root='https://api.cloudflare.com/client/v4/accounts/'+process.env.ACCOUNT;
+          async function api(path,token,{sql}={}){
+            const r=await fetch(root+path,{headers:{Authorization:'Bearer '+token,...(sql?{'Content-Type':'application/json'}:{})},
+             ...(sql?{method:'POST',body:JSON.stringify({sql})}:{}),signal:AbortSignal.timeout(20000)});
+            const v=await r.json();assert.ok(r.ok&&v?.success,'CF_API_'+r.status);return v.result;
+          }
+          const dbs=await api('/d1/database',process.env.D1_TOKEN);
+          const prod=dbs.find(x=>x.name==='saber-pagos-produccion');
+          assert.ok(prod?.uuid);
+          const sql=async statement=>(await api('/d1/database/'+prod.uuid+'/query',process.env.D1_TOKEN,{sql:statement}))[0].results;
+          const orders=await sql("SELECT id,status,amount_ars,preference_id IS NOT NULL AS has_pref,payment_id IS NOT NULL AS has_payment,created_at FROM orders ORDER BY created_at DESC LIMIT 4");
+          console.log('DIAG_LIVE_ORDERS='+JSON.stringify(orders.map(x=>({status:x.status,amount_ars:x.amount_ars,has_pref:Boolean(x.has_pref),has_payment:Boolean(x.has_payment),created_at:x.created_at}))));
+          const tables=await sql("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('live_checkout_attempts','live_checkout_locks','central_r2_universal_files')");
+          console.log('DIAG_MP_ATTEMPT_TABLE='+tables.some(x=>x.name==='live_checkout_attempts'));
+          if(tables.some(x=>x.name==='live_checkout_attempts')){
+            const attempts=await sql("SELECT started_at FROM live_checkout_attempts ORDER BY started_at DESC LIMIT 4");
+            console.log('DIAG_MP_ATTEMPTS='+JSON.stringify(attempts));
+          }
+          if(tables.some(x=>x.name==='live_checkout_locks')){
+            const locks=await sql("SELECT expires_at FROM live_checkout_locks ORDER BY expires_at DESC LIMIT 4");
+            console.log('DIAG_MP_LOCKS='+JSON.stringify(locks));
+          }
+          if(tables.some(x=>x.name==='central_r2_universal_files')){
+            const rows=await sql("SELECT transport,COUNT(*) AS n FROM central_r2_universal_files GROUP BY transport");
+            console.log('DIAG_FILE_TRANSPORTS='+JSON.stringify(rows));
+          }
+          for(const n of ['saber-pagos-produccion','saber-documentos-produccion','saber-webhook-produccion']){
+            const s=await api('/workers/scripts/'+n+'/settings',process.env.CF_TOKEN);
+            const names=['SABER_ENTORNO','CENTRAL_DB_ENV','MP_LIVE_GATE','CENTRAL_LIVE_BRIDGE_ENABLED','DOCS_MP_LIVE_GATE','CENTRAL_LIVE_TUS_GATE','CENTRAL_LIVE_POSTPAY_GATE','CENTRAL_LIVE_ORDER_GATE','DOCS_LIVE_ORDER_GATE','DOCS_LIVE_RECEPCION_GATE','DOCS_LIVE_TUS_GATE','WEBHOOK_EDGE_GATE','MP_LIVE_WEBHOOK_URL','MP_LIVE_RETURN_URL','CENTRAL_LIVE_URL'];
+            console.log('DIAG_GATE_'+n+'='+JSON.stringify(s.bindings.filter(x=>names.includes(x.name)).map(x=>({name:x.name,type:x.type,value:x.type==='plain_text'?x.text:undefined}))));
+            console.log('DIAG_MP_KEYS_'+n+'='+JSON.stringify(s.bindings.filter(x=>['MP_LIVE_ACCESS_TOKEN','MP_LIVE_SELLER_ID','MP_LIVE_WEBHOOK_SECRET','CENTRAL_BRIDGE_KEY'].includes(x.name)).map(x=>({name:x.name,type:x.type}))));
+          }
+          console.log('DIAG_READ_ONLY_NO_MP_CREATE_NO_LIVE_CHARGE');
+          NODE
