@@ -36,12 +36,19 @@ export async function prepararR2PagoSinArchivo(request,env,{
  if(raw.length>150000)return response({ok:false,error:'R2_PREPAGO_SOLICITUD_EXTENSA'},413);
  let p;try{p=JSON.parse(raw)}catch{return response({ok:false,error:'R2_PREPAGO_JSON_INVALIDO'},400)}
  if(!p||typeof p!=='object'||Array.isArray(p)||
-    Object.keys(p).sort().join(',')!=='archivos,bytes,fileId,sha256,webOrderId'||
+    !Object.keys(p).every(k=>['archivos','bytes','fileId','sha256','webOrderId','nombre','telefono','direccion'].includes(k))||
+    !['archivos','bytes','fileId','sha256','webOrderId'].every(k=>Object.hasOwn(p,k))||
     !WEB.test(p.webOrderId||'')||!FILE.test(p.fileId||'')||
     !SHA.test(p.sha256||'')||!Number.isSafeInteger(p.bytes)||
     p.bytes<=40*MIB||p.bytes>200*MIB||
     !Array.isArray(p.archivos)||p.archivos.length!==1)
   return response({ok:false,error:'R2_PREPAGO_IDENTIDAD_INVALIDA'},422);
+ if(p.nombre!==undefined&&(typeof p.nombre!=='string'||p.nombre.trim().length<2||p.nombre.trim().length>100||/[<>]/.test(p.nombre)))
+  return response({ok:false,error:'R2_PREPAGO_NOMBRE_INVALIDO'},422);
+ if(p.telefono!==undefined&&(typeof p.telefono!=='string'||!/^[+]?[0-9 ()-]{10,26}$/.test(p.telefono.trim())||p.telefono.replace(/\D/g,'').length<10||p.telefono.replace(/\D/g,'').length>15))
+  return response({ok:false,error:'R2_PREPAGO_TELEFONO_INVALIDO'},422);
+ if(p.direccion!==undefined&&(typeof p.direccion!=='string'||p.direccion.trim().length>180||/[<>]/.test(p.direccion)))
+  return response({ok:false,error:'R2_PREPAGO_DIRECCION_INVALIDA'},422);
  let price,quote;
  try{
   const snapshot=await priceLoader(env);
@@ -89,7 +96,10 @@ export async function prepararR2PagoSinArchivo(request,env,{
  const data={schema:'saber-central-r2-prepaid-intent-v2',
   webOrderId:p.webOrderId,fileId:p.fileId,sha256:p.sha256,
   bytes:p.bytes,amountArs:quote.total,declaredPages:file.paginas.length,
-  quoteSha256:digest,quoteRevision:price.prices.priceVersion,quoteSnapshot};
+  quoteSha256:digest,quoteRevision:price.prices.priceVersion,quoteSnapshot,
+  ...(p.nombre!==undefined?{nombre:p.nombre.trim()}:{}),
+  ...(p.telefono!==undefined?{telefono:p.telefono.trim()}:{}),
+  ...(p.direccion!==undefined?{direccion:p.direccion.trim()}:{})};
  const body=JSON.stringify(data);
  // El puente Central limita el body HMAC a 32.000 caracteres. Nunca
  // registrar una orden sin ficha completa de sus páginas.
