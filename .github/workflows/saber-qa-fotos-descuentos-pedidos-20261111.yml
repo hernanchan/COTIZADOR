@@ -5,6 +5,8 @@ on:
     paths:
       - .github/workflows/saber-qa-fotos-descuentos-pedidos-20261111.yml
       - tests/r2-universal-fotos-promociones-cobro.test.mjs
+      - tests/pdf-fotos-ensayo-reproducible.test.mjs
+      - integraciones/publicacion/pdf-fotos-ensayo-reproducible.mjs
 permissions: {contents: read, statuses: write}
 jobs:
   conciliar:
@@ -18,7 +20,7 @@ jobs:
         run: |
           set -euo pipefail
           npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.25.12
-          node --test tests/r2-universal-fotos-promociones-cobro.test.mjs
+          node --test tests/r2-universal-fotos-promociones-cobro.test.mjs tests/pdf-fotos-ensayo-reproducible.test.mjs
           node --test tests/r2-borrador-universal-central.test.mjs tests/r2-orden-universal-sin-cobro.test.mjs tests/r2-plan-universal-sin-subida.test.mjs tests/autocotizador-fotos-integracion.test.mjs tests/r2-universal-preprensa-central.test.mjs
           node --check integraciones/autocotizador/recepcion/repartir-promocion-ficha.mjs
           node --check integraciones/autocotizador/recepcion/ficha-prearchivo-universal.mjs
