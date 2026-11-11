@@ -26,7 +26,11 @@ button{border:0;background:#0a5583;color:#fff;padding:10px 15px;border-radius:8p
 button:disabled{opacity:.45;cursor:not-allowed}
 .state{white-space:pre-wrap;overflow-wrap:anywhere;color:#0a3158;font-size:13px}
 .warning{background:#fff2db;border-left:4px solid #f7931e;padding:10px;margin-bottom:12px}
-#cliente-telefono-label{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:13px;font-weight:700;color:#123852}
+#cliente-telefono-label,#cliente-nombre-label,#cliente-direccion-label{display:flex;align-items:flex-start;flex-direction:column;gap:5px;font-size:13px;font-weight:700;color:#123852}
+.contacto-datos{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;flex:1 1 550px}
+#cliente-nombre,#cliente-direccion{max-width:100%;font-size:15px;padding:9px 10px;border:1px solid #7599b9;border-radius:8px;background:#fff}
+#cliente-nombre{width:220px}#cliente-direccion{width:240px}
+#cliente-nombre:focus,#cliente-direccion:focus{outline:2px solid #1c7db5}
 #cliente-telefono{width:190px;max-width:100%;font-size:15px;padding:9px 10px;border:1px solid #7599b9;border-radius:8px;background:#fff}
 #cliente-telefono:focus{outline:2px solid #1c7db5}
 .contacto-ayuda,.contacto-error{flex-basis:100%;font-size:12px;line-height:1.2;margin:0}
@@ -52,11 +56,17 @@ body.estado-envio #smart,body.estado-registro #smart{display:none}
 </style></head><body>
 <header><h1>LIBRERÍA SABER · Cotizador V2 en ensayo privado</h1><small style="color:#d5e3f0">${sandboxEnabled?'Solo pagos con usuarios de prueba; sin cobros reales ni publicación comercial.':'Sin cobros, sin órdenes de producción y sin publicación comercial.'}</small></header>
 <div id="acciones-pedido"><div id="precio-smart" role="status" aria-live="polite">Presupuesto preliminar: todavía sin cotizar · No autoriza cobro</div>
+<div class="contacto-datos" role="group" aria-label="Datos de contacto del pedido">
+<label id="cliente-nombre-label" for="cliente-nombre">Nombre y apellido o responsable *
+<input id="cliente-nombre" type="text" autocomplete="name" maxlength="100" placeholder="Nombre de quien retira" required aria-describedby="cliente-nombre-error"></label>
 <label id="cliente-telefono-label" for="cliente-telefono">Teléfono de contacto *
 <input id="cliente-telefono" type="tel" inputmode="tel" autocomplete="tel" maxlength="26" placeholder="Ej.: 351 555 1234" required aria-describedby="cliente-telefono-ayuda cliente-telefono-error">
-</label><button id="send-all-pdf" type="button" disabled>Enviar mi pedido</button>
+</label><label id="cliente-direccion-label" for="cliente-direccion">Dirección (opcional si retirás en el local)
+<input id="cliente-direccion" type="text" autocomplete="street-address" maxlength="180" placeholder="Calle y número"></label></div><button id="send-all-pdf" type="button" disabled>Enviar mi pedido</button>
 <p id="cliente-telefono-ayuda" class="contacto-ayuda">Para consultar algo de tu archivo o avisarte cuando esté listo. No se usa para publicidad.</p>
+<p id="cliente-nombre-error" class="contacto-error" role="alert" aria-live="polite"></p>
 <p id="cliente-telefono-error" class="contacto-error" role="alert" aria-live="polite"></p>
+<p id="cliente-direccion-error" class="contacto-error" role="alert" aria-live="polite"></p>
 <p id="batch-progress" class="state" role="status" aria-live="polite">Cargá tus PDF y revisá las opciones.</p></div>
 <section id="r2-prepago-panel" hidden style="max-width:850px;margin:12px auto;padding:18px;background:white;border:1px solid #bed5e7;border-radius:12px" role="status" aria-live="polite">
 <h2 style="font-size:18px;margin:0 0 8px">Ploteo grande · pago antes de enviar</h2>
@@ -102,7 +112,26 @@ const list=document.getElementById('all'),status=document.getElementById('state'
  summary=document.getElementById('order-summary');
 const registerButton=document.getElementById('register-private'),registerStatus=document.getElementById('register-status');
 const sendAllButton=document.getElementById('send-all-pdf'),batchProgress=document.getElementById('batch-progress');
-const telefonoContacto=document.getElementById('cliente-telefono');
+const nombreCliente=document.getElementById('cliente-nombre');
+const direccionCliente=document.getElementById('cliente-direccion');
+const nombreError=document.getElementById('cliente-nombre-error');
+const direccionError=document.getElementById('cliente-direccion-error');
+function nombreValido(){
+ const value=nombreCliente.value.trim();
+ const ok=value.length>=2&&value.length<=100&&!/[<>]/.test(value);
+ nombreError.textContent=ok?'':'Ingresá nombre y apellido o responsable (2 a 100 caracteres).';
+ nombreCliente.setAttribute('aria-invalid',ok?'false':'true');
+ return ok?value:null;
+}
+function direccionValida(){
+ const value=direccionCliente.value.trim();
+ const ok=value.length<=180&&!/[<>]/.test(value);
+ direccionError.textContent=ok?'':'La dirección debe tener hasta 180 caracteres.';
+ direccionCliente.setAttribute('aria-invalid',ok?'false':'true');
+ return ok?value:null;
+}
+nombreCliente.addEventListener('input',()=>{nombreError.textContent='';nombreCliente.removeAttribute('aria-invalid')});
+direccionCliente.addEventListener('input',()=>{direccionError.textContent='';direccionCliente.removeAttribute('aria-invalid')});
 const telefonoError=document.getElementById('cliente-telefono-error');
 function telefonoValido(){
  const original=telefonoContacto.value.trim();
@@ -1000,7 +1029,8 @@ async function enviarTUSDesdeCarrito(pendientes){
  batchProgress.textContent='Enviando PDF al almacenamiento privado…';
  marcarTiempo('tus_inicio',{archivos:trabajos.length});
  const resultado=await mod.enviarPedidoTUSV2({
-  orderId,clientOrderId,trabajos,telefono:telefonoContacto.value.trim(),expectedPriceVersion,
+  orderId,clientOrderId,trabajos,telefono:telefonoContacto.value.trim(),
+  nombre:nombreCliente.value.trim(),direccion:direccionCliente.value.trim(),expectedPriceVersion,
   onProgress:p=>{
    if(p.phase==='transferencia')
     batchProgress.textContent='Recibiendo PDF: '+p.percent+'% · '+trabajos.length+' archivos.';
@@ -1304,6 +1334,7 @@ async function prepararPedidoUniversal(){
  universalFlujo=mod.crearFlujoUniversalPDF({
   files:universalPendiente.files,archivos:universalPendiente.archivos,
   webOrderId:orderId,telefono:telefonoContacto.value.trim(),
+  nombre:nombreCliente.value.trim(),direccion:direccionCliente.value.trim(),
   onProgress:p=>{
    if(p.phase==='hash')
     r2Informar('Identificando PDF '+p.index+' de '+p.count+
@@ -1334,6 +1365,7 @@ async function prepararPedidoR2Grande(){
  const data=r2PrepagoPendiente;
  r2PrepagoFlujo=mod.crearFlujoR2PagoAntesDeCarga({
   file:data.file,archivos:data.archivos,webOrderId:orderId,
+  nombre:nombreCliente.value.trim(),telefono:telefonoContacto.value.trim(),direccion:direccionCliente.value.trim(),
   onState:s=>{
    if(s.phase==='calculando_hash_local')
     r2Informar('Identificando el PDF en este dispositivo, sin subirlo a R2…');
@@ -1360,6 +1392,16 @@ async function prepararPedidoR2Grande(){
 }
 sendAllButton.addEventListener('click',async()=>{
  if(batchSending||registering||handoffInProgress||registeredOrder||TUS_BLOCKED)return;
+ if(!nombreValido()){
+  nombreCliente.focus();
+  batchProgress.textContent='Completá el nombre para enviar el pedido.';
+  return;
+ }
+ if(direccionValida()===null){
+  direccionCliente.focus();
+  batchProgress.textContent='Corregí la dirección de contacto.';
+  return;
+ }
  if(!telefonoValido()){
   telefonoContacto.focus();
   batchProgress.textContent='Completá el teléfono para enviar el pedido.';
