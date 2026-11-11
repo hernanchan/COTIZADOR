@@ -1,4 +1,4 @@
-name: Saber - validar identidad real vendedor MP LIVE con HMAC corregida
+name: Saber - verificar reparación Cloudflare redirect manual Mercado Pago real
 on:
   push:
     branches: [integracion/tus-pedido-privado-20261101]
