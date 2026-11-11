@@ -28,7 +28,8 @@ jobs:
             const b=bindings.find(x=>x.name===name);
             console.log('DIAG_'+name+'='+(b?.type==='plain_text'?b.text:b?'REDACTED':'ABSENT'));
           }
-          for(const url of ['https://pedidos.libreriasaber.com.ar/cotizar',
+          for(const url of ['https://pedidos.libreriasaber.com.ar/cotizar?utm_source=chatgpt.com',
+                            'https://pedidos.libreriasaber.com.ar/cotizar',
                             'https://pedidos.libreriasaber.com.ar/pedido/estado']){
             const r=await fetch(url,{redirect:'manual',signal:AbortSignal.timeout(20000)});
             const body=await r.text();
