@@ -31,7 +31,7 @@ export const REGLAS_RECEPCION_UNIVERSAL=Object.freeze({
  * El precio no se recibe de la UI. Si hay un PDF sin cotizar o fuera de cupo,
  * NO se genera borrador que pueda terminar pagándose parcialmente.
  */
-export function prepararPlanRecepcionUniversal({archivos,manifiestos,tarifario,produccion=false}={}){
+export function prepararPlanRecepcionUniversal({archivos,manifiestos,tarifario,produccion=false,ahora=Date.now()}={}){
  if(!tarifario||tarifario.source!==(produccion?'production-d1-approved-only':'private-d1-approved-only')||
     !Number.isSafeInteger(tarifario.revision)||tarifario.revision<1||
     tarifario.prices?.priceVersion!=='d1-approved-revision-'+tarifario.revision)
@@ -59,7 +59,7 @@ export function prepararPlanRecepcionUniversal({archivos,manifiestos,tarifario,p
  });
  if(tusBytes>MAX_TUS_BATCH)invalid('LOTE_TUS_EXCEDIDO');
  let quote;
- try{quote=cotizarCargaUnica({archivos,precios:tarifario.prices,promociones:tarifario.promotions})}
+ try{quote=cotizarCargaUnica({archivos,precios:tarifario.prices,promociones:tarifario.promotions,ahora})}
  catch{invalid('COTIZACION_INVALIDA')}
  if(quote.estado!=='PRELIMINAR'||quote.paymentAuthorized!==false||
     quote.pendientes?.length||!Array.isArray(quote.plan)||
