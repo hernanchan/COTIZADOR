@@ -71,7 +71,12 @@ async function patch(worker,settings,keys,value){
   ...keys.map(name=>({name,type:'plain_text',text:value}))
  ]})],{type:'application/json'}),'settings.json');
  await api('/workers/scripts/'+worker+'/settings',deploy,{method:'PATCH',form:update});
- const after=await status(worker);
+ let after=null;
+ for(let i=0;i<8;i++){
+  await new Promise(resolve=>setTimeout(resolve,1200));
+  after=await status(worker);
+  if(keys.every(key=>has(after,key,value)))break;
+ }
  for(const key of keys)assert.ok(has(after,key,value),'CANARY_SETTING_NOT_SAVED_'+key);
  for(const old of b)assert.ok(after.bindings.some(x=>x.name===old.name),
   'CANARY_LOST_EXISTING_BINDING_'+old.name);
@@ -117,10 +122,13 @@ try{
  console.log('CANARY_NO_PUBLIC_MAIN_SWITCH_NO_REAL_PAYMENT_NO_ORDER_NO_FILE_UPLOAD');
 }catch(e){
  console.log('CANARY_FAIL_CLOSED_ROLLBACK_START');
- for(const item of changed.reverse()){
-  try{await patch(item.worker,await status(item.worker),item.keys,'NO_GO');
-    console.log('CANARY_ROLLBACK_OK_'+item.worker);
-  }catch{console.log('CANARY_ROLLBACK_MANUAL_REQUIRED_'+item.worker)}
+ for(const [worker,_,keys] of [...targets].reverse()){
+  try{
+   const now=await status(worker);
+   const live=keys.filter(key=>has(now,key,'GO_COMERCIAL_CONFIRMADO'));
+   if(live.length)await patch(worker,now,live,'NO_GO');
+   console.log('CANARY_ROLLBACK_OK_'+worker);
+  }catch{console.log('CANARY_ROLLBACK_MANUAL_REQUIRED_'+worker)}
  }
  throw e;
 }
