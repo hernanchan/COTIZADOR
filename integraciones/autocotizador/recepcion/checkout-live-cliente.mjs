@@ -26,8 +26,15 @@ export async function iniciarCheckoutLiveCliente({orden,fetcher=fetch,storage=se
   credentials:'same-origin',redirect:'error',
   headers:{'Content-Type':'application/json'},body});
  const data=await r.json().catch(()=>null);
- if(!r.ok||data?.ok!==true||
-   data.webOrderId!==orden.webOrderId||
+ if(!r.ok||data?.ok!==true){
+  // Solo etiquetas públicas de diagnóstico; nunca imprimir respuesta MP ni secretos.
+  const etapa=typeof data?.etapa==='string'&&/^[a-z_]{1,45}$/.test(data.etapa)?
+   data.etapa:'conectar_checkout';
+  const codigo=typeof data?.codigo==='string'&&/^[A-Za-z0-9_-]{1,90}$/.test(data.codigo)?
+   data.codigo:String(data?.error||'NO_AUTORIZADO').slice(0,80);
+  throw Error('El pago está pendiente de habilitación ('+etapa+' / '+codigo+').');
+ }
+ if(data.webOrderId!==orden.webOrderId||
    data.commercialOrderId!==orden.commercialOrderId||
    data.amountArs!==orden.amountArs||data.fileCount!==orden.fileCount||
    data.uploadAuthorized!==false||data.productionAuthorized!==false||
