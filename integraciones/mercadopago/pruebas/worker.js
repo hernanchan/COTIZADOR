@@ -3358,6 +3358,9 @@ async function actualizarRecepcionLive(){
     " · recibidos "+o.receivedCount+"/"+o.fileCount+
     " · R2 pendiente de análisis "+o.stagedR2Count+
     " · $"+Number(o.amountArs).toLocaleString("es-AR");
+   li.append(node("p","Cliente: "+(o.nombreCliente||"No informado")+
+    " · Teléfono: "+(o.telefonoContacto||"No informado")+
+    " · Dirección: "+(o.direccionCliente||"No informada · retiro en local")));
    if(o.estado==="ORIGINALES_RECIBIDOS_PREPRENSA_PENDIENTE"&&
       o.pendingCount===0&&o.receivedCount===o.fileCount&&
       /^WEB-ENSAYO-[A-F0-9]{32}$/.test(o.webOrderId||"")){
