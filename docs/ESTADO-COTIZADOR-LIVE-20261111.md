@@ -22,3 +22,9 @@ Repositorio: `hernanchan/COTIZADOR`. Rama única de integración: `integracion/t
 - Rama: https://github.com/hernanchan/COTIZADOR/tree/integracion/tus-pedido-privado-20261101
 
 Mantener los archivos PDF privados. Política: borrar el original de cada pedido al marcarlo «Entregado» una vez confirmada la integración de retención. Nunca publicar secretos ni pedir al usuario repetir pruebas ya aprobadas.
+
+## Hotfix 11/11/2026: enlace /cotizar desde ChatGPT
+- Confirmado con HTTP real vía Actions: `/cotizar` daba 200 pero `/cotizar?utm_source=chatgpt.com` devolvía 404, texto «No disponible», porque `pagina-cotizar-live.mjs` rechazaba cualquier `u.search`.
+- Corrección en `integraciones/autocotizador/recepcion/pagina-cotizar-live.mjs` commit `04da5e6`: mantiene HTTPS, host, path, seguridad y gates, pero ignora parámetros no utilizados en presentación. Prueba de regresión `pagina-cotizar-live.test.mjs` commit `705be02`, QA LIVE SUCCESS.
+- Despliegue productivo reversible commit `7a43983`, Actions `43121245814` SUCCESS. No modificó `main`, no generó pedidos y mantuvo bloqueados cobros R2 grandes.
+- **Validación posterior definitiva:** Actions `43121365599` SUCCESS, ambas rutas `/cotizar` y `/cotizar?utm_source=chatgpt.com` **HTTP 200**, `/pedido/estado` 200; gates UI, MP y sesión en GO. El mensaje «No disponible» por parámetro queda corregido.
