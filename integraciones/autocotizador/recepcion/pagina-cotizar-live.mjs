@@ -70,25 +70,23 @@ window.saberIngresoLive=async token=>{
  const html=`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cotizador de PDF · Librería Saber</title><style>${baseCss}</style></head><body>
 <header><strong>Librería Saber · Impresiones y ploteos</strong></header>
-<main><section><h1>Prepará tus PDF</h1>
+<main><section><h1>Prepará tus PDF, JPG o PNG</h1>
 <p>Elegí los archivos y sus opciones de impresión. Las medidas y el tipo de trabajo se calculan por el contenido del PDF, no por el nombre ni por su peso.</p>
-<label for="nombre">Nombre y apellido o responsable *</label>
-<input id="nombre" autocomplete="name" maxlength="100" placeholder="Nombre de quien retira" required>
-<label for="telefono">Teléfono de contacto (con código de área) *</label>
-<input id="telefono" inputmode="tel" autocomplete="tel" maxlength="26" placeholder="351 555 5555" required>
-<label for="direccion">Dirección (opcional si retirás en el local)</label>
-<input id="direccion" autocomplete="street-address" maxlength="180" placeholder="Calle y número">
 <div id="precio-entrega" aria-label="Precio y fecha de entrega">
 <div><strong>TU PRECIO A PAGAR</strong><p id="precio" aria-live="polite">Pendiente de cotización</p></div>
 <div><strong>FECHA MÁXIMA ESTIMADA DE ENTREGA</strong><p id="plazo-orientativo" role="status" aria-live="polite">Consultando…</p></div>
 </div>
 <p id="plazo-explicacion">Fecha orientativa desde la acreditación del pago, sujeta a disponibilidad, trabajo, horario y feriados. Al iniciar tu trabajo, en el seguimiento verás una fecha y hora más precisas.</p>
 <p id="promo-dia" hidden></p>
+</section><section id="seccion-archivos"><h2>1. Subí tus archivos</h2><p>Seleccioná los PDF, JPG o PNG que querés imprimir. Podés elegir varios en una sola carga.</p><iframe id="pdf" title="Elegir PDF, JPG o PNG y opciones de impresión" src="/cotizar/archivos" loading="eager"></iframe></section><section id="seccion-confirmacion"><h2>2. Completá tus datos y confirmá</h2><label for="nombre">Nombre y apellido o responsable *</label>
+<input id="nombre" autocomplete="name" maxlength="100" placeholder="Nombre de quien retira" required>
+<label for="telefono">Teléfono de contacto (con código de área) *</label>
+<input id="telefono" inputmode="tel" autocomplete="tel" maxlength="26" placeholder="351 555 5555" required>
+<label for="direccion">Dirección (opcional si retirás en el local)</label>
+<input id="direccion" autocomplete="street-address" maxlength="180" placeholder="Calle y número">
 <p id="estado" role="status" aria-live="polite">Seleccioná tus archivos para comenzar.</p>
 <button type="button" id="continuar" disabled>${enabled?'Confirmar presupuesto':'Recepción de pedidos temporalmente desactivada'}</button>
 <p><small>La confirmación de pago se verifica en Librería Saber. No se envía ningún original por cotizar.</small></p>
-</section><section><h2>Tus archivos</h2>
-<iframe id="pdf" title="Elegir PDF y opciones de impresión" src="/cotizar/archivos"></iframe>
 </section></main><script type="module" nonce="${scriptNonce}">
 import {crearFlujoPresupuestoLive} from '/cotizar/flujo-live.js';
 const phone=document.getElementById('telefono');
