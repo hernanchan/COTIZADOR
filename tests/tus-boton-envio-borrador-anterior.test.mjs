@@ -79,5 +79,5 @@ test('la pantalla declara cada contacto ANTES de instalar listeners y activar en
  const enviar=script.indexOf("sendAllButton.addEventListener('click'");
  assert.ok(telefono>0&&nombre>0&&direccion>0,'Falta referencia DOM obligatoria; se rompe todo el módulo');
  assert.ok(listener>telefono&&enviar>listener,'Referencia de teléfono debe existir antes de utilizarse');
- assert.match(script,/const telefonoError=document.getElementById\\('cliente-telefono-error'\\)/);
+ assert.ok(script.includes("const telefonoError=document.getElementById('cliente-telefono-error');"));
 });
