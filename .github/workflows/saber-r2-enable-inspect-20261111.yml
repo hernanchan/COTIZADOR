@@ -31,6 +31,13 @@ jobs:
            const s=await req('/workers/scripts/'+worker+'/settings');
            const flags=s.bindings.filter(x=>x.name.endsWith('_GATE')||x.name.endsWith('_ENABLED')||x.name==='SABER_ENTORNO'||x.name==='CENTRAL_DB_ENV')
             .map(x=>({name:x.name,value:x.type==='plain_text'?x.text:'REDACTED'}));
+           const importantNames=['CENTRAL_LIVE_R2_INSPECTION_GATE','CENTRAL_LIVE_R2_INSPECTION_KEY',
+             'CENTRAL_LIVE_BOARD_GATE','CENTRAL_LIVE_TRANSFER_GATE','CENTRAL_LIVE_TRANSFER_APPROVAL_GATE',
+             'DOCS_LIVE_TRANSFER_GATE','CENTRAL_LIVE_PRICING_ADMIN_GATE'];
+           console.log('IMPORTANT_'+worker+'='+JSON.stringify(Object.fromEntries(importantNames.map(n=>{
+             const b=s.bindings.find(x=>x.name===n);
+             return [n,b?.type==='plain_text'?b.text:b?'SECRET_OR_BINDING':'ABSENT'];
+           }))));
            const dependencies=Object.fromEntries(
             ['SABER_CENTRAL','DB','CENTRAL_BRIDGE_KEY','DOCS_LIVE_R2_RECEIPT_KEY',
             'SABER_R2_GRANDES_LIVE','DOCS_LIVE_SESSION_KEY','DOCS_LIVE_STAFF_SECRET',
