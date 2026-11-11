@@ -22,12 +22,24 @@ try{
  await line.waitFor({state:'visible',timeout:15000});
  await page.waitForFunction(()=>{
   const s=document.querySelector('#plazo-produccion-orientativo')?.textContent||'';
-  return s.includes('Plazo máximo orientativo')&&!s.includes('consultando');
+  return s.includes('Fecha a confirmar')||/^\\d{2}\\/\\d{2}\\/20\\d{2}$/.test(s.trim());
  },{timeout:15000});
- const rendered=await line.innerText();
- assert.ok(rendered.includes(plan.label),'El cliente no ve la previsión vigente de Central');
- assert.ok(rendered.includes('acreditación del pago'),'Falta aclarar cuándo inicia el plazo');
- assert.ok(rendered.includes('fecha y hora'),'Falta aclarar cuándo se confirma el horario');
+ const rendered=(await line.innerText()).trim();
+ const expected=typeof plan.estimatedDeadlineDate==='string'?
+  plan.estimatedDeadlineDate.split('-').reverse().join('/'):'Fecha a confirmar';
+ assert.equal(rendered,expected,'Fecha visible no coincide con el calendario Central');
+ const fontSize=await line.evaluate(el=>parseFloat(getComputedStyle(el).fontSize));
+ assert.ok(fontSize>=20,'Fuente de fecha demasiado pequeña: '+fontSize+'px');
+ const priceFont=await page.locator('#precio-smart').evaluate(el=>parseFloat(getComputedStyle(el).fontSize));
+ assert.ok(priceFont>=20,'Fuente del precio demasiado pequeña: '+priceFont+'px');
+ const footnote=await page.locator('#aclaracion-plazo').innerText();
+ assert.ok(footnote.includes('acreditación del pago'),'Falta aclarar cuándo inicia el plazo');
+ assert.ok(footnote.includes('fecha y hora'),'Falta aclarar cuándo se confirma el horario');
+ if(plan.dayPromotion){
+  const promo=await page.locator('#promocion-dia-resumen').innerText();
+  assert.ok(promo.includes(plan.dayPromotion.title),'Promoción del día no informada');
+  assert.ok(promo.includes('No descontada'),'Se promete un descuento no aplicado');
+ }
  assert.equal(jsErrors.length,0,'Fallo JavaScript: '+jsErrors.join(' | '));
  console.log('PLAZO_PRESUPUESTO_BROWSER_VISIBLE_MATCHES_CENTRAL');
  console.log('PLAZO_NO_ORDER_NO_PAYMENT_NO_DEPLOY');
