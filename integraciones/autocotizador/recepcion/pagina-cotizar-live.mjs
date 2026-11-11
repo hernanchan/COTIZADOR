@@ -55,6 +55,8 @@ window.saberIngresoLive=async token=>{
  const scriptNonce=crypto.randomUUID().replaceAll('-','');
  const enabled=env?.DOCS_LIVE_RECEPCION_GATE===ON&&env?.DOCS_LIVE_PRICING_GATE===ON&&
   env?.DOCS_LIVE_ORDER_GATE===ON;
+ const bankEnabled=enabled&&env?.DOCS_LIVE_TRANSFER_GATE===ON&&
+  env?.DOCS_LIVE_TUS_GATE===ON;
  const html=`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cotizador de PDF · Librería Saber</title><style>${baseCss}</style></head><body>
 <header><strong>Librería Saber · Impresiones y ploteos</strong></header>
@@ -81,7 +83,7 @@ const status=document.getElementById('estado');
 const price=document.getElementById('precio');
 const action=document.getElementById('continuar');
 const iframe=document.getElementById('pdf');
-const enabled=${enabled};
+const enabled=${enabled},bankEnabled=${bankEnabled};
 let pending=null,flow=null,working=false;
 const money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(n);
 const orderId=()=>{const a=new Uint8Array(16);crypto.getRandomValues(a);return 'WEB-ENSAYO-'+Array.from(a,n=>n.toString(16).padStart(2,'0')).join('').toUpperCase()};
@@ -143,14 +145,74 @@ action.addEventListener('click',async()=>{
   const order=await flow.preparar();
   price.textContent='Orden '+order.numeroOrden+' · '+money(order.amountArs);
   status.textContent='Orden registrada. Para pagar, continuá con Mercado Pago.';
+  const options=document.createElement('div');
+  options.className='payment-options';
   const button=document.createElement('button');
-  button.type='button';button.textContent='Continuar a Mercado Pago';
+  button.type='button';button.textContent='Pagar con Mercado Pago';
   button.addEventListener('click',async()=>{
    button.disabled=true;
    try{const url=await flow.iniciarPago();location.assign(url)}
    catch{button.disabled=false;status.textContent='No pudimos iniciar el pago. La orden sigue pendiente. No pagues dos veces.'}
   });
-  action.replaceWith(button);
+  options.append(button);
+  if(bankEnabled){
+   const bank=document.createElement('button');
+   bank.type='button';bank.textContent='Pagar por transferencia';
+   bank.style.marginLeft='10px';
+   const instructions=document.createElement('p');
+   instructions.setAttribute('role','status');
+   options.append(bank,instructions);
+   const bankRequest=async(action)=>{
+    const r=await fetch('/api/pedido/live/transfer',{
+     method:'POST',credentials:'same-origin',redirect:'error',
+     headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({action,webOrderId:order.webOrderId,
+      commercialOrderId:order.commercialOrderId})
+    });
+    const data=await r.json().catch(()=>null);
+    if(!r.ok||data?.ok!==true||data.webOrderId!==order.webOrderId||
+       data.commercialOrderId!==order.commercialOrderId||
+       data.amountArs!==order.amountArs)
+     throw Error('La transferencia no está disponible para este pedido.');
+    return data;
+   };
+   let checking=false,interval=null;
+   const check=async()=>{
+    if(checking)return;
+    checking=true;
+    try{
+     const result=await bankRequest('status');
+     if(result.estado==='pagado_esperando_archivos'&&result.paymentVerified===true&&
+        result.uploadAuthorized===true){
+      if(interval)clearInterval(interval);
+      instructions.textContent='Transferencia acreditada. Se verificará la recepción segura de los PDF.';
+      const continueButton=document.createElement('button');
+      continueButton.type='button';continueButton.textContent='Continuar con archivos pagados';
+      continueButton.addEventListener('click',()=>location.assign('/pedido/estado'));
+      options.replaceChildren(continueButton,instructions);
+     }
+    }catch{instructions.textContent='Seguimos esperando la verificación bancaria. No hagas otra transferencia.';}
+    finally{checking=false}
+   };
+   bank.addEventListener('click',async()=>{
+    bank.disabled=true;instructions.textContent='Registrando transferencia pendiente…';
+    try{
+     const result=await bankRequest('start');
+     if(result.estado!=='transferencia_pendiente'||result.paymentVerified!==false||
+        result.uploadAuthorized!==false||!result.alias)
+      throw Error('Respuesta de transferencia inválida.');
+     button.disabled=true;
+     instructions.textContent='Transferí exactamente '+money(result.amountArs)+
+      ' al alias '+result.alias+'. El pedido entrará en producción solo cuando Librería Saber verifique la acreditación en su banco. No alcanza con enviar un comprobante.';
+     bank.remove();
+     interval=setInterval(check,30000);
+    }catch(error){
+     bank.disabled=false;
+     instructions.textContent=String(error.message||'No se pudo iniciar la transferencia.').slice(0,150);
+    }
+   });
+  }
+  action.replaceWith(options);
  }catch(e){status.textContent=String(e?.message||'No se pudo completar el presupuesto.').slice(0,180);working=false;action.disabled=false;}
 });
 </script></body></html>`;
