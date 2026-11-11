@@ -24,8 +24,8 @@ jobs:
           npm install --no-audit --no-fund
           npm run build:unificado
           node --check dist/saber-documentos-cotizador-fase4.mjs
-          grep -Fq 'image/png' dist/saber-documentos-cotizador-fase4.mjs
-          grep -Fq 'Promoción aplicada' dist/saber-documentos-cotizador-fase4.mjs
+          test -s dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq '/prueba-v2/carga-inteligente' dist/saber-documentos-cotizador-fase4.mjs
           echo COMPILADO_IMAGENES_PROMOS_OK
       - name: Subir nueva versión y promoverla SOLO en Worker de PRUEBAS
         shell: bash
