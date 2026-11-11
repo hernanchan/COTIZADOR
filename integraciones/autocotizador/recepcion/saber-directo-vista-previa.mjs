@@ -63,7 +63,7 @@ export function prepararVistaDisenoAbierta(html,{ofertas=false,categoria='',pedi
   .replace(/<a\b([^>]*?)href="([^"]*)"/gi,(_,attrs,target)=>{
     let href='#preview-aviso';
     if(target.startsWith('#'))href=target;
-    else if(target==='cotizar.html')href=pedidoTUS?'/prueba-v2/pedido-cliente':'https://libreriasaber.com.ar/cotizar';
+    else if(target==='cotizar.html')href=pedidoTUS?'/prueba-v2/pedido-cliente':'/prueba-v2/cotizar-cliente';
     else if(target.startsWith('ofertas.html'))href=PUBLIC_OFFERS+target.slice('ofertas.html'.length);
     else if(target.startsWith('index.html#'))href=PUBLIC_HOME+target.slice('index.html'.length);
     else if(target==='index.html')href=PUBLIC_HOME;
