@@ -1,0 +1,154 @@
+name: Saber - datos de cliente y transferencias SOLO en pruebas con rollback
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [docs/ACTIVAR-CONTACTOS-TRANSFERENCIAS-PRUEBAS-20261111.trigger]
+permissions:
+  contents: read
+concurrency:
+  group: saber-documentos-private-deploy
+  cancel-in-progress: false
+jobs:
+  contactos-pruebas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Regresiones TUS R2 transferencia y Central
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.25.12
+          node --test tests/tus-telefono-contacto-pedido.test.mjs tests/tus-zip-orden-privada.test.mjs tests/tus-transferencias-acreditacion.test.mjs tests/tus-transferencias-pendientes.test.mjs tests/tus-central-tablero-click-real.test.mjs tests/tus-central-seguimiento-operativo.test.mjs tests/r2-prepago-sin-archivo-central.test.mjs tests/r2-universal-interfaz-compra-unica.test.mjs
+          npx esbuild integraciones/mercadopago/pruebas/worker.js --bundle --format=esm --platform=browser --target=es2022 --outfile=/tmp/saber-central-contactos.mjs
+          node --check /tmp/saber-central-contactos.mjs
+          npm --prefix integraciones/autocotizador/recepcion install --no-audit --no-fund
+          npm --prefix integraciones/autocotizador/recepcion run build:unificado
+          node --check integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
+          for marker in 'cliente-nombre' 'cliente-direccion' 'nombreCliente' 'telefonoContacto'; do
+            grep -Fq "$marker" integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
+          done
+          grep -Fq 'central_order_customer_details' /tmp/saber-central-contactos.mjs
+          echo 'CONTACTOS_CI_OK_SIN_DEPLOY'
+      - name: Desplegar exclusivamente dos Workers de pruebas, reversión coordinada
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          tmp=$(mktemp -d)
+          chmod 700 "$tmp"
+          auth="Authorization: Bearer $TOKEN"
+          cf="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts"
+          docs="$cf/saber-documentos-pruebas"
+          central="$cf/saber-pagos-pruebas"
+          origin_docs="https://saber-documentos-pruebas.libreriasaber.workers.dev"
+          origin_central="https://saber-pagos-pruebas.libreriasaber.workers.dev"
+          central_old='' docs_old='' central_active=0 docs_active=0
+          cleanup(){
+            rc=$?
+            trap - EXIT
+            if [ "$rc" -ne 0 ]; then
+              echo "CONTACTOS_DEPLOY_FAILED_TRY_ROLLBACK"
+              for role in docs central; do
+                if [ "$role" = docs ]; then
+                  target="$docs"; old="$docs_old"; deployed="$docs_active"
+                else
+                  target="$central"; old="$central_old"; deployed="$central_active"
+                fi
+                if [ "$deployed" = 1 ] && [ -n "$old" ]; then
+                  jq -n --arg v "$old" '{strategy:"percentage",versions:[{percentage:100,version_id:$v}],annotations:{"workers/message":"Rollback coordinado: datos de cliente y transferencias ensayo"}}' > "$tmp/rollback-$role.json"
+                  if curl -fsS --max-time 60 -H "$auth" -H 'Content-Type: application/json' --data-binary "@$tmp/rollback-$role.json" "$target/deployments" > "$tmp/rollback-result-$role.json" && jq -e '.success==true' "$tmp/rollback-result-$role.json" >/dev/null; then
+                    echo "CONTACTOS_ROLLBACK_REQUESTED=$role"
+                  else echo "CONTACTOS_ROLLBACK_UNCONFIRMED=$role"; fi
+                fi
+              done
+            fi
+            rm -rf "$tmp"
+            exit "$rc"
+          }
+          trap cleanup EXIT
+          for role in central docs; do
+            if [ "$role" = central ]; then root="$central"; else root="$docs"; fi
+            curl -fsS --max-time 30 -H "$auth" "$root/settings" > "$tmp/settings-$role.json"
+            curl -fsS --max-time 30 -H "$auth" "$root/deployments" > "$tmp/deploy-$role.json"
+            jq -e '.success==true and (.result.bindings|type=="array")' "$tmp/settings-$role.json" >/dev/null
+            jq -e '.success==true' "$tmp/deploy-$role.json" >/dev/null
+            old=$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/deploy-$role.json")
+            test -n "$old"
+            if [ "$role" = central ]; then central_old="$old"; else docs_old="$old"; fi
+          done
+          jq -e '.result.bindings|any(.name=="DB" and .type=="d1") and any(.name=="DEMO_ADMIN_KEY" and .type=="secret_text") and any(.name=="MP_TEST_ACCESS_TOKEN" and .type=="secret_text") and any(.name=="TRANSFER_PRIVATE_ENABLED" and .text=="PRIVATE_TEST_ONLY")' "$tmp/settings-central.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="SABER_CENTRAL" and .type=="service") and any(.name=="DOCS_TUS_PURGE_ENABLED" and .text=="OFF") and any(.name=="DOCS_V2_PRIVATE_UI_ENABLED" and .text=="PRIVATE_TEST_ONLY") and any(.name=="DOCS_CLIENT_SANDBOX_CHECKOUT_ENABLED" and .text=="PRIVATE_TEST_ONLY")' "$tmp/settings-docs.json" >/dev/null
+          curl -fsS --max-time 25 "$origin_central/health" > "$tmp/health-before.json"
+          jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$tmp/health-before.json" >/dev/null
+          test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$origin_central/admin/api/orders")" = 401
+          test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$origin_docs/prueba-v2/")" = 401
+          echo 'CONTACTOS_PREFLIGHT_TEST_ONLY_REAL_PAYMENTS_OFF'
+          # Central: full ESM bundle, never raw worker.js; strict inheritance of ALL bindings.
+          jq -n --arg sha "$GITHUB_SHA" --slurpfile s "$tmp/settings-central.json" '{main_module:"index.mjs",annotations:{"workers/message":"Contactos completos + tablero compacto SOLO prueba","workers/commit_sha":$sha},bindings:[$s[0].result.bindings[]|{name,type:"inherit"}]}' > "$tmp/meta-central.json"
+          curl -fsS --max-time 120 -H "$auth" -F "metadata=@$tmp/meta-central.json;type=application/json" -F "index.mjs=@/tmp/saber-central-contactos.mjs;filename=index.mjs;type=application/javascript+module" "$central/versions?bindings_inherit=strict" > "$tmp/version-central.json"
+          jq -e '.success==true and (.result.id|type=="string")' "$tmp/version-central.json" >/dev/null
+          central_new=$(jq -r '.result.id' "$tmp/version-central.json")
+          jq -n --arg v "$central_new" '{strategy:"percentage",versions:[{percentage:100,version_id:$v}],annotations:{"workers/message":"Contactos en Central sandbox, sin cambios de credenciales"}}' > "$tmp/promote-central.json"
+          central_active=1
+          curl -fsS --max-time 65 -H "$auth" -H 'Content-Type: application/json' --data-binary "@$tmp/promote-central.json" "$central/deployments" > "$tmp/promoted-central.json"
+          jq -e '.success==true' "$tmp/promoted-central.json" >/dev/null
+          # Documents: compiled bundle, customer gate unchanged.
+          jq -n --arg sha "$GITHUB_SHA" --slurpfile s "$tmp/settings-docs.json" '{main_module:"index.mjs",annotations:{"workers/message":"Nombre telefono direccion en PDF SOLO pruebas","workers/commit_sha":$sha},bindings:[$s[0].result.bindings[]|{name,type:"inherit"}]}' > "$tmp/meta-docs.json"
+          curl -fsS --max-time 120 -H "$auth" -F "metadata=@$tmp/meta-docs.json;type=application/json" -F "index.mjs=@integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs;filename=index.mjs;type=application/javascript+module" "$docs/versions?bindings_inherit=strict" > "$tmp/version-docs.json"
+          jq -e '.success==true and (.result.id|type=="string")' "$tmp/version-docs.json" >/dev/null
+          docs_new=$(jq -r '.result.id' "$tmp/version-docs.json")
+          jq -n --arg v "$docs_new" '{strategy:"percentage",versions:[{percentage:100,version_id:$v}],annotations:{"workers/message":"Contacto cliente en comprador TUS, R2, ZIP solo pruebas"}}' > "$tmp/promote-docs.json"
+          docs_active=1
+          curl -fsS --max-time 65 -H "$auth" -H 'Content-Type: application/json' --data-binary "@$tmp/promote-docs.json" "$docs/deployments" > "$tmp/promoted-docs.json"
+          jq -e '.success==true' "$tmp/promoted-docs.json" >/dev/null
+          for role in central docs; do
+            if [ "$role" = central ]; then root="$central"; new="$central_new"; else root="$docs"; new="$docs_new"; fi
+            active=''
+            for i in 1 2 3 4 5 6 7 8 9 10; do
+              curl -fsS --max-time 25 -H "$auth" "$root/deployments" > "$tmp/check-$role.json"
+              active=$(jq -r '.result.deployments[0].versions[]?|select(.percentage==100)|.version_id' "$tmp/check-$role.json"|head -n1)
+              [ "$active" = "$new" ] && break
+              sleep 2
+            done
+            [ "$active" = "$new" ] || { echo "CONTACTOS_VERSION_NOT_ACTIVE=$role"; exit 1; }
+          done
+          passed=0
+          for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            c=$(curl -sS --max-time 25 -o "$tmp/admin.html" -w '%{http_code}' "$origin_central/admin" || true)
+            b=$(curl -sS --max-time 25 -o "$tmp/buyer.html" -w '%{http_code}' "$origin_docs/prueba-v2/pedido-cliente" || true)
+            if [ "$c" = 200 ] && [ "$b" = 200 ] &&
+                grep -Fq 'id="centralExtraTools"' "$tmp/admin.html" &&
+                grep -Fq 'id="cliente-nombre"' "$tmp/buyer.html" &&
+                grep -Fq 'id="cliente-direccion"' "$tmp/buyer.html"; then passed=1; break; fi
+            echo "CONTACTOS_EDGE_PROPAGATING_CHECK=${i}-CENTRAL-${c}-BUYER-${b}"
+            sleep 2
+          done
+          test "$passed" = 1 || { echo 'CONTACTOS_HTML_MISSING_ROLLBACK'; exit 1; }
+          test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$origin_central/admin/api/orders")" = 401
+          test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$origin_central/admin/api/transfers/pending")" = 401
+          test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$origin_docs/prueba-v2/")" = 401
+          curl -fsS --max-time 25 "$origin_central/health" > "$tmp/health-after.json"
+          jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$tmp/health-after.json" >/dev/null
+          for role in central docs; do
+            if [ "$role" = central ]; then root="$central"; else root="$docs"; fi
+            curl -fsS --max-time 25 -H "$auth" "$root/settings" > "$tmp/settings-after-$role.json"
+            jq -S '.result.bindings|map({name,type})|sort_by(.name)' "$tmp/settings-$role.json" > "$tmp/before-$role.bindings"
+            jq -S '.result.bindings|map({name,type})|sort_by(.name)' "$tmp/settings-after-$role.json" > "$tmp/after-$role.bindings"
+            cmp "$tmp/before-$role.bindings" "$tmp/after-$role.bindings"
+          done
+          echo 'CONTACTOS_TEST_WORKERS_DEPLOYED_AND_VERIFIED'
+          echo "CENTRAL_TEST_VERSION=$central_new"
+          echo "DOCS_TEST_VERSION=$docs_new"
+          echo 'NO_MAIN_NO_PRODUCTION_NO_REAL_BANK_MOVEMENT_NO_PAYMENTS_CREATED'
