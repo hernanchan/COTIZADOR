@@ -48,6 +48,18 @@ try{
   assert.equal(response.status(),200);
   const child=page.frameLocator('#pdf');
   await child.locator('#archivos').waitFor({state:'visible'});
+  await page.waitForTimeout(1200);
+  console.log('MOBILE_DIAGNOSTICO_'+width+'='+JSON.stringify({
+   errores:errors,
+   padre:await page.evaluate(()=>({
+    frame:document.getElementById('pdf')?.outerHTML.slice(0,350),
+    altura:document.getElementById('pdf')?.getBoundingClientRect().height
+   })),
+   hijo:await child.locator('body').evaluate(el=>({
+    alto:el.scrollHeight,documento:document.documentElement.scrollHeight,
+    pathname:location.pathname,observador:typeof ResizeObserver
+   }))
+  }));
   await page.waitForFunction(()=>{
    const frame=document.getElementById('pdf');
    return frame&&frame.style.height&&parseInt(frame.style.height,10)>250;
