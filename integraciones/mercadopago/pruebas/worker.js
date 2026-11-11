@@ -4855,6 +4855,20 @@ export default {
    const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
    return diagnosticarVendedorMPLive(req,env,{readSigned:leerFirmaInternaLive});
   }
+  if(url.pathname==='/internal/central/live/transfer-start'||
+     url.pathname==='/internal/central/live/transfer-status'){
+   const {manejarTransferenciaLiveCentral}=await import('./transferencias-live-central.mjs');
+   const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
+   return manejarTransferenciaLiveCentral(req,env,{readSigned:leerFirmaInternaLive});
+  }
+  if(url.pathname==='/admin/api/central/live-transfers/pending'&&req.method==='GET'){
+   const {listarTransferenciasLiveCentral}=await import('./transferencias-live-central.mjs');
+   return listarTransferenciasLiveCentral(req,env,{authorized:tokenOK(req,env)});
+  }
+  if(url.pathname==='/admin/api/central/live-transfers/approve'&&req.method==='POST'){
+   const {aprobarTransferenciaLiveCentral}=await import('./transferencias-live-central.mjs');
+   return aprobarTransferenciaLiveCentral(req,env,{authorized:tokenOK(req,env)});
+  }
   if(url.pathname==='/internal/central/live/checkout'){
    const {checkoutMPLiveCentral}=await import('./mercadopago-live-central.mjs');
    const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
