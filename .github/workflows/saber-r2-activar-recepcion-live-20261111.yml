@@ -1,0 +1,93 @@
+name: Saber - activar recepcion R2 LIVE privada sin abrir cobros grandes
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-r2-activar-recepcion-live-20261111.yml]
+permissions: {contents: read}
+concurrency: {group: saber-r2-documentos-gates-live, cancel-in-progress: false}
+jobs:
+  activar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+    steps:
+      - name: Activar solo recepcion privada, validar binding y rollback si falla
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const account=process.env.ACCOUNT,token=process.env.TOKEN;
+          assert.match(account||'',/^[a-f0-9]{32}$/i);assert.ok(token?.length>20);
+          const base='https://api.cloudflare.com/client/v4/accounts/'+account+'/workers/scripts/';
+          const DOCS='saber-documentos-produccion',CENTRAL='saber-pagos-produccion';
+          const GO='GO_COMERCIAL_CONFIRMADO',OFF='NO_GO';
+          const gates=['DOCS_LIVE_R2_GATE','DOCS_LIVE_R2_UPLOAD_GATE','DOCS_LIVE_R2_STAGING_GATE'];
+          async function api(worker,method='GET',data){
+           const r=await fetch(base+worker+'/settings',{method,headers:{Authorization:'Bearer '+token},
+            ...(data?{body:data}:{}),signal:AbortSignal.timeout(25000)});
+           const j=await r.json().catch(()=>null);
+           assert.ok(r.ok&&j?.success===true,'CF_'+worker+'_'+method+'_'+r.status);
+           return j.result;
+          }
+          const setting=async name=>await api(name);
+          const has=(s,n,value)=>s.bindings.some(b=>b.name===n&&b.type==='plain_text'&&b.text===value);
+          const old=await setting(DOCS),c=await setting(CENTRAL);
+          assert.ok(has(old,'SABER_ENTORNO','produccion')&&has(old,'CENTRAL_DB_ENV','produccion')&&
+           has(old,'DOCS_MP_LIVE_GATE',GO)&&has(old,'DOCS_LIVE_RECEPCION_GATE',GO)&&
+           has(old,'DOCS_LIVE_SESSION_GATE',GO)&&has(old,'DOCS_LIVE_STAFF_GATE',GO),'DOCS_CORE_NOT_READY');
+          assert.ok(has(c,'SABER_ENTORNO','produccion')&&has(c,'MP_LIVE_GATE',GO),'CENTRAL_CORE_NOT_READY');
+          assert.ok(['CENTRAL_LIVE_R2_GATE','CENTRAL_LIVE_R2_QUOTA_GATE','CENTRAL_LIVE_R2_STAGING_GATE']
+           .every(n=>has(c,n,OFF)),'CENTRAL_PAYMENT_R2_ALREADY_CHANGED_ABORT');
+          assert.ok(old.bindings.some(x=>x.name==='SABER_R2_GRANDES_LIVE'&&x.type==='r2_bucket'&&
+           x.bucket_name==='saber-documentos-produccion-privado'),'R2_LIVE_BUCKET_NOT_BOUND');
+          assert.ok(old.bindings.some(x=>x.name==='DOCS_LIVE_R2_RECEIPT_KEY'&&x.type==='secret_text'),'R2_RECEIPT_KEY_MISSING');
+          assert.ok(old.bindings.some(x=>x.name==='SABER_CENTRAL'&&x.type==='service'&&x.service===CENTRAL),'R2_CENTRAL_BRIDGE_MISSING');
+          assert.ok(gates.every(n=>has(old,n,OFF)||has(old,n,GO)),'UNEXPECTED_R2_GATE_STATE');
+          async function patch(value){
+           const now=await setting(DOCS);
+           const form=new FormData();
+           const bindings=now.bindings.filter(b=>!gates.includes(b.name)).map(b=>
+            b.type==='r2_bucket'?{name:b.name,type:'r2_bucket',bucket_name:b.bucket_name}:
+            {name:b.name,type:'inherit'});
+           bindings.push(...gates.map(name=>({name,type:'plain_text',text:value})));
+           form.append('settings',new Blob([JSON.stringify({bindings})],
+            {type:'application/json'}),'settings.json');
+           await api(DOCS,'PATCH',form);
+           let result;
+           for(let i=0;i<10;i++){
+            result=await setting(DOCS);
+            if(gates.every(n=>has(result,n,value)))break;
+            await new Promise(resolve=>setTimeout(resolve,850));
+           }
+           assert.ok(gates.every(n=>has(result,n,value)),'R2_DOCS_GATE_NOT_PROPAGATED');
+           const beforeNames=old.bindings.map(b=>b.name).sort().join('|');
+           const afterNames=result.bindings.map(b=>b.name).sort().join('|');
+           assert.equal(afterNames,beforeNames,'R2_BINDING_MISSING_OR_ADDED');
+           assert.ok(has(result,'DOCS_MP_LIVE_GATE',GO),'DOCS_MP_GATE_CHANGED');
+           assert.ok(result.bindings.some(x=>x.name==='SABER_R2_GRANDES_LIVE'&&
+             x.type==='r2_bucket'&&x.bucket_name==='saber-documentos-produccion-privado'),'R2_BUCKET_NOT_PRESERVED');
+          }
+          const needs=gates.some(n=>!has(old,n,GO));
+          try{
+           if(needs){await patch(GO);console.log('R2_DOCS_PRIVATE_GATE_SWITCHED_GO')}
+           else console.log('R2_DOCS_PRIVATE_ALREADY_GO');
+           const finalCentral=await setting(CENTRAL);
+           assert.ok(['CENTRAL_LIVE_R2_GATE','CENTRAL_LIVE_R2_QUOTA_GATE',
+            'CENTRAL_LIVE_R2_STAGING_GATE'].every(n=>has(finalCentral,n,OFF)),
+             'R2_PAYMENT_GATE_MUST_REMAIN_CLOSED');
+           const u=await fetch('https://pedidos.libreriasaber.com.ar/pedido/recepcion-r2.js',
+            {redirect:'manual',signal:AbortSignal.timeout(12000)});
+           assert.notEqual(u.status,200,'PRIVATE_R2_JS_EXPOSED_TO_ANONYMOUS');
+           console.log('R2_LIVE_PRIVATE_RECEIVER_CONFIGURED_NO_ANONYMOUS_ASSETS');
+           console.log('R2_LIVE_CENTRAL_CHECKOUT_STILL_NO_GO_NO_PAYMENT_NO_ORDERS');
+          }catch(e){
+           if(needs){
+            console.log('R2_DOCS_ERROR_ROLLBACK_START');
+            try{await patch(OFF);console.log('R2_DOCS_ROLLBACK_OK')}
+            catch{console.log('R2_DOCS_ROLLBACK_MANUAL_REQUIRED')}
+           }
+           throw e;
+          }
+          NODE
