@@ -31,7 +31,7 @@ export const REGLAS_RECEPCION_UNIVERSAL=Object.freeze({
  * El precio no se recibe de la UI. Si hay un PDF sin cotizar o fuera de cupo,
  * NO se genera borrador que pueda terminar pagándose parcialmente.
  */
-export function prepararPlanRecepcionUniversal({archivos,manifiestos,tarifario,produccion=false,ahora=Date.now()}={}){
+export function prepararPlanRecepcionUniversal({archivos,manifiestos,tarifario,produccion=false,ahora=Date.now(),admitirFotosTusPruebas=false}={}){
  if(!tarifario||tarifario.source!==(produccion?'production-d1-approved-only':'private-d1-approved-only')||
     !Number.isSafeInteger(tarifario.revision)||tarifario.revision<1||
     tarifario.prices?.priceVersion!=='d1-approved-revision-'+tarifario.revision)
@@ -79,7 +79,11 @@ export function prepararPlanRecepcionUniversal({archivos,manifiestos,tarifario,p
     paginasElegidas:plan.paginasElegidas.slice(),
     estado:'PENDIENTE_DE_ORIGINAL_VERIFICADO'});
  });
- if(!produccion&&!lines.some(l=>l.transporte==='r2'))
+ // En Sandbox permitimos TUS puro SOLAMENTE cuando hay un trabajo
+ // fotográfico, mediante flag de documentos; lotes PDF normales siguen
+ // usando el circuito histórico y sus garantías originales.
+ if(!produccion&&!lines.some(l=>l.transporte==='r2')&&
+    !(admitirFotosTusPruebas===true&&lines.some(l=>l.destino==='fotos')))
   invalid('SIN_ARCHIVOS_GRANDES');
  return Object.freeze({
   schema:'saber-r2-plan-multifamilia-v1',
