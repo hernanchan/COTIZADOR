@@ -1,0 +1,54 @@
+name: Saber - revisar logs Cloudflare MP vendedor LIVE solo lectura
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-mp-live-observability-diagnostico-001-20261111.yml]
+permissions: {contents: read}
+jobs:
+  logs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    steps:
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Intentar recuperar eventos de checkout MP sin revelar credenciales
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          const from=Date.now()-45*60000,to=Date.now()+1000;
+          const body={
+           queryId:'saber-mp-live-checkout-001-diagnostico-20261111',
+           timeframe:{from,to},dry:true,view:'events',limit:40,
+           parameters:{datasets:['cloudflare-workers'],
+            filters:[{key:'$metadata.service',operation:'eq',type:'string',value:'saber-pagos-produccion'}],
+            needle:{value:'saber_mp_live_checkout_fallo',isRegex:false,matchCase:true},
+            limit:40}
+          };
+          const res=await fetch('https://api.cloudflare.com/client/v4/accounts/'+process.env.ACCOUNT+
+            '/workers/observability/telemetry/query',{
+            method:'POST',headers:{Authorization:'Bearer '+process.env.TOKEN,'Content-Type':'application/json'},
+            body:JSON.stringify(body),signal:AbortSignal.timeout(25000)});
+          const x=await res.json().catch(()=>null);
+          console.log('OBSERVABILITY_HTTP_STATUS='+res.status);
+          console.log('OBSERVABILITY_SUCCESS='+Boolean(x?.success));
+          console.log('OBSERVABILITY_ERROR_CODES='+JSON.stringify((x?.errors||[]).map(z=>z.code).slice(0,6)));
+          const events=x?.result?.events||[];
+          console.log('OBSERVABILITY_MATCHED_COUNT='+events.length);
+          for(const e of events.slice(0,10)){
+           const safe={timestamp:e.timestamp,service:e.$metadata?.service||e.$workers?.scriptName,
+            message:e.$metadata?.message||'',stage:e.etapa||e.source?.etapa,
+            code:e.codigo||e.source?.codigo};
+           // Only print known static error categories, never raw log bodies or customer metadata.
+           console.log('MP_DIAG_LOG='+JSON.stringify({
+             timestamp:safe.timestamp,
+             stage:/^[a-z_]{1,50}$/.test(safe.stage||'')?safe.stage:null,
+             code:/^[A-Z0-9_-]{1,80}$/.test(safe.code||'')?safe.code:null,
+             eventDetected:typeof safe.message==='string'&&safe.message.includes('saber_mp_live_checkout_fallo')
+           }));
+          }
+          NODE
