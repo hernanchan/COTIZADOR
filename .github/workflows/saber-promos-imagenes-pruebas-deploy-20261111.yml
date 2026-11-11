@@ -1,0 +1,98 @@
+name: Saber - actualizar SOLO Documentos pruebas con imágenes y promociones
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-promos-imagenes-pruebas-deploy-20261111.yml]
+permissions: {contents: read, statuses: write}
+concurrency: {group: saber-promos-imagenes-solo-pruebas, cancel-in-progress: false}
+jobs:
+  desplegar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Probar descuentos e imágenes; compilar Worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.25.12
+          node --test integraciones/autocotizador/recepcion/promociones-semanales-cotizacion.test.mjs integraciones/autocotizador/recepcion/imagenes-a-pdf-local.test.mjs
+          cd integraciones/autocotizador/recepcion
+          npm install --no-audit --no-fund
+          npm run build:unificado
+          node --check dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq 'image/png' dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq 'Promoción aplicada' dist/saber-documentos-cotizador-fase4.mjs
+          echo COMPILADO_IMAGENES_PROMOS_OK
+      - name: Subir nueva versión y promoverla SOLO en Worker de PRUEBAS
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+          PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN" && test -n "$PASSWORD"
+          worker=saber-documentos-pruebas
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/$worker"
+          auth="Authorization: Bearer $TOKEN"
+          tmp="$(mktemp -d)"
+          applied=0
+          rollback(){
+            if [ "$applied" != 1 ]; then return; fi
+            jq -n --arg id "$old" '{strategy:"percentage",versions:[{version_id:$id,percentage:100}],annotations:{"workers/message":"Rollback privado imágenes y promociones"}}' > "$tmp/rollback.json"
+            if curl -fsS --max-time 40 -H "$auth" -H 'Content-Type: application/json' --data-binary "@$tmp/rollback.json" "$root/deployments" > "$tmp/reverted.json" &&
+              jq -e '.success==true' "$tmp/reverted.json" >/dev/null; then echo PRUEBAS_ROLLBACK_OK
+            else echo PRUEBAS_ROLLBACK_FALLO_REVISAR; fi
+          }
+          trap 'rollback' ERR
+          curl -fsS --max-time 25 -H "$auth" "$root/settings" > "$tmp/settings.json"
+          jq -e '.success==true and (.result.bindings|type=="array") and
+            (.result.bindings|any(.name=="SABER_CENTRAL" and .type=="service")) and
+            (.result.bindings|any(.name=="SABER_ENTORNO" and .type=="plain_text" and .text=="produccion")|not)' "$tmp/settings.json" >/dev/null
+          jq -S '[.result.bindings[]|if .type=="secret_text" then {name,type} else . end]|sort_by(.name)' "$tmp/settings.json" > "$tmp/before-bindings.json"
+          curl -fsS --max-time 25 -H "$auth" "$root/deployments" > "$tmp/before.json"
+          old="$(jq -er '.result.deployments[0].versions | if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/before.json")"
+          test -n "$old"
+          jq -n --arg commit "$GITHUB_SHA" --slurpfile settings "$tmp/settings.json" \
+            '{main_module:"index.mjs",annotations:{"workers/message":"JPG PNG y promociones aprobadas - pruebas privadas","workers/commit_sha":$commit},bindings:[$settings[0].result.bindings[]|{name,type:"inherit"}]}' > "$tmp/metadata.json"
+          curl -fsS --max-time 90 -H "$auth" \
+            -F "metadata=@$tmp/metadata.json;type=application/json" \
+            -F "index.mjs=@integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs;filename=index.mjs;type=application/javascript+module" \
+            "$root/versions?bindings_inherit=strict" > "$tmp/upload.json"
+          jq -e '.success==true and (.result.id|type=="string")' "$tmp/upload.json" >/dev/null
+          candidate="$(jq -er '.result.id' "$tmp/upload.json")"
+          test "$candidate" != "$old"
+          jq -n --arg id "$candidate" '{strategy:"percentage",versions:[{version_id:$id,percentage:100}],annotations:{"workers/message":"Activación privada JPG PNG y promociones, sin cambios de configuración"}}' > "$tmp/promotion.json"
+          curl -fsS --max-time 40 -H "$auth" -H 'Content-Type: application/json' --data-binary "@$tmp/promotion.json" "$root/deployments" > "$tmp/promote.json"
+          jq -e '.success==true' "$tmp/promote.json" >/dev/null
+          applied=1
+          curl -fsS --max-time 25 -H "$auth" "$root/settings" > "$tmp/after-settings.json"
+          jq -S '[.result.bindings[]|if .type=="secret_text" then {name,type} else . end]|sort_by(.name)' "$tmp/after-settings.json" > "$tmp/after-bindings.json"
+          cmp "$tmp/before-bindings.json" "$tmp/after-bindings.json"
+          curl -fsS --max-time 25 -H "$auth" "$root/deployments" > "$tmp/after.json"
+          actual="$(jq -er '.result.deployments[0].versions | if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/after.json")"
+          test "$candidate" = "$actual"
+          base='https://saber-documentos-pruebas.libreriasaber.workers.dev'
+          code="$(curl -sS --max-time 30 -u "operador:$PASSWORD" -o "$tmp/page.html" -w '%{http_code}' "$base/prueba-v2/carga-inteligente")"
+          test "$code" = 200
+          grep -Fq 'image/png' "$tmp/page.html"
+          code="$(curl -sS --max-time 30 -u "operador:$PASSWORD" -o "$tmp/client.js" -w '%{http_code}' "$base/prueba-v2/carga-inteligente.js")"
+          test "$code" = 200
+          grep -Fq 'imagenes-' "$tmp/client.js"
+          echo SABER_PRUEBAS_DESPLEGADO_JPG_PNG_PROMOS_Y_BINDINGS_INTACTOS
+          applied=0
+          trap - ERR
+      - name: Registrar estado comprobable
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STATUS: ${{ job.status }}
+        run: |
+          if [ "$STATUS" = success ]; then state=success; description="Imágenes y promos desplegadas en pruebas; bindings preservados"; else state=failure; description="No desplegado o rollback en pruebas"; fi
+          jq -n --arg state "$state" --arg context 'saber/imagenes-promos-private-deploy' --arg description "$description" --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/private-deploy-status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/private-deploy-status.json >/dev/null
