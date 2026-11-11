@@ -89,14 +89,25 @@ jobs:
           assert.equal(order.data.uploadAuthorized,false);
           assert.equal(order.data.paymentAuthorized,false);
           const id=order.data.commercialOrderId;
-          const check=await fetch(central+'/admin/api/order?id='+encodeURIComponent(id),{
+          // La Central sólo permite consultar por /admin/api/order los
+          // pedidos pagados. Los borradores sin pagar están en su vista privada.
+          const check=await fetch(central+'/admin/api/central/r2-universal-drafts',{
            headers:{Authorization:'Bearer '+admin},signal:AbortSignal.timeout(30000)});
           const inside=await check.json().catch(()=>({}));
-          assert.equal(check.status,200,'Central no devolvió orden '+check.status);
-          assert.equal(inside.order?.amount_ars,q.data.total);
-          assert.equal(inside.order?.status,'awaiting_payment');
-          console.log('E2E_CENTRAL_D1_ORDEN='+order.data.numeroOrden+
-           ' TOTAL='+inside.order.amount_ars+' ESTADO='+inside.order.status);
+          assert.equal(check.status,200,'Central borradores no disponible '+check.status);
+          const saved=(inside.drafts||[]).find(x=>x.webOrderId===webOrderId);
+          assert.ok(saved,'Borrador no quedó registrado en D1');
+          assert.equal(saved.totalArs,q.data.total);
+          assert.equal(saved.fileCount,1);
+          assert.equal(saved.trabajos?.[0]?.destino,'fotos');
+          assert.equal(saved.trabajos?.[0]?.importeArs,1000);
+          assert.equal(saved.trabajos?.[0]?.detalle?.descuentoPromocion,600);
+          console.log('E2E_CENTRAL_D1_BORRADOR='+order.data.numeroOrden+
+           ' TOTAL='+saved.totalArs+' FOTO_NETO='+saved.trabajos[0].importeArs);
+          const paidOnly=await fetch(central+'/admin/api/order?id='+encodeURIComponent(id),{
+           headers:{Authorization:'Bearer '+admin},signal:AbortSignal.timeout(30000)});
+          assert.equal(paidOnly.status,404,'No debe entrar en NUEVOS antes de pagar');
+          console.log('E2E_CENTRAL_NO_APARECE_EN_NUEVOS_ANTES_DEL_PAGO');
           const mp=await post('/prueba-v2/api/ensayo-r2-checkout-universal',{
            action:'start',webOrderId,commercialOrderId:id});
           console.log('E2E_MP_SANDBOX_HTTP='+mp.http+' ERROR='+(mp.data.error||'OK'));
