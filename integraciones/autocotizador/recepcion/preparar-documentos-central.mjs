@@ -9,7 +9,7 @@ const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]
 const HOST=/^saber-pagos-pruebas\.[a-z0-9-]+\.workers\.dev$/;
 const hex=bytes=>Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
 export async function prepararDocumentosCentralFirmado({
- env,webOrderId,clientOrderId,items=[],telefono,
+ env,webOrderId,clientOrderId,items=[],telefono,nombre,direccion,
  subtle=crypto.subtle,requestId=()=>crypto.randomUUID(),
  now=()=>Math.floor(Date.now()/1000)
 }){
@@ -47,8 +47,14 @@ export async function prepararDocumentosCentralFirmado({
      digits.length<10||digits.length>15)
    throw Error('Teléfono de pedido inválido.');
  }
+ if(nombre!==undefined&&(typeof nombre!=='string'||nombre.trim().length<2||nombre.trim().length>100||/[<>]/.test(nombre)))
+  throw Error('Nombre del cliente inválido.');
+ if(direccion!==undefined&&(typeof direccion!=='string'||direccion.trim().length>180||/[<>]/.test(direccion)))
+  throw Error('Dirección del cliente inválida.');
  const body=JSON.stringify({clientOrderId,webOrderId,items:products,
-  ...(typeof telefono==='string'?{telefono:telefono.trim()}:{})});
+  ...(typeof telefono==='string'?{telefono:telefono.trim()}:{}),
+  ...(typeof nombre==='string'?{nombre:nombre.trim()}:{}),
+  ...(typeof direccion==='string'?{direccion:direccion.trim()}:{} )});
  const ts=now(),nonce=requestId();
  if(!Number.isSafeInteger(ts)||!UUID.test(nonce))
   throw Error('Firma privada inválida.');
