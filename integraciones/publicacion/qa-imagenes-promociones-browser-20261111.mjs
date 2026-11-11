@@ -70,6 +70,47 @@ try{
   assert.match(total,/1\.000|1000/);
   assert.match(promo,/Promoción aplicada/i);
   assert.match(promo,/Descuento/i);
+  // El contrato de impresión común debe entregar los PDF convertidos
+  // al puente TUS; interceptar el mensaje ANTES del manejador del portal
+  // para no subir originales ni registrar órdenes durante este ensayo.
+  await page.evaluate(()=>{
+   window.__saberHandoffQA=[];
+   window.addEventListener('message',async event=>{
+    const frame=document.querySelector('#smart');
+    if(event.source!==frame?.contentWindow)return;
+    const t=event.data?.type;
+    if(!['SABER_SMART_DOCUMENTS_TO_PRIVATE','SABER_SMART_UNIVERSAL_PDF'].includes(t))return;
+    event.stopImmediatePropagation();
+    const files=event.data.files||[];
+    window.__saberHandoffQA.push({
+     type:t,files:files.length,
+     pdfSignatures:await Promise.all(files.map(async f=>{
+      const head=new Uint8Array(await f.slice(0,5).arrayBuffer());
+      return String.fromCharCode(...head);
+     })),
+     names:files.map(f=>f.name),
+     total:event.data.total??event.data.totalOrientativo
+    });
+   },true);
+  });
+  await card.locator('label').filter({hasText:'Servicio'}).locator('select').selectOption('auto');
+  await page.waitForFunction(()=>{
+   const frame=document.querySelector('#smart')?.contentDocument;
+   return /Total preliminar/i.test(frame?.querySelector('#presupuesto')?.textContent||'')&&
+     /Impresiones/i.test(frame?.querySelector('#presupuesto')?.textContent||'');
+  },null,{timeout:35000});
+  await page.evaluate(()=>{
+    const child=document.querySelector('#smart')?.contentWindow;
+    child.postMessage({type:'SABER_SMART_PREPARAR_ENVIO'},location.origin);
+  });
+  await page.waitForFunction(()=>window.__saberHandoffQA.length>0,null,{timeout:15000});
+  const handoff=(await page.evaluate(()=>window.__saberHandoffQA))[0];
+  assert.equal(handoff.type,'SABER_SMART_DOCUMENTS_TO_PRIVATE',
+   'Las imágenes convertidas deben poder continuar por la recepción de PDF.');
+  assert.equal(handoff.files,1);
+  assert.deepEqual(handoff.pdfSignatures,['%PDF-']);
+  assert.match(handoff.names[0],/^imagenes-01-2-fotos\\.pdf$/);
+  assert.ok(Number.isSafeInteger(handoff.total)&&handoff.total>0);
   assert.deepEqual(unexpected,[],'No autorizar envíos ni pagos durante QA');
   assert.equal(errors.length,0,'JS pageerror: '+errors.join(' | '));
   const scroll=await frm.locator('body').evaluate(el=>({
