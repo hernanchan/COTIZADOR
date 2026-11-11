@@ -68,8 +68,10 @@ export async function registrarR2LivePendiente(request,env,{
     stagedForCentral:true,registeredInD1:false,productionAuthorized:false}):
     respond({ok:false,error:'LIVE_R2_STAGE_CONFLICTO'},409);
   }
-  // Usar el método bancario auditado o MP confirmado: no bloquear un R2
-  // legítimamente pagado por transferencia con la condición exclusiva de MP.
+  // D1 ya concilió el cobro. Persistencia atómica exige el mismo método,
+  // sin confiar en un comprobante del navegador.
+  if(!['mercadopago','transferencia'].includes(paid.method))
+   return respond({ok:false,error:'LIVE_R2_STAGE_METODO_NO_VERIFICADO'},402);
   const bank=paid.method==='transferencia';
   if(bank){
    const table=await db.prepare("SELECT name FROM sqlite_master WHERE type='table' "+
