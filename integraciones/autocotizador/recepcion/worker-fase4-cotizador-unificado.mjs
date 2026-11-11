@@ -2373,7 +2373,7 @@ export default {
         .replace('<script src="/prueba-carga-unica.js" defer></script>',
          '<script src="/cotizar/archivos.js" defer></script>')
         .replace(/href="\/prueba-cotizador-conjunto"/g,'href="/cotizar"')
-        .replace('</head><body>',\`<style>
+        .replace('</head><body>',`<style>
           html,body{overflow-x:hidden;max-width:100%}
           body{background:transparent}
           main{box-shadow:none;margin:0;padding:4px;max-width:none;width:100%}
@@ -2391,8 +2391,8 @@ export default {
            .fila{gap:7px;padding:9px}
            .modo-config{padding:10px}
           }
-          </style></head><body>\`)
-        .replace('</body></html>',\`<script>
+          </style></head><body>`)
+        .replace('</body></html>',`<script>
           (() => {
            if(window.parent===window||location.pathname!=='/cotizar/archivos')return;
            let last=0;
@@ -2408,7 +2408,7 @@ export default {
            addEventListener('load',send);
            requestAnimationFrame(send);
           })();
-          </script></body></html>\`);
+          </script></body></html>`);
        return new Response(html,{headers:{
         'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store,private',
         'Content-Security-Policy':"default-src 'none'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'",
