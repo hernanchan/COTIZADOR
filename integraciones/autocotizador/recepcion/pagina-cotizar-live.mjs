@@ -52,6 +52,7 @@ window.saberIngresoLive=async token=>{
   return new Response(html,{headers:headers(
    "default-src 'none'; script-src 'unsafe-inline' https://challenges.cloudflare.com; style-src 'unsafe-inline'; frame-src https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")});
  }
+ const scriptNonce=crypto.randomUUID().replaceAll('-','');
  const enabled=env?.DOCS_LIVE_RECEPCION_GATE===ON&&env?.DOCS_LIVE_PRICING_GATE===ON&&
   env?.DOCS_LIVE_ORDER_GATE===ON;
  const html=`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -67,7 +68,7 @@ window.saberIngresoLive=async token=>{
 <p><small>La confirmación de pago se verifica en Librería Saber. No se envía ningún original por cotizar.</small></p>
 </section><section><h2>Tus archivos</h2>
 <iframe id="pdf" title="Elegir PDF y opciones de impresión" src="/cotizar/archivos"></iframe>
-</section></main><script type="module">
+</section></main><script type="module" nonce="${scriptNonce}">
 import {crearFlujoPresupuestoLive} from '/cotizar/flujo-live.js';
 const phone=document.getElementById('telefono');
 const status=document.getElementById('estado');
@@ -129,5 +130,5 @@ action.addEventListener('click',async()=>{
 });
 </script></body></html>`;
  return new Response(html,{headers:headers(
-  "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; frame-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")});
+  "default-src 'none'; script-src 'self' 'nonce-"+scriptNonce+"'; style-src 'unsafe-inline'; frame-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")});
 }
