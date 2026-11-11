@@ -18,6 +18,7 @@ on:
       - 'integraciones/mercadopago/pruebas/r2-universal-live-gate-central.mjs'
       - 'integraciones/mercadopago/pruebas/r2-universal-live-gate-central.test.mjs'
       - 'integraciones/mercadopago/pruebas/r2-universal-live-reserve-central.mjs'
+      - 'integraciones/mercadopago/pruebas/r2-universal-live-stage-central.mjs'
       - 'integraciones/mercadopago/pruebas/r2-universal-live-reserve-central.test.mjs'
       - 'integraciones/mercadopago/pruebas/r2-universal-checkout-central.mjs'
       - 'integraciones/mercadopago/pruebas/tus-live-pospago-aislado.test.mjs'
@@ -144,6 +145,7 @@ jobs:
           node --check integraciones/autocotizador/recepcion/ficha-prearchivo-universal.mjs
           node --check integraciones/mercadopago/pruebas/worker.js
           node --check integraciones/mercadopago/pruebas/mercadopago-live-central.mjs
+          node --check integraciones/mercadopago/pruebas/r2-universal-live-stage-central.mjs
       - name: Compilar interfaz comprador y cotizador PDF sin desplegar
         run: |
           set -euo pipefail
