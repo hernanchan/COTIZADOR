@@ -136,8 +136,13 @@ async function preciosPrivados(env,request){
     !(precioComprador&&await autorizadoPedidoCliente(request,env))&&
     !consultaLive)
   throw Error('La versión de precios privada requiere sesión autorizada.');
- return live?(await obtenerTarifarioD1Live(env)).prices:
-  (await obtenerTarifarioD1Privado(env)).prices;
+ const aprobado=live?await obtenerTarifarioD1Live(env):
+  await obtenerTarifarioD1Privado(env);
+ // Metadatos de promociones aprobadas únicamente para el motor de cotización.
+ // No se copian ni se exponen en el JSON público de precios.
+ return Object.defineProperty(aprobado.prices,'__promotions',{
+  value:aprobado.promotions,enumerable:false,configurable:false
+ });
 }
 
 const INTERNAL_ALLOW_UPLOADS = false;
