@@ -25,9 +25,11 @@ jobs:
         run: |
           set -euo pipefail
           node --check integraciones/mercadopago/pruebas/r2-universal-live-stage-central.mjs
+          node --check integraciones/mercadopago/pruebas/transferencias-live-central.mjs
+          grep -Fq 'transportesTransferenciaLiveHabilitados' integraciones/mercadopago/pruebas/transferencias-live-central.mjs
           grep -Fq "central_live_bank_accreditations a" integraciones/mercadopago/pruebas/r2-universal-live-stage-central.mjs
           npm install --no-save --no-audit --no-fund esbuild@0.25.12 wrangler@4.55.0
-          node --test integraciones/mercadopago/pruebas/r2-universal-live-gate-central.test.mjs             integraciones/mercadopago/pruebas/r2-universal-live-reserve-central.test.mjs             integraciones/mercadopago/pruebas/mercadopago-live-central.test.mjs
+          node --test integraciones/mercadopago/pruebas/r2-universal-live-gate-central.test.mjs integraciones/mercadopago/pruebas/r2-universal-live-reserve-central.test.mjs integraciones/mercadopago/pruebas/mercadopago-live-central.test.mjs integraciones/mercadopago/pruebas/transferencias-live-central.test.mjs
           ./node_modules/.bin/esbuild integraciones/mercadopago/pruebas/worker.js             --bundle --platform=browser --format=esm --target=es2022             --outfile=/tmp/saber-central-live-r2-fixed.mjs
           node --check /tmp/saber-central-live-r2-fixed.mjs
           echo SABER_R2_LIVE_FIX_BUILD_OK
