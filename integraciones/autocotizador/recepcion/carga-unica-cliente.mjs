@@ -90,6 +90,9 @@ function informarPrecioPrivado(estado,total=null,motivo=''){
  const sendable=estado==='listo'&&ultimoPresupuesto?.estado==='PRELIMINAR'&&!bloqueoRecepcion;
  window.parent.postMessage({type:'SABER_SMART_PRICE_STATE',estado,
   total:Number.isSafeInteger(total)&&total>0?total:null,
+  promocion:estado==='listo'&&ultimoPresupuesto?.promocion?.aplicada===true?
+   {titulo:ultimoPresupuesto.promocion.titulo,descuento:ultimoPresupuesto.promocion.descuento,
+    totalAnterior:ultimoPresupuesto.promocion.totalAnterior}:null,
   sendable,blockReason:bloqueoRecepcion||(estado==='error'?String(motivo||'No se pudo verificar el precio.').slice(0,220):null)},location.origin);
 }
 function importeArchivo(indice){
@@ -849,6 +852,9 @@ async function cotizar(){
    'Falta revisar '+lote.noLeidos.length+' PDF. Este subtotal NO es el total del pedido y no habilita su envío.':
    'Impresiones (incluye anillados): '+ars(d.subtotalImpresiones)+' · Ploteos: '+ars(d.subtotalPloteos)+' · Stickers: '+ars(d.subtotalStickers||0)+' · Fotos: '+ars(d.subtotalFotos||0)+' · Corte: '+ars(d.subtotalCortes||0)+' · Gráfica: '+ars(d.subtotalGraficas||0)),
   texto('p','Anillados incluidos en el cálculo: '+ars(d.subtotalAnillados)));
+ if(d.promocion?.aplicada===true)out.append(texto('p',
+  'Promoción aplicada: '+d.promocion.titulo+' · Antes '+ars(d.promocion.totalAnterior)+
+  ' · Ahorrás '+ars(d.promocion.descuento)+' · Total '+ars(d.total)));
  for(const p of d.pendientes){
   const warning=texto('p',p.nombre+': '+p.motivo+
    '. Tocá Editar o Quitá únicamente ese archivo; los demás mantienen su cálculo.');
