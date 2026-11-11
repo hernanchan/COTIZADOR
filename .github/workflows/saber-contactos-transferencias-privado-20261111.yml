@@ -37,6 +37,8 @@ jobs:
           for marker in 'cliente-nombre' 'cliente-direccion' 'nombreCliente' 'telefonoContacto'; do
             grep -Fq "$marker" integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
           done
+          grep -Fq 'id="resumen-precio-entrega"' integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq 'FECHA MÁXIMA ESTIMADA DE ENTREGA' integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
           grep -Fq 'central_order_customer_details' /tmp/saber-central-contactos.mjs
           echo 'CONTACTOS_CI_OK_SIN_DEPLOY'
       - name: Desplegar exclusivamente dos Workers de pruebas, reversión coordinada
@@ -131,13 +133,16 @@ jobs:
             c=$(curl -sS --max-time 25 -o "$tmp/admin.html" -w '%{http_code}' "$origin_central/admin" || true)
             b=$(curl -sS --max-time 25 -o "$tmp/buyer.html" -w '%{http_code}' "$origin_docs/prueba-v2/pedido-cliente" || true)
             st=$(curl -sS --max-time 25 --user "operador:$PASSWORD" -o "$tmp/staff.html" -w '%{http_code}' "$origin_docs/prueba-v2/" || true)
-            mc=0; mn=0; md=0; gate=0
+            mc=0; mn=0; md=0; gate=0; px=0; date=0; promo=0
             grep -Fq 'id="centralExtraTools"' "$tmp/admin.html" && mc=1 || true
             grep -Fq 'id="cliente-nombre"' "$tmp/staff.html" && mn=1 || true
             grep -Fq 'id="cliente-direccion"' "$tmp/staff.html" && md=1 || true
             grep -Fq 'cf-turnstile' "$tmp/buyer.html" && gate=1 || true
-            echo "CONTACTOS_HTML_PROBE attempt=$i central_http=$c buyer_http=$b staff_http=$st central_marker=$mc name_marker=$mn address_marker=$md buyer_turnstile_gate=$gate"
-            if [ "$c" = 200 ] && [ "$b" = 200 ] && [ "$st" = 200 ] && [ "$mc" = 1 ] && [ "$mn" = 1 ] && [ "$md" = 1 ] && [ "$gate" = 1 ]; then passed=1; break; fi
+            grep -Fq 'id="resumen-precio-entrega"' "$tmp/staff.html" && px=1 || true
+            grep -Fq 'FECHA MÁXIMA ESTIMADA DE ENTREGA' "$tmp/staff.html" && date=1 || true
+            grep -Fq 'id="promocion-dia-resumen"' "$tmp/staff.html" && promo=1 || true
+            echo "CONTACTOS_HTML_PROBE attempt=$i central_http=$c buyer_http=$b staff_http=$st central_marker=$mc name_marker=$mn address_marker=$md buyer_turnstile_gate=$gate summary=$px date=$date promo=$promo"
+            if [ "$c" = 200 ] && [ "$b" = 200 ] && [ "$st" = 200 ] && [ "$mc" = 1 ] && [ "$mn" = 1 ] && [ "$md" = 1 ] && [ "$gate" = 1 ] && [ "$px" = 1 ] && [ "$date" = 1 ] && [ "$promo" = 1 ]; then passed=1; break; fi
             sleep 2
           done
           test "$passed" = 1 || { echo 'CONTACTOS_HTML_MISSING_ROLLBACK'; exit 1; }
