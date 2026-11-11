@@ -67,9 +67,18 @@ test('próximo día respeta fines de semana y feriado editable',()=>{
   closedDates:['2026-11-16']});
  assert.equal(x.estimatedDeadlineDate,'2026-11-17');
 });
-test('si la Central no configuró agenda no se inventa fecha',()=>{
+test('si la Central fijó hoy, mostrar la fecha local aun sin agenda D1',()=>{
  const x=plazoInformativo('hoy',wednesday,null);
+ assert.equal(x.mode,'hoy');
+ assert.equal(x.estimatedDeadlineDate,'2026-11-11');
+ assert.equal(x.calendarVerified,false);
+ assert.equal(x.guaranteed,false);
+ assert.equal(x.exactReadyAt,null);
+});
+test('sin agenda D1, próximo día no inventa fecha calendario',()=>{
+ const x=plazoInformativo('proximo_dia',wednesday,null);
  assert.equal(x.estimatedDeadlineDate,null);
+ assert.equal(x.mode,'proximo_dia');
 });
 test('no prometer fecha de feriado o cierre informado',()=>{
  const x=plazoInformativo('hoy',wednesday,{...calendar,closedDates:['2026-11-11']});
