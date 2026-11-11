@@ -97,16 +97,25 @@ jobs:
           echo PRUEBAS_JS_HTTP_200
           # Comprobar la pantalla CLIENTE real con la cuenta de personal en GET
           # y que la sección de carga antecede al bloque de contacto.
-          code="$(curl -sS --max-time 30 -u "operador:$PASSWORD" -o "$tmp/portal.html" -w '%{http_code}' "$base/prueba-v2/")"
-          test "$code" = 200
-          node --input-type=module - "$tmp/portal.html" <<'NODE'
+          # Esperar propagación a los bordes: el endpoint puede responder la
+          # versión anterior durante unos segundos tras promover 100%.
+          verified=0
+          for attempt in 1 2 3 4 5 6; do
+            code="$(curl -sS --max-time 30 -u "operador:$PASSWORD" -o "$tmp/portal.html" -w '%{http_code}' "$base/prueba-v2/?web_version=$GITHUB_SHA")"
+            if [ "$code" = 200 ] && node --input-type=module - "$tmp/portal.html" <<'NODE'
           import fs from 'node:fs';
           const html=fs.readFileSync(process.argv[2],'utf8');
           const iframe=html.indexOf('<iframe id="smart"'),actions=html.indexOf('<div id="acciones-pedido">');
-          if(!(iframe>0&&actions>iframe)||html.includes('#acciones-pedido{position:sticky;top:0;'))
-            throw Error('Portal con cabecera fija tapando cargador');
+          const fixed=html.includes('#acciones-pedido{position:sticky;top:0;');
+          console.log('PORTAL_STRUCTURE iframe='+iframe+' actions='+actions+' sticky='+fixed);
+          if(!(iframe>0&&actions>iframe)||fixed)process.exit(1);
           console.log('PRUEBAS_CARGA_ANTES_DE_FORMULARIO_HTTP_200');
           NODE
+            then verified=1; break; fi
+            echo "PORTAL_ESPERANDO_PROPAGACION intento=$attempt"
+            sleep 2
+          done
+          test "$verified" = 1
           echo SABER_PRUEBAS_DESPLEGADO_JPG_PNG_PROMOS_Y_BINDINGS_INTACTOS
           applied=0
           trap - ERR
