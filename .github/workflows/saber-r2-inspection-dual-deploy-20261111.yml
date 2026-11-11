@@ -37,3 +37,5 @@ jobs:
         run: |
           set -euo pipefail
           bash integraciones/publicacion/desplegar-inspector-r2-live-20261111.sh
+# Release controlado 2026-11-11: UX carga visible PDF/JPG/PNG y mensaje comercial
+# QA success en rama: 919a9c7, 789298c, 75f94eb, 9276676; R2 pagos permanecen NO_GO.
