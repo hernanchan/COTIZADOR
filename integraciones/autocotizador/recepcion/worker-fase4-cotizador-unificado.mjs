@@ -2423,6 +2423,7 @@ export default {
     if(page==='/personal/paquete'||
        page==='/personal/api/live-paquete'||
        page==='/personal/api/live-descargar'||
+       page==='/personal/api/live-r2-board'||
        page==='/personal/api/live-r2-inspection-source'||
        page==='/personal/api/live-r2-inspection-original'||
        page==='/personal/api/live-r2-inspection-confirm'){
@@ -2441,7 +2442,8 @@ export default {
          'Cache-Control':'no-store, private','X-Robots-Tag':'noindex,nofollow',
          'Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"}});
       }
-      if(page==='/personal/api/live-r2-inspection-source'||
+      if(page==='/personal/api/live-r2-board'||
+         page==='/personal/api/live-r2-inspection-source'||
          page==='/personal/api/live-r2-inspection-original'||
          page==='/personal/api/live-r2-inspection-confirm'){
        const {inspeccionR2PersonalLive}=await import('./r2-inspeccion-personal-live.mjs');
