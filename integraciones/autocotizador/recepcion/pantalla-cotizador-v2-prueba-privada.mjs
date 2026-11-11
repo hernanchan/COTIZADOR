@@ -1343,7 +1343,7 @@ async function universalSubirPagados(){
   if(received.ok!==true||received.productionAuthorized!==false)
    throw Error('Recepción del pedido sin confirmar');
   r2Informar('Recibimos los '+received.fileCount+
-   ' PDF de la orden '+received.numeroOrden+'. Están pendientes de preprensa y preparación. No vuelvas a pagar.');
+   ' PDF de la orden '+received.numeroOrden+'. Están pendientes de revisión de impresión y preparación. No vuelvas a pagar.');
   document.getElementById('precio-smart').textContent='Orden N.º '+
    received.numeroOrden+' · PDF recibidos · Preprensa pendiente';
   r2Retry.hidden=true;
@@ -1394,7 +1394,7 @@ async function prepararPedidoUniversal(){
     r2Informar('Verificando integridad y medidas de los PDF recibidos…');
   }
  });
- r2Panel.querySelector('h2').textContent='Impresiones y ploteos · Un solo pago';
+ r2Panel.querySelector('h2').textContent='Impresiones, ploteos y fotos · Un solo pago';
  r2Recuperacion.hidden=true;r2Panel.hidden=false;
  r2Pagar.hidden=true;r2Link.hidden=true;r2Retry.hidden=true;
  r2Informar('Cotizando todos los archivos en la Central. Todavía no se subió ningún original.');
@@ -1691,7 +1691,8 @@ window.addEventListener('message',async event=>{
      universalPendiente||universalFlujo||!Array.isArray(p.files)||
      !Array.isArray(p.archivos)||p.files.length<1||p.files.length>10||
      p.files.length!==p.archivos.length||
-     !p.files.some(f=>f instanceof File&&f.size>40*1024*1024)||
+     !(p.files.some(f=>f instanceof File&&f.size>40*1024*1024)||
+     p.archivos.some(a=>a.servicio==='fotos'))||
      p.files.some((f,i)=>!(f instanceof File)||
       f.name!==p.archivos[i]?.nombre||f.size<5||
       f.size>200*1024*1024||!/\.pdf$/i.test(f.name))){
