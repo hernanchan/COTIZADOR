@@ -48,3 +48,18 @@ test('recepción activa solo bajo gate LIVE exacto; la pantalla no acredita pago
  assert.match(html,/flow\.iniciarPago\(\)/);
  assert.doesNotMatch(html,/uploadR2|sendOriginal|pagoAutorizado=true/);
 });
+
+test('la pantalla autenticada autoriza SOLO su propio módulo JS con nonce CSP',async()=>{
+ const out=paginaCotizarLive(new Request(url),{
+  ...env,DOCS_LIVE_RECEPCION_GATE:gate,DOCS_LIVE_PRICING_GATE:gate,
+  DOCS_LIVE_ORDER_GATE:gate
+ },{authorized:true});
+ assert.equal(out.status,200);
+ const html=await out.text();
+ const tag=html.match(/<script type="module" nonce="([a-f0-9]{32})">/);
+ assert.ok(tag,'MODULO_SIN_NONCE');
+ const csp=out.headers.get('Content-Security-Policy');
+ assert.ok(csp.includes("script-src 'self' 'nonce-"+tag[1]+"'"),'CSP_BLOQUEA_SCRIPT');
+ assert.doesNotMatch(csp,/script-src[^;]*'unsafe-inline'/);
+ assert.match(html,/crearFlujoPresupuestoLive/);
+});
