@@ -227,7 +227,7 @@ export async function checkoutMPLiveCentral(request,env,{
  }catch(error){
   const codigo=String(error?.message||'sin_detalle');
   // Nunca incluir secretos, URLs privadas, datos de comprador ni payload MP.
-  const causa=/^(?:MP_LIVE_HTTP_[0-9]{3}_[A-Za-z0-9_-]{1,60}|MP_LIVE_VENDEDOR_INCORRECTO|MP_LIVE_PREFERENCIA_INCOMPATIBLE)$/.test(codigo)?
+  const causa=/^(?:MP_LIVE_HTTP_[0-9]{3}_[A-Za-z0-9_-]{1,60}|MP_LIVE_VENDEDOR_INCORRECTO|MP_LIVE_PREFERENCIA_INCOMPATIBLE|MP_LIVE_REDIRECCION_RECHAZADA)$/.test(codigo)?
    codigo:'FALLO_INTERNO';
   console.warn('saber_mp_live_checkout_fallo',{etapa,codigo:causa});
   return reply({ok:false,error:'MP_LIVE_CHECKOUT_NO_VERIFICADO',
@@ -378,7 +378,7 @@ export async function diagnosticarVendedorMPLive(request,env,{
   let code='EXCEPCION_DESCONOCIDA';
   if(/^MP_LIVE_HTTP_[0-9]{3}_[A-Za-z0-9_-]{1,60}$/.test(message))
    code=message;
-  else if(message==='MP_LIVE_VENDEDOR_INCORRECTO')code=message;
+  else if(message==='MP_LIVE_VENDEDOR_INCORRECTO'||message==='MP_LIVE_REDIRECCION_RECHAZADA')code=message;
   else if(message==='MP_LIVE_RUTA_PROHIBIDA')code=message;
   else if(error?.name==='TimeoutError'||error?.name==='AbortError')code='MP_LIVE_RED_TIMEOUT';
   else if(error?.name==='TypeError'&&/fetch|network|connect/i.test(message))
