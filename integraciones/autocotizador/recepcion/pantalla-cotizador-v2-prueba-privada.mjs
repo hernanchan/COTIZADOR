@@ -36,6 +36,14 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .contacto-ayuda,.contacto-error{flex-basis:100%;font-size:12px;line-height:1.2;margin:0}
 .contacto-ayuda{color:#52677a}.contacto-error{color:#a12828;font-weight:700}
 .contacto-error:empty{display:none}
+#resumen-precio-entrega{display:grid;grid-template-columns:minmax(180px,1fr) minmax(210px,1fr);gap:14px;flex:1 1 100%;align-items:start}
+#resumen-precio-entrega>div{border-radius:10px;background:white;border:1px solid #bdd2e4;padding:12px 14px;min-width:0}
+#resumen-precio-entrega .resumen-titulo{display:block;color:#183f62;font-size:15px;font-weight:750;line-height:1.25}
+#resumen-precio-entrega #precio-smart{font-size:clamp(21px,2.3vw,27px);font-weight:850;line-height:1.25;overflow-wrap:anywhere}
+#resumen-precio-entrega #plazo-produccion-orientativo{font-size:clamp(20px,2.3vw,27px);font-weight:850;color:#0c4671;line-height:1.25;margin:3px 0}
+#resumen-precio-entrega .resumen-aviso{display:block;grid-column:1 / -1;font-size:14px;line-height:1.4;color:#43566a;font-weight:500}
+#promocion-dia-resumen:not([hidden]){display:block;grid-column:1 / -1;font-size:15px;font-weight:650;background:#fff7e8;border-radius:8px;padding:9px 12px;color:#76420b}
+@media(max-width:650px){#resumen-precio-entrega{grid-template-columns:1fr;gap:8px}#resumen-precio-entrega .resumen-aviso,#promocion-dia-resumen:not([hidden]){grid-column:1}}
 #acciones-pedido{position:sticky;top:0;z-index:30;background:#eaf3fa;border-bottom:2px solid #aecce5;padding:8px max(15px,calc((100vw - 1110px)/2));box-shadow:0 3px 9px #0a315812;display:flex;align-items:center;gap:12px;flex-wrap:wrap}#precio-smart{flex:1;font-size:16px;font-weight:750;color:#0a3158}#send-all-pdf{font-weight:750;background:#095985;white-space:nowrap;min-height:43px}#batch-progress{flex-basis:100%;margin:0;font-size:12px;line-height:1.2}#batch-progress.error-recepcion{background:#fee8e6;border-left:4px solid #b42318;border-radius:6px;color:#8f1d1d;padding:9px 12px;font-weight:750}#recepcion-avanzada>summary{font-size:13px!important;color:#536475}#seguridad-privada{max-width:1110px;margin:7px auto 0;padding:0 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}#seguridad-privada .cf-turnstile{margin:0} @media(max-width:600px){#acciones-pedido{padding:8px 12px}#send-all-pdf{width:100%}}
 .cf-turnstile{margin:15px 0}
 #vista-estado-pedido{background:#fff;border-radius:12px;padding:24px;margin:12px 0;border:1px solid #bad2e7}
@@ -55,8 +63,11 @@ body.estado-envio #smart,body.estado-registro #smart{display:none}
 @media(max-width:840px){main{display:block}.panel{margin-bottom:14px}iframe{min-height:740px}}
 </style></head><body>
 <header><h1>LIBRERÍA SABER · Cotizador V2 en ensayo privado</h1><small style="color:#d5e3f0">${sandboxEnabled?'Solo pagos con usuarios de prueba; sin cobros reales ni publicación comercial.':'Sin cobros, sin órdenes de producción y sin publicación comercial.'}</small></header>
-<div id="acciones-pedido"><div id="precio-smart" role="status" aria-live="polite">Presupuesto preliminar: todavía sin cotizar · No autoriza cobro</div>
-<p id="plazo-produccion-orientativo" class="contacto-ayuda" role="status" aria-live="polite">Plazo máximo orientativo de preparación: consultando previsión de la Central…</p>
+<div id="acciones-pedido"><div id="resumen-precio-entrega" aria-label="Resumen del precio y la fecha de entrega">
+<div><span class="resumen-titulo">TU PRECIO A PAGAR</span><div id="precio-smart" role="status" aria-live="polite">Pendiente de cotización</div></div>
+<div><span class="resumen-titulo">FECHA MÁXIMA ESTIMADA DE ENTREGA</span><p id="plazo-produccion-orientativo" role="status" aria-live="polite">Consultando…</p></div>
+<small class="resumen-aviso" id="aclaracion-plazo">Fecha orientativa desde la acreditación del pago, sujeta a disponibilidad, trabajo y horarios. Cuando iniciemos el pedido, en tu seguimiento tendrás una fecha y hora de retiro más precisas.</small>
+<p id="promocion-dia-resumen" hidden></p></div>
 <div class="contacto-datos" role="group" aria-label="Datos de contacto del pedido">
 <label id="cliente-nombre-label" for="cliente-nombre">Nombre y apellido o responsable *
 <input id="cliente-nombre" type="text" autocomplete="name" maxlength="100" placeholder="Nombre de quien retira" required aria-describedby="cliente-nombre-error"></label>
@@ -108,6 +119,12 @@ body.estado-envio #smart,body.estado-registro #smart{display:none}
 <script type="module">
 import {subirYVincularPdfCotizadorV2,ejecutarRecepcionParalela,fileIdParaReferencia} from '/prueba-v2/subir-vincular-pdf.mjs';
 const plazoInfo=document.getElementById('plazo-produccion-orientativo');
+const promoInfo=document.getElementById('promocion-dia-resumen');
+const localDate=date=>{
+ if(!/^20\\d{2}-\\d{2}-\\d{2}$/.test(date||''))return null;
+ const [year,month,day]=date.split('-');
+ return day+'/'+month+'/'+year;
+};
 (async()=>{
  try{
   const r=await fetch('/prueba-v2/api/plazo-produccion',{method:'GET',cache:'no-store'});
@@ -115,9 +132,19 @@ const plazoInfo=document.getElementById('plazo-produccion-orientativo');
   if(!r.ok||d?.ok!==true||d.guaranteed!==false||
      typeof d.label!=='string'||typeof d.notice!=='string')
    throw Error('Sin previsión vigente');
-  plazoInfo.textContent=d.heading+': '+d.label+'. '+d.notice;
+  plazoInfo.textContent=localDate(d.estimatedDeadlineDate)||'Fecha a confirmar';
+  plazoInfo.setAttribute('title',d.label);
+  if(d.dayPromotion?.informationalOnly===true&&
+     d.dayPromotion?.appliedToQuote===false&&
+     typeof d.dayPromotion.title==='string'&&
+     typeof d.dayPromotion.summary==='string'){
+    promoInfo.hidden=false;
+    promoInfo.textContent='Promoción del día (informativa): '+d.dayPromotion.title+
+     ' · '+d.dayPromotion.summary+'. No descontada de este presupuesto.';
+  }else{promoInfo.hidden=true;promoInfo.textContent=''}
+
  }catch{
-  plazoInfo.textContent='Plazo máximo orientativo de preparación: a confirmar por Librería Saber antes de acordar el retiro. Cuando iniciemos el trabajo, se informará una hora estimada.';
+  plazoInfo.textContent='Fecha a confirmar';
  }
 })();
 import {prepararManifiestoDocumentalV2} from '/prueba-v2/preparar-manifiesto.mjs';
