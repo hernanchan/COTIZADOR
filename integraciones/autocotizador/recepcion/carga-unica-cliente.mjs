@@ -11,6 +11,7 @@ import {clasificarPloteoGrandeVisualLimitado} from './clasificar-ploteo-grande-v
 import {prepararLoteParcial,recomponerLoteParcial} from './cotizar-lote-parcial.mjs';
 import {solicitarCotizacionPrivada} from './solicitar-cotizacion-privada.mjs';
 import {decidirTransportePDF,LIMITE_TUS_PDF_BYTES,LIMITE_R2_PDF_BYTES} from './seleccionar-transporte-pdf.mjs';
+import {normalizarArchivosImpresion} from './imagenes-a-pdf-local.mjs';
 const $=id=>document.getElementById(id);
 const entries=[];
 let modoLote=null; // El usuario elige antes de cargar: común o individual.
@@ -766,9 +767,23 @@ actualizarModoLote();
 $('archivos').addEventListener('change',async ev=>{
  if(!modoLote){$('estado').textContent='Elegí cómo querés configurar los archivos antes de subirlos.';return;}
  if(leyendo)return;
- const files=[...(ev.target.files||[])];ev.target.value='';
- if(entries.length+files.length>MAX_PDF_CARGA){$('estado').textContent='Máximo '+MAX_PDF_CARGA+' PDF.';return}
+ const elegidos=[...(ev.target.files||[])];ev.target.value='';
+ if(!elegidos.length)return;
  leyendo=true;
+ let files,imagenes=0;
+ try{
+  $('estado').textContent='Preparando PDF e imágenes para impresión en este dispositivo…';
+  const normalizados=await normalizarArchivosImpresion(elegidos);
+  files=normalizados.files;imagenes=normalizados.images;
+  if(entries.length+files.length>MAX_PDF_CARGA)
+   throw Error('Máximo '+MAX_PDF_CARGA+' archivos imprimibles. Dividí el lote.');
+ }catch(error){
+  leyendo=false;
+  $('estado').textContent=String(error.message||error);
+  return;
+ }
+ if(imagenes)$('estado').textContent=imagenes+' imágenes convertidas localmente a PDF para cotizar. Podés elegir 1, 2, 4 o 9 páginas por cara.';
+
  // Mantener fichas compactas al cargar un lote; cada PDF se edita sólo si hace falta.
  if(!entries.length)abierto=-1;
  for(const f of files)entries.push({name:f.name,archivoOriginal:f,paginas:null,seleccion:'sin-confirmar',error:null,copias:1,modo:'bn',caras:'simple',papelPoster:'obra80',anillado:'ninguno',grupoAnillado:'',paginasPorHoja:1,materialColor:'',paginasSeleccionadas:'',servicio:'auto',productoFoto:'',productoGrafica:'',corteVariante:'gt3',corteMetros:1});
