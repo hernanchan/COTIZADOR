@@ -143,7 +143,7 @@ const localDate=date=>{
      typeof d.dayPromotion.summary==='string'){
     promoInfo.hidden=false;
     promoInfo.textContent='Promoción del día (informativa): '+d.dayPromotion.title+
-     ' · '+d.dayPromotion.summary+'. No descontada de este presupuesto.';
+     ' · '+d.dayPromotion.summary+'. El beneficio se aplica automáticamente al cotizar los trabajos que cumplan sus condiciones.';
   }else{promoInfo.hidden=true;promoInfo.textContent=''}
 
  }catch{
