@@ -235,9 +235,9 @@ export async function finalizarPedidoTUSPrivado(request,env,{
  try{
   ensureRequest(request,env,authorized);
   const input=await bodyJSON(request);
-  if(!input||!['clientOrderId,entries,orderId','clientOrderId,entries,orderId,telefono',
-    'clientOrderId,entries,expectedPriceVersion,orderId',
-    'clientOrderId,entries,expectedPriceVersion,orderId,telefono'].includes(Object.keys(input).sort().join(','))||
+  if(!input||typeof input!=='object'||Array.isArray(input)||
+     !Object.keys(input).every(k=>['clientOrderId','entries','orderId','telefono','nombre','direccion','expectedPriceVersion'].includes(k))||
+     !Object.hasOwn(input,'entries')||!Object.hasOwn(input,'orderId')||
      !UUID.test(input.clientOrderId||''))
    throw Error('Pedido privado inválido.');
   if(input.telefono!==undefined){
@@ -246,6 +246,10 @@ export async function finalizarPedidoTUSPrivado(request,env,{
       d.length<10||d.length>15)
     throw Error('Teléfono de contacto inválido.');
   }
+  if(input.nombre!==undefined&&(typeof input.nombre!=='string'||input.nombre.trim().length<2||input.nombre.trim().length>100||/[<>]/.test(input.nombre)))
+   throw Error('Nombre del cliente inválido.');
+  if(input.direccion!==undefined&&(typeof input.direccion!=='string'||input.direccion.trim().length>180||/[<>]/.test(input.direccion)))
+   throw Error('Dirección del cliente inválida.');
   const version=verificarVersionPrecioPedido({
    versionVista:input.expectedPriceVersion,
    preciosServidor,tarifarioD1Activo:env?.DOCS_PRICE_ADMIN_D1_ENABLED==='PRIVATE_TEST_ONLY'
@@ -268,7 +272,9 @@ export async function finalizarPedidoTUSPrivado(request,env,{
    throw Error('Registro privado de D1 incongruente.');
   const pedido=await preparar({
    env,webOrderId:registrado.orderId,clientOrderId:input.clientOrderId,items:[],
-   ...(input.telefono?{telefono:input.telefono.trim()}:{})
+   ...(input.telefono?{telefono:input.telefono.trim()}:{}),
+   ...(input.nombre?{nombre:input.nombre.trim()}:{}),
+   ...(typeof input.direccion==='string'?{direccion:input.direccion.trim()}:{})
   });
   if(pedido.amountArs!==checked.verificacion.importeVerificado||
      pedido.paymentAuthorized!==false)
