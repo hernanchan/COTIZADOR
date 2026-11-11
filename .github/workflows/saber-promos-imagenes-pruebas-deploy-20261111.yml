@@ -7,6 +7,8 @@ on:
       - integraciones/autocotizador/recepcion/carga-unica-pagina.mjs
       - integraciones/autocotizador/recepcion/carga-unica-cliente.mjs
       - tests/tus-ux-modo-configuracion.test.mjs
+      - integraciones/autocotizador/recepcion/pantalla-cotizador-v2-prueba-privada.mjs
+      - tests/tus-portal-carga-visible.test.mjs
 permissions: {contents: read, statuses: write}
 concurrency: {group: saber-promos-imagenes-solo-pruebas, cancel-in-progress: false}
 jobs:
@@ -23,7 +25,7 @@ jobs:
         run: |
           set -euo pipefail
           npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.25.12
-          node --test integraciones/autocotizador/recepcion/promociones-semanales-cotizacion.test.mjs integraciones/autocotizador/recepcion/imagenes-a-pdf-local.test.mjs tests/tus-ux-modo-configuracion.test.mjs tests/tus-ui-cierre-operativo.test.mjs
+          node --test integraciones/autocotizador/recepcion/promociones-semanales-cotizacion.test.mjs integraciones/autocotizador/recepcion/imagenes-a-pdf-local.test.mjs tests/tus-ux-modo-configuracion.test.mjs tests/tus-ui-cierre-operativo.test.mjs tests/tus-portal-carga-visible.test.mjs
           cd integraciones/autocotizador/recepcion
           npm install --no-audit --no-fund
           npm run build:unificado
@@ -93,6 +95,18 @@ jobs:
           code="$(curl -sS --max-time 30 -u "operador:$PASSWORD" -o "$tmp/client.js" -w '%{http_code}' "$base/prueba-v2/carga-inteligente.js")"
           test "$code" = 200
           echo PRUEBAS_JS_HTTP_200
+          # Comprobar la pantalla CLIENTE real con la cuenta de personal en GET
+          # y que la sección de carga antecede al bloque de contacto.
+          code="$(curl -sS --max-time 30 -u "operador:$PASSWORD" -o "$tmp/portal.html" -w '%{http_code}' "$base/prueba-v2/")"
+          test "$code" = 200
+          node --input-type=module - "$tmp/portal.html" <<'NODE'
+          import fs from 'node:fs';
+          const html=fs.readFileSync(process.argv[2],'utf8');
+          const iframe=html.indexOf('<iframe id="smart"'),actions=html.indexOf('<div id="acciones-pedido">');
+          if(!(iframe>0&&actions>iframe)||html.includes('#acciones-pedido{position:sticky;top:0;'))
+            throw Error('Portal con cabecera fija tapando cargador');
+          console.log('PRUEBAS_CARGA_ANTES_DE_FORMULARIO_HTTP_200');
+          NODE
           echo SABER_PRUEBAS_DESPLEGADO_JPG_PNG_PROMOS_Y_BINDINGS_INTACTOS
           applied=0
           trap - ERR
