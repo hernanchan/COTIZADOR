@@ -77,6 +77,7 @@ import {pagoMPLiveComprador} from './mp-live-comprador.mjs';
 import {iniciarSesionCompradorLive,autorizadoCompradorLive,autorizadoOrdenLive,vinculoOrdenLive} from './sesion-comprador-live.mjs';
 import {guardarBorradorUniversalLive,crearOrdenUniversalLive} from './ordenes-universales-live-documentos.mjs';
 import {paginaRetornoLive} from './pagina-retorno-live.mjs';
+import {paginaContinuarPagoLive} from './pagina-continuar-pago-live.mjs';
 import {paginaCotizarLive} from './pagina-cotizar-live.mjs';
 import liveBuyerClientJs from './flujo-presupuesto-live-cliente.txt';
 import livePostpayTusJs from './recepcion-tus-live-cliente.txt';
@@ -2442,6 +2443,7 @@ export default {
         'Cache-Control':'no-store,private','X-Content-Type-Options':'nosniff',
         'X-Robots-Tag':'noindex,nofollow'}});
     }
+    if(page==='/pedido/continuar')return paginaContinuarPagoLive(request,env,{authorized:await autorizadoCompradorLive(request,env)});
     if(page==='/pedido/estado')return paginaRetornoLive(request,env);
     if(page==='/api/pedido/live/sesion')return iniciarSesionCompradorLive(request,env);
     if(page==='/api/pedido/live/borrador'){
