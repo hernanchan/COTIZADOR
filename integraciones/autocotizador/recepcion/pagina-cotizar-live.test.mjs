@@ -86,3 +86,21 @@ test('formulario comercial pide identidad completa sin ReferenceError y respeta 
  const nonce=html.match(/<script type="module" nonce="([a-f0-9]{32})">/);
  assert.ok(nonce&&res.headers.get('Content-Security-Policy').includes("nonce-"+nonce[1]));
 });
+
+test('cotizador comercial prioriza precio, carga PDF JPG PNG y después identificación',async()=>{
+ const res=paginaCotizarLive(new Request(url),{
+  ...env,DOCS_LIVE_RECEPCION_GATE:gate,DOCS_LIVE_PRICING_GATE:gate,
+  DOCS_LIVE_ORDER_GATE:gate
+ },{authorized:true});
+ const html=await res.text();
+ const precio=html.indexOf('id="precio-entrega"');
+ const carga=html.indexOf('id="pdf"');
+ const nombre=html.indexOf('id="nombre"');
+ const confirmar=html.indexOf('id="continuar"');
+ assert.ok(precio>0&&precio<carga&&carga<nombre&&nombre<confirmar,
+  'El cliente debe encontrar la carga antes de completar sus datos');
+ assert.match(html,/PDF, JPG o PNG/);
+ assert.match(html,/id="seccion-archivos"/);
+ assert.match(html,/id="promo-dia"/);
+ assert.match(html,/id="plazo-orientativo"/);
+});
