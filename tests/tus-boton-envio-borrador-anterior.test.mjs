@@ -46,7 +46,7 @@ test('borrador anterior sin File no bloquea el PDF nuevo ni mezcla identificador
 });
 test('el preflight TUS fallido prevalece aunque haya presupuesto válido',()=>{
  const q=probar({preflight:false});
- assert.match(q.reason,/almacenamiento privado/);
+ assert.match(q.reason,/conexión privada/);
 });
 test('no habilita enviar si aún no terminó la cotización',()=>{
  const q=probar({smartReady:false});
@@ -54,6 +54,18 @@ test('no habilita enviar si aún no terminó la cotización',()=>{
 });
 test('un envío en curso no se reactiva por mensajes nuevos del iframe',()=>{
  assert.match(script,/if\(batchSending\)return 'Los archivos se están enviando\.'/);
- assert.match(script,/sendAllButton.disabled=Boolean\(bloqueo\)/);
+ assert.match(script,/sendAllButton.disabled=Boolean\(batchSending\|\|registering\|\|handoffInProgress\|\|registeredOrder\)/);
+ assert.match(script,/const razon=motivoBloqueoEnvio\(\)/);
+ assert.match(script,/if\(TUS_ENABLED&&!tusPreflightOK\)await verificarDisponibilidadTUS\(\)/);
+ assert.match(script,/if\(razon\)\{/);
  assert.match(script,/if\(descartarBorradorAnteriorParaPedidoNuevo\(\)\)/);
+});
+
+
+test('si la precarga falla, el botón permite diagnosticar sin saltar controles de envío',()=>{
+ assert.match(script,/tusPreflightError=String\(error\?\.message\|\|error\)/);
+ assert.match(script,/verificarDisponibilidadTUS\(\)/);
+ assert.match(script,/El pedido todavía no se puede enviar:/);
+ assert.match(script,/if\(razon\)\{[\s\S]*?return;/);
+ assert.ok(script.indexOf('const razon=motivoBloqueoEnvio()')<script.indexOf('if(!nombreValido())'));
 });
