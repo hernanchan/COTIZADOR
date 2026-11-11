@@ -13,7 +13,8 @@ const env={SABER_ENTORNO:'produccion',CENTRAL_DB_ENV:'produccion',
  DOCS_MP_LIVE_GATE:gate,DOCS_LIVE_PRICING_GATE:gate,
  DOCS_LIVE_ORDER_GATE:gate,CENTRAL_BRIDGE_KEY:key};
 const draftFixture={webOrderId,archivos:[],manifiestos:[]};
-const orderFixture={webOrderId,draftId,quoteHash:hash,telefono:'351 5554444'};
+const orderFixture={webOrderId,draftId,quoteHash:hash,telefono:'351 5554444',
+ nombre:'Ana Pérez',direccion:'Poeta Lugones 123, Córdoba'};
 function request(path,payload,host=origin){
  return new Request(host+path,{method:'POST',headers:{
   Origin:host,'Content-Type':'application/json'},body:JSON.stringify(payload)});
@@ -84,4 +85,27 @@ test('orden produce contrato HMAC exacto, numeración y no habilita archivos',as
  assert.equal(calls[0].url,'https://pagos.libreriasaber.com.ar/internal/central/live/order');
  const signed=await calls[0].json();
  assert.deepEqual(signed,{schema:'saber-central-r2-universal-create-order-v1',...orderFixture});
+});
+
+
+test('orden LIVE protege contactos y conserva compatibilidad con órdenes anteriores',async()=>{
+ const calls=[],response={ok:true,webOrderId,commercialOrderId,
+  numeroOrden:'018',totalArs:24500,fileCount:1,
+  checkoutEnabled:false,paymentAuthorized:false,uploadAuthorized:false,
+  filesUploaded:false,productionAuthorized:false};
+ for(const patch of [
+  {nombre:'A'},{nombre:'  '},{nombre:'<script>'},{direccion:'x'.repeat(181)},
+  {nombre:undefined,direccion:'Calle 123'}
+ ]){
+  const input={...orderFixture,...patch};
+  if(patch.nombre===undefined)delete input.nombre;
+  const result=await crearOrdenUniversalLive(request('/api/pedido/live/orden',input),env,opts(response,calls));
+  assert.equal(result.status,422,JSON.stringify(patch));
+  assert.equal(calls.length,0);
+ }
+ const legacy={webOrderId,draftId,quoteHash:hash,telefono:'351 5554444'};
+ const previous=await crearOrdenUniversalLive(request('/api/pedido/live/orden',legacy),env,opts(response,calls));
+ assert.equal(previous.status,201,'No bloquear recuperación de órdenes creadas antes de agregar nombre');
+ assert.equal(calls.length,1);
+ assert.deepEqual(await calls[0].json(),{schema:'saber-central-r2-universal-create-order-v1',...legacy});
 });
