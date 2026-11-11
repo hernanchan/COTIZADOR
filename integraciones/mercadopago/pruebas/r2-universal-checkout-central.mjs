@@ -104,7 +104,7 @@ export async function verificarPedidoUniversalCobrable(env,commercialOrderId,{
    subidaAutorizada:false,produccionAutorizada:false,
    estado:'PRELIMINAR_SIN_ORIGINALES',
    quoteHash:link.quote_hash
-  },{subtle,allowTusOnly:livePostpay(env)});
+  },{subtle,allowTusOnly:livePostpay(env)||works.some(w=>w.destino==='fotos')});
  }catch{return error('UNIVERSAL_COTIZACION_FUERA_DE_CONTRATO')}
  return {ok:true,link,works,rows,commercialOrderId:link.id,
   webOrderId:link.web_order_id,amountArs:link.amount_ars};
