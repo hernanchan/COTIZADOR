@@ -358,10 +358,12 @@ export async function estadoMPLiveCentral(request,env,{readSigned}={}){
     !/^[A-Za-z0-9_-]{1,80}$/.test(x.file_id||'')||
     ![0,1].includes(x.received))||new Set(files.map(x=>x.file_id)).size!==files.length)
    return reply({ok:false,error:'MP_LIVE_STATUS_ARCHIVOS_INCOMPATIBLES'},409);
-  const revoked=order.review_state==='revoked';
-  const paid=order.status==='paid'&&Boolean(order.paid_at)&&
-   typeof order.payment_id==='string'&&PAYMENT.test(order.payment_id)&&
-   Boolean(order.preference_id)&&order.review_state==='verified';
+  // Mismo estado D1 para MP conciliado y transferencia auditada. El comprador
+  // nunca determina el estado pago ni reemplaza una firma de MP.
+  const {estadoPagoUniversal}=await import('./r2-universal-checkout-central.mjs');
+  const verified=await estadoPagoUniversal(env,order.id);
+  const revoked=verified.revoked;
+  const paid=verified.verified;
   const state=revoked?'revocado':paid?'pagado_esperando_archivos':'pendiente';
   return reply({ok:true,webOrderId:p.webOrderId,
    commercialOrderId:order.id,amountArs:order.amount_ars,fileCount:files.length,
