@@ -70,8 +70,16 @@ export async function pagoMPLiveComprador(request,env,{
    headers:{'Content-Type':'application/json','x-saber-ts':String(ts),
     'x-saber-request-id':id,'x-saber-signature':sig},body}));
  }catch{return reply({ok:false,error:'MP_LIVE_CENTRAL_NO_DISPONIBLE'},503)}
- if(!upstream.ok)return reply({ok:false,error:'MP_LIVE_CENTRAL_RECHAZO'},
-  upstream.status===409?409:503);
+ if(!upstream.ok){
+  const error=await upstream.json().catch(()=>null);
+  const etapa=typeof error?.etapa==='string'&&/^[a-z_]{1,45}$/.test(error.etapa)?
+   error.etapa:'checkout';
+  const codigo=typeof error?.codigo==='string'&&
+   /^(?:MP_LIVE_HTTP_[0-9]{3}_[A-Za-z0-9_-]{1,60}|MP_LIVE_VENDEDOR_INCORRECTO|MP_LIVE_PREFERENCIA_INCOMPATIBLE|FALLO_INTERNO)$/.test(error.codigo)?
+    error.codigo:'NO_AUTORIZADO';
+  return reply({ok:false,error:'MP_LIVE_CENTRAL_RECHAZO',etapa,codigo},
+   upstream.status===409?409:503);
+ }
  const result=await upstream.json().catch(()=>null);
  if(!result||result.ok!==true||!Number.isSafeInteger(result.amountArs)||
     result.amountArs<1||result.amountArs>50000000||
