@@ -32,7 +32,9 @@ export function validarIntencionR2Prepaga(x){
  const newKeys='amountArs,bytes,declaredPages,fileId,quoteRevision,quoteSha256,quoteSnapshot,schema,sha256,webOrderId';
  const keys=x&&typeof x==='object'&&!Array.isArray(x)?Object.keys(x).sort().join(','):'';
  const v1=x?.schema==='saber-central-r2-prepaid-intent-v1'&&keys===oldKeys;
- const v2=x?.schema==='saber-central-r2-prepaid-intent-v2'&&keys===newKeys;
+ const v2=x?.schema==='saber-central-r2-prepaid-intent-v2'&&
+  Object.keys(x).every(k=>newKeys.split(',').includes(k)||['nombre','telefono','direccion'].includes(k))&&
+  newKeys.split(',').every(k=>Object.hasOwn(x,k));
  const q=x?.quoteSnapshot;
  const validQuote=v1||(
   q&&typeof q==='object'&&!Array.isArray(q)&&
@@ -60,7 +62,10 @@ export function validarIntencionR2Prepaga(x){
   !Number.isSafeInteger(x.declaredPages)||x.declaredPages<1||
   x.declaredPages>2000||
   !Number.isSafeInteger(x.amountArs)||x.amountArs<1||x.amountArs>50000000||
-  typeof x.quoteRevision!=='string'||!/^d1-approved-revision-[1-9]\d{0,7}$/.test(x.quoteRevision))
+  typeof x.quoteRevision!=='string'||!/^d1-approved-revision-[1-9]\d{0,7}$/.test(x.quoteRevision)||
+  (x.nombre!==undefined&&(typeof x.nombre!=='string'||x.nombre.trim().length<2||x.nombre.trim().length>100||/[<>]/.test(x.nombre)||!x.telefono))||
+  (x.telefono!==undefined&&(typeof x.telefono!=='string'||!/^[+]?[0-9 ()-]{10,26}$/.test(x.telefono.trim())||x.telefono.replace(/\D/g,'').length<10||x.telefono.replace(/\D/g,'').length>15))||
+  (x.direccion!==undefined&&(typeof x.direccion!=='string'||x.direccion.trim().length>180||/[<>]/.test(x.direccion))))
   throw Error('R2_PREPAGO_INTENCION_INVALIDA');
  return x;
 }
@@ -98,12 +103,14 @@ export async function registrarIntencionR2Prepaga(req,env,{
   response({ok:true,webOrderId:p.webOrderId,commercialOrderId:existing.commercial_order_id,
    amountArs:p.amountArs,idempotent:true,filesUploaded:false,paymentAuthorized:false}):
   response({ok:false,error:'R2_PREPAGO_CONFLICTO_INMUTABLE'},409);
+ if(p.telefono)await db.prepare("CREATE TABLE IF NOT EXISTS central_order_contacts (order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE RESTRICT,phone TEXT NOT NULL CHECK(length(phone) BETWEEN 10 AND 26),created_at TEXT NOT NULL DEFAULT(datetime('now')))").run();
+ if(p.nombre)await db.prepare("CREATE TABLE IF NOT EXISTS central_order_customer_details (order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE RESTRICT,name TEXT NOT NULL CHECK(length(name) BETWEEN 2 AND 100),address TEXT NOT NULL DEFAULT '' CHECK(length(address)<=180),created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
  const id=uuid();
  if(!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(id))
   return response({ok:false,error:'R2_PREPAGO_ID_NO_VALIDO'},503);
  try{
   // DB.batch: transacción atómica. No crear órdenes huérfanas.
-  await db.batch([
+  const requests=[
    db.prepare('INSERT INTO orders(id,description,amount_ars,deposit_ars) VALUES(?,?,?,?)')
     .bind(id,'Librería Saber · ploteo grande pendiente de archivo',p.amountArs,p.amountArs),
    db.prepare('INSERT INTO central_r2_prepaid_intents('+
@@ -127,7 +134,10 @@ export async function registrarIntencionR2Prepaga(req,env,{
       requiresReviewOnQuoteMismatch:true,
       // v1 histórico no tiene ficha y permanece siempre en revisión.
       quoteSnapshot:v2Quote(p)}))
-  ]);
+  ];
+  if(p.telefono)requests.push(db.prepare('INSERT INTO central_order_contacts(order_id,phone) VALUES(?,?)').bind(id,p.telefono.trim()));
+  if(p.nombre)requests.push(db.prepare('INSERT INTO central_order_customer_details(order_id,name,address) VALUES(?,?,?)').bind(id,p.nombre.trim(),(p.direccion||'').trim()));
+  await db.batch(requests);
  }catch{
   // Una pestaña pudo registrar la misma intención concurrentemente.
   const prior=await lookup().catch(()=>null);
