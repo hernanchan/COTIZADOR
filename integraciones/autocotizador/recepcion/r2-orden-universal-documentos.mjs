@@ -28,11 +28,14 @@ export async function prepararOrdenUniversalSinCheckout(req,env,{
  if(raw.length>1200)return response({ok:false,error:'UNIVERSAL_ORDEN_LIMITE'},413);
  let p;try{p=JSON.parse(raw)}catch{}
  if(!p||typeof p!=='object'||Array.isArray(p)||
-    Object.keys(p).sort().join(',')!=='draftId,quoteHash,telefono,webOrderId'||
+    !Object.keys(p).every(k=>['draftId','quoteHash','telefono','webOrderId','nombre','direccion'].includes(k))||
+    !['draftId','quoteHash','telefono','webOrderId'].every(k=>Object.hasOwn(p,k))||
     !WEB.test(p.webOrderId||'')||!UUID.test(p.draftId||'')||
     !SHA.test(p.quoteHash||'')||typeof p.telefono!=='string'||
     !/^\+?[0-9 ()-]{10,26}$/.test(p.telefono)||
-    p.telefono.replace(/\D/g,'').length<10||p.telefono.replace(/\D/g,'').length>15)
+    p.telefono.replace(/\D/g,'').length<10||p.telefono.replace(/\D/g,'').length>15||
+    (p.nombre!==undefined&&(typeof p.nombre!=='string'||p.nombre.trim().length<2||p.nombre.trim().length>100||/[<>]/.test(p.nombre)))||
+    (p.direccion!==undefined&&(typeof p.direccion!=='string'||p.direccion.trim().length>180||/[<>]/.test(p.direccion))))
   return response({ok:false,error:'UNIVERSAL_ORDEN_PARAMETROS'},422);
  let central;try{central=new URL(env.CENTRAL_TEST_URL)}catch{}
  if(!central||central.protocol!=='https:'||!HOST.test(central.hostname)||
