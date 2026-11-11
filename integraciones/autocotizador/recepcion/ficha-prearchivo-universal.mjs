@@ -3,9 +3,9 @@ import {cotizarCargaUnica} from './cotizar-carga-unica.mjs';
 import {repartirPromocionFicha} from './repartir-promocion-ficha.mjs';
 // Ficha interna previa a originales. No autoriza cobros ni producción.
 const NAME=/^WEB-ENSAYO-[A-F0-9]{32}$/;
-export function fichaPrearchivoUniversal({webOrderId,archivos,manifiestos,tarifario,produccion=false,ahora=Date.now()}={}){
+export function fichaPrearchivoUniversal({webOrderId,archivos,manifiestos,tarifario,produccion=false,ahora=Date.now(),admitirFotosTusPruebas=false}={}){
  if(!NAME.test(webOrderId||''))throw Error('UNIVERSAL_ORDEN_INVALIDA');
- const plan=prepararPlanRecepcionUniversal({archivos,manifiestos,tarifario,produccion,ahora});
+ const plan=prepararPlanRecepcionUniversal({archivos,manifiestos,tarifario,produccion,ahora,admitirFotosTusPruebas});
  const quote=cotizarCargaUnica({archivos,precios:tarifario.prices,promociones:tarifario.promotions,ahora});
  if(quote.estado!=='PRELIMINAR'||quote.paymentAuthorized!==false||
     quote.total!==plan.totalArs||quote.plan.length!==archivos.length)
