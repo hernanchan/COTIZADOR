@@ -1,0 +1,62 @@
+name: Saber - verificar promo aplicada en presupuesto real de pruebas (solo lectura)
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-promos-qa-precio-real-20261111.yml]
+permissions: {contents: read, statuses: write}
+jobs:
+  cotizacion-real-solo-lectura:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    steps:
+      - name: Consultar gate D1 aprobado y cotización de una foto Luster sin pedido ni cobro
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+          PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+        run: |
+          set -euo pipefail
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-documentos-pruebas"
+          curl -fsS --max-time 25 -H "Authorization: Bearer $TOKEN" "$root/settings" > /tmp/saber-qa-settings.json
+          if ! jq -e '.result.bindings|any(.name=="DOCS_PRICE_ADMIN_D1_ENABLED" and .type=="plain_text" and .text=="PRIVATE_TEST_ONLY")' /tmp/saber-qa-settings.json >/dev/null; then
+            echo CENTRAL_PROMOCIONES_D1_GATE_NO_HABILITADO
+            exit 1
+          fi
+          echo CENTRAL_PROMOCIONES_D1_GATE_HABILITADO
+          base='https://saber-documentos-pruebas.libreriasaber.workers.dev'
+          cat > /tmp/saber-quote.json <<'JSON'
+          {"archivos":[{"nombre":"foto-verificacion.pdf","paginas":[{"numero":1,"anchoCm":10,"altoCm":15,"modo":"sin-clasificar"}],"paginasSeleccionadas":"","seleccion":"a4","servicio":"fotos","productoFoto":"luster_10x15","productoGrafica":"","corteVariante":"gt3","corteMetros":1,"copias":1,"modo":"color","caras":"simple","paginasPorHoja":1,"papelPoster":"obra80","anillado":"ninguno","grupoAnillado":"","materialColor":""}]}
+          JSON
+          http="$(curl -sS --max-time 30 -u "operador:$PASSWORD" -H "Origin: $base" -H 'Content-Type: application/json' -H 'Accept: application/json' --data-binary @/tmp/saber-quote.json -o /tmp/saber-quote-result.json -w '%{http_code}' "$base/api/ensayo-carga-unica")"
+          if [ "$http" != 200 ]; then
+            echo "COTIZADOR_PRUEBAS_HTTP_$http"
+            jq -r '.error//"No fue posible cotizar"' /tmp/saber-quote-result.json 2>/dev/null || true
+            exit 1
+          fi
+          if jq -e '.ok==true and .estado=="PRELIMINAR" and .paymentAuthorized==false and
+            .promocion.aplicada==true and .promocion.fuente=="tarifario-d1-aprobado" and
+            (.promocion.descuento>0) and
+            (.promocion.totalAnterior-.promocion.descuento==.total)' /tmp/saber-quote-result.json >/dev/null; then
+            jq -r '"PROMOCION_COTIZADA_VERIFICADA total=" + (.total|tostring) + " descuento=" + (.promocion.descuento|tostring)' /tmp/saber-quote-result.json
+          else
+            echo COTIZACION_NO_ACREDITA_DESCUENTO_APLICADO
+            jq -c '{estado,total,promocion,error,pendientes}' /tmp/saber-quote-result.json
+            exit 1
+          fi
+          http="$(curl -sS --max-time 25 -u "operador:$PASSWORD" -o /tmp/saber-imagenes.html -w '%{http_code}' "$base/prueba-v2/carga-inteligente")"
+          test "$http" = 200
+          grep -Fq 'image/jpeg,image/png' /tmp/saber-imagenes.html
+          echo IMAGENES_JPG_PNG_VISIBLE_EN_WEB_DE_PRUEBAS
+          echo SOLO_LECTURA_SIN_ORDEN_SIN_PAGO_SIN_SUBIDA
+      - name: Registrar resultado
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STATUS: ${{ job.status }}
+        shell: bash
+        run: |
+          if [ "$STATUS" = success ]; then state=success; description="Promo aplicada en precio real; JPG PNG visibles"; else state=failure; description="Verificar gate D1, presupuesto promocional o cargador"; fi
+          jq -n --arg state "$state" --arg context 'saber/promos-imagenes-qa-real' --arg description "$description" --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/qa-promo-status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/qa-promo-status.json >/dev/null
