@@ -6,6 +6,7 @@ import {procesarGraficaCarga} from './procesar-grafica-carga.mjs';
 import {seleccionarPaginas} from './seleccionar-paginas.mjs';
 import {cotizarDocumentosIndividuales} from '../pruebas/cotizar-documentos-individuales.mjs';
 import {cotizarPloteosRapido,rolloEstandarAutomatico} from '../pruebas/cotizar-ploteos-rapido.mjs';
+import {promocionSemanalCotizacion} from './promociones-semanales-cotizacion.mjs';
 
 const PLANO=['cad','poster'];
 const VALORACION='PRELIMINAR_SIN_VERIFICAR';
@@ -53,7 +54,7 @@ function tipoOriginal(paginas){
 /** Precio provisorio. Las medidas, clases y elecciones se declaran en el navegador;
  * jamás se usa este resultado para cobrar o imprimir sin verificación del PDF real.
  */
-export function cotizarCargaUnica({archivos,precios}){
+export function cotizarCargaUnica({archivos,precios,promociones=precios?.__promotions,ahora=Date.now()}){
  if(!Array.isArray(archivos)||!archivos.length||archivos.length>30)throw Error('Cantidad de archivos inválida');
  const documentos=[],ploteos=[],stickers=[],fotos=[],cortes=[],graficas=[],pendientes=[],plan=[];
  archivos.forEach((a,i)=>{
@@ -176,8 +177,16 @@ export function cotizarCargaUnica({archivos,precios}){
  const subtotalFotos=fotos.reduce((sum,x)=>sum+x.subtotal,0);
  const subtotalCortes=cortes.reduce((sum,x)=>sum+x.subtotal,0);
  const subtotalGraficas=graficas.reduce((sum,x)=>sum+x.subtotal,0);
+ const totalBruto=subtotalImpresiones+subtotalPloteos+subtotalStickers+subtotalFotos+subtotalCortes+subtotalGraficas;
+ const promocion=pendientes.length?null:promocionSemanalCotizacion({
+  promociones,precios,detalleImpresiones:c?.detalles||[],detallePloteos:p?.detalles||[],
+  detalleStickers:stickers,detalleFotos:fotos,
+  subtotalImpresiones,subtotalAnillados:c?.subtotalAnillados||0,
+  subtotalPloteos,subtotalStickers,subtotalFotos,subtotalCortes,subtotalGraficas,ahora
+ });
  return {ok:true,estado:pendientes.length?'INCOMPLETO':'PRELIMINAR',verificacion:VALORACION,
-  paymentAuthorized:false,total:pendientes.length?null:subtotalImpresiones+subtotalPloteos+subtotalStickers+subtotalFotos+subtotalCortes+subtotalGraficas,
+  paymentAuthorized:false,total:pendientes.length?null:(promocion?.totalFinal??totalBruto),
+  ...(promocion?{promocion}:{}),
   subtotalImpresiones,subtotalPloteos,subtotalStickers,subtotalFotos,subtotalCortes,subtotalGraficas,subtotalAnillados:c?.subtotalAnillados||0,
   detalleArmados:c?.detalleArmados||[],pendientes,plan,
   detalleImpresiones:c?.detalles||[],detallePloteos:p?.detalles||[],detalleStickers:stickers,detalleFotos:fotos,detalleCortes:cortes,detalleGraficas:graficas};
