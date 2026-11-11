@@ -150,6 +150,13 @@ export async function checkoutMPLiveCentral(request,env,{
  const transferTable=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='transfer_requests'").first();
  if(transferTable&&await env.DB.prepare('SELECT order_id FROM transfer_requests WHERE order_id=?').bind(order.id).first())
   return reply({ok:false,error:'MP_LIVE_TRANSFERENCIA_PENDIENTE'},409);
+ const liveBankTable=await env.DB.prepare(
+  "SELECT name FROM sqlite_master WHERE type='table' AND name='central_live_transfer_requests'"
+ ).first();
+ if(liveBankTable&&await env.DB.prepare(
+   'SELECT order_id FROM central_live_transfer_requests WHERE order_id=?'
+  ).bind(order.id).first())
+  return reply({ok:false,error:'MP_LIVE_TRANSFERENCIA_PENDIENTE'},409);
  let etapa='iniciar';
  try{
   if(order.preference_id){
@@ -170,7 +177,17 @@ export async function checkoutMPLiveCentral(request,env,{
     return reply({ok:true,orderId:order.id,amountArs:order.amount_ars,fileCount,checkoutUrl:checkout,reused:true});
    }
    etapa='verificar_intento';
-   const attempt=await env.DB.prepare('INSERT OR IGNORE INTO live_checkout_attempts(order_id) VALUES(?)').bind(order.id).run();
+   // La primera preferencia MP y la intención bancaria se excluyen mutuamente
+   // mediante D1 incluso si dos pestañas inician medios distintos al mismo tiempo.
+   const attemptSQL=liveBankTable?
+    'INSERT OR IGNORE INTO live_checkout_attempts(order_id) SELECT ? WHERE NOT EXISTS '+
+    '(SELECT 1 FROM central_live_transfer_requests t WHERE t.order_id=?)':
+    'INSERT OR IGNORE INTO live_checkout_attempts(order_id) VALUES(?)';
+   const attempt=await env.DB.prepare(attemptSQL).bind(...(liveBankTable?[order.id,order.id]:[order.id])).run();
+   if(liveBankTable&&await env.DB.prepare(
+     'SELECT order_id FROM central_live_transfer_requests WHERE order_id=?'
+    ).bind(order.id).first())
+    return reply({ok:false,error:'MP_LIVE_TRANSFERENCIA_PENDIENTE'},409);
    let prefId;
    const nuevaPreferencia=()=>mpLive(env,'/checkout/preferences',{fetcher,method:'POST',
     headers:{'X-Idempotency-Key':order.id},
