@@ -505,7 +505,13 @@ footer{background:#0b2942}
 (function(){
  const productsCsvUrl='https://docs.google.com/spreadsheets/d/e/2PACX-1vQx2zW0YP23ZjZMvLwkX_mkbPQgVPL_aUUtcI_n1ApZ6P9F4fBuKFOl-jB4qFmxwoeYsszAZSKbaUVn/pub?gid=419356696&single=true&output=csv';
  const productsCacheKey='saberProductsCacheV1';const cartKey='saberCartV1';let products=[];let cart=[];
- try{const saved=JSON.parse(localStorage.getItem(cartKey)||'[]');cart=Array.isArray(saved)?saved.filter(x=>x&&x.type==='product'&&typeof x.id==='string'&&Number.isSafeInteger(x.qty)&&x.qty>0&&x.qty<=99):[]}catch(e){cart=[]}
+ try{const saved=JSON.parse(localStorage.getItem(cartKey)||'[]');
+  cart=Array.isArray(saved)?saved.filter(x=>x&&typeof x.id==='string'&&x.id.length<=120&&
+   typeof x.name==='string'&&x.name.length<=180&&
+   Number.isSafeInteger(Number(x.price))&&Number(x.price)>0&&Number(x.price)<50000000&&
+   ((x.type==='product'&&Number.isSafeInteger(x.qty)&&x.qty>0&&x.qty<=99)||
+    (x.type==='print'&&Number(x.qty)===1))):[]
+ }catch(e){cart=[]}
  const money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(Number(n)||0);
  const norm=v=>String(v||'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
  const numberFromCell=value=>{const digits=String(value||'').replace(/[^0-9-]/g,'');return digits?Number(digits):0};
@@ -523,32 +529,48 @@ footer{background:#0b2942}
  window.openCart=function(){document.getElementById('cart').classList.add('open');document.getElementById('overlay').classList.add('open')};window.closeCart=function(){document.getElementById('cart').classList.remove('open');document.getElementById('overlay').classList.remove('open')};
  window.sendWhatsApp=async function(){
   if(!cart.length)return;
-  try{
-   const response=await fetch(productsCsvUrl+'&actualizacion='+Date.now(),{cache:'no-store'});
-   if(!response.ok)throw Error('catálogo');
-   const rows=parseCsv(await response.text());
-   if(rows.length<2)throw Error('catálogo vacío');
-   const headers=rows[0].map(norm),col=name=>headers.indexOf(norm(name));
-   const active=col('Activo'),code=col('Código'),price=col('Precio'),offer=col('Oferta'),name=col('Producto');
-   if([active,code,price,offer,name].some(i=>i<0))throw Error('columnas');
-   const latest=new Map(rows.slice(1).filter(r=>['SI','TRUE','1','X'].includes(norm(r[active])))
-    .map(r=>{const regular=numberFromCell(r[price]),discount=numberFromCell(r[offer]);
-     return [String(r[code]||'').trim(),{name:String(r[name]||'').trim(),price:discount>0&&discount<regular?discount:regular}]})
-    .filter(([k,p])=>k&&p.name&&p.price>0));
-   const previous=cart;
-   cart=cart.filter(x=>x.type==='product'&&latest.has(x.id))
-    .map(x=>({...x,name:latest.get(x.id).name,price:latest.get(x.id).price}));
-   const changed=previous.length!==cart.length||cart.some((x,i)=>x.price!==previous[i].price||x.id!==previous[i].id);
-   save();
-   if(!cart.length){alert('Los artículos ya no están disponibles. Revisá el catálogo.');return}
-   if(changed){alert('Se actualizaron precios o artículos. Revisá el carrito y pulsá nuevamente para consultar.');openCart();return}
-   const lines=['Hola, Librería Saber. Quisiera consultar estos artículos:','','ARTÍCULOS'];
-   cart.forEach(x=>lines.push(x.qty+' × '+x.name+' ('+x.id+') — '+money(x.price*x.qty)));
-   lines.push('','TOTAL ORIENTATIVO: '+money(cart.reduce((s,x)=>s+x.price*x.qty,0)),
-    '¿Me confirman disponibilidad y precio final?','No es una reserva ni un pago.');
-   // Navegar en la misma pestaña después de la consulta evita bloqueo de popups asíncronos.
-   window.location.assign('https://wa.me/5493513110130?text='+encodeURIComponent(lines.join('\n')));
-  }catch(e){alert('No pudimos verificar los precios actuales. Probá nuevamente antes de enviar el pedido.')}
+  const prints=cart.filter(x=>x.type==='print'),productsInCart=cart.filter(x=>x.type==='product');
+  if(productsInCart.length){
+   try{
+    const response=await fetch(productsCsvUrl+'&actualizacion='+Date.now(),{cache:'no-store'});
+    if(!response.ok)throw Error('catálogo');
+    const rows=parseCsv(await response.text());
+    if(rows.length<2)throw Error('catálogo vacío');
+    const headers=rows[0].map(norm),col=name=>headers.indexOf(norm(name));
+    const active=col('Activo'),code=col('Código'),price=col('Precio'),offer=col('Oferta'),name=col('Producto');
+    if([active,code,price,offer,name].some(i=>i<0))throw Error('columnas');
+    const latest=new Map(rows.slice(1).filter(r=>['SI','TRUE','1','X'].includes(norm(r[active])))
+     .map(r=>{const regular=numberFromCell(r[price]),discount=numberFromCell(r[offer]);
+      return [String(r[code]||'').trim(),{name:String(r[name]||'').trim(),price:discount>0&&discount<regular?discount:regular}]})
+     .filter(([k,p])=>k&&p.name&&p.price>0));
+    const updated=productsInCart.filter(x=>latest.has(x.id)).map(x=>({...x,name:latest.get(x.id).name,price:latest.get(x.id).price}));
+    const changed=updated.length!==productsInCart.length||
+     updated.some((x,i)=>x.price!==productsInCart[i].price||x.id!==productsInCart[i].id);
+    cart=[...updated,...prints];save();
+    if(changed){alert('Se actualizaron artículos o precios. Revisá el carrito y volvé a enviar.');openCart();return}
+   }catch(e){alert('No pudimos verificar los artículos actuales. Reintentá antes de enviar. Los trabajos de impresión siguen guardados.');return}
+  }
+  const lines=['Hola, Librería Saber. Quiero consultar este pedido:',''];
+  if(productsInCart.length){
+   lines.push('*ARTÍCULOS*');
+   cart.filter(x=>x.type==='product').forEach(x=>lines.push(x.qty+' × '+x.name+' ('+x.id+') — '+money(x.price*x.qty)));
+   lines.push('');
+  }
+  if(prints.length){
+   lines.push('*TRABAJOS DE IMPRESIÓN Y GRÁFICA*');
+   prints.forEach(x=>{
+    lines.push(x.name+' — '+money(x.price));
+    if(x.detail)lines.push('  '+String(x.detail).slice(0,1000));
+   });
+   lines.push('','Adjuntaré los archivos de impresión en este chat para su revisión.');
+  }
+  const total=cart.reduce((n,x)=>n+Number(x.price)*(Number(x.qty)||1),0);
+  lines.push('TOTAL ORIENTATIVO: '+money(total),
+   '¿Me confirman disponibilidad, precio final, forma de pago y plazo?',
+   'El pedido no queda pagado ni en producción hasta que Librería Saber lo confirme.');
+  // Modo comercial transitorio: no se transmite PDF al backend ni se ofrece
+  // Mercado Pago real desde la portada. No alterar la Central existente.
+  window.location.assign('https://wa.me/5493513110130?text='+encodeURIComponent(lines.join('\n')));
  };
  const buttons=[...document.querySelectorAll('[data-panel]')],panels=[...document.querySelectorAll('[data-content]')];buttons.forEach(btn=>btn.addEventListener('click',()=>{buttons.forEach(b=>b.classList.toggle('active',b===btn));panels.forEach(p=>p.hidden=p.dataset.content!==btn.dataset.panel)}));
   // Sin promociones diarias inventadas: solo el servidor de presupuestos define importes y beneficios.
