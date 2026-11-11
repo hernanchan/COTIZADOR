@@ -1,0 +1,122 @@
+name: Saber - autodiagnóstico vendedor MP LIVE sin cobrar ni crear orden
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-diagnostico-vendedor-mp-live-20261111.yml]
+permissions: {contents: read, statuses: write}
+concurrency: {group: saber-mp-live-temporary-seller-readonly-probe, cancel-in-progress: false}
+jobs:
+  diagnosticar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 17
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Probar protección y compilación sin consultar pagos reales
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund esbuild@0.25.12 wrangler@4.55.0
+          node --test integraciones/autocotizador/recepcion/diagnostico-mp-vendedor-live.test.mjs \
+            integraciones/mercadopago/pruebas/mercadopago-live-central.test.mjs
+          node --check integraciones/publicacion/diagnosticar-mp-vendedor-sin-pago-20261111.mjs
+          cd integraciones/autocotizador/recepcion
+          npm install --no-audit --no-fund
+          npm run build:unificado
+          cd ../../..
+          ./node_modules/.bin/esbuild integraciones/mercadopago/pruebas/worker.js \
+            --bundle --platform=browser --format=esm --target=es2022 \
+            --outfile=/tmp/saber-central-diagnostico.mp.mjs
+          node --check /tmp/saber-central-diagnostico.mp.mjs
+          echo SABER_MP_SELLER_READONLY_DIAG_TESTS_OK
+      - name: Comprobar que pedido 001 sigue sin cobro y respaldar bindings
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          DEPLOY: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+          D1_TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp=/tmp/saber-mp-readonly
+          mkdir -p "$tmp"
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT"
+          curl -fsS -H "Authorization: Bearer $D1_TOKEN" "$root/d1/database" >"$tmp/db.json"
+          id=$(jq -r '[.result[]|select(.name=="saber-pagos-produccion")]|if length==1 then .[0].uuid else empty end' "$tmp/db.json")
+          test -n "$id"
+          echo "$id" >"$tmp/db-id"
+          curl -fsS -H "Authorization: Bearer $D1_TOKEN" -H 'Content-Type: application/json' \
+            -d '{"sql":"SELECT status, amount_ars, payment_id FROM orders ORDER BY created_at DESC LIMIT 3"}' \
+            "$root/d1/database/$id/query" >"$tmp/order.json"
+          jq -e '.result[0].results|length==1 and .[0].status=="awaiting_payment" and .[0].amount_ars==200 and .[0].payment_id==null' "$tmp/order.json" >/dev/null
+          for w in saber-documentos-produccion saber-pagos-produccion;do
+            curl -fsS -H "Authorization: Bearer $DEPLOY" "$root/workers/scripts/$w/settings" >"$tmp/$w-before.json"
+            jq -r '.result.bindings[].name' "$tmp/$w-before.json" |sort >"$tmp/$w-before.names"
+            jq -e '.result.bindings|any(.name=="SABER_ENTORNO" and .type=="plain_text" and .text=="produccion")' "$tmp/$w-before.json" >/dev/null
+          done
+          jq -e '.result.bindings|any(.name=="SABER_R2_GRANDES_LIVE" and .type=="r2_bucket" and .bucket_name=="saber-documentos-produccion-privado") and any(.name=="DOCS_LIVE_STAFF_SECRET" and .type=="secret_text")' "$tmp/saber-documentos-produccion-before.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="MP_LIVE_ACCESS_TOKEN" and .type=="secret_text") and any(.name=="DB" and .type=="d1") and any(.name=="MP_LIVE_GATE" and .text=="GO_COMERCIAL_CONFIRMADO")' "$tmp/saber-pagos-produccion-before.json" >/dev/null
+          echo SABER_MP_READONLY_PREREQUISITES_OK
+      - name: Desplegar diagnósticos temporales con acceso todavía cerrado
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp=/tmp/saber-mp-readonly
+          central=integraciones/mercadopago/produccion/wrangler.toml
+          sed "s/__D1_PRODUCCION_UUID__/$(cat "$tmp/db-id")/g" \
+            integraciones/mercadopago/produccion/wrangler.toml.template >"$central"
+          sed -i 's/SABER_ENTORNO = "preparacion"/SABER_ENTORNO = "produccion"/' "$central"
+          sed -i 's/MP_LIVE_GATE = "NO_GO"/MP_LIVE_GATE = "GO_COMERCIAL_CONFIRMADO"/' "$central"
+          docs=integraciones/autocotizador/produccion/wrangler.toml
+          cp integraciones/autocotizador/produccion/wrangler.toml.template "$docs"
+          sed -i 's/^keep_vars = false$/keep_vars = true/' "$docs"
+          sed -i 's/SABER_ENTORNO = "preparacion"/SABER_ENTORNO = "produccion"/' "$docs"
+          sed -i 's/DOCS_MP_LIVE_GATE = "NO_GO"/DOCS_MP_LIVE_GATE = "GO_COMERCIAL_CONFIRMADO"/' "$docs"
+          printf '\n[[r2_buckets]]\nbinding = "SABER_R2_GRANDES_LIVE"\nbucket_name = "saber-documentos-produccion-privado"\n' >>"$docs"
+          CI=true npx wrangler deploy --config "$central" >"$tmp/central.log" 2>&1 ||
+            { tail -n 15 "$tmp/central.log";exit 1; }
+          CI=true npx wrangler deploy --config "$docs" >"$tmp/docs.log" 2>&1 ||
+            { tail -n 15 "$tmp/docs.log";exit 1; }
+          echo SABER_MP_READONLY_DIAG_DEPLOYED_DISABLED_BY_DEFAULT
+      - name: Comprobar conservación de bindings y accesos
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          DEPLOY: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp=/tmp/saber-mp-readonly
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts"
+          for w in saber-pagos-produccion saber-documentos-produccion;do
+            curl -fsS -H "Authorization: Bearer $DEPLOY" "$root/$w/settings" >"$tmp/$w-after.json"
+            jq -r '.result.bindings[].name' "$tmp/$w-after.json" |sort >"$tmp/$w-after.names"
+            comm -23 "$tmp/$w-before.names" "$tmp/$w-after.names" >"$tmp/$w-missing"
+            test ! -s "$tmp/$w-missing" || { cat "$tmp/$w-missing";exit 1; }
+          done
+          jq -e '.result.bindings|any(.name=="SABER_R2_GRANDES_LIVE" and .type=="r2_bucket" and .bucket_name=="saber-documentos-produccion-privado") and any(.name=="DOCS_LIVE_MP_DIAG_TOKEN")|not' "$tmp/saber-documentos-produccion-after.json" >/dev/null
+          echo SABER_MP_READONLY_DIAG_BINDINGS_PRESERVED
+      - name: Diagnosticar conexión Mercado Pago y eliminar acceso inmediatamente
+        env:
+          SABER_CF_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          SABER_CF_DEPLOY_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node integraciones/publicacion/diagnosticar-mp-vendedor-sin-pago-20261111.mjs
+      - name: Registrar comprobación sin alterar pedido ni pago
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          if [ "$RESULT" = success ];then state=success;else state=failure;fi
+          jq -n --arg state "$state" --arg context 'saber/mp-live-seller-readonly-probe' \
+           --arg description "Read-only merchant connectivity; no checkout: $RESULT" \
+           --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+           '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/status.json >/dev/null
