@@ -28,6 +28,7 @@ jobs:
           set -euo pipefail
           npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.25.12
           node --test tests/tus-telefono-contacto-pedido.test.mjs tests/tus-zip-orden-privada.test.mjs tests/tus-transferencias-acreditacion.test.mjs tests/tus-transferencias-pendientes.test.mjs tests/tus-central-tablero-click-real.test.mjs tests/tus-central-seguimiento-operativo.test.mjs tests/r2-prepago-sin-archivo-central.test.mjs tests/r2-universal-interfaz-compra-unica.test.mjs
+          node --test integraciones/mercadopago/pruebas/plazo-produccion-informativo.test.mjs integraciones/autocotizador/recepcion/plazo-produccion-cliente.test.mjs tests/tus-franjas-entrega-operativa.test.mjs tests/tus-seguimiento-privado-eta.test.mjs
           npx esbuild integraciones/mercadopago/pruebas/worker.js --bundle --format=esm --platform=browser --target=es2022 --outfile=/tmp/saber-central-contactos.mjs
           node --check /tmp/saber-central-contactos.mjs
           npm --prefix integraciones/autocotizador/recepcion install --no-audit --no-fund
@@ -140,6 +141,16 @@ jobs:
             sleep 2
           done
           test "$passed" = 1 || { echo 'CONTACTOS_HTML_MISSING_ROLLBACK'; exit 1; }
+          grep -Fq 'id="plazo-produccion-orientativo"' "$tmp/staff.html" || { echo 'PLAZO_ANTES_DE_PAGAR_NO_VISIBLE';exit 1; }
+          curl -fsS --max-time 25 "$origin_central/public/api/plazo-produccion" > "$tmp/plazo-central.json"
+          jq -e '.ok==true and .source=="central-delivery-plan-readonly" and
+            (.mode=="hoy" or .mode=="hoy_tarde" or .mode=="proximo_dia" or .mode=="por_confirmar") and
+            .guaranteed==false and .exactReadyAt==null and .productionAuthorized==false' "$tmp/plazo-central.json" >/dev/null
+          curl -fsS --max-time 25 --user "operador:$PASSWORD" "$origin_docs/prueba-v2/api/plazo-produccion" > "$tmp/plazo-cliente.json"
+          jq -e '.ok==true and .guaranteed==false and .exactReadyAt==null and
+            (.mode=="hoy" or .mode=="hoy_tarde" or .mode=="proximo_dia" or .mode=="por_confirmar") and
+            (.notice|contains("hora"))' "$tmp/plazo-cliente.json" >/dev/null
+          echo 'PLAZO_VISIBLE_COTIZADOR_Y_CENTRAL_CONSISTENTE_SIN_PROMESAS_HORA'
           test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$origin_central/admin/api/orders")" = 401
           test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$origin_central/admin/api/transfers/pending")" = 401
           test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$origin_docs/prueba-v2/")" = 401
