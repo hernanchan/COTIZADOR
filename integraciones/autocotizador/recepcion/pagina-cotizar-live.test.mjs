@@ -127,3 +127,17 @@ test('móvil: el iframe no tiene alto mínimo fijo ni desplazamiento anidado',as
  assert.ok(html.indexOf('id="precio-entrega"')<html.indexOf('id="pdf"'));
  assert.ok(html.indexOf('id="pdf"')<html.indexOf('id="nombre"'));
 });
+
+test('el módulo JavaScript comercial generado compila con teléfonos argentinos',async()=>{
+ const res=paginaCotizarLive(new Request(url),{
+  ...env,DOCS_LIVE_RECEPCION_GATE:gate,DOCS_LIVE_PRICING_GATE:gate,
+  DOCS_LIVE_ORDER_GATE:gate
+ },{authorized:true});
+ const html=await res.text();
+ const match=html.match(/<script type="module" nonce="[a-f0-9]{32}">([\s\S]*?)<\/script>/);
+ assert.ok(match,'Falta script comprador');
+ const body=match[1].replace(/^import .*?;\s*/,'');
+ assert.doesNotThrow(()=>new Function(body),'La pantalla tiene JS inválido y no responde a controles');
+ assert.match(body,/\/\^\\\+\?\[0-9 \(\)-\]\{10,26\}\$\//);
+ assert.match(body,/replace\(\/\\D\/g/);
+});
