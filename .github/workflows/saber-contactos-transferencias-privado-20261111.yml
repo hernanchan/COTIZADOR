@@ -128,11 +128,12 @@ jobs:
           for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
             c=$(curl -sS --max-time 25 -o "$tmp/admin.html" -w '%{http_code}' "$origin_central/admin" || true)
             b=$(curl -sS --max-time 25 -o "$tmp/buyer.html" -w '%{http_code}' "$origin_docs/prueba-v2/pedido-cliente" || true)
-            if [ "$c" = 200 ] && [ "$b" = 200 ] &&
-                grep -Fq 'id="centralExtraTools"' "$tmp/admin.html" &&
-                grep -Fq 'id="cliente-nombre"' "$tmp/buyer.html" &&
-                grep -Fq 'id="cliente-direccion"' "$tmp/buyer.html"; then passed=1; break; fi
-            echo "CONTACTOS_EDGE_PROPAGATING_CHECK=${i}-CENTRAL-${c}-BUYER-${b}"
+            mc=0; mn=0; md=0
+            grep -Fq 'id="centralExtraTools"' "$tmp/admin.html" && mc=1 || true
+            grep -Fq 'id="cliente-nombre"' "$tmp/buyer.html" && mn=1 || true
+            grep -Fq 'id="cliente-direccion"' "$tmp/buyer.html" && md=1 || true
+            echo "CONTACTOS_HTML_PROBE attempt=$i central_http=$c buyer_http=$b central_marker=$mc name_marker=$mn address_marker=$md central_bytes=$(wc -c < "$tmp/admin.html") buyer_bytes=$(wc -c < "$tmp/buyer.html")"
+            if [ "$c" = 200 ] && [ "$b" = 200 ] && [ "$mc" = 1 ] && [ "$mn" = 1 ] && [ "$md" = 1 ]; then passed=1; break; fi
             sleep 2
           done
           test "$passed" = 1 || { echo 'CONTACTOS_HTML_MISSING_ROLLBACK'; exit 1; }
