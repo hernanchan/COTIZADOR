@@ -268,7 +268,7 @@ function pagoSandboxEnRecibo(){
       plazo.textContent=Number.isFinite(fecha.getTime())?
        'Preparación estimada (provisional): '+new Intl.DateTimeFormat('es-AR',{
         timeZone:'America/Argentina/Cordoba',day:'2-digit',month:'2-digit',year:'numeric',
-        hour:'2-digit',minute:'2-digit'}).format(fecha)+' hs. Te avisaremos si cambia.':
+        hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(fecha)+' hs. Te avisaremos si cambia.':
        'Preparación: todavía sin horario confirmado.';
      }else{
       const textos={
