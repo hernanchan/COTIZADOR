@@ -173,6 +173,11 @@ window.addEventListener('message',event=>{
   status.textContent=String(data.message||'No se pudo preparar el pedido.').slice(0,180);
  }
 });
+// El contenido puede avisar su altura antes que se instale el listener.
+const pedirAltura=()=>iframe.contentWindow?.postMessage(
+ {type:'SABER_SMART_RESIZE_REQUEST'},location.origin);
+iframe.addEventListener('load',pedirAltura);
+requestAnimationFrame(pedirAltura);
 action.addEventListener('click',async()=>{
  if(!enabled||working)return;
  const nombre=nombreCliente.value.trim();
