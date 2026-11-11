@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 const base='https://saber-documentos-pruebas.libreriasaber.workers.dev';
 const password=process.env.SABER_OPERATOR_TEST_PASSWORD;
 assert.ok(password&&password.length>0,'Falta credencial de operador de QA');
-const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+const browser=await chromium.launch({channel:'chrome',headless:true,args:['--no-sandbox']});
 try{
  const page=await browser.newPage({httpCredentials:{username:'operador',password},viewport:{width:1366,height:900}});
  const errors=[];
