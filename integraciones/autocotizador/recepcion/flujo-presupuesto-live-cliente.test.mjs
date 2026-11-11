@@ -32,6 +32,7 @@ function fixture({originOverride=origin,draftOverride={},orderOverride={}}={}){
  };
  const build=()=>crearFlujoPresupuestoLive({
   origin:originOverride,files:[file],archivos,webOrderId,telefono:'351 5554444',
+  nombre:'Ana Pérez',direccion:'Poeta Lugones 123, Córdoba',
   fetcher,hasher:async()=>sha,uuid:()=>draftId,
   storage:{setItem:(key,val)=>store.set(key,val)},
   onState:v=>state.push(v)
@@ -50,6 +51,11 @@ test('LIVE presupuestar y crear orden sin transmitir originales',async()=>{
   assert.equal(c.opts.body.includes('%PDF-'),false);
   assert.equal(c.opts.body.includes('apunte.pdf'),c.path.endsWith('/borrador'));
  }
+ const orderCall=f.calls.find(c=>c.path.endsWith('/orden'));
+ const contact=JSON.parse(orderCall.opts.body);
+ assert.equal(contact.nombre,'Ana Pérez');
+ assert.equal(contact.telefono,'351 5554444');
+ assert.equal(contact.direccion,'Poeta Lugones 123, Córdoba');
  assert.equal(flow.estado,'presupuestado');
  assert.equal(f.store.size,0);
 });
@@ -80,4 +86,18 @@ test('no ejecuta solicitudes LIVE desde sandbox',()=>{
  const f=fixture({originOverride:'https://saber-documentos-pruebas.workers.dev'});
  assert.throws(f.build,/LIVE_FLUJO_IDENTIDAD_INVALIDA/);
  assert.equal(f.calls.length,0);
+});
+
+test('flujo LIVE no crea borrador ni orden si faltan datos obligatorios',()=>{
+ for(const patch of [
+  {nombre:''},{nombre:'A'},{nombre:'<script>'},
+  {direccion:'x'.repeat(181)},{telefono:'1234'}
+ ]){
+  const f=fixture();
+  const props={files:[file],archivos,webOrderId,telefono:'351 5554444',nombre:'Ana Pérez',
+   direccion:'',fetcher:async()=>{throw Error('NO_DEBE_ENVIAR')},origin,
+   hasher:async()=>sha,storage:{setItem(){}},...patch};
+  assert.throws(()=>crearFlujoPresupuestoLive(props),/LIVE_FLUJO_IDENTIDAD_INVALIDA/);
+  assert.equal(f.calls.length,0);
+ }
 });
