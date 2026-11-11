@@ -1,0 +1,166 @@
+name: Saber - corregir checkout MP real pedido 001 y textos de prueba
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-fix-checkout-live-orden-001-20261111.yml]
+permissions: {contents: read, statuses: write}
+concurrency: {group: saber-checkout-live-fix-pilot-001, cancel-in-progress: false}
+jobs:
+  corregir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Probar recuperación MP, pago seguro y cotizador con código de error
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-fund --no-audit esbuild@0.25.12 wrangler@4.55.0
+          node --check integraciones/mercadopago/pruebas/mercadopago-live-central.mjs
+          node --check integraciones/autocotizador/recepcion/checkout-live-cliente.mjs
+          node --test \
+            integraciones/mercadopago/pruebas/mercadopago-live-central.test.mjs \
+            integraciones/autocotizador/recepcion/checkout-live-cliente.test.mjs \
+            integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs \
+            integraciones/mercadopago/pruebas/central-live-bridge.test.mjs \
+            integraciones/mercadopago/produccion/webhook-edge.test.mjs
+          cd integraciones/autocotizador/recepcion
+          npm install --no-fund --no-audit
+          npm run build:unificado
+          cd ../../..
+          ./node_modules/.bin/esbuild integraciones/mercadopago/pruebas/worker.js \
+           --bundle --platform=browser --format=esm --target=es2022 \
+           --outfile=/tmp/saber-central-live-fix-001.mjs
+          node --check /tmp/saber-central-live-fix-001.mjs
+          echo SABER_FIX_001_BUILD_AND_REGRESSION_OK
+      - name: Confirmar pedido 001 pendiente y tomar respaldo de bindings efectivos
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+          D1_TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+        run: |
+          set -euo pipefail
+          tmp=/tmp/saber-fix-001;mkdir -p "$tmp"
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT"
+          curl -fsS --max-time 25 -H "Authorization: Bearer $D1_TOKEN" "$root/d1/database" > "$tmp/dbs.json"
+          jq -e '.success==true' "$tmp/dbs.json" >/dev/null
+          prod=$(jq -r '[.result[]|select(.name=="saber-pagos-produccion")]|if length==1 then .[0].uuid else empty end' "$tmp/dbs.json")
+          test -n "$prod";echo "$prod" > "$tmp/db-id"
+          curl -fsS --max-time 25 -H "Authorization: Bearer $D1_TOKEN" \
+           -H 'Content-Type: application/json' -d '{"sql":"SELECT status,amount_ars,preference_id,payment_id FROM orders ORDER BY created_at DESC LIMIT 3"}' \
+           "$root/d1/database/$prod/query" > "$tmp/orders.json"
+          jq -e '.success==true and (.result[0].results|length)==1 and
+           (.result[0].results[0].status=="awaiting_payment") and
+           (.result[0].results[0].amount_ars==200) and
+           (.result[0].results[0].preference_id==null) and
+           (.result[0].results[0].payment_id==null)' "$tmp/orders.json" >/dev/null
+          for w in saber-pagos-produccion saber-documentos-produccion;do
+           curl -fsS --max-time 25 -H "Authorization: Bearer $TOKEN" "$root/workers/scripts/$w/settings" > "$tmp/$w-before.json"
+           jq -e '.success==true and
+            (.result.bindings|any(.name=="SABER_ENTORNO" and .type=="plain_text" and .text=="produccion")) and
+            (.result.bindings|any(.name=="CENTRAL_DB_ENV" and .type=="plain_text" and .text=="produccion"))' "$tmp/$w-before.json" >/dev/null
+           jq -r '.result.bindings[].name' "$tmp/$w-before.json" | sort > "$tmp/$w-bindings-before.txt"
+          done
+          jq -e '.result.bindings|any(.name=="DB" and .type=="d1" and ((.id//.database_id)==$id))' --arg id "$prod" "$tmp/saber-pagos-produccion-before.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="MP_LIVE_GATE" and .text=="GO_COMERCIAL_CONFIRMADO") and
+             any(.name=="CENTRAL_LIVE_ORDER_GATE" and .text=="GO_COMERCIAL_CONFIRMADO") and
+             any(.name=="CENTRAL_LIVE_POSTPAY_GATE" and .text=="GO_COMERCIAL_CONFIRMADO")' "$tmp/saber-pagos-produccion-before.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="DOCS_MP_LIVE_GATE" and .text=="GO_COMERCIAL_CONFIRMADO") and
+             any(.name=="DOCS_LIVE_ORDER_GATE" and .text=="GO_COMERCIAL_CONFIRMADO") and
+             any(.name=="DOCS_LIVE_TUS_GATE" and .text=="GO_COMERCIAL_CONFIRMADO") and
+             any(.name=="SABER_R2_GRANDES_LIVE" and .type=="r2_bucket" and .bucket_name=="saber-documentos-produccion-privado")' "$tmp/saber-documentos-produccion-before.json" >/dev/null
+          echo SABER_FIX_001_PREDEPLOY_ORDER_PENDING_AND_GATES_OK
+      - name: Desplegar corrección de checkout Central sin reiniciar checkout de usuario
+        shell: bash
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          tmp=/tmp/saber-fix-001
+          cfg=integraciones/mercadopago/produccion/wrangler.toml
+          sed "s/__D1_PRODUCCION_UUID__/$(cat "$tmp/db-id")/g" \
+           integraciones/mercadopago/produccion/wrangler.toml.template > "$cfg"
+          sed -i 's/SABER_ENTORNO = "preparacion"/SABER_ENTORNO = "produccion"/' "$cfg"
+          sed -i 's/MP_LIVE_GATE = "NO_GO"/MP_LIVE_GATE = "GO_COMERCIAL_CONFIRMADO"/' "$cfg"
+          grep -Fq 'keep_vars = true' "$cfg"
+          grep -Fxq 'workers_dev = false' "$cfg"
+          grep -Fxq 'preview_urls = false' "$cfg"
+          CI=true npx wrangler deploy --config "$cfg" > "$tmp/central-deploy.log" 2>&1 ||
+           { tail -n 25 "$tmp/central-deploy.log"; exit 1; }
+          echo SABER_MP_LIVE_CHECKOUT_RECOVERY_CODE_DEPLOYED
+      - name: Desplegar únicamente código documental nuevo sin perder R2 ni staff
+        shell: bash
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          tmp=/tmp/saber-fix-001
+          cfg=integraciones/autocotizador/produccion/wrangler.toml
+          cp integraciones/autocotizador/produccion/wrangler.toml.template "$cfg"
+          sed -i 's/^keep_vars = false$/keep_vars = true/' "$cfg"
+          sed -i 's/SABER_ENTORNO = "preparacion"/SABER_ENTORNO = "produccion"/' "$cfg"
+          sed -i 's/DOCS_MP_LIVE_GATE = "NO_GO"/DOCS_MP_LIVE_GATE = "GO_COMERCIAL_CONFIRMADO"/' "$cfg"
+          printf '\n[[r2_buckets]]\nbinding = "SABER_R2_GRANDES_LIVE"\nbucket_name = "saber-documentos-produccion-privado"\n' >> "$cfg"
+          grep -Fxq 'keep_vars = true' "$cfg"
+          grep -Fxq 'workers_dev = false' "$cfg"
+          grep -Fxq 'preview_urls = false' "$cfg"
+          CI=true npx wrangler deploy --config "$cfg" > "$tmp/docs-deploy.log" 2>&1 ||
+           { tail -n 25 "$tmp/docs-deploy.log"; exit 1; }
+          echo SABER_BUYER_LIVE_CLEAR_ERRORS_AND_NO_PRIVATE_NOTICE_DEPLOYED
+      - name: Verificar que siguen intactos pedido 001, gates y secretos
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+          D1_TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+        run: |
+          set -euo pipefail
+          tmp=/tmp/saber-fix-001
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT"
+          for w in saber-pagos-produccion saber-documentos-produccion;do
+           curl -fsS --max-time 25 -H "Authorization: Bearer $TOKEN" "$root/workers/scripts/$w/settings" > "$tmp/$w-after.json"
+           jq -r '.result.bindings[].name' "$tmp/$w-after.json" | sort > "$tmp/$w-bindings-after.txt"
+           comm -23 "$tmp/$w-bindings-before.txt" "$tmp/$w-bindings-after.txt" > "$tmp/$w-missing.txt"
+           test ! -s "$tmp/$w-missing.txt" || { echo "SABER_BINDINGS_LOST_$w"; cat "$tmp/$w-missing.txt"; exit 1; }
+           jq -e '.result.bindings|any(.name=="SABER_ENTORNO" and .text=="produccion")' "$tmp/$w-after.json" >/dev/null
+          done
+          jq -e '.result.bindings|any(.name=="MP_LIVE_GATE" and .text=="GO_COMERCIAL_CONFIRMADO") and
+            any(.name=="CENTRAL_LIVE_TUS_GATE" and .text=="GO_COMERCIAL_CONFIRMADO") and
+            any(.name=="CENTRAL_LIVE_POSTPAY_GATE" and .text=="GO_COMERCIAL_CONFIRMADO") and
+            any(.name=="CENTRAL_LIVE_ORDER_GATE" and .text=="GO_COMERCIAL_CONFIRMADO") and
+            any(.name=="CENTRAL_BRIDGE_KEY" and .type=="secret_text")' "$tmp/saber-pagos-produccion-after.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="DOCS_MP_LIVE_GATE" and .text=="GO_COMERCIAL_CONFIRMADO") and
+            any(.name=="DOCS_LIVE_ORDER_GATE" and .text=="GO_COMERCIAL_CONFIRMADO") and
+            any(.name=="DOCS_LIVE_TUS_GATE" and .text=="GO_COMERCIAL_CONFIRMADO") and
+            any(.name=="DOCS_LIVE_TURNSTILE_SECRET" and .type=="secret_text") and
+            any(.name=="DOCS_LIVE_STAFF_SECRET" and .type=="secret_text") and
+            any(.name=="SABER_R2_GRANDES_LIVE" and .type=="r2_bucket" and .bucket_name=="saber-documentos-produccion-privado")' "$tmp/saber-documentos-produccion-after.json" >/dev/null
+          curl -fsS --max-time 25 -H "Authorization: Bearer $D1_TOKEN" -H 'Content-Type: application/json' \
+           -d '{"sql":"SELECT status,amount_ars,preference_id,payment_id FROM orders ORDER BY created_at DESC LIMIT 3"}' \
+           "$root/d1/database/$(cat "$tmp/db-id")/query" > "$tmp/orders-after.json"
+          jq -e '.result[0].results|length==1 and .[0].status=="awaiting_payment" and .[0].amount_ars==200 and .[0].preference_id==null and .[0].payment_id==null' "$tmp/orders-after.json" >/dev/null
+          code=$(curl -sS --max-time 18 -o /dev/null -w '%{http_code}' 'https://pedidos.libreriasaber.com.ar/cotizar')
+          test "$code" = 200
+          code=$(curl -sS --max-time 18 -o /dev/null -w '%{http_code}' 'https://pedidos.libreriasaber.com.ar/personal/paquete')
+          test "$code" = 401
+          echo SABER_LIVE_ORDER_001_PENDING_RECOVERY_READY_NO_EXTRA_CHARGE_NO_MAIN_CHANGE
+      - name: Registrar resultado
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          if [ "$RESULT" = success ];then state=success;else state=failure;fi
+          jq -n --arg state "$state" --arg context 'saber/mp-live-order-001-recovery' \
+           --arg description "Recovery existing order 001, MP preference and no duplicate charge: $RESULT" \
+           --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+           '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/ghstatus.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/ghstatus.json >/dev/null
