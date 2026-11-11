@@ -4911,6 +4911,10 @@ export default {
    const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
    return recibirTUSUniversalCentral(req,env,{readSigned:leerFirmaInternaLive});
   }
+  if(url.pathname==='/public/api/plazo-produccion'){
+   const {plazoPublicoCentral}=await import('./plazo-produccion-informativo.mjs');
+   return plazoPublicoCentral(req,env);
+  }
   if(url.pathname==='/internal/central/live/order'){
    const {promoverPedidoUniversalD1}=await import('./r2-universal-order-central.mjs');
    const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
