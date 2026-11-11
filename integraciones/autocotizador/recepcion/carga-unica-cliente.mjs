@@ -860,7 +860,7 @@ async function cotizar(){
    '. Tocá Editar o Quitá únicamente ese archivo; los demás mantienen su cálculo.');
   warning.className='advertencia';out.append(warning);
  }
- if(d.plan.length)out.append(texto('p','Precio orientativo. Los archivos no se enviaron ni se autoriza el cobro.'));
+ if(d.plan.length)out.append(texto('p',UNIVERSAL_COMPRADOR_LIVE?'Presupuesto orientativo. Librería Saber confirmará el importe antes de registrar la orden. Tus originales permanecerán en este dispositivo hasta acreditar el pago.':'Precio orientativo. Los archivos no se enviaron ni se autoriza el cobro.'));
  render();
  }catch(e){if(n===version){
    const razon=String(e.message||e).slice(0,220);
