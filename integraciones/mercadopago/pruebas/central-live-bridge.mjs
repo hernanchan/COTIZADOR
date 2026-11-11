@@ -9,6 +9,8 @@ const routeSchema=new Map([
  ['/internal/central/live/checkout','saber-mp-live-checkout-v1'],
  ['/internal/central/live/diag-seller','saber-mp-live-seller-diagnostic-v1'],
  ['/internal/central/live/status','saber-mp-live-status-v1'],
+ ['/internal/central/live/transfer-start','saber-central-live-transfer-start-v1'],
+ ['/internal/central/live/transfer-status','saber-central-live-transfer-status-v1'],
  ['/internal/central/live/order','saber-central-r2-universal-create-order-v1'],
  ['/internal/central/live/pricing','saber-price-snapshot-live-v1'],
  ['/internal/central/live/draft','saber-r2-universal-draft-v1'],
@@ -62,6 +64,8 @@ export async function leerFirmaInternaLive(request,env,{
    return {error:'Tamaño LIVE inválido',status:413};
  let payload;try{payload=JSON.parse(raw)}catch{}
  const orderRoute=url.pathname==='/internal/central/live/order';
+ const transferRoute=url.pathname==='/internal/central/live/transfer-start'||
+  url.pathname==='/internal/central/live/transfer-status';
  const pricingRoute=url.pathname==='/internal/central/live/pricing';
  const sellerDiag=url.pathname==='/internal/central/live/diag-seller';
  const keys=packageManifest?'schema,webOrderId':
