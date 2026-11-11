@@ -1,0 +1,85 @@
+name: Saber - Turnstile LIVE, servicio TUS/R2 y gates verificados
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-check-turnstile-live-20261111.yml]
+permissions: {contents: read, statuses: write}
+jobs:
+  turnstile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    steps:
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verificar configuración real y dominio sin mostrar secretos
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const account=process.env.ACCOUNT,token=process.env.TOKEN;
+          assert.match(account||'',/^[a-f0-9]{32}$/i);
+          assert.ok(token?.length>15);
+          const root='https://api.cloudflare.com/client/v4/accounts/'+account;
+          async function get(path){
+            const res=await fetch(root+path,{headers:{Authorization:'Bearer '+token},
+              signal:AbortSignal.timeout(25000)});
+            const v=await res.json().catch(()=>null);
+            assert.equal(res.ok,true,'CF_STATUS_'+res.status);
+            assert.equal(v?.success,true,'CF_READ_INVALID');
+            return v.result;
+          }
+          const d=await get('/workers/scripts/saber-documentos-produccion/settings');
+          const bindings=d.bindings||[];
+          function present(name,type,value){
+            return bindings.some(x=>x.name===name&&x.type===type&&
+              (value===undefined||x.text===value));
+          }
+          assert.ok(present('SABER_ENTORNO','plain_text','preparacion'));
+          assert.ok(present('CENTRAL_DB_ENV','plain_text','produccion'));
+          assert.ok(present('DOCS_MP_LIVE_GATE','plain_text','NO_GO'));
+          const site=bindings.find(x=>x.name==='DOCS_LIVE_TURNSTILE_SITE_KEY');
+          const secret=bindings.find(x=>x.name==='DOCS_LIVE_TURNSTILE_SECRET');
+          assert.ok(site&&site.type==='plain_text','TURNSTILE_SITE_KEY_NOT_CONFIGURED');
+          assert.match(site.text||'',/^[A-Za-z0-9_-]{20,100}$/,'TURNSTILE_SITE_KEY_BAD_FORMAT');
+          assert.ok(secret&&secret.type==='secret_text','TURNSTILE_SECRET_NOT_SECRET');
+          assert.ok(present('DOCS_LIVE_TUS_SERVICE_KEY','secret_text'));
+          assert.ok(present('DOCS_LIVE_TUS_RECEIPT_KEY','secret_text'));
+          assert.ok(present('DOCS_LIVE_SESSION_KEY','secret_text'));
+          assert.ok(present('DOCS_LIVE_TUS_BUCKET','plain_text','saber-tus-produccion'));
+          assert.ok(present('SABER_R2_GRANDES_LIVE','r2_bucket'));
+          assert.ok(present('DOCS_LIVE_R2_RECEIPT_KEY','secret_text'));
+          assert.ok(bindings.some(x=>x.name==='SABER_CENTRAL'&&
+            x.type==='service'&&x.service==='saber-pagos-produccion'));
+          const domains=await get('/workers/domains');
+          assert.ok(domains.some(x=>x.hostname==='pedidos.libreriasaber.com.ar'&&
+            x.service==='saber-documentos-produccion'&&x.enabled===true));
+          const central=await get('/workers/scripts/saber-pagos-produccion/settings');
+          assert.ok(central.bindings.some(x=>x.name==='MP_LIVE_GATE'&&
+            x.type==='plain_text'&&x.text==='NO_GO'));
+          console.log('TURNSTILE_LIVE_SITE_KEY_FORMAT_VALID=true');
+          console.log('TURNSTILE_LIVE_SECRET_STORED_AS_SECRET=true');
+          console.log('SUPABASE_LIVE_PRIVATE_SERVICE_KEY_PRESENT=true');
+          console.log('R2_LIVE_BUCKET_BOUND=true');
+          console.log('BUYER_DOMAIN_BOUND=true');
+          console.log('CENTRAL_MP_LIVE_GATE_NO_GO=true');
+          console.log('DOCS_MP_LIVE_GATE_NO_GO=true');
+          console.log('NO_SECRETS_READ_OR_PRINTED_NO_WRITES_NO_CHARGES');
+          NODE
+      - name: Registrar comprobación sin activar cobros
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          if [ "$RESULT" = success ];then state=success;else state=failure;fi
+          jq -n --arg state "$state" --arg context 'saber/live-turnstile-storage-ready' \
+           --arg description "Turnstile, TUS, R2 LIVE settings NO_GO: $RESULT" \
+           --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+           '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/live-turnstile-status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/live-turnstile-status.json >/dev/null
