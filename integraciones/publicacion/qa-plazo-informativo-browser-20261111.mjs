@@ -22,7 +22,7 @@ try{
  await line.waitFor({state:'visible',timeout:15000});
  await page.waitForFunction(()=>{
   const s=document.querySelector('#plazo-produccion-orientativo')?.textContent||'';
-  return s.includes('Fecha a confirmar')||new RegExp('^[0-9]{2}/[0-9]{2}/20[0-9]{2}
+  return s.includes('Fecha a confirmar')||new RegExp('^[0-9]{2}/[0-9]{2}/20[0-9]{2}$').test(s.trim());
  },{timeout:15000});
  const rendered=(await line.innerText()).trim();
  const expected=typeof plan.estimatedDeadlineDate==='string'?
