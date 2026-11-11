@@ -25,5 +25,6 @@ jobs:
           SABER_OPERATOR_TEST_PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
         run: |
           set -euo pipefail
+          node --check integraciones/publicacion/qa-plazo-informativo-browser-20261111.mjs
           npm install --no-save --no-fund --no-audit playwright@1.56.1
           node integraciones/publicacion/qa-plazo-informativo-browser-20261111.mjs
