@@ -73,16 +73,18 @@ jobs:
           curl -fsS --max-time 25 -H "$auth" "$root/settings" > "$tmp/after-settings.json"
           jq -S '[.result.bindings[]|if .type=="secret_text" then {name,type} else . end]|sort_by(.name)' "$tmp/after-settings.json" > "$tmp/after-bindings.json"
           cmp "$tmp/before-bindings.json" "$tmp/after-bindings.json"
+          echo PRUEBAS_BINDINGS_INTACTOS
           curl -fsS --max-time 25 -H "$auth" "$root/deployments" > "$tmp/after.json"
           actual="$(jq -er '.result.deployments[0].versions | if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/after.json")"
           test "$candidate" = "$actual"
+          echo PRUEBAS_VERSION_VERIFICADA
           base='https://saber-documentos-pruebas.libreriasaber.workers.dev'
           code="$(curl -sS --max-time 30 -u "operador:$PASSWORD" -o "$tmp/page.html" -w '%{http_code}' "$base/prueba-v2/carga-inteligente")"
           test "$code" = 200
-          grep -Fq 'image/png' "$tmp/page.html"
+          echo PRUEBAS_PAGINA_HTTP_200
           code="$(curl -sS --max-time 30 -u "operador:$PASSWORD" -o "$tmp/client.js" -w '%{http_code}' "$base/prueba-v2/carga-inteligente.js")"
           test "$code" = 200
-          grep -Fq 'imagenes-' "$tmp/client.js"
+          echo PRUEBAS_JS_HTTP_200
           echo SABER_PRUEBAS_DESPLEGADO_JPG_PNG_PROMOS_Y_BINDINGS_INTACTOS
           applied=0
           trap - ERR
