@@ -6,6 +6,46 @@
   <meta name="robots" content="noindex,nofollow,noarchive">
   <meta name="theme-color" content="#082f57">
   <title>Cotizador · Librería Saber</title>
+  <script>
+    // La rama de vista previa abre el cotizador NUEVO de comprador en el
+    // Worker documental de ensayos. NUNCA trasladar este link a producción:
+    // su circuito de pagos es Sandbox y su acceso no es el dominio comercial.
+    // El Pages de producción y el dominio público conservan temporalmente el
+    // cotizador anterior hasta que se autorice el corte completo.
+    (function(){
+      var host=location.hostname.toLowerCase();
+      if(host.endsWith('.libreriasaber.pages.dev')){
+        location.replace('https://saber-documentos-pruebas.libreriasaber.workers.dev/prueba-v2/pedido-cliente');
+        return;
+      }
+      // La producción comercial conserva el cotizador anterior mientras
+      // el nuevo backend esté en Sandbox. Un JSON sin autorización NO abre
+      // el servicio de pruebas ni habilita pagos. Los bloqueos verdaderos
+      // de producción también deben vivir en el servidor y en MP.
+      if(host!=='libreriasaber.com.ar'&&host!=='www.libreriasaber.com.ar')return;
+      fetch('portal-comercial.json',{cache:'no-store'})
+        .then(function(response){
+          if(!response.ok)throw Error('Configuración comercial no disponible');
+          return response.json();
+        })
+        .then(function(config){
+          if(!config||config.schema!=='saber-portal-comercial-v1'||
+            config.enabled!==true||config.release!=='GO_COMERCIAL_CONFIRMADO'||
+            typeof config.buyerUrl!=='string')return;
+          var target;
+          try{target=new URL(config.buyerUrl)}catch(_){return}
+          // Host de producción previsto, sujeto a vinculación/validación.
+          // Nunca workers.dev, pages.dev, /prueba-v2, admin ni Sandbox.
+          if(target.protocol!=='https:'||
+            target.hostname!=='pedidos.libreriasaber.com.ar'||
+            target.pathname!=='/cotizar'||
+            target.port||target.search||target.hash||
+            target.username||target.password)return;
+          location.replace(target.href);
+        })
+        .catch(function(){/* Fail closed: continúa el cotizador previo. */});
+    })();
+  </script>
   <style>
     :root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;--blue:#082f57;--orange:#f7941d;--line:#dbe5ed;--muted:#637187}
     *{box-sizing:border-box}
@@ -37,6 +77,7 @@
   <script>
     (function(){
       var key='saberCartV1';
+      var ensayoArchivos=new URLSearchParams(location.search).get('ensayoArchivos')==='1';
       function readCart(){try{return JSON.parse(localStorage.getItem(key)||'[]')}catch(e){return []}}
       function updateStatus(){var cart=readCart();var count=cart.reduce(function(sum,item){return sum+(Number(item.qty)||1)},0);document.getElementById('cartStatus').textContent='Carrito '+count}
       // Se mantiene invisible hasta un lanzamiento expresamente aprobado.
@@ -55,6 +96,31 @@
         var item=event.data.payload;
         if(!item||item.type!=='print'||!Number(item.price))return;
         var cart=readCart();
+        // Solo en ensayo: conservar por trabajo una referencia declarativa.
+        // Nunca se reciben bytes ni archivos desde el iframe por postMessage.
+        var pdfDrafts=[];
+        if(ensayoArchivos&&Array.isArray(item.pdfDrafts)&&item.pdfDrafts.length<=30){
+          var received=new Set(),valid=true;
+          item.pdfDrafts.forEach(function(d){
+            var r=d&&d.reference;
+            if(!d||!Number.isSafeInteger(d.itemIndex)||d.itemIndex<0||
+               d.itemIndex>29||d.service!=='impresiones'||!r||
+               Object.keys(r).sort().join(',')!=='bytes,estado,localRef,nombre,paginas,recibido,schema,sha256,verificadoServidor'||
+               r.schema!=='saber-pdf-local-pendiente-v1'||
+               !/^[a-f0-9-]{36}$/i.test(r.localRef||'')||
+               received.has(r.localRef)||!Number.isSafeInteger(r.bytes)||
+               r.bytes<5||r.bytes>20*1024*1024||
+               !Number.isSafeInteger(r.paginas)||r.paginas<1||r.paginas>2000||
+               !/^[a-f0-9]{64}$/.test(r.sha256||'')||
+               typeof r.nombre!=='string'||r.nombre.length>180||
+               !/\.pdf$/i.test(r.nombre)||r.estado!=='PENDIENTE_DE_ENVIO'||
+               r.recibido!==false||r.verificadoServidor!==false){valid=false;return}
+            received.add(r.localRef);
+            pdfDrafts.push({itemIndex:d.itemIndex,service:'impresiones',
+              reference:{...r}});
+          });
+          if(!valid)pdfDrafts=[];
+        }
         cart.push({
           id:String(item.id||('PRINT-'+Date.now())),
           type:'print',
@@ -62,7 +128,8 @@
           price:Number(item.price)||0,
           qty:1,
           detail:String(item.detail||''),
-          deposit:Number(item.deposit)||0
+          deposit:Number(item.deposit)||0,
+          ...(ensayoArchivos?{pdfDrafts}: {})
         });
         localStorage.setItem(key,JSON.stringify(cart));
         updateStatus();
