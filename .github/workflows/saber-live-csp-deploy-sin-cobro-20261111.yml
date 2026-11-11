@@ -19,6 +19,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          npm install --ignore-scripts --no-audit --no-fund --package-lock=false
           node --test \
             integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs \
             integraciones/autocotizador/recepcion/pagina-retorno-live.test.mjs \
