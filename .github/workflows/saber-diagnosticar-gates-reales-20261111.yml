@@ -39,6 +39,8 @@ jobs:
              .map(x=>({name:x.name,text:x.text}));
             console.log('GATE_WORKER='+name+' '+JSON.stringify(allowed));
             console.log('GATE_R2_BOUND='+name+' '+s.bindings.some(x=>x.name==='SABER_R2_GRANDES_LIVE'&&x.type==='r2_bucket'));
+            if(name==='saber-documentos-produccion') console.log('GATE_LIVE_STAFF_SECRET_EXISTS='+s.bindings.some(x=>x.name==='DOCS_LIVE_STAFF_SECRET'&&x.type==='secret_text'));
+            if(name==='saber-pagos-produccion') console.log('GATE_CENTRAL_LIVE_PACKAGE='+JSON.stringify(s.bindings.filter(x=>x.name==='CENTRAL_LIVE_PACKAGE_GATE').map(x=>x.text)));
             const d=await req('/'+name+'/deployments');
             console.log('GATE_ACTIVE_DEPLOYMENT='+name+' '+JSON.stringify(
              (d?.deployments||[]).slice(0,2).map(x=>({id:x.id,versions:x.versions?.map(v=>({id:v.version_id,percentage:v.percentage}))}))));
