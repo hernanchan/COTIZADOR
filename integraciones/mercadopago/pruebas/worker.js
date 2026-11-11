@@ -3936,10 +3936,14 @@ document.querySelector("#refreshTransfers").addEventListener("click",()=>refresh
 let liveTransferRefreshing=false;
 async function refreshLiveTransfers(){
  if(liveTransferRefreshing||!secret.value.trim())return;
- liveTransferRefreshing=true;
- const area=document.querySelector("#transferLiveArea"),
-  list=document.querySelector("#transferLivePending"),
+ let area,list,message;
+ try{
+  area=document.querySelector("#transferLiveArea");
+  list=document.querySelector("#transferLivePending");
   message=document.querySelector("#transferLiveStatus");
+ }catch{return} // Panel ausente en clientes antiguos o pruebas del tablero.
+ if(!area||!list||!message)return;
+ liveTransferRefreshing=true;
  try{
   const result=await api("/admin/api/central/live-transfers/pending");
   if(result.ok!==true||!Array.isArray(result.pending))throw Error("Respuesta de Central inconsistente");
