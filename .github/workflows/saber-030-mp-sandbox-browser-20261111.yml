@@ -1,0 +1,28 @@
+name: Saber 030 - inspección checkout MP Sandbox test_user sin cobro real
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths:
+      - .github/workflows/saber-030-mp-sandbox-browser-20261111.yml
+      - integraciones/publicacion/qa-orden-030-checkout-sandbox-20261111.mjs
+permissions: {contents: read, statuses: write}
+concurrency: {group: saber-030-sandbox-test-buyer, cancel-in-progress: false}
+jobs:
+  mp-sandbox-030:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Revisar sesión vendedor TEST, estado Central y abrir Checkout Pro
+        env:
+          SABER_CF_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          SABER_CF_DEPLOY_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+          SABER_V2_OPERATOR_PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund playwright@1.56.1
+          node --check integraciones/publicacion/qa-orden-030-checkout-sandbox-20261111.mjs
+          node integraciones/publicacion/qa-orden-030-checkout-sandbox-20261111.mjs
