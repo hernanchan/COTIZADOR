@@ -200,6 +200,7 @@ async function centralTables(env){
   "amount_ars INTEGER NOT NULL,measured_json TEXT NOT NULL,operator TEXT NOT NULL,"+
   "notes TEXT NOT NULL,approved_at TEXT NOT NULL DEFAULT(datetime('now')))").run();
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_order_contacts (order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE RESTRICT,phone TEXT NOT NULL CHECK(length(phone) BETWEEN 10 AND 26),created_at TEXT NOT NULL DEFAULT(datetime('now')))").run();
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_order_customer_details (order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE RESTRICT,name TEXT NOT NULL CHECK(length(name) BETWEEN 2 AND 100),address TEXT NOT NULL DEFAULT '' CHECK(length(address)<=180),created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_bridge_requests (request_id TEXT PRIMARY KEY,request_hash TEXT NOT NULL,action TEXT NOT NULL CHECK(action IN ('stage','link')),created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_document_receipts (receipt_id TEXT PRIMARY KEY,web_order_id TEXT NOT NULL REFERENCES central_document_manifests(web_order_id) ON DELETE CASCADE,file_id TEXT NOT NULL,sha256 TEXT NOT NULL,UNIQUE(web_order_id,file_id))").run();
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_document_print_drafts (receipt_id TEXT PRIMARY KEY,web_order_id TEXT NOT NULL REFERENCES central_document_manifests(web_order_id) ON DELETE CASCADE,file_id TEXT NOT NULL,original_receipt_id TEXT NOT NULL UNIQUE REFERENCES central_document_receipts(receipt_id) ON DELETE RESTRICT,sha256 TEXT NOT NULL CHECK(length(sha256)=64),bytes INTEGER NOT NULL CHECK(bytes BETWEEN 100 AND 20971520),pages INTEGER NOT NULL CHECK(pages BETWEEN 1 AND 2000),status TEXT NOT NULL DEFAULT 'stored_private_unpaid' CHECK(status='stored_private_unpaid'),created_at TEXT NOT NULL DEFAULT (datetime('now')),UNIQUE(web_order_id,file_id))").run();
@@ -384,9 +385,12 @@ async function centralTUSPackageManifest(req,env){
   return json({ok:false,error:"Los archivos se eliminaron al entregar",paymentAuthorized:false},410);
  await centralTables(env);
  const row=await env.DB.prepare(
-  "SELECT m.web_order_id,m.commercial_order_id,m.manifest_json,m.amount_ars,m.file_count,o.status,n.number "+
+  "SELECT m.web_order_id,m.commercial_order_id,m.manifest_json,m.amount_ars,m.file_count,o.status,n.number,"+
+  "c.phone AS telefonoContacto,d.name AS nombreCliente,d.address AS direccionCliente "+
   "FROM central_document_manifests m JOIN orders o ON o.id=m.commercial_order_id "+
   "JOIN central_work_order_numbers n ON n.commercial_order_id=o.id "+
+  "LEFT JOIN central_order_contacts c ON c.order_id=o.id "+
+  "LEFT JOIN central_order_customer_details d ON d.order_id=o.id "+
   "WHERE m.web_order_id=? LIMIT 1"
  ).bind(p.webOrderId).first();
  if(!row||!Number.isSafeInteger(row.number)||row.number<=0)
@@ -445,6 +449,8 @@ async function centralTUSPackageManifest(req,env){
  }
  return json({ok:true,schema:p.schema,numeroOrden:shortWorkNumber(row.number),
   webOrderId:p.webOrderId,importe:row.amount_ars,trabajos,
+  nombreCliente:row.nombreCliente||null,telefonoContacto:row.telefonoContacto||null,
+  direccionCliente:row.direccionCliente||null,
   estadoPago:pagoVerificado?"PAGADO_VERIFICADO":"SIN_PAGO_CONFIRMADO",
   pagoVerificado,pdfImprimibleVerificado:false,listoParaProducir:false,
   paymentAuthorized:false},200);
@@ -609,7 +615,9 @@ async function centralPrepareDraft(req,env){
  if(env.CENTRAL_PREPARE_ENABLED!=="PRIVATE_TEST_ONLY")
   return json({error:"Preparación documental deshabilitada"},503);
  const data=signed.payload;
- if(!data||!["clientOrderId,items,webOrderId","clientOrderId,items,telefono,webOrderId"].includes(Object.keys(data).sort().join(","))||
+ if(!data||typeof data!=="object"||Array.isArray(data)||
+    !Object.keys(data).every(k=>["clientOrderId","items","webOrderId","telefono","nombre","direccion"].includes(k))||
+    !Object.hasOwn(data,"clientOrderId")||!Object.hasOwn(data,"items")||!Object.hasOwn(data,"webOrderId")||
     !CENTRAL_WEB.test(data.webOrderId||"")||!CENTRAL_UUID.test(data.clientOrderId||"")||
     !Array.isArray(data.items)||data.items.length>50)
   return json({error:"Solicitud de pedido inválida"},400);
@@ -620,6 +628,12 @@ async function centralPrepareDraft(req,env){
      digits.length<10||digits.length>15)
    return json({error:"Teléfono de contacto inválido"},422);
  }
+ const nombre=typeof data.nombre==="string"?data.nombre.trim():null;
+ const direccion=typeof data.direccion==="string"?data.direccion.trim():null;
+ if(data.nombre!==undefined&&(!nombre||nombre.length<2||nombre.length>100||/[<>]/.test(nombre)||!telefono))
+  return json({error:"Nombre o teléfono del responsable inválido"},422);
+ if(data.direccion!==undefined&&(direccion===null||direccion.length>180||/[<>]/.test(direccion)))
+  return json({error:"Dirección del cliente inválida"},422);
  const codes=new Set(),clean=[];
  for(const it of data.items){
   if(!it||Object.keys(it).sort().join(",")!=="code,qty"||
@@ -632,7 +646,7 @@ async function centralPrepareDraft(req,env){
  await ensureOrderItems(env);
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS cart_requests (client_order_id TEXT PRIMARY KEY, request_hash TEXT NOT NULL,order_id TEXT NOT NULL UNIQUE)").run();
  const hash=await centralHash(JSON.stringify({webOrderId:data.webOrderId,items:clean,
-  ...(telefono?{telefono}:{})}));
+  ...(telefono?{telefono}:{}),...(nombre?{nombre}:{}),...(direccion!==null?{direccion}:{})}));
  const previous=await env.DB.prepare("SELECT request_hash,order_id FROM cart_requests WHERE client_order_id=?").bind(data.clientOrderId).first();
  if(previous){
   if(previous.request_hash!==hash)return json({error:"Identificador de compra usado con otro carrito"},409);
@@ -682,6 +696,7 @@ async function centralPrepareDraft(req,env){
  products.forEach((it,i)=>requests.push(env.DB.prepare("INSERT INTO order_items(order_id,line_number,item_type,sku,title,quantity,unit_price_ars,line_total_ars,detail_json,file_references_json) VALUES(?,?,?,?,?,?,?,?,?,?)")
   .bind(orderId,i+2,"product",it.code,it.name,it.qty,it.price,it.total,"{}","[]")));
  if(telefono)requests.push(env.DB.prepare("INSERT INTO central_order_contacts(order_id,phone) VALUES(?,?)").bind(orderId,telefono));
+ if(nombre)requests.push(env.DB.prepare("INSERT INTO central_order_customer_details(order_id,name,address) VALUES(?,?,?)").bind(orderId,nombre,direccion||""));
  requests.push(env.DB.prepare("INSERT INTO central_work_order_numbers(commercial_order_id) VALUES(?)").bind(orderId));
  requests.push(env.DB.prepare("INSERT INTO cart_requests(client_order_id,request_hash,order_id) VALUES(?,?,?)").bind(data.clientOrderId,hash,orderId));
  requests.push(env.DB.prepare("UPDATE central_document_manifests SET commercial_order_id=?,status='linked_waiting_payment',linked_at=datetime('now') WHERE web_order_id=? AND commercial_order_id IS NULL").bind(orderId,data.webOrderId));
@@ -2395,12 +2410,13 @@ async function trackingCustomerStatus(req,env){
 
 async function centralAdminDetail(env,id){
  await centralTables(env);
- const row=await env.DB.prepare("SELECT m.web_order_id,m.manifest_json,m.created_at,m.amount_ars,m.file_count,c.phone AS telefonoContacto FROM central_document_manifests m LEFT JOIN central_order_contacts c ON c.order_id=m.commercial_order_id WHERE m.commercial_order_id=?").bind(id).first();
+ const row=await env.DB.prepare("SELECT m.web_order_id,m.manifest_json,m.created_at,m.amount_ars,m.file_count,c.phone AS telefonoContacto,d.name AS nombreCliente,d.address AS direccionCliente FROM central_document_manifests m LEFT JOIN central_order_contacts c ON c.order_id=m.commercial_order_id LEFT JOIN central_order_customer_details d ON d.order_id=m.commercial_order_id WHERE m.commercial_order_id=?").bind(id).first();
  if(!row)return null;
  let document;
  try{document=JSON.parse(row.manifest_json)}catch(_){return null}
  const number=await env.DB.prepare("SELECT number FROM central_work_order_numbers WHERE commercial_order_id=?").bind(id).first();
  return {numeroOrden:shortWorkNumber(number?.number),webOrderId:row.web_order_id,totalDocumentos:row.amount_ars,telefonoContacto:row.telefonoContacto||null,
+  nombreCliente:row.nombreCliente||null,direccionCliente:row.direccionCliente||null,
   fechaRecepcion:row.created_at,archivos:row.file_count,
   estado:"DOCUMENTOS_VERIFICADOS_PDF_FINAL_PENDIENTE",
   esTUS:/^WEB-ENSAYO-[A-F0-9]{32}$/.test(row.web_order_id),
@@ -3022,10 +3038,9 @@ async function showOrder(id){try{status.textContent="Consultando detalle...";con
  const d=x.produccion.documentosVerificados;
  details.append(node("h4",(d.numeroOrden?"Orden de trabajo N.º "+d.numeroOrden+" · ":"")+
   "PDF originales verificados · "+d.archivos+" archivo(s)"));
- if(d.telefonoContacto){
-  const tel=node("p","Teléfono de contacto: "+d.telefonoContacto);
-  details.append(tel);
- }
+ details.append(node("p","Nombre del cliente: "+(d.nombreCliente||"No informado")));
+ details.append(node("p","Teléfono de contacto: "+(d.telefonoContacto||"No informado")));
+ details.append(node("p","Dirección: "+(d.direccionCliente||"No informada · retiro en local")));
  details.append(node("p","PAGO VERIFICADO · "+money(d.totalDocumentos)+
   " · Preparación de archivos pendiente. Los originales no están impuestos ni listos para imprimir automáticamente."));
  if(!Array.isArray(d.trabajos)||d.trabajos.length!==d.archivos){
@@ -3506,7 +3521,9 @@ function boardCard(order){
  card.append(node("p",String(order.description||"Pedido documental").slice(0,130)));
  const totals=node("p",money(order.amount_ars)+" · "+(order.file_count||0)+" PDF · Pago verificado");
  totals.className="money";card.append(totals);
- if(order.customer_phone)card.append(node("p","Teléfono: "+order.customer_phone));
+ card.append(node("p","Cliente: "+(order.customer_name||"No informado")));
+ card.append(node("p","Teléfono: "+(order.customer_phone||"No informado")));
+ card.append(node("p","Dirección: "+(order.customer_address||"No informada · retiro en local")));
  if(order.universal_pdf_pending===true){
   const count=Number.isSafeInteger(order.universal_pdf_pending_count)?
    order.universal_pdf_pending_count:order.file_count;
@@ -5081,7 +5098,8 @@ export default {
      "n.number AS work_number,a.receipt_id AS r2_receipt_id,"+
      "COALESCE(m.file_count,CASE WHEN a.order_id IS NOT NULL THEN 1 END) AS file_count,"+
      "COALESCE(m.web_order_id,i.web_order_id) AS web_order_id,"+
-     "c.phone AS customer_phone,COALESCE(s.version,0) AS production_version,"+
+     "c.phone AS customer_phone,d.name AS customer_name,d.address AS customer_address,"+
+     "COALESCE(s.version,0) AS production_version,"+
      "e.ready_at AS estimated_ready_at,COALESCE(e.version,0) AS estimated_ready_version FROM orders o "+
      "LEFT JOIN central_document_manifests m ON m.commercial_order_id=o.id "+
      "LEFT JOIN central_r2_prepress_approvals a ON a.order_id=o.id "+
@@ -5090,6 +5108,7 @@ export default {
      "LEFT JOIN central_preparation_estimates e ON e.order_id=o.id "+
      "LEFT JOIN central_work_order_numbers n ON n.commercial_order_id=o.id "+
      "LEFT JOIN central_order_contacts c ON c.order_id=o.id "+
+     "LEFT JOIN central_order_customer_details d ON d.order_id=o.id "+
      "WHERE o.status='paid' AND o.deposit_ars=o.amount_ars AND EXISTS ("+
      "SELECT 1 FROM payment_reviews WHERE order_id=o.id AND state='verified') "+
      "ORDER BY CASE COALESCE(s.state,'pendiente') WHEN 'en_espera' THEN 0 WHEN 'pendiente' THEN 1 "+
