@@ -18,7 +18,8 @@ try{
    if(['GET','HEAD'].includes(r.method()))return;
    const url=new URL(r.url());
    if(url.hostname==='challenges.cloudflare.com'||url.pathname.startsWith('/cdn-cgi/'))return;
-   if(url.pathname==='/api/ensayo-carga-unica')return;
+   if(url.pathname==='/api/ensayo-carga-unica'||
+      url.pathname==='/prueba-v2/api/ensayo-tus-comprobar')return;
    unexpected.push(r.method()+' '+url.pathname);
   });
   const res=await page.goto(origin+'/prueba-v2/',{waitUntil:'domcontentloaded',timeout:50000});
