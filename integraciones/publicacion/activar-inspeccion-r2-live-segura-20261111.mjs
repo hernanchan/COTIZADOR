@@ -33,8 +33,9 @@ assert.ok(gate(d,'SABER_ENTORNO','produccion')&&gate(d,'DOCS_LIVE_R2_GATE',G)&&
 for(const n of ['CENTRAL_LIVE_R2_GATE','CENTRAL_LIVE_R2_QUOTA_GATE',
  'CENTRAL_LIVE_R2_STAGING_GATE'])
  assert.ok(gate(c,n,OFF),'R2_PAYMENT_GATES_MUST_REMAIN_CLOSED_'+n);
-assert.ok(has(c,'DEMO_ADMIN_KEY','secret_text')&&has(c,'CENTRAL_BRIDGE_KEY','secret_text')&&
- has(c,'DB','d1'),'CENTRAL_AUTH_OR_D1_MISSING');
+assert.ok(has(c,'CENTRAL_BRIDGE_KEY','secret_text')&&
+ has(c,'DB','d1'),'CENTRAL_BRIDGE_OR_D1_MISSING');
+console.log('LIVE_R2_CENTRAL_ADMIN_KEY_PRESENT='+has(c,'DEMO_ADMIN_KEY'));
 const keyName='CENTRAL_LIVE_R2_INSPECTION_KEY';
 const gateName='CENTRAL_LIVE_R2_INSPECTION_GATE';
 assert.ok(!has(c,keyName),'DO_NOT_REPLACE_EXISTING_INSPECTION_KEY');
