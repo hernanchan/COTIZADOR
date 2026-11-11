@@ -1,0 +1,35 @@
+name: Saber - regresión comercial Fotos, descuentos y firma Central (sin deploy)
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths:
+      - .github/workflows/saber-qa-fotos-descuentos-pedidos-20261111.yml
+      - tests/r2-universal-fotos-promociones-cobro.test.mjs
+permissions: {contents: read, statuses: write}
+jobs:
+  conciliar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verificar Fotos descuentos contra hash de Central y regresión previa
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.25.12
+          node --test tests/r2-universal-fotos-promociones-cobro.test.mjs
+          node --test tests/r2-borrador-universal-central.test.mjs tests/r2-orden-universal-sin-cobro.test.mjs tests/r2-plan-universal-sin-subida.test.mjs tests/autocotizador-fotos-integracion.test.mjs tests/r2-universal-preprensa-central.test.mjs
+          node --check integraciones/autocotizador/recepcion/repartir-promocion-ficha.mjs
+          node --check integraciones/autocotizador/recepcion/ficha-prearchivo-universal.mjs
+          node --check integraciones/mercadopago/pruebas/r2-lote-universal-central.mjs
+          echo SABER_FOTOS_PROMO_CENTRAL_REGRESION_OK
+      - name: Registrar resultado QA
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          if [ "$RESULT" = success ];then state=success;description="Fotos y promociones conciliadas con hash Central; QA success";else state=failure;description="Fotos y promociones no pasan regresión Central";fi
+          jq -n --arg state "$state" --arg context 'saber/fotos-promos-central-qa' --arg description "$description" --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/fotos-qa-status.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/fotos-qa-status.json >/dev/null
