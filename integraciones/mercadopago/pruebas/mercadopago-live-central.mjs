@@ -354,3 +354,36 @@ export async function estadoMPLiveCentral(request,env,{readSigned}={}){
   return reply({ok:false,error:'MP_LIVE_STATUS_D1_NO_DISPONIBLE'},503);
  }
 }
+
+/** Read-only seller probe. Internal HMAC-only, no preference, orders or payment calls. */
+export async function diagnosticarVendedorMPLive(request,env,{
+ readSigned,fetcher=fetch
+}={}){
+ if(!productionOn(env))return reply({ok:false,code:'CONFIG_LIVE_INCOMPLETA'},503);
+ if(request.method!=='POST'||typeof readSigned!=='function')
+  return reply({ok:false,code:'DIAG_REQUIERE_HMAC'},403);
+ const verified=await readSigned(request,env);
+ if(verified?.error)return reply({ok:false,code:'DIAG_HMAC_RECHAZADO'},401);
+ if(!verified.payload||Object.keys(verified.payload).sort().join(',')!=='purpose,schema'||
+    verified.payload.schema!=='saber-mp-live-seller-diagnostic-v1'||
+    verified.payload.purpose!=='verificar-cuenta-solo-lectura')
+  return reply({ok:false,code:'DIAG_ARGUMENTOS_INVALIDOS'},422);
+ try{
+  const seller=await sellerLive(env,fetcher);
+  return reply({ok:true,code:'MP_LIVE_VENDEDOR_VALIDADO',
+   productionSeller:true,testUser:seller.test_user===true},200);
+ }catch(error){
+  const message=String(error?.message||'');
+  let code='EXCEPCION_DESCONOCIDA';
+  if(/^MP_LIVE_HTTP_[0-9]{3}_[A-Za-z0-9_-]{1,60}$/.test(message))
+   code=message;
+  else if(message==='MP_LIVE_VENDEDOR_INCORRECTO')code=message;
+  else if(message==='MP_LIVE_RUTA_PROHIBIDA')code=message;
+  else if(error?.name==='TimeoutError'||error?.name==='AbortError')code='MP_LIVE_RED_TIMEOUT';
+  else if(error?.name==='TypeError'&&/fetch|network|connect/i.test(message))
+   code='MP_LIVE_RED_FETCH_FALLO';
+  else if(error?.name==='SyntaxError')code='MP_LIVE_RESPUESTA_NO_JSON';
+  else if(error?.name==='TypeError')code='MP_LIVE_TYPE_ERROR';
+  return reply({ok:false,code},503);
+ }
+}
