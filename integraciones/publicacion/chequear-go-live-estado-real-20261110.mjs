@@ -138,7 +138,7 @@ for(const host of ['https://pagos.'+domain,'https://pedidos.'+domain]){
  const r=await remote(host+'/health');
  const key=host.includes('pagos')?'PAYMENT_GATEWAY_TLS':'BUYER_DOMAIN_TLS';
  // 200/401/404/503 all indicate TLS established and response from edge; 0/525/526 fail.
- checked(key,r.status>0&&r.status<500,'HTTP_'+r.status);
+ checked(key,r.status>0&&r.status<600&&r.status!==525&&r.status!==526,'HTTP_'+r.status);
 }
 console.log('SABER_GO_LIVE_READY_COUNT='+ok.length);
 console.log('SABER_GO_LIVE_BLOCKER_COUNT='+issues.length);
