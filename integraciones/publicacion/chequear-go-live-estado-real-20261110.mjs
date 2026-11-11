@@ -83,7 +83,8 @@ if(documents){
  checked('DOCUMENTS_LIVE_CENTRAL_SERVICE',binds(documents).some(x=>x.name==='SABER_CENTRAL'&&x.type==='service'&&x.service==='saber-pagos-produccion'));
  const needed=['DOCS_LIVE_PRICING_GATE','DOCS_LIVE_TUS_GATE','DOCS_LIVE_R2_GATE',
   'DOCS_LIVE_R2_STAGING_GATE','DOCS_LIVE_STAFF_GATE','DOCS_LIVE_PACKAGE_GATE'];
- for(const k of needed)checked(k,n.has(k));
+ for(const k of needed)checked(k+'_STAGED_NO_GO',has(documents,k,'plain_text','NO_GO'));
+ checked('DOCS_LIVE_TURNSTILE_KEYS_READY',has(documents,'DOCS_LIVE_TURNSTILE_SITE_KEY','plain_text')&&has(documents,'DOCS_LIVE_TURNSTILE_SECRET','secret_text'));
  checked('DOCS_LIVE_SUPABASE_PROJECT',n.has('DOCS_LIVE_TUS_PROJECT_URL'));
  checked('DOCS_LIVE_SUPABASE_BUCKET',n.has('DOCS_LIVE_TUS_BUCKET'));
  checked('DOCS_LIVE_SUPABASE_SERVICE_KEY',n.has('DOCS_LIVE_TUS_SERVICE_KEY'));
@@ -142,5 +143,5 @@ for(const host of ['https://pagos.'+domain,'https://pedidos.'+domain]){
 }
 console.log('SABER_GO_LIVE_READY_COUNT='+ok.length);
 console.log('SABER_GO_LIVE_BLOCKER_COUNT='+issues.length);
-console.log('SABER_GO_LIVE_SAFE_MODE='+(issues.length?'NO_GO':'INFRA_READY_REQUIRES_PAYMENT_E2E'));
+console.log('SABER_GO_LIVE_SAFE_MODE='+(issues.length?'NO_GO_INCOMPLETE':'INFRA_STAGED_GATES_CLOSED_NEEDS_LIVE_E2E'));
 console.log('AUDIT_READ_ONLY_NO_WORKER_WRITE_NO_MP_NO_PAGES_NO_MAIN');
