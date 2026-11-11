@@ -3987,8 +3987,10 @@ async function refreshLiveTransfers(){
   area.hidden=true;list.replaceChildren();
  }finally{liveTransferRefreshing=false}
 }
-setInterval(()=>refreshLiveTransfers(),30000);
-refreshLiveTransfers();
+if(typeof setInterval==='function'){
+ setInterval(()=>refreshLiveTransfers(),30000);
+ refreshLiveTransfers();
+}
 
 document.querySelector("#refreshUnpaid").addEventListener("click",async()=>{
  const list=document.querySelector("#unpaidDocs");
