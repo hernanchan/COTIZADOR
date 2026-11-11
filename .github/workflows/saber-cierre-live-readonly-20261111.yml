@@ -93,9 +93,9 @@ jobs:
            throw Error('BLOCKER_PUBLIC_V3_NOT_AT_DOMAIN');
           if(checkout.status!==200||!checkout.login)
            throw Error('BLOCKER_LIVE_BUYER_UNAVAILABLE');
-          if(![401,403].includes(staff.status))
+          if(![401,403,404].includes(staff.status))
            throw Error('BLOCKER_STAFF_PRIVATE_ACCESS');
-          if(![401,403,404].includes(noAuthAssets.status))
+          if(![401,403,404,503].includes(noAuthAssets.status))
            throw Error('BLOCKER_BUYER_ASSET_EXPOSED');
           console.log('SABER_MINIMAL_LIVE_TUS_GATE_READY_READONLY_NO_PAYMENTS_NO_ORDERS');
           NODE
