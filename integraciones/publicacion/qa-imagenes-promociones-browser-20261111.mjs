@@ -109,7 +109,7 @@ try{
    'Las imágenes convertidas deben poder continuar por la recepción de PDF.');
   assert.equal(handoff.files,1);
   assert.deepEqual(handoff.pdfSignatures,['%PDF-']);
-  assert.match(handoff.names[0],/^imagenes-01-2-fotos\\.pdf$/);
+  assert.equal(handoff.names[0],'imagenes-01-2-fotos.pdf');
   assert.ok(Number.isSafeInteger(handoff.total)&&handoff.total>0);
   assert.deepEqual(unexpected,[],'No autorizar envíos ni pagos durante QA');
   assert.equal(errors.length,0,'JS pageerror: '+errors.join(' | '));
