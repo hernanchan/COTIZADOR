@@ -89,10 +89,23 @@ try{
       return String.fromCharCode(...head);
      })),
      names:files.map(f=>f.name),
+     services:event.data.archivos?.map(a=>a.servicio)||[],
      total:event.data.total??event.data.totalOrientativo
     });
    },true);
   });
+  const src=await page.locator('#smart').getAttribute('src');
+  assert.match(src||'',/universal=1/,'La compuerta TUS universal debe estar habilitada en PRUEBAS');
+  await page.evaluate(()=>document.querySelector('#smart').contentWindow.postMessage(
+    {type:'SABER_SMART_PREPARAR_ENVIO'},location.origin));
+  await page.waitForFunction(()=>window.__saberHandoffQA?.length>0,null,{timeout:15000});
+  const fotosHandoff=(await page.evaluate(()=>window.__saberHandoffQA))[0];
+  assert.equal(fotosHandoff.type,'SABER_SMART_UNIVERSAL_PDF','Las fotos deben usar la pasarela universal TUS');
+  assert.equal(fotosHandoff.files,1);
+  assert.deepEqual(fotosHandoff.pdfSignatures,['%PDF-']);
+  assert.deepEqual(fotosHandoff.services,['fotos']);
+  assert.equal(fotosHandoff.total,1000);
+  await page.evaluate(()=>{window.__saberHandoffQA=[]});
   await card.locator('label').filter({hasText:'Servicio'}).locator('select').selectOption('auto');
   await page.waitForFunction(()=>{
    const frame=document.querySelector('#smart')?.contentDocument;
