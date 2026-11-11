@@ -32,8 +32,11 @@ jobs:
           deployed=""
           status=""
           for i in 1 2 3 4 5 6; do
-            curl -fsS --max-time 30 -H "Authorization: Bearer $EDITOR_TOKEN" "$base/deployments" > "$dir/deployments.json"
-            jq -e '.success==true and (.result | type == "array")' "$dir/deployments.json" >/dev/null
+            http=$(curl -sS --max-time 30 -H "Authorization: Bearer $EDITOR_TOKEN" -w '%{http_code}' -o "$dir/deployments.json" "$base/deployments")
+            echo "RELEASE_CANDIDATE_PAGES_API_HTTP=$http"
+            jq -c '{success,resultType:(.result|type),errorCodes:[.errors[]?|.code]}' "$dir/deployments.json" || true
+            test "$http" = 200 || { echo 'RELEASE_CANDIDATE_PAGES_READ_NOT_AUTHORIZED';exit 1; }
+            jq -e '.success==true and (.result | type == "array")' "$dir/deployments.json" >/dev/null || { echo 'RELEASE_CANDIDATE_PAGES_UNEXPECTED_RESPONSE';exit 1; }
             jq -c --arg branch 'publicacion/candidata-web-saber-20261111' '[.result[]|select(.deployment_trigger.metadata.branch==$branch)]|sort_by(.created_on)|reverse|.[0] // {}' "$dir/deployments.json" > "$dir/preview.json"
             deployed=$(jq -r '.id//empty' "$dir/preview.json")
             status=$(jq -r '.latest_stage.status//"unknown"' "$dir/preview.json")
