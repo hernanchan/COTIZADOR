@@ -4,6 +4,7 @@ on:
     branches: [integracion/tus-pedido-privado-20261101]
     paths:
       - .github/workflows/saber-qa-jpg-png-promos-browser-20261111.yml
+      - integraciones/publicacion/qa-imagenes-promociones-browser-20261111.mjs
 permissions: {contents: read, statuses: write}
 concurrency: {group: saber-qa-imagenes-precio-browser, cancel-in-progress: false}
 jobs:
