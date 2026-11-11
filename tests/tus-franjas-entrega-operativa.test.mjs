@@ -81,7 +81,7 @@ test('hoy no se promete al día siguiente, después de cerrar o los fines de sem
  assert.equal(plan('hoy',jueves,'pendiente',Date.parse('2026-11-06T14:00:00Z')),'por_confirmar');
  assert.equal(plan('hoy_tarde',jueves,'pendiente',Date.parse('2026-11-07T13:00:00Z')),'por_confirmar');
  assert.equal(plan('proximo_dia',jueves,'pendiente',tarde),'proximo_dia');
- assert.equal(plan('hoy',jueves,'en_preparacion',tarde),'por_confirmar');
+ assert.equal(plan('hoy',jueves,'en_preparacion',tarde),'hoy');
  assert.equal(plan('hoy',null,'pendiente',tarde),'por_confirmar');
 });
 
@@ -97,7 +97,7 @@ test('confirmación, seguimiento y Central usan la franja sin inventar tiempos',
  assert.match(adminScript,/Definir hora de entrega/);
  assert.match(tracking,/Seguí este pedido/);
  assert.match(clientScript,/d\.deliveryPlan/);
- assert.match(clientScript,/hora estimada de retiro/);
+ assert.match(clientScript,/fecha y hora más precisas/);
  assert.match(proxy,/result\.estado==='pagado'&&/);
  assert.match(proxy,/deliveryPlan=result\.deliveryPlan/);
  assert.match(portal,/result\.deliveryPlan/);
