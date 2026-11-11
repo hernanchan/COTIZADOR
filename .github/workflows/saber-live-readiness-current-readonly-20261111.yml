@@ -1,0 +1,65 @@
+name: Saber LIVE - estado actual de compuertas sin cambios
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [docs/COMPROBAR-LIVE-GATES-ACTUALES-20261111.trigger]
+permissions: {contents: read}
+jobs:
+  gate-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Lectura de estado LIVE sin pedidos ni escrituras
+        shell: bash
+        env:
+          CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          CF_DEPLOY_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+          CF_EDITOR_TOKEN: ${{ secrets.SABER_CF_EDITOR_TOKEN }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const account=process.env.CF_ACCOUNT;
+          const tokens=[process.env.CF_DEPLOY_TOKEN,process.env.CF_EDITOR_TOKEN].filter(Boolean);
+          assert.match(account||'',/^[a-f0-9]{32}$/i);
+          assert.ok(tokens.length);
+          const base='https://api.cloudflare.com/client/v4/accounts/'+account;
+          async function read(path){
+            for(const token of tokens){
+              const res=await fetch(base+path,{method:'GET',headers:{Authorization:'Bearer '+token},
+                signal:AbortSignal.timeout(16000)});
+              const body=await res.json().catch(()=>null);
+              if(res.ok&&body?.success===true)return body.result;
+            }
+            throw Error('READONLY_CF_NOT_AUTHORIZED_'+path.split('/').at(-1));
+          }
+          const configs=[
+            ['central','saber-pagos-produccion',['MP_LIVE_GATE','CENTRAL_LIVE_ORDER_GATE','CENTRAL_LIVE_POSTPAY_GATE','CENTRAL_LIVE_TUS_GATE','CENTRAL_LIVE_R2_GATE','CENTRAL_LIVE_R2_STAGING_GATE','CENTRAL_LIVE_R2_QUOTA_GATE','CENTRAL_LIVE_BRIDGE_ENABLED','CENTRAL_LIVE_PACKAGE_GATE']],
+            ['comprador','saber-documentos-produccion',['DOCS_MP_LIVE_GATE','DOCS_LIVE_UI_GATE','DOCS_LIVE_SESSION_GATE','DOCS_LIVE_RECEPCION_GATE','DOCS_LIVE_PRICING_GATE','DOCS_LIVE_ORDER_GATE','DOCS_LIVE_TUS_GATE','DOCS_LIVE_R2_GATE','DOCS_LIVE_PACKAGE_GATE']],
+            ['webhook','saber-webhook-produccion',['WEBHOOK_EDGE_GATE']]
+          ];
+          for(const [label,script,fields] of configs){
+            const settings=await read('/workers/scripts/'+script+'/settings');
+            const binds=settings.bindings||[];
+            const binding=name=>binds.find(x=>x.name===name);
+            const mode=name=>{const b=binding(name);return b?.type==='plain_text'?
+              (b.text==='GO_COMERCIAL_CONFIRMADO'?'GO':b.text==='NO_GO'?'NO_GO':'OTHER'):'MISSING'};
+            for(const name of fields)console.log('SABER_CURRENT_'+label.toUpperCase()+'_'+name+'='+mode(name));
+            console.log('SABER_CURRENT_'+label.toUpperCase()+'_HMAC_PRESENT='+!!binding('CENTRAL_BRIDGE_KEY'));
+            if(label==='central')console.log('SABER_CURRENT_MP_LIVE_TOKEN_PRESENT='+!!binding('MP_LIVE_ACCESS_TOKEN'));
+            if(label==='comprador')console.log('SABER_CURRENT_BUYER_SESSION_PRESENT='+!!binding('DOCS_LIVE_SESSION_KEY'));
+            const deploy=await read('/workers/scripts/'+script+'/deployments');
+            const current=deploy?.deployments?.[0];
+            console.log('SABER_CURRENT_'+label.toUpperCase()+'_DEPLOY_PERCENT='+
+              (current?.versions?.map(v=>v.percentage).join(',')||'UNKNOWN'));
+          }
+          const pages=await read('/pages/projects/libreriasaber');
+          console.log('SABER_PAGES_PRODUCTION_BRANCH='+String(pages?.production_branch||'UNKNOWN'));
+          console.log('SABER_PAGES_CURRENT_COMMIT='+String(pages?.canonical_deployment?.deployment_trigger?.metadata?.commit_hash||'UNKNOWN').slice(0,12));
+          console.log('SABER_LIVE_READONLY_COMPLETE_NO_PAYMENTS_NO_WRITES');
+          NODE
