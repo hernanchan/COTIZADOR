@@ -104,8 +104,9 @@ test('Un R2 ya aprobado no vuelve a revisión aunque venga una cotización legad
  assert.equal(board[0].work_number,21);
  assert.equal(board[0].r2_legacy_unusable,undefined);
 });
-test('El operador encuentra preprensa R2 desde el acceso superior con un clic',()=>{
- assert.match(html,/id="goR2Paid"[^>]*>Ver ploteos R2 para aprobar/);
+test('El operador conserva acceso R2 en herramientas plegadas sin duplicar botones visibles',()=>{
+ assert.match(html,/id="centralExtraTools"/);
+ assert.match(html,/id="goR2Paid"[^>]*>Revisar ploteos R2/);
  assert.match(html,/id="r2ReviewPanel"/);
  assert.match(script,/document\.querySelector\("#goR2Paid"\)/);
  assert.match(script,/document\.querySelector\("#refreshR2Paid"\)\?\.click\(\)/);
