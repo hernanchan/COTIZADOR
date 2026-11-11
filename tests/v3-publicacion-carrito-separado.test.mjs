@@ -11,7 +11,8 @@ for(const file of ['index.html','ofertas.html']){
   assert.match(html,/TOTAL ORIENTATIVO/);
   assert.ok(html.includes("window.location.assign('https://wa.me/5493513110130?text='"),
     'WhatsApp debe navegar en la misma pestaña tras validar el catálogo');
-  assert.ok(!html.includes("window.open('https://wa.me/5493513110130?text='"));
+  assert.ok(!html.includes("window.open('https://wa.me/5493513110130?text='+encodeURIComponent(lines.join("),
+    'No abrir popup después de una consulta asincrónica del carrito');
   assert.match(html,/No pudimos verificar los precios actuales/);
   assert.doesNotMatch(html,/\*DATOS PARA TRANSFERIR LA SEÑA\*/);
   const scripts=[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)];
