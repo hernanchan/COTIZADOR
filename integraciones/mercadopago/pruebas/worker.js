@@ -4881,6 +4881,11 @@ export default {
     consultarPaqueteUniversalCentral(req,env,{readSigned:leerFirmaInternaLive}):
     consultarArchivoUniversalCentral(req,env,{readSigned:leerFirmaInternaLive});
   }
+  if(url.pathname==='/internal/central/live/r2-inspection-source'||
+     url.pathname==='/internal/central/live/r2-inspection-confirm'){
+   const {operarInspeccionR2LiveInterna}=await import('./r2-live-personal-inspection-bridge.mjs');
+   return operarInspeccionR2LiveInterna(req,env);
+  }
   if(url.pathname==='/internal/central/live/r2-recover'){
    const {consultarRecuperacionR2Live}=await import('./r2-universal-live-recovery-central.mjs');
    const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
