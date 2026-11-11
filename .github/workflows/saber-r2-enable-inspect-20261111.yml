@@ -1,0 +1,51 @@
+name: Saber - R2 LIVE chequeo de compuertas para habilitación segura
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-r2-enable-inspect-20261111.yml]
+permissions: {contents: read}
+jobs:
+  read-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+      D1_TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+    steps:
+      - name: Leer Cloudflare/D1 sin modificar nada ni exponer secretos
+        run: |
+          node --input-type=module <<'NODE'
+          const base='https://api.cloudflare.com/client/v4/accounts/'+process.env.ACCOUNT;
+          async function req(path,token=process.env.TOKEN,sql){
+           const r=await fetch(base+path,{method:sql?'POST':'GET',
+            headers:{Authorization:'Bearer '+token,...(sql?{'Content-Type':'application/json'}:{})},
+            ...(sql?{body:JSON.stringify({sql})}:{}),signal:AbortSignal.timeout(18000)});
+           const j=await r.json().catch(()=>null);
+           if(!r.ok||!j?.success)throw Error('CF_READ_'+r.status+'_'+path.split('/').at(-1));
+           return j.result;
+          }
+          const workers=['saber-documentos-produccion','saber-pagos-produccion','saber-webhook-produccion'];
+          for(const worker of workers){
+           const s=await req('/workers/scripts/'+worker+'/settings');
+           const flags=s.bindings.filter(x=>x.name.endsWith('_GATE')||x.name.endsWith('_ENABLED')||x.name==='SABER_ENTORNO'||x.name==='CENTRAL_DB_ENV')
+            .map(x=>({name:x.name,value:x.type==='plain_text'?x.text:'REDACTED'}));
+           const dependencies=Object.fromEntries(
+            ['SABER_CENTRAL','DB','CENTRAL_BRIDGE_KEY','DOCS_LIVE_R2_RECEIPT_KEY',
+            'SABER_R2_GRANDES_LIVE','DOCS_LIVE_SESSION_KEY','DOCS_LIVE_STAFF_SECRET',
+            'MP_LIVE_ACCESS_TOKEN','MP_LIVE_WEBHOOK_SECRET','DOCS_LIVE_TUS_SERVICE_KEY']
+            .map(n=>[n,s.bindings.find(x=>x.name===n)?.type||'ABSENT']));
+           console.log('WORKER_'+worker+'='+JSON.stringify({flags,dependencies,
+            r2Bucket:s.bindings.find(x=>x.name==='SABER_R2_GRANDES_LIVE')?.bucket_name||'ABSENT'}));
+          }
+          const dbs=await req('/d1/database',process.env.D1_TOKEN);
+          const id=dbs.find(x=>x.name==='saber-pagos-produccion')?.uuid;
+          if(!id)throw Error('D1_LIVE_NOT_FOUND');
+          const data=await req('/d1/database/'+id+'/query',process.env.D1_TOKEN,
+           "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('central_r2_large_reservations','central_r2_large_pending','central_r2_live_inspections','central_r2_universal_files','central_live_bank_accreditations')");
+          console.log('D1_LIVE_R2_TABLES='+JSON.stringify(data[0]?.results||[]));
+          const check=await fetch('https://pedidos.libreriasaber.com.ar/pedido/estado',{redirect:'manual'});
+          console.log('R2_RETURN_PAGE_STATUS='+check.status);
+          console.log('R2_AUDIT_ONLY_NO_CONFIG_CHANGED_NO_PAYMENT_NO_ORDERS');
+          NODE
