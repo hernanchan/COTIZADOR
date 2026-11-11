@@ -16,7 +16,7 @@ h1{font-size:25px;margin:0 0 10px}h2{font-size:18px;margin:0 0 10px}p{margin:9px
 label{font-weight:600}input{font:inherit;width:100%;max-width:330px;padding:12px;border:1px solid #aabcca;border-radius:9px;display:block;margin:8px 0 15px}
 button{font:inherit;border:0;background:#0c5688;color:white;border-radius:9px;padding:13px 17px;font-weight:700;cursor:pointer}
 button:disabled{opacity:.47;cursor:not-allowed}#estado{min-height:25px}small{color:#586c7e}
-#pdf{width:100%;min-height:850px;border:0}
+#pdf{display:block;width:100%;height:960px;min-height:0;border:0;overflow:hidden;background:#fff}
 #precio-entrega{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:15px 0 0;border:2px solid #c3d9ea;background:#f4f9fe;border-radius:12px;padding:16px}
 #precio-entrega>div{min-width:0;padding:0 4px}
 #precio-entrega strong{display:block;color:#23506f;font-size:15px}
@@ -27,7 +27,7 @@ button:disabled{opacity:.47;cursor:not-allowed}#estado{min-height:25px}small{col
 #precio-entrega:has(+ #plazo-explicacion){border-bottom:0;border-radius:12px 12px 0 0}
 #plazo-explicacion:not(:has(+ #promo-dia:not([hidden]))){border-bottom:2px solid #c3d9ea;border-radius:0 0 12px 12px;padding-bottom:12px}
 @media(max-width:650px){#precio-entrega{grid-template-columns:1fr}}
-@media(max-width:700px){section{padding:15px}main{padding:0 9px}#pdf{min-height:1100px}}`;
+@media(max-width:700px){main{width:100%;max-width:100%;margin:0;padding:8px}section{padding:13px;margin-bottom:10px;border-radius:10px}h1{font-size:22px}h2{font-size:18px}#seccion-archivos{overflow:visible}#pdf{height:960px;min-height:0}#precio-entrega{padding:10px;gap:5px}#precio-entrega #precio,#precio-entrega #plazo-orientativo{font-size:21px}#plazo-explicacion,#promo-dia{padding:9px 11px;font-size:14px}button{max-width:100%;white-space:normal;min-height:46px}.payment-options button{display:block;width:100%;margin:8px 0!important}}`;
 export function paginaCotizarLive(req,env,{authorized=false}={}){
  const u=new URL(req.url);
  if(req.method!=='GET'||u.protocol!=='https:'||u.hostname!==HOST||
@@ -78,7 +78,7 @@ window.saberIngresoLive=async token=>{
 </div>
 <p id="plazo-explicacion">Fecha orientativa desde la acreditación del pago, sujeta a disponibilidad, trabajo, horario y feriados. Al iniciar tu trabajo, en el seguimiento verás una fecha y hora más precisas.</p>
 <p id="promo-dia" hidden></p>
-</section><section id="seccion-archivos"><h2>1. Subí tus archivos</h2><p>Seleccioná los PDF, JPG o PNG que querés imprimir. Podés elegir varios en una sola carga.</p><iframe id="pdf" title="Elegir PDF, JPG o PNG y opciones de impresión" src="/cotizar/archivos" loading="eager"></iframe></section><section id="seccion-confirmacion"><h2>2. Completá tus datos y confirmá</h2><label for="nombre">Nombre y apellido o responsable *</label>
+</section><section id="seccion-archivos"><h2>1. Subí tus archivos</h2><p>Seleccioná los PDF, JPG o PNG que querés imprimir. Podés elegir varios en una sola carga.</p><iframe id="pdf" title="Elegir PDF, JPG o PNG y opciones de impresión" src="/cotizar/archivos" loading="eager" scrolling="no"></iframe></section><section id="seccion-confirmacion"><h2>2. Completá tus datos y confirmá</h2><label for="nombre">Nombre y apellido o responsable *</label>
 <input id="nombre" autocomplete="name" maxlength="100" placeholder="Nombre de quien retira" required>
 <label for="telefono">Teléfono de contacto (con código de área) *</label>
 <input id="telefono" inputmode="tel" autocomplete="tel" maxlength="26" placeholder="351 555 5555" required>
@@ -134,6 +134,17 @@ const orderId=()=>{const a=new Uint8Array(16);crypto.getRandomValues(a);return '
 window.addEventListener('message',event=>{
  if(event.origin!==location.origin||event.source!==iframe.contentWindow||!event.data)return;
  const data=event.data;
+ if(data.type==='SABER_SMART_RESIZE'){
+  // El contenido del iframe crece cuando el cliente agrega archivos u opciones.
+  // Evitar scroll anidado: el documento principal es quien debe desplazarse.
+  const h=Number(data.height);
+  if(Number.isFinite(h)&&h>=280&&h<=30000){
+   const target=Math.ceil(h+12);
+   if(Math.abs(iframe.getBoundingClientRect().height-target)>3)
+    iframe.style.height=target+'px';
+  }
+  return;
+ }
  if(data.type==='SABER_SMART_PRICE_STATE'){
   if(Number.isSafeInteger(data.total)&&data.total>0)price.textContent='Presupuesto orientativo: '+money(data.total);
   else price.textContent='Precio pendiente';
