@@ -1,0 +1,26 @@
+name: Saber - diagnosticar botón de enviar (solo lectura)
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [docs/DIAGNOSTICAR-BOTON-PEDIDO-20261111.trigger]
+permissions:
+  contents: read
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - name: Consultar TUS sin crear pedido ni recibir archivos
+        shell: bash
+        env:
+          PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$PASSWORD"
+          host='https://saber-documentos-pruebas.libreriasaber.workers.dev'
+          status=$(curl -sS --max-time 30 -o /tmp/tus-probe.json -w '%{http_code}' --user "operador:$PASSWORD" -H "Origin: $host" -H 'Content-Type: application/json' --data '{}' "$host/prueba-v2/api/ensayo-tus-comprobar")
+          echo "TUS_PREFLIGHT_HTTP=$status"
+          jq -c '{ok,etapa,error}' /tmp/tus-probe.json
+          echo 'SIN CARGA, SIN PAGO, SIN PEDIDO'
