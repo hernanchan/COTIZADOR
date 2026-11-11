@@ -1,0 +1,39 @@
+name: Saber - activar panel operador LIVE privado sin cobros
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths:
+      - .github/workflows/saber-panel-operador-live-sin-cobro-20261111.yml
+      - integraciones/publicacion/habilitar-panel-operador-sin-cobros-live-20261111.mjs
+permissions: {contents: read, statuses: write}
+concurrency: {group: saber-personal-live-gates, cancel-in-progress: false}
+jobs:
+  panel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verificar credencial guardada y panel exige autenticación sin activar pagos
+        env:
+          SABER_CF_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          SABER_CF_DEPLOY_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          node --check integraciones/publicacion/habilitar-panel-operador-sin-cobros-live-20261111.mjs
+          node integraciones/publicacion/habilitar-panel-operador-sin-cobros-live-20261111.mjs
+      - name: Registrar estado de panel cerrado al público
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          if [ "$RESULT" = success ];then state=success;else state=failure;fi
+          jq -n --arg state "$state" --arg context 'saber/live-staff-password-gate' \
+            --arg description "Staff Basic-only access and checkout NO_GO: $RESULT" \
+            --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/staff-live.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/staff-live.json >/dev/null
