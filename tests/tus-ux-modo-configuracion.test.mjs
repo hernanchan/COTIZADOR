@@ -5,17 +5,20 @@ import {paginaCargaUnica} from '../integraciones/autocotizador/recepcion/carga-u
 
 const source=readFileSync(new URL('../integraciones/autocotizador/recepcion/carga-unica-cliente.mjs',import.meta.url),'utf8');
 
-test('private PDF editor requests configuration mode before upload',()=>{
+test('carga móvil visible desde el inicio y modo individual predeterminado',()=>{
  const html=paginaCargaUnica();
  assert.match(html,/id="modoConfiguracion"/);
  assert.match(html,/name="modoImpresionLote" value="comun"/);
  assert.match(html,/name="modoImpresionLote" value="individual"/);
- assert.match(html,/id="zonaArchivos" hidden/);
+ assert.match(html,/id="zonaArchivos"/);
+ assert.doesNotMatch(html,/id="zonaArchivos" hidden/);
+ assert.match(html,/name="modoImpresionLote" value="individual" checked/);
  assert.match(html,/id="configComunGlobal" hidden/);
- assert.ok(html.indexOf('id="modoConfiguracion"')<html.indexOf('id="archivos"'));
+ assert.ok(html.indexOf('id="archivos"')<html.indexOf('id="modoConfiguracion"'));
 });
 test('shared mode preserves per-file size, pages, server quote and individual exceptions',()=>{
- assert.match(source,/let modoLote=null/);
+ assert.match(source,/let modoLote='individual'/);
+ assert.match(source,/const zona=\$\('zonaArchivos'\);if\(zona\)zona.hidden=false/);
  assert.ok(source.includes('const configuracionComun={}'));
  assert.ok(source.includes("select.value=seleccion"));
  assert.ok(source.includes("configuracionComun.modo||''"));
@@ -33,7 +36,7 @@ test('shared mode preserves per-file size, pages, server quote and individual ex
  assert.ok(source.includes('aplicarConfiguracionComunAlDocumento(entries[start+i])'));
  assert.ok(source.includes("const barra=controlesComunes({id:'a4',indices},true)"));
  assert.ok(!source.includes('bloque.append(comunes)'));
- assert.match(source,/campo\.disabled=!modoLote/);
+ assert.match(source,/campo\.disabled=false/);
  assert.match(source,/if\(!modoLote\)\{\$\('estado'\)/);
  assert.doesNotMatch(source,/bloque.append\\(comunes\\)/);
  assert.match(source,/function renderConfiguracionGlobal\(/);
