@@ -62,7 +62,9 @@ export function crearFlujoUniversalPDF({
   throw Error('UNIVERSAL_NOMBRE_INVALIDO');
  if(direccion!==undefined&&(typeof direccion!=='string'||direccion.trim().length>180||/[<>]/.test(direccion)))
   throw Error('UNIVERSAL_DIRECCION_INVALIDA');
- if(!r2Count||tusBytes>60*MIB)
+ // El Sandbox permite fotografías tradicionales TUS sin archivo R2.
+ // La Central recalcula la cotización y verifica HMAC, SHA y pago.
+ if((!r2Count&&!archivos.some(a=>a.servicio==='fotos'))||tusBytes>60*MIB)
   throw Error('UNIVERSAL_CUPO_RECEPCION_INVALIDO');
  let phase='seleccionado',draftId=null,quoteHash=null,
   commercialOrderId=null,numeroOrden=null,totalArs=null,
