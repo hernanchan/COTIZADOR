@@ -17,12 +17,15 @@ label{font-weight:600}input{font:inherit;width:100%;max-width:330px;padding:12px
 button{font:inherit;border:0;background:#0c5688;color:white;border-radius:9px;padding:13px 17px;font-weight:700;cursor:pointer}
 button:disabled{opacity:.47;cursor:not-allowed}#estado{min-height:25px}small{color:#586c7e}
 #pdf{width:100%;min-height:850px;border:0}
-#precio-entrega{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:15px 0}
-#precio-entrega>div{border:1px solid #c3d9ea;background:#f4f9fe;border-radius:12px;padding:16px}
+#precio-entrega{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:15px 0 0;border:2px solid #c3d9ea;background:#f4f9fe;border-radius:12px;padding:16px}
+#precio-entrega>div{min-width:0;padding:0 4px}
 #precio-entrega strong{display:block;color:#23506f;font-size:15px}
 #precio-entrega #precio,#precio-entrega #plazo-orientativo{font-size:clamp(22px,2.4vw,28px);font-weight:850;line-height:1.25;overflow-wrap:anywhere}
-#plazo-explicacion{font-size:14px;color:#536579}
-#promo-dia{font-size:15px;font-weight:650;color:#69420b}
+#plazo-explicacion{font-size:15px;color:#536579;margin:0;padding:10px 20px 4px;background:#f4f9fe;border-left:2px solid #c3d9ea;border-right:2px solid #c3d9ea}
+#promo-dia{font-size:15px;font-weight:650;color:#69420b;margin:0;padding:4px 20px 12px;background:#f4f9fe;border-left:2px solid #c3d9ea;border-right:2px solid #c3d9ea;border-bottom:2px solid #c3d9ea;border-radius:0 0 12px 12px}
+#promo-dia[hidden]{display:none}
+#precio-entrega:has(+ #plazo-explicacion){border-bottom:0;border-radius:12px 12px 0 0}
+#plazo-explicacion:not(:has(+ #promo-dia:not([hidden]))){border-bottom:2px solid #c3d9ea;border-radius:0 0 12px 12px;padding-bottom:12px}
 @media(max-width:650px){#precio-entrega{grid-template-columns:1fr}}
 @media(max-width:700px){section{padding:15px}main{padding:0 9px}#pdf{min-height:1100px}}`;
 export function paginaCotizarLive(req,env,{authorized=false}={}){
@@ -106,8 +109,10 @@ const formatDate=s=>{
   if(!r.ok||p?.ok!==true||p.guaranteed!==false||
     typeof p.label!=='string'||typeof p.notice!=='string')
    throw Error('No hay previsión disponible');
-  plazo.textContent=formatDate(p.estimatedDeadlineDate)||'Fecha a confirmar';
+  const fecha=formatDate(p.estimatedDeadlineDate);
+  plazo.textContent=fecha?((p.mode==='hoy'||p.mode==='hoy_tarde'?'Hoy · ':'')+fecha):p.label;
   plazo.setAttribute('title',p.label);
+  document.getElementById('plazo-explicacion').textContent=p.notice;
   if(p.dayPromotion?.informationalOnly===true&&
      p.dayPromotion?.appliedToQuote===false&&
      typeof p.dayPromotion.title==='string'&&typeof p.dayPromotion.summary==='string'){
@@ -117,7 +122,9 @@ const formatDate=s=>{
   }else{promo.hidden=true;promo.textContent=''}
 
  }catch{
-  plazo.textContent='Fecha a confirmar';
+  plazo.textContent='Previsión no disponible';
+  document.getElementById('plazo-explicacion').textContent=
+   'No pudimos consultar la previsión de la Central. La fecha de entrega no está confirmada; consultanos antes de pagar.';
  }
 })();
 const action=document.getElementById('continuar');
