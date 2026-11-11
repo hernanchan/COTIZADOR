@@ -55,7 +55,7 @@ jobs:
             http=$(curl -sS -L --max-time 25 -w '%{http_code}' -o "$dir/$file" "$url/$item")
             [ "$http" = 200 ] || { echo "RELEASE_CANDIDATE_HTTP_FAILED_$file=$http";exit 1; }
           done
-          grep -Fq 'Tu librería del barrio' "$dir/root"
+          grep -Fq 'Cotizar impresiones' "$dir/root"
           grep -Fq 'Consultar artículos por WhatsApp' "$dir/ofertas.html"
           grep -Fq 'portal-comercial.json' "$dir/cotizar.html"
           jq -e '.enabled==false and .release=="NO_GO" and .buyerUrl==null' "$dir/portal-comercial.json" >/dev/null
