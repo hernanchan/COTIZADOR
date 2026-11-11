@@ -52,9 +52,9 @@ async function setKeys(which,allowed,expected){
   const matches=prev.bindings.filter(x=>x.name===k);
   assert.ok(matches.length<=1&&(!matches.length||matches[0].type==='plain_text'),
    'GATE_BINDING_TYPE_'+k);
-  if(!allowed.includes(k))assert.ok(has(prev,k,expected),'GATE_UNEXPECTED_'+k);
+  if(!allowed.includes(k))assert.ok(has(prev,k,GO)||has(prev,k,OFF),'GATE_UNEXPECTED_'+k);
  }
- const modified=keys[which].filter(k=>!has(prev,k,expected));
+ const modified=allowed.filter(k=>!has(prev,k,expected));
  if(modified.length===0)return prev;
  const bindings=[
   ...prev.bindings.filter(x=>!modified.includes(x.name)).map(x=>
