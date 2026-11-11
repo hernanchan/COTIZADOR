@@ -126,13 +126,23 @@ export async function finalizarInspeccionR2Live(req,env,{
   if(file.received!==0)return respond({ok:false,error:'LIVE_R2_INSPECCION_ESTADO'},409);
  }catch{return respond({ok:false,error:'LIVE_R2_INSPECCION_D1'},503)}
  try{
+  // D1 ya concilió la cuenta. La operación final debe conservar la misma
+  // prueba de pago, también cuando fue una transferencia bancaria auditada.
+  if(!['transferencia','mercadopago'].includes(paid.method))
+   return respond({ok:false,error:'LIVE_R2_INSPECCION_METODO'},402);
+  const paymentMethodSQL=paid.method==='transferencia'?
+   "AND o.payment_id IS NULL AND o.preference_id IS NULL "+
+   "AND EXISTS (SELECT 1 FROM central_live_bank_accreditations b "+
+   "WHERE b.order_id=o.id AND b.amount_ars=o.amount_ars "+
+   "AND length(b.bank_reference)>=6 AND length(b.operator)>=2)":
+   "AND o.payment_id IS NOT NULL AND o.preference_id IS NOT NULL";
   const paidSQL="EXISTS(SELECT 1 FROM central_r2_universal_order_links l "+
    "JOIN orders o ON o.id=l.commercial_order_id "+
    "JOIN payment_reviews r ON r.order_id=o.id "+
    "WHERE l.web_order_id=? AND l.commercial_order_id=? "+
    "AND o.status='paid' AND o.paid_at IS NOT NULL "+
-   "AND o.amount_ars=o.deposit_ars AND o.payment_id IS NOT NULL "+
-   "AND o.preference_id IS NOT NULL AND r.state='verified')";
+   "AND o.amount_ars=o.deposit_ars AND r.state='verified' "+
+   paymentMethodSQL+")";
   const stageSQL="EXISTS(SELECT 1 FROM central_r2_large_pending p "+
    "JOIN central_r2_large_reservations q ON q.object_key=p.object_key "+
    "WHERE p.web_order_id=? AND p.file_id=? AND p.receipt_id=? "+
