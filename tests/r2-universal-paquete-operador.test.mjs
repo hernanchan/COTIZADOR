@@ -158,6 +158,16 @@ test('LIVE: paquete pagado exige inspección física R2 aprobada y misma ficha D
    inspectionQueries++;
    return {bind(){return this},first:async()=>inspection};
   }
+  if(sql.includes("name IN ('central_order_contacts','central_order_customer_details')"))
+   return {all:async()=>({results:[
+    {name:'central_order_contacts'},{name:'central_order_customer_details'}
+   ]})};
+  if(sql.includes('SELECT phone FROM central_order_contacts'))
+   return {bind(){return this},first:async()=>({phone:'351 555 1234'})};
+  if(sql.includes('SELECT name,address FROM central_order_customer_details'))
+   return {bind(){return this},first:async()=>({
+    name:'Ana Pérez',address:'Poeta Lugones 123, Córdoba'
+   })};
   return original(sql);
  };
  const p={schema:'saber-central-r2-universal-package-manifest-v1',webOrderId:WEB};
@@ -176,6 +186,9 @@ test('LIVE: paquete pagado exige inspección física R2 aprobada y misma ficha D
  assert.equal(approved.status,200,JSON.stringify(await approved.clone().json()));
  const result=await approved.json();
  assert.equal(result.totalArchivos,2);
+ assert.equal(result.nombreCliente,'Ana Pérez');
+ assert.equal(result.telefonoContacto,'351 555 1234');
+ assert.equal(result.direccionCliente,'Poeta Lugones 123, Córdoba');
  assert.equal(result.productionAuthorized,false);
  assert.equal(result.preprensaPendiente,true);
  assert.equal(result.trabajos[1].transporte,'r2');
