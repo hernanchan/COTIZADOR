@@ -2,6 +2,7 @@
  * No payments, no Pages/main change, no production order, no storage writes.
  */
 import assert from 'node:assert/strict';
+import {resolveAny} from 'node:dns/promises';
 const account=process.env.SABER_CF_ACCOUNT_ID,token=process.env.SABER_CF_DEPLOY_TOKEN;
 const editor=process.env.SABER_CF_EDITOR_TOKEN;
 assert.match(account||'',/^[a-f0-9]{32}$/i);assert.ok(token?.length>15);
@@ -48,9 +49,13 @@ const buyer=domainList.filter(x=>x.hostname===buyerHost);
 assert.ok(buyer.length<=1,'BUYER_HOST_MULTIPLE');
 if(buyer.length)assert.ok(buyer[0].service===docs&&buyer[0].enabled===true,'BUYER_DOMAIN_FOREIGN');
 if(!buyer.length){
- const dns=await cf(root+'/zones/'+zone[0].id+'/dns_records?name='+buyerHost);
- assert.ok(Array.isArray(dns));
- assert.equal(dns.length,0,'DNS_BUYER_HOST_ALREADY_EXISTS_SKIP_CHANGE');
+ // Los tokens no tienen DNS Read (403). Verificar resolución pública y
+ // dejar que Workers Custom Domains rechace un conflicto DNS existente.
+ let records=[];
+ try{records=await resolveAny(buyerHost)}
+ catch(e){if(!['ENOTFOUND','ENODATA'].includes(e?.code))throw e;}
+ assert.equal(records.length,0,'PUBLIC_DNS_BUYER_ALREADY_EXISTS_SKIP_CHANGE');
+ console.log('PROD_BUYER_NO_PUBLIC_DNS_RESOLUTION_WORKER_API_CONFLICT_SAFE');
  const data={hostname:buyerHost,service:docs,enabled:true,previews_enabled:false,
   zone_id:zone[0].id,zone_name:'libreriasaber.com.ar'};
  const result=await cf(acct+'/workers/domains',{method:'PUT',body:data});
