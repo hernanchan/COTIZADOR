@@ -17,7 +17,7 @@ const envWith=(items=rows)=>{
  const env={SABER_ENTORNO:'produccion',CENTRAL_DB_ENV:'produccion',
   CENTRAL_LIVE_BOARD_GATE:gate,MP_LIVE_GATE:gate,
   CENTRAL_LIVE_BRIDGE_ENABLED:gate,
-  DB:{prepare(sql){queries.push(sql);return {all:async()=>({results:items})}}}};
+  DB:{prepare(sql){queries.push(sql);return {all:async()=>({results:sql.includes('sqlite_master')?[]:items})}}}};
  return {env,queries};
 };
 test('Central LIVE sin autorización o gate no consulta ni modifica D1',async()=>{
@@ -43,12 +43,12 @@ test('solo pagos D1 verificados; Nuevos espera originales o preprensa sin descar
  assert.ok(body.orders.every(x=>x.readyForProduction===false&&x.zipEnabled===false));
  assert.equal(body.productionAuthorized,false);
  assert.equal(body.orders[0].stagedR2Count,1);
- assert.match(queries[0],/FROM central_r2_large_pending r/);
- assert.equal(queries.length,1);
- assert.match(queries[0],/p\.state='verified'/);
- assert.match(queries[0],/o\.status='paid'/);
- assert.match(queries[0],/o\.payment_id IS NOT NULL/);
- assert.doesNotMatch(queries[0],/\bINSERT\b|\bUPDATE\b|\bDELETE\b|\bCREATE\b/i);
+ assert.match(queries[1],/FROM central_r2_large_pending r/);
+ assert.equal(queries.length,2);
+ assert.match(queries[1],/p\.state='verified'/);
+ assert.match(queries[1],/o\.status='paid'/);
+ assert.match(queries[1],/o\.payment_id IS NOT NULL/);
+ assert.doesNotMatch(queries[1],/\bINSERT\b|\bUPDATE\b|\bDELETE\b|\bCREATE\b/i);
 });
 test('inconsistencia de cantidad o numeración bloquea el listado completo',async()=>{
  for(const change of [{pending_count:5},{work_number:0},{total_ars:0}]){
@@ -85,4 +85,25 @@ test('Central falla cerrada ante recibos R2 imposibles o inconsistentes',async()
   const r=await listarRecepcionUniversalLive(new Request(url),env,{authorized:true});
   assert.equal(r.status,409);
  }
+});
+
+test('recepción LIVE admite pago bancario solo con asiento D1, no por comprobante cliente',async()=>{
+ const {env,queries}=envWith();
+ const old=env.DB.prepare;
+ env.DB.prepare=(sql)=>{
+  if(sql.includes('sqlite_master'))return {all:async()=>({results:[
+   {name:'central_live_bank_accreditations'},
+   {name:'central_order_contacts'},
+   {name:'central_order_customer_details'}
+  ]})};
+  return old(sql);
+ };
+ const res=await listarRecepcionUniversalLive(new Request(url),env,{authorized:true});
+ assert.equal(res.status,200);
+ const sql=queries.find(q=>q.includes('FROM central_r2_universal_order_links l'));
+ assert.match(sql,/EXISTS.*central_live_bank_accreditations b/);
+ assert.match(sql,/b\.amount_ars=o\.amount_ars/);
+ assert.match(sql,/c\.phone AS telefono_contacto/);
+ assert.match(sql,/k\.name AS nombre_cliente/);
+ assert.equal((await res.json()).orders[0].productionAuthorized,undefined);
 });
