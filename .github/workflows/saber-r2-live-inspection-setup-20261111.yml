@@ -1,4 +1,4 @@
-name: Saber - provisionar inspeccion R2 LIVE sin cobros, tercera comprobacion
+name: Saber - provisionar inspeccion R2 LIVE sin cobros, instalacion aislada
 on:
   push:
     branches: [integracion/tus-pedido-privado-20261101]
