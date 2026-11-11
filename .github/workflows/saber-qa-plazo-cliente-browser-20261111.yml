@@ -19,7 +19,7 @@ jobs:
         run: |
           set -euo pipefail
           node --test tests/tus-franjas-entrega-operativa.test.mjs
-      - name: Chrome real: debe verse plazo desde el presupuesto
+      - name: "Chrome real: debe verse plazo desde el presupuesto"
         shell: bash
         env:
           SABER_OPERATOR_TEST_PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
