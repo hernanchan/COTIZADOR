@@ -90,12 +90,19 @@ export async function crearOrdenUniversalLive(req,env,{
  if(raw.length>1200)return reply({ok:false,error:'LIVE_ORDER_LIMITE'},413);
  let input;try{input=JSON.parse(raw)}catch{}
  if(!input||typeof input!=='object'||Array.isArray(input)||
-  Object.keys(input).sort().join(',')!=='draftId,quoteHash,telefono,webOrderId'||
+  !Object.keys(input).every(k=>['draftId','quoteHash','telefono','webOrderId','nombre','direccion'].includes(k))||
+  !['draftId','quoteHash','telefono','webOrderId'].every(k=>Object.hasOwn(input,k))||
   !WEB.test(input.webOrderId||'')||!UUID.test(input.draftId||'')||
   !SHA.test(input.quoteHash||'')||
   typeof input.telefono!=='string'||!/^[+0-9 ()-]{10,26}$/.test(input.telefono)||
   input.telefono.replace(/\D/g,'').length<10||
-  input.telefono.replace(/\D/g,'').length>15)
+  input.telefono.replace(/\D/g,'').length>15||
+  (input.nombre!==undefined&&
+    (typeof input.nombre!=='string'||input.nombre.trim().length<2||
+     input.nombre.trim().length>100||/[<>]/.test(input.nombre)))||
+  (input.direccion!==undefined&&
+    (typeof input.direccion!=='string'||input.direccion.trim().length>180||
+     /[<>]/.test(input.direccion)||input.nombre===undefined)))
   return reply({ok:false,error:'LIVE_ORDER_INPUT'},422);
  let response;
  try{response=await signedService(service,env,'order',{
