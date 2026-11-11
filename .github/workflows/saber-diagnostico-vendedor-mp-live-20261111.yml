@@ -1,4 +1,4 @@
-name: Saber - autodiagnóstico vendedor MP LIVE sin cobrar ni crear orden
+name: Saber - validar identidad real vendedor MP LIVE con HMAC corregida
 on:
   push:
     branches: [integracion/tus-pedido-privado-20261101]
