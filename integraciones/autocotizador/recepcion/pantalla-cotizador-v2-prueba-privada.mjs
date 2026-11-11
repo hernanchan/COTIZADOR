@@ -112,6 +112,7 @@ const list=document.getElementById('all'),status=document.getElementById('state'
  summary=document.getElementById('order-summary');
 const registerButton=document.getElementById('register-private'),registerStatus=document.getElementById('register-status');
 const sendAllButton=document.getElementById('send-all-pdf'),batchProgress=document.getElementById('batch-progress');
+const telefonoContacto=document.getElementById('cliente-telefono');
 const nombreCliente=document.getElementById('cliente-nombre');
 const direccionCliente=document.getElementById('cliente-direccion');
 const nombreError=document.getElementById('cliente-nombre-error');
