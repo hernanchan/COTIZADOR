@@ -70,7 +70,7 @@ export function normalizarTrabajoTUS(d,plan){
  };
 }
 export async function enviarPedidoTUSV2({
- orderId,clientOrderId,trabajos,telefono,expectedPriceVersion,onProgress=()=>{},
+ orderId,clientOrderId,trabajos,telefono,nombre,direccion,expectedPriceVersion,onProgress=()=>{},
  fetcher=fetch,loadUploader=()=>import('https://releases.transloadit.com/uppy/v3.6.1/uppy.min.mjs')
 }={}){
  if(!WEB.test(orderId||'')||!UUID.test(clientOrderId||'')||
@@ -93,6 +93,10 @@ export async function enviarPedidoTUSV2({
      digits.length<10||digits.length>15)
    throw Error('Ingresá un teléfono válido para el pedido.');
  }
+ if(nombre!==undefined&&(typeof nombre!=='string'||nombre.trim().length<2||nombre.trim().length>100||/[<>]/.test(nombre)))
+  throw Error('Ingresá el nombre y apellido o responsable del pedido.');
+ if(direccion!==undefined&&(typeof direccion!=='string'||direccion.trim().length>180||/[<>]/.test(direccion)))
+  throw Error('Dirección de contacto inválida.');
  // Comprobación previa a cualquier autorización o subida. El servidor
  // vuelve a validar tamaño, copias, páginas y precio sobre los PDF reales.
  const grupos=new Map();
@@ -174,6 +178,8 @@ export async function enviarPedidoTUSV2({
   const finalized=await call('/prueba-v2/api/ensayo-tus-registrar',{
    orderId,clientOrderId,
    ...(typeof telefono==='string'?{telefono:telefono.trim()}:{}),
+   ...(typeof nombre==='string'?{nombre:nombre.trim()}:{}),
+   ...(typeof direccion==='string'?{direccion:direccion.trim()}:{}),
    ...(typeof expectedPriceVersion==='string'?{expectedPriceVersion}:{}),
    entries:trabajos.map((t,i)=>({
     proof:started.sessions[i].proof,opciones:t.opciones
