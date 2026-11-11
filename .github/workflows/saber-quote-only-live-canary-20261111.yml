@@ -1,0 +1,43 @@
+name: Saber - habilitar cotizador LIVE solo lectura sin pagos
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths:
+      - .github/workflows/saber-quote-only-live-canary-20261111.yml
+      - integraciones/publicacion/piloto-cotizador-sin-cobro-live-20261111.mjs
+permissions: {contents: read, statuses: write}
+concurrency: {group: saber-quote-only-live-canary, cancel-in-progress: false}
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Permitir UI y precios aprobados solo sin órdenes, cobros ni subida
+        shell: bash
+        env:
+          SABER_CF_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          SABER_CF_DEPLOY_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+          SABER_CF_D1_WRITE_TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+        run: |
+          set -euo pipefail
+          node --check integraciones/publicacion/piloto-cotizador-sin-cobro-live-20261111.mjs
+          node integraciones/publicacion/piloto-cotizador-sin-cobro-live-20261111.mjs
+      - name: Registrar canary sin pagos
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        shell: bash
+        run: |
+          if [ "$RESULT" = success ];then state=success;else state=failure;fi
+          jq -n --arg state "$state" --arg context 'saber/quote-only-live-canary' \
+           --arg description "Live quote Turnstile no payments: $RESULT" \
+           --arg target_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+           '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/saber-canary.json
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+           --input /tmp/saber-canary.json >/dev/null
