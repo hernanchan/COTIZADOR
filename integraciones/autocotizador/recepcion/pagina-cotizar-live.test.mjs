@@ -63,3 +63,26 @@ test('la pantalla autenticada autoriza SOLO su propio módulo JS con nonce CSP',
  assert.doesNotMatch(csp,/script-src[^;]*'unsafe-inline'/);
  assert.match(html,/crearFlujoPresupuestoLive/);
 });
+
+
+test('formulario comercial pide identidad completa sin ReferenceError y respeta CSP',async()=>{
+ const res=paginaCotizarLive(new Request(url),{
+  ...env,DOCS_LIVE_RECEPCION_GATE:gate,DOCS_LIVE_PRICING_GATE:gate,DOCS_LIVE_ORDER_GATE:gate
+ },{authorized:true});
+ const html=await res.text();
+ assert.match(html,/id="nombre"[^>]*required/);
+ assert.match(html,/id="telefono"[^>]*required/);
+ assert.match(html,/id="direccion"[^>]*maxlength="180"/);
+ const n=html.indexOf("const nombreCliente=document.getElementById('nombre');");
+ const t=html.indexOf("const phone=document.getElementById('telefono');");
+ const d=html.indexOf("const direccionCliente=document.getElementById('direccion');");
+ const listener=html.indexOf("action.addEventListener('click'");
+ assert.ok(n>0&&t>0&&d>0&&listener>Math.max(n,t,d),'contactos no declarados antes de ejecutar JS');
+ assert.match(html,/\.\.\.pending,webOrderId:orderId\(\),telefono,nombre,direccion/);
+ assert.match(html,/nombre\.length<2/);
+ assert.match(html,/nombreCliente\.focus\(\)/);
+ assert.match(html,/\[<>\]\/\.test\(nombre\)/);
+ assert.match(html,/action\.disabled=!enabled/);
+ const nonce=html.match(/<script type="module" nonce="([a-f0-9]{32})">/);
+ assert.ok(nonce&&res.headers.get('Content-Security-Policy').includes("nonce-"+nonce[1]));
+});
