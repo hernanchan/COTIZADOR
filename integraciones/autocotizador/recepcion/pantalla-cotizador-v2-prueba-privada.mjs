@@ -1786,6 +1786,18 @@ window.addEventListener('message',async event=>{
   if(smartBlockedReason)batchProgress.textContent=smartBlockedReason;
   else if(all.length===0)batchProgress.textContent=smartReady?'Presupuesto listo. Pulsá «Enviar mi pedido».':'Revisá los archivos para continuar.';
   updateSummary();
+  const promocion=event.data.promocion;
+  if(status==='listo'&&promocion&&typeof promocion.titulo==='string'&&
+     promocion.titulo.length<=90&&Number.isSafeInteger(promocion.descuento)&&
+     promocion.descuento>0&&Number.isSafeInteger(promocion.totalAnterior)&&
+     promocion.totalAnterior-promocion.descuento===price){
+    promoInfo.hidden=false;
+    const moneda=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',
+      maximumFractionDigits:0}).format(n);
+    promoInfo.textContent='Promoción aplicada: '+promocion.titulo+
+      ' · Antes '+moneda(promocion.totalAnterior)+' · Descuento −'+
+      moneda(promocion.descuento)+' · Total '+moneda(price);
+  }
   const headerPrice=document.getElementById('precio-smart');
   if(status==='listo'&&Number.isSafeInteger(price)&&price>0)
    headerPrice.textContent='Total preliminar: '+new Intl.NumberFormat('es-AR',{
