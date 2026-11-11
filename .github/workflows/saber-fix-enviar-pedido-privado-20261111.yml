@@ -33,6 +33,8 @@ jobs:
           node --check integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
           node --test tests/tus-boton-envio-borrador-anterior.test.mjs
           echo 'BUTTON_BUILD_TESTS_PASSED'
+          npm install --no-save --no-audit --no-fund playwright@1.56.1
+          node --check integraciones/publicacion/qa-boton-envio-browser-20261111.mjs
       - name: Desplegar SOLO Documentos de pruebas con rollback
         shell: bash
         env:
@@ -93,6 +95,8 @@ jobs:
             sleep 2
           done
           test "$live" = 1 || { echo 'BUTTON_FIX_NOT_VISIBLE';exit 1; }
+          command -v google-chrome >/dev/null || { echo 'CHROME_UNAVAILABLE_SAFE_ROLLBACK';exit 1; }
+          SABER_OPERATOR_TEST_PASSWORD="$PASSWORD" node integraciones/publicacion/qa-boton-envio-browser-20261111.mjs
           test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$base/prueba-v2/")" = 401
           curl -fsS --max-time 25 -H "$auth" "$root/settings" > "$tmp/bindings-after.json"
           jq -S '.result.bindings|map({name,type})|sort_by(.name)' "$tmp/bindings-before.json" > "$tmp/a"
