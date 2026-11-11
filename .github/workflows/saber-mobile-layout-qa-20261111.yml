@@ -21,3 +21,4 @@ jobs:
           node --check integraciones/publicacion/qa-cotizador-mobile-layout-20261111.mjs
           node integraciones/publicacion/qa-cotizador-mobile-layout-20261111.mjs
 # Rerun con handshake de altura y diagnóstico de Chrome.
+# QA integrado con corrección de JS comercial y handshake.
