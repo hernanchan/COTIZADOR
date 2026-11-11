@@ -381,3 +381,34 @@ test('TUS LIVE no emite preferencia si el transporte pospago está cerrado',asyn
   assert.equal(f.posts,0);
  }
 });
+
+test('recupera un intento de preferencia fallido de la misma orden sin duplicar el cobro',async()=>{
+ const f=fixture();
+ const req=new Request('https://pagos.libreriasaber.com.ar/internal/central/live/checkout',{method:'POST'});
+ let first=true,remotePosts=0;
+ const fetcher=async(url,options={})=>{
+  const path=new URL(url).pathname;
+  if(path==='/checkout/preferences/search')return response({elements:[]});
+  if(path==='/checkout/preferences'&&options.method==='POST'){
+   remotePosts++;
+   if(first){
+    first=false;
+    return {ok:false,status:400,json:async()=>({error:'invalid_back_urls'})};
+   }
+  }
+  return f.mpFetch(url,options);
+ };
+ const fail=await checkoutMPLiveCentral(req,f.env,{readSigned:f.signed,fetcher});
+ assert.equal(fail.status,503);
+ const body=await fail.json();
+ assert.equal(body.etapa,'crear_preferencia');
+ assert.equal(body.codigo,'MP_LIVE_HTTP_400_invalid_back_urls');
+ assert.equal(f.o.preference_id,null);
+ const recovered=await checkoutMPLiveCentral(req,f.env,{readSigned:f.signed,fetcher});
+ assert.equal(recovered.status,200,JSON.stringify(await recovered.clone().json()));
+ assert.equal(f.o.preference_id,'MP-LIVE-PREF-1');
+ assert.equal(remotePosts,2);
+ const repeat=await checkoutMPLiveCentral(req,f.env,{readSigned:f.signed,fetcher});
+ assert.equal(repeat.status,200);
+ assert.equal(remotePosts,2,'no reenviar preferencia una vez asociada a D1');
+});
