@@ -30,11 +30,12 @@ async function mpLive(env,path,{fetcher=fetch,method='GET',body=null,headers={}}
  if(!/^\/(users\/me|v1\/payments\/[0-9]+|merchant_orders\/[0-9]+|checkout\/preferences(?:\/[a-zA-Z0-9-]+|\/search\?[^#]*)?)$/.test(path))
   throw Error('MP_LIVE_RUTA_PROHIBIDA');
  const r=await fetcher('https://api.mercadopago.com'+path,{
-  method,redirect:'error',signal:AbortSignal.timeout(15000),
+  method,redirect:'manual',signal:AbortSignal.timeout(15000),
   headers:{Authorization:'Bearer '+env.MP_LIVE_ACCESS_TOKEN,
    'Content-Type':'application/json',...headers},
   ...(body?{body:JSON.stringify(body)}:{})
  });
+ if(r.status>=300&&r.status<400)throw Error('MP_LIVE_REDIRECCION_RECHAZADA');
  if(!r.ok){
   // Código público de Mercado Pago, sin reproducir mensajes ni datos del cliente.
   let failure;
