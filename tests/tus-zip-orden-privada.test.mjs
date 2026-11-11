@@ -55,6 +55,7 @@ const printable=vm.createContext({Blob,console,TextEncoder});
 vm.runInContext(pdfCode+'\n'+pre+'\n'+
  'globalThis.pdf=generarPdfOrdenTrabajo;globalThis.filas=formatoOrden;globalThis.nombre=nombreZip;',printable);
 const base={numeroOrden:'013',importe:4730,estadoPago:'PAGADO_VERIFICADO',pagoVerificado:true,
+ nombreCliente:'María Belén Gómez',telefonoContacto:'351 555 1234',direccionCliente:'Av. Colón 1234, Córdoba',
  webOrderId:'WEB-ENSAYO-12345678901234567890123456789012',
  trabajos:[
  {orden:1,nombreOriginal:'Día de las familias.pdf',servicio:'documentos',paginasOriginales:8,
@@ -97,7 +98,7 @@ test('orden PDF A4 contiene número, pago verificado, originales e instrucciones
  assert.match(raw,/\/BaseFont \/Helvetica/);
  const txt=pdfTexto(raw);
  for(const label of ['ORDEN DE TRABAJO','013','PAGO VERIFICADO','PDF 01',
-  'Día de las familias.pdf','Páginas a imprimir','Doble faz','Múltiples en Adobe Acrobat',
+  'Día de las familias.pdf','María Belén Gómez','351 555 1234','Av. Colón 1234, Córdoba','Páginas a imprimir','Doble faz','Múltiples en Adobe Acrobat',
   'Anillado en grupo','PDF 02','Póster','Recubierto','rollo60','NO IMPRIMIR']){
   assert.ok(txt.includes(label),label);
  }
