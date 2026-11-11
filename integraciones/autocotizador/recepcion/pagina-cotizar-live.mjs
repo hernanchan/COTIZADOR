@@ -188,8 +188,8 @@ action.addEventListener('click',async()=>{
   nombreCliente.focus();
   return;
  }
- if(!/^\+?[0-9 ()-]{10,26}$/.test(telefono)||telefono.replace(/\D/g,'').length<10||
-    telefono.replace(/\D/g,'').length>15){
+ if(!/^\\+?[0-9 ()-]{10,26}$/.test(telefono)||telefono.replace(/\\D/g,'').length<10||
+    telefono.replace(/\\D/g,'').length>15){
   status.textContent='Ingresá un teléfono válido con código de área.';
   phone.focus();
   return;
