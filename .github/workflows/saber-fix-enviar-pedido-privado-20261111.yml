@@ -1,0 +1,103 @@
+name: Saber - corregir botón Enviar SOLO Worker Documentos PRUEBAS
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [docs/ACTIVAR-FIX-BOTON-PRUEBAS-20261111.trigger]
+permissions:
+  contents: read
+concurrency:
+  group: saber-documentos-private-deploy
+  cancel-in-progress: false
+jobs:
+  fix-boton:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Regresiones y compilacion
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund pdf-lib@1.17.1 esbuild@0.25.12
+          node --test tests/tus-boton-envio-borrador-anterior.test.mjs tests/tus-ui-presupuesto-smoke.test.mjs tests/tus-telefono-contacto-pedido.test.mjs tests/tus-pago-cliente-sandbox.test.mjs tests/r2-universal-interfaz-compra-unica.test.mjs
+          npm --prefix integraciones/autocotizador/recepcion install --no-audit --no-fund
+          npm --prefix integraciones/autocotizador/recepcion run build:unificado
+          node --check integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq 'El pedido todavía no se puede enviar:' integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq 'verificarDisponibilidadTUS' integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
+      - name: Desplegar SOLO Documentos de pruebas con rollback
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+          PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN" && test -n "$PASSWORD"
+          tmp=$(mktemp -d);chmod 700 "$tmp"
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-documentos-pruebas"
+          base="https://saber-documentos-pruebas.libreriasaber.workers.dev"
+          auth="Authorization: Bearer $TOKEN"
+          old='' modified=0
+          cleanup(){
+            rc=$?
+            trap - EXIT
+            if [ "$rc" -ne 0 ] && [ "$modified" = 1 ] && [ -n "$old" ];then
+              echo 'BUTTON_ROLLBACK_REQUESTED'
+              jq -n --arg v "$old" '{strategy:"percentage",versions:[{percentage:100,version_id:$v}],annotations:{"workers/message":"Rollback botón pedido pruebas"}}' > "$tmp/rollback.json"
+              curl -fsS --max-time 65 -H "$auth" -H 'Content-Type: application/json' --data-binary "@$tmp/rollback.json" "$root/deployments" > "$tmp/rollback-response.json" &&
+                jq -e '.success==true' "$tmp/rollback-response.json" >/dev/null &&
+                echo 'BUTTON_ROLLBACK_ACCEPTED' || echo 'BUTTON_ROLLBACK_UNCONFIRMED'
+            fi
+            rm -rf "$tmp";exit "$rc"
+          }
+          trap cleanup EXIT
+          curl -fsS --max-time 30 -H "$auth" "$root/settings" > "$tmp/bindings-before.json"
+          curl -fsS --max-time 30 -H "$auth" "$root/deployments" > "$tmp/deploy-before.json"
+          jq -e '.success==true and (.result.bindings|type=="array")' "$tmp/bindings-before.json" >/dev/null
+          old=$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/deploy-before.json")
+          jq -e '.result.bindings|any(.name=="DOCS_V2_PRIVATE_UI_ENABLED" and .text=="PRIVATE_TEST_ONLY") and any(.name=="DOCS_TUS_PURGE_ENABLED" and .text=="OFF") and any(.name=="SABER_CENTRAL" and .type=="service")' "$tmp/bindings-before.json" >/dev/null
+          test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$base/prueba-v2/")" = 401
+          p=$(curl -sS --max-time 25 -o "$tmp/before.html" -w '%{http_code}' --user "operador:$PASSWORD" "$base/prueba-v2/")
+          test "$p" = 200
+          grep -Fq 'id="cliente-nombre"' "$tmp/before.html"
+          echo 'BOTON_FIX_PREFLIGHT_SAFE'
+          jq -n --arg sha "$GITHUB_SHA" --slurpfile s "$tmp/bindings-before.json" '{main_module:"index.mjs",annotations:{"workers/message":"Boton enviar visible con diagnostico y preflight reintentable en pruebas","workers/commit_sha":$sha},bindings:[$s[0].result.bindings[]|{name,type:"inherit"}]}' > "$tmp/meta.json"
+          curl -fsS --max-time 120 -H "$auth" -F "metadata=@$tmp/meta.json;type=application/json" -F "index.mjs=@integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs;filename=index.mjs;type=application/javascript+module" "$root/versions?bindings_inherit=strict" > "$tmp/version.json"
+          jq -e '.success==true and (.result.id|type=="string")' "$tmp/version.json" >/dev/null
+          new=$(jq -r '.result.id' "$tmp/version.json")
+          jq -n --arg v "$new" '{strategy:"percentage",versions:[{percentage:100,version_id:$v}],annotations:{"workers/message":"Fix boton envio solo Worker Documentos privado; sin cambios de otros Workers"}}' > "$tmp/promotion.json"
+          modified=1
+          curl -fsS --max-time 65 -H "$auth" -H 'Content-Type: application/json' --data-binary "@$tmp/promotion.json" "$root/deployments" > "$tmp/promotion-response.json"
+          jq -e '.success==true' "$tmp/promotion-response.json" >/dev/null
+          ready=0
+          for i in 1 2 3 4 5 6 7 8;do
+            curl -fsS --max-time 25 -H "$auth" "$root/deployments" > "$tmp/active.json"
+            v=$(jq -r '.result.deployments[0].versions[]?|select(.percentage==100)|.version_id' "$tmp/active.json"|head -n1)
+            if [ "$v" = "$new" ];then ready=1;break;fi
+            sleep 2
+          done
+          test "$ready" = 1
+          live=0
+          for i in 1 2 3 4 5 6;do
+            code=$(curl -sS --max-time 25 --user "operador:$PASSWORD" -o "$tmp/page.html" -w '%{http_code}' "$base/prueba-v2/")
+            if [ "$code" = 200 ] && grep -Fq 'verificarDisponibilidadTUS' "$tmp/page.html" && grep -Fq 'id="send-all-pdf"' "$tmp/page.html" && grep -Fq 'id="cliente-nombre"' "$tmp/page.html"; then live=1;break;fi
+            sleep 2
+          done
+          test "$live" = 1 || { echo 'BUTTON_FIX_NOT_VISIBLE';exit 1; }
+          test "$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$base/prueba-v2/")" = 401
+          curl -fsS --max-time 25 -H "$auth" "$root/settings" > "$tmp/bindings-after.json"
+          jq -S '.result.bindings|map({name,type})|sort_by(.name)' "$tmp/bindings-before.json" > "$tmp/a"
+          jq -S '.result.bindings|map({name,type})|sort_by(.name)' "$tmp/bindings-after.json" > "$tmp/b"
+          cmp "$tmp/a" "$tmp/b"
+          echo 'BOTON_FIX_WORKER_DOCUMENTOS_DEPLOY_SUCCESS'
+          echo "DOCUMENTOS_PRIVATE_VERSION=$new"
+          echo 'NO_MAIN_NO_CENTRAL_CHANGE_NO_PRODUCTION_NO_PAYMENT'
