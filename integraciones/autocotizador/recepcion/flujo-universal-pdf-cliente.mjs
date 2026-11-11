@@ -27,7 +27,7 @@ async function post(fetcher,path,payload){
  return body;
 }
 export function crearFlujoUniversalPDF({
- files,archivos,webOrderId,telefono,fetcher=fetch,
+ files,archivos,webOrderId,telefono,nombre,direccion,fetcher=fetch,
  hasher=sha256PdfLocalPorFragmentos,
  uploadR2=enviarArchivoR2Grande,uploadTus=enviarTUSUniversalPagado,
  uuid=()=>crypto.randomUUID(),
@@ -58,6 +58,10 @@ export function crearFlujoUniversalPDF({
   if(file.size>40*MIB)r2Count++;
   else tusBytes+=file.size;
  }
+ if(nombre!==undefined&&(typeof nombre!=='string'||nombre.trim().length<2||nombre.trim().length>100||/[<>]/.test(nombre)))
+  throw Error('UNIVERSAL_NOMBRE_INVALIDO');
+ if(direccion!==undefined&&(typeof direccion!=='string'||direccion.trim().length>180||/[<>]/.test(direccion)))
+  throw Error('UNIVERSAL_DIRECCION_INVALIDA');
  if(!r2Count||tusBytes>60*MIB)
   throw Error('UNIVERSAL_CUPO_RECEPCION_INVALIDO');
  let phase='seleccionado',draftId=null,quoteHash=null,
@@ -102,7 +106,9 @@ export function crearFlujoUniversalPDF({
    throw Error('UNIVERSAL_FICHA_D1_DISTINTA');
   draftId=saved.draftId;quoteHash=saved.quoteHash;
   const created=await post(fetcher,'/prueba-v2/api/ensayo-r2-orden-universal',{
-   webOrderId,draftId,quoteHash,telefono});
+   webOrderId,draftId,quoteHash,telefono,
+   ...(nombre!==undefined?{nombre:nombre.trim()}:{}),
+   ...(direccion!==undefined?{direccion:direccion.trim()}:{})});
   if(created.webOrderId!==webOrderId||!UUID.test(created.commercialOrderId||'')||
      created.fileCount!==files.length||created.totalArs!==saved.totalArs||
      !/^[0-9]{3,}$/.test(created.numeroOrden||'')||
