@@ -43,6 +43,11 @@ on:
       - 'integraciones/mercadopago/pruebas/central-live-bridge.test.mjs'
       - 'integraciones/mercadopago/pruebas/central-live-hmac-e2e.test.mjs'
       - 'integraciones/mercadopago/pruebas/worker.js'
+      - 'integraciones/mercadopago/pruebas/plazo-produccion-informativo.mjs'
+      - 'integraciones/mercadopago/pruebas/plazo-produccion-informativo.test.mjs'
+      - 'integraciones/autocotizador/recepcion/plazo-produccion-cliente.mjs'
+      - 'integraciones/autocotizador/recepcion/plazo-produccion-cliente.test.mjs'
+      - 'integraciones/autocotizador/recepcion/pantalla-cotizador-v2-prueba-privada.mjs'
       - 'integraciones/autocotizador/recepcion/mp-live-comprador.mjs'
       - 'integraciones/autocotizador/recepcion/mp-live-comprador.test.mjs'
       - 'integraciones/autocotizador/recepcion/pagina-retorno-live.mjs'
@@ -110,6 +115,9 @@ jobs:
           node --test integraciones/mercadopago/pruebas/transferencias-live-central.test.mjs
           node --test integraciones/autocotizador/recepcion/transferencia-live-comprador.test.mjs
           node --test integraciones/mercadopago/pruebas/central-live-bridge.test.mjs
+          node --test integraciones/mercadopago/pruebas/plazo-produccion-informativo.test.mjs
+          node --test integraciones/autocotizador/recepcion/plazo-produccion-cliente.test.mjs
+          node --test tests/tus-seguimiento-privado-eta.test.mjs
           node --test integraciones/mercadopago/pruebas/tus-live-pospago-aislado.test.mjs
           node --test integraciones/mercadopago/pruebas/r2-universal-live-gate-central.test.mjs
           node --test integraciones/mercadopago/pruebas/r2-universal-live-reserve-central.test.mjs
