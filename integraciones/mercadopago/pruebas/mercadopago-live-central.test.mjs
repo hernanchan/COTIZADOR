@@ -412,3 +412,22 @@ test('recupera un intento de preferencia fallido de la misma orden sin duplicar 
  assert.equal(repeat.status,200);
  assert.equal(remotePosts,2,'no reenviar preferencia una vez asociada a D1');
 });
+
+test('Cloudflare Workers usa redirect manual y bloquea 302 antes de cualquier pago',async()=>{
+ const f=fixture(),paths=[];
+ const fake=async(url,opts)=>{
+  paths.push({path:new URL(url).pathname,redirect:opts.redirect});
+  assert.equal(opts.redirect,'manual','Cloudflare Workers rechaza redirect:error');
+  return {ok:false,status:302,json:async()=>({error:'redirect'})};
+ };
+ const res=await checkoutMPLiveCentral(new Request(
+  'https://pagos.libreriasaber.com.ar/internal/central/live/checkout',{method:'POST'}),
+  f.env,{readSigned:f.signed,fetcher:fake});
+ assert.equal(res.status,503);
+ const data=await res.json();
+ assert.equal(data.etapa,'verificar_vendedor');
+ assert.equal(data.codigo,'MP_LIVE_REDIRECCION_RECHAZADA');
+ assert.deepEqual(paths,[{path:'/users/me',redirect:'manual'}]);
+ assert.equal(f.o.preference_id,null);
+ assert.equal(f.posts,0);
+});
