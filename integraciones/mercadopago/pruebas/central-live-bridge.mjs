@@ -22,6 +22,7 @@ const routeSchema=new Map([
  ['/internal/central/live/r2-recover','saber-central-r2-universal-recovery-v1'],
  ['/internal/central/live/r2-inspection-source','saber-central-r2-inspection-source-v1'],
  ['/internal/central/live/r2-inspection-confirm','saber-central-r2-inspection-confirm-v1'],
+ ['/internal/central/live/r2-staff-board','saber-central-r2-live-staff-board-v1'],
  ['/internal/central/live/package-manifest','saber-central-r2-universal-package-manifest-v1'],
  ['/internal/central/live/package-file','saber-central-r2-universal-package-file-v1']
 ]);
@@ -60,6 +61,7 @@ export async function leerFirmaInternaLive(request,env,{
  const r2Reserve=url.pathname==='/internal/central/live/r2-reserve';
  const r2Stage=url.pathname==='/internal/central/live/r2-stage';
  const r2Recover=url.pathname==='/internal/central/live/r2-recover';
+ const boardRoute=url.pathname==='/internal/central/live/r2-staff-board';
  const inspectionSource=url.pathname==='/internal/central/live/r2-inspection-source';
  const inspectionConfirm=url.pathname==='/internal/central/live/r2-inspection-confirm';
  const packageManifest=url.pathname==='/internal/central/live/package-manifest';
@@ -72,7 +74,8 @@ export async function leerFirmaInternaLive(request,env,{
   url.pathname==='/internal/central/live/transfer-status';
  const pricingRoute=url.pathname==='/internal/central/live/pricing';
  const sellerDiag=url.pathname==='/internal/central/live/diag-seller';
- const keys=inspectionConfirm?'confirmed,fileId,measuredDimensions,operator,schema,webOrderId':
+ const keys=boardRoute?'purpose,schema':
+  inspectionConfirm?'confirmed,fileId,measuredDimensions,operator,schema,webOrderId':
   inspectionSource?'fileId,schema,webOrderId':
   packageManifest?'schema,webOrderId':
   packageFile?'fileId,schema,webOrderId':
@@ -91,7 +94,8 @@ export async function leerFirmaInternaLive(request,env,{
        !['draftId','quoteHash','schema','telefono','webOrderId'].every(k=>Object.hasOwn(payload,k))):
       Object.keys(payload).sort().join(',')!==keys)||
     payload.schema!==expectedSchema||
-    (inspectionConfirm?(!WEB.test(payload.webOrderId||'')||
+    (boardRoute?payload.purpose!=='listar-pedidos-entrantes':
+     inspectionConfirm?(!WEB.test(payload.webOrderId||'')||
        !/^[A-Za-z0-9_-]{1,80}$/.test(payload.fileId||'')||
        payload.confirmed!==true||typeof payload.operator!=='string'||
        payload.operator.trim().length<2||payload.operator.trim().length>60||
@@ -179,7 +183,7 @@ export async function leerFirmaInternaLive(request,env,{
        payload.direccion.trim().length>180||/[<>]/.test(payload.direccion)||
        payload.nombre===undefined)):
       !UUID.test(payload.commercialOrderId||''))||
-    (!pricingRoute&&!sellerDiag&&!tusGate&&!tusReceipt&&!r2Gate&&!r2Reserve&&!r2Stage&&!r2Recover&&!WEB.test(payload.webOrderId||'')))
+    (!pricingRoute&&!sellerDiag&&!boardRoute&&!tusGate&&!tusReceipt&&!r2Gate&&!r2Reserve&&!r2Stage&&!r2Recover&&!WEB.test(payload.webOrderId||'')))
    return {error:'Orden LIVE inválida',status:422};
  const key=await subtle.importKey('raw',new TextEncoder().encode(env.CENTRAL_BRIDGE_KEY),
   {name:'HMAC',hash:'SHA-256'},false,['verify']);
