@@ -12,7 +12,13 @@ const direct=read('integraciones/autocotizador/recepcion/tus-directo-cliente.mjs
 const tus=read('integraciones/autocotizador/recepcion/tus-pedido-worker.mjs');
 const central=read('integraciones/mercadopago/pruebas/worker.js');
 
-test('UI exige un único teléfono al enviar, conserva cotización independiente',()=>{
+test('UI pide nombre y teléfono, dirección opcional, conserva cotización independiente',()=>{
+ assert.match(ui,/id="cliente-nombre"[^>]*required/);
+ assert.match(ui,/id="cliente-direccion"[^>]*maxlength="180"/);
+ assert.match(ui,/if\(!nombreValido\(\)\)/);
+ assert.match(ui,/direccionValida\(\)===null/);
+ assert.match(ui,/nombre:nombreCliente\.value\.trim\(\)/);
+ assert.match(ui,/direccion:direccionCliente\.value\.trim\(\)/);
  assert.match(ui,/<input id="cliente-telefono" type="tel"[^>]*required/);
  assert.match(ui,/telefonoContacto\.value\.trim\(\)/);
  assert.match(ui,/if\(!telefonoValido\(\)\)/);
@@ -33,7 +39,15 @@ test('UI exige un único teléfono al enviar, conserva cotización independiente
  assert.equal(fn(),null);
  assert.match(error.textContent,/válido/);
 });
-test('el teléfono viaja dentro del POST TUS y solo en pedido, no en Storage',()=>{
+test('los contactos viajan en pedido TUS y no en Storage',()=>{
+ assert.match(direct,/typeof nombre==='string'/);
+ assert.match(direct,/typeof direccion==='string'/);
+ assert.match(tus,/input\.nombre/);
+ assert.match(tus,/input\.direccion/);
+ assert.match(central,/central_order_customer_details/);
+ assert.match(central,/c\.phone AS customer_phone,d\.name AS customer_name,d\.address AS customer_address/);
+ assert.match(central,/nombreCliente:row\.nombreCliente\|\|null/);
+ assert.match(central,/direccionCliente:row\.direccionCliente\|\|null/);
  assert.match(direct,/\.{3}\(typeof telefono==='string'\?\{telefono:telefono\.trim\(\)\}:\{\}\)/);
  assert.match(tus,/input\.telefono!==undefined/);
  assert.match(tus,/\.\.\.\(input\.telefono\?\{telefono:input\.telefono\.trim\(\)\}:\{\}\)/);
@@ -61,12 +75,14 @@ test('se entrega el teléfono a Central firmado por HMAC y no en URL',async()=>{
  const result=await prepararDocumentosCentralFirmado({
   env,webOrderId:'WEB-ENSAYO-12345678901234567890123456789012',
   clientOrderId:'e2d76c8b-ce1c-4daf-9030-4bd402295a68',
-  telefono:'351 555 1234',items:[],subtle:webcrypto.subtle,
+  telefono:'351 555 1234',nombre:'María Belén Gómez',direccion:'Av. Colón 1234, Córdoba',items:[],subtle:webcrypto.subtle,
   requestId:()=> 'e3d76c8b-ce1c-4daf-9030-4bd402295a68',
   now:()=>1762165000
  });
  assert.equal(result.created,true);
  assert.equal(received.body.telefono,'351 555 1234');
+ assert.equal(received.body.nombre,'María Belén Gómez');
+ assert.equal(received.body.direccion,'Av. Colón 1234, Córdoba');
  assert.equal(received.method,'POST');
  assert.equal(received.url.includes('351'),false);
  assert.ok(received.headers.get('x-saber-signature'));
@@ -77,4 +93,43 @@ test('el backend rechaza teléfonos inválidos antes de la Central',async()=>{
   clientOrderId:'e2d76c8b-ce1c-4daf-9030-4bd402295a68',
   telefono:'1234',items:[],subtle:webcrypto.subtle
  }),/Teléfono/);
+});
+
+
+test('rechaza identidad incompleta en el puente firmado, sin consultar Central',async()=>{
+ await assert.rejects(()=>prepararDocumentosCentralFirmado({
+  env,webOrderId:'WEB-ENSAYO-12345678901234567890123456789012',
+  clientOrderId:'e2d76c8b-ce1c-4daf-9030-4bd402295a68',
+  telefono:'351 555 1234',nombre:'X',items:[],subtle:webcrypto.subtle
+ }),/Nombre/);
+ await assert.rejects(()=>prepararDocumentosCentralFirmado({
+  env,webOrderId:'WEB-ENSAYO-12345678901234567890123456789012',
+  clientOrderId:'e2d76c8b-ce1c-4daf-9030-4bd402295a68',
+  telefono:'351 555 1234',nombre:'Ana Pérez',direccion:'x'.repeat(181),
+  items:[],subtle:webcrypto.subtle
+ }),/Dirección/);
+});
+
+test('los tres datos integran la orden PDF y las tarjetas; transferencia sigue bajo verificación bancaria',()=>{
+ const pdf=read('integraciones/autocotizador/recepcion/pdf-orden-tus-cliente.txt');
+ assert.match(pdf,/d\.nombreCliente/);
+ assert.match(pdf,/d\.telefonoContacto/);
+ assert.match(pdf,/d\.direccionCliente/);
+ assert.match(central,/Cliente: /);
+ assert.match(central,/customer_address/);
+ assert.match(central,/confirm\("¿Confirmás la acreditación de ENSAYO/);
+ assert.match(central,/bank_reference:bankReference/);
+});
+
+test('ploteos R2 y lotes mixtos conservan los mismos datos antes de pagar',()=>{
+ const r2=read('integraciones/autocotizador/recepcion/r2-prepago-documentos.mjs');
+ const uni=read('integraciones/autocotizador/recepcion/r2-orden-universal-documentos.mjs');
+ const r2Central=read('integraciones/mercadopago/pruebas/r2-prepago-intencion-central.mjs');
+ const uniCentral=read('integraciones/mercadopago/pruebas/r2-universal-order-central.mjs');
+ for(const file of [r2,uni,r2Central,uniCentral]){
+  assert.match(file,/nombre/);
+  assert.match(file,/direccion/);
+ }
+ assert.match(r2Central,/INSERT INTO central_order_customer_details/);
+ assert.match(uniCentral,/INSERT INTO central_order_customer_details/);
 });
