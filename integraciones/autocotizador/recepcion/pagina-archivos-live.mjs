@@ -35,15 +35,19 @@ export function prepararCotizadorArchivosLive(htmlEntrada){
           (() => {
            if(window.parent===window||location.pathname!=='/cotizar/archivos')return;
            let last=0;
-           const send=()=>{
+           const send=(force=false)=>{
             const h=Math.ceil(Math.max(document.body.scrollHeight,
              document.documentElement.scrollHeight));
-            if(h>=280&&h<=30000&&Math.abs(h-last)>3){
+            if(h>=280&&h<=30000&&(force||Math.abs(h-last)>3)){
              last=h;
              window.parent.postMessage({type:'SABER_SMART_RESIZE',height:h},location.origin);
             }
            };
-           if(typeof ResizeObserver==='function')new ResizeObserver(send).observe(document.body);
+           addEventListener('message',event=>{
+            if(event.origin===location.origin&&event.source===window.parent&&
+               event.data?.type==='SABER_SMART_RESIZE_REQUEST')send(true);
+           });
+           if(typeof ResizeObserver==='function')new ResizeObserver(()=>send()).observe(document.body);
            addEventListener('load',send);
            requestAnimationFrame(send);
           })();
