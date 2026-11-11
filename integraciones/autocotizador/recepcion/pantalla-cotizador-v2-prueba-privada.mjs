@@ -150,7 +150,7 @@ const TUS_ENABLED=${tusEnabled===true};
  const UNIVERSAL_R2_UI_ENABLED=${universalEnabled===true};
  const MAX_PDF_PRIVADOS=TUS_ENABLED?10:30;
 const TUS_BLOCKED=${tusBloqueado};
-let tusPreflightOK=false;
+let tusPreflightOK=false,tusPreflightError='',tusPreflightPromise=null;
 if(TUS_BLOCKED){
  document.getElementById('seguridad-privada').hidden=true;
  batchProgress.textContent='Supabase/TUS no disponible. Envío desactivado para evitar Google Drive.';
@@ -581,7 +581,7 @@ function borradorAnteriorSinPDF(){
 function motivoBloqueoEnvio(){
  const refs=all.flatMap(item=>item.references);
  if(TUS_BLOCKED)return 'Recepción privada no configurada.';
- if(TUS_ENABLED&&!tusPreflightOK)return 'Comprobación del almacenamiento privado pendiente o fallida.';
+ if(TUS_ENABLED&&!tusPreflightOK)return 'La conexión privada aún no está verificada'+(typeof tusPreflightError==='string'&&tusPreflightError?' ('+tusPreflightError+')':'')+'.';
  if(batchSending)return 'Los archivos se están enviando.';
  if(registering)return 'Se está registrando el pedido.';
  if(handoffInProgress)return 'Preparando los archivos del pedido.';
@@ -627,7 +627,9 @@ function updateSummary(){
    ' · Central D1: '+(registeredOrder?'registrado':'pendiente')+' · Cobros desactivados.';
  summary.append(title,detail);
  const bloqueo=motivoBloqueoEnvio();
- sendAllButton.disabled=Boolean(bloqueo);
+ // No dejar un botón gris sin diagnóstico: sólo deshabilitar durante operaciones irreversibles.
+ // Clic con validaciones pendientes informa el motivo y NUNCA inicia un envío inseguro.
+ sendAllButton.disabled=Boolean(batchSending||registering||handoffInProgress||registeredOrder);
  sendAllButton.title=bloqueo||'Enviar el pedido cotizado';
  if(bloqueo&&smartReady&&!batchSending&&!registering&&!registeredOrder)
   batchProgress.textContent='Envío pendiente: '+bloqueo;
@@ -1391,7 +1393,16 @@ async function prepararPedidoR2Grande(){
    maximumFractionDigits:0}).format(draft.amountArs)+' · PDF sin subir';
 }
 sendAllButton.addEventListener('click',async()=>{
- if(batchSending||registering||handoffInProgress||registeredOrder||TUS_BLOCKED)return;
+ if(batchSending||registering||handoffInProgress||registeredOrder)return;
+ if(TUS_ENABLED&&!tusPreflightOK)await verificarDisponibilidadTUS();
+ const razon=motivoBloqueoEnvio();
+ if(razon){
+  batchProgress.textContent='El pedido todavía no se puede enviar: '+razon;
+  batchProgress.classList.add('error-recepcion');
+  sendAllButton.focus();
+  return;
+ }
+ batchProgress.classList.remove('error-recepcion');
  if(!nombreValido()){
   nombreCliente.focus();
   batchProgress.textContent='Completá el nombre para enviar el pedido.';
@@ -1841,11 +1852,15 @@ window.addEventListener('message',async event=>{
  status.textContent='Se agregó un trabajo. Los PDF están pendientes hasta que Google confirme su recepción. Pedido de prueba: '+orderId;
  render();
 });
-// La recepción se habilita solo cuando el Worker logra firmar una carga
-// de prueba SIN enviar bytes a Storage y SIN devolver el token al navegador.
-if(TUS_ENABLED){
- batchProgress.textContent='Comprobando conexión privada con Supabase antes del envío…';
- void (async()=>{
+// La autorización real de envío nunca depende del color del botón.
+// Si falla esta comprobación, mostrar su código y permitir reintentar sin recargar
+// ni pedir al cliente que vuelva a subir o pagar archivos.
+async function verificarDisponibilidadTUS(){
+ if(!TUS_ENABLED)return false;
+ if(tusPreflightPromise)return tusPreflightPromise;
+ tusPreflightPromise=(async()=>{
+  tusPreflightError='';
+  batchProgress.textContent='Verificando conexión privada antes del envío…';
   try{
    const reply=await fetch('/prueba-v2/api/ensayo-tus-comprobar',{
     method:'POST',credentials:'same-origin',redirect:'error',
@@ -1855,15 +1870,22 @@ if(TUS_ENABLED){
    if(!reply.ok||result?.ok!==true||result.etapa!=='STORAGE_FIRMA_OK')
     throw Error(result?.etapa||'SIN_RESPUESTA');
    tusPreflightOK=true;
-   batchProgress.textContent='Supabase/TUS verificado. Los PDF se enviarán directamente a almacenamiento privado.';
+   batchProgress.textContent='Conexión privada verificada. Ya podés enviar un presupuesto listo.';
+   return true;
   }catch(error){
    tusPreflightOK=false;
-   batchProgress.textContent='Envío bloqueado: Supabase no autorizó la comprobación previa ('+
-    String(error?.message||error).slice(0,80)+'). No vuelvas a subir los PDF.';
+   tusPreflightError=String(error?.message||error).slice(0,80);
+   batchProgress.textContent='No se pudo verificar la recepción segura ('+
+    tusPreflightError+'). Pulsá «Enviar mi pedido» para reintentar la conexión.';
+   return false;
+  }finally{
+   tusPreflightPromise=null;
+   updateSummary();
   }
-  updateSummary();
  })();
+ return tusPreflightPromise;
 }
+if(TUS_ENABLED)void verificarDisponibilidadTUS();
 </script></body></html>`;
 }
 
