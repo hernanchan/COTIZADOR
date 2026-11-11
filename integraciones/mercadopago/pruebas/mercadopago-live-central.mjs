@@ -149,6 +149,7 @@ export async function checkoutMPLiveCentral(request,env,{
  const transferTable=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='transfer_requests'").first();
  if(transferTable&&await env.DB.prepare('SELECT order_id FROM transfer_requests WHERE order_id=?').bind(order.id).first())
   return reply({ok:false,error:'MP_LIVE_TRANSFERENCIA_PENDIENTE'},409);
+ let etapa='iniciar';
  try{
   if(order.preference_id){
    const checkout=await verificarPref(env,order,order.preference_id,{fetcher});
@@ -158,7 +159,7 @@ export async function checkoutMPLiveCentral(request,env,{
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS live_checkout_locks(order_id TEXT PRIMARY KEY,expires_at TEXT NOT NULL)").run();
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS live_checkout_attempts(order_id TEXT PRIMARY KEY,started_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
   const lock=await env.DB.prepare("INSERT INTO live_checkout_locks(order_id,expires_at) VALUES(?,datetime('now','+90 seconds')) ON CONFLICT(order_id) DO UPDATE SET expires_at=excluded.expires_at WHERE live_checkout_locks.expires_at<datetime('now')").bind(order.id).run();
-  let etapa='obtener_pedido';
+  etapa='obtener_pedido';
   if(!lock.meta?.changes)return reply({ok:false,error:'MP_LIVE_CHECKOUT_EN_PREPARACION'},409);
   try{
    const check=await env.DB.prepare('SELECT status,preference_id FROM orders WHERE id=?').bind(order.id).first();
