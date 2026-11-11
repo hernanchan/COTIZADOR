@@ -105,3 +105,22 @@ test('Central bloquea total y descuento adulterados aunque parezcan coherentes',
  await assert.rejects(verificarFichaUniversal({...signed,archivos:[{...f.archivos[0],
   importeArs:1}]},{subtle:webcrypto.subtle}),/HASH|TOTAL/);
 });
+
+test('fotos de 2 MiB usan sólo TUS en Sandbox con flag, hash y total Luster $500',async()=>{
+ const foto={...base('Fotos pequeñas.pdf'),servicio:'fotos',productoFoto:'luster_10x15',
+  paginas:[{numero:1,anchoCm:10,altoCm:15,modo:'sin-clasificar'}],
+  modo:'color'};
+ const args={webOrderId,archivos:[foto],manifiestos:[file(foto,0,2*MiB)],
+  tarifario:tariff,ahora:day(3)};
+ assert.throws(()=>fichaPrearchivoUniversal(args),/SIN_ARCHIVOS_GRANDES/);
+ const q=fichaPrearchivoUniversal({...args,admitirFotosTusPruebas:true});
+ assert.equal(q.totalArs,500);
+ assert.equal(q.archivos[0].transporte,'tus');
+ assert.equal(q.archivos[0].destino,'fotos');
+ const signed=await signature(q);
+ await verificarFichaUniversal(signed,{subtle:webcrypto.subtle,allowTusOnly:true});
+ await assert.rejects(verificarFichaUniversal(signed,{subtle:webcrypto.subtle}),/RUTA_INVALIDA/);
+ const doc=base('Apunte.pdf');
+ assert.throws(()=>fichaPrearchivoUniversal({...args,archivos:[doc],
+  manifiestos:[file(doc,0,2*MiB)],admitirFotosTusPruebas:true}),/SIN_ARCHIVOS_GRANDES/);
+});
