@@ -42,7 +42,7 @@ function fixture(){
     },
     async all(){
      if(sql.includes('FROM order_items'))return {results:[{line_total_ars:4400,quantity:1,unit_price_ars:4400}]};
-     if(sql.includes('FROM central_r2_universal_files'))return {results:[{file_id:'pdf_0_abcdef',received:0,transport:transportType}]};
+     if(sql.includes('FROM central_r2_universal_files'))return {results:[{file_id:'pdf_0_abcdef',received:0,transport:transportType,bytes:transportType==='r2'?60*1048576:120000}]};
      return {results:[]};
     },
     async run(){
@@ -430,4 +430,38 @@ test('Cloudflare Workers usa redirect manual y bloquea 302 antes de cualquier pa
  assert.deepEqual(paths,[{path:'/users/me',redirect:'manual'}]);
  assert.equal(f.o.preference_id,null);
  assert.equal(f.posts,0);
+});
+
+test('canary LIVE: sólo orden exacta con R2 único abre MP, otros pedidos siguen 503',async()=>{
+ const G='GO_COMERCIAL_CONFIRMADO',N='NO_GO';
+ const cfg={CENTRAL_LIVE_BRIDGE_ENABLED:G,CENTRAL_LIVE_ORDER_GATE:G,
+  CENTRAL_LIVE_PRICING_GATE:G,CENTRAL_LIVE_R2_GATE:N,
+  CENTRAL_LIVE_R2_QUOTA_GATE:N,CENTRAL_LIVE_R2_STAGING_GATE:N,
+  CENTRAL_R2_CANARY_MODE:'SOLO_PEDIDO_R2_CONTROLADO',
+  CENTRAL_R2_CANARY_ORDER_ID:WEB,
+  CENTRAL_R2_CANARY_EXPIRES_AT:new Date(Date.now()+3600000).toISOString().replace('.000Z','Z')};
+ const req=new Request('https://pagos.libreriasaber.com.ar/internal/central/live/checkout',{method:'POST'});
+ for(const invalid of [
+  {CENTRAL_R2_CANARY_ORDER_ID:'WEB-ENSAYO-'+'B'.repeat(32)},
+  {CENTRAL_R2_CANARY_MODE:'NO_GO'},
+  {CENTRAL_R2_CANARY_EXPIRES_AT:'2026-01-01T00:00:00Z'},
+  {CENTRAL_LIVE_R2_GATE:G},
+  {CENTRAL_LIVE_POSTPAY_GATE:N}
+ ]){
+  const f=fixture();f.setTransport('r2');
+  let calls=0;
+  const blocked=await checkoutMPLiveCentral(req,{...f.env,...cfg,...invalid},{
+   readSigned:f.signed,fetcher:async()=>{calls++;throw Error('NO_MP')}
+  });
+  assert.equal(blocked.status,503,JSON.stringify(invalid));
+  assert.equal(calls,0);
+  assert.equal(f.posts,0);
+ }
+ const ok=fixture();ok.setTransport('r2');
+ const opened=await checkoutMPLiveCentral(req,{...ok.env,...cfg},{
+  readSigned:ok.signed,fetcher:ok.mpFetch
+ });
+ assert.equal(opened.status,200,JSON.stringify(await opened.clone().json()));
+ assert.equal(ok.posts,1);
+ assert.equal(ok.o.preference_id,'MP-LIVE-PREF-1');
 });
