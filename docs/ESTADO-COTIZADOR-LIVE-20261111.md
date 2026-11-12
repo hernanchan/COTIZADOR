@@ -36,3 +36,11 @@ Mantener los archivos PDF privados. Política: borrar el original de cada pedido
 - **QA real automatizada Chrome**: workflow `43123076822` SUCCESS con tamaños 360, 390, 768 y 1366 px; sin error JS, sin desborde horizontal, el iframe crece con 6 tarjetas sintéticas, el formulario permanece por debajo, precio interno duplicado oculto. **No equivale a prueba visual con archivos de cliente** ni prueba de pedido/cobro.
 - **Despliegue LIVE reversible**: Actions `43123222751` SUCCESS. Compilación aprobada, Cloudflare preserva bindings. Inspector original R2 mantiene autenticación HTTP 401 sin credencial y cobro grande R2 cerrado.
 - **Pendiente**: inspección visual real en móvil con 1 PDF A4 y luego JPG/PNG; si todavía es confuso, suspender acceso móvil antes de habilitar publicidad/publicación en web principal. No repetir pruebas previas MP, transferencia ni Supabase por errores de CSS.
+
+## Decisión comercial vigente — UX congelada y cierre de circuito
+
+El titular confirmó que la versión móvil mejoró; reconoce que el formulario sigue largo por la cantidad de opciones. **Posponer** el trabajo de reducir bloques/opciones hasta después de terminar el circuito comercial. No introducir nuevas modificaciones de UX durante el cierre.
+
+**Chequeo read-only del 11/11/2026**: GitHub Actions `43127210044` SUCCESS. Entorno producción en los tres Workers. Documentos: recepción, UI, sesión, pricing, pedido, TUS, R2, R2 staging, R2 upload, paquete y acceso staff habilitados (GO). Central/pagos: MP, pedido, postpago, TUS, paquete y bridge habilitados (GO); **CENTRAL_LIVE_R2_GATE, CENTRAL_LIVE_R2_QUOTA_GATE y CENTRAL_LIVE_R2_STAGING_GATE = NO_GO**. Inspección R2 personal en Central GO, clave presente, tablas D1 de reserva/pendientes/inspecciones presentes. Página de seguimiento HTTP 200. Auditoría sin escrituras ni cargos.
+
+**Bloqueo específico para cierre comercial universal:** para PDF >40 MiB falta comprobar un acceso autenticado de personal a ficha y original R2 de un pedido acreditado, y que su circuito posterior de producción/paquete sea apto. Un HTTP 401 sin sesión solo valida protección. **No activar** gates de cobro R2 ni afirmar E2E completo hasta tener evidencia, autorización y control de cuotas. No repetir MP/TUS/transferencias ni volver a tocar el diseño para intentar resolver esto.
