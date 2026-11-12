@@ -53,9 +53,11 @@ export function plazoInformativo(mode,instant=Date.now(),calendar=null){
  const weekday=!['Sat','Sun'].includes(parts.weekday);
  const minute=Number(parts.hour)*60+Number(parts.minute);
  const withinDay=weekday&&minute<20*60;
- let effective=modes.has(mode)?mode:'por_confirmar';
- if(!withinDay&&['hoy','hoy_tarde'].includes(effective))
-  effective='por_confirmar';
+ const configuredMode=modes.has(mode)?mode:'por_confirmar';
+ const todaySelected=['hoy','hoy_tarde'].includes(configuredMode);
+ const expiredToday=todaySelected&&!withinDay;
+ let effective=configuredMode;
+ if(expiredToday)effective='por_confirmar';
  // Si el operador seleccionó explícitamente "hoy", esa previsión es la
  // fuente comercial. Mostrar el día local incluso si falta la agenda D1;
  // nunca inventar una hora ni un "próximo día" sin calendario verificado.
@@ -63,6 +65,7 @@ export function plazoInformativo(mode,instant=Date.now(),calendar=null){
   fechaLocal(instant):proximaFechaDeAtencion(effective,instant,calendar);
  if((effective==='hoy'||effective==='hoy_tarde')&&calendar&&promisedDate===null)
   effective='por_confirmar';
+ const closedToday=todaySelected&&!expiredToday&&effective==='por_confirmar';
  const labels={
   hoy:'En el día de hoy, dentro del horario de atención',
   hoy_tarde:'Hoy por la tarde, dentro del horario de atención',
@@ -70,12 +73,15 @@ export function plazoInformativo(mode,instant=Date.now(),calendar=null){
   por_confirmar:'A confirmar según la disponibilidad del local'
  };
  return {
-  ok:true,mode:effective,configuredMode:modes.has(mode)?mode:'por_confirmar',
+  ok:true,mode:effective,configuredMode,
   heading:'Plazo máximo orientativo de preparación',
-  label:labels[effective],
+  label:expiredToday?'La previsión de hoy venció al cerrar el local':
+    closedToday?'La previsión de hoy no aplica: día sin atención':labels[effective],
   estimatedDeadlineDate:effective==='por_confirmar'?null:promisedDate,
   calendarVerified:calendarioVigente(calendar),
-  notice:'Es una previsión, no una hora de retiro garantizada. Se cuenta desde la acreditación del pago y depende de las características del trabajo, la demanda, el horario de atención y los feriados. Una vez que iniciemos la preparación, te informaremos una fecha y hora más precisas.',
+  notice:expiredToday?'La Central tenía indicado hoy, pero ya terminó el horario de atención. No sería correcto prometer una entrega vencida. Consultanos antes de pagar para conocer la próxima fecha estimada.':
+    closedToday?'La Central tenía indicado hoy, pero el calendario registra un cierre o feriado. Consultanos antes de pagar para confirmar una nueva fecha.':
+    'Es una previsión, no una hora de retiro garantizada. Se cuenta desde la acreditación del pago y depende de las características del trabajo, la demanda, el horario de atención y los feriados. Una vez que iniciemos la preparación, te informaremos una fecha y hora más precisas.',
   exactReadyAt:null,guaranteed:false,productionAuthorized:false,
   source:'central-delivery-plan-readonly'
  };
