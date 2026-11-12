@@ -1,0 +1,51 @@
+name: Saber - verificar preferencias MP LIVE en D1 sin crear pagos
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths:
+      - .github/workflows/saber-mp-live-preferencias-readonly-20261112.yml
+permissions: {contents: read}
+jobs:
+  diagnostico:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      D1_TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+    steps:
+      - name: Leer solo cantidades de ordenes y preferencias desde D1
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const root='https://api.cloudflare.com/client/v4/accounts/'+process.env.ACCOUNT;
+          async function api(path,body){
+           const r=await fetch(root+path,{
+            method:body?'POST':'GET',
+            headers:{Authorization:'Bearer '+process.env.D1_TOKEN,
+             ...(body?{'Content-Type':'application/json'}:{})},
+            ...(body?{body:JSON.stringify(body)}:{}),
+            signal:AbortSignal.timeout(20000)});
+           const j=await r.json();
+           assert.ok(r.ok&&j.success,'CF_D1_READ_FAILED');
+           return j.result;
+          }
+          const db=(await api('/d1/database')).find(x=>x.name==='saber-pagos-produccion');
+          assert.ok(db?.uuid);
+          const sql=[
+           'SELECT COUNT(*) AS total,',
+           'COALESCE(SUM(CASE WHEN status=\'awaiting_payment\' THEN 1 ELSE 0 END),0) AS pendientes,',
+           'COALESCE(SUM(CASE WHEN preference_id IS NOT NULL THEN 1 ELSE 0 END),0) AS con_preferencia,',
+           'COALESCE(SUM(CASE WHEN payment_id IS NOT NULL THEN 1 ELSE 0 END),0) AS con_pago,',
+           'COALESCE(SUM(CASE WHEN created_at >= datetime(\'now\',\'-2 hours\') THEN 1 ELSE 0 END),0) AS nuevas_2h,',
+           'COALESCE(SUM(CASE WHEN created_at >= datetime(\'now\',\'-2 hours\') AND preference_id IS NOT NULL THEN 1 ELSE 0 END),0) AS preferencias_ordenes_nuevas_2h',
+           'FROM orders'
+          ].join(' ');
+          const out=await api('/d1/database/'+db.uuid+'/query',{sql});
+          assert.ok(out.length===1&&out[0].success);
+          const x=out[0].results?.[0]||{};
+          console.log('SABER_MP_D1_READONLY_COUNTERS='+JSON.stringify(x));
+          console.log('SABER_MP_READONLY_NO_PREF_CREATION_NO_ORDER_NO_CHARGE');
+          NODE
