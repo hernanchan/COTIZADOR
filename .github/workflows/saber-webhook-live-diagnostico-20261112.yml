@@ -1,0 +1,62 @@
+name: Saber - diagnostico webhooks MP LIVE GET sin cobros
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-webhook-live-diagnostico-20261112.yml]
+permissions: {contents: write}
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: true}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verificar el endpoint webhook y la URL configurada SIN enviar eventos MP
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'EOF'
+          import {mkdir,writeFile} from 'node:fs/promises';
+          const expected='https://pagos.libreriasaber.com.ar/webhooks/mercadopago-live';
+          const result={schema:'saber-mp-webhook-health-v1',
+            fecha:new Date().toISOString(),soloGET:true,observaciones:[]};
+          try{
+           const r=await fetch(expected,{method:'GET',redirect:'manual',signal:AbortSignal.timeout(20000)});
+           result.webhook_http_get=r.status;
+           result.webhook_endpoint_responde=r.status===405;
+          }catch(e){result.observaciones.push('ERROR_CONEXION_ENDPOINT')}
+          try{
+           const r=await fetch('https://api.cloudflare.com/client/v4/accounts/'+process.env.ACCOUNT+
+            '/workers/scripts/saber-pagos-produccion/settings',{
+              headers:{Authorization:'Bearer '+process.env.TOKEN},signal:AbortSignal.timeout(20000)});
+           const o=await r.json();
+           if(!r.ok||o?.success!==true)throw Error('SETTINGS_NO_DISPONIBLE');
+           const b=o.result.bindings||[];
+           const g=n=>b.find(x=>x.name===n);
+           result.webhook_url_configurada=g('MP_LIVE_WEBHOOK_URL')?.text===expected;
+           result.mp_gate_activo=g('MP_LIVE_GATE')?.text==='GO_COMERCIAL_CONFIRMADO';
+           result.webhook_secret_presente=g('MP_LIVE_WEBHOOK_SECRET')?.type==='secret_text';
+          }catch(e){result.observaciones.push('NO_SE_PUDO_CONSULTAR_CONFIGURACION_CF')}
+          await mkdir('docs',{recursive:true});
+          await writeFile('docs/INCIDENCIA-MP-LIVE-WEBHOOK.json',JSON.stringify(result,null,2)+'\n');
+          console.log('WEBHOOK_STATUS='+JSON.stringify(result));
+          EOF
+      - name: Guardar solamente resultado tecnico no sensible
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/INCIDENCIA-MP-LIVE-WEBHOOK.json || exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/INCIDENCIA-MP-LIVE-WEBHOOK.json
+          if ! git diff --cached --quiet;then
+            git commit -m "ops: estado no sensible webhook MP LIVE"
+            git push origin HEAD:integracion/tus-pedido-privado-20261101
+          fi
