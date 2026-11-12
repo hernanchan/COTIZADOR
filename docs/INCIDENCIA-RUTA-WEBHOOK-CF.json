@@ -1,0 +1,17 @@
+{
+  "schema": "saber-route-audit-v1",
+  "checkedAt": "2026-11-12T23:52:12.123Z",
+  "mode": "solo_lectura",
+  "observaciones": [],
+  "codigo_worker_descargable": true,
+  "codigo_incluye_webhook": true,
+  "codigo_incluye_firma": true,
+  "codigo_incluye_ruta_no_disponible": false,
+  "dominio_pagos_tiene_registro": true,
+  "dominio_pagos_servicio": [
+    "saber-webhook-produccion"
+  ],
+  "http_health": 404,
+  "health_mode": "sin_modo",
+  "http_status_firmado": 404
+}
