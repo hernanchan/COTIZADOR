@@ -2419,7 +2419,7 @@ export default {
        'X-Robots-Tag':'noindex,nofollow'}});
     }
     if(page==='/personal/api/live-forecast'||
-       if(page==='/personal/api/live-status'||
+       page==='/personal/api/live-status'||
        page==='/personal/central'||page==='/personal/api/live-board'||
        page==='/personal/paquete'||page==='/personal/transferencias'||
        page==='/personal/transferencias.js'||
