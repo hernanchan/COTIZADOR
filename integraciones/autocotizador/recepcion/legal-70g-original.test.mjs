@@ -65,7 +65,8 @@ test('D1 acepta ficha Legal original de 48MiB firmada con precio A4 obra70',asyn
  const archivo=file(21.59,35.56,'color','obra70');
  const sha256='b'.repeat(64);
  const manifiestos=[{fileId:'pdf_0_abcdef1234',nombre:archivo.nombre,bytes:49823112,sha256}];
- const tarifario={prices:{...precios,priceVersion:'d1-approved-revision-3'},
+ const tarifario={source:'production-d1-approved-only',revision:3,
+  prices:{...precios,priceVersion:'d1-approved-revision-3'},
   promotions:{codes:[]}};
  const ficha=fichaPrearchivoUniversal({webOrderId,archivos:[archivo],
   manifiestos,tarifario,produccion:true,ahora:Date.UTC(2026,10,12,12)});
