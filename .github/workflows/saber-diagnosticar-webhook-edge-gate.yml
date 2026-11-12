@@ -1,0 +1,53 @@
+name: Saber - diagnosticar regla de acceso de webhook edge
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-diagnosticar-webhook-edge-gate.yml]
+permissions: {contents: write}
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: true}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Solo lectura del gate, host y validacion de ruta sin claves
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'EOF'
+          import {mkdir,writeFile} from 'node:fs/promises';
+          const endpoint='https://api.cloudflare.com/client/v4/accounts/'+process.env.ACCOUNT+'/workers/scripts/saber-webhook-produccion';
+          const h={Authorization:'Bearer '+process.env.TOKEN};
+          const src=await (await fetch(endpoint,{headers:h})).text();
+          const j=await (await fetch(endpoint+'/settings',{headers:h})).json();
+          const bindings=j.result.bindings||[];
+          const clean=src.split('\n').filter(x=>/RUTA_NO_DISPONIBLE|webhooks\/mercadopago-live|WEBHOOK_EDGE_GATE|SABER_ENTORNO|request.method|req.method|pathname|host|hostname|SABER_CENTRAL_LIVE|fetch\(|URL\(|return new Response|Response.json|return json|gate\(/i.test(x))
+            .map(x=>x.slice(0,250)).slice(0,55);
+          const result={fecha:new Date().toISOString(),modo:'READONLY',
+           gateValue:bindings.find(x=>x.name==='WEBHOOK_EDGE_GATE')?.text??null,
+           environmentValue:bindings.find(x=>x.name==='SABER_ENTORNO')?.text??null,
+           conditions:clean};
+          await mkdir('docs',{recursive:true});
+          await writeFile('docs/INCIDENCIA-WEBHOOK-EDGE-GATE.json',JSON.stringify(result,null,2)+'\n');
+          console.log('SABER_WEBHOOK_GATE_CHECKED');
+          EOF
+      - name: Guardar reglas sin tokens
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/INCIDENCIA-WEBHOOK-EDGE-GATE.json || exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/INCIDENCIA-WEBHOOK-EDGE-GATE.json
+          if ! git diff --cached --quiet;then
+            git commit -m "ops: diagnostico de gate del webhook edge"
+            git push origin HEAD:integracion/tus-pedido-privado-20261101
+          fi
