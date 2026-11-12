@@ -107,3 +107,31 @@ test('recepción LIVE admite pago bancario solo con asiento D1, no por comproban
  assert.match(sql,/k\.name AS nombre_cliente/);
  assert.equal((await res.json()).orders[0].productionAuthorized,undefined);
 });
+
+test('tablero staff R2 firmado puede listar sólo R2 pagados sin abrir cobros',async()=>{
+ const {env,queries}=envWith();
+ env.CENTRAL_LIVE_BOARD_GATE='NO_GO';
+ env.CENTRAL_LIVE_R2_INSPECTION_GATE=gate;
+ env.CENTRAL_LIVE_R2_GATE='NO_GO';
+ env.CENTRAL_LIVE_R2_STAGING_GATE='NO_GO';
+ const defaultBlocked=await listarRecepcionUniversalLive(new Request(url),env,{authorized:true});
+ assert.equal(defaultBlocked.status,503,'La ruta normal no cambia');
+ const response=await listarRecepcionUniversalLive(new Request(url),env,{
+  authorized:true,r2StaffOnly:true
+ });
+ assert.equal(response.status,200);
+ const data=await response.json();
+ assert.deepEqual(data.orders.map(x=>x.numeroOrden),['018']);
+ assert.equal(data.orders[0].readyForProduction,false);
+ assert.equal(data.productionAuthorized,false);
+ assert.equal(queries.length,2,'Solo consultas de lectura');
+ env.CENTRAL_LIVE_R2_INSPECTION_GATE='NO_GO';
+ const denied=await listarRecepcionUniversalLive(new Request(url),env,{
+  authorized:true,r2StaffOnly:true
+ });
+ assert.equal(denied.status,503);
+ const noStaff=await listarRecepcionUniversalLive(new Request(url),env,{
+  authorized:false,r2StaffOnly:true
+ });
+ assert.equal(noStaff.status,401);
+});
