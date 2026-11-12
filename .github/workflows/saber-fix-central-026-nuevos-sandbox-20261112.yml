@@ -40,6 +40,7 @@ jobs:
           tmp=$(mktemp -d)
           curl -fsS --max-time 25 -H "Authorization: Bearer $TOKEN" "$root/settings" > "$tmp/before.json"
           jq -e '.success==true and (.result.bindings|any(.name=="DB" and .type=="d1" and ((.id//.database_id)=="60124ac5-1941-44ba-96e5-ea3165b65ec9"))) and (.result.bindings|any(.name=="DEMO_ADMIN_KEY" and .type=="secret_text")) and (.result.bindings|any(.name=="MP_TEST_ACCESS_TOKEN" and .type=="secret_text"))' "$tmp/before.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="SABER_DOCUMENTOS" and .type=="service" and .service=="saber-documentos-pruebas" and .environment=="production") and any(.name=="SABER_R2_GRANDES" and .type=="r2_bucket" and .bucket_name=="saber-documentos-grandes-ensayo-20261106")' "$tmp/before.json" >/dev/null
           jq -cS '.result.bindings|sort_by(.name)' "$tmp/before.json" > "$tmp/bindings-before.json"
           curl -fsS --max-time 25 -H "Authorization: Bearer $TOKEN" "$root/deployments" > "$tmp/deploy-before.json"
           previous=$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/deploy-before.json")
@@ -54,10 +55,29 @@ jobs:
               jq -nc --arg old "$previous" '{strategy:"percentage",versions:[{version_id:$old,percentage:100}],annotations:{"workers/message":"Rollback de clasificacion sandbox orden 026"}}' |
                 curl -fsS --max-time 40 -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" --data-binary @- "$root/deployments" >/dev/null ||
                 echo SABER_026_SANDBOX_ROLLBACK_NOT_CONFIRMED
+              curl -fsS --max-time 25 -H "Authorization: Bearer $TOKEN" "$root/deployments" > "$tmp/deploy-rollback.json" || true
+              if jq -e --arg old "$previous" '.result.deployments[0].versions|length==1 and .[0].percentage==100 and .[0].version_id==$old' "$tmp/deploy-rollback.json" >/dev/null 2>&1;then
+                echo SABER_026_SANDBOX_ROLLBACK_VERIFIED
+              else
+                echo SABER_026_SANDBOX_ROLLBACK_REQUIRES_MANUAL_CHECK
+              fi
             fi
             exit "$code"
           }
           trap rollback ERR
+          # Wrangler keep_vars conserva textos/secretos pero no necesariamente
+          # bindings de servicio y bucket; conservarlos en el manifiesto explícitamente.
+          cat >> integraciones/mercadopago/pruebas/wrangler.toml <<'TOML'
+          
+          [[services]]
+          binding = "SABER_DOCUMENTOS"
+          service = "saber-documentos-pruebas"
+          environment = "production"
+          
+          [[r2_buckets]]
+          binding = "SABER_R2_GRANDES"
+          bucket_name = "saber-documentos-grandes-ensayo-20261106"
+          TOML
           touched=1
           CI=true npx wrangler deploy --config integraciones/mercadopago/pruebas/wrangler.toml > "$tmp/deploy.log" 2>&1 ||
             { tail -n 28 "$tmp/deploy.log"; false; }
