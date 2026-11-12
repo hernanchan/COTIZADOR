@@ -36,7 +36,7 @@ export async function agendaPersonalDocumentosLive(request,env,{authorized=false
  const body=JSON.stringify(payload),ts=Math.floor(Date.now()/1000),id=crypto.randomUUID();
  try{
   const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(env.CENTRAL_BRIDGE_KEY),{name:'HMAC',hash:'SHA-256'},false,['sign']);
-  const raw=new Uint8Array(await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(ts+'\\n'+id+'\\n'+body)));
+  const raw=new Uint8Array(await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(ts+'\n'+id+'\n'+body)));
   const signature=Array.from(raw,b=>b.toString(16).padStart(2,'0')).join('');
   const response=await env.SABER_CENTRAL.fetch(new Request('https://pagos.libreriasaber.com.ar/internal/central/live/staff-calendar',{
    method:'POST',headers:{'Content-Type':'application/json',
