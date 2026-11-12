@@ -1,0 +1,46 @@
+name: Saber LIVE - publicar recuperación de sesión solo en documentos
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-live-session-recovery-docs-deploy-20261112.yml]
+permissions: {contents: read}
+concurrency: {group: saber-live-session-recovery-docs-only, cancel-in-progress: false}
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 13
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      DEPLOY: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verificar renovaciones, orden ajena, retornos y cobros simulados
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check integraciones/autocotizador/recepcion/revincular-orden-live.mjs
+          node --check integraciones/autocotizador/recepcion/pagina-continuar-pago-live.mjs
+          node --check integraciones/autocotizador/recepcion/pagina-retorno-live.mjs
+          node --test \
+            integraciones/autocotizador/recepcion/revincular-orden-live.test.mjs \
+            integraciones/autocotizador/recepcion/sesion-comprador-live.test.mjs \
+            integraciones/autocotizador/recepcion/pagina-continuar-pago-live.test.mjs \
+            integraciones/autocotizador/recepcion/pagina-retorno-live.test.mjs \
+            integraciones/autocotizador/recepcion/recepcion-r2-live-cliente.test.mjs \
+            integraciones/autocotizador/recepcion/checkout-live-cliente.test.mjs
+          npm install --no-save --no-audit --no-fund wrangler@4.55.0
+          (cd integraciones/autocotizador/recepcion && npm install --no-fund --no-audit && npm run build:unificado)
+          node --check integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq '/api/pedido/live/revincular' integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
+          echo SABER_ORDER_RECOVERY_TEST_AND_BUILD_PASS_NO_PAYMENT
+      - name: Desplegar SOLO Worker documentos preservando Central R2 GO y secretos
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash integraciones/publicacion/deploy-renovar-sesion-pedido-live-20261112.sh
