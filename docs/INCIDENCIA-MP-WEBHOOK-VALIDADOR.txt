@@ -1,0 +1,25 @@
+async function manejarWebhookPublico(request, env, { service = env?.SABER_CENTRAL_LIVE } = {}) {
+  const u = new URL(request.url);
+  if (u.protocol !== "https:" || u.hostname !== HOST || u.pathname !== WEBHOOK || u.hash || !/^[1-9][0-9]{3,19}$/.test(u.searchParams.get("data.id") || "") || u.searchParams.get("type") !== "payment" || [...u.searchParams.keys()].sort().join(",") !== "data.id,type")
+    return reply(404, "RUTA_NO_DISPONIBLE");
+  if (env?.SABER_ENTORNO !== "produccion" || env?.WEBHOOK_EDGE_GATE !== GATE || typeof service?.fetch !== "function" || service === env?.SABER_CENTRAL)
+    return reply(503, "WEBHOOK_NO_HABILITADO");
+  if (request.method !== "POST" || request.headers.has("Origin") || !/^application\/json(?:;|$)/i.test(request.headers.get("Content-Type") || "") || !(request.headers.get("x-signature") || "").trim() || !(request.headers.get("x-request-id") || "").trim())
+    return reply(403, "SOLICITUD_INVALIDA");
+  const size = request.headers.get("Content-Length");
+  if (size !== null && (!/^\d+$/.test(size) || Number(size) > 16384))
+    return reply(413, "CUERPO_DEMASIADO_GRANDE");
+  let upstream;
+  try {
+    upstream = await service.fetch(request);
+  } catch {
+    return reply(503, "CENTRAL_NO_DISPONIBLE");
+  }
+  if (!upstream.ok) return reply(upstream.status === 401 ? 401 : 503, "CENTRAL_RECHAZO");
+  return new Response(null, { status: 200, headers: {
+    "Cache-Control": "no-store",
+    "X-Robots-Tag": "noindex,nofollow"
+  } });
+}
+__name(manejarWebhookPublico, "manejarWebhookPublico");
+var webhook_edge_default = { fetch: manejarWebhookPublico };
