@@ -58,12 +58,10 @@ assert.ok(names.every(name=>getBinding(bCentral,name)?.text===OFF)||
 const databases=await cf('/d1/database',dbToken);
 const db=databases.find(x=>x.name==='saber-pagos-produccion');
 assert.ok(db?.uuid,'R2_D1_PRODUCCION_NO_EXISTE');
-const sql=[
- 'SELECT name FROM sqlite_master WHERE type="table" AND name IN',
- '("central_r2_large_reservations","central_r2_large_pending",',
- '"central_r2_universal_files","central_r2_universal_order_links",',
- '"orders","payment_reviews","central_work_order_numbers")'
-].join(' ');
+const sql="SELECT name FROM sqlite_master WHERE type='table' AND name IN ("+
+ "'central_r2_large_reservations','central_r2_large_pending',"+
+ "'central_r2_universal_files','central_r2_universal_order_links',"+
+ "'orders','payment_reviews','central_work_order_numbers')";
 const q=await cf('/d1/database/'+db.uuid+'/query',dbToken,{method:'POST',
  headers:{'Content-Type':'application/json'},body:JSON.stringify({sql})});
 const tables=new Set(q?.[0]?.results?.map(x=>x.name));
