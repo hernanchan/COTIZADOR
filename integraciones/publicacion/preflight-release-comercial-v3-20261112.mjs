@@ -31,7 +31,7 @@ for(const k of ['MP_LIVE_GATE','CENTRAL_LIVE_BRIDGE_ENABLED','CENTRAL_LIVE_ORDER
  'CENTRAL_LIVE_PRICING_GATE','CENTRAL_LIVE_POSTPAY_GATE',
  'CENTRAL_LIVE_R2_GATE','CENTRAL_LIVE_R2_QUOTA_GATE',
  'CENTRAL_LIVE_R2_STAGING_GATE','CENTRAL_LIVE_R2_INSPECTION_GATE'])gate(payments,k);
-for(const k of ['DOCS_MP_LIVE_GATE','DOCS_LIVE_RECEPCION_GATE',
+for(const k of ['DOCS_LIVE_UI_GATE','DOCS_MP_LIVE_GATE','DOCS_LIVE_RECEPCION_GATE',
  'DOCS_LIVE_SESSION_GATE','DOCS_LIVE_ORDER_GATE','DOCS_LIVE_PRICING_GATE',
  'DOCS_LIVE_R2_GATE','DOCS_LIVE_R2_STAGING_GATE','DOCS_LIVE_R2_UPLOAD_GATE',
  'DOCS_LIVE_STAFF_GATE','DOCS_LIVE_PACKAGE_GATE'])gate(docs,k);
@@ -50,9 +50,10 @@ const response=await official.text();
 assert.match(response,/Librer[ií]a Saber/i);
 const quote=await fetch('https://pedidos.libreriasaber.com.ar/cotizar/archivos',
  {redirect:'manual',signal:AbortSignal.timeout(15000)});
-assert.equal(quote.status,200);
-const qhtml=await quote.text();
-assert.ok(qhtml.includes('archivo')||qhtml.includes('PDF'));
+// El iframe comprador exige cookie Turnstile. Sin ella debe rechazar.
+assert.equal(quote.status,503,'ANONYMOUS_PRIVATE_BUYER_IFRAME_MUST_FAIL_CLOSED');
+const qbody=await quote.text();
+assert.match(qbody,/LIVE_COTIZADOR_CERRADO/);
 const board=await fetch('https://pedidos.libreriasaber.com.ar/personal/api/live-r2-inspection-original',
  {redirect:'manual',signal:AbortSignal.timeout(15000)});
 assert.equal(board.status,401,'STAFF_R2_MUST_REJECT_ANONYMOUS');
