@@ -2,6 +2,7 @@
  * Exige pago D1 y reserva existente. NUNCA autoriza preprensa o ZIP.
  */
 import {validarPreRecepcionR2} from './r2-grandes-central-pendientes.mjs';
+import {r2GateGeneralOCanary} from './r2-live-canary-order.mjs';
 import {verificarPedidoUniversalCobrable,estadoPagoUniversal}
  from './r2-universal-checkout-central.mjs';
 const GO='GO_COMERCIAL_CONFIRMADO',MIB=1048576;
@@ -12,7 +13,6 @@ export async function registrarR2LivePendiente(request,env,{
 }={}){
  if(env?.SABER_ENTORNO!=='produccion'||env?.CENTRAL_DB_ENV!=='produccion'||
    env?.MP_LIVE_GATE!==GO||env?.CENTRAL_LIVE_BRIDGE_ENABLED!==GO||
-   env?.CENTRAL_LIVE_R2_GATE!==GO||env?.CENTRAL_LIVE_R2_STAGING_GATE!==GO||
    env?.CENTRAL_LIVE_POSTPAY_GATE!==GO||
    env?.CENTRAL_LIVE_ORDER_GATE!==GO||
    typeof env?.DB?.prepare!=='function')
@@ -26,6 +26,9 @@ export async function registrarR2LivePendiente(request,env,{
  }
  if(p.bytes>200*MIB||!/^WEB-ENSAYO-[A-F0-9]{32}$/.test(p.orderId))
   return respond({ok:false,error:'LIVE_R2_STAGE_TAMANO'},422);
+ if(!r2GateGeneralOCanary(env,p.orderId,
+   ['CENTRAL_LIVE_R2_GATE','CENTRAL_LIVE_R2_STAGING_GATE']))
+  return respond({ok:false,error:'LIVE_R2_STAGE_PEDIDO_NO_HABILITADO'},503);
  const db=env.DB;
  let valid,paid;
  try{
