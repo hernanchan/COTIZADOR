@@ -40,8 +40,10 @@ jobs:
           tmp=$(mktemp -d)
           curl -fsS --max-time 25 -H "Authorization: Bearer $TOKEN" "$root/settings" > "$tmp/before.json"
           jq -e '.success==true and (.result.bindings|any(.name=="DB" and .type=="d1" and ((.id//.database_id)=="60124ac5-1941-44ba-96e5-ea3165b65ec9"))) and (.result.bindings|any(.name=="DEMO_ADMIN_KEY" and .type=="secret_text")) and (.result.bindings|any(.name=="MP_TEST_ACCESS_TOKEN" and .type=="secret_text"))' "$tmp/before.json" >/dev/null
-          jq -e '.result.bindings|any(.name=="SABER_DOCUMENTOS" and .type=="service" and .service=="saber-documentos-pruebas" and .environment=="production") and any(.name=="SABER_R2_GRANDES" and .type=="r2_bucket" and .bucket_name=="saber-documentos-grandes-ensayo-20261106")' "$tmp/before.json" >/dev/null
-          jq -cS '.result.bindings|sort_by(.name)' "$tmp/before.json" > "$tmp/bindings-before.json"
+          # La reversión de código de Cloudflare no restaura settings globales:
+          # comprobar que los bindings existentes sean legítimos y reponer los dos perdidos.
+          jq -e '.result.bindings|all(.name!="SABER_DOCUMENTOS" and .name!="SABER_R2_GRANDES";true)' "$tmp/before.json" >/dev/null
+          jq -cS '[.result.bindings[]|select(.name!="SABER_DOCUMENTOS" and .name!="SABER_R2_GRANDES")]|sort_by(.name)' "$tmp/before.json" > "$tmp/bindings-before.json"
           curl -fsS --max-time 25 -H "Authorization: Bearer $TOKEN" "$root/deployments" > "$tmp/deploy-before.json"
           previous=$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/deploy-before.json")
           curl -fsS --max-time 20 "$site/health" > "$tmp/health-before.json"
@@ -82,7 +84,8 @@ jobs:
           CI=true npx wrangler deploy --config integraciones/mercadopago/pruebas/wrangler.toml > "$tmp/deploy.log" 2>&1 ||
             { tail -n 28 "$tmp/deploy.log"; false; }
           curl -fsS --max-time 25 -H "Authorization: Bearer $TOKEN" "$root/settings" > "$tmp/after.json"
-          jq -cS '.result.bindings|sort_by(.name)' "$tmp/after.json" > "$tmp/bindings-after.json"
+          jq -e '.result.bindings|any(.name=="SABER_DOCUMENTOS" and .type=="service" and .service=="saber-documentos-pruebas" and .environment=="production") and any(.name=="SABER_R2_GRANDES" and .type=="r2_bucket" and .bucket_name=="saber-documentos-grandes-ensayo-20261106")' "$tmp/after.json" >/dev/null
+          jq -cS '[.result.bindings[]|select(.name!="SABER_DOCUMENTOS" and .name!="SABER_R2_GRANDES")]|sort_by(.name)' "$tmp/after.json" > "$tmp/bindings-after.json"
           diff "$tmp/bindings-before.json" "$tmp/bindings-after.json"
           curl -fsS --max-time 20 "$site/health" > "$tmp/health-after.json"
           jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$tmp/health-after.json" >/dev/null
