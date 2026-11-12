@@ -33,12 +33,13 @@ jobs:
             integraciones/autocotizador/recepcion/pagina-continuar-pago-live.test.mjs \
             integraciones/autocotizador/recepcion/pagina-retorno-live.test.mjs \
             integraciones/autocotizador/recepcion/recepcion-r2-live-cliente.test.mjs \
-            integraciones/autocotizador/recepcion/checkout-live-cliente.test.mjs
+            integraciones/autocotizador/recepcion/checkout-live-cliente.test.mjs \
+            integraciones/autocotizador/recepcion/flujo-presupuesto-live-cliente.test.mjs
           npm install --no-save --no-audit --no-fund wrangler@4.55.0
           (cd integraciones/autocotizador/recepcion && npm install --no-fund --no-audit && npm run build:unificado)
           node --check integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
           grep -Fq '/api/pedido/live/revincular' integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
-          echo SABER_ORDER_RECOVERY_TEST_AND_BUILD_PASS_NO_PAYMENT
+          echo SABER_ORDER_RECOVERY_AND_EARLY_SAVE_TEST_AND_BUILD_PASS_NO_PAYMENT
       - name: Desplegar SOLO Worker documentos preservando Central R2 GO y secretos
         shell: bash
         run: |
