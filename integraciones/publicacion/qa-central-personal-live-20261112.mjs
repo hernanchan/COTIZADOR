@@ -55,7 +55,7 @@ try{
    assert.ok(body.includes(label),label);
   }
   assert.equal(await page.locator('a[href*="/personal/paquete?webOrderId="]').count(),1);
-  assert.equal(await page.getByText('Iniciar preparación').count(),width===390&&updated?0:1);
+  assert.equal(await page.getByText('Iniciar preparación').count(),updated?0:1);
   const viewport=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,width:innerWidth}));
   assert.ok(viewport.scroll<=viewport.width+5,'mobile overflow');
   if(width===390){
