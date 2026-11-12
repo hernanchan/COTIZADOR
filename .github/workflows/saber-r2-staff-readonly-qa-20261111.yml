@@ -23,7 +23,8 @@ jobs:
           node --test \
             integraciones/mercadopago/pruebas/r2-live-inspection-finalize.test.mjs \
             integraciones/mercadopago/pruebas/central-recepcion-live.test.mjs \
-            integraciones/autocotizador/recepcion/r2-inspeccion-personal-live.test.mjs
+            integraciones/autocotizador/recepcion/r2-inspeccion-personal-live.test.mjs \
+            tests/r2-panel-staff-live-browser.test.mjs
           echo STAFF_R2_UNIT_AND_AUTHORIZATION_PASS
       - name: Consultar conteos D1 de originales staged, sin datos identificables
         run: |
