@@ -44,3 +44,17 @@ El titular confirmó que la versión móvil mejoró; reconoce que el formulario 
 **Chequeo read-only del 11/11/2026**: GitHub Actions `43127210044` SUCCESS. Entorno producción en los tres Workers. Documentos: recepción, UI, sesión, pricing, pedido, TUS, R2, R2 staging, R2 upload, paquete y acceso staff habilitados (GO). Central/pagos: MP, pedido, postpago, TUS, paquete y bridge habilitados (GO); **CENTRAL_LIVE_R2_GATE, CENTRAL_LIVE_R2_QUOTA_GATE y CENTRAL_LIVE_R2_STAGING_GATE = NO_GO**. Inspección R2 personal en Central GO, clave presente, tablas D1 de reserva/pendientes/inspecciones presentes. Página de seguimiento HTTP 200. Auditoría sin escrituras ni cargos.
 
 **Bloqueo específico para cierre comercial universal:** para PDF >40 MiB falta comprobar un acceso autenticado de personal a ficha y original R2 de un pedido acreditado, y que su circuito posterior de producción/paquete sea apto. Un HTTP 401 sin sesión solo valida protección. **No activar** gates de cobro R2 ni afirmar E2E completo hasta tener evidencia, autorización y control de cuotas. No repetir MP/TUS/transferencias ni volver a tocar el diseño para intentar resolver esto.
+
+## Corrección real del puente de inspección R2 — cierre de esta ejecución
+
+**Causa raíz comprobada**: la Central tenía `CENTRAL_LIVE_R2_GATE=NO_GO` y `CENTRAL_LIVE_R2_STAGING_GATE=NO_GO` por seguridad, pero `r2-live-personal-inspection-bridge.mjs`, `r2-live-inspection-finalize.mjs` y el manifiesto exigían erróneamente esas mismas compuertas para **consultar o inspeccionar originales ya pagados**. Además, `CENTRAL_LIVE_BOARD_GATE` estaba ausente y la lista firmada del personal nunca podría consultarse. Se separó el permiso de lectura de operador del permiso de nuevos cobros, sin modificar checkout.
+
+**Otro bloqueo comprobado**: `staff-r2-personal-ui.txt` tenía una línea de JavaScript cortada y 53 líneas duplicadas, invalidando el script de la página privada `/personal/paquete`. Se reparó (commit `9487296`) y se agregó `tests/r2-panel-staff-live-browser.test.mjs` para compilar el script HTML resultante, incluso con el bundle universal generado en el paso de build.
+
+**Pruebas y producción**:
+- GitHub Actions `43128052797`: 23/23 tests R2 PASS; consulta D1 en producción **sin escrituras**: 0 archivos `central_r2_large_pending`, 0 pendientes de inspección.
+- GitHub Actions `43128770503`: QA panel privado con script reparado, SUCCESS.
+- GitHub Actions `43128832129`: construcción completa y despliegue reversible **SUCCESS**, con 23/23 pruebas R2, 124/124 tests de build, 2/2 tests del panel completo; endpoints personal sin autenticación devuelven HTTP 401. Los nuevos cobros R2 y cuota/staging de Central permanecen **NO_GO**.
+- Archivos relevantes: `integraciones/mercadopago/pruebas/r2-live-personal-inspection-bridge.mjs`, `r2-live-inspection-finalize.mjs`, `central-recepcion-live.mjs`, `worker.js`; `integraciones/autocotizador/recepcion/staff-r2-personal-ui.txt` y su pantalla privada.
+
+**Límite de verificación**: no se pudo realizar una descarga autenticada de un R2 **real** en producción, porque la tabla D1 tiene cero originales staged. El deploy y las pruebas de código NO sustituyen esa descarga. Mantener la nueva recepción/pago R2 **NO_GO** hasta un pedido >40 MiB controlado, acreditado y recibido, con verificación de la descarga y preprensa. No inventar un pedido pago, no insertar registros falsos en D1 ni habilitar cobros globales para generar evidencia. La web principal `main` permanece intacta.
