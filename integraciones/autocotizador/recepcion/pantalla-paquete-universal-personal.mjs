@@ -22,6 +22,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 small{color:#586c7d}
 </style></head><body><main>
 <h1 id="numero">Orden de trabajo · verificando…</h1>
+<p><a href="/personal/transferencias" style="color:#0c5688;font-weight:700">Transferencias por verificar</a></p>
 <p id="detalle">Comprobando cantidad de originales y pago conciliado</p>
 <div class="warning"><strong>PREPRENSA PENDIENTE — NO IMPRIMIR.</strong>
 Esta descarga incluye los PDF originales sin modificar y la hoja A4 de instrucciones.
