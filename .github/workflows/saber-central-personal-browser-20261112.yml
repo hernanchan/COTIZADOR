@@ -17,11 +17,13 @@ jobs:
         run: |
           set -euo pipefail
           node --check integraciones/mercadopago/pruebas/central-estado-personal-live.test.mjs
+          node --check integraciones/mercadopago/pruebas/central-agenda-personal-live.mjs
+          node --check integraciones/autocotizador/recepcion/agenda-personal-live-documentos.mjs
           node --check integraciones/mercadopago/pruebas/central-prevision-personal-live.mjs
           node --check integraciones/autocotizador/recepcion/prevision-personal-live-documentos.mjs
           node --check integraciones/autocotizador/recepcion/pagina-central-personal-live.mjs
           node --check integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs
-          node --test integraciones/mercadopago/pruebas/central-estado-personal-live.test.mjs integraciones/mercadopago/pruebas/central-prevision-personal-live.test.mjs integraciones/mercadopago/pruebas/central-live-bridge.test.mjs
+          node --test integraciones/mercadopago/pruebas/central-estado-personal-live.test.mjs integraciones/mercadopago/pruebas/central-prevision-personal-live.test.mjs integraciones/mercadopago/pruebas/central-agenda-personal-live.test.mjs integraciones/mercadopago/pruebas/central-live-bridge.test.mjs
       - name: Chrome real móvil y escritorio con datos simulados, sin API producción
         run: |
           set -euo pipefail
