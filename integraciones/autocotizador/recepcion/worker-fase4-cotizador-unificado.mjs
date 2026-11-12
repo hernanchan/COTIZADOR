@@ -2419,8 +2419,8 @@ export default {
        'X-Robots-Tag':'noindex,nofollow'}});
     }
     if(page==='/personal/api/live-status'||
-       if(page==='/personal/central'||page==='/personal/api/live-board'||
-       if(page==='/personal/paquete'||page==='/personal/transferencias'||
+       page==='/personal/central'||page==='/personal/api/live-board'||
+       page==='/personal/paquete'||page==='/personal/transferencias'||
        page==='/personal/transferencias.js'||
        page==='/personal/api/live-transferencias-pendientes'||
        page==='/personal/api/live-transferencias-aprobar'||
