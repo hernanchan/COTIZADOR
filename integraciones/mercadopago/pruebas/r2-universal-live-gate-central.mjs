@@ -3,6 +3,7 @@
  */
 import {verificarPedidoUniversalCobrable,estadoPagoUniversal}
  from './r2-universal-checkout-central.mjs';
+import {r2GateGeneralOCanary} from './r2-live-canary-order.mjs';
 const G='GO_COMERCIAL_CONFIRMADO',M=1048576;
 const WEB=/^WEB-ENSAYO-[A-F0-9]{32}$/;
 const ID=/^[A-Za-z0-9_-]{1,80}$/;
@@ -14,7 +15,6 @@ export async function autorizarOriginalR2Live(request,env,{readSigned,subtle=cry
   env?.CENTRAL_DB_ENV==='produccion'&&env?.MP_LIVE_GATE===G&&
   env?.CENTRAL_LIVE_BRIDGE_ENABLED===G&&
   env?.CENTRAL_LIVE_POSTPAY_GATE===G&&
-  env?.CENTRAL_LIVE_R2_GATE===G&&
   env?.CENTRAL_LIVE_ORDER_GATE===G&&
   env?.CENTRAL_LIVE_PRICING_GATE===G&&
   env?.CENTRAL_R2_UNIVERSAL_POSTPAY_ENABLED!=='PRIVATE_TEST_ONLY';
@@ -34,6 +34,8 @@ export async function autorizarOriginalR2Live(request,env,{readSigned,subtle=cry
   !Number.isSafeInteger(p.bytes)||p.bytes<=40*M||p.bytes>200*M||
   !Number.isSafeInteger(p.pages)||p.pages<1||p.pages>2000)
   return respond({ok:false,error:'LIVE_R2_FICHA_INVALIDA',uploadAuthorized:false},422);
+ if(!r2GateGeneralOCanary(env,p.orderId,['CENTRAL_LIVE_R2_GATE']))
+  return respond({ok:false,error:'LIVE_R2_ORDEN_NO_HABILITADA',uploadAuthorized:false},503);
  let result,paid,mode,expectedMetrics;
  try{
   const link=await env.DB.prepare(
