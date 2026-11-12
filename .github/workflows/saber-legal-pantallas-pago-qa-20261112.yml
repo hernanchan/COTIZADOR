@@ -41,3 +41,4 @@ jobs:
           echo SABER_LEGAL_WIZARD_BUILD_OK
 # Revalidación: fixture de precios real corregido.
 # Verificación de ficha R2 Legal 48MiB firmada y aceptada en estructura D1.
+# Revalida ficha firmada con snapshot aprobado realista (source y revisión D1).
