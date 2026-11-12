@@ -24,6 +24,8 @@ test('retorno LIVE no acredita pago por argumentos de Mercado Pago',async()=>{
  assert.match(html,/action:'status'/);
  assert.match(html,/credentials:'same-origin'/);
  assert.match(html,/uploadAuthorized===true/);
+ assert.match(html,/response.status===401/);
+ assert.match(html,/location.replace\('\/pedido\/continuar'\)/);
  assert.doesNotMatch(html,/\b123\b|\b777\b/);
  assert.equal(r.headers.get('Cache-Control'),'no-store, private');
  assert.match(r.headers.get('Content-Security-Policy'),/connect-src 'self'/);
