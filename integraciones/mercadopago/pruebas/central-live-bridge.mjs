@@ -25,6 +25,7 @@ const routeSchema=new Map([
  ['/internal/central/live/r2-inspection-source','saber-central-r2-inspection-source-v1'],
  ['/internal/central/live/r2-inspection-confirm','saber-central-r2-inspection-confirm-v1'],
  ['/internal/central/live/r2-staff-board','saber-central-r2-live-staff-board-v1'],
+ ['/internal/central/live/staff-status','saber-central-live-staff-status-v1'],
  ['/internal/central/live/package-manifest','saber-central-r2-universal-package-manifest-v1'],
  ['/internal/central/live/package-file','saber-central-r2-universal-package-file-v1']
 ]);
@@ -64,6 +65,7 @@ export async function leerFirmaInternaLive(request,env,{
  const r2Stage=url.pathname==='/internal/central/live/r2-stage';
  const r2Recover=url.pathname==='/internal/central/live/r2-recover';
  const boardRoute=url.pathname==='/internal/central/live/r2-staff-board';
+ const staffStatus=url.pathname==='/internal/central/live/staff-status';
  const bankStaffPending=url.pathname==='/internal/central/live/transfer-staff-pending';
  const bankStaffApprove=url.pathname==='/internal/central/live/transfer-staff-approve';
  const inspectionSource=url.pathname==='/internal/central/live/r2-inspection-source';
@@ -81,6 +83,7 @@ export async function leerFirmaInternaLive(request,env,{
  const keys=bankStaffPending?'purpose,schema':
   bankStaffApprove?'amount_ars,bank_reference,confirmed,operator,order_id,schema':
   boardRoute?'purpose,schema':
+  staffStatus?'confirmed,from,operator,orderId,reason,schema,to,version':
   inspectionConfirm?'confirmed,fileId,measuredDimensions,operator,schema,webOrderId':
   inspectionSource?'fileId,schema,webOrderId':
   packageManifest?'schema,webOrderId':
@@ -108,6 +111,12 @@ export async function leerFirmaInternaLive(request,env,{
       typeof payload.bank_reference!=='string'||
       payload.bank_reference.trim().length<6||payload.bank_reference.trim().length>80):
      boardRoute?payload.purpose!=='listar-pedidos-entrantes':
+     staffStatus?(!UUID.test(payload.orderId||'')||payload.confirmed!==true||
+       !['pendiente','en_preparacion','en_espera','listo','entregado'].includes(payload.from)||
+       !['pendiente','en_preparacion','en_espera','listo','entregado'].includes(payload.to)||
+       !Number.isSafeInteger(payload.version)||payload.version<0||payload.version>1000||
+       typeof payload.operator!=='string'||payload.operator.trim().length<2||payload.operator.trim().length>60||
+       typeof payload.reason!=='string'||payload.reason.length>180):
      inspectionConfirm?(!WEB.test(payload.webOrderId||'')||
        !/^[A-Za-z0-9_-]{1,80}$/.test(payload.fileId||'')||
        payload.confirmed!==true||typeof payload.operator!=='string'||
@@ -196,7 +205,7 @@ export async function leerFirmaInternaLive(request,env,{
        payload.direccion.trim().length>180||/[<>]/.test(payload.direccion)||
        payload.nombre===undefined)):
       !UUID.test(payload.commercialOrderId||''))||
-    (!pricingRoute&&!sellerDiag&&!boardRoute&&!bankStaffPending&&!bankStaffApprove&&!tusGate&&!tusReceipt&&!r2Gate&&!r2Reserve&&!r2Stage&&!r2Recover&&!WEB.test(payload.webOrderId||'')))
+    (!pricingRoute&&!sellerDiag&&!boardRoute&&!staffStatus&&!bankStaffPending&&!bankStaffApprove&&!tusGate&&!tusReceipt&&!r2Gate&&!r2Reserve&&!r2Stage&&!r2Recover&&!WEB.test(payload.webOrderId||'')))
    return {error:'Orden LIVE inválida',status:422};
  const key=await subtle.importKey('raw',new TextEncoder().encode(env.CENTRAL_BRIDGE_KEY),
   {name:'HMAC',hash:'SHA-256'},false,['verify']);
