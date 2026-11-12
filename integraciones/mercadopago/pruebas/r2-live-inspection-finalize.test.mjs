@@ -147,3 +147,27 @@ test('GET manifiesto cierra por identidad, pago pendiente y sesión operador',as
  assert.equal((await manifiestoInspeccionR2Live(
   new Request(endpoint+'&fileId=pdf_1'),f.env,f.opts)).status,422);
 });
+
+test('inspección de PDF ya pagado funciona con checkout y staging R2 nuevos NO_GO',async()=>{
+ const f=fixture();
+ const e={...f.env,CENTRAL_LIVE_R2_GATE:'NO_GO',
+  CENTRAL_LIVE_R2_STAGING_GATE:'NO_GO',CENTRAL_LIVE_R2_QUOTA_GATE:'NO_GO'};
+ const r=await finalizarInspeccionR2Live(request(),e,f.opts);
+ assert.equal(r.status,201,JSON.stringify(await r.clone().json()));
+ assert.equal((await r.json()).productionAuthorized,false);
+ assert.equal(f.batches.length,1,'Solo guarda inspección pagada; jamás genera pago');
+});
+test('manifiesto de sólo lectura no necesita habilitar cobros R2',async()=>{
+ const f=fixture();
+ const e={...f.env,CENTRAL_LIVE_R2_GATE:'NO_GO',
+  CENTRAL_LIVE_R2_STAGING_GATE:'NO_GO',CENTRAL_LIVE_R2_QUOTA_GATE:'NO_GO'};
+ const url='https://pagos.libreriasaber.com.ar/admin/api/central/live-r2-manifest'+
+  '?webOrderId='+web+'&fileId='+file;
+ const r=await manifiestoInspeccionR2Live(new Request(url),e,f.opts);
+ assert.equal(r.status,200,JSON.stringify(await r.clone().json()));
+ assert.equal((await r.json()).downloadAuthorized,false);
+ assert.equal(f.batches.length,0,'Lectura sin escrituras D1');
+ e.CENTRAL_LIVE_R2_INSPECTION_GATE='NO_GO';
+ const blocked=await manifiestoInspeccionR2Live(new Request(url),e,f.opts);
+ assert.equal(blocked.status,503);
+});
