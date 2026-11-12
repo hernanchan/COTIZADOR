@@ -35,6 +35,34 @@ const board=document.getElementById('tablero'),info=document.getElementById('est
 const short=x=>String(x||'').trim(),price=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(n);
 const element=(tag,text)=>{const x=document.createElement(tag);if(text!==undefined)x.textContent=text;return x;};
 let working=false;
+async function changeState(order,next,btn){
+ const operator=window.prompt('Nombre de quien realiza el cambio de estado:');
+ if(operator===null)return;
+ if(operator.trim().length<2){window.alert('Ingresá el responsable.');return;}
+ let reason='';
+ if(next==='en_espera'){
+  const r=window.prompt('Motivo de la espera (mínimo cinco caracteres):');
+  if(r===null)return;reason=r.trim();
+  if(reason.length<5){window.alert('Falta el motivo.');return;}
+ }
+ const message=next==='en_preparacion'?
+  '¿Revisaste los PDF originales, medidas e instrucciones y confirmás INICIAR la producción?':
+  next==='listo'?'¿Confirmás que la orden está LISTA para retirar?':
+  '¿Confirmás que querés pausar este trabajo?';
+ if(!window.confirm(message))return;
+ btn.disabled=true;
+ try{
+  const res=await fetch('/personal/api/live-status',{
+   method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({orderId:order.orderId,from:order.productionState||'pendiente',
+    to:next,version:order.productionVersion||0,operator:operator.trim(),reason,confirmed:true})
+  });
+  const data=await res.json().catch(()=>null);
+  if(!res.ok||data?.ok!==true)throw Error(data?.error||('HTTP '+res.status));
+  await refresh();
+ }catch(e){window.alert('No se cambió el estado: '+String(e.message||e));}
+ finally{btn.disabled=false;}
+}
 async function refresh(){
  if(working)return;working=true;info.textContent='Actualizando pedidos pagados…';
  try{
@@ -71,6 +99,22 @@ async function refresh(){
      link.href='/personal/paquete?webOrderId='+encodeURIComponent(o.webOrderId);
      link.target='_blank';link.rel='noopener noreferrer';tools.append(link);
     }
+    if(state==='pendiente'&&o.pendingCount===0){
+     const start=element('button','Iniciar preparación');
+     start.addEventListener('click',()=>void changeState(o,'en_preparacion',start));
+     tools.append(start);
+    }
+    if(state==='en_preparacion'){
+     const ready=element('button','Marcar listo');
+     ready.addEventListener('click',()=>void changeState(o,'listo',ready));tools.append(ready);
+     const hold=element('button','En espera');
+     hold.addEventListener('click',()=>void changeState(o,'en_espera',hold));tools.append(hold);
+    }
+    if(state==='en_espera'){
+     const resume=element('button','Retomar preparación');
+     resume.addEventListener('click',()=>void changeState(o,'en_preparacion',resume));tools.append(resume);
+    }
+    if(state==='listo')card.append(element('small','Entrega: pendiente de habilitar eliminación segura de originales; no borrar ni cerrar todavía.'));
     card.append(tools);lane.append(card);total++;
    }
    board.append(lane);
