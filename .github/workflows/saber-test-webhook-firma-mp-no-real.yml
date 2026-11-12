@@ -1,0 +1,55 @@
+name: Saber - webhook LIVE debe rechazar firma inventada con 401
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-test-webhook-firma-mp-no-real.yml]
+permissions: {contents: write}
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: true}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: POST con id ficticio y firma invalida sin pagos ni escrituras
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'EOF'
+          import {mkdir,writeFile} from 'node:fs/promises';
+          const fakeId='9999999999999999999';
+          const result={schema:'saber-webhook-firma-probe-v1',
+            checkedAt:new Date().toISOString(),fictitiousPayment:true,mode:'NO_SIDE_EFFECTS'};
+          try{
+           const u=new URL('https://pagos.libreriasaber.com.ar/webhooks/mercadopago-live');
+           u.searchParams.set('type','payment');u.searchParams.set('data.id',fakeId);
+           const r=await fetch(u,{method:'POST',redirect:'manual',headers:{
+             'Content-Type':'application/json',
+             'x-request-id':'00000000-0000-4000-8000-000000000000',
+             'x-signature':'ts=1,v1='+'0'.repeat(64)},
+             body:JSON.stringify({type:'payment',data:{id:fakeId}}),
+             signal:AbortSignal.timeout(15000)});
+           const j=await r.json().catch(()=>({}));
+           result.httpStatus=r.status;
+           result.errorCode=typeof j.error==='string'?j.error.slice(0,60):null;
+           result.rejectsFakeSignature=r.status===401;
+          }catch(e){result.error=String(e.message||e).slice(0,70)}
+          await mkdir('docs',{recursive:true});
+          await writeFile('docs/INCIDENCIA-MP-WEBHOOK-FIRMA-INVALIDA.json',JSON.stringify(result,null,2)+'\n');
+          console.log('SABER_MP_WEBHOOK_PROBE='+JSON.stringify(result));
+          EOF
+      - name: Guardar verificacion no sensible
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/INCIDENCIA-MP-WEBHOOK-FIRMA-INVALIDA.json || exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/INCIDENCIA-MP-WEBHOOK-FIRMA-INVALIDA.json
+          if ! git diff --cached --quiet;then
+            git commit -m "ops: estado de rechazo de firma webhook LIVE"
+            git push origin HEAD:integracion/tus-pedido-privado-20261101
+          fi
