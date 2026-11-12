@@ -43,3 +43,4 @@ jobs:
         run: |
           set -euo pipefail
           bash integraciones/publicacion/desplegar-transferencias-personal-live-20261112.sh
+# Esperar propagación de Docs a URL pública antes de verificar las rutas privadas.
