@@ -14,9 +14,13 @@ const offer=readFileSync(join(root,'ofertas.html'),'utf8');
 const redirect=readFileSync(join(root,'cotizar.html'),'utf8');
 const portal=JSON.parse(readFileSync(join(root,'portal-comercial.json'),'utf8'));
 assert.equal(portal.schema,'saber-portal-comercial-v1');
-assert.equal(portal.enabled,true);
-assert.equal(portal.release,'GO_COMERCIAL_CONFIRMADO');
-assert.equal(portal.buyerUrl,'https://pedidos.libreriasaber.com.ar/cotizar');
+// La rama y Pages main quedan en NO_GO. Ensayamos el contrato de lanzamiento
+// en memoria: no modificar el portal real para probar su futura redirección.
+assert.equal(portal.enabled,false);
+assert.equal(portal.release,'NO_GO');
+assert.equal(portal.buyerUrl,null);
+const portalLive={schema:portal.schema,enabled:true,
+ release:'GO_COMERCIAL_CONFIRMADO',buyerUrl:'https://pedidos.libreriasaber.com.ar/cotizar'};
 assert.ok(html.includes('href="cotizar.html"'));
 assert.match(redirect,/target\.hostname!=='pedidos\.libreriasaber\.com\.ar'/);
 assert.match(redirect,/fetch\('portal-comercial\.json'/);
@@ -75,7 +79,7 @@ try{
  const context=await browser.newContext();
  await context.route('https://libreriasaber.com.ar/**',r=>{
   const p=new URL(r.request().url()).pathname;
-  const body=p==='/cotizar.html'?redirect:p==='/portal-comercial.json'?JSON.stringify(portal):'';
+  const body=p==='/cotizar.html'?redirect:p==='/portal-comercial.json'?JSON.stringify(portalLive):'';
   r.fulfill({status:body?200:404,contentType:p.endsWith('.json')?'application/json':'text/html',
    headers:{'Access-Control-Allow-Origin':'*'},body});
  });
