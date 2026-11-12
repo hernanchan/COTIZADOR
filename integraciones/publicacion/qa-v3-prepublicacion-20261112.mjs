@@ -76,9 +76,13 @@ try{
   await page.locator('.product-actions .add').first().waitFor({state:'visible',timeout:18000});
   const photoBefore=await page.locator('.product img').count();
   assert.ok(photoBefore>0,'No hay ninguna foto de artículo del catálogo');
+  // Las fotos que todavía no entraron en pantalla usan loading=lazy.
+  // Forzar su solicitud en QA evita contar como "rota" una imagen aún diferida.
+  await page.locator('.product img').evaluateAll(images=>
+   images.forEach(img=>{img.loading='eager'}));
   await page.waitForFunction(()=>{
    const images=[...document.querySelectorAll('.product img')];
-   return images.length>0&&images.every(img=>img.complete);
+   return images.length>0&&images.every(img=>img.complete&&img.naturalWidth>0);
   },null,{timeout:15000}).catch(()=>{});
   const imageResults=await page.locator('.product img').evaluateAll(images=>
    images.map(img=>({ok:img.complete&&img.naturalWidth>0,
