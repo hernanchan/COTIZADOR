@@ -1,0 +1,37 @@
+name: Saber LIVE - reingreso seguro y recuperación de orden sin duplicar pagos
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-live-session-recovery-qa-20261112.yml]
+permissions: {contents: read}
+jobs:
+  test-session:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verificar firma, Turnstile, 2 referencias D1 y rechazo de sesión vencida
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check integraciones/autocotizador/recepcion/revincular-orden-live.mjs
+          node --check integraciones/autocotizador/recepcion/pagina-continuar-pago-live.mjs
+          node --test \
+            integraciones/autocotizador/recepcion/revincular-orden-live.test.mjs \
+            integraciones/autocotizador/recepcion/sesion-comprador-live.test.mjs \
+            integraciones/autocotizador/recepcion/pagina-continuar-pago-live.test.mjs \
+            integraciones/autocotizador/recepcion/pagina-retorno-live.test.mjs \
+            integraciones/autocotizador/recepcion/recepcion-r2-live-cliente.test.mjs \
+            integraciones/autocotizador/recepcion/checkout-live-cliente.test.mjs
+          echo SABER_LIVE_SESSION_RENEWAL_SECURITY_PASS_NO_PAYMENT
+      - name: Compilar Worker de documentos con nueva ruta de revinculación
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd integraciones/autocotizador/recepcion && npm install --no-fund --no-audit && npm run build:unificado)
+          node --check integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
+          grep -q '/api/pedido/live/revincular' integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
+          echo SABER_LIVE_SESSION_RENEWAL_BUILD_OK
