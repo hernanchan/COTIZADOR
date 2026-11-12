@@ -21,7 +21,7 @@ export function normalizeCentralCalendar(weekly,closedDates){
   if(slots.length>4)return null;
   let last=0;const canonical=[];
   for(const text of slots){
-   const m=text.trim().match(/^([01]\\d|2[0-3]):([0-5]\\d)-([01]\\d|2[0-3]|24):([0-5]\\d)$/);
+   const m=text.trim().match(/^([01]\d|2[0-3]):([0-5]\d)-([01]\d|2[0-3]|24):([0-5]\d)$/);
    if(!m||(m[3]==='24'&&m[4]!=='00'))return null;
    const from=Number(m[1])*60+Number(m[2]),to=Number(m[3])*60+Number(m[4]);
    if(from>=to||to-from<15||from<last||to>1440)return null;
@@ -32,7 +32,7 @@ export function normalizeCentralCalendar(weekly,closedDates){
   normalized[day]=canonical.join(',');
  }
  if(closedDates.some(date=>{
-   if(typeof date!=='string'||!/^(20\\d\\d|2100)-\\d{2}-\\d{2}$/.test(date))return true;
+   if(typeof date!=='string'||!/^(20\d\d|2100)-\d{2}-\d{2}$/.test(date))return true;
    const d=new Date(date+'T00:00:00Z');
    return !Number.isFinite(d.getTime())||d.toISOString().slice(0,10)!==date;
  })||new Set(closedDates).size!==closedDates.length)return null;
