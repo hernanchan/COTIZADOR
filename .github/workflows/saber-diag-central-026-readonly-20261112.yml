@@ -1,0 +1,48 @@
+name: Saber - diagnostico exacto Nuevos orden 026 solo lectura
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-diag-central-026-readonly-20261112.yml]
+permissions: {contents: read}
+jobs:
+  diagnosticar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      DEMO_ADMIN_KEY: ${{ secrets.DEMO_ADMIN_KEY }}
+    steps:
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verificar estado de 026 sin escribir en Central ni divulgar datos de clientes
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const id='e552cf32-356d-40e3-9736-6fbb8fef5dca';
+          const url='https://saber-pagos-pruebas.libreriasaber.workers.dev';
+          assert.ok(process.env.DEMO_ADMIN_KEY?.length>0);
+          const response=await fetch(url+'/admin/api/orders',{
+           headers:{Authorization:'Bearer '+process.env.DEMO_ADMIN_KEY},
+           signal:AbortSignal.timeout(25000)});
+          const data=await response.json().catch(()=>null);
+          assert.equal(response.status,200,'CENTRAL_LIST_HTTP_'+response.status);
+          assert.ok(Array.isArray(data?.orders));
+          const matches=data.orders.filter(o=>o.id===id);
+          const o=matches[0]||{};
+          const result={
+           pedidos_026_en_tablero:matches.length,
+           pagado:o.status==='paid',
+           numero:o.work_number===26,
+           estado_prod:o.production_state??null,
+           total_archivos:o.file_count??null,
+           universal_pending:o.universal_pdf_pending??null,
+           universal_approved:o.universal_pdf_approved??null,
+           universal_pending_count:o.universal_pdf_pending_count??null,
+           universal_review_unavailable:data.universalReviewUnavailable??null,
+           r2_review_unavailable:data.r2ReviewUnavailable??null
+          };
+          console.log('SABER_CENTRAL_026_DIAG='+JSON.stringify(result));
+          console.log('SABER_CENTRAL_026_READONLY_NO_NEW_ORDER_NO_CHARGE');
+          NODE
