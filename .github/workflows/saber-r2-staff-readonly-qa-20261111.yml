@@ -1,0 +1,60 @@
+name: Saber R2 - QA inspección staff sin nuevos pagos ni escrituras
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-r2-staff-readonly-qa-20261111.yml]
+permissions: {contents: read}
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      D1_TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Validar inspección staff pagada y bloqueos R2
+        run: |
+          set -euo pipefail
+          node --test \
+            integraciones/mercadopago/pruebas/r2-live-inspection-finalize.test.mjs \
+            integraciones/mercadopago/pruebas/central-recepcion-live.test.mjs \
+            integraciones/autocotizador/recepcion/r2-inspeccion-personal-live.test.mjs
+          echo STAFF_R2_UNIT_AND_AUTHORIZATION_PASS
+      - name: Consultar conteos D1 de originales staged, sin datos identificables
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const account=process.env.CF_ACCOUNT,token=process.env.D1_TOKEN;
+          assert.match(account||'',/^[a-f0-9]{32}$/i);
+          assert.ok(token&&token.length>12);
+          const base='https://api.cloudflare.com/client/v4/accounts/'+account;
+          async function cf(path,options={}){
+           const r=await fetch(base+path,{...options,headers:{
+             Authorization:'Bearer '+token,...(options.headers||{})
+           },signal:AbortSignal.timeout(20000)});
+           const j=await r.json();
+           assert.ok(r.ok&&j.success,'D1_READONLY_DENIED_'+r.status);
+           return j.result;
+          }
+          const dbs=await cf('/d1/database');
+          const id=dbs.find(v=>v.name==='saber-pagos-produccion')?.uuid;
+          assert.ok(id,'D1_PRODUCCION_INEXISTENTE');
+          const sql="SELECT COUNT(*) AS total, "+
+            "SUM(CASE WHEN status='awaiting_pdf_analysis' THEN 1 ELSE 0 END) AS pendientes "+
+            "FROM central_r2_large_pending";
+          assert.match(sql,/^SELECT /);
+          const result=await cf('/d1/database/'+id+'/query',{method:'POST',
+           headers:{'Content-Type':'application/json'},body:JSON.stringify({sql})});
+          assert.ok(result?.[0]?.success);
+          const counts=result[0].results?.[0];
+          assert.ok(Number.isSafeInteger(counts?.total));
+          console.log('STAFF_R2_D1_STAGED_TOTAL='+counts.total);
+          console.log('STAFF_R2_D1_PENDING_INSPECTION='+Number(counts.pendientes||0));
+          console.log('STAFF_R2_D1_READONLY_NO_ORDERS_NO_PAYMENTS_NO_WRITES');
+          NODE
