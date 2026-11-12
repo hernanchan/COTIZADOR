@@ -128,6 +128,7 @@ const formatoOriginal=paginas=>{
  const v=paginas.map(p=>{const a=Math.min(p.anchoCm,p.altoCm),b=Math.max(p.anchoCm,p.altoCm);
   return Math.abs(a-14.8)<0.2&&Math.abs(b-21)<0.2?'a5':
    Math.abs(a-21)<0.2&&Math.abs(b-29.7)<0.2?'a4':
+   Math.abs(a-21.59)<=0.25&&Math.abs(b-35.56)<=0.25?'legal':
    Math.abs(a-29.7)<0.2&&Math.abs(b-42)<0.2?'a3':null});
  const exacto=v.every(x=>x===v[0])?v[0]:null;
  return exacto||(paginas.every(p=>Math.min(p.anchoCm,p.altoCm)<=21.1&&
@@ -222,6 +223,7 @@ function grupoVisible(e){
   if(formato==='personalizado_a4')return {id:'personalizado_a4',titulo:'Tamaño original menor que A4 · tarifa A4'};
   if(formato==='a5')return {id:'a5',titulo:'Documentos A5 (tarifa A4)'};
   if(formato==='a4')return {id:'a4',titulo:'Documentos A4'};
+  if(formato==='legal')return {id:'legal',titulo:'Documentos Legal originales (obra 70 g · tarifa A4)'};
   if(formato==='a3')return {id:'a3',titulo:'Documentos A3'};
   return {id:'pendientes',titulo:'Archivos por revisar'};
  }
@@ -989,7 +991,7 @@ if((location.pathname==='/prueba-v2/carga-inteligente'||UNIVERSAL_COMPRADOR_LIVE
        elegidas.length!==plan.paginasElegidas.length||
        elegidas.some((pagina,k)=>pagina.numero!==plan.paginasElegidas[k]))
      throw Error('La selección de páginas no coincide con el presupuesto.');
-    if(!['personalizado_a4','a5','a4','a3'].includes(plan.formatoFinal)||
+    if(!['personalizado_a4','a5','a4','legal','a3'].includes(plan.formatoFinal)||
        !['bn','color'].includes(e.modo)||!['simple','double'].includes(e.caras)||
        !Number.isSafeInteger(e.copias)||e.copias<1||e.copias>200)
      throw Error('Formato, copias o impresión no admitidos por la recepción privada.');
