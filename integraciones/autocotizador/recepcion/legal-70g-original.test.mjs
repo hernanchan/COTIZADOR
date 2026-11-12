@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+import {fichaPrearchivoUniversal} from './ficha-prearchivo-universal.mjs';
+import {verificarFichaUniversal} from '../../mercadopago/pruebas/r2-lote-universal-central.mjs';
 import {cotizarCargaUnica} from './cotizar-carga-unica.mjs';
 import {cotizarDocumentosIndividuales} from '../pruebas/cotizar-documentos-individuales.mjs';
 const precios=JSON.parse(readFileSync(new URL('../../../precios-web.json',import.meta.url),'utf8'));
@@ -56,4 +59,22 @@ test('no confundir Legal original con ploteo, A3 ni tamaño grande arbitrario',(
  const other=quote(file(21.59,37.2));
  assert.equal(other.estado,'INCOMPLETO');
  assert.equal(other.total,null);
+});
+test('D1 acepta ficha Legal original de 48MiB firmada con precio A4 obra70',async()=>{
+ const webOrderId='WEB-ENSAYO-'+'A'.repeat(32);
+ const archivo=file(21.59,35.56,'color','obra70');
+ const sha256='b'.repeat(64);
+ const manifiestos=[{fileId:'pdf_0_abcdef1234',nombre:archivo.nombre,bytes:49823112,sha256}];
+ const tarifario={prices:{...precios,priceVersion:'d1-approved-revision-3'},
+  promotions:{codes:[]}};
+ const ficha=fichaPrearchivoUniversal({webOrderId,archivos:[archivo],
+  manifiestos,tarifario,produccion:true,ahora:Date.UTC(2026,10,12,12)});
+ assert.equal(ficha.archivos[0].formatoFinal,'legal');
+ assert.equal(ficha.archivos[0].transporte,'r2');
+ assert.equal(ficha.archivos[0].configuracion.seleccion,'original');
+ assert.equal(ficha.archivos[0].importeArs,quote(archivo).total);
+ const quoteHash=createHash('sha256').update(JSON.stringify(ficha)).digest('hex');
+ const received=await verificarFichaUniversal({...ficha,quoteHash});
+ assert.equal(received.totalArs,ficha.totalArs);
+ assert.equal(received.archivos[0].formatoFinal,'legal');
 });
