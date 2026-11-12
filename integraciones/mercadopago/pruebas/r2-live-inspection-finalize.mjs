@@ -192,7 +192,8 @@ export async function manifiestoInspeccionR2Live(req,env,{
  if(!authorized)return respond({ok:false,error:'LIVE_R2_MANIFEST_OPERADOR'},401);
  if(env?.SABER_ENTORNO!=='produccion'||env?.CENTRAL_DB_ENV!=='produccion'||
   env?.MP_LIVE_GATE!==GO||env?.CENTRAL_LIVE_POSTPAY_GATE!==GO||
-  env?.CENTRAL_LIVE_R2_GATE!==GO||env?.CENTRAL_LIVE_R2_STAGING_GATE!==GO||
+  // Manifiesto de sólo lectura para personal. Exige pedido/pago D1
+  // verificados y gate de inspección, NO activa checkout ni staging R2.
   env?.CENTRAL_LIVE_R2_INSPECTION_GATE!==GO||!env?.DB?.prepare)
   return respond({ok:false,error:'LIVE_R2_MANIFEST_OFF'},503);
  if([...u.searchParams.keys()].sort().join(',')!=='fileId,webOrderId')
