@@ -113,3 +113,4 @@ jobs:
             '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/saber-result-status.json
           gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --input /tmp/saber-result-status.json >/dev/null
 # cierre 2026-11-10: revalidar sin modificar comercio ni producción
+# Control 12/11: Pages preview y dominio tras QA de fotos, sin publicar main.
