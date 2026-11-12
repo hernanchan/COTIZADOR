@@ -3,6 +3,7 @@
  */
 import {verificarPedidoUniversalCobrable,estadoPagoUniversal}
  from './r2-universal-checkout-central.mjs';
+import {r2GateGeneralOCanary} from './r2-live-canary-order.mjs';
 const GO='GO_COMERCIAL_CONFIRMADO',MIB=1048576;
 const reply=(x,status=200)=>Response.json(x,{status,headers:{
  'Cache-Control':'no-store,private','X-Content-Type-Options':'nosniff'}});
@@ -11,7 +12,7 @@ export async function consultarRecuperacionR2Live(request,env,{
 }={}){
  if(env?.SABER_ENTORNO!=='produccion'||env?.CENTRAL_DB_ENV!=='produccion'||
   env?.MP_LIVE_GATE!==GO||env?.CENTRAL_LIVE_BRIDGE_ENABLED!==GO||
-  env?.CENTRAL_LIVE_R2_GATE!==GO||env?.CENTRAL_LIVE_POSTPAY_GATE!==GO||
+  env?.CENTRAL_LIVE_POSTPAY_GATE!==GO||
   env?.CENTRAL_LIVE_ORDER_GATE!==GO||typeof env?.DB?.prepare!=='function')
   return reply({ok:false,error:'LIVE_R2_RECOVERY_OFF'},503);
  if(typeof readSigned!=='function')return reply({ok:false,error:'LIVE_R2_RECOVERY_HMAC_OFF'},503);
@@ -29,6 +30,8 @@ export async function consultarRecuperacionR2Live(request,env,{
   !Number.isSafeInteger(p.bytes)||p.bytes<=40*MIB||p.bytes>200*MIB||
   !Number.isSafeInteger(p.pages)||p.pages<1||p.pages>2000)
   return reply({ok:false,error:'LIVE_R2_RECOVERY_FICHA'},422);
+ if(!r2GateGeneralOCanary(env,p.orderId,['CENTRAL_LIVE_R2_GATE']))
+  return reply({ok:false,error:'LIVE_R2_RECOVERY_ORDEN_NO_HABILITADA'},503);
  try{
   const db=env.DB;
   const link=await db.prepare(
