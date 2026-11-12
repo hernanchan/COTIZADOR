@@ -9,18 +9,18 @@ const reply=(x,status=200)=>Response.json(x,{status,headers:{
  'X-Robots-Tag':'noindex,nofollow','Referrer-Policy':'no-referrer'
 }});
 const hex=a=>Array.from(a,b=>b.toString(16).padStart(2,'0')).join('');
-const enabled=env=>env?.SABER_ENTORNO==='produccion'&&
+const enabled=(env,service)=>env?.SABER_ENTORNO==='produccion'&&
  env?.CENTRAL_DB_ENV==='produccion'&&env?.DOCS_LIVE_TRANSFER_GATE===GO&&
  env?.DOCS_LIVE_STAFF_GATE===GO&&env?.DOCS_MP_LIVE_GATE===GO&&
  env?.DOCS_LIVE_PACKAGE_GATE===GO&&
  typeof env?.CENTRAL_BRIDGE_KEY==='string'&&env.CENTRAL_BRIDGE_KEY.length>=32&&
- typeof env?.SABER_CENTRAL?.fetch==='function';
+ typeof service?.fetch==='function';
 export async function transferenciasPersonalLive(request,env,{
  authorized=false,service=env?.SABER_CENTRAL,
  now=()=>Math.floor(Date.now()/1000),nonce=()=>crypto.randomUUID(),subtle=crypto.subtle
 }={}){
  if(!authorized)return reply({ok:false,error:'TRANSFER_STAFF_NO_AUTORIZADO'},401);
- if(!enabled(env))return reply({ok:false,error:'TRANSFER_STAFF_NO_HABILITADO'},503);
+ if(!enabled(env,service))return reply({ok:false,error:'TRANSFER_STAFF_NO_HABILITADO'},503);
  const url=new URL(request.url);
  const pending=url.pathname==='/personal/api/live-transferencias-pendientes',
   approve=url.pathname==='/personal/api/live-transferencias-aprobar';
