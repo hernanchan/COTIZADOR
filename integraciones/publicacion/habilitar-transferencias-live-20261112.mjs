@@ -135,7 +135,11 @@ try{
  await verify(docsWorker,docsPatch,GO,beforeDocs);
  const unauth=await fetch('https://pagos.libreriasaber.com.ar/admin/api/central/live-transfers/pending',
   {redirect:'manual',signal:AbortSignal.timeout(15000)});
- assert.equal(unauth.status,401,'STAFF_BANK_PENDING_MUST_REQUIRE_LOGIN');
+ // La Central es sólo service binding: su URL pública DEBE ser 404.
+ assert.equal(unauth.status,404,'CENTRAL_BANK_MUST_NOT_HAVE_PUBLIC_ROUTE');
+ const staffUnauth=await fetch('https://pedidos.libreriasaber.com.ar/personal/api/live-transferencias-pendientes',{
+  redirect:'manual',signal:AbortSignal.timeout(15000)});
+ assert.equal(staffUnauth.status,401,'STAFF_BANK_PENDING_MUST_REQUIRE_LOGIN');
  const docUnauth=await fetch('https://pedidos.libreriasaber.com.ar/api/pedido/live/transfer',
   {redirect:'manual',signal:AbortSignal.timeout(15000)});
  assert.equal(docUnauth.status,401,'BUYER_TRANSFER_MUST_REQUIRE_VALID_ORDER_SESSION');
