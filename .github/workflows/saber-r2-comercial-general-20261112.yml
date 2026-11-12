@@ -1,0 +1,39 @@
+name: Saber R2 - habilitar cobro y recepción general 40-200 MiB con rollback
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths:
+      - docs/R2-COMERCIAL-GENERAL.trigger
+      - .github/workflows/saber-r2-comercial-general-20261112.yml
+permissions: {contents: read}
+concurrency: {group: saber-r2-comercial-general-live, cancel-in-progress: false}
+jobs:
+  habilitar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      CF_DEPLOY: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+      CF_DB: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verificar gates, bucket privado, pagos, D1, cuota e inspección R2
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check integraciones/publicacion/habilitar-r2-comercial-general-20261112.mjs
+          node --test \
+            integraciones/mercadopago/pruebas/r2-live-canary-order.test.mjs \
+            integraciones/mercadopago/pruebas/mercadopago-live-central.test.mjs \
+            integraciones/mercadopago/pruebas/transferencias-live-central.test.mjs \
+            integraciones/mercadopago/pruebas/r2-universal-live-gate-central.test.mjs \
+            integraciones/mercadopago/pruebas/r2-universal-live-reserve-central.test.mjs \
+            integraciones/mercadopago/pruebas/r2-live-inspection-finalize.test.mjs \
+            integraciones/autocotizador/recepcion/r2-live-multipart-documentos.test.mjs \
+            integraciones/autocotizador/recepcion/recepcion-r2-live-cliente.test.mjs
+          node integraciones/publicacion/habilitar-r2-comercial-general-20261112.mjs
+          echo R2_LIVE_GENERAL_PIPELINE_COMPLETE_NO_ACTUAL_CHARGE
