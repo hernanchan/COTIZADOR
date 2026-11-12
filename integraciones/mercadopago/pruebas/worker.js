@@ -4890,6 +4890,11 @@ export default {
     new Request('https://pagos.libreriasaber.com.ar/admin/api/central/live-recepcion'),
     env,{authorized:true,r2StaffOnly:true,staffAll:true});
   }
+  if(url.pathname==='/internal/central/live/staff-forecast'){
+   const {previsionCentralPersonalLive}=await import('./central-prevision-personal-live.mjs');
+   const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
+   return previsionCentralPersonalLive(req,env,{readSigned:leerFirmaInternaLive});
+  }
   if(url.pathname==='/internal/central/live/staff-status'){
    const {cambiarEstadoCentralPersonalLive}=await import('./central-estado-personal-live.mjs');
    const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
