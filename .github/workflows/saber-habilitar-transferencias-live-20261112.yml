@@ -35,3 +35,4 @@ jobs:
           set -euo pipefail
           node integraciones/publicacion/habilitar-transferencias-live-20261112.mjs
           echo SABER_TRANSFER_LIVE_ENABLE_COMPLETE_NO_CHARGE
+# Central interna 404 pública, acceso staff por pedidos protegido 401.
