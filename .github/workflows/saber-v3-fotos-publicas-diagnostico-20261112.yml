@@ -1,0 +1,69 @@
+name: Saber V3 - diagnóstico HTTP fotos públicas Google Sheets
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-v3-fotos-publicas-diagnostico-20261112.yml]
+permissions: {contents: read}
+jobs:
+  fotos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Medir acceso público por producto sin descargar fotos ni cambiar permisos
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import {readFileSync} from 'node:fs';
+          const html=readFileSync('vidriera/index.html','utf8');
+          const url=(html.match(/const productsCsvUrl='([^']+)'/)||[])[1];
+          if(!url)throw Error('CSV_URL_MISSING');
+          const res=await fetch(url,{signal:AbortSignal.timeout(17000)});
+          if(!res.ok)throw Error('CSV_ERROR_'+res.status);
+          const csv=await res.text();
+          const rows=[];let f='',row=[],q=false;
+          for(let i=0;i<csv.length;i++){
+            const c=csv[i],next=csv[i+1];
+            if(c==='"'&&q&&next==='"'){f+='"';i++}
+            else if(c==='"'){q=!q}
+            else if(c===','&&!q){row.push(f);f=''}
+            else if((c==='\n'||c==='\r')&&!q){
+              if(c==='\r'&&next==='\n')i++;
+              row.push(f);if(row.some(v=>v.trim()))rows.push(row);
+              row=[];f='';
+            }else f+=c;
+          }
+          row.push(f);if(row.some(v=>v.trim()))rows.push(row);
+          const norm=x=>String(x||'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+          const head=rows.shift().map(norm);
+          const col=t=>head.indexOf(norm(t));
+          const records=rows.filter(r=>['SI','TRUE','1','X'].includes(norm(r[col('Activo')])));
+          const link=(str)=>{
+            const u=String(str||'').trim();
+            let m=u.match(/drive\.google\.com\/file\/d\/([^/?#]+)/);
+            if(!m)m=u.match(/[?&]id=([^&#]+)/);
+            return m?'https://drive.google.com/thumbnail?id='+encodeURIComponent(m[1])+'&sz=w1200':u;
+          };
+          for(const [i,r] of records.entries()){
+            const img=String((col('Enlace foto (pegá aquí)')>=0?r[col('Enlace foto (pegá aquí)')]:'')||r[col('Foto')]||'').trim();
+            const uri=link(img);
+            let result;
+            try{
+              const u=new URL(uri);
+              const resp=await fetch(uri,{method:'GET',redirect:'follow',
+                headers:{Range:'bytes=0-2047'},signal:AbortSignal.timeout(15000)});
+              const type=resp.headers.get('content-type')||'';
+              result={status:resp.status,domain:new URL(resp.url).hostname,
+                image:type.startsWith('image/'),type:type.slice(0,35),
+                sourceDomain:u.hostname,sourceShape:img.includes('/file/d/')?'file-d':img.includes('id=')?'query-id':'other'};
+              await resp.body?.cancel().catch(()=>{});
+            }catch(e){
+              result={error:String(e?.message||e).slice(0,90),sourceShape:img.includes('id=')?'query-id':img.includes('file/d/')?'file-d':'other'};
+            }
+            console.log('SABER_PHOTO_'+(i+1)+'='+JSON.stringify({category:r[col('Categoría')],hasLink:!!uri,...result}));
+          }
+          console.log('SABER_PHOTOS_DIAGNOSTIC_READONLY='+records.length);
+          NODE
