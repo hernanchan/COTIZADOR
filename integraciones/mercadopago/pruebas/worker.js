@@ -5298,7 +5298,9 @@ export default {
        card.universal_pdf_pending=!approved;
        card.universal_pdf_approved=approved;
        card.universal_pdf_pending_count=entry.pending_count;
-       if(!approved)card.production_state="pendiente";
+       // Sin estado de producción, la orden pagada corresponde a Nuevos,
+       // incluso si la inspección/preprensa ya quedó aprobada.
+       if(!card.production_state)card.production_state="pendiente";
        card.web_order_id=entry.web_order_id;
        card.file_count=entry.file_count;
       }
