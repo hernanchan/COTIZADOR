@@ -144,8 +144,8 @@ try{
  // Cloudflare puede tardar en propagar cambios de bindings entre isolates.
  // No interpretar el 503 de una versión anterior como problema comercial.
  for(let attempt=1;attempt<=20;attempt++){
-  const r=await fetch('https://pedidos.libreriasaber.com.ar/api/pedido/live/transfer?check='+attempt,{
-   redirect:'manual',signal:AbortSignal.timeout(15000)
+  const r=await fetch('https://pedidos.libreriasaber.com.ar/api/pedido/live/transfer',{
+   redirect:'manual',headers:{'Cache-Control':'no-cache'},signal:AbortSignal.timeout(15000)
   });
   buyerStatus=r.status;
   if(buyerStatus===401)break;
