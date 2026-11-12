@@ -97,7 +97,7 @@ test('recepción LIVE admite pago bancario solo con asiento D1, no por comproban
    {name:'central_live_bank_accreditations'},
    {name:'central_order_contacts'},
    {name:'central_order_customer_details'}
-  ]})};
+  ]}),first:async()=>null};
   return old(sql);
  };
  const res=await listarRecepcionUniversalLive(new Request(url),env,{authorized:true});
