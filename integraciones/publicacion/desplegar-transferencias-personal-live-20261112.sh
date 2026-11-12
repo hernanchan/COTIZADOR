@@ -69,7 +69,12 @@ for w in saber-pagos-produccion saber-documentos-produccion;do
  diff "$tmp/$w.bindings" "$tmp/$w.after.bindings"
 done
 for path in /personal/transferencias /personal/api/live-transferencias-pendientes /personal/api/live-transferencias-aprobar /personal/paquete;do
- status=$(curl -sS --max-time 16 -o /dev/null -w '%{http_code}' "https://pedidos.libreriasaber.com.ar$path")
+ status=0
+ for attempt in 1 2 3 4 5 6 7 8 9 10 11 12;do
+  status=$(curl -sS --max-time 16 -o /dev/null -w '%{http_code}' "https://pedidos.libreriasaber.com.ar$path")
+  if [ "$status" = 401 ];then break;fi
+  sleep 2
+ done
  echo "SABER_TRANSFER_PROTECTED_PATH_HTTP_$status"
  test "$status" = 401
 done
