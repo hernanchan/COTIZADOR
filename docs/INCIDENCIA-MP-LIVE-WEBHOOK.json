@@ -1,0 +1,11 @@
+{
+  "schema": "saber-mp-webhook-health-v1",
+  "fecha": "2026-11-12T23:50:01.975Z",
+  "soloGET": true,
+  "observaciones": [],
+  "webhook_http_get": 404,
+  "webhook_endpoint_responde": false,
+  "webhook_url_configurada": true,
+  "mp_gate_activo": true,
+  "webhook_secret_presente": true
+}
