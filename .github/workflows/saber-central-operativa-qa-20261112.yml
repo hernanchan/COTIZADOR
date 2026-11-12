@@ -39,3 +39,5 @@ jobs:
           grep -Fq '/personal/central' integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
           grep -Fq '/personal/api/live-status' integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
           echo SABER_CENTRAL_PERSONAL_TWO_WORKERS_BUILD_OK_NO_CLOUDFLARE_CHANGES
+
+# Revalidacion de sintaxis de rutas central privadas.
