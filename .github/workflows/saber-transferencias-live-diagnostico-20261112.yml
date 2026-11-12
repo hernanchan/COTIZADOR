@@ -24,3 +24,4 @@ jobs:
           set -euo pipefail
           node --check integraciones/publicacion/diagnostico-transferencias-live-20261112.mjs
           node integraciones/publicacion/diagnostico-transferencias-live-20261112.mjs
+# Diagnóstico del service binding y URL esperada, sin exponer valores de configuración.
