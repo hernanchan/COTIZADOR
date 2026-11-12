@@ -1,0 +1,48 @@
+name: Saber - diagnostico final LIVE previo a publicacion, solo lectura
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-diagnostico-final-live-20261112.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: saber-preflight-readonly
+  cancel-in-progress: false
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    env:
+      SABER_CF_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      SABER_CF_DEPLOY_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+      SABER_CF_D1_WRITE_TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Consultar sitio, privacidad, gates MP y R2, D1 SELECT
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check integraciones/publicacion/diagnostico-final-live-20261112.mjs
+          node integraciones/publicacion/diagnostico-final-live-20261112.mjs
+      - name: Guardar informe anonimo de disponibilidad en rama de trabajo
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/DIAGNOSTICO-PREPUBLICACION-LIVE-ULTIMO.json || exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/DIAGNOSTICO-PREPUBLICACION-LIVE-ULTIMO.json
+          if ! git diff --cached --quiet; then
+            git commit -m "ops: resultado preflight LIVE sin publicacion"
+            git push origin HEAD:integracion/tus-pedido-privado-20261101
+          fi
