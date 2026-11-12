@@ -24,7 +24,7 @@ jobs:
       - name: Testear seguridad y compilar Workers
         run: |
           set -euo pipefail
-          node --test integraciones/autocotizador/recepcion/r2-inspeccion-personal-live.test.mjs integraciones/mercadopago/pruebas/r2-live-inspection-finalize.test.mjs integraciones/mercadopago/pruebas/central-recepcion-live.test.mjs integraciones/mercadopago/pruebas/r2-live-canary-order.test.mjs integraciones/mercadopago/pruebas/mercadopago-live-central.test.mjs integraciones/mercadopago/pruebas/transferencias-live-central.test.mjs integraciones/mercadopago/pruebas/r2-universal-live-gate-central.test.mjs integraciones/mercadopago/pruebas/r2-universal-live-reserve-central.test.mjs integraciones/autocotizador/recepcion/r2-live-multipart-documentos.test.mjs
+          node --test integraciones/autocotizador/recepcion/r2-inspeccion-personal-live.test.mjs integraciones/mercadopago/pruebas/r2-live-inspection-finalize.test.mjs integraciones/mercadopago/pruebas/central-recepcion-live.test.mjs integraciones/mercadopago/pruebas/r2-live-canary-order.test.mjs integraciones/mercadopago/pruebas/mercadopago-live-central.test.mjs integraciones/mercadopago/pruebas/transferencias-live-central.test.mjs integraciones/mercadopago/pruebas/r2-universal-live-gate-central.test.mjs integraciones/mercadopago/pruebas/r2-universal-live-reserve-central.test.mjs integraciones/autocotizador/recepcion/r2-live-multipart-documentos.test.mjs integraciones/autocotizador/recepcion/legal-70g-original.test.mjs integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs
           npm install --no-save --no-audit --no-fund esbuild@0.25.12 wrangler@4.55.0
           (cd integraciones/autocotizador/recepcion && npm install --no-fund --no-audit && npm run build:unificado)
           ./node_modules/.bin/esbuild integraciones/mercadopago/pruebas/worker.js --bundle --platform=browser --format=esm --target=es2022 --outfile=/tmp/saber-r2-live-central-built.mjs
@@ -45,3 +45,4 @@ jobs:
 # 11/11: lector staff separado de compuertas checkout R2; QA 43128052797 23/23, D1 staged=0.
 # Staff R2: pantalla completa corregida; compilar bundle antes del test con asset real. QA 43128770503 OK.
 # 12/11: canary solo una orden <=200MiB, seguridad de cobros generales NO_GO, instalar código con modo OFF. QA 43208307319 56/56 PASS.
+# 12/11: publicar segunda pantalla Siguiente/Volver y precio Legal original obra70, ambos probados en Chrome 4 anchos QA 43213274906 SUCCESS. MP R2 canary aún OFF.
