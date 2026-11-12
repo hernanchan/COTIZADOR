@@ -439,7 +439,7 @@ test('canary LIVE: sólo orden exacta con R2 único abre MP, otros pedidos sigue
   CENTRAL_LIVE_R2_QUOTA_GATE:N,CENTRAL_LIVE_R2_STAGING_GATE:N,
   CENTRAL_R2_CANARY_MODE:'SOLO_PEDIDO_R2_CONTROLADO',
   CENTRAL_R2_CANARY_ORDER_ID:WEB,
-  CENTRAL_R2_CANARY_EXPIRES_AT:new Date(Date.now()+3600000).toISOString().replace('.000Z','Z')};
+  CENTRAL_R2_CANARY_EXPIRES_AT:new Date(Date.now()+3600000).toISOString().slice(0,19)+'Z'};
  const req=new Request('https://pagos.libreriasaber.com.ar/internal/central/live/checkout',{method:'POST'});
  for(const invalid of [
   {CENTRAL_R2_CANARY_ORDER_ID:'WEB-ENSAYO-'+'B'.repeat(32)},
