@@ -29,3 +29,4 @@ jobs:
             integraciones/mercadopago/pruebas/central-live-bridge.test.mjs \
             integraciones/mercadopago/pruebas/mercadopago-live-central.test.mjs
           echo SABER_TRANSFER_STAFF_HMAC_SECURITY_QA_PASS_NO_PAYMENT
+# Revalidar binding inyectado en simulaciones sin modificar entorno real.
