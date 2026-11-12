@@ -9,6 +9,13 @@ async function get(url){
  return fetch(url,{redirect:'manual',headers:{'Cache-Control':'no-cache'},
   signal:AbortSignal.timeout(15000)});
 }
+async function publicHtml(path){
+ const url=web+path;
+ const res=await fetch(url,{redirect:'follow',headers:{'Cache-Control':'no-cache'},
+  signal:AbortSignal.timeout(15000)});
+ assert.equal(new URL(res.url).origin,web,'UNEXPECTED_PUBLIC_HTML_REDIRECT');
+ return res;
+}
 async function cf(path,secret=token,options={}){
  const res=await fetch('https://api.cloudflare.com/client/v4/accounts/'+account+path,{
   ...options,headers:{Authorization:'Bearer '+secret,...options.headers},
@@ -21,7 +28,7 @@ const home=await get(web+'/?monitor='+Date.now());
 assert.equal(home.status,200,'WEB_HOME');
 assert.match(await home.text(),/Librería Saber/);
 for(const path of ['/ofertas.html','/cotizar.html']){
- const r=await get(web+path);assert.equal(r.status,200,'PUBLIC_PAGE_'+path);
+ const r=await publicHtml(path);assert.equal(r.status,200,'PUBLIC_PAGE_'+path);
  const html=await r.text();
  assert.match(html,/Librería Saber/);
  if(path==='/cotizar.html')assert.match(html,/portal-comercial\.json/);
