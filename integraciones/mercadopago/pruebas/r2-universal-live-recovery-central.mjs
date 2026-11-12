@@ -13,6 +13,8 @@ export async function consultarRecuperacionR2Live(request,env,{
  if(env?.SABER_ENTORNO!=='produccion'||env?.CENTRAL_DB_ENV!=='produccion'||
   env?.MP_LIVE_GATE!==GO||env?.CENTRAL_LIVE_BRIDGE_ENABLED!==GO||
   env?.CENTRAL_LIVE_POSTPAY_GATE!==GO||
+  (env?.CENTRAL_LIVE_R2_GATE!==GO&&
+   env?.CENTRAL_R2_CANARY_MODE!=='SOLO_PEDIDO_R2_CONTROLADO')||
   env?.CENTRAL_LIVE_ORDER_GATE!==GO||typeof env?.DB?.prepare!=='function')
   return reply({ok:false,error:'LIVE_R2_RECOVERY_OFF'},503);
  if(typeof readSigned!=='function')return reply({ok:false,error:'LIVE_R2_RECOVERY_HMAC_OFF'},503);
