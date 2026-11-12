@@ -1,0 +1,9 @@
+{
+  "schema": "saber-webhook-firma-probe-v1",
+  "checkedAt": "2026-11-12T23:56:27.616Z",
+  "fictitiousPayment": true,
+  "mode": "NO_SIDE_EFFECTS",
+  "httpStatus": 401,
+  "errorCode": "CENTRAL_RECHAZO",
+  "rejectsFakeSignature": true
+}
