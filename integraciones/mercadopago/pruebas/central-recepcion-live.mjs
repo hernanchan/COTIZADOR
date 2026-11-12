@@ -4,13 +4,15 @@
 const GO='GO_COMERCIAL_CONFIRMADO';
 const reply=(body,status=200)=>Response.json(body,{status,headers:{
  'Cache-Control':'no-store,private','X-Content-Type-Options':'nosniff'}});
-export async function listarRecepcionUniversalLive(request,env,{authorized=false}={}){
+export async function listarRecepcionUniversalLive(request,env,{authorized=false,r2StaffOnly=false}={}){
  const u=new URL(request.url);
  if(request.method!=='GET'||u.pathname!=='/admin/api/central/live-recepcion'||
     u.search||u.hash)return reply({ok:false,error:'LIVE_LISTA_RUTA'},405);
  if(!authorized)return reply({ok:false,error:'LIVE_LISTA_ACCESO'},401);
  if(env?.SABER_ENTORNO!=='produccion'||env?.CENTRAL_DB_ENV!=='produccion'||
-    env?.CENTRAL_LIVE_BOARD_GATE!==GO||env?.MP_LIVE_GATE!==GO||
+    !(env?.CENTRAL_LIVE_BOARD_GATE===GO||
+      r2StaffOnly&&env?.CENTRAL_LIVE_R2_INSPECTION_GATE===GO)||
+    env?.MP_LIVE_GATE!==GO||
     env?.CENTRAL_LIVE_BRIDGE_ENABLED!==GO||
     typeof env?.DB?.prepare!=='function')
   return reply({ok:false,error:'LIVE_LISTA_OFF'},503);
@@ -78,6 +80,9 @@ export async function listarRecepcionUniversalLive(request,env,{authorized=false
      !/^[a-f0-9-]{36}$/i.test(x.order_id||'')||
      !Number.isSafeInteger(x.work_number)||x.work_number<1)
    return reply({ok:false,error:'LIVE_LISTA_DATOS_INCONSISTENTES'},409);
+  // El puente R2 sólo enumera pedidos con archivos R2 y sigue requiriendo
+  // sesión de personal + HMAC. La lista comercial normal no cambia.
+  if(r2StaffOnly&&x.r2_count===0)continue;
   ready.push({orderId:x.order_id,webOrderId:x.web_order_id,
    numeroOrden:String(x.work_number).padStart(3,'0'),
    amountArs:x.total_ars,fileCount:x.file_count,
