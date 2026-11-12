@@ -4,14 +4,14 @@
 const GO='GO_COMERCIAL_CONFIRMADO';
 const reply=(body,status=200)=>Response.json(body,{status,headers:{
  'Cache-Control':'no-store,private','X-Content-Type-Options':'nosniff'}});
-export async function listarRecepcionUniversalLive(request,env,{authorized=false,r2StaffOnly=false}={}){
+export async function listarRecepcionUniversalLive(request,env,{authorized=false,r2StaffOnly=false,staffAll=false}={}){
  const u=new URL(request.url);
  if(request.method!=='GET'||u.pathname!=='/admin/api/central/live-recepcion'||
     u.search||u.hash)return reply({ok:false,error:'LIVE_LISTA_RUTA'},405);
  if(!authorized)return reply({ok:false,error:'LIVE_LISTA_ACCESO'},401);
  if(env?.SABER_ENTORNO!=='produccion'||env?.CENTRAL_DB_ENV!=='produccion'||
     !(env?.CENTRAL_LIVE_BOARD_GATE===GO||
-      r2StaffOnly&&env?.CENTRAL_LIVE_R2_INSPECTION_GATE===GO)||
+      (r2StaffOnly||staffAll)&&env?.CENTRAL_LIVE_R2_INSPECTION_GATE===GO)||
     env?.MP_LIVE_GATE!==GO||
     env?.CENTRAL_LIVE_BRIDGE_ENABLED!==GO||
     typeof env?.DB?.prepare!=='function')
@@ -25,6 +25,7 @@ export async function listarRecepcionUniversalLive(request,env,{authorized=false
   const bank=names.has('central_live_bank_accreditations');
   const hasPhone=names.has('central_order_contacts');
   const hasCustomer=names.has('central_order_customer_details');
+  const hasProduction=(await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='central_live_production_states'").first())!=null;
   const paymentClause=bank?
    "AND ((o.payment_id IS NOT NULL AND o.preference_id IS NOT NULL) OR "+
    "(o.payment_id IS NULL AND o.preference_id IS NULL AND EXISTS "+
@@ -36,10 +37,13 @@ export async function listarRecepcionUniversalLive(request,env,{authorized=false
    (hasCustomer?'k.address':'NULL')+" AS direccion_cliente,";
   const joinContact=(hasPhone?'LEFT JOIN central_order_contacts c ON c.order_id=o.id ':'')+
    (hasCustomer?'LEFT JOIN central_order_customer_details k ON k.order_id=o.id ':'');
+  const selectProduction=hasProduction?'COALESCE(s.state,\'pendiente\') AS estado_produccion,COALESCE(s.version,0) AS version_produccion,':
+   "'pendiente' AS estado_produccion,0 AS version_produccion,";
+  const joinProduction=hasProduction?'LEFT JOIN central_live_production_states s ON s.order_id=o.id ':'';
   rows=await env.DB.prepare(
    'SELECT l.commercial_order_id AS order_id,l.web_order_id AS web_order_id,'+
    'n.number AS work_number,d.file_count AS file_count,d.total_ars AS total_ars,'+
-   'o.paid_at AS paid_at,'+selectContact+
+   'o.paid_at AS paid_at,'+selectContact+selectProduction+
    'SUM(CASE WHEN f.received=1 THEN 1 ELSE 0 END) AS received_count,'+
    'SUM(CASE WHEN f.received=0 THEN 1 ELSE 0 END) AS pending_count,'+
    "SUM(CASE WHEN f.transport='tus' THEN 1 ELSE 0 END) AS tus_count,"+
@@ -54,12 +58,13 @@ export async function listarRecepcionUniversalLive(request,env,{authorized=false
    'JOIN central_r2_universal_files f ON f.web_order_id=l.web_order_id '+
    'JOIN orders o ON o.id=l.commercial_order_id '+
    "JOIN payment_reviews p ON p.order_id=o.id AND p.state='verified' "+
-   'LEFT JOIN central_work_order_numbers n ON n.commercial_order_id=o.id '+joinContact+
+   'LEFT JOIN central_work_order_numbers n ON n.commercial_order_id=o.id '+joinContact+joinProduction+
    "WHERE o.status='paid' AND o.paid_at IS NOT NULL "+
    'AND o.amount_ars=o.deposit_ars AND o.amount_ars=l.amount_ars '+
    paymentClause+
    'GROUP BY l.commercial_order_id,l.web_order_id,n.number'+
-   (hasPhone?',c.phone':'')+(hasCustomer?',k.name,k.address':'')+','+
+   (hasPhone?',c.phone':'')+(hasCustomer?',k.name,k.address':'')+
+   (hasProduction?',s.state,s.version':'')+','+
    'd.file_count,d.total_ars,o.paid_at '+
    'ORDER BY o.paid_at DESC LIMIT 100'
   ).all();
@@ -82,7 +87,10 @@ export async function listarRecepcionUniversalLive(request,env,{authorized=false
    return reply({ok:false,error:'LIVE_LISTA_DATOS_INCONSISTENTES'},409);
   // El puente R2 sólo enumera pedidos con archivos R2 y sigue requiriendo
   // sesión de personal + HMAC. La lista comercial normal no cambia.
-  if(r2StaffOnly&&x.r2_count===0)continue;
+  if(!['pendiente','en_preparacion','en_espera','listo','entregado'].includes(x.estado_produccion||'pendiente')||
+     !Number.isSafeInteger(x.version_produccion)||x.version_produccion<0)
+   return reply({ok:false,error:'LIVE_LISTA_ESTADO_INCONSISTENTE'},409);
+  if(r2StaffOnly&&!staffAll&&x.r2_count===0)continue;
   ready.push({orderId:x.order_id,webOrderId:x.web_order_id,
    numeroOrden:String(x.work_number).padStart(3,'0'),
    amountArs:x.total_ars,fileCount:x.file_count,
@@ -95,7 +103,9 @@ export async function listarRecepcionUniversalLive(request,env,{authorized=false
     x.pending_count===x.staged_r2_count?
     'R2_ALMACENADO_PENDIENTE_ANALISIS_PDF':
     'PAGADO_ESPERANDO_ORIGINALES',
-   lane:'pendiente',readyForProduction:false,zipEnabled:false});
+   lane:x.estado_produccion||'pendiente',productionState:x.estado_produccion||'pendiente',
+   productionVersion:x.version_produccion||0,readyForProduction:false,
+   zipEnabled:x.pending_count===0});
  }
  return reply({ok:true,orders:ready,source:'production-d1-verified-payments-only',
   productionAuthorized:false,downloadAuthorized:false});
