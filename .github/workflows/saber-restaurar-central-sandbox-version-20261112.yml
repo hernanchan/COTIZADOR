@@ -37,7 +37,7 @@ jobs:
           tmp=$(mktemp -d)
           echo "$tmp" > /tmp/saber-sandbox-restoration-tmp
           curl -fsS --max-time 30 -H "Authorization: Bearer $TOKEN" "$root/settings" > "$tmp/before.json"
-          jq -e '.success==true and (.result.bindings|any(.name=="DB" and .type=="d1" and ((.id//.database_id)=="60124ac5-1941-44ba-96e5-ea3165b65ec9"))) and (.result.bindings|any(.name=="DEMO_ADMIN_KEY" and .type=="secret_text")) and (.result.bindings|any(.name=="MP_TEST_ACCESS_TOKEN" and .type=="secret_text")) and (any(.name=="SABER_DOCUMENTOS")|not) and (any(.name=="SABER_R2_GRANDES")|not)' "$tmp/before.json" >/dev/null
+          jq -e '.success==true and (.result.bindings|\n            any(.name=="DB" and .type=="d1" and ((.id//.database_id)=="60124ac5-1941-44ba-96e5-ea3165b65ec9")) and\n            any(.name=="DEMO_ADMIN_KEY" and .type=="secret_text") and\n            any(.name=="MP_TEST_ACCESS_TOKEN" and .type=="secret_text") and\n            (any(.name=="SABER_DOCUMENTOS")|not) and\n            (any(.name=="SABER_R2_GRANDES")|not))' "$tmp/before.json" >/dev/null
           curl -fsS --max-time 30 -H "Authorization: Bearer $TOKEN" "$root/deployments" > "$tmp/deploy-before.json"
           jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/deploy-before.json" > "$tmp/old-id"
           curl -fsS --max-time 20 "$site/health" | jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' >/dev/null
