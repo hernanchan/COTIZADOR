@@ -1,0 +1,19 @@
+{
+  "fecha": "2026-11-12T23:54:21.341Z",
+  "modo": "READONLY",
+  "gateValue": "GO_COMERCIAL_CONFIRMADO",
+  "environmentValue": "produccion",
+  "conditions": [
+    "var WEBHOOK = \"/webhooks/mercadopago-live\";",
+    "var HOST = \"pagos.libreriasaber.com.ar\";",
+    "var reply = /* @__PURE__ */ __name((status, error) => Response.json({ ok: false, error }, {",
+    "async function manejarWebhookPublico(request, env, { service = env?.SABER_CENTRAL_LIVE } = {}) {",
+    "  const u = new URL(request.url);",
+    "  if (u.protocol !== \"https:\" || u.hostname !== HOST || u.pathname !== WEBHOOK || u.hash || !/^[1-9][0-9]{3,19}$/.test(u.searchParams.get(\"data.id\") || \"\") || u.searchParams.get(\"type\") !== \"payment\" || [...u.searchParams.keys()].sort().join(\",\") !==",
+    "    return reply(404, \"RUTA_NO_DISPONIBLE\");",
+    "  if (env?.SABER_ENTORNO !== \"produccion\" || env?.WEBHOOK_EDGE_GATE !== GATE || typeof service?.fetch !== \"function\" || service === env?.SABER_CENTRAL)",
+    "  if (request.method !== \"POST\" || request.headers.has(\"Origin\") || !/^application\\/json(?:;|$)/i.test(request.headers.get(\"Content-Type\") || \"\") || !(request.headers.get(\"x-signature\") || \"\").trim() || !(request.headers.get(\"x-request-id\") || \"\").tr",
+    "    upstream = await service.fetch(request);",
+    "  return new Response(null, { status: 200, headers: {"
+  ]
+}
