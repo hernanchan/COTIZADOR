@@ -1,0 +1,57 @@
+name: Saber - comprobar aviso Central en Worker productivo, solo lectura
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-comprobar-aviso-central-live-20261112.yml]
+permissions: {contents: write}
+concurrency: {group: saber-comprobar-central-readonly, cancel-in-progress: false}
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    env:
+      CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      CF_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: true}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Leer codigo Worker productivo y proteccion de Central sin operaciones comerciales
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'EOF'
+          import {mkdir,writeFile} from 'node:fs/promises';
+          const report={schema:'saber-central-live-warning-v1',
+           fecha:new Date().toISOString(),soloLectura:true,estado:'NO_VERIFICADO'};
+          try{
+           const account=process.env.CF_ACCOUNT, token=process.env.CF_TOKEN;
+           if(!/^[a-f0-9]{32}$/i.test(account||'')||!token||token.length<20)throw Error('CREDENCIALES_NO_DISPONIBLES');
+           const url='https://api.cloudflare.com/client/v4/accounts/'+account+'/workers/scripts/saber-documentos-produccion';
+           const res=await fetch(url,{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(20000)});
+           if(!res.ok)throw Error('WORKER_HTTP_'+res.status);
+           const code=await res.text();
+           if(!code.includes('previsionCliente')||!code.includes('pero el cliente ve'))throw Error('AVISO_NO_DESPLEGADO');
+           const a=await fetch('https://pedidos.libreriasaber.com.ar/personal/central',{redirect:'manual',signal:AbortSignal.timeout(15000)});
+           if(a.status!==401)throw Error('ACCESO_PERSONAL_NO_PROTEGIDO_'+a.status);
+           report.estado='AVISO_DESPLEGADO_Y_CENTRAL_PROTEGIDA';
+          }catch(e){report.estado=String(e.message||e).slice(0,90)}
+          await mkdir('docs',{recursive:true});
+          await writeFile('docs/ESTADO-AVISO-CENTRAL-LIVE-20261112.json',JSON.stringify(report,null,2)+'\n');
+          console.log('SABER_CENTRAL_LIVE_STATUS='+report.estado);
+          EOF
+      - name: Publicar estado tecnico anonimo en rama de trabajo
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/ESTADO-AVISO-CENTRAL-LIVE-20261112.json
+          if ! git diff --cached --quiet;then
+            git commit -m "ops: resultado verificacion aviso Central LIVE"
+            git push origin HEAD:integracion/tus-pedido-privado-20261101
+          fi
