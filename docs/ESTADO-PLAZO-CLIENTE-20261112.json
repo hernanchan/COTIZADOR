@@ -1,0 +1,12 @@
+{
+  "fechaConsulta": "2026-11-12T23:24:08.821Z",
+  "schema": "saber-plazo-live-readonly-v1",
+  "origin": "comprador-live",
+  "noChanges": true,
+  "httpStatus": 200,
+  "ok": true,
+  "mode": "por_confirmar",
+  "label": "La previsión de hoy venció al cerrar el local",
+  "estimatedDeadlineDate": null,
+  "notice": "La Central tenía indicado hoy, pero ya terminó el horario de atención. No sería correcto prometer una entrega vencida. Consultanos antes de pagar para conocer la próxima fecha estimada."
+}
