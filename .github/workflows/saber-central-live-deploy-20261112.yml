@@ -115,12 +115,9 @@ jobs:
             result=$(curl -sS --max-time 15 -o /dev/null -w '%{http_code}' "https://pedidos.libreriasaber.com.ar$path")
             test "$result" = 401 || { echo "SABER_STAFF_PROTECTION_FAILED_$path $result";false; }
           done
-          python3 - <<'PY'
-          import json,urllib.request
-          u='https://libreriasaber.com.ar/portal-comercial.json'
-          with urllib.request.urlopen(u,timeout=15) as r: p=json.loads(r.read())
-          assert p['enabled'] is False and p['release']=='NO_GO' and p['buyerUrl'] is None
-          print('SABER_STAFF_SITE_ANTERIOR_NO_GO_CONFIRMED')
-          PY
+          curl -fsS --retry 2 -A 'Mozilla/5.0 (compatible; LibreriaSaberQA/1.0)' --max-time 20 \
+            'https://libreriasaber.com.ar/portal-comercial.json?staffqa=1' > "$temp/portal.json"
+          jq -e '.enabled==false and .release=="NO_GO" and .buyerUrl==null' "$temp/portal.json" >/dev/null
+          echo SABER_STAFF_SITE_ANTERIOR_NO_GO_CONFIRMED
           echo SABER_STAFF_CENTRAL_LIVE_PROTECTED_READY_NO_NEW_ORDERS_NO_CHARGES
           trap - ERR
