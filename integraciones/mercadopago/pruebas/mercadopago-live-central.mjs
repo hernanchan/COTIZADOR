@@ -5,6 +5,7 @@
  */
 import {compuertaMPProduccion,cotejarPagoRealMP}
  from '../../publicacion/mercadopago-live-preflight.mjs';
+import {r2CanaryArchivoUnico} from './r2-live-canary-order.mjs';
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 const WEB=/^WEB-ENSAYO-[A-F0-9]{32}$/;
 const PAYMENT=/^[1-9][0-9]{3,19}$/;
@@ -116,7 +117,7 @@ export async function checkoutMPLiveCentral(request,env,{
  let transports;
  try{
   const rows=await env.DB.prepare(
-   'SELECT f.transport FROM central_r2_universal_files f '+
+   'SELECT f.transport,f.bytes FROM central_r2_universal_files f '+
    'JOIN central_r2_universal_order_links l ON l.web_order_id=f.web_order_id '+
    'WHERE l.web_order_id=? AND l.commercial_order_id=? ORDER BY f.file_id'
   ).bind(p.webOrderId,p.commercialOrderId).all();
@@ -142,7 +143,8 @@ export async function checkoutMPLiveCentral(request,env,{
     'CENTRAL_LIVE_R2_QUOTA_GATE',
     'CENTRAL_LIVE_R2_STAGING_GATE',
     'CENTRAL_LIVE_POSTPAY_GATE'
-   ].some(key=>env?.[key]!==GO))
+   ].some(key=>env?.[key]!==GO)&&
+   !(fileCount===1&&r2CanaryArchivoUnico(env,p.webOrderId,transports)))
   return reply({ok:false,error:'MP_LIVE_R2_NO_DISPONIBLE'},503);
  const age=now()-Date.parse(String(order.created_at).replace(' ','T')+'Z');
  if(!Number.isFinite(age)||age<0||age>=86400000)
