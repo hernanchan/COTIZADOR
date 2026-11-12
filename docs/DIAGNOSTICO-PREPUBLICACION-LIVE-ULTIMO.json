@@ -1,0 +1,22 @@
+{
+  "esquema": "saber-preflight-sin-ordenes-v1",
+  "fecha": "2026-11-12T23:13:45.228Z",
+  "rama": "integracion/tus-pedido-privado-20261101",
+  "sitio_publico": "NO_GO_conservado",
+  "verificaciones": {
+    "web_publica_y_bloqueo_comercial": "OK",
+    "central_personal_privada": "OK",
+    "comprador_y_recepcion_protegida": "OK",
+    "cloudflare_compuertas_MP_y_R2": "OK",
+    "d1_consistencia_pagos_y_archivos": "OK"
+  },
+  "evidencia_anonima": {
+    "compueras_live": "habilitadas_en_ambos_workers",
+    "existen_pagos_verificados": false,
+    "existen_archivos_r2_recibidos": false,
+    "existen_archivos_tus_recibidos": false
+  },
+  "infraestructura_apta_para_evaluar_apertura": true,
+  "pedido_real_integral_cobro_recepcion_central": "NO_CERTIFICADO_POR_ESTE_DIAGNOSTICO",
+  "acciones": "SOLO_LECTURA;NINGUN_PEDIDO;NINGUN_COBRO;NINGUNA_PUBLICACION"
+}
