@@ -1,4 +1,4 @@
-name: Saber - vigilancia postpublicación de tienda, MP, R2 y pedidos
+name: Saber - monitoreo web, MP, R2, TUS y transferencias bancarias
 on:
   push:
     branches: [integracion/tus-pedido-privado-20261101, main]
@@ -29,3 +29,4 @@ jobs:
           node --check integraciones/publicacion/monitor-postpublicacion-20261112.mjs
           node integraciones/publicacion/monitor-postpublicacion-20261112.mjs
 # Redirección canónica 308 de Pages se sigue sólo dentro del dominio oficial.
+# Verificar transferencia bancaria y TUS activados en producción, solo lectura.
