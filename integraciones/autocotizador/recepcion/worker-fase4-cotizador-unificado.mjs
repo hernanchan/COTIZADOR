@@ -37,6 +37,8 @@ import {checkoutCanarioTUSPersonal} from './tus-canaria-checkout-privado.mjs';
 import {paginaDescargaTUSPersonal} from './pantalla-descarga-tus-personal.mjs';
 import {paginaPaqueteTUSPersonal} from './pantalla-paquete-tus-personal.mjs';
 import {paginaPaqueteUniversalPersonal} from './pantalla-paquete-universal-personal.mjs';
+import {paginaTransferenciasPersonalLive,jsTransferenciasPersonalLive} from './pantalla-transferencias-personal-live.mjs';
+import {transferenciasPersonalLive} from './transferencias-personal-live.mjs';
 import {consultarPaqueteUniversalPersonal,descargarUniversalPersonal} from './r2-universal-paquete-personal.mjs';
 import {consultarPaqueteTUSPersonal} from './tus-paquete-personal.mjs';
 import {simularLimpiezaTUS,recibirLimpiezaEntregadaInterna} from './borrado-tus-entregado.mjs';
@@ -2415,7 +2417,10 @@ export default {
        'Cache-Control':'no-store,private','X-Content-Type-Options':'nosniff',
        'X-Robots-Tag':'noindex,nofollow'}});
     }
-    if(page==='/personal/paquete'||
+    if(page==='/personal/paquete'||page==='/personal/transferencias'||
+       page==='/personal/transferencias.js'||
+       page==='/personal/api/live-transferencias-pendientes'||
+       page==='/personal/api/live-transferencias-aprobar'||
        page==='/personal/api/live-paquete'||
        page==='/personal/api/live-descargar'||
        page==='/personal/api/live-r2-board'||
@@ -2430,6 +2435,24 @@ export default {
        return new Response('Acceso exclusivo de personal de Librería Saber',
         {status:401,headers:{'Cache-Control':'no-store',
          'WWW-Authenticate':'Basic realm="Libreria Saber Personal LIVE", charset="UTF-8"'}});
+      if(page==='/personal/transferencias'){
+       if(request.method!=='GET')return closed();
+       return new Response(paginaTransferenciasPersonalLive(),{headers:{
+        'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store,private',
+        'X-Content-Type-Options':'nosniff','X-Robots-Tag':'noindex,nofollow',
+        'Content-Security-Policy':"default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+       }});
+      }
+      if(page==='/personal/transferencias.js'){
+       if(request.method!=='GET')return closed();
+       return new Response(jsTransferenciasPersonalLive(),{headers:{
+        'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-store,private',
+        'X-Content-Type-Options':'nosniff','X-Robots-Tag':'noindex,nofollow'
+       }});
+      }
+      if(page==='/personal/api/live-transferencias-pendientes'||
+         page==='/personal/api/live-transferencias-aprobar')
+       return transferenciasPersonalLive(request,env,{authorized:true});
       if(page==='/personal/paquete'){
        if(request.method!=='GET')return closed();
        return new Response(paginaPaqueteUniversalPersonal(),{
