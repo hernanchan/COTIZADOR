@@ -13,6 +13,13 @@ const html=readFileSync(join(root,'index.html'),'utf8');
 const offer=readFileSync(join(root,'ofertas.html'),'utf8');
 const redirect=readFileSync(join(root,'cotizar.html'),'utf8');
 const portal=JSON.parse(readFileSync(join(root,'portal-comercial.json'),'utf8'));
+const fotosManifest=JSON.parse(readFileSync(join(root,'fotos-productos.json'),'utf8'));
+assert.equal(fotosManifest.schema,'saber-fotos-productos-local-v1');
+assert.ok(Object.keys(fotosManifest.images).length>=3);
+for(const asset of Object.values(fotosManifest.images)){
+ assert.match(asset,/^assets\/productos\/[a-f0-9]{16}\.(?:jpg|png|webp)$/);
+ assert.ok(readFileSync(join(root,asset)).length>=128);
+}
 assert.equal(portal.schema,'saber-portal-comercial-v1');
 // La rama y Pages main quedan en NO_GO. Ensayamos el contrato de lanzamiento
 // en memoria: no modificar el portal real para probar su futura redirección.
@@ -40,7 +47,14 @@ const server=http.createServer((req,resp)=>{
  const path=new URL(req.url,'http://localhost').pathname;
  const name=path==='/'?'index.html':path.slice(1);
  const allowed={'index.html':html,'cotizar.html':redirect,'ofertas.html':offer,
-  'portal-comercial.json':JSON.stringify(portal)};
+  'portal-comercial.json':JSON.stringify(portal),
+  'fotos-productos.json':JSON.stringify(fotosManifest)};
+ if(/^assets\/productos\/[a-f0-9]{16}\.(?:jpg|png|webp)$/.test(name)){
+  const body=readFileSync(join(root,name));
+  const type=name.endsWith('.png')?'image/png':name.endsWith('.webp')?'image/webp':'image/jpeg';
+  resp.writeHead(200,{'Content-Type':type,'Cache-Control':'public, max-age=3600'}).end(body);
+  return;
+ }
  if(!Object.hasOwn(allowed,name)){resp.writeHead(404).end();return}
  resp.writeHead(200,{'Content-Type':name.endsWith('.json')?'application/json':'text/html; charset=utf-8',
   'Access-Control-Allow-Origin':'*','Cache-Control':'no-store'}).end(allowed[name]);
