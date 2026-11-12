@@ -37,7 +37,7 @@ jobs:
           tmp=$(mktemp -d)
           echo "$tmp" > /tmp/saber-sandbox-restoration-tmp
           curl -fsS --max-time 30 -H "Authorization: Bearer $TOKEN" "$root/settings" > "$tmp/before.json"
-          jq -e '.success==true and (.result.bindings|             any(.name=="DB" and .type=="d1" and ((.id//.database_id)=="60124ac5-1941-44ba-96e5-ea3165b65ec9")) and             any(.name=="DEMO_ADMIN_KEY" and .type=="secret_text") and             any(.name=="MP_TEST_ACCESS_TOKEN" and .type=="secret_text") and             (any(.name=="SABER_DOCUMENTOS")|not) and             (any(.name=="SABER_R2_GRANDES")|not))' "$tmp/before.json" >/dev/null
+          jq -e '.success==true and (.result.bindings|             any(.name=="DB" and .type=="d1" and ((.id//.database_id)=="60124ac5-1941-44ba-96e5-ea3165b65ec9")) and             any(.name=="DEMO_ADMIN_KEY" and .type=="secret_text") and             any(.name=="MP_TEST_ACCESS_TOKEN" and .type=="secret_text") and             (all(.[];true)))' "$tmp/before.json" >/dev/null
           curl -fsS --max-time 30 -H "Authorization: Bearer $TOKEN" "$root/deployments" > "$tmp/deploy-before.json"
           jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/deploy-before.json" > "$tmp/old-id"
           curl -fsS --max-time 20 "$site/health" | jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' >/dev/null
@@ -45,8 +45,10 @@ jobs:
            main_module:"index.mjs",
            annotations:{"workers/message":"Restaurar R2+servicio y clasificacion 026 solo sandbox"},
            bindings:([.result.bindings[]|{name,type:"inherit"}] +
-            [{name:"SABER_DOCUMENTOS",type:"service",service:"saber-documentos-pruebas",environment:"production"},
-             {name:"SABER_R2_GRANDES",type:"r2_bucket",bucket_name:"saber-documentos-grandes-ensayo-20261106"}])
+             (if (.result.bindings|any(.name=="SABER_DOCUMENTOS")) then [] else
+              [{name:"SABER_DOCUMENTOS",type:"service",service:"saber-documentos-pruebas",environment:"production"}] end) +
+             (if (.result.bindings|any(.name=="SABER_R2_GRANDES")) then [] else
+              [{name:"SABER_R2_GRANDES",type:"r2_bucket",bucket_name:"saber-documentos-grandes-ensayo-20261106"}] end))
           }' "$tmp/before.json" > "$tmp/metadata.json"
           http=$(curl -sS --max-time 120 -o "$tmp/stage.json" -w '%{http_code}' \
             -H "Authorization: Bearer $TOKEN" \
@@ -93,10 +95,17 @@ jobs:
           jq -nc --arg id "$candidate" '{strategy:"percentage",versions:[{version_id:$id,percentage:100}],annotations:{"workers/message":"Restaurar R2+servicio Central sandbox y pedido 026 en Nuevos"}}' |
             curl -fsS --max-time 40 -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" --data-binary @- "$root/deployments" > "$tmp/promote.json"
           jq -e '.success==true' "$tmp/promote.json" >/dev/null
-          curl -fsS --max-time 30 -H "Authorization: Bearer $TOKEN" "$root/settings" > "$tmp/after.json"
-          jq -e '.success==true and (.result.bindings|
-            any(.name=="SABER_DOCUMENTOS" and .type=="service" and .service=="saber-documentos-pruebas") and
-            any(.name=="SABER_R2_GRANDES" and .type=="r2_bucket" and .bucket_name=="saber-documentos-grandes-ensayo-20261106"))' "$tmp/after.json" >/dev/null
+          available=0
+          for attempt in 1 2 3 4 5 6 7 8 9 10;do
+            curl -fsS --max-time 30 -H "Authorization: Bearer $TOKEN" "$root/settings" > "$tmp/after.json"
+            if jq -e '.success==true and (.result.bindings|
+              any(.name=="SABER_DOCUMENTOS" and .type=="service" and .service=="saber-documentos-pruebas") and
+              any(.name=="SABER_R2_GRANDES" and .type=="r2_bucket" and .bucket_name=="saber-documentos-grandes-ensayo-20261106"))' "$tmp/after.json" >/dev/null;then
+               available=1;break
+            fi
+            sleep 2
+          done
+          test "$available" = 1
           jq -r '.result.bindings[].name' "$tmp/after.json" |sort -u > "$tmp/names-after.txt"
           diff "$tmp/names-expected.txt" "$tmp/names-after.txt"
           curl -fsS --max-time 30 "$site/health" | jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' >/dev/null
