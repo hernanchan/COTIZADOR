@@ -1,0 +1,44 @@
+name: Saber - comprobar entrada real a paneles de personal (sin cambios)
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-acceso-personal-produccion-readonly-20261112.yml]
+permissions: {contents: read}
+jobs:
+  read:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      CF_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+    steps:
+      - name: Verificar portales de personal, protección y key sin revelar secretos
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          const root='https://api.cloudflare.com/client/v4/accounts/'+process.env.CF_ACCOUNT;
+          const res=await fetch(root+'/workers/scripts/saber-documentos-produccion/settings',{
+           headers:{Authorization:'Bearer '+process.env.CF_TOKEN},
+           signal:AbortSignal.timeout(25000)});
+          const s=await res.json();
+          if(!res.ok||!s.success)throw Error('CANNOT_READ_SETTINGS');
+          const b=s.result.bindings||[];
+          for(const k of ['DOCS_LIVE_STAFF_SECRET','DOCS_LIVE_STAFF_GATE','DOCS_LIVE_PACKAGE_GATE','DOCS_MP_LIVE_GATE']){
+           const x=b.find(v=>v.name===k);
+           console.log('SABER_PERSONAL_'+k+'='+(k.endsWith('_SECRET')?(x?.type==='secret_text'?'SECRET_EXISTS':'NO_SECRET'):x?.text==='GO_COMERCIAL_CONFIRMADO'?'GO':'NO_GO'));
+          }
+          const urls=[
+           ['PAQUETE','https://pedidos.libreriasaber.com.ar/personal/paquete'],
+           ['TRANSFERENCIAS','https://pedidos.libreriasaber.com.ar/personal/transferencias'],
+           ['NUEVOS_ADMIN','https://pagos.libreriasaber.com.ar/admin']
+          ];
+          for(const [name,url] of urls){
+           try{const r=await fetch(url,{redirect:'manual',signal:AbortSignal.timeout(15000)});
+            console.log('SABER_PERSONAL_'+name+'_HTTP='+r.status);
+            console.log('SABER_PERSONAL_'+name+'_AUTH_CHALLENGE='+(r.headers.has('www-authenticate')?'YES':'NO'));
+           }catch(e){console.log('SABER_PERSONAL_'+name+'_ERROR='+e.name);}
+          }
+          console.log('SABER_PERSONAL_READONLY_NO_CREDENTIALS_EXPOSED_NO_WRITES');
+          NODE
