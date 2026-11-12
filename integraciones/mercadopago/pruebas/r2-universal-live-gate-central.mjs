@@ -15,6 +15,8 @@ export async function autorizarOriginalR2Live(request,env,{readSigned,subtle=cry
   env?.CENTRAL_DB_ENV==='produccion'&&env?.MP_LIVE_GATE===G&&
   env?.CENTRAL_LIVE_BRIDGE_ENABLED===G&&
   env?.CENTRAL_LIVE_POSTPAY_GATE===G&&
+  (env?.CENTRAL_LIVE_R2_GATE===G||
+   env?.CENTRAL_R2_CANARY_MODE==='SOLO_PEDIDO_R2_CONTROLADO')&&
   env?.CENTRAL_LIVE_ORDER_GATE===G&&
   env?.CENTRAL_LIVE_PRICING_GATE===G&&
   env?.CENTRAL_R2_UNIVERSAL_POSTPAY_ENABLED!=='PRIVATE_TEST_ONLY';
