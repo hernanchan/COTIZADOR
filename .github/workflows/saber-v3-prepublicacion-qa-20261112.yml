@@ -21,3 +21,4 @@ jobs:
           node --check integraciones/publicacion/qa-v3-prepublicacion-20261112.mjs
           node integraciones/publicacion/qa-v3-prepublicacion-20261112.mjs
 # Lanzamiento GO sólo simulado en memoria. Portal comercial permanece NO_GO.
+# QA fotos verdaderamente cargadas, no sólo IMG en DOM.
