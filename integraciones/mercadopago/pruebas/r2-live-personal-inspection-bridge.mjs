@@ -23,7 +23,9 @@ export async function operarInspeccionR2LiveInterna(req,env,{
  if(!source&&!confirm)return json({ok:false,error:'LIVE_R2_STAFF_RUTA'},404);
  if(env?.SABER_ENTORNO!=='produccion'||env?.CENTRAL_DB_ENV!=='produccion'||
   env?.MP_LIVE_GATE!==GO||env?.CENTRAL_LIVE_BRIDGE_ENABLED!==GO||
-  env?.CENTRAL_LIVE_R2_GATE!==GO||env?.CENTRAL_LIVE_R2_STAGING_GATE!==GO||
+  // Inspección autenticada de un PDF YA pagado y registrado en D1.
+  // No depende de las compuertas de NUEVOS cobros/altas R2, que siguen NO_GO.
+  env?.CENTRAL_LIVE_POSTPAY_GATE!==GO||
   env?.CENTRAL_LIVE_R2_INSPECTION_GATE!==GO||
   typeof env?.DB?.prepare!=='function')
   return json({ok:false,error:'LIVE_R2_STAFF_GATE_CERRADO'},503);
