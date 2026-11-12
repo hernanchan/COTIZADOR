@@ -50,7 +50,7 @@ export async function inspeccionR2PersonalLive(request,env,{authorized=false}={}
  if(!authorized)return respond({ok:false,error:'STAFF_R2_NO_AUTORIZADO'},401);
  if(!enabled(env))return respond({ok:false,error:'STAFF_R2_NO_CONFIGURADO'},503);
  const u=new URL(request.url);
- const path=u.pathname,board=path.endsWith('/live-r2-board'),
+ const path=u.pathname,board=path.endsWith('/live-r2-board')||path.endsWith('/live-board'),
   source=path.endsWith('/live-r2-inspection-source');
  const original=path.endsWith('/live-r2-inspection-original');
  const confirm=path.endsWith('/live-r2-inspection-confirm');
