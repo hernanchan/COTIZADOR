@@ -1,0 +1,22 @@
+name: Saber V3 - prepublicación Chrome móvil, catálogo y carrito sin cobros
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-v3-prepublicacion-qa-20261112.yml]
+permissions: {contents: read}
+jobs:
+  web-v3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: QA de prepublicación navegador real y CSV de Google
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund playwright@1.56.0
+          node --check integraciones/publicacion/qa-v3-prepublicacion-20261112.mjs
+          node integraciones/publicacion/qa-v3-prepublicacion-20261112.mjs
