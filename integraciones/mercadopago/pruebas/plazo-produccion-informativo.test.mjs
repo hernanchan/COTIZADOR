@@ -16,11 +16,14 @@ test('modo hoy publicado antes del pago indica máximo ORIENTATIVO sin hora de r
  assert.match(value.notice,/feriados/);
  assert.match(value.notice,/iniciemos la preparación/);
 });
-test('no prometer hoy después del cierre ni en fin de semana',()=>{
+test('no prometer hoy después del cierre ni en fin de semana; explicar el motivo al cliente',()=>{
  for(const now of [closing,saturday]){
   const x=plazoInformativo('hoy',now);
   assert.equal(x.mode,'por_confirmar');
-  assert.doesNotMatch(x.label,/día de hoy/);
+  assert.equal(x.configuredMode,'hoy');
+  assert.match(x.label,/previsión de hoy venció/);
+  assert.match(x.notice,/ya terminó el horario/);
+  assert.equal(x.estimatedDeadlineDate,null);
   assert.equal(x.guaranteed,false);
  }
 });
@@ -84,6 +87,14 @@ test('no prometer fecha de feriado o cierre informado',()=>{
  const x=plazoInformativo('hoy',wednesday,{...calendar,closedDates:['2026-11-11']});
  assert.equal(x.estimatedDeadlineDate,null);
  assert.equal(x.mode,'por_confirmar');
+});
+test('día cerrado no disfraza una previsión hoy como a confirmar genérico',()=>{
+ const x=plazoInformativo('hoy',wednesday,{...calendar,closedDates:['2026-11-11']});
+ assert.equal(x.mode,'por_confirmar');
+ assert.equal(x.configuredMode,'hoy');
+ assert.match(x.label,/día sin atención/);
+ assert.match(x.notice,/calendario registra un cierre o feriado/);
+ assert.equal(x.estimatedDeadlineDate,null);
 });
 test('promo semanal solo informativa y nunca aplicada a un importe cobrado',async()=>{
  const snapshot={promotions:{enabled:true,weekly:[
