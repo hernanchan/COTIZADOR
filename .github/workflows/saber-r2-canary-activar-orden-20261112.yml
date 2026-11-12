@@ -1,0 +1,29 @@
+name: Saber R2 - activar solamente orden controlada D1 por número
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths:
+      - docs/ACTIVAR-R2-ORDEN-UNICA.trigger
+      - .github/workflows/saber-r2-canary-activar-orden-20261112.yml
+permissions: {contents: read}
+concurrency: {group: saber-r2-production-single-order-switch, cancel-in-progress: false}
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      CF_DEPLOY: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+      CF_D1_TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verificar gatillos y activar sólo si hay número explícito y orden D1 única
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check integraciones/publicacion/activar-canary-r2-orden-20261112.mjs
+          node integraciones/publicacion/activar-canary-r2-orden-20261112.mjs
