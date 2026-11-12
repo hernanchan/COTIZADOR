@@ -144,3 +144,4 @@ jobs:
             exit 1
           fi
           echo SABER_V3_PUBLISHED_NEW_WEBSITE_MP_R2_GO_NO_REAL_PAYMENT_RUN
+# QA: iframe sin cookie debe rechazar acceso (503), no falsificar autenticación.
