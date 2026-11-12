@@ -42,7 +42,6 @@ jobs:
           jq -e '.success==true and (.result.bindings|any(.name=="DB" and .type=="d1" and ((.id//.database_id)=="60124ac5-1941-44ba-96e5-ea3165b65ec9"))) and (.result.bindings|any(.name=="DEMO_ADMIN_KEY" and .type=="secret_text")) and (.result.bindings|any(.name=="MP_TEST_ACCESS_TOKEN" and .type=="secret_text"))' "$tmp/before.json" >/dev/null
           # La reversión de código de Cloudflare no restaura settings globales:
           # comprobar que los bindings existentes sean legítimos y reponer los dos perdidos.
-          jq -e '.result.bindings|all(.name!="SABER_DOCUMENTOS" and .name!="SABER_R2_GRANDES";true)' "$tmp/before.json" >/dev/null
           jq -cS '[.result.bindings[]|select(.name!="SABER_DOCUMENTOS" and .name!="SABER_R2_GRANDES")]|sort_by(.name)' "$tmp/before.json" > "$tmp/bindings-before.json"
           curl -fsS --max-time 25 -H "Authorization: Bearer $TOKEN" "$root/deployments" > "$tmp/deploy-before.json"
           previous=$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/deploy-before.json")
