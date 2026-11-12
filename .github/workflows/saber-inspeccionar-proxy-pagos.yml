@@ -1,0 +1,70 @@
+name: Saber - inspeccionar proxy actual del dominio pagos (solo lectura)
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-inspeccionar-proxy-pagos.yml]
+permissions: {contents: write}
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: true}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Leer estructura de Worker proxy sin claves ni cuerpo de codigo
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'EOF'
+          import {mkdir,writeFile} from 'node:fs/promises';
+          const base='https://api.cloudflare.com/client/v4/accounts/'+process.env.ACCOUNT;
+          const h={Authorization:'Bearer '+process.env.TOKEN};
+          const out={fecha:new Date().toISOString(),soloLectura:true};
+          const grab=async path=>{
+           const r=await fetch(base+path,{headers:h,signal:AbortSignal.timeout(25000)});
+           if(!r.ok)throw Error('HTTP_'+r.status);
+           return r;
+          };
+          for(const script of ['saber-webhook-produccion','saber-pagos-produccion']){
+           const p={};
+           try{
+            const src=await (await grab('/workers/scripts/'+script)).text();
+            p.bytes=src.length;
+            p.tiene_ruta_MP_LIVE=src.includes('/webhooks/mercadopago-live');
+            p.tiene_ruta_MP_generica=src.includes('/webhooks/mercadopago');
+            p.tiene_ERROR_RUTA_NO_DISPONIBLE=src.includes('RUTA_NO_DISPONIBLE');
+            p.referencias_SABER_CENTRAL=src.includes('SABER_CENTRAL');
+            p.referencias_SERVICE_fetch=src.includes('.fetch(');
+            p.paths=Array.from(new Set(src.match(/\/(?:webhooks?|internal|health|demo|api)\/[a-zA-Z0-9/_-]+/g)||[])).slice(0,35);
+           }catch(e){p.errorScript=String(e.message||e)}
+           try{
+            const res=await (await grab('/workers/scripts/'+script+'/settings')).json();
+            p.serviceBindings=(res.result?.bindings||[]).filter(x=>x.type==='service')
+              .map(x=>({name:x.name,service:x.service}));
+            p.envNames=(res.result?.bindings||[]).filter(x=>x.type==='plain_text').map(x=>x.name);
+           }catch(e){p.errorConfig=String(e.message||e)}
+           out[script]=p;
+          }
+          await mkdir('docs',{recursive:true});
+          await writeFile('docs/INCIDENCIA-PROXY-PAGOS-AUDIT.json',JSON.stringify(out,null,2)+'\n');
+          console.log('SABER_WORKER_PROXY_AUDIT_OK');
+          EOF
+      - name: Guardar ruta y bindings no sensibles
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/INCIDENCIA-PROXY-PAGOS-AUDIT.json || exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/INCIDENCIA-PROXY-PAGOS-AUDIT.json
+          if ! git diff --cached --quiet;then
+            git commit -m "ops: diagnostico de Worker proxy pagos"
+            git push origin HEAD:integracion/tus-pedido-privado-20261101
+          fi
