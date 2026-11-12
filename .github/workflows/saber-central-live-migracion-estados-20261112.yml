@@ -1,0 +1,50 @@
+name: Saber - activar tablas de estados de Central LIVE sin alterar pedidos
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-central-live-migracion-estados-20261112.yml]
+permissions: {contents: read}
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      D1_TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+    steps:
+      - name: Crear dos tablas de estados y auditoría, sin tocar órdenes
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const base='https://api.cloudflare.com/client/v4/accounts/'+process.env.ACCOUNT+'/d1/database';
+          const headers={Authorization:'Bearer '+process.env.D1_TOKEN,'Content-Type':'application/json'};
+          const list=await fetch(base,{headers,signal:AbortSignal.timeout(16000)});
+          const inventory=await list.json();
+          assert.equal(inventory.success,true);
+          const databases=inventory.result.filter(x=>x.name==='saber-pagos-produccion');
+          assert.equal(databases.length,1);
+          const id=databases[0].uuid;assert.match(id,/^[a-f0-9-]{36}$/);
+          async function sql(command){
+            const response=await fetch(base+'/'+id+'/query',{method:'POST',headers,
+             body:JSON.stringify({sql:command}),signal:AbortSignal.timeout(20000)});
+            const x=await response.json();
+            assert.equal(response.ok&&x.success,true,'D1 query failed');
+            assert.equal(x.result?.[0]?.success,true);
+            return x.result[0].results||[];
+          }
+          const before=await sql("SELECT (SELECT COUNT(*) FROM orders) AS orders_total, (SELECT COUNT(*) FROM payment_reviews) AS payment_reviews_total");
+          await sql("CREATE TABLE IF NOT EXISTS central_live_production_states (order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE RESTRICT,state TEXT NOT NULL CHECK(state IN ('pendiente','en_preparacion','en_espera','listo','entregado')),version INTEGER NOT NULL DEFAULT 0 CHECK(version>=0),operator TEXT NOT NULL,updated_at TEXT NOT NULL DEFAULT(datetime('now')))");
+          await sql("CREATE TABLE IF NOT EXISTS central_live_production_audit (id INTEGER PRIMARY KEY AUTOINCREMENT,order_id TEXT NOT NULL,from_state TEXT NOT NULL,to_state TEXT NOT NULL,from_version INTEGER NOT NULL,to_version INTEGER NOT NULL,operator TEXT NOT NULL,reason TEXT NOT NULL,prepress_confirmed INTEGER NOT NULL,created_at TEXT NOT NULL DEFAULT(datetime('now')))");
+          const found=await sql("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('central_live_production_states','central_live_production_audit')");
+          assert.deepEqual(found.map(x=>x.name).sort(),['central_live_production_audit','central_live_production_states']);
+          const state=await sql("SELECT (SELECT COUNT(*) FROM central_live_production_states) AS states_total,(SELECT COUNT(*) FROM central_live_production_audit) AS audit_total,(SELECT COUNT(*) FROM orders) AS orders_total,(SELECT COUNT(*) FROM payment_reviews) AS payment_reviews_total");
+          assert.equal(state[0].states_total,0,'No crear estados falsos');
+          assert.equal(state[0].audit_total,0,'No crear auditoría falsa');
+          assert.equal(state[0].orders_total,before[0].orders_total);
+          assert.equal(state[0].payment_reviews_total,before[0].payment_reviews_total);
+          console.log('SABER_CENTRAL_PRODUCTION_STATUS_TABLES_READY_NO_CUSTOMER_ORDERS_MODIFIED');
+          console.log('SABER_CENTRAL_ORDER_COUNT='+state[0].orders_total);
+          NODE
