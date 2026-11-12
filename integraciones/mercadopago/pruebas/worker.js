@@ -4939,6 +4939,28 @@ export default {
    const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
    return diagnosticarVendedorMPLive(req,env,{readSigned:leerFirmaInternaLive});
   }
+  if(url.pathname==='/internal/central/live/transfer-staff-pending'||
+     url.pathname==='/internal/central/live/transfer-staff-approve'){
+   const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
+   const signed=await leerFirmaInternaLive(req,env);
+   if(signed?.error)return json({ok:false,error:'TRANSFER_LIVE_STAFF_FIRMA'},
+     signed.status||401);
+   const {listarTransferenciasLiveCentral,aprobarTransferenciaLiveCentral}=
+    await import('./transferencias-live-central.mjs');
+   if(url.pathname.endsWith('pending')){
+    const synthetic=new Request('https://pagos.libreriasaber.com.ar/admin/api/central/live-transfers/pending',
+     {method:'GET'});
+    return listarTransferenciasLiveCentral(synthetic,env,{authorized:true});
+   }
+   const p=signed.payload;
+   const input={order_id:p.order_id,amount_ars:p.amount_ars,
+    bank_reference:p.bank_reference,operator:p.operator,confirmed:p.confirmed};
+   const synthetic=new Request('https://pagos.libreriasaber.com.ar/admin/api/central/live-transfers/approve',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(input)
+   });
+   return aprobarTransferenciaLiveCentral(synthetic,env,{authorized:true});
+  }
   if(url.pathname==='/internal/central/live/transfer-start'||
      url.pathname==='/internal/central/live/transfer-status'){
    const {manejarTransferenciaLiveCentral}=await import('./transferencias-live-central.mjs');
