@@ -20,3 +20,4 @@ jobs:
           npm install --no-save --no-audit --no-fund playwright@1.56.0
           node --check integraciones/publicacion/qa-v3-prepublicacion-20261112.mjs
           node integraciones/publicacion/qa-v3-prepublicacion-20261112.mjs
+# Lanzamiento GO sólo simulado en memoria. Portal comercial permanece NO_GO.
