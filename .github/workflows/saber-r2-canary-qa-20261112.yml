@@ -27,3 +27,4 @@ jobs:
             integraciones/mercadopago/pruebas/r2-live-inspection-finalize.test.mjs \
             integraciones/autocotizador/recepcion/r2-live-multipart-documentos.test.mjs
           echo SABER_R2_CANARY_QA_NO_GO_NO_REAL_PAYMENT_PASS
+# Regresión 12/11: crear preferencia MP sólo para orden autorizada, R2 global NO_GO.
