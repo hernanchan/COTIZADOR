@@ -4,7 +4,7 @@ import {chromium} from 'playwright';
 import {paginaCentralPersonalLive} from '../autocotizador/recepcion/pagina-central-personal-live.mjs';
 const WEB='WEB-ENSAYO-'+'A'.repeat(32);
 const UUID='123e4567-e89b-42d3-a456-426614174000';
-let state='pendiente',version=0,updated=0;
+let state='pendiente',version=0,updated=0,mode='por_confirmar',planRevision=0;
 const url='/personal/central';
 const server=createServer(async(req,res)=>{
  if(req.url===url){
@@ -23,6 +23,20 @@ const server=createServer(async(req,res)=>{
     amountArs:1000,fileCount:1,receivedCount:0,pendingCount:1,tusCount:1,r2Count:0,
     productionState:'pendiente',productionVersion:0}
   ]}));return;
+ }
+ if(req.url==='/personal/api/live-forecast'&&req.method==='GET'){
+  res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'});
+  res.end(JSON.stringify({ok:true,settings:{mode,revision:planRevision,operator:null},estimates:[]}));
+  return;
+ }
+ if(req.url==='/personal/api/live-forecast'&&req.method==='POST'){
+  const chunks=[];for await(const chunk of req)chunks.push(chunk);
+  const p=JSON.parse(Buffer.concat(chunks).toString());
+  assert.equal(p.action,'global');assert.equal(p.mode,'hoy');
+  assert.equal(p.operator,'Operador Saber');
+  mode=p.mode;planRevision++;
+  res.writeHead(200,{'content-type':'application/json'});
+  res.end(JSON.stringify({ok:true,saved:true,settings:{mode,revision:planRevision}}));return;
  }
  if(req.url==='/personal/api/live-status'){
   const chunks=[];for await(const c of req)chunks.push(c);
@@ -55,6 +69,13 @@ try{
    assert.ok(body.includes(label),label);
   }
   assert.equal(await page.locator('a[href*="/personal/paquete?webOrderId="]').count(),1);
+  assert.equal(await page.locator('#previsionModo').count(),1);
+  await page.getByText('Previsión general de entrega').waitFor({timeout:10000});
+  if(width===390){
+   await page.locator('#previsionModo').selectOption('hoy');
+   await page.getByText('Guardar previsión').click();
+   await page.getByText('Previsión vigente: Durante el día de hoy').waitFor({timeout:10000});
+  }
   assert.equal(await page.getByText('Iniciar preparación').count(),updated?0:1);
   const viewport=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,width:innerWidth}));
   assert.ok(viewport.scroll<=viewport.width+5,'mobile overflow');
