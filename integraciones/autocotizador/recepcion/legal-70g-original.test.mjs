@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {cotizarCargaUnica} from './cotizar-carga-unica.mjs';
 import {cotizarDocumentosIndividuales} from '../pruebas/cotizar-documentos-individuales.mjs';
-const prices=JSON.parse(readFileSync(new URL('../../../precios-web.json',import.meta.url),'utf8'));
+const precios=JSON.parse(readFileSync(new URL('../../../precios-web.json',import.meta.url),'utf8'));
 const file=(w,h,modo='bn',materialColor='obra70',sel='original')=>({
  nombre:'original.pdf',servicio:'auto',seleccion:sel,
  paginas:Array.from({length:114},(_,i)=>({numero:i+1,anchoCm:w,altoCm:h,modo:'sin-clasificar'})),
