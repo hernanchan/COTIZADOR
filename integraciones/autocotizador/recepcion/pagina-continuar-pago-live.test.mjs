@@ -35,6 +35,9 @@ test('pantalla para retomar mismo pedido nunca crea orden y verifica acreditacio
   const html=await res.text();
   assert.match(html,/sessionStorage\.getItem\("saber-live-archivos-v1"\)/);
   assert.match(html,/post\("status",saved\)/);
+  assert.match(html,/\/api\/pedido\/live\/revincular/);
+  assert.match(html,/r\.status===401/);
+  assert.match(html,/recuperada!==true/);
   assert.match(html,/post\("start",order\)/);
   assert.match(html,/sessionStorage\.setItem\("saber-live-pedido-v1"/);
   assert.match(html,/\/pedido\/estado/);
