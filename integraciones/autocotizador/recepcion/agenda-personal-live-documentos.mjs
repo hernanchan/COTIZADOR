@@ -18,7 +18,7 @@ export async function agendaPersonalDocumentosLive(request,env,{authorized=false
  const p={action:'read',weekly:null,closedDates:null,expectedRevision:0,operator:''};
  if(request.method==='POST'){
   if(request.headers.get('Origin')!==HOST||
-   !/^application\\/json(?:;|$)/i.test(request.headers.get('Content-Type')||''))
+   !/^application\/json(?:;|$)/i.test(request.headers.get('Content-Type')||''))
    return respond({ok:false,error:'AGENDA_ORIGEN'},403);
   const body=await request.text();
   if(body.length>6500)return respond({ok:false,error:'AGENDA_TAMANO'},413);
