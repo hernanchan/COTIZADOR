@@ -1,0 +1,9 @@
+{
+  "schema": "saber-fotos-productos-local-v1",
+  "images": {
+    "ESC001": "assets/productos/b33e5bd35000d1bf.jpg",
+    "ESC002": "assets/productos/e0c783d035cdfa9a.png",
+    "esc003": "assets/productos/202f3ac8f5fa4993.png",
+    "OFI001": "assets/productos/0443ba378bdc7e65.jpg"
+  }
+}

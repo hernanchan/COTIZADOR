@@ -73,42 +73,59 @@ html.embedded .demo-cart{display:none}
 .receiver-health{border:1px solid #dfba72;background:#fff8ec;color:#6f521f;border-radius:10px;padding:12px 14px;margin-top:12px;font-size:13px;line-height:1.5}
 .receiver-health[hidden]{display:none!important}.receiver-health strong{display:block;margin-bottom:5px}
 .receiver-health a{font-weight:800;color:#16538c;text-decoration:underline}
+
+/* Flujo visual independiente inspirado en un cotizador por pasos; sin reutilizar código externo. */
+.header-offer{display:flex;flex-direction:column;gap:3px;text-align:right;font-size:12px;color:#245c92;white-space:nowrap}
+.header-offer span{color:#63748b;font-size:11px}
+.express-steps{max-width:1200px;margin:13px auto 0;padding:0 15px;display:flex;gap:8px}
+.express-steps span{flex:1;border:1px solid #dae3ef;border-radius:8px;background:#fff;color:#586b82;text-align:center;padding:10px 6px;font-size:12px;font-weight:700}
+.express-steps .step-now{background:#e9f3ff;border-color:#a8c7e8;color:#235e9d}
+@media(max-width:650px){.header-offer{white-space:normal;text-align:left}.express-steps{gap:5px;margin:9px auto 0;padding:0 10px}.express-steps span{font-size:10px;padding:8px 4px}header{flex-wrap:wrap}}
 </style>
 </head>
 <body>
-<header><div><div class="brand">Polaroids<span style="color:#7990a8"> / </span><em>hasta 60 fotos</em><span class="tag">Librería Saber</span></div><p>Editor Polaroids · fotos privadas, sin descarga pública</p></div><div style="font-size:12px;color:#62718a;text-align:right">2 columnas × 3 filas<br>Vista previa sin descarga</div></header>
+<header><div><div class="brand">Polaroids<span style="color:#7990a8"> / </span><em>Express</em><span class="tag">Librería Saber</span></div><p>Servicio independiente · tus fotos se preparan en forma privada</p></div><div class="header-offer"><strong>6 fotos por hoja A4</strong><span>$3.000 por hoja · hasta 24 fotos</span></div></header>
+<nav class="express-steps" aria-label="Pasos del pedido Polaroids"><span class="step-now">1 · Subí tus fotos</span><span>2 · Ajustá los encuadres</span><span>3 · Confirmá el pedido</span></nav>
 <main class="app">
 <section class="panel left">
   <div class="sheetnav" aria-label="Hojas de seis fotos">
 <div class="sheetnavtop"><b id="sheetPosition">Hoja 1 de 1</b><strong id="sheetPrice">Total: $3.000</strong></div>
 <div class="sheetnavbuttons"><button type="button" class="secondary" id="prevSheet">← Anterior</button><button type="button" class="secondary" id="nextSheet">Siguiente →</button><button type="button" class="secondary" id="addSheet">+ Otra hoja de 6</button><button type="button" class="secondary delete-sheet" id="deleteSheet">Eliminar hoja</button></div>
-<small id="sheetProgress">Hasta 60 fotos por pedido</small></div><div class="partial-notice" id="partialNotice" hidden aria-live="polite"></div>
-<div class="sect"><h2>1. Seleccioná tus fotos (hasta 60 juntas)</h2><small id="count">0 de 6</small></div>
-  <label class="drop" id="drop" for="inputPhotos" title="Seleccioná hasta 60 imágenes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4h16v16H4zM7 16l4-4 3 3 2-2 2 3M8 8h.01"/><path d="M12 2v4M10 4h4"/></svg><strong>Elegí hasta 60 fotos juntas o arrastralas acá</strong><p>JPG, PNG o WebP · Se distribuyen de a seis por hoja A4</p></label>
+<small id="sheetProgress">Hasta 24 fotos por pedido</small></div><div class="partial-notice" id="partialNotice" hidden aria-live="polite"></div>
+<div class="sect"><h2>Elegí tus fotos (máximo 24)</h2><small id="count">0 de 6</small></div>
+  <label class="drop" id="drop" for="inputPhotos" title="Seleccioná hasta 24 imágenes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4h16v16H4zM7 16l4-4 3 3 2-2 2 3M8 8h.01"/><path d="M12 2v4M10 4h4"/></svg><strong>Elegí hasta 24 fotos juntas o arrastralas acá</strong><p>JPG, PNG o WebP · Se distribuyen de a seis por hoja A4</p></label>
   <input id="inputPhotos" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden>
   <input id="inputReplace" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" hidden>
   <div class="slots" id="slots"></div>
-  <div class="options"><label>2. Tus Polaroids</label>
+  <div class="options"><label>Formato de tus Polaroids</label>
   <div class="fixed-format"><strong>85 × 90 mm por fotografía</strong><span>Imagen interior 75 × 75 mm · borde blanco inferior de 11 mm</span></div>
   <div class="trim-tip">Las seis fotos se imprimirán y cortarán en Librería Saber. Vos podés ajustar cada encuadre; del corte nos encargamos nosotros.</div></div>
   <div id="secureReceptionNotice" class="secure-reception-note" hidden>
    <strong>Recepción protegida de fotografías</strong>
-   <span>Podés enviar entre 1 y 60 fotos, en hasta 10 hojas A4 (máximo seis por hoja). Usaremos tus fotos únicamente para preparar tu pedido.</span>
-   <span>Envío en tandas de 6. Al empezar, guardamos tus fotos y el avance en este dispositivo. Si se interrumpe, volvé desde el mismo navegador y pulsá Continuar envío.</span>
+   <span>Podés enviar entre 1 y 24 fotos, en hasta 4 hojas A4 (máximo seis por hoja). Las fotografías se usan para preparar el pedido. Librería Saber accederá al PDF final privado.</span>
    <label class="consent-check"><input id="photoConsent" type="checkbox"> Acepto enviar mis fotografías únicamente para preparar este pedido en Librería Saber.</label>
    <div id="turnstileBox"></div>
+  </div>
+  <div id="expressRecovery" class="secure-reception-note" hidden>
+   <strong>Envío Express recuperable</strong>
+   <span id="expressRecoveryText">Hay un PDF Express pendiente de confirmar desde este navegador.</span>
+   <div class="buttons">
+    <button class="secondary" id="retryExpress" type="button">Reintentar envío preparado</button>
+    <button class="secondary" id="discardExpress" type="button">Descartar recortes locales</button>
+   </div>
+   <small>Se conservan sólo los recortes optimizados en este dispositivo, hasta 2 horas. Se borran al confirmar o descartar. Para reintentar debés completar nuevamente la verificación de seguridad.</small>
   </div>
   <div id="receiverHolder" hidden></div><div id="receiverHealth" class="receiver-health" hidden role="status" aria-live="polite"><strong>Google todavía no confirmó la conexión.</strong><span id="receiverHealthText"></span> <a id="receiverHealthLink" target="_blank" rel="noopener noreferrer">Comprobar receptor de Google</a></div>
   <div class="buttons"><button class="primary" id="btnPdf" disabled>Recepción no disponible</button><button class="secondary" id="btnDemo" title="Para probar antes de usar fotos reales">Cargar prueba</button><button class="secondary" id="btnClear">Vaciar</button></div>
   <div class="status" id="status" role="status" aria-live="polite">Seleccioná tus fotografías. Podés cargarlas todas de una vez.</div>
    <div id="afterReceipt" hidden style="margin-top:12px;padding:14px;background:#eaf8f0;border-radius:12px">
-     <strong style="display:block;color:#155c39;margin-bottom:10px">¡Tus fotos ya están listas! Continuá al carrito para completar tu pedido.</strong>
+     <strong style="display:block;color:#155c39;margin-bottom:10px">Fotografías recibidas y PDF listo en Drive privado.</strong>
      <button type="button" class="primary" id="goToCartAfterReceipt">Continuar al carrito</button>
    </div>
 </section>
 <section class="panel right">
   <section id="sheetOverview" class="sheet-overview" hidden aria-label="Vista general de todas las hojas"><h3 id="overviewHeading">Todas tus hojas A4</h3><p>Tocá una hoja para verla más grande y ajustar sus fotografías.</p><div id="sheetOverviewGrid" class="sheet-overview-grid"></div></section>
-  <div class="sheet-title"><h2>Hoja seleccionada · vista ampliada</h2><small id="previewSheetLabel">Hoja 1 · A4 vertical</small></div>
+  <div class="sheet-title"><h2>Vista previa · ajustá cada foto</h2><small id="previewSheetLabel">Hoja 1 · A4 vertical</small></div>
   <div class="paper-holder"><canvas class="paper" id="preview" width="840" height="1188" title="Hacé clic en una foto para corregir su encuadre"></canvas></div>
   <section class="preview-guide" aria-label="Cómo ajustar tus fotografías">
     <h3>Cómo ajustar tus fotos</h3>
@@ -145,7 +162,7 @@ if(window.parent!==window){
 'use strict';
 const PAGE={w:210,h:297};
 const FORMAT={w:85,h:90,photo:75,left:5,top:4,bottom:11,gapX:0,gapY:0,label:'Compacta · 85 × 90 mm'};
-const MAX_SHEETS=10;
+const MAX_SHEETS=4;
 const sheets=[Array(6).fill(null)];
 let activeSheet=0;
 let photos=sheets[0];
@@ -186,10 +203,10 @@ function updateSheetNav(){
  $('nextSheet').disabled=activeSheet===sheets.length-1;
  $('addSheet').disabled=locked||sheets.length>=MAX_SHEETS||activeSheet!==sheets.length-1||!sheetComplete(photos);
  $('deleteSheet').disabled=locked||sheets.length===1;
- $('btnPdf').disabled=recoveryLoading||loadingPhotos||!orderComplete()||busy||!!receivedReference||!receiverConfig?.enabled||!receiverApiUrl;
+ $('btnPdf').disabled=loadingPhotos||!orderComplete()||busy||!!receivedReference||!receiverConfig?.enabled||!receiverApiUrl;
  $('afterReceipt').hidden=!receivedReference||window.parent!==window;
- $('btnPdf').textContent=receivedReference?'Pedido '+customerOrderNumber(receivedReference):
-  receivingSession?'Continuar envío':receiverConfig&&receiverConfig.enabled?'Enviar '+n+' fotos y agregar al carrito':
+ $('btnPdf').textContent=receivedReference?'Fotos recibidas · '+receivedReference:
+  receiverConfig&&receiverConfig.enabled?(receiverConfig.mode==='express'?'Enviar '+n+' fotos · un PDF privado':'Enviar '+n+' fotos y agregar al carrito'):
   'Servicio próximamente disponible';
  showPartialNotice();
 }
@@ -222,7 +239,7 @@ let beforeEdit=null;
 let replaceIndex=-1;
 let busy=false;
 let loadingPhotos=false;
-const editingLocked=()=>recoveryLoading||busy||loadingPhotos||!!receivingSession||!!receivedReference;
+const editingLocked=()=>busy||loadingPhotos||!!receivingSession||!!receivedReference;
 let provisionalReference='';
 let receiverConfig=null;
 let receiverBridge=null;
@@ -234,7 +251,6 @@ let turnstileToken='';
 let receiverRequestCount=0;
 const receiverPending=new Map();
 let receivingSession=null;
-function customerOrderNumber(reference){return String(reference).slice(0,12)}
 let receivedReference='';
 let receivedOrder=null;
 let receiverInitError='';
@@ -327,14 +343,7 @@ function renderSlots(){const target=$('slots');target.replaceChildren();let tota
  }$('count').textContent=total+' de 6';updateSheetNav();if(total===6)status('Hoja '+(activeSheet+1)+' completa. Podés agregar otra o continuar con el pedido.','ok');else status('Hoja '+(activeSheet+1)+': faltan '+(6-total)+' fotografía'+(6-total===1?'':'s')+'.');}
 function renderAll(){renderSlots();renderPreview();renderOverview()}
 function dropPhoto(i){if(editingLocked())return;if(photos[i]&&photos[i].url)URL.revokeObjectURL(photos[i].url);photos[i]=null}
-async function loadImage(source){
- let file;
- try{
-  const bytes=await source.arrayBuffer();
-  if(!bytes.byteLength||bytes.byteLength!==source.size)throw new Error('Lectura incompleta');
-  file=new File([bytes],source.name,{type:source.type,lastModified:source.lastModified});
- }catch(_){throw new Error('No se pudo preparar '+source.name+'. Descargá esa foto en el teléfono y volvé a seleccionarla.')}
- return new Promise((resolve,reject)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>resolve({name:file.name,img:im,url:u,file,zoom:1,cx:.5,cy:.5});im.onerror=()=>{URL.revokeObjectURL(u);reject(new Error('No se pudo abrir '+file.name+'. Usá JPG, PNG o WebP.'))};im.src=u})}
+function loadImage(file){return new Promise((resolve,reject)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>resolve({name:file.name,img:im,url:u,file,zoom:1,cx:.5,cy:.5});im.onerror=()=>{URL.revokeObjectURL(u);reject(new Error('No se pudo abrir '+file.name+'. Usá JPG, PNG o WebP.'))};im.src=u})}
 async function acceptFiles(files,specific=-1){
  if(editingLocked()||!files.length)return;
  const valid=files.filter(f=>receiverConfig&&receiverConfig.enabled
@@ -342,7 +351,7 @@ async function acceptFiles(files,specific=-1){
   :f.type.startsWith('image/')||/\.(jpe?g|png|webp|heic|heif)$/i.test(f.name));
  if(!valid.length){status('No hay imágenes válidas.','bad');return;}
  const free=specific>=0?1:MAX_SHEETS*6-photoCount();
- if(free<=0){status('Máximo 60 fotos. Quitá alguna antes de añadir más.','bad');return;}
+ if(free<=0){status('Máximo 24 fotos. Quitá alguna antes de añadir más.','bad');return;}
  const selected=valid.slice(0,free),errors=[];let loaded=0,last=activeSheet;
  loadingPhotos=true;updateSheetNav();
  for(const file of selected){
@@ -363,7 +372,7 @@ async function acceptFiles(files,specific=-1){
  renderAll();
  const excess=valid.length-selected.length,invalid=files.length-valid.length;
  if(excess||invalid||errors.length)
-  status('Se cargaron '+loaded+' foto'+(loaded===1?'':'s')+'.'+(excess?' '+excess+' foto'+(excess===1?'':'s')+' exceden el límite de 60.':'')+(invalid?' '+invalid+' rechazadas por formato/tamaño.':'')+(errors.length?' '+errors.join(' '):''),'bad');
+  status('Se cargaron '+loaded+' foto'+(loaded===1?'':'s')+'.'+(excess?' '+excess+' foto'+(excess===1?'':'s')+' exceden el límite de 24.':'')+(invalid?' '+invalid+' rechazadas por formato/tamaño.':'')+(errors.length?' '+errors.join(' '):''),'bad');
  else if(loaded)status('Se cargaron '+loaded+' foto'+(loaded===1?'':'s')+'. Total: '+photoCount()+'. Revisá los encuadres.','ok');
 }
 $('inputPhotos').addEventListener('change',e=>{acceptFiles([...e.target.files]);e.target.value='' });$('inputReplace').addEventListener('change',e=>{acceptFiles([...e.target.files],replaceIndex);e.target.value='';replaceIndex=-1});
@@ -490,7 +499,7 @@ function readFileBase64(file){
   r.readAsDataURL(file);
  });
 }
-function imprimirRecorte(p){
+function imprimirRecorte(p,quality=.94){
  return new Promise((resolve,reject)=>{
   const canvas=document.createElement('canvas');
   canvas.width=886;canvas.height=886;
@@ -501,7 +510,7 @@ function imprimirRecorte(p){
   ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
   ctx.drawImage(p.img,crop.x,crop.y,crop.s,crop.s,0,0,886,886);
   canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('No se pudo generar la fotografía de imprenta.')),
-   'image/jpeg',0.94);
+   'image/jpeg',quality);
  });
 }
 function photoFingerprint(){
@@ -516,57 +525,139 @@ function resetChallenge(){
  if(turnstileWidget!==null&&window.turnstile&&typeof turnstile.reset==='function')
   turnstile.reset(turnstileWidget);
 }
-// Recuperación local: los originales se guardan una vez; el avance, tras cada confirmación.
-let recoveryLoading=true,screenLock=null;
-function recoveryStore(mode,action){
- return new Promise((resolve,reject)=>{
-  if(!window.indexedDB){reject(new Error('Este navegador no permite guardar el avance. Abrí el editor en Chrome o Safari.'));return}
-  const request=indexedDB.open('saber-polaroids-recovery',1);
-  request.onupgradeneeded=()=>request.result.createObjectStore('order');
-  request.onerror=()=>reject(new Error('No se pudo abrir el guardado del pedido en este teléfono.'));
-  request.onsuccess=()=>{
-   const db=request.result;let result;
-   const tx=db.transaction('order',mode),store=tx.objectStore('order');
-   tx.oncomplete=()=>{db.close();resolve(result)};
-   tx.onerror=tx.onabort=()=>{db.close();reject(new Error('No hay espacio disponible para guardar el pedido. Liberá espacio antes de enviar.'))};
-   try{action(store,value=>{result=value})}catch(e){tx.abort();db.close();reject(e)}
-  };
- });
-}
-function saveRecovery(includePhotos=false){
- const session=receivingSession?{...receivingSession,uploaded:[...receivingSession.uploaded]}:null;
- const meta={version:1,session,receivedReference,receivedOrder,partialConfirmed,consent:$('photoConsent').checked};
- return recoveryStore('readwrite',store=>{
-  store.put(meta,'meta');
-  if(includePhotos)store.put(sheets.map(sheet=>sheet.map(p=>p?{file:p.file,zoom:p.zoom,cx:p.cx,cy:p.cy}:null)),'photos');
- });
-}
-async function restoreRecovery(){
+async function detectarExpressPendiente(){
+ if(receiverConfig?.mode!=='express')return;
  try{
-  if(!window.indexedDB)return;
-  const saved=await recoveryStore('readonly',(store,done)=>{
-   const result={};store.get('meta').onsuccess=e=>{result.meta=e.target.result};
-   store.get('photos').onsuccess=e=>{result.photos=e.target.result;done(result)};
-  });
-  if(!saved?.meta||!saved.photos)return;
-  if(saved.meta.version!==1||!Array.isArray(saved.photos)||saved.photos.length>10)throw new Error('No se pudo recuperar el pedido guardado.');
-  const recovered=[];
-  for(const sheet of saved.photos){const row=[];for(const p of sheet)row.push(p?Object.assign(await loadImage(p.file),{zoom:p.zoom,cx:p.cx,cy:p.cy}):null);recovered.push(row)}
-  sheets.splice(0,sheets.length,...recovered);activeSheet=0;photos=sheets[0];
-  partialConfirmed=saved.meta.partialConfirmed;
-  receivingSession=saved.meta.session?{...saved.meta.session,uploaded:new Set(saved.meta.session.uploaded)}:null;
-  receivedReference=saved.meta.receivedReference||'';receivedOrder=saved.meta.receivedOrder||null;
-  $('photoConsent').checked=saved.meta.consent===true;
-  renderAll();status(receivedReference?'Pedido recuperado. Continuá al carrito.':'Recuperamos tus fotos y encuadres. Pulsá Continuar envío para retomar.','ok');
- }catch(e){status(e.message,'bad');throw e}
- finally{recoveryLoading=false;updateSheetNav()}
+  const {leerBorradorExpress}=await import('./express-recuperacion.mjs');
+  const pending=await leerBorradorExpress();
+  $('expressRecovery').hidden=!pending;
+  if(pending)$('expressRecoveryText').textContent=
+   'Hay '+pending.fotos+' fotos de '+pending.hojasA4+
+   ' hoja(s) preparadas. Podés reintentar sin volver a elegir las imágenes.';
+ }catch(_){$('expressRecovery').hidden=true}
 }
-async function keepScreenAwake(){try{if(document.visibilityState==='visible'&&navigator.wakeLock)screenLock=await navigator.wakeLock.request('screen')}catch(_){}}
-document.addEventListener('visibilitychange',()=>{if(busy&&document.visibilityState==='visible')keepScreenAwake()});
+async function eliminarExpressLocal(){
+ try{
+  const {borrarBorradorExpress}=await import('./express-recuperacion.mjs');
+  await borrarBorradorExpress();
+ }catch(_){}
+ $('expressRecovery').hidden=true;
+}
+async function confirmarExpressPrivado({reference,challenge,hojas,fotos,numeroHojas}){
+ const response=await fetch(receiverApiUrl,{
+  method:'POST',headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({reference,turnstileToken:challenge,hojas}),
+  cache:'no-store'
+ });
+ const reply=await response.json().catch(()=>null);
+ if(!response.ok||reply?.ok!==true||reply.verified!==true||
+    reply.pdfPrivateConfirmed!==true||reply.reference!==reference||
+    reply.sheets!==numeroHojas||reply.photos!==fotos||
+    reply.pdfForClient!==false||reply.checkoutAuthorized!==false)
+  throw new Error(reply?.error||'Google no confirmó el PDF. Podés reintentar.');
+ receivedOrder=Object.freeze({
+  reference,sheets:numeroHojas,photos:fotos,price:numeroHojas*unitPrice
+ });
+ receivedReference=reference;receivingSession=null;
+ await eliminarExpressLocal();
+ status('¡PDF privado confirmado! '+numeroHojas+
+  ' hoja(s) A4 · Referencia '+reference+'.','ok');
+ if(window.parent!==window)
+  window.parent.postMessage({type:'SABER_POLAROID_RECEIVED',
+   payload:{sheets:numeroHojas,photos:fotos,format:'85x90',
+    uploadsReceived:true,reference,referenceStatus:'received'}},window.location.origin);
+}
+async function reintentarExpressGuardado(){
+ if(busy||receivedReference||receiverConfig?.mode!=='express'||!receiverApiUrl)return;
+ if(!$('photoConsent').checked)
+  throw new Error('Aceptá el uso de tus fotografías para el pedido.');
+ if(!turnstileToken)throw new Error('Completá nuevamente el control de seguridad.');
+ const {leerBorradorExpress}=await import('./express-recuperacion.mjs');
+ const cached=await leerBorradorExpress();
+ if(!cached){$('expressRecovery').hidden=true;throw new Error('No hay fotos recuperables en este navegador.');}
+ const challenge=turnstileToken;turnstileToken='';
+ busy=true;document.querySelector('.app').classList.add('uploading');updateSheetNav();
+ try{
+  status('Reintentando el envío preparado · '+cached.fotos+' fotos…');
+  await confirmarExpressPrivado({
+   reference:cached.referencia,challenge,hojas:cached.hojas,
+   fotos:cached.fotos,numeroHojas:cached.hojasA4
+  });
+ }catch(e){
+  status('La recepción aún no se confirmó: '+String(e.message||e)+
+   '. Podés volver a reintentar durante dos horas.','bad');
+ }finally{
+  resetChallenge();busy=false;
+  document.querySelector('.app').classList.remove('uploading');updateSheetNav();
+ }
+}
+/** Nuevo flujo: JPG optimizados en tránsito; sólo PDF final en Google.
+ * Nunca envía File originales, ni genera PDF imprimible en el navegador.
+ */
+async function sendExpressPhotos(){
+ if(busy||loadingPhotos||editorIndex>=0||receivedReference||
+    receiverConfig?.mode!=='express'||!orderComplete())return;
+ if(!receiverApiUrl||sheets.length<1||sheets.length>MAX_SHEETS)
+  throw new Error('El receptor Express no está listo.');
+ if(!$('photoConsent').checked)
+  throw new Error('Aceptá el envío de tus fotos para producir el PDF privado.');
+ const fingerprint=photoFingerprint();
+ if(receivingSession&&receivingSession.fingerprint!==fingerprint)
+  throw new Error('Las fotos o encuadres cambiaron durante el envío.');
+ if(!turnstileToken)
+  throw new Error('Completá la verificación de seguridad para enviar o reintentar.');
+ const all=sheets.flat().filter(Boolean);
+ if(all.length<1||all.length>24)
+  throw new Error('Polaroids Express admite hasta 24 fotografías.');
+ for(const p of all){
+  const file=p?.file;
+  if(!file||!['image/jpeg','image/png'].includes(file.type)||
+     file.size<1||file.size>5*1024*1024)
+   throw new Error('Usá fotos JPG o PNG de hasta 5 MB.');
+ }
+ if(!receivingSession){
+  receivingSession={reference:secureOrderReference(),fingerprint,mode:'express'};
+ }
+ const reference=receivingSession.reference;
+ const challenge=turnstileToken;turnstileToken='';
+ busy=true;document.querySelector('.app').classList.add('uploading');updateSheetNav();
+ try{
+  const {prepararEnvioExpress}=await import('./express-cliente.mjs');
+  const prepared=await prepararEnvioExpress({
+   hojas:sheets.map(sheet=>sheet.filter(Boolean)),
+   recortar:(p,quality)=>imprimirRecorte(p,quality),
+   onAvance:p=>status('Optimizando fotos '+p.preparadas+' de '+p.total+
+    ' · hoja '+p.hoja+' de '+p.hojas+'…')
+  });
+  if(photoFingerprint()!==fingerprint)
+   throw new Error('Los encuadres cambiaron durante la preparación.');
+  try{
+   const {guardarBorradorExpress}=await import('./express-recuperacion.mjs');
+   await guardarBorradorExpress({referencia:reference,hojas:prepared.hojas});
+   $('expressRecovery').hidden=false;
+   $('expressRecoveryText').textContent='Se guardaron temporalmente '+prepared.fotos+
+    ' recortes optimizados para recuperar este envío durante dos horas.';
+  }catch(e){
+   if(String(e.message||e).includes('otro envío'))throw e;
+   status('Este navegador no permitió guardar una copia local recuperable. No cierres la pantalla durante el envío.','bad');
+  }
+  status('Enviando '+prepared.fotos+' recortes optimizados para generar un solo PDF privado…');
+  await confirmarExpressPrivado({reference,challenge,
+   hojas:prepared.hojas,fotos:prepared.fotos,numeroHojas:prepared.numeroHojas});
+ }catch(e){
+  status('El PDF todavía no está confirmado. '+String(e?.message||'')+
+   ' Mantené esta pantalla abierta y reintentá con una nueva verificación.','bad');
+ }finally{
+  resetChallenge();
+  busy=false;document.querySelector('.app').classList.remove('uploading');updateSheetNav();
+ }
+}
+
 async function sendSecurePhotos(){
- if(recoveryLoading||busy||loadingPhotos||editorIndex>=0||receivedReference||!receiverConfig||!receiverConfig.enabled||!orderComplete())return;
- if(sheets.length<1||sheets.length>10)
-  throw new Error('Podés preparar entre una y diez hojas A4.');
+ if(receiverConfig?.mode==='express')return sendExpressPhotos();
+ if(busy||loadingPhotos||editorIndex>=0||receivedReference||!receiverConfig||!receiverConfig.enabled||!orderComplete())return;
+ if(sheets.length<1||sheets.length>MAX_SHEETS)
+  throw new Error('Podés preparar entre una y cuatro hojas A4.');
  if(!receiverApiUrl)throw new Error('La recepción segura todavía no está configurada.');
  if(!$('photoConsent').checked)throw new Error('Aceptá primero el envío de fotografías para este pedido.');
  const allPhotos=sheets.flat().filter(Boolean);
@@ -582,36 +673,25 @@ async function sendSecurePhotos(){
   throw new Error('Completá la verificación de seguridad antes de enviar.');
  busy=true;document.querySelector('.app').classList.add('uploading');updateSheetNav();
  try{
-  await keepScreenAwake();
   if(!receivingSession){
-   status('Guardando tus fotos para poder retomar el envío…');
+   status('Validando seguridad y creando el pedido privado…');
    const reference=secureOrderReference(),uploadKey=secureOrderKey();
+   const token=turnstileToken;turnstileToken='';
    receivingSession={reference,uploadKey,uploaded:new Set(),fingerprint,started:false};
-   try{await saveRecovery(true)}catch(e){receivingSession=null;throw e}
+   try{await publicPost('start',{reference,uploadKey,sheets:sheets.length,photos:allPhotos.length,turnstileToken:token});}
+   catch(e){/* verificar por estado: la solicitud pudo completarse antes de un error de red */ }
+   await confirmServer(reference,uploadKey,x=>x.status==='receiving'&&x.photos===allPhotos.length&&x.sheets===sheets.length);
+   receivingSession.started=true;
+  }else if(!receivingSession.started){
+   await confirmServer(receivingSession.reference,receivingSession.uploadKey,
+    x=>x.status==='receiving'&&x.photos===allPhotos.length&&x.sheets===sheets.length,20000);
+   receivingSession.started=true;
   }
-  if(!receivingSession.started){
-   const known=await publicStatus(receivingSession.reference,receivingSession.uploadKey);
-   if(!known.found){
-    if(!turnstileToken){resetChallenge();throw new Error('Tus fotos están guardadas. Completá la verificación de seguridad y pulsá Continuar envío.');}
-    const token=turnstileToken;turnstileToken='';
-    try{await publicPost('start',{reference:receivingSession.reference,uploadKey:receivingSession.uploadKey,sheets:sheets.length,photos:allPhotos.length,turnstileToken:token});}
-    catch(e){/* comprobar estado: pudo llegar al servidor aunque se cortara la respuesta */}
-   }
-  }
-  const resumed=await confirmServer(receivingSession.reference,receivingSession.uploadKey,
-   x=>['receiving','received'].includes(x.status)&&x.photos===allPhotos.length&&x.sheets===sheets.length,20000);
-  receivingSession.started=true;
-  if(!Number.isInteger(resumed.received)||resumed.received<0||resumed.received>allPhotos.length)
-   throw new Error('No pudimos comprobar el avance del pedido. Tus fotos siguen guardadas.');
-  receivingSession.uploaded=new Set(Array.from({length:resumed.received},(_,i)=>i));
-  await saveRecovery();
   for(let i=0;i<allPhotos.length;i++){
    if(receivingSession.uploaded.has(i))continue;
    const p=allPhotos[i];
-   status('Tanda '+(Math.floor(i/6)+1)+' de '+Math.ceil(allPhotos.length/6)+' · Enviando foto '+(i+1)+' de '+allPhotos.length+'…');
-   let original;
-   try{original=await readFileBase64(p.file);}
-   catch(_){throw new Error('No pudimos leer la foto '+(i+1)+' ('+p.file.name+'). Las fotos ya enviadas se conservan; pulsá Enviar para reintentar.');}
+   status('Preparando y enviando la foto '+(i+1)+' de '+allPhotos.length+'…');
+   const original=await readFileBase64(p.file);
    const blob=await imprimirRecorte(p);
    const printJpeg=await readFileBase64(blob),c=cropBounds(p);
    const payload={reference:receivingSession.reference,
@@ -622,11 +702,9 @@ async function sendSecurePhotos(){
    await confirmServer(receivingSession.reference,receivingSession.uploadKey,
     x=>x.received>=i+1&&['receiving','received'].includes(x.status));
    receivingSession.uploaded.add(i);
-   await saveRecovery();
-   if((i+1)%6===0)status('Tanda '+((i+1)/6)+' recibida. Avance guardado.','ok');
   }
-  status('Preparando tu pedido…');
-  try{if(resumed.status!=='received')await publicPost('finish',{reference:receivingSession.reference,uploadKey:receivingSession.uploadKey});}
+  status('Creando el PDF privado…');
+  try{await publicPost('finish',{reference:receivingSession.reference,uploadKey:receivingSession.uploadKey});}
   catch(e){/* confirmar por consulta */ }
   const result=await confirmServer(receivingSession.reference,receivingSession.uploadKey,
    x=>x.status==='received'&&x.received===allPhotos.length&&x.photos===allPhotos.length,120000);
@@ -635,16 +713,16 @@ async function sendSecurePhotos(){
    uploadsReceived:true,reference,referenceStatus:'received'};
   receivedOrder=Object.freeze({reference,sheets:sheets.length,photos:allPhotos.length,price:sheets.length*unitPrice});
   receivedReference=reference;receivingSession=null;
-  await saveRecovery();
-  status('¡Recibimos '+result.received+' fotografías! Pedido '+customerOrderNumber(reference)+'.','ok');
+  status('¡Recibimos '+result.received+' fotografías! Referencia '+reference+'.','ok');
   updateSheetNav();
   if(window.parent!==window)
    window.parent.postMessage({type:'SABER_POLAROID_RECEIVED',payload:cartPayload},window.location.origin);
  }catch(error){
-  // Conservamos referencia y claves ante cortes; consultar estado antes de reenviar.
+  if(receivingSession&&!receivingSession.started){
+   receivingSession=null;resetChallenge();
+  }
   status('No se completó el envío: '+(error&&error.message||'error desconocido'),'bad');
  }finally{
-  if(screenLock){try{await screenLock.release()}catch(_){}screenLock=null}
   busy=false;document.querySelector('.app').classList.remove('uploading');updateSheetNav();
  }
 }
@@ -660,7 +738,7 @@ async function loadTurnstile(sitekey){
  if(!window.turnstile||typeof turnstile.render!=='function')
   throw new Error('La verificación Turnstile no está disponible.');
  turnstileWidget=turnstile.render('#turnstileBox',{
-  sitekey,action:'polaroids',
+  sitekey,action:receiverConfig?.mode==='express'?'polaroids-express':'polaroids',
   callback:token=>{if(receivedReference||busy)return;turnstileToken=token;status('Verificación completada. Ya podés enviar tus fotos.','ok')},
   'expired-callback':()=>{turnstileToken='';if(!receivedReference&&!busy)status('La verificación venció. Completala nuevamente.','bad')},
   'error-callback':()=>{turnstileToken='';if(!receivedReference&&!busy)status('Falló la verificación de seguridad. Volvé a intentarlo.','bad')}
@@ -672,22 +750,41 @@ async function setupSecureReception(){
   if(!res.ok)throw new Error('Configuración de recepción no encontrada.');
   const cfg=await res.json();
   if(cfg.enabled!==true||cfg.rollout!=='APROBADO')return;
-  receiverConfig={enabled:true};
-  if(location.hostname!==cfg.allowedHost||cfg.maxSheetsForRealUploads!==10||
+  receiverConfig={enabled:true,mode:cfg.delivery==='express-pdf-only'?'express':'legacy'};
+  if(location.hostname!==cfg.allowedHost||cfg.maxSheetsForRealUploads!==MAX_SHEETS||
      typeof cfg.turnstileSiteKey!=='string'||!/^[a-zA-Z0-9_-]{5,100}$/.test(cfg.turnstileSiteKey))
    throw new Error('La recepción protegida no está configurada para este sitio.');
-  const url=new URL(cfg.bridgeUrl);
-  if(url.protocol!=='https:'||url.hostname!=='script.google.com'||
-     !/^\/macros\/s\/[A-Za-z0-9_-]{20,}\/exec\/?$/.test(url.pathname))
-   throw new Error('La dirección del receptor es inválida.');
-  await publicPing(); // Verifica por servidor; sin iframes ni JSONP en navegador.
-  receiverApiUrl=location.origin+'/api/polaroids-receiver';
+  if(receiverConfig.mode==='express'){
+   const url=new URL('/api/polaroids-express',location.origin);
+   if(cfg.expressApiPath!=='/api/polaroids-express'||url.origin!==location.origin)
+    throw new Error('La ruta Express no coincide con el sitio.');
+   const ping=await fetch(url.href,{cache:'no-store'});
+   const response=await ping.json().catch(()=>null);
+   if(!ping.ok||response?.enabled!==true||response.maxPhotos!==MAX_SHEETS*6||
+      response.pdfForClient!==false)
+    throw new Error('El nuevo receptor Express todavía está deshabilitado.');
+   receiverApiUrl=url.href;
+   const info=$('secureReceptionNotice');
+   // No reemplazar el contenedor: incluye consentimiento y Turnstile.
+   const heading=info.querySelector('strong');
+   const details=info.querySelector('span');
+   if(heading)heading.textContent='Polaroids Express · PDF privado único';
+   if(details)details.textContent='Se envían únicamente recortes optimizados. Drive recibe un solo PDF imprimible, privado para Librería Saber.';
+  }else{
+   const url=new URL(cfg.bridgeUrl);
+   if(url.protocol!=='https:'||url.hostname!=='script.google.com'||
+      !/^\/macros\/s\/[A-Za-z0-9_-]{20,}\/exec\/?$/.test(url.pathname))
+    throw new Error('La dirección del receptor es inválida.');
+   await publicPing();
+   receiverApiUrl=location.origin+'/api/polaroids-receiver';
+  }
   $('secureReceptionNotice').hidden=false;
   $('inputPhotos').accept='image/jpeg,image/png';
   $('inputReplace').accept='image/jpeg,image/png';
-  if(!receivedReference&&!receivingSession?.started)await loadTurnstile(cfg.turnstileSiteKey);
+  await loadTurnstile(cfg.turnstileSiteKey);
+  if(receiverConfig.mode==='express')await detectarExpressPendiente();
   updateSheetNav();
-  status(receivedReference?'Pedido recuperado. Continuá al carrito.':receivingSession?'Tus fotos y encuadres están guardados. Pulsá Continuar envío para retomar.':'Recepción protegida lista. Verificá la seguridad antes de enviar las fotos.');
+  status('Recepción protegida lista. Verificá la seguridad antes de enviar las fotos.');
   if(window.parent!==window)
    window.parent.postMessage({type:'SABER_POLAROID_MODE',enabled:true},window.location.origin);
  }catch(e){
@@ -699,8 +796,12 @@ async function setupSecureReception(){
   }
  }
 }
-restoreRecovery().then(()=>setupSecureReception()).catch(()=>{receiverApiUrl='';});
+setupSecureReception();
 
+$('retryExpress').onclick=()=>reintentarExpressGuardado()
+ .catch(e=>status(String(e.message||e),'bad'));
+$('discardExpress').onclick=()=>eliminarExpressLocal()
+ .then(()=>status('Se descartaron los recortes temporales de este dispositivo.','ok'));
 $('btnPdf').onclick=()=>{
  if(busy||receivedReference)return;
  if(!receiverConfig?.enabled||!receiverApiUrl){
@@ -709,11 +810,15 @@ $('btnPdf').onclick=()=>{
  }
  sendSecurePhotos().catch(err=>status('No se pudo enviar: '+(err&&err.message||err),'bad'));
 };
-$('goToCartAfterReceipt').onclick=async()=>{
+$('goToCartAfterReceipt').onclick=()=>{
+ if(receiverConfig?.mode==='express'){
+  status('El PDF Express está confirmado en la Central. El carrito y los cobros para esta modalidad siguen desactivados hasta completar la prueba integral.','bad');
+  return;
+ }
  if(window.parent!==window||!receivedReference||!/^POL-[A-F0-9]{24}$/.test(receivedReference))return;
  if(!receivedOrder||receivedOrder.reference!==receivedReference)return;
  const n=receivedOrder.photos,count=receivedOrder.sheets;
- if(n<1||n>60||count!==Math.ceil(n/6)||count>10)return;
+ if(n<1||n>MAX_SHEETS*6||count!==Math.ceil(n/6)||count>MAX_SHEETS)return;
  const price=receivedOrder.price,key='saberCartV1';
  let items=[];
  try{items=JSON.parse(localStorage.getItem(key)||'[]')}catch(_){items=[]}
@@ -723,13 +828,12 @@ $('goToCartAfterReceipt').onclick=async()=>{
   items.push({
    id:'PRINT-'+receivedReference,type:'print',photoOrder:true,name:'Polaroids 85 × 90 mm',
    qty:1,price,deposit:price/2,
-   detail:count+' hoja'+(count===1?'':'s')+' A4 · '+n+' Polaroids · Pedido '+customerOrderNumber(receivedReference),
+   detail:count+' hoja'+(count===1?'':'s')+' A4 · '+n+' Polaroids · Ref. '+receivedReference,
    draftReferences:[],receivedReferences:[receivedReference],filesReceived:true
   });
   try{localStorage.setItem(key,JSON.stringify(items))}
   catch(_){status('No se pudo guardar el pedido en este navegador. Revisá el almacenamiento local.','bad');return}
  }
- try{await recoveryStore('readwrite',store=>store.clear())}catch(_){/* el carrito ya conserva el pedido; la referencia evita duplicados */}
  window.location.assign('../index.html?carrito=1');
 };
 $('btnDemo').onclick=async()=>{if(editingLocked())return;let fs=[];for(let i=0;i<6;i++){const c=document.createElement('canvas');c.width=i%2?1250:1700;c.height=i%2?1700:1200;let ctx=c.getContext('2d'),g=ctx.createLinearGradient(0,0,c.width,c.height);const pair=[['#355f78','#e2a775'],['#6c8188','#c4d4bd'],['#98786b','#e6c3aa'],['#526e94','#cbbddd'],['#5f8d85','#e9c393'],['#8680a8','#d1b7a2']][i];g.addColorStop(0,pair[0]);g.addColorStop(1,pair[1]);ctx.fillStyle=g;ctx.fillRect(0,0,c.width,c.height);ctx.fillStyle='#ffffff44';ctx.beginPath();ctx.arc(c.width*(.25+.09*i),c.height*.4,c.height*.22,0,2*Math.PI);ctx.fill();ctx.strokeStyle='#ffffff77';ctx.lineWidth=18;ctx.beginPath();ctx.moveTo(-60,c.height*.9);ctx.lineTo(c.width*.75,c.height*.26);ctx.lineTo(c.width+30,c.height*.75);ctx.stroke();ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold '+Math.round(c.width*.075)+'px Segoe UI, Arial';ctx.fillText('FOTO DE PRUEBA',c.width/2,c.height*.70);ctx.font=Math.round(c.width*.05)+'px Segoe UI, Arial';ctx.fillText(String(i+1),c.width/2,c.height*.79);const b=await new Promise(r=>c.toBlob(r,'image/jpeg',.92));fs.push(new File([b],`Prueba_${i+1}.jpg`,{type:'image/jpeg'}))}if(editingLocked())return;for(let i=0;i<6;i++)dropPhoto(i);await acceptFiles(fs);status('Fotos de prueba cargadas. Podés practicar el encuadre y revisar la vista previa antes de usar fotos reales.','ok')};
