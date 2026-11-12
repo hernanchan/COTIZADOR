@@ -4888,7 +4888,7 @@ export default {
    const {listarRecepcionUniversalLive}=await import('./central-recepcion-live.mjs');
    return listarRecepcionUniversalLive(
     new Request('https://pagos.libreriasaber.com.ar/admin/api/central/live-recepcion'),
-    env,{authorized:true});
+    env,{authorized:true,r2StaffOnly:true});
   }
   if(url.pathname==='/internal/central/live/r2-inspection-source'||
      url.pathname==='/internal/central/live/r2-inspection-confirm'){
