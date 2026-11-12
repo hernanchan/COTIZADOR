@@ -2418,7 +2418,8 @@ export default {
        'Cache-Control':'no-store,private','X-Content-Type-Options':'nosniff',
        'X-Robots-Tag':'noindex,nofollow'}});
     }
-    if(page==='/personal/central'||page==='/personal/api/live-board'||
+    if(page==='/personal/api/live-status'||
+       if(page==='/personal/central'||page==='/personal/api/live-board'||
        if(page==='/personal/paquete'||page==='/personal/transferencias'||
        page==='/personal/transferencias.js'||
        page==='/personal/api/live-transferencias-pendientes'||
@@ -2437,6 +2438,10 @@ export default {
        return new Response('Acceso exclusivo de personal de Librería Saber',
         {status:401,headers:{'Cache-Control':'no-store',
          'WWW-Authenticate':'Basic realm="Libreria Saber Personal LIVE", charset="UTF-8"'}});
+      if(page==='/personal/api/live-status'){
+        const {cambiarEstadoPersonalDocumentosLive}=await import('./estado-personal-live-documentos.mjs');
+        return cambiarEstadoPersonalDocumentosLive(request,env,{authorized:true});
+      }
       if(page==='/personal/central'){
         if(request.method!=='GET')return closed();
         return new Response(paginaCentralPersonalLive(),{headers:{
