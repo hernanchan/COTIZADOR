@@ -68,6 +68,11 @@ small{color:#526579}#estado{line-height:1.6}</style></head><body><main>
    const response=await fetch('/api/pedido/live/checkout',{method:'POST',credentials:'same-origin',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({action:'status',webOrderId:order.webOrderId,commercialOrderId:order.commercialOrderId})});
+   if(response.status===401){
+    output.textContent='Tu sesión venció. Estamos recuperando el acceso a esta misma orden, sin cobrarte de nuevo.';
+    location.replace('/pedido/continuar');
+    return;
+   }
    const data=await response.json();
    if(!response.ok||data?.ok!==true||data.webOrderId!==order.webOrderId||
      data.commercialOrderId!==order.commercialOrderId)throw Error('pendiente');
