@@ -46,7 +46,8 @@ export async function finalizarInspeccionR2Live(req,env,{
  if(!authorized)return respond({ok:false,error:'LIVE_R2_INSPECCION_OPERADOR'},401);
  if(env?.SABER_ENTORNO!=='produccion'||env?.CENTRAL_DB_ENV!=='produccion'||
   env?.MP_LIVE_GATE!==G||env?.CENTRAL_LIVE_POSTPAY_GATE!==G||
-  env?.CENTRAL_LIVE_R2_GATE!==G||env?.CENTRAL_LIVE_R2_STAGING_GATE!==G||
+  // Confirmar inspección de un original previamente pagado no autoriza
+  // nuevos cobros ni cargas R2: éstos conservan sus propios gates NO_GO.
   env?.CENTRAL_LIVE_R2_INSPECTION_GATE!==G||
   !env?.DB?.prepare||!env?.DB?.batch||
   typeof env?.CENTRAL_LIVE_R2_INSPECTION_KEY!=='string'||
