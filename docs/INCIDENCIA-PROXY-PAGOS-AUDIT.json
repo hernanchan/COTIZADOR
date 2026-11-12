@@ -1,0 +1,95 @@
+{
+  "fecha": "2026-11-12T23:53:23.408Z",
+  "soloLectura": true,
+  "saber-webhook-produccion": {
+    "bytes": 2453,
+    "tiene_ruta_MP_LIVE": true,
+    "tiene_ruta_MP_generica": true,
+    "tiene_ERROR_RUTA_NO_DISPONIBLE": true,
+    "referencias_SABER_CENTRAL": true,
+    "referencias_SERVICE_fetch": true,
+    "paths": [
+      "/webhooks/mercadopago-live"
+    ],
+    "serviceBindings": [
+      {
+        "name": "SABER_CENTRAL_LIVE",
+        "service": "saber-pagos-produccion"
+      }
+    ],
+    "envNames": [
+      "SABER_ENTORNO",
+      "WEBHOOK_EDGE_GATE"
+    ]
+  },
+  "saber-pagos-produccion": {
+    "bytes": 734804,
+    "tiene_ruta_MP_LIVE": true,
+    "tiene_ruta_MP_generica": true,
+    "tiene_ERROR_RUTA_NO_DISPONIBLE": false,
+    "referencias_SABER_CENTRAL": false,
+    "referencias_SERVICE_fetch": true,
+    "paths": [
+      "/demo/checkout",
+      "/internal/central/r2-universal-package-manifest",
+      "/internal/r2-universal-purge-delivered",
+      "/internal/central/live/draft",
+      "/internal/central/live/tus-received",
+      "/internal/central/live/tus-gate",
+      "/internal/central/live/r2-gate",
+      "/internal/central/live/r2-reserve",
+      "/internal/central/live/r2-stage",
+      "/internal/central/live/r2-recover",
+      "/internal/central/live/r2-staff-board",
+      "/internal/central/live/staff-status",
+      "/internal/central/live/staff-forecast",
+      "/internal/central/live/staff-calendar",
+      "/internal/central/live/transfer-staff-pending",
+      "/internal/central/live/transfer-staff-approve",
+      "/internal/central/live/r2-inspection-source",
+      "/internal/central/live/r2-inspection-confirm",
+      "/internal/central/live/package-manifest",
+      "/internal/central/live/package-file",
+      "/internal/central/live/order",
+      "/internal/central/live/transfer-start",
+      "/internal/central/live/transfer-status",
+      "/internal/central/live/pricing",
+      "/internal/central/live/diag-seller",
+      "/internal/central/live/checkout",
+      "/internal/central/live/status",
+      "/api/central/live-recepcion",
+      "/api/central/live-r2-inspection",
+      "/api/central/live-r2-manifest",
+      "/api/plazo-produccion",
+      "/webhooks/mercadopago-live",
+      "/api/central/live-transfers/",
+      "/api/pricing-live",
+      "/api/pricing-live/draft"
+    ],
+    "serviceBindings": [],
+    "envNames": [
+      "CENTRAL_DB_ENV",
+      "CENTRAL_LIVE_BRIDGE_ENABLED",
+      "CENTRAL_LIVE_DRAFT_GATE",
+      "CENTRAL_LIVE_ORDER_GATE",
+      "CENTRAL_LIVE_PACKAGE_GATE",
+      "CENTRAL_LIVE_POSTPAY_GATE",
+      "CENTRAL_LIVE_PRICING_GATE",
+      "CENTRAL_LIVE_R2_GATE",
+      "CENTRAL_LIVE_R2_INSPECTION_GATE",
+      "CENTRAL_LIVE_R2_QUOTA_GATE",
+      "CENTRAL_LIVE_R2_STAGING_GATE",
+      "CENTRAL_LIVE_TRANSFER_ALIAS",
+      "CENTRAL_LIVE_TRANSFER_APPROVAL_GATE",
+      "CENTRAL_LIVE_TRANSFER_GATE",
+      "CENTRAL_LIVE_TUS_GATE",
+      "CENTRAL_R2_CANARY_EXPIRES_AT",
+      "CENTRAL_R2_CANARY_MODE",
+      "CENTRAL_R2_CANARY_ORDER_ID",
+      "MP_LIVE_GATE",
+      "MP_LIVE_RETURN_URL",
+      "MP_LIVE_WEBHOOK_URL",
+      "SABER_ENTORNO"
+    ]
+  }
+}
