@@ -19,13 +19,13 @@ button:disabled{opacity:.55}select{padding:10px;border:1px solid #b3cad9;border-
 .count{background:#fff;border-radius:16px;padding:0 9px}
 .card{background:white;border:1px solid #d0dce9;border-radius:11px;margin-bottom:11px;padding:14px;overflow-wrap:anywhere}
 .card strong{font-size:19px}.row{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
-.banner{border-left:4px solid #db8d21;padding:9px;background:#fff7e8;margin:10px 0}
+.banner{border-left:4px solid #db8d21;padding:9px;background:#fff7e8;margin:10px 0}#previsionCliente{font-weight:650;color:#1c5369}#previsionCliente.warning{border-left:4px solid #c27919;background:#fff5e6;padding:10px;color:#6f4400}
 @media(max-width:800px){.board{grid-template-columns:1fr;overflow:visible}.lane{min-height:80px}}
 </style></head><body><main>
 <header><h1>Central de Pedidos · Librería Saber</h1><div class="row">
 <a class="action" href="/personal/transferencias">Transferencias por verificar</a>
 <button id="actualizar">Actualizar</button></div></header>
-<section class="forecast" aria-labelledby="previsionTitle"><h2 id="previsionTitle">Previsión general de entrega</h2><p id="previsionEstado" role="status">Consultando previsión…</p><div class="row"><label for="previsionModo">Plazo orientativo para pedidos nuevos</label><select id="previsionModo"><option value="por_confirmar">A confirmar</option><option value="hoy">Durante el día de hoy</option><option value="hoy_tarde">Hoy por la tarde</option><option value="proximo_dia">Próximo día de atención</option></select><button id="previsionGuardar" type="button">Guardar previsión</button></div><small>La fecha y hora exactas se fijan por pedido al comenzar la preparación. No se asignan automáticamente.</small></section>
+<section class="forecast" aria-labelledby="previsionTitle"><h2 id="previsionTitle">Previsión general de entrega</h2><p id="previsionEstado" role="status">Consultando previsión…</p><p id="previsionCliente" role="status" aria-live="polite">Verificando lo que ve el cliente…</p><div class="row"><label for="previsionModo">Plazo orientativo para pedidos nuevos</label><select id="previsionModo"><option value="por_confirmar">A confirmar</option><option value="hoy">Durante el día de hoy</option><option value="hoy_tarde">Hoy por la tarde</option><option value="proximo_dia">Próximo día de atención</option></select><button id="previsionGuardar" type="button">Guardar previsión</button></div><small>La fecha y hora exactas se fijan por pedido al comenzar la preparación. No se asignan automáticamente.</small></section>
 <section class="forecast" aria-labelledby="agendaTitle">
 <h2 id="agendaTitle">Días y horarios de atención</h2>
 <p id="agendaResumen" class="weekly-view">Consultando horario guardado…</p>
@@ -84,6 +84,29 @@ async function changeState(order,next,btn){
  finally{btn.disabled=false;}
 }
 const forecastLabels={por_confirmar:'A confirmar',hoy:'Durante el día de hoy',hoy_tarde:'Hoy por la tarde',proximo_dia:'Próximo día de atención'};
+async function revisarPlazoVisibleAlCliente(){
+ const status=document.getElementById('previsionCliente');
+ status.classList.remove('warning');
+ try{
+  const res=await fetch('/api/pedido/plazo',{credentials:'same-origin',cache:'no-store'});
+  const data=await res.json().catch(()=>null);
+  if(!res.ok||data?.ok!==true||typeof data.mode!=='string'||typeof data.label!=='string')
+   throw Error('No hay respuesta válida de previsión del cliente');
+  const saved=forecast?.settings?.mode;
+  if(saved&&saved!==data.mode){
+   status.classList.add('warning');
+   status.textContent='Atención: la Central tiene «'+(forecastLabels[saved]||saved)+
+    '», pero el cliente ve «'+data.label+'». '+(data.notice||'')+
+    ' Revisá la previsión antes de recibir un nuevo trabajo.';
+  }else{
+   status.textContent='El cliente ve: «'+data.label+'».'+
+    (data.estimatedDeadlineDate?' Fecha orientativa: '+data.estimatedDeadlineDate+'.':'');
+  }
+ }catch{
+  status.classList.add('warning');
+  status.textContent='No se pudo comprobar qué plazo ve el cliente. Revisá la previsión antes de comprometer una entrega.';
+ }
+}
 const formatDate=iso=>{try{return new Intl.DateTimeFormat('es-AR',{timeZone:'America/Argentina/Cordoba',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(iso))+' hs'}catch{return 'Fecha no válida'}};
 async function saveForecast(){
  if(!forecast?.settings){window.alert('Previsión no cargada. Actualizá la Central.');return;}
@@ -187,6 +210,7 @@ async function refresh(){
   document.getElementById('previsionModo').value=f.settings.mode;
   document.getElementById('previsionEstado').textContent='Previsión vigente: '+(forecastLabels[f.settings.mode]||'A confirmar')+' · Revisión '+f.settings.revision;
   await loadAgenda();
+  await revisarPlazoVisibleAlCliente();
   board.replaceChildren();
   let total=0;
   for(const [state,title] of columns){
