@@ -37,6 +37,8 @@ function tipoOriginal(paginas){
   const ancho=Math.min(p.anchoCm,p.altoCm),largo=Math.max(p.anchoCm,p.altoCm);
   if(Math.abs(ancho-14.8)<=0.2&&Math.abs(largo-21)<=0.2)return 'a5';
   if(Math.abs(ancho-21)<=0.2&&Math.abs(largo-29.7)<=0.2)return 'a4';
+  // Legal US: 8,5 × 14 pulgadas (21,59 × 35,56 cm), aun rotado.
+  if(Math.abs(ancho-21.59)<=0.25&&Math.abs(largo-35.56)<=0.25)return 'legal';
   if(Math.abs(ancho-29.7)<=0.2&&Math.abs(largo-42)<=0.2)return 'a3';
   return null;
  });
@@ -96,7 +98,7 @@ export function cotizarCargaUnica({archivos,precios,promociones=precios?.__promo
   }
   if(d.destino==='documentos'){
    const formato=d.tamanoFinal==='original'?tipoOriginal(seleccionadas):d.tamanoFinal;
-   if(!['personalizado_a4','a5','a4','a3'].includes(formato)){
+   if(!['personalizado_a4','a5','a4','legal','a3'].includes(formato)){
     pendientes.push({indice:i,nombre:a.nombre,motivo:'El tamaño original supera el área A4 y no coincide con A3. Elegí un tamaño A4/A3 o consultá por ploteos.'});return;
    }
    const id='pdf'+(documentos.length+1);
@@ -105,13 +107,17 @@ export function cotizarCargaUnica({archivos,precios,promociones=precios?.__promo
    if(a.modo==='color'&&!catalogo.some(m=>m.id===a.materialColor)){
     pendientes.push({indice:i,nombre:a.nombre,motivo:'Material incompatible con formato final'});return;
    }
+   // Legal cotizable sólo como impresión común en papel obra de 70 g.
+   if(formato==='legal'&&a.modo==='color'&&a.materialColor!=='obra70'){
+    pendientes.push({indice:i,nombre:a.nombre,motivo:'Legal original: sólo obra 70 g a precio A4; elegí A4/A3 para otros papeles'});return;
+   }
    documentos.push({id,nombre:a.nombre,paginas:seleccionadas.length,
     paginasPorHoja:a.paginasPorHoja??1,copias:a.copias,
     formato,modo:a.modo,caras:a.caras,anillado:a.anillado,grupoAnillado:a.grupoAnillado,
     materialColor:a.modo==='color'?a.materialColor:'estandar',orden:i+1});
    plan.push({indice:i,nombre:a.nombre,origen:seleccionadas.map(p=>({numero:p.numero,anchoCm:p.anchoCm,altoCm:p.altoCm})),
     paginasElegidas:seleccionadas.map(p=>p.numero),paginasPorHoja:a.paginasPorHoja??1,
-    formatoFinal:formato,tarifaAplicada:formato==='personalizado_a4'||formato==='a5'?'a4':formato,
+    formatoFinal:formato,tarifaAplicada:['personalizado_a4','a5','legal'].includes(formato)?'a4':formato,
     ajuste:d.cambioEscala?'proporcional_sin_recorte':'sin_escalado',destino:'documentos',id});
    return;
   }
