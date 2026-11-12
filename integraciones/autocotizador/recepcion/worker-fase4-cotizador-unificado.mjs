@@ -76,6 +76,7 @@ import {manejarR2MultipartLive} from './r2-live-multipart-documentos.mjs';
 import {pagoSandboxUniversalDocumentos} from './r2-universal-checkout-documentos.mjs';
 import {pagoMPLiveComprador} from './mp-live-comprador.mjs';
 import {iniciarSesionCompradorLive,autorizadoCompradorLive,autorizadoOrdenLive,vinculoOrdenLive} from './sesion-comprador-live.mjs';
+import {revincularOrdenLive} from './revincular-orden-live.mjs';
 import {guardarBorradorUniversalLive,crearOrdenUniversalLive} from './ordenes-universales-live-documentos.mjs';
 import {paginaRetornoLive} from './pagina-retorno-live.mjs';
 import {paginaContinuarPagoLive} from './pagina-continuar-pago-live.mjs';
@@ -2464,6 +2465,10 @@ export default {
     if(page==='/pedido/continuar')return paginaContinuarPagoLive(request,env,{authorized:await autorizadoCompradorLive(request,env)});
     if(page==='/pedido/estado')return paginaRetornoLive(request,env);
     if(page==='/api/pedido/live/sesion')return iniciarSesionCompradorLive(request,env);
+    if(page==='/api/pedido/live/revincular'){
+      const buyer=await autorizadoCompradorLive(request,env);
+      return revincularOrdenLive(request,env,{authorized:buyer});
+    }
     if(page==='/api/pedido/live/borrador'){
       if(env?.SABER_ENTORNO!=='produccion')
        return testResponse({ok:false,error:'LIVE_BORRADOR_CERRADO'},503);
