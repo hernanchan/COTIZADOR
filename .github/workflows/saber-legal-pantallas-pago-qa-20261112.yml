@@ -1,0 +1,41 @@
+name: Saber LIVE - Legal 70g, pantalla Siguiente y mensaje de pago
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-legal-pantallas-pago-qa-20261112.yml]
+permissions: {contents: read}
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Legal original y motor servidor, UI y seguridad checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check integraciones/autocotizador/recepcion/cotizar-carga-unica.mjs
+          node --check integraciones/autocotizador/recepcion/carga-unica-cliente.mjs
+          node --check integraciones/autocotizador/recepcion/pagina-cotizar-live.mjs
+          node --test \
+            integraciones/autocotizador/recepcion/legal-70g-original.test.mjs \
+            integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs \
+            integraciones/mercadopago/pruebas/mercadopago-live-central.test.mjs
+      - name: Chrome real 360, 390, 768 y 1366 - Siguiente/Volver sin pagos
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund playwright@1.56.0
+          node integraciones/publicacion/qa-cotizador-mobile-layout-20261111.mjs
+          echo SABER_LEGAL_WIZARD_CHROME_OK_NO_PAYMENT
+      - name: Compilar documento completo y confirmar que Legal llega al bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd integraciones/autocotizador/recepcion && npm install --no-audit --no-fund && npm run build:unificado)
+          node --check integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
+          grep -q "Documentos Legal originales" integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
+          echo SABER_LEGAL_WIZARD_BUILD_OK
