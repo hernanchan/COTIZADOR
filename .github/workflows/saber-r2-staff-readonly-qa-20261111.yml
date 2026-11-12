@@ -59,3 +59,4 @@ jobs:
           console.log('STAFF_R2_D1_PENDING_INSPECTION='+Number(counts.pendientes||0));
           console.log('STAFF_R2_D1_READONLY_NO_ORDERS_NO_PAYMENTS_NO_WRITES');
           NODE
+# Regression panel staff R2: script reparado, assets generados en deploy.
