@@ -79,7 +79,7 @@ assert.ok(!get('CENTRAL_R2_CANARY_MODE')||get('CENTRAL_R2_CANARY_MODE').text==='
  'CANARY_ANTERIOR_AUN_ACTIVO');
 const keys=['CENTRAL_R2_CANARY_MODE','CENTRAL_R2_CANARY_ORDER_ID','CENTRAL_R2_CANARY_EXPIRES_AT'];
 const mode='SOLO_PEDIDO_R2_CONTROLADO';
-const expires=new Date(current+24*3600*1000).toISOString().replace('.000Z','Z');
+const expires=new Date(current+24*3600*1000).toISOString().slice(0,19)+'Z';
 function patchBindings(modeValue,orderId,expiresAt){
  const remaining=bindings.filter(x=>!keys.includes(x.name)).map(x=>
   x.type==='r2_bucket'?{name:x.name,type:'r2_bucket',bucket_name:x.bucket_name}:
