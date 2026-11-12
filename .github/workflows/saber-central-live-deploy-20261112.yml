@@ -22,7 +22,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node --test integraciones/mercadopago/pruebas/central-recepcion-live.test.mjs integraciones/mercadopago/pruebas/central-live-bridge.test.mjs integraciones/mercadopago/pruebas/central-prevision-personal-live.test.mjs integraciones/mercadopago/pruebas/central-agenda-personal-live.test.mjs
+          node --test integraciones/mercadopago/pruebas/central-recepcion-live.test.mjs integraciones/mercadopago/pruebas/central-live-bridge.test.mjs integraciones/mercadopago/pruebas/central-prevision-personal-live.test.mjs integraciones/mercadopago/pruebas/central-agenda-personal-live.test.mjs integraciones/mercadopago/pruebas/plazo-produccion-informativo.test.mjs integraciones/autocotizador/recepcion/plazo-produccion-cliente.test.mjs
           npm install --no-save --no-audit --no-fund esbuild@0.25.12
           ./node_modules/.bin/esbuild integraciones/mercadopago/pruebas/worker.js --bundle --platform=browser --format=esm --target=es2022 --outfile=/tmp/saber-central-live.mjs
           (cd integraciones/autocotizador/recepcion && npm install --no-audit --no-fund && npm run build:unificado)
