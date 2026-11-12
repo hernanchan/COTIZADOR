@@ -16,6 +16,7 @@ jobs:
       - name: Contratos HMAC, lista solo pagados, estados y sintaxis
         run: |
           set -euo pipefail
+          (cd integraciones/autocotizador/recepcion && npm install --no-audit --no-fund)
           node --check integraciones/mercadopago/pruebas/central-recepcion-live.mjs
           node --check integraciones/mercadopago/pruebas/central-estado-personal-live.mjs
           node --check integraciones/mercadopago/pruebas/central-live-bridge.mjs
