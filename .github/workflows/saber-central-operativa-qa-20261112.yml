@@ -1,0 +1,41 @@
+name: Saber - QA Central personal LIVE antes de desplegar
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-central-operativa-qa-20261112.yml]
+permissions: {contents: read}
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Contratos HMAC, lista solo pagados, estados y sintaxis
+        run: |
+          set -euo pipefail
+          node --check integraciones/mercadopago/pruebas/central-recepcion-live.mjs
+          node --check integraciones/mercadopago/pruebas/central-estado-personal-live.mjs
+          node --check integraciones/mercadopago/pruebas/central-live-bridge.mjs
+          node --check integraciones/autocotizador/recepcion/estado-personal-live-documentos.mjs
+          node --check integraciones/autocotizador/recepcion/pagina-central-personal-live.mjs
+          node --check integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs
+          node --test \
+            integraciones/mercadopago/pruebas/central-recepcion-live.test.mjs \
+            integraciones/mercadopago/pruebas/central-live-bridge.test.mjs \
+            integraciones/mercadopago/pruebas/central-live-hmac-e2e.test.mjs \
+            integraciones/autocotizador/recepcion/paquete-live-operador.test.mjs
+          echo SABER_CENTRAL_PERSONAL_HMAC_AND_BOTH_TRANSPORTS_QA_OK
+      - name: Compilar Central y Documentos completos sin desplegar
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund esbuild@0.25.12
+          ./node_modules/.bin/esbuild integraciones/mercadopago/pruebas/worker.js --bundle --platform=browser --format=esm --target=es2022 --outfile=/tmp/saber-pagos-produccion-central.mjs
+          node --check /tmp/saber-pagos-produccion-central.mjs
+          (cd integraciones/autocotizador/recepcion && npm install --no-audit --no-fund && npm run build:unificado)
+          node --check integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq '/personal/central' integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq '/personal/api/live-status' integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
+          echo SABER_CENTRAL_PERSONAL_TWO_WORKERS_BUILD_OK_NO_CLOUDFLARE_CHANGES
