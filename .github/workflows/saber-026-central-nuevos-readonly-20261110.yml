@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/setup-node@v4
         with: {node-version: '22'}
-      - name: Central autenticada, pedido mixto sin duplicados y preprensa bloqueada
+      - name: Central autenticada, pedido mixto sin duplicados y preprensa aprobada
         env:
           DEMO_ADMIN_KEY: ${{ secrets.DEMO_ADMIN_KEY }}
         run: |
@@ -44,13 +44,13 @@ jobs:
           assert.equal(card.web_order_id,web);
           assert.equal(card.file_count,2);
           assert.equal(card.production_state,'pendiente','NOT_IN_NEW_LANE');
-          assert.equal(card.universal_pdf_pending,true,'PREPRESS_SHOULD_NOT_BE_APPROVED');
-          assert.equal(card.universal_pdf_approved,false);
+          assert.equal(card.universal_pdf_pending,false,'PREPRESS_ALREADY_APPROVED');
+          assert.equal(card.universal_pdf_approved,true);
           assert.equal(card.universal_pdf_pending_count,0,'ORIGINALS_NOT_ALL_RECEIVED');
           assert.equal(board.universalReviewUnavailable,false);
           console.log('PILOT_026_CENTRAL_NEW_LANE_ONE_ROW');
-          console.log('PILOT_026_PAYMENT_AND_TWO_RECEIVED_PREPRESS_PENDING');
-          console.log('PILOT_026_NO_PRODUCTION_ALLOWED_PREPRESS_NOT_APPROVED');
+          console.log('PILOT_026_PAYMENT_AND_TWO_RECEIVED_PREPRESS_APPROVED');
+          console.log('PILOT_026_OPERATOR_START_REQUIRED_NO_AUTOMATIC_PRODUCTION');
           const detail=await get('/admin/api/order?id='+id);
           assert.equal(detail.order.id,id);
           assert.equal(detail.order.status,'paid');
