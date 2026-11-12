@@ -107,3 +107,4 @@ jobs:
            .map(b=>({name:b.name,status:b.text||b.type}))));
           console.log('MP_LIVE_DIAG_READONLY_NO_PAYMENT_NO_PII_NO_NEW_ORDER');
           NODE
+# Read-only after R2 GENERAL 3 GO: verify order 003 still pending before user payment.
