@@ -10,7 +10,10 @@ const reply=(x,status=200)=>Response.json(x,{status,headers:{
  'Cache-Control':'no-store,private','X-Content-Type-Options':'nosniff'}});
 const live=env=>env?.SABER_ENTORNO==='produccion'&&env?.CENTRAL_DB_ENV==='produccion'&&
  env?.MP_LIVE_GATE===GO&&env?.CENTRAL_LIVE_BRIDGE_ENABLED===GO&&
- env?.CENTRAL_LIVE_POSTPAY_GATE===GO&&env?.CENTRAL_LIVE_ORDER_GATE===GO&&
+ env?.CENTRAL_LIVE_POSTPAY_GATE===GO&&
+ (env?.CENTRAL_LIVE_R2_GATE===GO&&env?.CENTRAL_LIVE_R2_QUOTA_GATE===GO||
+  env?.CENTRAL_R2_CANARY_MODE==='SOLO_PEDIDO_R2_CONTROLADO')&&
+ env?.CENTRAL_LIVE_ORDER_GATE===GO&&
  env?.CENTRAL_LIVE_PRICING_GATE===GO&&
  env?.CENTRAL_R2_QUOTA_ENABLED!=='PRIVATE_TEST_ONLY'&&
  typeof env?.DB?.prepare==='function';
