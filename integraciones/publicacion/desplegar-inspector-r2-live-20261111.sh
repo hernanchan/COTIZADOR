@@ -23,6 +23,10 @@ sed -i 's/^keep_vars = false$/keep_vars = true/' integraciones/autocotizador/pro
 sed -i 's/SABER_ENTORNO = "preparacion"/SABER_ENTORNO = "produccion"/' integraciones/autocotizador/produccion/wrangler.toml
 sed -i 's/DOCS_MP_LIVE_GATE = "NO_GO"/DOCS_MP_LIVE_GATE = "GO_COMERCIAL_CONFIRMADO"/' integraciones/autocotizador/produccion/wrangler.toml
 printf '\n[[r2_buckets]]\nbinding = "SABER_R2_GRANDES_LIVE"\nbucket_name = "saber-documentos-produccion-privado"\n' >>integraciones/autocotizador/produccion/wrangler.toml
+# El canary NO puede estar activado antes de este deploy. El código se
+# instala inerte, manteniendo bloqueado el checkout de R2 para todo el público.
+jq -e '(.result.bindings|all(.name!="CENTRAL_R2_CANARY_MODE" or .text!="SOLO_PEDIDO_R2_CONTROLADO"))' /tmp/saber-r2-staff/saber-pagos-produccion.before.json >/dev/null
+echo SABER_R2_CANARY_DORMANT_PREDEPLOY
 echo SABER_R2_STAFF_SNAPSHOT_AND_PRECONDITIONS_OK
 rollback(){
   code=$?
@@ -61,4 +65,6 @@ for route in live-r2-board live-r2-inspection-source live-r2-inspection-original
   echo "R2_LIVE_STAFF_$route=$status"
   test "$status" = 401
 done
+jq -e '(.result.bindings|all(.name!="CENTRAL_R2_CANARY_MODE" or .text!="SOLO_PEDIDO_R2_CONTROLADO"))' /tmp/saber-r2-staff/saber-pagos-produccion.after.json >/dev/null
+echo SABER_R2_CANARY_DORMANT_AFTER_DEPLOY_NO_NEW_CHECKOUT
 echo SABER_R2_LIVE_STAFF_DEPLOYED_AUTH_ONLY_RECEIVING_R2_PAYMENT_CLOSED
