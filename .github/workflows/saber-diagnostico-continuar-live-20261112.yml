@@ -1,0 +1,48 @@
+name: Saber - diagnosticar No disponible en recuperar pedido (solo lectura)
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-diagnostico-continuar-live-20261112.yml]
+permissions: {contents: read}
+jobs:
+  diagnostico:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+    steps:
+      - name: GET sitio y lectura booleana de gates sin datos personales
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const base='https://api.cloudflare.com/client/v4/accounts/'+process.env.ACCOUNT;
+          const request=await fetch(base+'/workers/scripts/saber-documentos-produccion/settings',{
+           headers:{Authorization:'Bearer '+process.env.TOKEN},signal:AbortSignal.timeout(18000)});
+          const json=await request.json();
+          assert.ok(request.ok&&json?.success);
+          const bindings=json.result.bindings||[];
+          const binding=n=>bindings.find(x=>x.name===n);
+          const GO='GO_COMERCIAL_CONFIRMADO';
+          for(const key of ['SABER_ENTORNO','DOCS_MP_LIVE_GATE','DOCS_LIVE_SESSION_GATE','DOCS_LIVE_TURNSTILE_SITE_KEY']){
+           const x=binding(key);
+           console.log('CONTINUAR_GATE_'+key+'='+(
+             key==='SABER_ENTORNO'?(x?.text==='produccion'?'OK':'NO_PRODUCCION'):
+             key==='DOCS_LIVE_TURNSTILE_SITE_KEY'?
+               (typeof x?.text==='string'&&/^[A-Za-z0-9_-]{20,100}$/.test(x.text)?'VALIDO':'INVALIDO'):
+             x?.text===GO?'GO':'NO_GO_OR_ABSENT'));
+          }
+          const res=await fetch('https://pedidos.libreriasaber.com.ar/pedido/continuar',{
+           method:'GET',redirect:'manual',signal:AbortSignal.timeout(18000)});
+          const text=await res.text();
+          let body='OTRO';
+          if(text.trim()==='No disponible')body='NO_DISPONIBLE';
+          else if(text.includes('Retomá tu pedido'))body='RECUPERAR_SESION';
+          else if(text.includes('Retomar el pedido pendiente'))body='PAGINA_CONTINUAR';
+          else if(text.includes('Not Found'))body='NOT_FOUND';
+          console.log('CONTINUAR_HTTP='+res.status);
+          console.log('CONTINUAR_BODY_CLASS='+body);
+          console.log('CONTINUAR_READONLY_NO_ORDERS_NO_PREFERENCES_NO_CHARGES');
+          NODE
