@@ -24,6 +24,9 @@ button:disabled{opacity:.47;cursor:not-allowed}#estado{min-height:25px}small{col
 #plazo-explicacion{font-size:15px;color:#536579;margin:0;padding:10px 20px 4px;background:#f4f9fe;border-left:2px solid #c3d9ea;border-right:2px solid #c3d9ea}
 #promo-dia{font-size:15px;font-weight:650;color:#69420b;margin:0;padding:4px 20px 12px;background:#f4f9fe;border-left:2px solid #c3d9ea;border-right:2px solid #c3d9ea;border-bottom:2px solid #c3d9ea;border-radius:0 0 12px 12px}
 #promo-dia[hidden]{display:none}
+section[hidden]{display:none!important}
+#siguiente{margin-top:12px}
+#volver-archivos{background:#fff;color:#18547c;border:1px solid #9eb7cd;margin:0 0 18px}
 #precio-entrega:has(+ #plazo-explicacion){border-bottom:0;border-radius:12px 12px 0 0}
 #plazo-explicacion:not(:has(+ #promo-dia:not([hidden]))){border-bottom:2px solid #c3d9ea;border-radius:0 0 12px 12px;padding-bottom:12px}
 @media(max-width:650px){#precio-entrega{grid-template-columns:1fr}}
@@ -78,7 +81,11 @@ window.saberIngresoLive=async token=>{
 </div>
 <p id="plazo-explicacion">Fecha orientativa desde la acreditación del pago, sujeta a disponibilidad, trabajo, horario y feriados. Al iniciar tu trabajo, en el seguimiento verás una fecha y hora más precisas.</p>
 <p id="promo-dia" hidden></p>
-</section><section id="seccion-archivos"><h2>1. Subí tus archivos</h2><p>Seleccioná los PDF, JPG o PNG que querés imprimir. Podés elegir varios en una sola carga.</p><iframe id="pdf" title="Elegir PDF, JPG o PNG y opciones de impresión" src="/cotizar/archivos" loading="eager" scrolling="no"></iframe></section><section id="seccion-confirmacion"><h2>2. Completá tus datos y confirmá</h2><label for="nombre">Nombre y apellido o responsable *</label>
+</section><section id="seccion-archivos"><h2>1. Subí tus archivos</h2><p>Seleccioná los PDF, JPG o PNG que querés imprimir. Podés elegir varios en una sola carga.</p><iframe id="pdf" title="Elegir PDF, JPG o PNG y opciones de impresión" src="/cotizar/archivos" loading="eager" scrolling="no"></iframe>
+<button type="button" id="siguiente" disabled>Siguiente · Tus datos</button>
+<p id="aviso-siguiente" aria-live="polite">Elegí y confirmá las opciones de impresión para continuar.</p>
+</section><section id="seccion-confirmacion" hidden><h2>2. Tus datos y el pago</h2>
+<button type="button" id="volver-archivos">Volver a mis archivos</button><label for="nombre">Nombre y apellido o responsable *</label>
 <input id="nombre" autocomplete="name" maxlength="100" placeholder="Nombre de quien retira" required>
 <label for="telefono">Teléfono de contacto (con código de área) *</label>
 <input id="telefono" inputmode="tel" autocomplete="tel" maxlength="26" placeholder="351 555 5555" required>
@@ -126,6 +133,11 @@ const formatDate=s=>{
  }
 })();
 const action=document.getElementById('continuar');
+const next=document.getElementById('siguiente');
+const stepFiles=document.getElementById('seccion-archivos');
+const stepData=document.getElementById('seccion-confirmacion');
+const back=document.getElementById('volver-archivos');
+const stepNotice=document.getElementById('aviso-siguiente');
 const iframe=document.getElementById('pdf');
 const enabled=${enabled},bankEnabled=${bankEnabled};
 let pending=null,flow=null,working=false;
@@ -160,16 +172,25 @@ window.addEventListener('message',event=>{
   }
   if(data.blockReason)status.textContent=data.blockReason;
   action.disabled=!enabled||!data.sendable||working;
+  next.disabled=!enabled||!data.sendable||working;
+  if(data.sendable)stepNotice.textContent='Todo listo. Continuá para completar tus datos y confirmar.';
  }
  if(data.type==='SABER_SMART_UNIVERSAL_PDF'){
   if(working)return;
   pending={files:data.files,archivos:data.archivos};
   action.disabled=!enabled;
   status.textContent=enabled?'Archivos preparados, validando el presupuesto…':'Presupuesto preparado. El pago y el envío todavía no están habilitados.';
-  if(enabled)action.click();
+  if(enabled){
+   stepFiles.hidden=true;
+   stepData.hidden=false;
+   action.disabled=false;
+   status.textContent='Archivos preparados. Completá tus datos y confirmá el presupuesto.';
+   stepData.scrollIntoView({behavior:'smooth',block:'start'});
+   nombreCliente.focus({preventScroll:true});
+  }
  }
  if(data.type==='SABER_SMART_HANDOFF_ERROR'){
-  pending=null;action.disabled=true;
+  pending=null;action.disabled=true;next.disabled=true;
   status.textContent=String(data.message||'No se pudo preparar el pedido.').slice(0,180);
  }
 });
@@ -178,6 +199,23 @@ const pedirAltura=()=>iframe.contentWindow?.postMessage(
  {type:'SABER_SMART_RESIZE_REQUEST'},location.origin);
 iframe.addEventListener('load',pedirAltura);
 requestAnimationFrame(pedirAltura);
+next.addEventListener('click',()=>{
+ if(!enabled||working||next.disabled||pending)return;
+ next.disabled=true;
+ stepNotice.textContent='Validando archivos y opciones…';
+ iframe.contentWindow?.postMessage({type:'SABER_SMART_PREPARAR_ENVIO'},location.origin);
+});
+back.addEventListener('click',()=>{
+ if(working||flow)return;
+ pending=null;
+ stepData.hidden=true;
+ stepFiles.hidden=false;
+ stepNotice.textContent='Podés revisar tus opciones y volver a continuar.';
+ next.disabled=false;
+ action.disabled=true;
+ requestAnimationFrame(pedirAltura);
+ stepFiles.scrollIntoView({behavior:'smooth',block:'start'});
+});
 action.addEventListener('click',async()=>{
  if(!enabled||working)return;
  const nombre=nombreCliente.value.trim();
@@ -222,7 +260,13 @@ action.addEventListener('click',async()=>{
   button.addEventListener('click',async()=>{
    button.disabled=true;
    try{const url=await flow.iniciarPago();location.assign(url)}
-   catch{button.disabled=false;status.textContent='No pudimos iniciar el pago. La orden sigue pendiente. No pagues dos veces.'}
+   catch(e){
+    button.disabled=false;
+    const reason=String(e?.message||'').slice(0,160);
+    if(reason.includes('MP_LIVE_R2_NO_DISPONIBLE'))
+     status.textContent='El archivo grande todavía no tiene autorizada su recepción R2 para la orden '+order.numeroOrden+'. No pagues hasta que se habilite.';
+    else status.textContent='No pudimos iniciar el pago de la orden '+order.numeroOrden+'. La orden sigue pendiente; no pagues dos veces. '+reason;
+   }
   });
   options.append(button);
   if(bankEnabled){
