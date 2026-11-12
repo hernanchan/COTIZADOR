@@ -79,7 +79,9 @@ try{
    return frame.getBoundingClientRect().height>previous+900;
   },before.height,{timeout:14000});
   const box=await page.locator('#pdf').boundingBox();
-  const contact=await page.locator('#seccion-confirmacion').boundingBox();
+  const hiddenForm=await page.locator('#seccion-confirmacion').isHidden();
+  assert.equal(hiddenForm,true,'Los datos personales deben estar en la segunda pantalla');
+  assert.equal(await page.locator('#siguiente').isDisabled(),true,'No avanzar antes de cotizar');
   const childInfo=await child.locator('body').evaluate(el=>({
    scroll:document.documentElement.scrollHeight,
    width:document.documentElement.scrollWidth,
@@ -89,7 +91,23 @@ try{
   }));
   const horizontal=await page.evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth}));
   assert.ok(box.height>before.height+900,'No se ajustó la altura del iframe');
-  assert.ok(contact.y>=box.y+box.height-5,'El formulario invade el iframe');
+  await child.locator('body').evaluate(()=>{
+    addEventListener('message',event=>{
+      if(event.data?.type==='SABER_SMART_PREPARAR_ENVIO')
+       window.parent.postMessage({type:'SABER_SMART_UNIVERSAL_PDF',files:[],archivos:[]},location.origin);
+    });
+    window.parent.postMessage({type:'SABER_SMART_PRICE_STATE',
+      sendable:true,total:7524,estado:'listo'},location.origin);
+  });
+  await page.waitForFunction(()=>!document.querySelector('#siguiente').disabled,{timeout:5000});
+  await page.locator('#siguiente').click();
+  await page.waitForFunction(()=>!document.querySelector('#seccion-confirmacion').hidden,{timeout:5000});
+  assert.equal(await page.locator('#seccion-archivos').isHidden(),true);
+  assert.equal(await page.locator('#nombre').isVisible(),true);
+  assert.equal(await page.locator('#continuar').isVisible(),true);
+  await page.locator('#volver-archivos').click();
+  assert.equal(await page.locator('#seccion-confirmacion').isHidden(),true);
+  assert.equal(await child.locator('#archivos').isVisible(),true);
   assert.ok(horizontal.scroll<=horizontal.width+3,'Desborde horizontal en pantalla principal');
   assert.ok(childInfo.width<=childInfo.viewport+3,'Desborde horizontal dentro de iframe');
   assert.ok(childInfo.inputRight<=childInfo.viewport+3,'Selector fuera de pantalla');
@@ -97,7 +115,7 @@ try{
   assert.deepEqual(errors,[],'Excepción de interfaz '+errors.join(' | '));
   console.log('SABER_MOBILE_LAYOUT_OK '+JSON.stringify({
     width,iframeAntes:Math.round(before.height),iframeDespues:Math.round(box.height),
-    formY:Math.round(contact.y),frameBottom:Math.round(box.y+box.height),
+    datosEnSegundaPantalla:true,frameBottom:Math.round(box.y+box.height),
     documentWidth:horizontal.scroll,childWidth:childInfo.width
   }));
   await context.close();
