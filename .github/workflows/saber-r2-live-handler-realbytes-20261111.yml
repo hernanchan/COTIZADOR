@@ -1,0 +1,26 @@
+name: Saber R2 - 60 MiB real sobre lector LIVE, sin cobro
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-r2-live-handler-realbytes-20261111.yml]
+permissions: {contents: read}
+concurrency: {group: saber-r2-live-reader-realbytes, cancel-in-progress: false}
+jobs:
+  integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      SABER_V2_OPERATOR_PASSWORD: ${{ secrets.SABER_V2_OPERATOR_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Leer original R2 privado existente con lector LIVE y SHA-256
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check integraciones/publicacion/qa-live-staff-r2-realbytes-20261111.mjs
+          node integraciones/publicacion/qa-live-staff-r2-realbytes-20261111.mjs
+          echo SABER_R2_REAL_BYTES_QA_COMPLETED_NO_WRITE
