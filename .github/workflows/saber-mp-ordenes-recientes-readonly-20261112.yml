@@ -108,3 +108,4 @@ jobs:
           console.log('MP_LIVE_DIAG_READONLY_NO_PAYMENT_NO_PII_NO_NEW_ORDER');
           NODE
 # Read-only after R2 GENERAL 3 GO: verify order 003 still pending before user payment.
+# 2026-11-12 12:58 UTC: revisar 003 tras recuperación de sesión, sólo lectura.
