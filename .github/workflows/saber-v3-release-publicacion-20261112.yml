@@ -67,7 +67,7 @@ jobs:
           BASE=$(git rev-parse origin/main)
           echo "SABER_V3_MAIN_BEFORE_CUTOVER=$BASE"
           # Main podría avanzar por otro proceso: en ese caso NO sobrescribir.
-          test "$BASE" = 'ded2cc0bd0262c297cf4090d6772cd8a12a5bc9d'
+          test "$BASE" = 'c7c50a867946415009510e5052ae5360e82e9fa6'
           git worktree add /tmp/saber-v3-main "$BASE" >/dev/null
           git -C /tmp/saber-v3-main config user.name 'Saber Publicación Controlada'
           git -C /tmp/saber-v3-main config user.email '41898282+github-actions[bot]@users.noreply.github.com'
