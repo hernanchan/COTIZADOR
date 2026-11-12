@@ -1,0 +1,82 @@
+name: Saber - corregir Nuevos orden 026 SOLO Central sandbox
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-fix-central-026-nuevos-sandbox-20261112.yml]
+permissions: {contents: read}
+concurrency: {group: saber-central-sandbox-026-new-lane, cancel-in-progress: false}
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+      DEMO_ADMIN_KEY: ${{ secrets.DEMO_ADMIN_KEY }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verificar corrección y pruebas de regresión del tablero
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'if(!card.production_state)card.production_state="pendiente";' integraciones/mercadopago/pruebas/worker.js
+          node --check integraciones/mercadopago/pruebas/worker.js
+          node --test tests/tus-central-seguimiento-operativo.test.mjs tests/tus-central-tablero-click-real.test.mjs tests/r2-prepago-revision-central.test.mjs
+          npm install --no-save --no-audit --no-fund wrangler@4.55.0
+          echo SABER_026_CLASSIFICATION_TESTS_OK
+      - name: Respaldar versión y bindings, desplegar sandbox, verificar 026 y rollback ante fallo
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${ACCOUNT:?}" "${TOKEN:?}" "${DEMO_ADMIN_KEY:?}"
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-pagos-pruebas"
+          site="https://saber-pagos-pruebas.libreriasaber.workers.dev"
+          tmp=$(mktemp -d)
+          curl -fsS --max-time 25 -H "Authorization: Bearer $TOKEN" "$root/settings" > "$tmp/before.json"
+          jq -e '.success==true and (.result.bindings|any(.name=="DB" and .type=="d1" and ((.id//.database_id)=="60124ac5-1941-44ba-96e5-ea3165b65ec9"))) and (.result.bindings|any(.name=="DEMO_ADMIN_KEY" and .type=="secret_text")) and (.result.bindings|any(.name=="MP_TEST_ACCESS_TOKEN" and .type=="secret_text"))' "$tmp/before.json" >/dev/null
+          jq -cS '.result.bindings|sort_by(.name)' "$tmp/before.json" > "$tmp/bindings-before.json"
+          curl -fsS --max-time 25 -H "Authorization: Bearer $TOKEN" "$root/deployments" > "$tmp/deploy-before.json"
+          previous=$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/deploy-before.json")
+          curl -fsS --max-time 20 "$site/health" > "$tmp/health-before.json"
+          jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$tmp/health-before.json" >/dev/null
+          touched=0
+          rollback(){
+            code=$?
+            trap - ERR
+            if [ "$touched" = 1 ];then
+              echo SABER_026_SANDBOX_ROLLBACK_REQUESTED
+              jq -nc --arg old "$previous" '{strategy:"percentage",versions:[{version_id:$old,percentage:100}],annotations:{"workers/message":"Rollback de clasificacion sandbox orden 026"}}' |
+                curl -fsS --max-time 40 -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" --data-binary @- "$root/deployments" >/dev/null ||
+                echo SABER_026_SANDBOX_ROLLBACK_NOT_CONFIRMED
+            fi
+            exit "$code"
+          }
+          trap rollback ERR
+          touched=1
+          CI=true npx wrangler deploy --config integraciones/mercadopago/pruebas/wrangler.toml > "$tmp/deploy.log" 2>&1 ||
+            { tail -n 28 "$tmp/deploy.log"; false; }
+          curl -fsS --max-time 25 -H "Authorization: Bearer $TOKEN" "$root/settings" > "$tmp/after.json"
+          jq -cS '.result.bindings|sort_by(.name)' "$tmp/after.json" > "$tmp/bindings-after.json"
+          diff "$tmp/bindings-before.json" "$tmp/bindings-after.json"
+          curl -fsS --max-time 20 "$site/health" > "$tmp/health-after.json"
+          jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$tmp/health-after.json" >/dev/null
+          status=$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$site/admin/api/orders")
+          test "$status" = 401
+          curl -fsS --max-time 25 -H "Authorization: Bearer $DEMO_ADMIN_KEY" "$site/admin/api/orders" > "$tmp/orders.json"
+          jq -e --arg id "e552cf32-356d-40e3-9736-6fbb8fef5dca" '
+            [ .orders[] | select(.id==$id) ] as $m |
+            ($m|length)==1 and
+            ($m[0].status=="paid") and ($m[0].work_number==26) and
+            ($m[0].file_count==2) and ($m[0].production_state=="pendiente") and
+            ($m[0].universal_pdf_pending==false) and
+            ($m[0].universal_pdf_approved==true) and
+            ($m[0].universal_pdf_pending_count==0)' "$tmp/orders.json" >/dev/null
+          echo SABER_026_ONE_PAID_TWO_FILES_APPROVED_IN_NEW_LANE
+          echo SABER_026_SANDBOX_ONLY_GATES_AND_SECRETS_PRESERVED_NO_NEW_ORDERS_NO_CHARGES
+          trap - ERR
