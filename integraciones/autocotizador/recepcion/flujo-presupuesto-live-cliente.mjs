@@ -61,6 +61,8 @@ export function crearFlujoPresupuestoLive({
    metas=manifiestos.map((m,i)=>({fileId:m.fileId,name:m.nombre,bytes:m.bytes,sha256:m.sha256,
     pages:archivos[i].paginas.length,mode:archivos[i].modo,
     transport:m.bytes<=40*MIB?'tus':'r2'}));
+   if(!metas||metas.some(m=>!['bn','color'].includes(m.mode)||
+     m.pages<1||m.pages>2000))throw Error('LIVE_METAS_POSTPAGO_INVALIDAS');
    setState('registrando_borrador');
    const draft=await post(fetcher,'/api/pedido/live/borrador',{
     webOrderId,archivos,manifiestos});
@@ -81,6 +83,10 @@ export function crearFlujoPresupuestoLive({
     throw Error('LIVE_FLUJO_ORDEN_INCONSISTENTE');
    order={webOrderId,commercialOrderId:result.commercialOrderId,
     amountArs:result.totalArs,fileCount:files.length,numeroOrden:result.numeroOrden};
+   // Guardar referencia y manifiesto en esta pestaña en cuanto Central confirma
+   // la orden: recuperarla no puede depender de haber pulsado Mercado Pago.
+   storage.setItem('saber-live-archivos-v1',JSON.stringify({
+    webOrderId,commercialOrderId:order.commercialOrderId,metas}));
    setState('presupuestado');
    return Object.freeze({...order});
   }catch(error){setState('error');throw error}
