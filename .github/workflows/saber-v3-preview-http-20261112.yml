@@ -1,0 +1,64 @@
+name: Saber V3 - verificar preview Pages real sin publicar
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-v3-preview-http-20261112.yml]
+permissions: {contents: read}
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      CF_EDITOR: ${{ secrets.SABER_CF_EDITOR_TOKEN }}
+    steps:
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Consultar URL preview real, verificar fotos y cotizador sin cambiar main
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const origin='https://api.cloudflare.com/client/v4/accounts/'+process.env.CF_ACCOUNT;
+          const res=await fetch(origin+'/pages/projects/libreriasaber/deployments',{
+            headers:{Authorization:'Bearer '+process.env.CF_EDITOR},
+            signal:AbortSignal.timeout(20000)});
+          const data=await res.json();
+          assert.ok(res.ok&&data.success===true);
+          const deployments=data.result.filter(x=>x.environment==='preview'&&
+            x.deployment_trigger?.metadata?.branch==='integracion/tus-pedido-privado-20261101');
+          assert.ok(deployments.length);
+          const d=deployments[0];
+          assert.ok(['success','active'].includes(d.latest_stage?.status));
+          const base=new URL(d.url).origin;
+          assert.match(base,/^https:\/\/[a-f0-9]+\.libreriasaber\.pages\.dev$/);
+          async function get(p){
+            const r=await fetch(base+p,{signal:AbortSignal.timeout(22000)});
+            assert.equal(r.status,200,'PAGES_HTTP_'+p+'_'+r.status);
+            return r;
+          }
+          const home=await (await get('/')).text();
+          assert.ok(home.includes('Librería Saber'));
+          const catalog=await (await get('/fotos-productos.json')).json();
+          assert.equal(catalog.schema,'saber-fotos-productos-local-v1');
+          assert.equal(Object.keys(catalog.images).length,4);
+          for(const asset of Object.values(catalog.images)){
+            assert.match(asset,/^assets\/productos\/[a-f0-9]{16}\.(jpg|png|webp)$/);
+            const r=await get('/'+asset);
+            assert.match(r.headers.get('content-type')||'',/^image\//);
+            assert.ok((await r.arrayBuffer()).byteLength>=128);
+          }
+          const quote=await (await get('/cotizar.html')).text();
+          assert.ok(quote.includes('portal-comercial.json'));
+          assert.ok(quote.includes('saber-documentos-pruebas'));
+          const portal=await (await get('/portal-comercial.json')).json();
+          assert.equal(portal.enabled,false);
+          assert.equal(portal.release,'NO_GO');
+          assert.equal(portal.buyerUrl,null);
+          console.log('SABER_V3_PREVIEW_VERIFIED_URL='+base);
+          console.log('SABER_V3_PREVIEW_4_OF_4_PRODUCT_PHOTOS_HTTP_OK');
+          console.log('SABER_V3_PREVIEW_PORTAL_NO_GO_AND_SANDBOX_QUOTE_PREVIEW_ONLY');
+          console.log('SABER_V3_PUBLIC_MAIN_NOT_CHANGED_NO_PAYMENT');
+          NODE
