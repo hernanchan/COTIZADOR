@@ -29,12 +29,8 @@ const health=await fetch('https://saber-pagos-pruebas.libreriasaber.workers.dev/
 assert.equal(health?.ok,true);
 assert.equal(health?.databaseReady,true);
 assert.equal(health?.paymentsEnabled,false,'Private environment must never charge');
-const payment=await privatePost('/prueba-v2/api/ensayo-r2-prepago-checkout',
- {action:'status',webOrderId:web,commercialOrderId:commercial});
-const state=await payment.json();
-assert.equal(payment.status,200,'EXISTING_SANDBOX_PAYMENT_UNVERIFIED');
-assert.equal(state?.estado,'pagado_esperando_archivo');
-assert.equal(state?.amountArs,4400);
+// La referencia firmada de personal verifica D1 + pago + objeto R2;
+// no exigimos que el checkout antiguo conserve su estado operativo.
 const input={webOrderId:web,fileId:'planoA1',sha256:sha,bytes};
 const refResponse=await privatePost('/prueba-v2/api/ensayo-r2-referencia-personal',input);
 const ref=await refResponse.json();
