@@ -62,6 +62,18 @@ try{
   await page.locator('.product-actions .add').first().waitFor({state:'visible',timeout:18000});
   const photoBefore=await page.locator('.product img').count();
   assert.ok(photoBefore>0,'No hay ninguna foto de artículo del catálogo');
+  await page.waitForFunction(()=>{
+   const images=[...document.querySelectorAll('.product img')];
+   return images.length>0&&images.every(img=>img.complete);
+  },null,{timeout:15000}).catch(()=>{});
+  const imageResults=await page.locator('.product img').evaluateAll(images=>
+   images.map(img=>({ok:img.complete&&img.naturalWidth>0,
+    width:img.naturalWidth,visible:getComputedStyle(img).visibility!=='hidden'})));
+  const goodPhotos=imageResults.filter(img=>img.ok&&img.visible).length;
+  console.log('SABER_V3_PRODUCT_PHOTOS='+JSON.stringify({width,goodPhotos,
+   expected:photoBefore,results:imageResults}));
+  assert.equal(goodPhotos,photoBefore,
+   'Fotos de catálogo no visibles: no publicar V3 con fotografías ocultas');
   const before=await page.locator('#cartBadge').textContent();
   assert.equal(Number(before),0);
   await page.locator('.product-actions .add').first().click();
