@@ -1,0 +1,49 @@
+name: Saber - validar ruta MP LIVE por POST sin firma (sin pagos)
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-validar-ruta-post-webhook-20261112.yml]
+permissions: {contents: write}
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: true}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Peticion POST vacia sin firma a webhook para comprobar rechazo correcto 401
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'EOF'
+          import {mkdir,writeFile} from 'node:fs/promises';
+          const report={checkedAt:new Date().toISOString(),
+            test:'POST_JSON_SIN_FIRMA;NO_PAYMENTS;NO_ORDERS'};
+          try{
+           const r=await fetch('https://pagos.libreriasaber.com.ar/webhooks/mercadopago-live',{
+             method:'POST',headers:{'Content-Type':'application/json'},
+             body:'{}',redirect:'manual',signal:AbortSignal.timeout(15000)});
+           report.httpStatus=r.status;
+           const x=await r.json().catch(()=>null);
+           report.errorCode=typeof x?.error==='string'?x.error.slice(0,70):null;
+           report.expected401=r.status===401&&report.errorCode==='MP_LIVE_WEBHOOK_FIRMA';
+          }catch(e){report.error=String(e?.message||e).slice(0,80)}
+          await mkdir('docs',{recursive:true});
+          await writeFile('docs/INCIDENCIA-MP-POST-WEBHOOK.json',JSON.stringify(report,null,2)+'\n');
+          console.log('MP_WEBHOOK_POST_HEALTH='+JSON.stringify(report));
+          EOF
+      - name: Guardar resultado no sensible
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/INCIDENCIA-MP-POST-WEBHOOK.json || exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/INCIDENCIA-MP-POST-WEBHOOK.json
+          if ! git diff --cached --quiet;then
+            git commit -m "ops: resultado prueba firma rechazable webhook MP"
+            git push origin HEAD:integracion/tus-pedido-privado-20261101
+          fi
