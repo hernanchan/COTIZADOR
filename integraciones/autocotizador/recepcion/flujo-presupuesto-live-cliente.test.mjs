@@ -57,12 +57,20 @@ test('LIVE presupuestar y crear orden sin transmitir originales',async()=>{
  assert.equal(contact.telefono,'351 5554444');
  assert.equal(contact.direccion,'Poeta Lugones 123, Córdoba');
  assert.equal(flow.estado,'presupuestado');
- assert.equal(f.store.size,0);
+ // Regresión: pedido confirmado recuperable ANTES de pulsar pagar.
+ assert.deepEqual([...f.store.keys()],['saber-live-archivos-v1']);
+ const saved=JSON.parse(f.store.get('saber-live-archivos-v1'));
+ assert.equal(saved.webOrderId,webOrderId);
+ assert.equal(saved.commercialOrderId,commercialOrderId);
+ assert.equal(saved.metas.length,1);
+ assert.equal(saved.metas[0].sha256,sha);
+ assert.equal(f.calls.some(c=>c.path.endsWith('/checkout')),false);
 });
 test('checkout solo después de orden productiva y conservación antes del retorno',async()=>{
  const f=fixture(),flow=f.build();
  await assert.rejects(flow.iniciarPago(),/SIN_ORDEN/);
  await flow.preparar();
+ assert.equal(f.store.has('saber-live-archivos-v1'),true);
  const url=await flow.iniciarPago();
  assert.match(url,/mercadopago.com.ar/);
  assert.equal(f.store.has('saber-live-pedido-v1'),true);
