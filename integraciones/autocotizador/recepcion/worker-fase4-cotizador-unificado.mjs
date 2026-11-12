@@ -2418,7 +2418,8 @@ export default {
        'Cache-Control':'no-store,private','X-Content-Type-Options':'nosniff',
        'X-Robots-Tag':'noindex,nofollow'}});
     }
-    if(page==='/personal/api/live-forecast'||
+    if(page==='/personal/api/live-calendar'||
+       page==='/personal/api/live-forecast'||
        page==='/personal/api/live-status'||
        page==='/personal/central'||page==='/personal/api/live-board'||
        page==='/personal/paquete'||page==='/personal/transferencias'||
@@ -2439,6 +2440,10 @@ export default {
        return new Response('Acceso exclusivo de personal de Librería Saber',
         {status:401,headers:{'Cache-Control':'no-store',
          'WWW-Authenticate':'Basic realm="Libreria Saber Personal LIVE", charset="UTF-8"'}});
+      if(page==='/personal/api/live-calendar'){
+       const {agendaPersonalDocumentosLive}=await import('./agenda-personal-live-documentos.mjs');
+       return agendaPersonalDocumentosLive(request,env,{authorized:true});
+      }
       if(page==='/personal/api/live-forecast'){
        const {previsionPersonalDocumentosLive}=await import('./prevision-personal-live-documentos.mjs');
        return previsionPersonalDocumentosLive(request,env,{authorized:true});
