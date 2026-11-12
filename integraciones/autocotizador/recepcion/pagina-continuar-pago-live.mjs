@@ -9,8 +9,45 @@ export function paginaContinuarPagoLive(request,env,{authorized=false}={}){
     u.search||u.hash||env?.SABER_ENTORNO!=='produccion'||
     env?.DOCS_MP_LIVE_GATE!==LIVE||env?.DOCS_LIVE_SESSION_GATE!==LIVE)
   return new Response('No disponible',{status:404,headers:{'Cache-Control':'no-store'}});
- if(!authorized)return new Response('Sesión de compra vencida. No crees otro pedido; contactá a Librería Saber.',{
-   status:401,headers:{'Cache-Control':'no-store,private','X-Robots-Tag':'noindex,nofollow'}});
+ if(!authorized){
+  // La sesión caduca a los 60 minutos. Volver a verificar Turnstile
+  // renueva la sesión; el vínculo de la orden se valida por HMAC/D1 después.
+  const key=env?.DOCS_LIVE_TURNSTILE_SITE_KEY;
+  if(typeof key!=='string'||!/^[A-Za-z0-9_-]{20,100}$/.test(key))
+   return new Response('No se pudo renovar el acceso. Contactá a Librería Saber.',{
+    status:503,headers:{'Cache-Control':'no-store,private'}});
+  const html=`<!doctype html><html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>Recuperar pedido · Librería Saber</title>
+<style>body{font:17px/1.5 system-ui,Arial,sans-serif;background:#f3f6fa;color:#153d65;margin:0;padding:25px}
+main{max-width:610px;margin:9vh auto;background:white;border:1px solid #ccdbea;border-radius:14px;padding:28px}
+h1{font-size:24px}p{line-height:1.55}small{color:#526579}</style>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+</head><body><main><h1>Retomá tu pedido</h1>
+<p>Tu acceso venció por seguridad. Verificalo nuevamente y recuperaremos el pedido de esta misma pestaña, sin crear otro ni cobrarte.</p>
+<div class="cf-turnstile" data-sitekey="${key}" data-action="saber_pedido_live" data-callback="saberRenovarPedido"></div>
+<p id="estado" role="status" aria-live="polite">Verificá el acceso para continuar.</p>
+<small>No hagas un nuevo pedido ni pagues dos veces.</small>
+</main><script>
+window.saberRenovarPedido=async token=>{
+ const label=document.getElementById('estado');
+ label.textContent='Renovando acceso seguro…';
+ try{
+  const r=await fetch('/api/pedido/live/sesion',{method:'POST',credentials:'same-origin',
+   headers:{'Content-Type':'application/json'},body:JSON.stringify({token})});
+  const data=await r.json();
+  if(!r.ok||data?.ok!==true)throw Error('No se pudo renovar la sesión');
+  location.replace('/pedido/continuar');
+ }catch{label.textContent='No pudimos renovar el acceso. Reintentá la verificación; no hagas otro pedido.'}
+};
+</script></body></html>`;
+  return new Response(html,{status:200,headers:{
+   'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store,private',
+   'Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline' https://challenges.cloudflare.com; style-src 'unsafe-inline'; frame-src https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+   'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer',
+   'X-Robots-Tag':'noindex,nofollow'
+  }});
+ }
  const nonce=crypto.randomUUID().replaceAll('-','');
  const html='<!doctype html><html lang="es"><head><meta charset="utf-8">'+
  '<meta name="viewport" content="width=device-width,initial-scale=1">'+
@@ -34,7 +71,13 @@ export function paginaContinuarPagoLive(request,env,{authorized=false}={}){
  'function safeMp(value){try{const u=new URL(value);return u.protocol==="https:"&&!u.username&&!u.password&&!u.port&&!u.hash&&/(^|\\.)(mercadopago\\.com|mercadopago\\.com\\.ar)$/.test(u.hostname)}catch{return false}}'+
  'async function load(){let saved;try{saved=JSON.parse(sessionStorage.getItem("saber-live-archivos-v1")||"null")}catch{}'+
  'if(!saved||!WEB.test(saved.webOrderId||"")||!UUID.test(saved.commercialOrderId||"")||!Array.isArray(saved.metas)||saved.metas.length<1||saved.metas.length>10){price.textContent="No hay datos para retomar en esta pestaña.";status.textContent="Abrí esta dirección desde la misma pestaña donde preparaste la orden. No generes un nuevo pedido.";return}'+
- 'try{const {r,data}=await post("status",saved);'+
+ 'try{let {r,data}=await post("status",saved);'+
+ 'if(r.status===401){status.textContent="Reconectando tu orden original…";'+
+ 'const recovered=await fetch("/api/pedido/live/revincular",{method:"POST",credentials:"same-origin",redirect:"error",'+
+ 'headers:{"Content-Type":"application/json"},body:JSON.stringify({webOrderId:saved.webOrderId,commercialOrderId:saved.commercialOrderId})});'+
+ 'const check=await recovered.json().catch(()=>null);if(!recovered.ok||check?.ok!==true||check.recuperada!==true)'+
+ 'throw Error("No se pudo recuperar la orden original. No hagas otro pedido.");'+
+ '({r,data}=await post("status",saved));}'+
  'if(!r.ok||data?.ok!==true||data.webOrderId!==saved.webOrderId||data.commercialOrderId!==saved.commercialOrderId||!Number.isSafeInteger(data.amountArs)||data.amountArs<1||data.fileCount!==saved.metas.length)throw Error("No se pudo verificar la orden existente");'+
  'order={webOrderId:saved.webOrderId,commercialOrderId:saved.commercialOrderId,amountArs:data.amountArs,fileCount:data.fileCount};'+
  'price.textContent="Orden pendiente · "+pesos(data.amountArs);'+
