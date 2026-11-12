@@ -1,0 +1,70 @@
+name: Saber LIVE - diagnóstico MP y transportes recientes sin datos personales
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-mp-ordenes-recientes-readonly-20261112.yml]
+permissions: {contents: read}
+jobs:
+  diagnostico:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      D1_TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+      DEPLOY_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+    steps:
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Consultar últimas órdenes en D1 y compuertas de cobro sin escrituras
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const host='https://api.cloudflare.com/client/v4/accounts/'+process.env.ACCOUNT;
+          async function get(path,token,opt={}){
+           const res=await fetch(host+path,{...opt,headers:{
+             Authorization:'Bearer '+token,...(opt.headers||{})
+           },signal:AbortSignal.timeout(22000)});
+           const value=await res.json().catch(()=>null);
+           assert.ok(res.ok&&value?.success===true,'CLOUDFLARE_READ_'+res.status);
+           return value.result;
+          }
+          const dbs=await get('/d1/database',process.env.D1_TOKEN);
+          const id=dbs.find(x=>x.name==='saber-pagos-produccion')?.uuid;
+          assert.ok(id,'PRODUCTION_D1_MISSING');
+          const sql=[
+            'SELECT o.status AS status,o.created_at AS created_at,',
+            'CASE WHEN o.preference_id IS NOT NULL THEN 1 ELSE 0 END AS has_mp_preference,',
+            'CASE WHEN o.payment_id IS NOT NULL THEN 1 ELSE 0 END AS has_mp_payment,',
+            'COUNT(f.file_id) AS files,',
+            "SUM(CASE WHEN f.transport='r2' THEN 1 ELSE 0 END) AS r2_count,",
+            "SUM(CASE WHEN f.transport='tus' THEN 1 ELSE 0 END) AS tus_count,",
+            'MAX(f.bytes) AS max_pdf_bytes',
+            'FROM orders o',
+            'JOIN central_r2_universal_order_links l ON l.commercial_order_id=o.id',
+            'JOIN central_r2_universal_files f ON f.web_order_id=l.web_order_id',
+            "WHERE o.created_at>=datetime('now','-6 hours')",
+            'GROUP BY o.id ORDER BY o.created_at DESC LIMIT 8'
+          ].join(' ');
+          const q=await get('/d1/database/'+id+'/query',process.env.D1_TOKEN,{
+           method:'POST',headers:{'Content-Type':'application/json'},
+           body:JSON.stringify({sql})});
+          assert.equal(q.length,1);assert.equal(q[0].success,true);
+          const orders=q[0].results||[];
+          const summary=orders.map(o=>({
+           status:o.status,hasMpPreference:o.has_mp_preference===1,
+           hasMpPayment:o.has_mp_payment===1,
+           files:o.files,r2:o.r2_count,tus:o.tus_count,
+           maxPdfMiB:Math.round((o.max_pdf_bytes||0)/1048576),
+           ageMinutes:Math.max(0,Math.round((Date.now()-Date.parse(o.created_at.replace(' ','T')+'Z'))/60000))
+          }));
+          console.log('MP_LIVE_RECENT_ORDERS_NO_IDS_NO_PII='+JSON.stringify(summary));
+          const s=await get('/workers/scripts/saber-pagos-produccion/settings',process.env.DEPLOY_TOKEN);
+          const values=['CENTRAL_LIVE_R2_GATE','CENTRAL_LIVE_R2_QUOTA_GATE',
+           'CENTRAL_LIVE_R2_STAGING_GATE','CENTRAL_R2_CANARY_MODE','MP_LIVE_GATE',
+           'CENTRAL_LIVE_TUS_GATE','CENTRAL_LIVE_POSTPAY_GATE'];
+          console.log('MP_LIVE_GATES='+JSON.stringify((s.bindings||[]).filter(b=>values.includes(b.name))
+           .map(b=>({name:b.name,status:b.text||b.type}))));
+          console.log('MP_LIVE_DIAG_READONLY_NO_PAYMENT_NO_PII_NO_NEW_ORDER');
+          NODE
