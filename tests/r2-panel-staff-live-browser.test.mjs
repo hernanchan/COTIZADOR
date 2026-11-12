@@ -1,14 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import {readFileSync} from 'node:fs';
+import {readFileSync,existsSync} from 'node:fs';
 const root='../integraciones/autocotizador/recepcion/';
 const read=name=>readFileSync(new URL(root+name,import.meta.url),'utf8');
 const source=read('pantalla-paquete-universal-personal.mjs');
 const compiled=[
  'const zipJs='+JSON.stringify(read('zip-tus-cliente.txt'))+';',
  'const pdfJs='+JSON.stringify(read('pdf-orden-tus-cliente.txt'))+';',
- 'const universalJs='+JSON.stringify(read('paquete-universal-cliente.txt'))+';',
+ // El bundle se genera al compilar; QA aislada usa vacío y el deploy exige el bundle real.
+ 'const universalJs='+JSON.stringify(existsSync(new URL(root+'paquete-universal-cliente.txt',import.meta.url))?
+  read('paquete-universal-cliente.txt'):'')+';',
  'const staffR2Js='+JSON.stringify(read('staff-r2-personal-ui.txt'))+';'
 ].join('\n')+'\n'+source.replace(/^import .*?;\s*$/gm,'')
  .replace('export function paginaPaqueteUniversalPersonal(){',
