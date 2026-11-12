@@ -1,0 +1,56 @@
+name: Saber - restaurar horarios de atención confirmados en D1 LIVE
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-agenda-produccion-restaurar-20261112.yml]
+permissions: {contents: read}
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      D1_TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+    steps:
+      - name: Guardar solo horarios confirmados, preservar revisiones previas y pagos
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const base='https://api.cloudflare.com/client/v4/accounts/'+process.env.ACCOUNT+'/d1/database';
+          const headers={Authorization:'Bearer '+process.env.D1_TOKEN,'Content-Type':'application/json'};
+          async function cf(url,params={}){const r=await fetch(url,{...params,headers,signal:AbortSignal.timeout(18000)});const j=await r.json();assert.equal(r.ok&&j.success,true,'Cloudflare D1 error');return j.result}
+          const dbs=await cf(base),dbsProd=dbs.filter(d=>d.name==='saber-pagos-produccion');
+          assert.equal(dbsProd.length,1);
+          const url=base+'/'+dbsProd[0].uuid+'/query';
+          async function query(sql,params){const response=await cf(url,{method:'POST',body:JSON.stringify({sql,...(params?{params}:{})})});assert.equal(response?.[0]?.success,true);return response[0].results||[]}
+          const before=await query("SELECT (SELECT COUNT(*) FROM orders) AS orders_total, (SELECT COUNT(*) FROM payment_reviews) AS payments_total");
+          await query("CREATE TABLE IF NOT EXISTS central_eta_calendar (id INTEGER PRIMARY KEY CHECK(id=1),weekly_json TEXT NOT NULL,closed_json TEXT NOT NULL,revision INTEGER NOT NULL DEFAULT 1,operator TEXT NOT NULL,updated_at TEXT NOT NULL DEFAULT (datetime('now')))");
+          await query("CREATE TABLE IF NOT EXISTS central_eta_calendar_events (id INTEGER PRIMARY KEY AUTOINCREMENT,revision INTEGER NOT NULL UNIQUE,weekly_json TEXT NOT NULL,closed_json TEXT NOT NULL,operator TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT (datetime('now')))");
+          const prior=await query("SELECT weekly_json,closed_json,revision FROM central_eta_calendar WHERE id=1");
+          if(!prior.length){
+           const slot='07:00-13:30,16:30-20:00';
+           const weekly={mon:slot,tue:slot,wed:slot,thu:slot,fri:slot,sat:'',sun:''};
+           const week=JSON.stringify(weekly),closed='[]',operator='Horario confirmado Saber 2026-11-05';
+           await query("INSERT OR IGNORE INTO central_eta_calendar(id,weekly_json,closed_json,revision,operator) VALUES(1,?,?,1,?)",[week,closed,operator]);
+           await query("INSERT OR IGNORE INTO central_eta_calendar_events(revision,weekly_json,closed_json,operator) VALUES(1,?,?,?)",[week,closed,operator]);
+           console.log('SABER_ETA_HORARIO_CONFIRMADO_RESTAURADO');
+          }else{
+           console.log('SABER_ETA_AGENDA_EXISTENTE_PRESERVADA_SIN_SOBREESCRIBIR');
+          }
+          const rows=await query('SELECT weekly_json,closed_json,revision,operator FROM central_eta_calendar WHERE id=1');
+          assert.equal(rows.length,1);
+          const w=JSON.parse(rows[0].weekly_json),closed=JSON.parse(rows[0].closed_json);
+          assert.deepEqual(Object.keys(w).sort(),['fri','mon','sat','sun','thu','tue','wed']);
+          assert.ok(Array.isArray(closed)&&closed.length<=180);
+          assert.ok(Number.isSafeInteger(rows[0].revision)&&rows[0].revision>=1);
+          const after=await query("SELECT (SELECT COUNT(*) FROM orders) AS orders_total, (SELECT COUNT(*) FROM payment_reviews) AS payments_total");
+          assert.deepEqual(after,before,'La migración no debe tocar órdenes ni pagos');
+          console.log('SABER_ETA_REVISION='+rows[0].revision);
+          console.log('SABER_ETA_LUNES_VIERNES='+w.mon);
+          console.log('SABER_ETA_FIN_DE_SEMANA_CERRADO='+(w.sat===''&&w.sun===''));
+          console.log('SABER_ETA_CIERRES_EXCEPCIONALES='+closed.length);
+          console.log('SABER_ETA_ORDERS_AND_PAYMENTS_UNMODIFIED');
+          NODE
