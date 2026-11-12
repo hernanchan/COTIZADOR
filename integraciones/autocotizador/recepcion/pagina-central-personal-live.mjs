@@ -12,7 +12,7 @@ h1{font-size:clamp(22px,3vw,32px);margin:10px 0}
 h2{font-size:18px;margin:0 0 12px}p{margin:8px 0}small{color:#4d6375}
 a{color:#075b99}button{border:0;border-radius:9px;padding:11px 15px;color:white;background:#155a87;font:inherit;font-weight:700;cursor:pointer}
 button:disabled{opacity:.55}select{padding:10px;border:1px solid #b3cad9;border-radius:8px;font:inherit;background:white;color:#103452}a.action{display:inline-block;padding:9px 13px;border:1px solid #b3cad9;border-radius:8px;text-decoration:none;background:#eef7fd;font-weight:650}
-#estado{margin:15px 0;padding:12px;background:#fff;border:1px solid #cddbe7;border-radius:10px}.forecast{border:1px solid #cddbe7;border-radius:12px;background:#fff;padding:16px;margin:14px 0}.forecast h2{margin-bottom:5px}.forecast .row{align-items:center}
+#estado{margin:15px 0;padding:12px;background:#fff;border:1px solid #cddbe7;border-radius:10px}.forecast{border:1px solid #cddbe7;border-radius:12px;background:#fff;padding:16px;margin:14px 0}.forecast h2{margin-bottom:5px}.forecast .row{align-items:center}.weekly-view{font-size:15px;font-weight:600;margin:8px 0 10px}.agenda-editor{margin-top:10px;padding-top:10px;border-top:1px solid #d5e0e9}.agenda-editor summary{font-weight:700;color:#155a87;cursor:pointer}.days{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:9px;margin:12px 0}.days label{font-weight:600}.days input{display:block;width:100%;font:inherit;padding:9px;border:1px solid #b3cad9;border-radius:8px;margin-top:3px}.agenda-editor textarea{width:100%;max-width:440px;display:block;min-height:90px;font:inherit;padding:10px;border:1px solid #b3cad9;border-radius:8px}
 .board{display:grid;grid-template-columns:repeat(5,minmax(205px,1fr));gap:12px;overflow:auto}
 .lane{background:#e7edf4;border-radius:12px;padding:12px;min-height:230px}
 .lane h2{display:flex;justify-content:space-between;gap:5px}
@@ -26,6 +26,25 @@ button:disabled{opacity:.55}select{padding:10px;border:1px solid #b3cad9;border-
 <a class="action" href="/personal/transferencias">Transferencias por verificar</a>
 <button id="actualizar">Actualizar</button></div></header>
 <section class="forecast" aria-labelledby="previsionTitle"><h2 id="previsionTitle">Previsión general de entrega</h2><p id="previsionEstado" role="status">Consultando previsión…</p><div class="row"><label for="previsionModo">Plazo orientativo para pedidos nuevos</label><select id="previsionModo"><option value="por_confirmar">A confirmar</option><option value="hoy">Durante el día de hoy</option><option value="hoy_tarde">Hoy por la tarde</option><option value="proximo_dia">Próximo día de atención</option></select><button id="previsionGuardar" type="button">Guardar previsión</button></div><small>La fecha y hora exactas se fijan por pedido al comenzar la preparación. No se asignan automáticamente.</small></section>
+<section class="forecast" aria-labelledby="agendaTitle">
+<h2 id="agendaTitle">Días y horarios de atención</h2>
+<p id="agendaResumen" class="weekly-view">Consultando horario guardado…</p>
+<p id="agendaEstado" role="status"></p>
+<details class="agenda-editor" id="agendaEditor"><summary>Editar días, horarios, feriados y cierres especiales</summary>
+<div class="days">
+<label>Lunes<input id="agendaMon" placeholder="07:00-13:30,16:30-20:00" maxlength="120"></label>
+<label>Martes<input id="agendaTue" placeholder="07:00-13:30,16:30-20:00" maxlength="120"></label>
+<label>Miércoles<input id="agendaWed" placeholder="07:00-13:30,16:30-20:00" maxlength="120"></label>
+<label>Jueves<input id="agendaThu" placeholder="07:00-13:30,16:30-20:00" maxlength="120"></label>
+<label>Viernes<input id="agendaFri" placeholder="07:00-13:30,16:30-20:00" maxlength="120"></label>
+<label>Sábado<input id="agendaSat" placeholder="CERRADO" maxlength="120"></label>
+<label>Domingo<input id="agendaSun" placeholder="CERRADO" maxlength="120"></label>
+</div>
+<label for="agendaCierres"><strong>Fechas sin atención (feriados y cierres especiales)</strong></label>
+<textarea id="agendaCierres" placeholder="AAAA-MM-DD · una fecha por línea" spellcheck="false"></textarea>
+<p><small>Un día sin horario significa cerrado. Los feriados se atienden normalmente salvo que agregues la fecha aquí. Para abrir un feriado, quitá su fecha de la lista.</small></p>
+<button type="button" id="agendaGuardar">Guardar horario de atención</button>
+</details></section>
 <p class="banner">Solo se muestran pedidos con pago verificado. Antes de imprimir, comprobá cada original y la hoja de instrucciones.</p>
 <p id="estado" role="status">Consultando pedidos…</p>
 <div id="tablero" class="board"></div>
@@ -35,7 +54,7 @@ const columns=[['pendiente','Nuevos'],['en_preparacion','En preparación'],['en_
 const board=document.getElementById('tablero'),info=document.getElementById('estado');
 const short=x=>String(x||'').trim(),price=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(n);
 const element=(tag,text)=>{const x=document.createElement(tag);if(text!==undefined)x.textContent=text;return x;};
-let working=false;let forecast=null;
+let working=false;let forecast=null;let agendaSnapshot=null;
 async function changeState(order,next,btn){
  const operator=window.prompt('Nombre de quien realiza el cambio de estado:');
  if(operator===null)return;
@@ -108,6 +127,52 @@ async function saveOrderEta(o,button){
  }catch(e){window.alert('No se guardó la hora: '+String(e.message||e));}
  finally{button.disabled=false;}
 }
+const agendaDays=[['mon','Mon','Lunes'],['tue','Tue','Martes'],['wed','Wed','Miércoles'],['thu','Thu','Jueves'],['fri','Fri','Viernes'],['sat','Sat','Sábado'],['sun','Sun','Domingo']];
+async function loadAgenda(force=false){
+ if(document.getElementById('agendaEditor').open&&agendaSnapshot&&!force)return;
+ const status=document.getElementById('agendaEstado');
+ try{
+  const res=await fetch('/personal/api/live-calendar',{credentials:'same-origin',cache:'no-store'});
+  const data=await res.json().catch(()=>null);
+  if(!res.ok||data?.ok!==true||!data.calendar||!data.calendar.weekly)
+   throw Error('No se pudo consultar la agenda · HTTP '+res.status);
+  const c=data.calendar;
+  agendaSnapshot=c;
+  agendaDays.forEach(([key,field])=>{
+   document.getElementById('agenda'+field).value=c.weekly[key]||'';
+  });
+  document.getElementById('agendaCierres').value=(c.closedDates||[]).join('\n');
+  document.getElementById('agendaResumen').textContent=c.configured?
+    'Lunes a viernes: '+[...new Set(['mon','tue','wed','thu','fri'].map(d=>c.weekly[d]))].join(' / ') +
+    ' · Sábado: '+(c.weekly.sat||'CERRADO')+' · Domingo: '+(c.weekly.sun||'CERRADO'):
+    'Agenda sin horarios guardados.';
+  status.textContent='Agenda guardada · Revisión '+c.revision+' · Cierres especiales: '+(c.closedDates||[]).length;
+ }catch(e){
+  status.textContent='No se pudo consultar la agenda: '+String(e.message||e);
+ }
+}
+async function saveAgenda(){
+ if(!agendaSnapshot){window.alert('Primero cargá la agenda guardada.');return;}
+ const weekly={};
+ for(const [key,field] of agendaDays)weekly[key]=document.getElementById('agenda'+field).value.trim();
+ const closedDates=document.getElementById('agendaCierres').value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+ if((weekly.sat||weekly.sun)&&!window.confirm('Los fines de semana normalmente están cerrados. ¿Querés registrar atención esos días?'))return;
+ const operator=window.prompt('Responsable que confirma este horario:');
+ if(operator===null)return;
+ if(operator.trim().length<2){window.alert('Indicá un responsable.');return;}
+ if(!window.confirm('¿Guardar los horarios y cierres especiales en la Central de producción?'))return;
+ const button=document.getElementById('agendaGuardar');
+ button.disabled=true;
+ try{
+  const res=await fetch('/personal/api/live-calendar',{method:'POST',credentials:'same-origin',
+   headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    weekly,closedDates,expectedRevision:agendaSnapshot.revision,operator:operator.trim()})});
+  const data=await res.json().catch(()=>null);
+  if(!res.ok||data?.ok!==true||data.saved!==true)throw Error(data?.error||('HTTP '+res.status));
+  await loadAgenda(true);
+ }catch(e){window.alert('No se guardó la agenda: '+String(e.message||e));}
+ finally{button.disabled=false;}
+}
 async function refresh(){
 
  if(working)return;working=true;info.textContent='Actualizando pedidos pagados…';
@@ -121,6 +186,7 @@ async function refresh(){
   forecast=f;
   document.getElementById('previsionModo').value=f.settings.mode;
   document.getElementById('previsionEstado').textContent='Previsión vigente: '+(forecastLabels[f.settings.mode]||'A confirmar')+' · Revisión '+f.settings.revision;
+  await loadAgenda();
   board.replaceChildren();
   let total=0;
   for(const [state,title] of columns){
@@ -184,6 +250,7 @@ async function refresh(){
 }
 document.getElementById('actualizar').addEventListener('click',()=>void refresh());
 document.getElementById('previsionGuardar').addEventListener('click',()=>void saveForecast());
+document.getElementById('agendaGuardar').addEventListener('click',()=>void saveAgenda());
 void refresh();setInterval(()=>{if(!document.hidden)void refresh()},60000);
 </script></body></html>`;
 }
