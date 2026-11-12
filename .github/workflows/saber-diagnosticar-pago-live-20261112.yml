@@ -1,0 +1,92 @@
+name: Saber - diagnostico de pago LIVE sin cambiar pedidos
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-diagnosticar-pago-live-20261112.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: saber-diagnosticar-pago-live
+  cancel-in-progress: false
+jobs:
+  diagnostico:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    env:
+      CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      CF_D1: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Diagnosticar ordenes ultimas 24 horas, estados y links (SOLO SELECT)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'EOF'
+          import {mkdir,writeFile} from 'node:fs/promises';
+          const a=process.env.CF_ACCOUNT,t=process.env.CF_D1;
+          const info={schema:'saber-mp-live-incidencia-v1',checkedAt:new Date().toISOString(),
+            mode:'D1_SELECT_READ_ONLY',status:'NO_CONCLUIDO',details:{}};
+          const fetchCF=async(path,opts={})=>{
+           const r=await fetch('https://api.cloudflare.com/client/v4/accounts/'+a+path,
+            { ...opts, headers:{Authorization:'Bearer '+t,...opts.headers},
+              signal:AbortSignal.timeout(20000)});
+           const j=await r.json().catch(()=>null);
+           if(!r.ok||j?.success!==true)throw Error('CLOUDFLARE_'+r.status);
+           return j.result;
+          };
+          try{
+           if(!/^[a-f0-9]{32}$/i.test(a||'')||!t||t.length<20)throw Error('SECRETO_D1_AUSENTE');
+           const databases=await fetchCF('/d1/database');
+           const d=databases.find(x=>x.name==='saber-pagos-produccion');
+           if(!d?.uuid)throw Error('D1_PRODUCCION_NO_ENCONTRADA');
+           const sql=[
+            'SELECT o.status AS estado,',
+            'CASE WHEN o.preference_id IS NOT NULL THEN 1 ELSE 0 END AS tiene_preferencia,',
+            'CASE WHEN o.payment_id IS NOT NULL THEN 1 ELSE 0 END AS tiene_pago_registrado,',
+            'CASE WHEN o.paid_at IS NOT NULL THEN 1 ELSE 0 END AS tiene_fecha_pago,',
+            "CASE WHEN EXISTS (SELECT 1 FROM payment_reviews r WHERE r.order_id=o.id AND r.state='verified') THEN 1 ELSE 0 END AS pago_verificado,",
+            'CASE WHEN EXISTS (SELECT 1 FROM central_r2_universal_order_links l WHERE l.commercial_order_id=o.id) THEN 1 ELSE 0 END AS vinculo_documentos,',
+            'COUNT(*) AS cantidad',
+            'FROM orders o',
+            "WHERE datetime(o.created_at)>=datetime('now','-24 hours')",
+            'GROUP BY o.status,tiene_preferencia,tiene_pago_registrado,tiene_fecha_pago,pago_verificado,vinculo_documentos',
+            'ORDER BY cantidad DESC'
+           ].join(' ');
+           const result=await fetchCF('/d1/database/'+d.uuid+'/query',{
+            method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sql})});
+           if(!Array.isArray(result)||result.length!==1||result[0].success!==true)throw Error('D1_QUERY_NO_COMPLETO');
+           const rows=result[0].results||[];
+           for(const row of rows){
+            if(!Number.isSafeInteger(row.cantidad)||row.cantidad<0||
+             !['paid','awaiting_payment','cancelled','failed','refunded','expired'].includes(row.estado))
+              throw Error('D1_AGREGADO_INCONSISTENTE');
+           }
+           info.details={pedidos_ultimas_24h:rows.reduce((n,r)=>n+r.cantidad,0),grupos:rows};
+           info.status='OK';
+          }catch(e){info.status='FALLO_'+String(e.message||e).replace(/[^a-z0-9_]/gi,'_').slice(0,64)}
+          await mkdir('docs',{recursive:true});
+          await writeFile('docs/INCIDENCIA-PAGO-LIVE-DIAGNOSTICO.json',JSON.stringify(info,null,2)+'\n');
+          console.log('INCIDENCIA_MP_RESUMEN',{status:info.status,groupCount:info.details.grupos?.length||0});
+          EOF
+      - name: Guardar solo estados agregados, sin identificadores de pedidos ni pagos
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/INCIDENCIA-PAGO-LIVE-DIAGNOSTICO.json || exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/INCIDENCIA-PAGO-LIVE-DIAGNOSTICO.json
+          if ! git diff --cached --quiet;then
+            git commit -m "ops: diagnostico anonimo de pago real pendiente de Central"
+            git push origin HEAD:integracion/tus-pedido-privado-20261101
+          fi
