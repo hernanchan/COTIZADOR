@@ -1,0 +1,7 @@
+{
+  "checkedAt": "2026-11-12T23:50:53.865Z",
+  "test": "POST_JSON_SIN_FIRMA;NO_PAYMENTS;NO_ORDERS",
+  "httpStatus": 404,
+  "errorCode": "RUTA_NO_DISPONIBLE",
+  "expected401": false
+}
