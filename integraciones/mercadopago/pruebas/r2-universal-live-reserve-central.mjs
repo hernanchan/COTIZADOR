@@ -2,6 +2,7 @@
  * Guardas separadas de Sandbox; SQL atómico para impedir exceder cuota.
  */
 import {autorizarOriginalR2Live} from './r2-universal-live-gate-central.mjs';
+import {r2GateGeneralOCanary} from './r2-live-canary-order.mjs';
 const GO='GO_COMERCIAL_CONFIRMADO',MIB=1048576;
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 const KEY=/^r2-v1\/(WEB-ENSAYO-[A-F0-9]{32})\/([a-f0-9-]{36})\.pdf$/i;
@@ -9,8 +10,7 @@ const reply=(x,status=200)=>Response.json(x,{status,headers:{
  'Cache-Control':'no-store,private','X-Content-Type-Options':'nosniff'}});
 const live=env=>env?.SABER_ENTORNO==='produccion'&&env?.CENTRAL_DB_ENV==='produccion'&&
  env?.MP_LIVE_GATE===GO&&env?.CENTRAL_LIVE_BRIDGE_ENABLED===GO&&
- env?.CENTRAL_LIVE_POSTPAY_GATE===GO&&env?.CENTRAL_LIVE_R2_GATE===GO&&
- env?.CENTRAL_LIVE_R2_QUOTA_GATE===GO&&env?.CENTRAL_LIVE_ORDER_GATE===GO&&
+ env?.CENTRAL_LIVE_POSTPAY_GATE===GO&&env?.CENTRAL_LIVE_ORDER_GATE===GO&&
  env?.CENTRAL_LIVE_PRICING_GATE===GO&&
  env?.CENTRAL_R2_QUOTA_ENABLED!=='PRIVATE_TEST_ONLY'&&
  typeof env?.DB?.prepare==='function';
@@ -30,6 +30,9 @@ export async function reservarR2Live(request,env,{
   !KEY.test(p.objectKey||'')||
   !p.objectKey.startsWith('r2-v1/'+p.orderId+'/'))
   return reply({ok:false,error:'LIVE_R2_QUOTA_FICHA'},422);
+ if(!r2GateGeneralOCanary(env,p.orderId,
+   ['CENTRAL_LIVE_R2_GATE','CENTRAL_LIVE_R2_QUOTA_GATE']))
+  return reply({ok:false,error:'LIVE_R2_QUOTA_PEDIDO_NO_HABILITADO'},503);
  const gate={
   schema:'saber-central-r2-universal-live-gate-v1',
   orderId:p.orderId,fileId:p.fileId,sha256:p.sha256,
