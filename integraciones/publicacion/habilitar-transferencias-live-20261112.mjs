@@ -140,9 +140,19 @@ try{
  const staffUnauth=await fetch('https://pedidos.libreriasaber.com.ar/personal/api/live-transferencias-pendientes',{
   redirect:'manual',signal:AbortSignal.timeout(15000)});
  assert.equal(staffUnauth.status,401,'STAFF_BANK_PENDING_MUST_REQUIRE_LOGIN');
- const docUnauth=await fetch('https://pedidos.libreriasaber.com.ar/api/pedido/live/transfer',
-  {redirect:'manual',signal:AbortSignal.timeout(15000)});
- assert.equal(docUnauth.status,401,'BUYER_TRANSFER_MUST_REQUIRE_VALID_ORDER_SESSION');
+ let buyerStatus=0;
+ // Cloudflare puede tardar en propagar cambios de bindings entre isolates.
+ // No interpretar el 503 de una versión anterior como problema comercial.
+ for(let attempt=1;attempt<=20;attempt++){
+  const r=await fetch('https://pedidos.libreriasaber.com.ar/api/pedido/live/transfer?check='+attempt,{
+   redirect:'manual',signal:AbortSignal.timeout(15000)
+  });
+  buyerStatus=r.status;
+  if(buyerStatus===401)break;
+  console.log('SABER_TRANSFER_BINDING_PROPAGATION_WAIT_'+attempt+'_'+buyerStatus);
+  await new Promise(resolve=>setTimeout(resolve,1500));
+ }
+ assert.equal(buyerStatus,401,'BUYER_TRANSFER_MUST_REQUIRE_VALID_ORDER_SESSION');
  console.log('SABER_TRANSFER_LIVE_CENTRAL_AND_DOCS_GO_VERIFIED');
  console.log('SABER_TRANSFER_BANK_APPROVAL_REQUIRES_STAFF_AUTH_401_VERIFIED');
  console.log('SABER_TRANSFER_CUSTOMER_POST_REQUIRES_SESSION_401_VERIFIED');
