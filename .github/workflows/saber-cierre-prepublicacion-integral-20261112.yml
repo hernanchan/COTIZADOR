@@ -1,0 +1,64 @@
+name: Saber - cierre integral web y cotizador sin pedidos ni cobros
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-cierre-prepublicacion-integral-20261112.yml]
+permissions: {contents: read}
+jobs:
+  cotizador:
+    name: Legal A4, pago y controles movil
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Tests de precios, cuotas y pagos sin crear orden
+        run: |
+          set -euo pipefail
+          node --test \
+            integraciones/autocotizador/recepcion/legal-70g-original.test.mjs \
+            integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs \
+            integraciones/autocotizador/recepcion/flujo-presupuesto-live-cliente.test.mjs \
+            integraciones/autocotizador/recepcion/checkout-live-cliente.test.mjs \
+            integraciones/mercadopago/pruebas/mercadopago-live-central.test.mjs
+      - name: Validar Chrome 360 390 768 1366 y pantalla Siguiente
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund playwright@1.56.0
+          node integraciones/publicacion/qa-cotizador-mobile-layout-20261111.mjs
+          echo SABER_COTIZADOR_MOBILE_LEGAL_MP_QA_OK
+  vidriera:
+    name: Catalogo y carrito sin publicar
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Comprobar fotos, CSV, carrito y portal comercial NO_GO
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund playwright@1.56.0
+          node integraciones/publicacion/qa-v3-prepublicacion-20261112.mjs
+          echo SABER_CATALOGO_CARRITO_PUBLICACION_AUN_NO_GO_VERIFICADO
+  backend:
+    name: D1 produccion read-only
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      SABER_CF_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      SABER_CF_D1_WRITE_TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verificar esquemas y tarifario productivo sin escribir
+        run: |
+          set -euo pipefail
+          node integraciones/publicacion/preflight-d1-final-live-20261111.mjs
+          echo SABER_D1_PRICES_TUS_R2_VERIFIED_NO_WRITES
