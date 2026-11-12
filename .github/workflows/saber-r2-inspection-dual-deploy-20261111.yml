@@ -32,6 +32,7 @@ jobs:
           node --check integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
           grep -Fq '/personal/api/live-r2-inspection-original' integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
           grep -Fq '/internal/central/live/r2-inspection-source' /tmp/saber-r2-live-central-built.mjs
+          node --test tests/r2-panel-staff-live-browser.test.mjs
           echo SABER_R2_INSPECTION_BUILD_AND_TEST_PASS
       - name: Desplegar de forma reversible con R2 cobro NO_GO
         run: |
@@ -42,3 +43,4 @@ jobs:
 # HOTFIX /cotizar 2026-11-11: admitir parámetros UTM del enlace; commit 04da5e6; pruebas LIVE success.
 # Corrección móvil 11/11: iframe dinámico, sin scroll doble, JS teléfono válido; Browser QA 43123076822 SUCCESS.
 # 11/11: lector staff separado de compuertas checkout R2; QA 43128052797 23/23, D1 staged=0.
+# Staff R2: pantalla completa corregida; compilar bundle antes del test con asset real. QA 43128770503 OK.
