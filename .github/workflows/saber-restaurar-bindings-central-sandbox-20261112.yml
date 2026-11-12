@@ -1,0 +1,51 @@
+name: Saber - restaurar servicio y R2 de Central sandbox sin desplegar codigo
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-restaurar-bindings-central-sandbox-20261112.yml]
+permissions: {contents: read}
+jobs:
+  restaurar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+    steps:
+      - name: Restaurar 2 bindings perdidos sin cambiar código, secretos o compuertas
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${ACCOUNT:?}" "${TOKEN:?}"
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-pagos-pruebas"
+          tmp=$(mktemp -d)
+          curl -fsS --max-time 30 -H "Authorization: Bearer $TOKEN" "$root/settings" > "$tmp/before.json"
+          jq -e '.success==true and (.result.bindings|any(.name=="DEMO_ADMIN_KEY" and .type=="secret_text")) and (.result.bindings|any(.name=="DB" and .type=="d1")) and (.result.bindings|any(.name=="MP_TEST_ACCESS_TOKEN" and .type=="secret_text"))' "$tmp/before.json" >/dev/null
+          jq -cS '.result.bindings|sort_by(.name)' "$tmp/before.json" > "$tmp/base-bindings.json"
+          jq '{bindings:(
+             [.result.bindings[]|{name,type:"inherit"}] +
+             (if (.result.bindings|any(.name=="SABER_DOCUMENTOS")) then [] else
+             [{name:"SABER_DOCUMENTOS",type:"service",service:"saber-documentos-pruebas",environment:"production"}] end) +
+             (if (.result.bindings|any(.name=="SABER_R2_GRANDES")) then [] else
+             [{name:"SABER_R2_GRANDES",type:"r2_bucket",bucket_name:"saber-documentos-grandes-ensayo-20261106"}] end)
+           )}' "$tmp/before.json" > "$tmp/patch.json"
+          status=$(curl -sS --max-time 45 -X PATCH -o "$tmp/patch-result.json" -w '%{http_code}' \
+            -H "Authorization: Bearer $TOKEN" \
+            -F "settings=@$tmp/patch.json;type=application/json" "$root/settings")
+          if [ "$status" != 200 ] || ! jq -e '.success==true' "$tmp/patch-result.json" >/dev/null;then
+            echo "SABER_BINDING_RESTORE_PATCH_HTTP_$status"
+            jq -c '{success,errors:[.errors[]?|{code,message}]}' "$tmp/patch-result.json" || true
+            exit 1
+          fi
+          curl -fsS --max-time 30 -H "Authorization: Bearer $TOKEN" "$root/settings" > "$tmp/after.json"
+          jq -e '.success==true and (.result.bindings|
+             any(.name=="SABER_DOCUMENTOS" and .type=="service" and .service=="saber-documentos-pruebas" and .environment=="production") and
+             any(.name=="SABER_R2_GRANDES" and .type=="r2_bucket" and .bucket_name=="saber-documentos-grandes-ensayo-20261106"))' "$tmp/after.json" >/dev/null
+          jq -cS '[.result.bindings[]|select(.name!="SABER_DOCUMENTOS" and .name!="SABER_R2_GRANDES")]|sort_by(.name)' "$tmp/after.json" > "$tmp/existing-after.json"
+          jq -cS '[.result.bindings[]|select(.name!="SABER_DOCUMENTOS" and .name!="SABER_R2_GRANDES")]|sort_by(.name)' "$tmp/before.json" > "$tmp/existing-before.json"
+          diff "$tmp/existing-before.json" "$tmp/existing-after.json"
+          curl -fsS --max-time 25 https://saber-pagos-pruebas.libreriasaber.workers.dev/health > "$tmp/health.json"
+          jq -e '.ok==true and .databaseReady==true and .paymentsEnabled==false' "$tmp/health.json" >/dev/null
+          echo SABER_SANDBOX_CENTRAL_SERVICE_AND_R2_BINDINGS_RESTORED
+          echo SABER_SANDBOX_CENTRAL_ALL_EXISTING_BINDINGS_PRESERVED_NO_PAYMENT_NO_DEPLOY
