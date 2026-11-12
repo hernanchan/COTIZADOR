@@ -56,3 +56,4 @@ jobs:
           console.log('R2_RETURN_PAGE_STATUS='+check.status);
           console.log('R2_AUDIT_ONLY_NO_CONFIG_CHANGED_NO_PAYMENT_NO_ORDERS');
           NODE
+# 2026-11-11 verificar prerrequisitos efectivos de inspección R2 autenticada antes de E2E comercial.
