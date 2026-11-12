@@ -1,0 +1,71 @@
+name: Saber - URGENTE restaurar web anterior, sin tocar pedidos ni pagos
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-restaurar-web-anterior-urgente-20261112.yml]
+permissions: {contents: write}
+concurrency: {group: saber-website-production-v3-release, cancel-in-progress: false}
+jobs:
+  revertir-web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: true, fetch-depth: 0}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Restaurar exactamente vidriera anterior y deshabilitar nuevo cotizador
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --quiet
+          current=$(git rev-parse origin/main)
+          expected='af5c886286a027c2857c988a718ba769967a99a1'
+          baseline='c7c50a867946415009510e5052ae5360e82e9fa6'
+          test "$current" = "$expected" || { echo "WEB_MAIN_MOVED_ABORT_ROLLBACK=$current";exit 1; }
+          git cat-file -e "$baseline^{commit}"
+          git worktree add --detach /tmp/saber-web-previo "$baseline" >/dev/null
+          git worktree add --detach /tmp/saber-web-main "$current" >/dev/null
+          git -C /tmp/saber-web-main config user.name 'Libreria Saber Reversion de Emergencia'
+          git -C /tmp/saber-web-main config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          rsync -a --delete /tmp/saber-web-previo/vidriera/ /tmp/saber-web-main/vidriera/
+          cmp /tmp/saber-web-previo/vidriera/index.html /tmp/saber-web-main/vidriera/index.html
+          cmp /tmp/saber-web-previo/vidriera/cotizar.html /tmp/saber-web-main/vidriera/cotizar.html
+          node --input-type=module <<'NODE'
+          import {readFileSync} from 'node:fs';
+          import assert from 'node:assert/strict';
+          const portal=JSON.parse(readFileSync('/tmp/saber-web-main/vidriera/portal-comercial.json','utf8'));
+          assert.deepEqual(portal,{schema:'saber-portal-comercial-v1',enabled:false,release:'NO_GO',buyerUrl:null});
+          console.log('SABER_RESTORE_PORTAL_NO_GO_AND_OLD_QUOTE');
+          NODE
+          git -C /tmp/saber-web-main add -A vidriera/
+          git -C /tmp/saber-web-main diff --cached --check
+          git -C /tmp/saber-web-main diff --cached --quiet &&
+            { echo WEB_ALREADY_RESTORED;exit 0; }
+          git -C /tmp/saber-web-main commit -m 'revert(web): restaurar version anterior hasta operar Central de Pedidos'
+          git -C /tmp/saber-web-main push origin HEAD:main
+          echo 'SABER_WEB_PREVIOUS_VERSION_PUSHED_NO_WORKERS_NO_PAYMENTS_NO_DB'
+      - name: Verificar sitio real volvió a NO_GO
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          let ok=false;
+          for(let i=0;i<35;i++){
+            try{
+              const res=await fetch('https://libreriasaber.com.ar/portal-comercial.json?rollback='+Date.now(),{cache:'no-store',signal:AbortSignal.timeout(12000)});
+              const portal=await res.json();
+              const home=await fetch('https://libreriasaber.com.ar/?rollback='+Date.now(),{cache:'no-store',signal:AbortSignal.timeout(12000)});
+              const html=await home.text();
+              if(res.status===200&&portal.enabled===false&&portal.release==='NO_GO'&&portal.buyerUrl===null&&
+                 home.status===200&&html.includes('Librería Saber')){
+                  console.log('SABER_PUBLIC_SITE_RESTORED_NO_GO_PREVIOUS_VERSION');
+                  ok=true;break;
+              }
+            }catch(e){console.log('SABER_RESTORE_PROPAGATING_'+i);}
+            await new Promise(r=>setTimeout(r,4000));
+          }
+          assert.equal(ok,true,'WEB_RESTORE_PUBLIC_VERIFY_NOT_COMPLETE');
+          console.log('SABER_RESTORE_NO_ORDERS_NO_CHARGES_NO_D1_CHANGES');
+          NODE
