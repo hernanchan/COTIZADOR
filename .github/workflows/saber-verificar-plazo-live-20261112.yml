@@ -1,0 +1,54 @@
+name: Saber - verificar previsión de comprador LIVE sin cambios
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-verificar-plazo-live-20261112.yml]
+permissions:
+  contents: write
+concurrency:
+  group: saber-plazo-readonly
+  cancel-in-progress: false
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Leer plazo real del cliente sin enviar pedidos ni pagos
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'EOF'
+          import {mkdir,writeFile} from 'node:fs/promises';
+          const url='https://pedidos.libreriasaber.com.ar/api/pedido/plazo';
+          const now=new Date().toISOString();
+          let result={fechaConsulta:now,schema:'saber-plazo-live-readonly-v1',origin:'comprador-live',noChanges:true};
+          try{
+           const r=await fetch(url,{redirect:'error',headers:{'Cache-Control':'no-cache'},
+             signal:AbortSignal.timeout(18000)});
+           const data=await r.json().catch(()=>null);
+           result={...result,httpStatus:r.status,ok:r.ok&&data?.ok===true,
+             mode:data?.mode??null,label:data?.label??null,
+             estimatedDeadlineDate:data?.estimatedDeadlineDate??null,
+             notice:data?.notice??null};
+          }catch(e){result={...result,ok:false,error:String(e.message||e).slice(0,90)}}
+          await mkdir('docs',{recursive:true});
+          await writeFile('docs/ESTADO-PLAZO-CLIENTE-20261112.json',JSON.stringify(result,null,2)+'\n');
+          console.log('SABER_LIVE_PLAZO_CHECK '+JSON.stringify({ok:result.ok,httpStatus:result.httpStatus,mode:result.mode,label:result.label}));
+          EOF
+      - name: Registrar observación anónima para verificar el cambio
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/ESTADO-PLAZO-CLIENTE-20261112.json
+          if ! git diff --cached --quiet;then
+            git commit -m "ops: comprobar plazo comprador LIVE (solo lectura)"
+            git push origin HEAD:integracion/tus-pedido-privado-20261101
+          fi
