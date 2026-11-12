@@ -24,3 +24,4 @@ jobs:
           node --check integraciones/publicacion/qa-live-staff-r2-realbytes-20261111.mjs
           node integraciones/publicacion/qa-live-staff-r2-realbytes-20261111.mjs
           echo SABER_R2_REAL_BYTES_QA_COMPLETED_NO_WRITE
+# Revalidación: referencia de personal existente, sin consultar checkout antiguo.
