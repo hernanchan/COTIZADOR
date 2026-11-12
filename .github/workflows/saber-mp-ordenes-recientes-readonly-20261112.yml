@@ -82,6 +82,23 @@ jobs:
           console.log('MP_R2_SCREENSHOT_MATCH_COUNT='+matches.length);
           if(matches.length===1)
            console.log('MP_R2_SCREENSHOT_ORDER_NUMBER='+String(matches[0].numero_orden).padStart(3,'0'));
+          const sizeSQL=[
+            'SELECT json_extract(f.work_json,\'$.formatoFinal\') AS formato_final,',
+            'json_extract(f.work_json,\'$.configuracion.seleccion\') AS seleccion,',
+            'json_extract(f.work_json,\'$.configuracion.materialColor\') AS material,',
+            'json_extract(f.work_json,\'$.configuracion.modo\') AS modo,',
+            'json_extract(f.work_json,\'$.destino\') AS destino',
+            'FROM central_work_order_numbers n',
+            'JOIN central_r2_universal_order_links l ON l.commercial_order_id=n.commercial_order_id',
+            'JOIN central_r2_universal_files f ON f.web_order_id=l.web_order_id',
+            'WHERE n.number=3 LIMIT 2'
+          ].join(' ');
+          const sizeResult=await get('/d1/database/'+id+'/query',process.env.D1_TOKEN,{
+           method:'POST',headers:{'Content-Type':'application/json'},
+           body:JSON.stringify({sql:sizeSQL})});
+          assert.equal(sizeResult[0].success,true);
+          const configs=sizeResult[0].results||[];
+          console.log('MP_R2_ORDER_003_SIZE_ONLY='+JSON.stringify(configs));
           const s=await get('/workers/scripts/saber-pagos-produccion/settings',process.env.DEPLOY_TOKEN);
           const values=['CENTRAL_LIVE_R2_GATE','CENTRAL_LIVE_R2_QUOTA_GATE',
            'CENTRAL_LIVE_R2_STAGING_GATE','CENTRAL_R2_CANARY_MODE','MP_LIVE_GATE',
