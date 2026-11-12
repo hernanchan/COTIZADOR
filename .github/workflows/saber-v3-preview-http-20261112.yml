@@ -30,8 +30,9 @@ jobs:
           const deployments=data.result.filter(x=>x.environment==='preview'&&
             x.deployment_trigger?.metadata?.branch==='integracion/tus-pedido-privado-20261101');
           assert.ok(deployments.length);
-          const d=deployments[0];
-          assert.ok(['success','active'].includes(d.latest_stage?.status));
+          const d=deployments.find(x=>x.latest_stage?.status==='success');
+          assert.ok(d,'PAGES_PREVIEW_BUILD_NOT_YET_SUCCESSFUL');
+          console.log('SABER_PREVIEW_TEST_COMMIT='+String(d.deployment_trigger?.metadata?.commit_hash||'').slice(0,12));
           const base=new URL(d.url).origin;
           assert.match(base,/^https:\/\/[a-f0-9]+\.libreriasaber\.pages\.dev$/);
           async function get(p){
