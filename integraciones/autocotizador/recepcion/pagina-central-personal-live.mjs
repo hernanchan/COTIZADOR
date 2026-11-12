@@ -141,7 +141,7 @@ async function loadAgenda(force=false){
   agendaDays.forEach(([key,field])=>{
    document.getElementById('agenda'+field).value=c.weekly[key]||'';
   });
-  document.getElementById('agendaCierres').value=(c.closedDates||[]).join('\n');
+  document.getElementById('agendaCierres').value=(c.closedDates||[]).join('\\n');
   document.getElementById('agendaResumen').textContent=c.configured?
     'Lunes a viernes: '+[...new Set(['mon','tue','wed','thu','fri'].map(d=>c.weekly[d]))].join(' / ') +
     ' · Sábado: '+(c.weekly.sat||'CERRADO')+' · Domingo: '+(c.weekly.sun||'CERRADO'):
@@ -155,7 +155,7 @@ async function saveAgenda(){
  if(!agendaSnapshot){window.alert('Primero cargá la agenda guardada.');return;}
  const weekly={};
  for(const [key,field] of agendaDays)weekly[key]=document.getElementById('agenda'+field).value.trim();
- const closedDates=document.getElementById('agendaCierres').value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+ const closedDates=document.getElementById('agendaCierres').value.split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean);
  if((weekly.sat||weekly.sun)&&!window.confirm('Los fines de semana normalmente están cerrados. ¿Querés registrar atención esos días?'))return;
  const operator=window.prompt('Responsable que confirma este horario:');
  if(operator===null)return;
