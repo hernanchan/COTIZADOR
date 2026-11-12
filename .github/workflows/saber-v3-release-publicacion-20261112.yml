@@ -1,0 +1,146 @@
+name: Saber V3 - cortar al sitio nuevo con MP y R2 listos, rollback de portada
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths:
+      - .github/workflows/saber-v3-release-publicacion-20261112.yml
+      - docs/RELEASE-V3-PUBLICAR-20261112.trigger
+permissions: {contents: write}
+concurrency: {group: saber-website-production-v3-release, cancel-in-progress: false}
+jobs:
+  cutover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      CF_DEPLOY: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+    steps:
+      - name: Obtener código candidato de integración
+        uses: actions/checkout@v4
+        with: {persist-credentials: true, fetch-depth: 0}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Validar interruptor, precio Legal, pagos y R2
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fxq 'ACTION=OFF' docs/RELEASE-V3-PUBLICAR-20261112.trigger ||
+          grep -Fxq 'ACTION=PUBLICAR' docs/RELEASE-V3-PUBLICAR-20261112.trigger
+          node --check integraciones/publicacion/preflight-release-comercial-v3-20261112.mjs
+          node integraciones/publicacion/preflight-release-comercial-v3-20261112.mjs
+          node --test \
+            integraciones/autocotizador/recepcion/legal-70g-original.test.mjs \
+            integraciones/autocotizador/recepcion/revincular-orden-live.test.mjs \
+            integraciones/mercadopago/pruebas/mercadopago-live-central.test.mjs \
+            integraciones/mercadopago/pruebas/r2-universal-live-gate-central.test.mjs \
+            integraciones/mercadopago/pruebas/r2-universal-live-reserve-central.test.mjs \
+            integraciones/autocotizador/recepcion/r2-live-multipart-documentos.test.mjs
+          npm install --no-save --no-audit --no-fund playwright@1.56.0
+          node integraciones/publicacion/qa-v3-prepublicacion-20261112.mjs
+          test -f vidriera/portal-comercial.json
+          node - <<'NODE'
+          const fs=require('fs'),assert=require('assert/strict');
+          const portal=JSON.parse(fs.readFileSync('vidriera/portal-comercial.json'));
+          assert.equal(portal.enabled,false);
+          assert.equal(portal.release,'NO_GO');
+          const photos=JSON.parse(fs.readFileSync('vidriera/fotos-productos.json'));
+          assert.equal(Object.keys(photos.images).length,4);
+          for(const asset of Object.values(photos.images)){
+           assert.match(asset,/^assets\/productos\/[a-f0-9]{16}\.(jpg|png|webp)$/);
+           assert.ok(fs.statSync('vidriera/'+asset).size>100);
+          }
+          console.log('V3_PRICE_CATALOG_IMAGES_AND_PRODUCTION_MP_R2_READY');
+          NODE
+      - name: Publicar sólo el sitio (sin tocar Workers, pagos ni datos)
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -Fxq 'ACTION=OFF' docs/RELEASE-V3-PUBLICAR-20261112.trigger;then
+            echo SABER_V3_RELEASE_PREFLIGHT_PASS_SWITCH_OFF_NO_MAIN_CHANGE
+            exit 0
+          fi
+          grep -Fxq 'ACTION=PUBLICAR' docs/RELEASE-V3-PUBLICAR-20261112.trigger
+          test "$GITHUB_REF_NAME" = 'integracion/tus-pedido-privado-20261101'
+          git fetch origin main --quiet
+          BASE=$(git rev-parse origin/main)
+          echo "SABER_V3_MAIN_BEFORE_CUTOVER=$BASE"
+          # Main podría avanzar por otro proceso: en ese caso NO sobrescribir.
+          test "$BASE" = 'ded2cc0bd0262c297cf4090d6772cd8a12a5bc9d'
+          git worktree add /tmp/saber-v3-main "$BASE" >/dev/null
+          git -C /tmp/saber-v3-main config user.name 'Saber Publicación Controlada'
+          git -C /tmp/saber-v3-main config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          rsync -a --delete vidriera/ /tmp/saber-v3-main/vidriera/
+          node - <<'NODE'
+          const fs=require('fs'),assert=require('assert/strict');
+          const file='/tmp/saber-v3-main/vidriera/portal-comercial.json';
+          const old=JSON.parse(fs.readFileSync(file,'utf8'));
+          assert.equal(old.enabled,false);assert.equal(old.release,'NO_GO');
+          const live={schema:'saber-portal-comercial-v1',enabled:true,
+           release:'GO_COMERCIAL_CONFIRMADO',buyerUrl:'https://pedidos.libreriasaber.com.ar/cotizar'};
+          fs.writeFileSync(file,JSON.stringify(live,null,2)+'\n');
+          const quote=fs.readFileSync('/tmp/saber-v3-main/vidriera/cotizar.html','utf8');
+          assert.ok(quote.includes('portal-comercial.json'));
+          assert.ok(quote.includes("target.hostname!=='pedidos.libreriasaber.com.ar'"));
+          console.log('SABER_V3_ONLY_OFFICIAL_HOST_ALLOWED');
+          NODE
+          git -C /tmp/saber-v3-main add vidriera/
+          git -C /tmp/saber-v3-main diff --cached --check
+          git -C /tmp/saber-v3-main commit -m 'release(web): nueva vidriera V3 con cotizador LIVE, R2 grande y fotos locales'
+          git -C /tmp/saber-v3-main push origin HEAD:main
+          echo SABER_V3_RELEASE_MAIN_COMMIT_PUSH_OK
+          # Confirmar HTTP de producción; si falla, restaurar el árbol anterior.
+          set +e
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const origin='https://libreriasaber.com.ar';
+          let success=false;
+          for(let attempt=1;attempt<=35;attempt++){
+            try{
+              const u=origin+'/?saber_release_check='+Date.now();
+              const res=await fetch(u,{signal:AbortSignal.timeout(12000)});
+              if(!res.ok)throw Error('HOME_'+res.status);
+              const text=await res.text();
+              if(!text.includes('Librería Saber'))throw Error('HOME_NOT_READY');
+              const p=await fetch(origin+'/portal-comercial.json?t='+Date.now(),
+               {cache:'no-store',signal:AbortSignal.timeout(12000)});
+              const portal=await p.json();
+              if(p.status!==200||portal.enabled!==true||
+                portal.buyerUrl!=='https://pedidos.libreriasaber.com.ar/cotizar')
+                throw Error('PORTAL_NOT_GO');
+              const c=await fetch(origin+'/cotizar.html?t='+Date.now(),
+               {signal:AbortSignal.timeout(12000)});
+              const html=await c.text();
+              if(c.status!==200||!html.includes('portal-comercial.json'))throw Error('QUOTE_NOT_READY');
+              const photos=await fetch(origin+'/fotos-productos.json?t='+Date.now(),
+               {signal:AbortSignal.timeout(12000)}).then(r=>r.json());
+              assert.equal(Object.keys(photos.images).length,4);
+              const asset=Object.values(photos.images)[0];
+              const im=await fetch(origin+'/'+asset,{signal:AbortSignal.timeout(12000)});
+              if(im.status!==200||!(im.headers.get('content-type')||'').startsWith('image/'))
+                throw Error('PHOTO_NOT_READY');
+              const live=await fetch('https://pedidos.libreriasaber.com.ar/cotizar',
+               {signal:AbortSignal.timeout(12000)});
+              if(live.status!==200)throw Error('BUYER_NOT_READY');
+              console.log('SABER_V3_PUBLIC_DOMAIN_PORTAL_GO_FOTOS_AND_BUYER_OK');
+              success=true;break;
+            }catch(e){
+              console.log('SABER_V3_RELEASE_PAGES_PROPAGATING_ATTEMPT_'+attempt);
+              await new Promise(r=>setTimeout(r,5000));
+            }
+          }
+          if(!success)process.exit(5);
+          NODE
+          verification=$?
+          set -e
+          if [ "$verification" -ne 0 ];then
+            echo SABER_V3_PUBLIC_VERIFY_FAILED_ROLLBACK_MAIN
+            git -C /tmp/saber-v3-main restore --source "$BASE" --staged --worktree vidriera/
+            git -C /tmp/saber-v3-main add -A vidriera/
+            git -C /tmp/saber-v3-main commit -m 'rollback(web): restaurar web pública anterior tras verificación V3 fallida'
+            git -C /tmp/saber-v3-main push origin HEAD:main
+            echo SABER_V3_PUBLIC_ROLLBACK_PUSH_CONFIRMED
+            exit 1
+          fi
+          echo SABER_V3_PUBLISHED_NEW_WEBSITE_MP_R2_GO_NO_REAL_PAYMENT_RUN
