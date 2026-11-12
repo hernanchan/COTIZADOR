@@ -81,20 +81,23 @@ for(const name of ['MP_LIVE_GATE','CENTRAL_LIVE_BRIDGE_ENABLED',
  'CENTRAL_LIVE_ORDER_GATE','CENTRAL_LIVE_PRICING_GATE',
  'CENTRAL_LIVE_POSTPAY_GATE','CENTRAL_LIVE_R2_GATE',
  'CENTRAL_LIVE_R2_QUOTA_GATE','CENTRAL_LIVE_R2_STAGING_GATE',
- 'CENTRAL_LIVE_R2_INSPECTION_GATE'])requireGate(mp,name);
+ 'CENTRAL_LIVE_R2_INSPECTION_GATE','CENTRAL_LIVE_TUS_GATE',
+ 'CENTRAL_LIVE_TRANSFER_GATE','CENTRAL_LIVE_TRANSFER_APPROVAL_GATE'])requireGate(mp,name);
 for(const name of ['DOCS_LIVE_UI_GATE','DOCS_MP_LIVE_GATE',
  'DOCS_LIVE_RECEPCION_GATE','DOCS_LIVE_SESSION_GATE',
  'DOCS_LIVE_ORDER_GATE','DOCS_LIVE_PRICING_GATE',
  'DOCS_LIVE_R2_GATE','DOCS_LIVE_R2_STAGING_GATE',
  'DOCS_LIVE_R2_UPLOAD_GATE','DOCS_LIVE_STAFF_GATE',
- 'DOCS_LIVE_PACKAGE_GATE'])requireGate(docs,name);
+ 'DOCS_LIVE_PACKAGE_GATE','DOCS_LIVE_TUS_GATE',
+ 'DOCS_LIVE_TRANSFER_GATE'])requireGate(docs,name);
 assert.equal(b(docs,'SABER_R2_GRANDES_LIVE')?.type,'r2_bucket');
 assert.equal(b(docs,'SABER_R2_GRANDES_LIVE')?.bucket_name,
  'saber-documentos-produccion-privado');
 assert.equal(b(docs,'SABER_CENTRAL')?.type,'service');
 assert.equal(b(docs,'SABER_CENTRAL')?.service,'saber-pagos-produccion');
 assert.equal(b(mp,'MP_LIVE_ACCESS_TOKEN')?.type,'secret_text');
-console.log('SABER_MONITOR_MP_R2_40_TO_200_MIB_GATES_OK');
+assert.match(b(mp,'CENTRAL_LIVE_TRANSFER_ALIAS')?.text||'',/^[A-Za-z0-9._-]{6,50}$/);
+console.log('SABER_MONITOR_MP_TRANSFER_TUS_R2_40_TO_200_MIB_GATES_OK');
 const dbs=await cf('/d1/database',dbToken);
 const db=dbs.find(x=>x.name==='saber-pagos-produccion');
 assert.ok(db?.uuid);
