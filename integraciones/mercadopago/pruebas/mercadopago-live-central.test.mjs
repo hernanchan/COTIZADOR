@@ -127,15 +127,22 @@ test('retorno HTTPS admite comprador productivo y rechaza URL insegura sin crear
  const f=fixture();let calls=0;
  const accepted='https://pedidos.libreriasaber.com.ar/pedido/estado';
  const req=new Request('https://pagos.libreriasaber.com.ar/internal/central/live/checkout',{method:'POST'});
- const observed=[];
+ const observed=[],vigencias=[];
  const fetcher=async(url,options)=>{
-  if(new URL(url).pathname==='/checkout/preferences'&&options?.method==='POST')
-   observed.push(JSON.parse(options.body).back_urls);
+  if(new URL(url).pathname==='/checkout/preferences'&&options?.method==='POST'){
+   const body=JSON.parse(options.body);
+   observed.push(body.back_urls);
+   vigencias.push({expires:body.expires,inicio:body.expiration_date_from,fin:body.expiration_date_to});
+  }
   return f.mpFetch(url,options);
  };
  const approved=await checkoutMPLiveCentral(req,{...f.env,MP_LIVE_RETURN_URL:accepted},{readSigned:f.signed,fetcher});
  assert.equal(approved.status,200);
  assert.deepEqual(observed,[{success:accepted,pending:accepted,failure:accepted}]);
+ assert.equal(vigencias.length,1);
+ assert.equal(vigencias[0].expires,true);
+ assert.match(vigencias[0].inicio,/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/);
+ assert.ok(Date.parse(vigencias[0].fin)>Date.parse(vigencias[0].inicio));
  assert.equal(f.posts,1,'solo simulacion local de la preferencia');
  for(const returnUrl of [
   'https://pedidos.libreriasaber.com.ar/pedido/estado',
