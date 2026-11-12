@@ -34,6 +34,15 @@ for(const [name,o] of [['central',central],['docs',docs]]){
  });
  console.log('SABER_TRANSFER_'+name.toUpperCase()+'_GATES='+JSON.stringify(info));
 }
+const docsKey=k=>docs.bindings.find(x=>x.name===k);
+console.log('SABER_TRANSFER_DOCS_BRIDGE_PREFLIGHT='+JSON.stringify({
+ liveUrlConfigured:!!docsKey('CENTRAL_LIVE_URL'),
+ liveUrlExact:docsKey('CENTRAL_LIVE_URL')?.text===
+  'https://pagos.libreriasaber.com.ar/internal/central/live/checkout',
+ bridgeHmacSecret:docsKey('CENTRAL_BRIDGE_KEY')?.type==='secret_text',
+ centralServiceValid:docsKey('SABER_CENTRAL')?.type==='service'&&
+  docsKey('SABER_CENTRAL')?.service==='saber-pagos-produccion'
+}));
 const dbs=await get('/d1/database',dbToken);
 const db=dbs.find(x=>x.name==='saber-pagos-produccion');
 assert.ok(db?.uuid);
