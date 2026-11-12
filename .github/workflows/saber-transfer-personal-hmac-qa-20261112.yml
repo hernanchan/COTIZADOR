@@ -1,0 +1,31 @@
+name: Saber LIVE - QA transferencias personal y puente HMAC
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-transfer-personal-hmac-qa-20261112.yml]
+permissions: {contents: read}
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verificar JS, firma HMAC, CSRF, personal y pagos sin credenciales reales
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check integraciones/mercadopago/pruebas/central-live-bridge.mjs
+          node --check integraciones/mercadopago/pruebas/worker.js
+          node --check integraciones/autocotizador/recepcion/transferencias-personal-live.mjs
+          node --check integraciones/autocotizador/recepcion/pantalla-transferencias-personal-live.mjs
+          node --check integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs
+          node --test \
+            integraciones/autocotizador/recepcion/transferencias-personal-live.test.mjs \
+            integraciones/mercadopago/pruebas/transferencias-live-central.test.mjs \
+            integraciones/autocotizador/recepcion/transferencia-live-comprador.test.mjs \
+            integraciones/mercadopago/pruebas/central-live-bridge.test.mjs \
+            integraciones/mercadopago/pruebas/mercadopago-live-central.test.mjs
+          echo SABER_TRANSFER_STAFF_HMAC_SECURITY_QA_PASS_NO_PAYMENT
