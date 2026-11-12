@@ -22,60 +22,7 @@
     item.style.cssText='padding:9px 0;border-bottom:1px solid #dde5ec';
     const label=document.createElement('span');
     label.textContent='Orden '+x.numeroOrden+' · '+x.estado+' · '+x.fileCount+
-     ' PDF · R2 '+x.r2Count+' · Pendientes '+x.pendingCount+' · 
- const url=()=>new URLSearchParams({webOrderId:order.value.trim(),
-  fileId:file.value.trim()}).toString();
- const error=e=>{status.textContent='No se completó: '+String(e?.message||e).slice(0,160)};
- q('r2Consultar').addEventListener('click',async()=>{
-  detail.hidden=true;manifest=null;status.textContent='Consultando PDF pendiente…';
-  try{
-   const response=await fetch('/personal/api/live-r2-inspection-source?'+url(),{cache:'no-store'});
-   const d=await response.json();
-   if(!response.ok||d?.ok!==true||d.webOrderId!==order.value.trim()||
-      d.fileId!==file.value.trim()||!Array.isArray(d.paginasDeclaradas))
-    throw Error('La Central no confirmó este PDF pendiente.');
-   manifest=d;
-   fic.textContent='Archivo: '+d.fileId+' | '+d.bytes.toLocaleString('es-AR')+' bytes | '+
-    d.paginasDeclaradas.length+' páginas\nSHA-256: '+d.sha256+
-    '\nMedidas cotizadas: '+d.paginasDeclaradas.slice(0,8).map(x=>x.anchoCm+' x '+x.altoCm).join(', ')+
-    (d.paginasDeclaradas.length>8?'…':'');
-   q('r2Descargar').href='/personal/api/live-r2-inspection-original?'+url();
-   detail.hidden=false;status.textContent='Descargá el original y verificá los datos antes de aprobar.';
-  }catch(e){error(e)}
- });
- q('r2Aprobar').addEventListener('click',async()=>{
-  if(!manifest)return;
-  status.textContent='Registrando inspección…';
-  const button=q('r2Aprobar');button.disabled=true;
-  try{
-   if(!q('r2Verificado').checked)throw Error('Confirmá la revisión del PDF.');
-   const operator=q('r2Operador').value.trim();
-   if(operator.length<2||operator.length>60)throw Error('Ingresá el responsable.');
-   const parts=q('r2Medidas').value.trim().split(/\r?\n/).filter(Boolean);
-   const dimensions=parts.map((line,i)=>{
-    const match=line.trim().match(/^(\d+(?:[.,]\d+)?)\s*[x×]\s*(\d+(?:[.,]\d+)?)$/);
-    if(!match)throw Error('Medida incorrecta, línea '+(i+1));
-    return {numero:i+1,anchoCm:Number(match[1].replace(',','.')),
-     altoCm:Number(match[2].replace(',','.'))};
-   });
-   const count=manifest.paginasDeclaradas.length;
-   let measuredDimensions=dimensions;
-   if(dimensions.length===1&&count>1&&q('r2Uniforme').checked)
-    measuredDimensions=Array.from({length:count},(_,i)=>({...dimensions[0],numero:i+1}));
-   if(measuredDimensions.length!==count)
-    throw Error('Ingresá '+count+' medidas o verificá que todas las páginas tienen el mismo tamaño.');
-   const response=await fetch('/personal/api/live-r2-inspection-confirm',{
-    method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({webOrderId:manifest.webOrderId,fileId:manifest.fileId,
-     operator,confirmed:true,measuredDimensions})});
-   const d=await response.json();
-   if(!response.ok||d?.ok!==true||d.inspected!==true)
-    throw Error('La Central no aprobó la inspección. Revisá geometría y pago.');
-   detail.hidden=true;
-   status.textContent='Inspección registrada. Reabrí el pedido para obtener el ZIP. Preprensa final pendiente.';
-  }catch(e){error(e)}finally{button.disabled=false}
- });
-})();+x.amountArs;
+     ' PDF · R2 '+x.r2Count+' · Pendientes '+x.pendingCount+' · $ '+Number(x.amountArs).toLocaleString('es-AR');
     item.append(label);
     const use=document.createElement('button');
     use.type='button';use.textContent='Usar referencia';
