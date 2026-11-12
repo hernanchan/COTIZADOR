@@ -29,3 +29,4 @@ jobs:
           node --check integraciones/publicacion/monitor-postpublicacion-20261112.mjs
           node integraciones/publicacion/monitor-postpublicacion-20261112.mjs
 # Redirección canónica 308 de Pages se sigue sólo dentro del dominio oficial.
+# Gate de transferencia y TUS agregado al control de R2/MP.
