@@ -88,7 +88,7 @@ async function revisarPlazoVisibleAlCliente(){
  const status=document.getElementById('previsionCliente');
  status.classList.remove('warning');
  try{
-  const res=await fetch('/api/pedido/plazo',{credentials:'same-origin',cache:'no-store'});
+  const res=await fetch('/api/pedido/plazo',{credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(6000)});
   const data=await res.json().catch(()=>null);
   if(!res.ok||data?.ok!==true||typeof data.mode!=='string'||typeof data.label!=='string')
    throw Error('No hay respuesta válida de previsión del cliente');
@@ -210,7 +210,7 @@ async function refresh(){
   document.getElementById('previsionModo').value=f.settings.mode;
   document.getElementById('previsionEstado').textContent='Previsión vigente: '+(forecastLabels[f.settings.mode]||'A confirmar')+' · Revisión '+f.settings.revision;
   await loadAgenda();
-  await revisarPlazoVisibleAlCliente();
+  void revisarPlazoVisibleAlCliente();
   board.replaceChildren();
   let total=0;
   for(const [state,title] of columns){
