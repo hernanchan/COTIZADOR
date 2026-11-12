@@ -1,0 +1,29 @@
+{
+  "schema": "saber-mp-live-incidencia-v1",
+  "checkedAt": "2026-11-12T23:48:19.238Z",
+  "mode": "D1_SELECT_READ_ONLY",
+  "status": "OK",
+  "details": {
+    "pedidos_ultimas_24h": 7,
+    "grupos": [
+      {
+        "estado": "awaiting_payment",
+        "tiene_preferencia": 1,
+        "tiene_pago_registrado": 0,
+        "tiene_fecha_pago": 0,
+        "pago_verificado": 0,
+        "vinculo_documentos": 1,
+        "cantidad": 4
+      },
+      {
+        "estado": "awaiting_payment",
+        "tiene_preferencia": 0,
+        "tiene_pago_registrado": 0,
+        "tiene_fecha_pago": 0,
+        "pago_verificado": 0,
+        "vinculo_documentos": 1,
+        "cantidad": 3
+      }
+    ]
+  }
+}
