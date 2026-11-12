@@ -24,7 +24,7 @@ jobs:
       - name: Testear seguridad y compilar Workers
         run: |
           set -euo pipefail
-          node --test integraciones/autocotizador/recepcion/r2-inspeccion-personal-live.test.mjs integraciones/mercadopago/pruebas/r2-live-inspection-finalize.test.mjs
+          node --test integraciones/autocotizador/recepcion/r2-inspeccion-personal-live.test.mjs integraciones/mercadopago/pruebas/r2-live-inspection-finalize.test.mjs integraciones/mercadopago/pruebas/central-recepcion-live.test.mjs
           npm install --no-save --no-audit --no-fund esbuild@0.25.12 wrangler@4.55.0
           (cd integraciones/autocotizador/recepcion && npm install --no-fund --no-audit && npm run build:unificado)
           ./node_modules/.bin/esbuild integraciones/mercadopago/pruebas/worker.js --bundle --platform=browser --format=esm --target=es2022 --outfile=/tmp/saber-r2-live-central-built.mjs
@@ -41,3 +41,4 @@ jobs:
 # QA success en rama: 919a9c7, 789298c, 75f94eb, 9276676; R2 pagos permanecen NO_GO.
 # HOTFIX /cotizar 2026-11-11: admitir parámetros UTM del enlace; commit 04da5e6; pruebas LIVE success.
 # Corrección móvil 11/11: iframe dinámico, sin scroll doble, JS teléfono válido; Browser QA 43123076822 SUCCESS.
+# 11/11: lector staff separado de compuertas checkout R2; QA 43128052797 23/23, D1 staged=0.
