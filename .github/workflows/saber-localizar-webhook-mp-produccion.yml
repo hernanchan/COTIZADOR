@@ -1,0 +1,76 @@
+name: Saber - comprobar codigo y dominio del webhook MP LIVE
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-localizar-webhook-mp-produccion.yml]
+permissions: {contents: write}
+jobs:
+  diagnostico:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      CF_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: true}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Solo lectura API Cloudflare para identificar código y ruta de webhook
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'EOF'
+          import {mkdir,writeFile} from 'node:fs/promises';
+          const account=process.env.CF_ACCOUNT,token=process.env.CF_TOKEN;
+          const base='https://api.cloudflare.com/client/v4/accounts/'+account;
+          const out={schema:'saber-route-audit-v1',checkedAt:new Date().toISOString(),
+            mode:'solo_lectura',observaciones:[]};
+          const api=async(path)=>{
+           const r=await fetch(base+path,{headers:{Authorization:'Bearer '+token},
+            signal:AbortSignal.timeout(25000)});
+           if(!r.ok)throw Error('CF_HTTP_'+r.status);
+           return r;
+          };
+          try{
+           const r=await api('/workers/scripts/saber-pagos-produccion');
+           const src=await r.text();
+           out.codigo_worker_descargable=true;
+           out.codigo_incluye_webhook=src.includes('/webhooks/mercadopago-live');
+           out.codigo_incluye_firma=src.includes('MP_LIVE_WEBHOOK_FIRMA');
+           out.codigo_incluye_ruta_no_disponible=src.includes('RUTA_NO_DISPONIBLE');
+          }catch(e){out.observaciones.push('CODIGO_WORKER_'+String(e.message||e).slice(0,50))}
+          try{
+           const r=await api('/workers/domains');
+           const d=await r.json();
+           if(!d?.success||!Array.isArray(d.result))throw Error('DOMINIOS_NO_DISPONIBLES');
+           const matches=d.result.filter(x=>x.hostname==='pagos.libreriasaber.com.ar');
+           out.dominio_pagos_tiene_registro=matches.length>0;
+           out.dominio_pagos_servicio=matches.map(x=>x.service||null);
+          }catch(e){out.observaciones.push('DOMINIO_'+String(e.message||e).slice(0,50))}
+          for(const [p,label] of [['/health','health'],['/internal/central/live/status','status_firmado']]){
+           try{
+            const r=await fetch('https://pagos.libreriasaber.com.ar'+p,{method:'GET',
+              redirect:'manual',signal:AbortSignal.timeout(15000)});
+            out['http_'+label]=r.status;
+            if(p==='/health')out.health_mode=String((await r.json().catch(()=>({}))).environment||'sin_modo');
+           }catch(e){out.observaciones.push(label+'_no_disponible')}
+          }
+          await mkdir('docs',{recursive:true});
+          await writeFile('docs/INCIDENCIA-RUTA-WEBHOOK-CF.json',JSON.stringify(out,null,2)+'\n');
+          console.log('SABER_CF_WEBHOOK_ROUTE_AUDIT='+JSON.stringify(out));
+          EOF
+      - name: Guardar resultado anonimo
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/INCIDENCIA-RUTA-WEBHOOK-CF.json || exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/INCIDENCIA-RUTA-WEBHOOK-CF.json
+          if ! git diff --cached --quiet;then
+            git commit -m "ops: ruta Cloudflare y codigo webhook MP LIVE"
+            git push origin HEAD:integracion/tus-pedido-privado-20261101
+          fi
