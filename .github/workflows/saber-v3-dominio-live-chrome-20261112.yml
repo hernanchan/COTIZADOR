@@ -1,0 +1,21 @@
+name: Saber V3 - Chrome real en web pública sin compras
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-v3-dominio-live-chrome-20261112.yml]
+permissions: {contents: read}
+jobs:
+  live-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Chrome móvil + PC en dominio oficial, solo GET
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund playwright@1.56.0
+          node integraciones/publicacion/qa-v3-dominio-live-chrome-20261112.mjs
