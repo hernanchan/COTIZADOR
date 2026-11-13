@@ -71,3 +71,4 @@ jobs:
 # Orden 013: error real de acreditacion bancaria, unicidad de movimiento y polling sin perder campos.
 # 13/11: QA corrección test duplicado vs índice D1 y cadena JS del panel bancario.
 # 13/11 QA casos originales: PDF MUNICIPAL FINAL 9 paginas raster grandes; renovacion sesion de transferencia; no repago.
+# 13/11: QA limitar análisis de PDF 60 MiB a páginas elegidas antes de leer raster, sin cobro ni subida.
