@@ -190,3 +190,5 @@ jobs:
 # Último código de entrega LIVE; flags de borrado OFF hasta activación controlada.
 
 # Entregados informa borrado confirmado/pendiente sin revelar Storage.
+
+# UI: listado automático R2 en paquete sin ID y seguimiento de staging real.
