@@ -38,7 +38,7 @@ jobs:
           grep -Fq 'actualizarSeguimiento' /tmp/saber-documentos-live.mjs
           grep -Fq 'saber-live-originales-privados-v1' /tmp/saber-documentos-live.mjs
           grep -Fq 'enviarAutomaticamente' /tmp/saber-documentos-live.mjs
-          grep -Fq 'Pago acreditado. Reanudando el envío automático' /tmp/saber-documentos-live.mjs
+          grep -Fq 'SABER_POSTPAGO_SIN_SEGUNDA_SELECCION_V1' /tmp/saber-documentos-live.mjs
           grep -Fq 'leerOriginalesLive' /tmp/saber-documentos-live.mjs
           grep -Fq '/personal/api/live-reconcile' /tmp/saber-documentos-live.mjs
           grep -Fq 'staff-calendar' /tmp/saber-central-live.mjs
