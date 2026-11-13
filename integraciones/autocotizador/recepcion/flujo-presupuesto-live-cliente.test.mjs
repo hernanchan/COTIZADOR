@@ -68,7 +68,7 @@ test('LIVE presupuestar y crear orden sin transmitir originales',async()=>{
  assert.equal(contact.direccion,'Poeta Lugones 123, Córdoba');
  assert.equal(flow.estado,'presupuestado');
  // Regresión: pedido confirmado recuperable ANTES de pulsar pagar.
- assert.deepEqual([...f.store.keys()],['saber-live-archivos-v1','saber-live-pedido-v1']);
+ assert.deepEqual([...f.store.keys()],['saber-live-archivos-v1','saber-live-pedido-v1','saber-live-numero-v1']);
   assert.deepEqual(JSON.parse(f.store.get('saber-live-pedido-v1')),{webOrderId,commercialOrderId});
  const saved=JSON.parse(f.store.get('saber-live-archivos-v1'));
  assert.equal(saved.webOrderId,webOrderId);
