@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {pagoUnicoDeOrdenComerciante,rescatarPagosMPLiveCentral,conciliarPendientesMPLiveAutomatico}
+import {pagoUnicoDeOrdenComerciante,pagoUnicoDeBusqueda,rescatarPagosMPLiveCentral,conciliarPendientesMPLiveAutomatico}
  from './central-mp-live-rescate.mjs';
 const GO='GO_COMERCIAL_CONFIRMADO';
 const ID='123e4567-e89b-42d3-a456-426614174000';
@@ -42,6 +42,14 @@ test('selector rechaza ambiguedad, pago inexistente y preferencias ajenas',()=>{
  assert.equal(pagoUnicoDeOrdenComerciante({elements:[{...merchant,payments:[{id:PAY,status:'approved'},
   {id:'177777777777',status:'approved'}]}]},mockOrder),null);
 });
+test('búsqueda oficial MP por referencia detecta un solo pago aprobado y rechaza ambiguos',()=>{
+ const p={id:PAY,status:'approved',external_reference:ID,order:{id:MO}};
+ assert.deepEqual(pagoUnicoDeBusqueda({results:[p]},mockOrder),{paymentId:PAY,merchantId:MO});
+ assert.equal(pagoUnicoDeBusqueda({results:[p,p]},mockOrder),null);
+ assert.equal(pagoUnicoDeBusqueda({results:[{...p,external_reference:'otra'}]},mockOrder),null);
+ assert.equal(pagoUnicoDeBusqueda({results:[{...p,status:'rejected'}]},mockOrder),null);
+ assert.equal(pagoUnicoDeBusqueda({results:[{...p,order:null}]},mockOrder),null);
+});
 test('solo pagos oficialmente verificados se escriben una vez, sin crear cargos',async()=>{
  const logs=[];let batchCount=0;
  const db={
@@ -65,6 +73,10 @@ test('solo pagos oficialmente verificados se escriben una vez, sin crear cargos'
   assert.match(options.headers.Authorization,/^Bearer APP_USR_/);
   const path=new URL(url).pathname;
   if(path==='/users/me')return response(seller);
+  if(path==='/v1/payments/search'){
+   assert.equal(new URL(url).searchParams.get('external_reference'),ID);
+   return response({results:[payment]});
+  }
   if(path==='/merchant_orders/search')return response({elements:[merchant]});
   if(path==='/merchant_orders/'+MO)return response(merchant);
   if(path==='/v1/payments/'+PAY)return response(payment);
@@ -96,7 +108,8 @@ test('si el importe no coincide NO se acredita',async()=>{
   payments:[{id:Number(PAY),status:'approved'}]};
  const fetcher=async url=>{
   const path=new URL(url).pathname;
-  return response(path==='/users/me'?seller:path==='/merchant_orders/search'?
+  return response(path==='/users/me'?seller:path==='/v1/payments/search'?
+   {results:[payment]}:path==='/merchant_orders/search'?
    {elements:[merchant]}:path==='/merchant_orders/'+MO?merchant:payment);
  };
  const r=await rescatarPagosMPLiveCentral(req(),env,{readSigned,fetcher});
