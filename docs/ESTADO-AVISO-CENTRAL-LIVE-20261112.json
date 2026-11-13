@@ -1,6 +1,10 @@
 {
   "schema": "saber-central-live-warning-v1",
-  "fecha": "2026-11-12T23:29:19.885Z",
+  "fecha": "2026-11-13T00:12:43.591Z",
   "soloLectura": true,
-  "estado": "AVISO_DESPLEGADO_Y_CENTRAL_PROTEGIDA"
+  "estado": "RESCATE_MP_LIVE_DESPLEGADO_Y_PROTEGIDO",
+  "personalReconcileUnauthorizedStatus": 401,
+  "docsRouteExists": true,
+  "centralRouteExists": true,
+  "paymentRecoveryLogicExists": true
 }
