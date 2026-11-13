@@ -113,7 +113,17 @@ export async function enviarPDFsTUSPagadosLive({
   retryDelays:[0,1000,3000,5000],chunkSize:6*MIB,limit:2,
   allowedMetaFields:['bucketName','objectName','contentType','cacheControl']
  });
- uppy.on('upload-progress',(_f,p)=>onProgress({phase:'upload',bytesUploaded:p.bytesUploaded||0,totalBytes:total}));
+ const uploadedByFile=new Map();
+ uppy.on('upload-progress',(f,p)=>{
+  // Uppy informa bytes por ARCHIVO, no por lote. Sumar las cantidades
+  // confirmadas sin duplicar y no declarar 100% hasta el recibo D1.
+  const id=String(f?.id||''),length=Math.max(0,Number(f?.size)||0);
+  const current=Math.min(length,Math.max(0,Number(p?.bytesUploaded)||0));
+  uploadedByFile.set(id,Math.max(uploadedByFile.get(id)||0,current));
+  const bytesUploaded=[...uploadedByFile.values()].reduce((a,b)=>a+b,0);
+  const percent=Math.min(99,Math.floor(100*bytesUploaded/total));
+  onProgress({phase:'upload',file:f?.name||'',bytesUploaded,totalBytes:total,percent});
+ });
  try{
   work.forEach((w,i)=>{
    const s=started.sessions[i];
@@ -125,6 +135,7 @@ export async function enviarPDFsTUSPagadosLive({
   const uploaded=await uppy.upload();
   if(uploaded.failed?.length||uploaded.successful?.length!==work.length)
    throw Error('LIVE_TUS_SUBIDA_INCOMPLETA');
+  onProgress({phase:'verificando-recibos',bytesUploaded:total,totalBytes:total,percent:99});
   const done=await post(fetcher,'/api/pedido/live/tus/confirmar',{
    orderId:order.webOrderId,
    entries:started.sessions.map(s=>({proof:s.proof}))});
@@ -132,6 +143,7 @@ export async function enviarPDFsTUSPagadosLive({
     done.productionAuthorized!==false||done.receipts?.length!==work.length||
     done.receipts.some((x,i)=>x.fileId!==work[i].meta.fileId||x.saved!==true))
    throw Error('LIVE_TUS_RECIBOS_INCONSISTENTES');
+  onProgress({phase:'recibido',bytesUploaded:total,totalBytes:total,percent:100});
   return {ok:true,savedFiles:work.length,pendingR2:r2.length,
    productionAuthorized:false};
  }finally{uppy.close?.()}
