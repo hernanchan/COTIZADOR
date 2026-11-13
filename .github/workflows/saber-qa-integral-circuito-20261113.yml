@@ -13,6 +13,9 @@ jobs:
         with: {persist-credentials: true}
       - uses: actions/setup-node@v4
         with: {node-version: '22'}
+      - name: Instalar dependencia de hoja A4 y ZIP del mismo circuito
+        shell: bash
+        run: npm install --ignore-scripts --no-audit --no-fund
       - name: Recorrido integral sin cobros ni archivos personales reales
         shell: bash
         run: |
@@ -45,6 +48,7 @@ jobs:
           await writeFile('docs/QA-CIRCUITO-COMERCIAL-INTEGRAL.json',JSON.stringify(out,null,2)+'\n');
           console.log('SABER_QA_INTEGRAL='+JSON.stringify({passed:out.passed,code:out.code,scenario:out.scenario}));
           EOF
+          exit "$rc"
       - name: Guardar evidencia no sensible de QA integral
         if: always()
         shell: bash
