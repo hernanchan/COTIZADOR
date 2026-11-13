@@ -84,7 +84,21 @@ async function deleteTUS(env,p,{fetcher=fetch}={}){
  }
  // Confirmación sin volver a descargar 40 MiB: HEAD, sin redirecciones.
  const r=await fetcher(target,{method:'HEAD',headers,redirect:'manual'});
- if(r.status!==404)throw Error('TUS_ABSENCE_UNVERIFIED');
+ if(r.status===404)return;
+ if(r.status===400){
+  // Supabase Storage puede responder 400 para un objeto ausente; sólo
+  // aceptar un NoSuchKey inequívoco, nunca errores de autenticación.
+  const info=await fetcher(base+'info/'+bucket+'/'+encoded,{
+   method:'GET',headers,redirect:'manual'});
+  if(info.status===404)return;
+  if(info.status===400){
+   const raw=await info.text();
+   if(raw.length>1500)throw Error('TUS_ABSENCE_UNVERIFIED');
+   let value;try{value=JSON.parse(raw)}catch{}
+   if(value?.code==='NoSuchKey')return;
+  }
+ }
+ throw Error('TUS_ABSENCE_UNVERIFIED');
 }
 async function deleteR2(env,p){
  const bucket=env.SABER_R2_GRANDES_LIVE;
