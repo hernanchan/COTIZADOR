@@ -37,11 +37,11 @@ test('rechaza órdenes sin todos los originales o con R2 sin inspeccionar',async
   assert.equal(statements.filter(x=>/CREATE TABLE|UPDATE /.test(x.sql)).length,0);
  }
 });
-test('estado listo exige pasos previos; entregado bloqueado hasta purga segura',async()=>{
+test('estado listo exige pasos previos; entregado bloqueado sin gates de purga LIVE',async()=>{
  const {env,statements}=fixture();
  for(const p of [{...payload,to:'listo'},{...payload,from:'listo',to:'entregado',version:3}]){
   const response=await cambiarEstadoCentralPersonalLive(req(),env,{readSigned:async()=>({payload:p})});
-  assert.equal(response.status,p.to==='entregado'?409:422);
+  assert.equal(response.status,p.to==='entregado'?503:422);
  }
  assert.equal(statements.length,0);
 });
