@@ -95,6 +95,12 @@ export function crearFlujoPresupuestoLive({
    // la orden: recuperarla no puede depender de haber pulsado Mercado Pago.
    storage.setItem('saber-live-archivos-v1',JSON.stringify({
     webOrderId,commercialOrderId:order.commercialOrderId,metas}));
+   // La recepción posterior al pago necesita la referencia EN AMBOS medios:
+   // antes sólo la guardaba el botón Mercado Pago; las transferencias pagadas
+   // quedaban sin orden recuperable y nunca comenzaba TUS/R2.
+   storage.setItem('saber-live-pedido-v1',JSON.stringify({
+    webOrderId,commercialOrderId:order.commercialOrderId
+   }));
    setState('presupuestado');
    return Object.freeze({...order});
   }catch(error){setState('error');throw error}
