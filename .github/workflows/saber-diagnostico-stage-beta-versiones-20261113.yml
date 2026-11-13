@@ -24,20 +24,20 @@ jobs:
           curl -fsS --max-time 30 -H "Authorization: Bearer $TOKEN" "$script/settings" > "$temp/settings.json"
           curl -fsS --max-time 30 -H "Authorization: Bearer $TOKEN" "$script/deployments" > "$temp/deployments.json"
           old=$(jq -er '.result.deployments[0].versions | if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$temp/deployments.json")
-          jq --arg old "$old" '{main_module:"index.mjs",bindings:[.result.bindings[]|{name,type:"inherit",version_id:$old}]}' "$temp/settings.json" > "$temp/meta.json"
-          cat > "$temp/index.mjs" <<'EOF'
-          export default {async fetch(){return new Response("NO DESPLEGADO",{status:503})}};
-          EOF
+          printf '%s' 'export default {async fetch(){return new Response("NO DESPLEGADO",{status:503})}};' > "$temp/index.mjs"
+          jq -nc --arg old "$old" --rawfile code "$temp/index.mjs" \
+            --slurpfile settings "$temp/settings.json" \
+            '{main_module:"index.mjs",bindings:[$settings[0].result.bindings[]|{name,type:"inherit",version_id:$old}], \
+              modules:[{name:"index.mjs",content_type:"application/javascript+module",content_base64:($code|@base64)}]}' > "$temp/body.json"
           status=$(curl -sS --max-time 110 -w '%{http_code}' -o "$temp/result.json" \
             -H "Authorization: Bearer $TOKEN" \
-            -F "metadata=@$temp/meta.json;type=application/json" \
-            -F "index.mjs=@$temp/index.mjs;filename=index.mjs;type=application/javascript+module" \
-            "$beta?bindings_inherit=strict")
+            -H "Content-Type: application/json" --data-binary @"$temp/body.json" \
+            "$beta?deploy=false")
           if [ "$status" = 200 ] && jq -e '.success==true and (.result.id|type=="string")' "$temp/result.json" >/dev/null;then
             candidate=$(jq -r '.result.id' "$temp/result.json")
             curl -fsS --max-time 30 -H "Authorization: Bearer $TOKEN" "$beta/$candidate" > "$temp/staged.json"
             jq -e '.success==true' "$temp/staged.json" >/dev/null
-            jq -r '.result.resources.bindings[].name' "$temp/staged.json" | sort > "$temp/staged.names"
+            jq -r '(.result.bindings//.result.resources.bindings)[].name' "$temp/staged.json" | sort > "$temp/staged.names"
             jq -r '.result.bindings[].name' "$temp/settings.json" | sort > "$temp/current.names"
             diff "$temp/current.names" "$temp/staged.names"
             verdict="BETA_STAGE_OK_BINDINGS_PRESERVED"
