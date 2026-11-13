@@ -302,16 +302,12 @@ test('plano de 9 páginas y 60 MB permite elegir 1-3 ANTES del render pesado',()
  assert.match(source,/Preparando análisis de/);
 });
 
-test('si raster de 60 MB no responde, se puede elegir CAD/Pleno sin otra carga ni precio falso',()=>{
- assert.match(source,/fijarTipoPloteoInformado\(e,modo\)/);
- assert.match(source,/Plano técnico · CAD/);
- assert.match(source,/Póster · Pleno/);
- assert.match(source,/e\.analisisAbort\?\.abort\(\)/);
- assert.match(source,/e\.tipoPloteoElegidoPorCliente=true/);
- assert.match(source,/e\.clasificacionAutomatica=false/);
- assert.match(source,/TIPO_INFORMADO_POR_CLIENTE/);
- assert.match(source,/precio preliminar sujeto a revisión/i);
+
+test('si el raster no responde, informa límite sin inventar CAD/Pleno ni cobrar',()=>{
  assert.match(source,/maxAnalysisMs:12000/);
+ assert.match(source,/El análisis visual no terminó/);
+ assert.match(source,/e\.clasificacionAutomatica===true&&/);
+ assert.doesNotMatch(source,/TIPO_INFORMADO_POR_CLIENTE/);
+ assert.doesNotMatch(source,/fijarTipoPloteoInformado/);
  assert.match(source,/if\(!controller\.signal\.aborted\)/);
- assert.match(source,/elegidas\.every\(p=>\['cad','poster'\]\.includes\(p\.modo\)\)/);
 });
