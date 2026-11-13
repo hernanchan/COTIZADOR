@@ -375,10 +375,21 @@ export async function estadoMPLiveCentral(request,env,{readSigned}={}){
    paid=bank.verified&&bank.method==='transferencia';
   }
   const state=revoked?'revocado':paid?'pagado_esperando_archivos':'pendiente';
+  let tracking=null;
+  if(paid&&!revoked){
+   try{
+    const {leerSeguimientoLiveCentral}=await import('./seguimiento-live-estado-central.mjs');
+    tracking=await leerSeguimientoLiveCentral(env.DB,order.id);
+   }catch{
+    // El seguimiento no puede bloquear la recepción de originales ya pagados.
+    tracking=null;
+   }
+  }
   return reply({ok:true,webOrderId:p.webOrderId,
    commercialOrderId:order.id,amountArs:order.amount_ars,fileCount:files.length,
    estado:state,pendingFiles:files.filter(x=>x.received===0).length,
    receivedFileIds:files.filter(x=>x.received===1).map(x=>x.file_id),
+   tracking,
    uploadAuthorized:paid&&!revoked,productionAuthorized:false},200);
  }catch{
   return reply({ok:false,error:'MP_LIVE_STATUS_D1_NO_DISPONIBLE'},503);
