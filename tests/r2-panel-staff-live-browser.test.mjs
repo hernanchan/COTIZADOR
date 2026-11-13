@@ -31,6 +31,6 @@ test('el operador no recibe pantallas de TUS, R2 ni medidas manuales',()=>{
  const code=html.match(/<script>([\s\S]*?)<\/script>/)[1];
  assert.doesNotMatch(code,/live-r2-inspection-original|live-r2-inspection-confirm/);
  assert.doesNotMatch(code,/r2Verificado|r2Operador|measuredDimensions/);
- assert.match(code,/validarZIPDeProduccion/);
+ assert.match(read('paquete-universal-cliente.mjs'),/validarZIPDeProduccion/);
  assert.doesNotMatch(code,/getPublicUrl|service_role|MP_LIVE_ACCESS_TOKEN/);
 });
