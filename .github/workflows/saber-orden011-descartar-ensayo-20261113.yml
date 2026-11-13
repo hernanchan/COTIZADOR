@@ -1,4 +1,4 @@
-name: Saber - archivar ensayo 011 sin alterar pagos ni archivos R2
+name: Saber - excluir ensayo 011 de la cola con auditoría intacta
 on:
   push:
     branches: [integracion/tus-pedido-privado-20261101]
@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: {persist-credentials: false}
-      - name: Archivar solo orden 011 conservando auditoría financiera y archivo R2 pendiente
+      - name: Excluir solo orden 011 de la cola sin alterar estado de pago ni R2
         shell: bash
         run: |
           set -euo pipefail
@@ -68,49 +68,32 @@ jobs:
              f.estado!=='paid'||f.sinMP!==1||f.verified!==1||f.banco!==1||f.recibido!==0||f.stage!=='awaiting_pdf_analysis'||
              f.reserva!=='reserved'||!f.objectKey?.startsWith('r2-v1/'+f.webOrderId+'/'))
             throw Error('ORDER_011_MISMATCH');
-          const url='/r2/buckets/saber-documentos-produccion-privado/objects?prefix='+
-            encodeURIComponent('r2-v1/'+f.webOrderId+'/');
-          let r2;
-          try {
-           const listed=await call(url,process.env.R2TOKEN);
-           const objects=Array.isArray(listed)?listed:
-            Array.isArray(listed?.objects)?listed.objects:[];
-           const item=objects.find(x=>x.key===f.objectKey);
-           r2={readable:true,objects:objects.length,match:!!item,
-             bytesMatch:item?.size===f.bytes,etagMatch:typeof item?.etag==='string'&&
-             item.etag.replaceAll('"','')===String(f.etag||'').replaceAll('"','')};
-          }catch(e){r2={readable:false,error:String(e.message||e).slice(0,75)}}
-          if(!archives||!['order_id','work_number','reason','archived_at'].every(
-              c=>(arch?.[0]?.results||[]).some(x=>x.name===c)))throw Error('ARCHIVE_TABLE_UNEXPECTED');
-          if(f.archived===1){
-           console.log('SABER_011_ALREADY_ARCHIVED_NO_ACTION');process.exit(0);
-          }
-          const parts=f.objectKey.split('/');
-          if(!/^[a-f0-9-]{36}$/i.test(f.orderId)||parts.length!==3||
-            parts[0]!=='r2-v1'||parts[1]!==f.webOrderId||
-            !parts[2].endsWith('.pdf')||!parts[2].slice(0,-4).match(/^[a-f0-9-]{36}$/i))
-            throw Error('ORDER_011_OBJECT_KEY_MISMATCH');
-          // El token de Cloudflare no tiene acceso R2 (HTTP 403).
-          // Archivar la prueba en la Central sin falsificar estados de pago;
-          // el original se conserva hasta que un operador autorizado pueda eliminarlo.
-          console.log('SABER_011_R2_PURGA_PENDIENTE_FALTA_PERMISO');
-          const tableDef=await call('/d1/database/'+db.uuid+'/query',process.env.D1TOKEN,
-             "SELECT sql FROM sqlite_master WHERE type='table' AND name='central_live_order_archives'");
-          console.log('SABER_011_ARCHIVE_TABLE='+String(tableDef?.[0]?.results?.[0]?.sql||'NO_SCHEMA').slice(0,700));
-          const archiveSQL=[
-           "INSERT INTO central_live_order_archives(order_id,work_number,reason)",
-           "SELECT o.id,11,'ENSAYO_TRANSF_SIN_DINERO_REAL_PDF_A4_DESCARTADO_20261113'",
-           "FROM orders o JOIN central_work_order_numbers n ON n.commercial_order_id=o.id",
-           "WHERE n.number=11 AND o.id='"+f.orderId+"' AND o.status='paid'",
-           "AND NOT EXISTS(SELECT 1 FROM central_live_order_archives x WHERE x.order_id=o.id)"
+          // El token disponible no tiene permiso para borrar objetos R2.
+          // Registrar exclusión operativa con motivo correcto, conservando pagos y bytes.
+          const ddl=[
+           'CREATE TABLE IF NOT EXISTS central_live_test_exclusions (',
+           'order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE RESTRICT,',
+           'work_number INTEGER NOT NULL UNIQUE,',
+           "reason TEXT NOT NULL CHECK(reason='ensayo_transferencia_r2_anulado'),",
+           "created_at TEXT NOT NULL DEFAULT(datetime('now')))"
           ].join(' ');
-          const archived=await call('/d1/database/'+db.uuid+'/query',process.env.D1TOKEN,archiveSQL);
-          if(archived?.[0]?.success!==true||archived?.[0]?.meta?.changes!==1)
-           throw Error('ARCHIVE_D1_NOT_SAVED');
-          const verify=await call('/d1/database/'+db.uuid+'/query',process.env.D1TOKEN,
-           "SELECT count(*) AS total FROM central_live_order_archives WHERE work_number=11 AND order_id='"+f.orderId+"'");
-          if(verify?.[0]?.results?.[0]?.total!==1)throw Error('ARCHIVE_D1_NOT_VERIFIED');
-          console.log('SABER_011_CLEANUP='+JSON.stringify({order:11,
-           r2DeleteAccepted:false,r2PendingPurge:true,d1Archived:true,paymentLedgerPreserved:true,
-           priorR2ReadStatus:r2.readable,archiveOnly:true}));
+          const create=await call('/d1/database/'+db.uuid+'/query',process.env.D1TOKEN,ddl);
+          if(create?.[0]?.success!==true)throw Error('D1_NO_PUDO_CREAR_EXCLUSION');
+          const safeOrder=f.orderId;
+          if(!/^[a-f0-9-]{36}$/i.test(safeOrder)||!f.webOrderId?.startsWith('WEB-ENSAYO-'))
+           throw Error('EXCLUSION_IDENTIDAD_INVALIDA');
+          const statement=[
+           'INSERT OR IGNORE INTO central_live_test_exclusions(order_id,work_number,reason)',
+           "SELECT o.id,11,'ensayo_transferencia_r2_anulado'",
+           'FROM orders o JOIN central_work_order_numbers n ON n.commercial_order_id=o.id',
+           "WHERE o.id='"+safeOrder+"' AND n.number=11 AND o.status='paid'"
+          ].join(' ');
+          const inserted=await call('/d1/database/'+db.uuid+'/query',process.env.D1TOKEN,statement);
+          if(inserted?.[0]?.success!==true)throw Error('D1_EXCLUSION_NO_INSERTADA');
+          const verified=await call('/d1/database/'+db.uuid+'/query',process.env.D1TOKEN,
+           "SELECT count(*) AS total FROM central_live_test_exclusions WHERE work_number=11 AND order_id='"+safeOrder+"' AND reason='ensayo_transferencia_r2_anulado'");
+          if(verified?.[0]?.results?.[0]?.total!==1)throw Error('D1_EXCLUSION_NO_VERIFICADA');
+          console.log('SABER_011_DESCARTE='+JSON.stringify({orden:11,
+           excluidaDeCola:true,pagoAuditadoConservado:true,
+           r2OriginalAunAlmacenado:true,requierePurgaR2ConPermisos:true}));
           EOF
