@@ -29,40 +29,40 @@ jobs:
           cp integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs /tmp/saber-documentos-live.mjs
           node --check /tmp/saber-central-live.mjs
           node --check /tmp/saber-documentos-live.mjs
-          grep -Fq '/personal/central' /tmp/saber-documentos-live.mjs
-          grep -Fq '/personal/api/live-status' /tmp/saber-documentos-live.mjs
-          grep -Fq '/personal/api/live-forecast' /tmp/saber-documentos-live.mjs
-          grep -Fq '/personal/api/live-calendar' /tmp/saber-documentos-live.mjs
-          grep -Fq 'Ya transferí' /tmp/saber-documentos-live.mjs
-          grep -Fq 'actualizarAvisosTransferencia' /tmp/saber-documentos-live.mjs
-          grep -Fq 'transfer-notify' /tmp/saber-central-live.mjs
-          grep -Fq 'central_live_transfer_customer_notices' /tmp/saber-central-live.mjs
-          grep -Fq 'Transferencias avisadas por clientes' /tmp/saber-documentos-live.mjs
-          grep -Fq 'etaDate' /tmp/saber-documentos-live.mjs
-          grep -Fq 'openOrderEta' /tmp/saber-documentos-live.mjs
-          grep -Fq 'actualizarSeguimiento' /tmp/saber-documentos-live.mjs
-          grep -Fq 'saber-live-originales-privados-v1' /tmp/saber-documentos-live.mjs
-          grep -Fq 'enviarAutomaticamente' /tmp/saber-documentos-live.mjs
-          grep -Fq 'SABER_POSTPAGO_SIN_SEGUNDA_SELECCION_V1' /tmp/saber-documentos-live.mjs
-          grep -Fq 'leerOriginalesLive' /tmp/saber-documentos-live.mjs
-          grep -Fq '/personal/api/live-reconcile' /tmp/saber-documentos-live.mjs
-          grep -Fq 'staff-calendar' /tmp/saber-central-live.mjs
-          grep -Fq 'staff-reconcile' /tmp/saber-central-live.mjs
-          grep -Fq 'SABER_MP_LIVE_CRON_ACREDITADOS' /tmp/saber-central-live.mjs
-          grep -Fq 'v1/payments/search' /tmp/saber-central-live.mjs
-          grep -Fq 'auto_return' /tmp/saber-central-live.mjs
-          grep -Fq 'leerSeguimientoLiveCentral' /tmp/saber-central-live.mjs
-          grep -Fq 'central_mp_live_auto_health' /tmp/saber-central-live.mjs
-          grep -Fq 'FALLO_NO_IDENTIFICADO' /tmp/saber-central-live.mjs
-          grep -Fq 'RESCATE_VENDEDOR_ID_DIFERENTE' /tmp/saber-central-live.mjs
-          grep -Fq 'RESCATE_VENDEDOR_JSON_INVALIDO' /tmp/saber-central-live.mjs
-          grep -Fq 'REDACTADO' /tmp/saber-central-live.mjs
-          grep -Fq 'api.mercadolibre.com/users/me' /tmp/saber-central-live.mjs
-          grep -Fq 'SABER_MP_LIVE_CRON_AISLADO' /tmp/saber-central-live.mjs
-          grep -Fq 'SABER_MP_LIVE_STAFF_AUTO_ACREDITADOS' /tmp/saber-central-live.mjs
-          grep -Fq 'setTimeout' /tmp/saber-documentos-live.mjs
+          grep -Fq '/personal/central' /tmp/saber-documentos-live.mjs || { echo 'SABER_DEPLOY_MARKER_01_MISSING'; exit 1; }
+          grep -Fq '/personal/api/live-status' /tmp/saber-documentos-live.mjs || { echo 'SABER_DEPLOY_MARKER_02_MISSING'; exit 1; }
+          grep -Fq '/personal/api/live-forecast' /tmp/saber-documentos-live.mjs || { echo 'SABER_DEPLOY_MARKER_03_MISSING'; exit 1; }
+          grep -Fq '/personal/api/live-calendar' /tmp/saber-documentos-live.mjs || { echo 'SABER_DEPLOY_MARKER_04_MISSING'; exit 1; }
+          grep -Fq 'Ya transferí' /tmp/saber-documentos-live.mjs || { echo 'SABER_DEPLOY_MARKER_05_MISSING'; exit 1; }
+          grep -Fq 'actualizarAvisosTransferencia' /tmp/saber-documentos-live.mjs || { echo 'SABER_DEPLOY_MARKER_06_MISSING'; exit 1; }
+          grep -Fq 'transfer-notify' /tmp/saber-central-live.mjs || { echo 'SABER_DEPLOY_MARKER_07_MISSING'; exit 1; }
+          grep -Fq 'central_live_transfer_customer_notices' /tmp/saber-central-live.mjs || { echo 'SABER_DEPLOY_MARKER_08_MISSING'; exit 1; }
+          grep -Fq 'Transferencias avisadas por clientes' /tmp/saber-documentos-live.mjs || { echo 'SABER_DEPLOY_MARKER_09_MISSING'; exit 1; }
+          grep -Fq 'etaDate' /tmp/saber-documentos-live.mjs || { echo 'SABER_DEPLOY_MARKER_10_MISSING'; exit 1; }
+          grep -Fq 'openOrderEta' /tmp/saber-documentos-live.mjs || { echo 'SABER_DEPLOY_MARKER_11_MISSING'; exit 1; }
+          grep -Fq 'actualizarSeguimiento' /tmp/saber-documentos-live.mjs || { echo 'SABER_DEPLOY_MARKER_12_MISSING'; exit 1; }
+          grep -Fq 'saber-live-originales-privados-v1' /tmp/saber-documentos-live.mjs || { echo 'SABER_DEPLOY_MARKER_13_MISSING'; exit 1; }
+          grep -Fq 'enviarAutomaticamente' /tmp/saber-documentos-live.mjs || { echo 'SABER_DEPLOY_MARKER_14_MISSING'; exit 1; }
+          grep -Fq 'SABER_POSTPAGO_SIN_SEGUNDA_SELECCION_V1' /tmp/saber-documentos-live.mjs || { echo 'SABER_DEPLOY_MARKER_15_MISSING'; exit 1; }
+          grep -Fq 'leerOriginalesLive' /tmp/saber-documentos-live.mjs || { echo 'SABER_DEPLOY_MARKER_16_MISSING'; exit 1; }
+          grep -Fq '/personal/api/live-reconcile' /tmp/saber-documentos-live.mjs || { echo 'SABER_DEPLOY_MARKER_17_MISSING'; exit 1; }
+          grep -Fq 'staff-calendar' /tmp/saber-central-live.mjs || { echo 'SABER_DEPLOY_MARKER_18_MISSING'; exit 1; }
+          grep -Fq 'staff-reconcile' /tmp/saber-central-live.mjs || { echo 'SABER_DEPLOY_MARKER_19_MISSING'; exit 1; }
+          grep -Fq 'SABER_MP_LIVE_CRON_ACREDITADOS' /tmp/saber-central-live.mjs || { echo 'SABER_DEPLOY_MARKER_20_MISSING'; exit 1; }
+          grep -Fq 'v1/payments/search' /tmp/saber-central-live.mjs || { echo 'SABER_DEPLOY_MARKER_21_MISSING'; exit 1; }
+          grep -Fq 'auto_return' /tmp/saber-central-live.mjs || { echo 'SABER_DEPLOY_MARKER_22_MISSING'; exit 1; }
+          grep -Fq 'leerSeguimientoLiveCentral' /tmp/saber-central-live.mjs || { echo 'SABER_DEPLOY_MARKER_23_MISSING'; exit 1; }
+          grep -Fq 'central_mp_live_auto_health' /tmp/saber-central-live.mjs || { echo 'SABER_DEPLOY_MARKER_24_MISSING'; exit 1; }
+          grep -Fq 'FALLO_NO_IDENTIFICADO' /tmp/saber-central-live.mjs || { echo 'SABER_DEPLOY_MARKER_25_MISSING'; exit 1; }
+          grep -Fq 'RESCATE_VENDEDOR_ID_DIFERENTE' /tmp/saber-central-live.mjs || { echo 'SABER_DEPLOY_MARKER_26_MISSING'; exit 1; }
+          grep -Fq 'RESCATE_VENDEDOR_JSON_INVALIDO' /tmp/saber-central-live.mjs || { echo 'SABER_DEPLOY_MARKER_27_MISSING'; exit 1; }
+          grep -Fq 'REDACTADO' /tmp/saber-central-live.mjs || { echo 'SABER_DEPLOY_MARKER_28_MISSING'; exit 1; }
+          grep -Fq 'api.mercadolibre.com/users/me' /tmp/saber-central-live.mjs || { echo 'SABER_DEPLOY_MARKER_29_MISSING'; exit 1; }
+          grep -Fq 'SABER_MP_LIVE_CRON_AISLADO' /tmp/saber-central-live.mjs || { echo 'SABER_DEPLOY_MARKER_30_MISSING'; exit 1; }
+          grep -Fq 'SABER_MP_LIVE_STAFF_AUTO_ACREDITADOS' /tmp/saber-central-live.mjs || { echo 'SABER_DEPLOY_MARKER_31_MISSING'; exit 1; }
+          grep -Fq 'setTimeout' /tmp/saber-documentos-live.mjs || { echo 'SABER_DEPLOY_MARKER_32_MISSING'; exit 1; }
           ! grep -Fq 'Verificar cobros Mercado Pago' /tmp/saber-documentos-live.mjs
-          grep -Fq 'staff-forecast' /tmp/saber-central-live.mjs
+          grep -Fq 'staff-forecast' /tmp/saber-central-live.mjs || { echo 'SABER_DEPLOY_MARKER_33_MISSING'; exit 1; }
           echo SABER_STAFF_LIVE_2_BUNDLES_READY
       - name: Stage y promover ambos Workers con bindings heredados y rollback de código
         shell: bash
@@ -161,8 +161,8 @@ jobs:
           test -n "$ACCOUNT" && test -n "$TOKEN"
           root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-pagos-produccion"
           curl -fsS --max-time 30 -H "Authorization: Bearer $TOKEN" "$root" > /tmp/saber-live-code-check.js
-          grep -Fq 'SABER_MP_LIVE_CRON_ACREDITADOS' /tmp/saber-live-code-check.js
-          grep -Fq 'central_mp_live_auto_health' /tmp/saber-live-code-check.js
+          grep -Fq 'SABER_MP_LIVE_CRON_ACREDITADOS' /tmp/saber-live-code-check.js || { echo 'SABER_DEPLOY_MARKER_34_MISSING'; exit 1; }
+          grep -Fq 'central_mp_live_auto_health' /tmp/saber-live-code-check.js || { echo 'SABER_DEPLOY_MARKER_35_MISSING'; exit 1; }
           curl -fsS --max-time 30 -H "Authorization: Bearer $TOKEN" "$root/schedules" > /tmp/saber-live-before-schedules.json
           jq -e '.success==true and (.result.schedules | type=="array") and
             (.result.schedules | length==0 or (length==1 and .[0].cron=="* * * * *"))' /tmp/saber-live-before-schedules.json >/dev/null
