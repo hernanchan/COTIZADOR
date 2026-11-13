@@ -110,12 +110,12 @@ export async function encolarEntregaLive(env,orderId,version,{preflight=false}={
  return {state:existing.every(x=>x.state==='deleted')?'deleted':'pending',totalFiles:existing.length,
   filesDeleted:existing.filter(x=>x.state==='deleted').length};
 }
-async function deleteTUS(env,orderId,f){
+async function deleteRemote(env,orderId,f){
  if(typeof env.SABER_DOCUMENTOS?.fetch!=='function'||typeof env.CENTRAL_BRIDGE_KEY!=='string'||
   env.CENTRAL_BRIDGE_KEY.length<32)throw Error('NO_TUS_BRIDGE');
- const body=JSON.stringify({schema:'saber-docs-r2-universal-purge-file-v1',
+ const body=JSON.stringify({schema:'saber-docs-live-purge-file-v1',
   webOrderId:f.web_order_id,commercialOrderId:orderId,fileId:f.file_id,
-  transport:'tus',receiptId:f.receipt_id,objectKey:f.object_key,
+  transport:f.transport,receiptId:f.receipt_id,objectKey:f.object_key,etag:f.etag,
   sha256:f.sha256,bytes:f.bytes,productionVersion:f.production_version});
  const ts=Math.floor(Date.now()/1000),id=crypto.randomUUID();
  const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(env.CENTRAL_BRIDGE_KEY),
@@ -123,16 +123,16 @@ async function deleteTUS(env,orderId,f){
  const sig=Array.from(new Uint8Array(await crypto.subtle.sign('HMAC',key,
   new TextEncoder().encode(ts+'\n'+id+'\n'+body))),b=>b.toString(16).padStart(2,'0')).join('');
  const response=await env.SABER_DOCUMENTOS.fetch(new Request(
-  'https://saber-documentos-produccion.libreriasaber.workers.dev/internal/r2-universal-purge-delivered',{
+  'https://saber-documentos-produccion.libreriasaber.workers.dev/internal/live/purge-file',{
    method:'POST',headers:{'Content-Type':'application/json','x-saber-ts':String(ts),
     'x-saber-request-id':id,'x-saber-signature':sig},body}));
- if(!response.ok)throw Error('TUS_DELETE_UNCONFIRMED');
+ if(!response.ok)throw Error('STORAGE_DELETE_UNCONFIRMED');
  const data=await response.json();
  if(data?.ok!==true||data.verifiedAbsent!==true||
    data.webOrderId!==f.web_order_id||data.fileId!==f.file_id)
-  throw Error('TUS_DELETE_NO_PROOF');
+  throw Error('STORAGE_DELETE_NO_PROOF');
 }
-export async function procesarEntregaLive(env,orderId,{bucket=env?.SABER_R2_GRANDES}={}){
+export async function procesarEntregaLive(env,orderId,{deleteFile=deleteRemote}={}){
  if(!active(env)||!UUID.test(orderId||'')||env.CENTRAL_LIVE_PURGE_EXECUTE_GATE!==GO)
   return {state:'off',deleted:0};
  const db=env.DB;await tables(db);
@@ -158,17 +158,7 @@ export async function procesarEntregaLive(env,orderId,{bucket=env?.SABER_R2_GRAN
   await db.prepare("INSERT INTO central_live_purge_audit(order_id,file_id,phase,version) VALUES(?,?,'attempt',?)")
    .bind(orderId,job.file_id,job.production_version).run();
   try{
-   if(job.transport==='tus')await deleteTUS(env,orderId,job);
-   else{
-    if(!bucket?.head||!bucket?.delete)throw Error('NO_R2_BINDING');
-    const obj=await bucket.head(job.object_key);
-    if(obj){
-     if(obj.size!==job.bytes||String(obj.etag||'').replaceAll('"','')!==
-      String(job.etag).replaceAll('"',''))throw Error('R2_OBJECT_CHANGED');
-     await bucket.delete(job.object_key);
-    }else if(job.attempts===0)throw Error('R2_UNEXPECTEDLY_MISSING');
-    if(await bucket.head(job.object_key))throw Error('R2_DELETE_NOT_VERIFIED');
-   }
+   await deleteFile(env,orderId,job);
    const done=await db.prepare(
     "UPDATE central_live_purge_files SET state='deleted',deleted_at=datetime('now') "+
     "WHERE order_id=? AND file_id=? AND state='processing' AND production_version=?"
