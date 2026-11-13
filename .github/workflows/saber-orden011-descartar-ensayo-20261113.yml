@@ -85,7 +85,10 @@ jobs:
           if(f.archived===1){
            console.log('SABER_011_ALREADY_ARCHIVED_NO_ACTION');process.exit(0);
           }
-          if(!/^[a-f0-9-]{36}$/i.test(f.orderId)||!/^r2-v1\\/WEB-ENSAYO-[A-F0-9]{32}\\/[a-f0-9-]{36}\\.pdf$/.test(f.objectKey))
+          const parts=f.objectKey.split('/');
+          if(!/^[a-f0-9-]{36}$/i.test(f.orderId)||parts.length!==3||
+            parts[0]!=='r2-v1'||parts[1]!==f.webOrderId||
+            !parts[2].endsWith('.pdf')||!parts[2].slice(0,-4).match(/^[a-f0-9-]{36}$/i))
             throw Error('ORDER_011_OBJECT_KEY_MISMATCH');
           // Aunque el token de deploy no pueda LISTAR R2, DELETE puede tener otro permiso.
           // Si el borrado no fue confirmado, NO ocultar el pedido en D1.
