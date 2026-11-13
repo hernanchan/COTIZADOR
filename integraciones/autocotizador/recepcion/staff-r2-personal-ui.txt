@@ -98,4 +98,5 @@
   }catch(e){error(e)}finally{button.disabled=false}
  });
 if(file.value&&order.value)queueMicrotask(()=>q('r2Consultar').click());
+else if(!order.value)queueMicrotask(()=>q('r2Recargar').click());
 })();
