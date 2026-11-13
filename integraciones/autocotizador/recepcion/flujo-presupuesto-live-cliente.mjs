@@ -20,7 +20,8 @@ export function crearFlujoPresupuestoLive({
  files,archivos,webOrderId,telefono,nombre,direccion='',origin=location.origin,
  fetcher=fetch,hasher=sha256PdfLocalPorFragmentos,uuid=()=>crypto.randomUUID(),
  storage=typeof sessionStorage==='undefined'?null:sessionStorage,
- onProgress=()=>{},onState=()=>{}
+ onProgress=()=>{},onState=()=>{},
+ custodiarOriginales=guardarOriginalesLive,recuperarOriginales=leerOriginalesLive
 }={}){
  if(origin!=='https://pedidos.libreriasaber.com.ar'||!WEB.test(webOrderId||'')||
   !/^\+?[0-9 ()-]{10,26}$/.test(telefono||'')||
@@ -31,7 +32,7 @@ export function crearFlujoPresupuestoLive({
   !Array.isArray(files)||!Array.isArray(archivos)||
   files.length<1||files.length>10||files.length!==archivos.length||
   typeof fetcher!=='function'||typeof hasher!=='function'||
-  typeof storage?.setItem!=='function')throw Error('LIVE_FLUJO_IDENTIDAD_INVALIDA');
+  typeof storage?.setItem!=='function'||typeof custodiarOriginales!=='function'||typeof recuperarOriginales!=='function')throw Error('LIVE_FLUJO_IDENTIDAD_INVALIDA');
  let totalTus=0;
  for(let i=0;i<files.length;i++){
   const f=files[i],a=archivos[i];
@@ -87,7 +88,7 @@ export function crearFlujoPresupuestoLive({
     amountArs:result.totalArs,fileCount:files.length,numeroOrden:result.numeroOrden};
    // Los PDF originales deben persistir antes de permitir el pago.
    setState('conservando_originales');
-   await guardarOriginalesLive({files,metas,webOrderId,
+   await custodiarOriginales({files,metas,webOrderId,
     commercialOrderId:order.commercialOrderId,
     onProgress:p=>onProgress({phase:p.phase,total:files.length})});
    // Guardar referencia y manifiesto en esta pestaña en cuanto Central confirma
@@ -104,7 +105,7 @@ export function crearFlujoPresupuestoLive({
   if(!metas||metas.some(m=>!['bn','color'].includes(m.mode)||
     m.pages<1||m.pages>2000))throw Error('LIVE_METAS_POSTPAGO_INVALIDAS');
   // Bloquear el pago si se perdió alguno de los File locales.
-  await leerOriginalesLive({webOrderId,commercialOrderId:order.commercialOrderId,metas});
+  await recuperarOriginales({webOrderId,commercialOrderId:order.commercialOrderId,metas});
   // Sin estos metadatos persistidos, no abrir Checkout: después del
   // redirect habría pago sin posibilidad de verificar los PDF originales.
   storage.setItem('saber-live-archivos-v1',JSON.stringify({
