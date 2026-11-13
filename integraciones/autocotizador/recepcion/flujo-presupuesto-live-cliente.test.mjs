@@ -68,7 +68,8 @@ test('LIVE presupuestar y crear orden sin transmitir originales',async()=>{
  assert.equal(contact.direccion,'Poeta Lugones 123, Córdoba');
  assert.equal(flow.estado,'presupuestado');
  // Regresión: pedido confirmado recuperable ANTES de pulsar pagar.
- assert.deepEqual([...f.store.keys()],['saber-live-archivos-v1']);
+ assert.deepEqual([...f.store.keys()],['saber-live-archivos-v1','saber-live-pedido-v1']);
+  assert.deepEqual(JSON.parse(f.store.get('saber-live-pedido-v1')),{webOrderId,commercialOrderId});
  const saved=JSON.parse(f.store.get('saber-live-archivos-v1'));
  assert.equal(saved.webOrderId,webOrderId);
  assert.equal(saved.commercialOrderId,commercialOrderId);
@@ -126,4 +127,14 @@ test('prohíbe pagar si no se pudieron custodiar los originales y conserva D1 si
  await assert.rejects(flow.preparar(),/ALMACENAMIENTO_LOCAL_SIN_ESPACIO/);
  assert.equal(fixtureFail.calls.filter(c=>c.path.endsWith('/checkout')).length,0);
  assert.equal(fixtureFail.store.has('saber-live-archivos-v1'),false);
+});
+
+test('pago por transferencia conserva referencia y manifest ANTES de abrir Mercado Pago',async()=>{
+ const f=fixture(),flow=f.build();
+ await flow.preparar();
+ assert.deepEqual(JSON.parse(f.store.get('saber-live-pedido-v1')),{webOrderId,commercialOrderId});
+ const manifest=JSON.parse(f.store.get('saber-live-archivos-v1'));
+ assert.equal(manifest.metas[0].transport,'tus');
+ assert.equal(manifest.metas[0].sha256,sha);
+ assert.equal(f.calls.filter(c=>c.path.endsWith('/checkout')).length,0);
 });
