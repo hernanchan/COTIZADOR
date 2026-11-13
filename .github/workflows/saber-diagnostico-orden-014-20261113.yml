@@ -28,7 +28,7 @@ jobs:
           }
           const db=(await cf('/d1/database')).find(x=>x.name==='saber-pagos-produccion');
           if(!db)throw Error('D1_NOT_FOUND');
-          const sql=String.raw\`SELECT n.number AS numero,
+          const sql=`SELECT n.number AS numero,
             o.status AS pago_estado,pr.state AS revision_estado,
             COALESCE(s.state,'pendiente') AS produccion_estado,
             d.file_count AS esperados,
@@ -58,7 +58,7 @@ jobs:
            LEFT JOIN payment_reviews pr ON pr.order_id=o.id
            LEFT JOIN central_live_production_states s ON s.order_id=o.id
            WHERE n.number=14
-           GROUP BY n.number,o.status,pr.state,s.state,d.file_count\`;
+           GROUP BY n.number,o.status,pr.state,s.state,d.file_count`;
           const x=await cf('/d1/database/'+db.uuid+'/query',{sql});
           if(x?.[0]?.success!==true)throw Error('INVALID_QUERY');
           console.log('SABER_014_CHECK='+JSON.stringify(x[0].results));
