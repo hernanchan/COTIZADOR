@@ -39,6 +39,8 @@ jobs:
             jq -r '(.result.bindings//.result.resources.bindings)[].name' "$temp/staged.json" | sort > "$temp/staged.names"
             jq -r '.result.bindings[].name' "$temp/settings.json" | sort > "$temp/current.names"
             diff "$temp/current.names" "$temp/staged.names"
+            jq -c '{compatibility_date:.result.compatibility_date,compatibility_flags:.result.compatibility_flags,has_version:.result.id!=null}' "$temp/staged.json" | sed 's/^/SABER_STAGE_VERSION_INFO=/'
+            jq -c '{compatibility_date:.result.compatibility_date,compatibility_flags:.result.compatibility_flags}' "$temp/settings.json" | sed 's/^/SABER_CURRENT_SETTINGS_INFO=/'
             verdict="BETA_STAGE_OK_BINDINGS_PRESERVED"
           else
             verdict="BETA_STAGE_FAILED"
