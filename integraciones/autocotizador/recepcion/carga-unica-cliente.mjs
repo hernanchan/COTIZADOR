@@ -9,6 +9,7 @@ import {clasificarPaginasPloteo} from './clasificar-paginas-ploteo.mjs';
 import {clasificarMosaicoRasterPDFGrande} from './clasificar-ploteo-grande-raster-local.mjs';
 import {clasificarPloteoGrandeVisualLimitado} from './clasificar-ploteo-grande-visual-limitado.mjs';
 import {clasificarPloteoGrandePorRangos} from './clasificar-ploteo-grande-por-rangos.mjs';
+import {clasificarMosaicoGrandePorMuestras} from './clasificar-mosaico-grande-muestreo-local.mjs';
 import {prepararLoteParcial,recomponerLoteParcial} from './cotizar-lote-parcial.mjs';
 import {solicitarCotizacionPrivada} from './solicitar-cotizacion-privada.mjs';
 import {decidirTransportePDF,LIMITE_TUS_PDF_BYTES,LIMITE_R2_PDF_BYTES} from './seleccionar-transporte-pdf.mjs';
@@ -833,20 +834,27 @@ async function analizarPaginasSolicitadas(e){
  $('estado').textContent='Preparando análisis de '+pedidas.length+
   ' página(s) elegida(s). El original no se sube todavía…';
  try{
-  const visual=await clasificarPloteoGrandePorRangos(e.archivoOriginal,{
+  // En originales mosaico raster (cientos de tiras por página) muestrear
+  // solo unos fragmentos de las páginas elegidas. No renderizar cada página.
+  const progreso=({terminadas,total,numeroPagina,metodo})=>{
+   $('estado').textContent=(metodo==='MUESTREO_RASTER'?'Muestreo local':'Análisis visual')+
+    ': '+terminadas+' de '+total+' páginas; original '+numeroPagina+
+    '. Sin subir el archivo…';
+  };
+  const visual=(await clasificarMosaicoGrandePorMuestras(e.archivoOriginal,{
+   paginas:e.paginas,seleccionadas:pedidas.map(p=>p.numero),
+   onProgreso:progreso
+  }))||(await clasificarPloteoGrandePorRangos(e.archivoOriginal,{
    paginas:e.paginas,seleccionadas:pedidas.map(p=>p.numero),
    signal:controller.signal,maxAnalysisMs:12000,
-   onProgreso:({terminadas,total,numeroPagina})=>{
-    $('estado').textContent='Analizando visualmente el plano '+terminadas+' de '+total+
-     ' (página '+numeroPagina+' del original). Sin subir el PDF…';
-   }
-  });
+   onProgreso:progreso
+  }));
   if(controller.signal.aborted)return;
   if(!visual?.altaConfianza||visual.paginas.length!==pedidas.length)
    throw Error('No se completó el análisis de las páginas elegidas');
   for(const pagina of visual.paginas)e.paginas[pagina.numero-1].modo=pagina.modo;
   e.clasificacionAutomatica=pedidas.every(p=>['cad','poster'].includes(p.modo));
-  e.metodoClasificacion='VISUAL_PDFJS_RANGOS';
+  e.metodoClasificacion=visual.metodo||'VISUAL_PDFJS_RANGOS';
   e.elegirPaginasAntesDeAnalizar=false;
  }catch{
   if(!controller.signal.aborted)e.avisoClasificacion='El análisis visual no terminó. Elegí CAD o Pleno si conocés el tipo de trabajo, o solicitá revisión. El PDF sigue cargado.';
