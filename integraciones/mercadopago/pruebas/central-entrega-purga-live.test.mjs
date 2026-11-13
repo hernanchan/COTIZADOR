@@ -7,7 +7,7 @@ const id='123e4567-e89b-42d3-a456-426614174000';
 const rid='123e4567-e89b-42d3-a456-426614174004';
 const key='r2-v1/'+web+'/'+rid+'.pdf';
 const sha='a'.repeat(64),etag='etag12345678',bytes=41*1048576;
-function fixture({state='listo',version=3,received=1,inspected=1,changed=false,deleted=false}={}){
+function fixture({state='listo',version=3,received=1,reservationState='reserved',changed=false,deleted=false}={}){
  const operations=[],queue=[];
  const order={id,status:'paid',paid_at:'2026-11-13 02:00:00',
   amount_ars:1000,deposit_ars:1000,link_amount:1000,web_order_id:web,
@@ -15,13 +15,11 @@ function fixture({state='listo',version=3,received=1,inspected=1,changed=false,d
  const files=[{file_id:'pdf_0',transport:'r2',web_order_id:web,sha256:sha,
   bytes,received,tus_receipt:null,tus_key:null,tus_sha:null,tus_bytes:null,
   r2_receipt:'DOC-'+rid,r2_key:key,r2_etag:etag,r2_sha:changed?'b'.repeat(64):sha,
-  r2_bytes:bytes,r2_status:'awaiting_pdf_analysis',inspected}];
+  r2_bytes:bytes,r2_status:'awaiting_pdf_analysis',reservation_state:reservationState,pages_claimed:6}];
  const db={
   prepare(sql){const q={sql,values:[],bind(...v){this.values=v;return this},
    async first(){
     if(sql.includes('FROM orders o JOIN central_r2_universal_order_links'))return order;
-    if(sql.includes("sqlite_master")&&sql.includes("central_r2_live_inspections"))
-     return {name:'central_r2_live_inspections'};
     if(sql.includes('SELECT COUNT(*) AS total'))return {total:queue.length,
      deleted:queue.filter(x=>x.state==='deleted').length};
     return null;
@@ -55,8 +53,8 @@ function fixture({state='listo',version=3,received=1,inspected=1,changed=false,d
   assert.equal(name,key);deleted=true}};
  return {env,bucket,operations,queue,order};
 }
-test('entrega LIVE sólo prepara purga con pago verificado, archivo íntegro e inspección R2',async()=>{
- for(const options of [{received:0},{inspected:0},{changed:true}]){
+test('entrega LIVE prepara purga con pago, SHA, ETag, reserva R2 válida (sin inspección manual)',async()=>{
+ for(const options of [{received:0},{reservationState:'invalid'},{changed:true}]){
   const f=fixture(options);
   assert.equal(await planEntregaLive(f.env,id,{state:'listo',version:3}),null);
   assert.equal(f.operations.length,0);
@@ -93,4 +91,15 @@ test('sin gate LIVE nunca consulta ni elimina originales',async()=>{
  assert.equal((await encolarEntregaLive(f.env,id,4,{preflight:true})).state,'off');
  assert.equal((await procesarEntregaLive(f.env,id,{deleteFile:async(_env,_id,row)=>{assert.equal(row.object_key,key);await f.bucket.delete(row.object_key)}})).state,'off');
  assert.equal(f.operations.length,0);
+});
+
+test('no requiere tabla manual de inspecciones R2 para purgar trabajo revisado en ZIP',async()=>{
+ const f=fixture();
+ const plan=await planEntregaLive(f.env,id,{state:'listo',version:3});
+ assert.ok(plan?.files?.length===1);
+ assert.equal(plan.files[0].reservation_state,'reserved');
+ const sql=f.operations.map(x=>x.sql).join('\n');
+ assert.doesNotMatch(sql,/central_r2_live_inspections/);
+ const queued=await encolarEntregaLive(f.env,id,4,{preflight:true});
+ assert.equal(queued.state,'pending');
 });
