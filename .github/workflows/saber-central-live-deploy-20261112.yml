@@ -203,3 +203,4 @@ jobs:
 # 13/11: desplegar muestreo seguro de raster multipágina PDF grande, límite 8/12s, solicitud 1-3,5-7; QA 43439139934 SUCCESS.
 # 13/11: corrección verificada del PDF MUNICIPAL FINAL: /ObjStm xref tipo 2 para recursos por página, selección 1-3,5-7; QA 43441907972 SUCCESS.
 # 13/11: protegido - subir TUS y R2 al Ya transferi sin acreditar pago; archivos antes de banco, 2 JPG separados con obra180, QA 43451362838 D1 43450391298 SUCCESS, rollback.
+# 13/11: segundo deploy del piloto protegido con imagenes separadas y banco aviso, QA 43451786688 y preflight D1 43450391298 SUCCESS; test E2E pospago corregido.
