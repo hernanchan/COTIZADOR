@@ -72,7 +72,10 @@ test('solo pagos oficialmente verificados se escriben una vez, sin crear cargos'
   assert.equal(options.method,'GET','PROHIBIDO_MODIFICAR_MERCADO_PAGO');
   assert.match(options.headers.Authorization,/^Bearer APP_USR_/);
   const path=new URL(url).pathname;
-  if(path==='/users/me')return response(seller);
+  if(path==='/users/me'){
+   assert.equal(new URL(url).origin,'https://api.mercadolibre.com');
+   return response(seller);
+  }
   if(path==='/v1/payments/search'){
    assert.equal(new URL(url).searchParams.get('external_reference'),ID);
    return response({results:[payment]});
