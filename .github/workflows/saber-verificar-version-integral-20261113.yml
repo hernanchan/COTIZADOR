@@ -51,6 +51,16 @@ jobs:
            const docsBindings=await settings('saber-documentos-produccion');
            const payBindings=await settings('saber-pagos-produccion');
            const gate=(bindings,name)=>bindings.some(x=>x.name===name&&x.text==='GO_COMERCIAL_CONFIRMADO');
+           result.deliveryPurgeGates=gate(payBindings,'CENTRAL_LIVE_PURGE_GATE')&&
+            gate(payBindings,'CENTRAL_LIVE_PURGE_EXECUTE_GATE')&&gate(docsBindings,'DOCS_LIVE_PURGE_GATE');
+           result.deliveryPrivateBridge=payBindings.some(x=>x.name==='SABER_DOCUMENTOS'&&
+            x.type==='service'&&x.service==='saber-documentos-produccion');
+           result.deliveryStorageReady=docsBindings.some(x=>x.name==='DOCS_LIVE_TUS_SERVICE_KEY'&&x.type==='secret_text')&&
+            docsBindings.some(x=>x.name==='SABER_R2_GRANDES_LIVE'&&x.type==='r2_bucket'&&
+             x.bucket_name==='saber-documentos-produccion-privado');
+           result.deliveryCodeLive=p.includes('central_live_purge_files')&&
+            p.includes('reintentarEntregasLive')&&d.includes('atenderPurgaArchivoLive')&&
+            d.includes('purgeStatus');
            result.docsTUSReady=['DOCS_LIVE_TUS_GATE','DOCS_LIVE_RECEPCION_GATE','DOCS_LIVE_ORDER_GATE'].every(x=>gate(docsBindings,x));
            result.docsR2Ready=['DOCS_LIVE_R2_GATE','DOCS_LIVE_R2_UPLOAD_GATE','DOCS_LIVE_R2_STAGING_GATE','DOCS_LIVE_RECEPCION_GATE'].every(x=>gate(docsBindings,x))&&
             docsBindings.some(x=>x.name==='SABER_R2_GRANDES_LIVE'&&x.type==='r2_bucket'&&x.bucket_name==='saber-documentos-produccion-privado');
@@ -85,7 +95,8 @@ jobs:
           const checks=['buyerFlowActive','bankNoticeActive','customerTrackingActive','operatorStageDialogActive',
            'r2InspectionDirectActive','archiveFilterActive','r2IdentifiersActive',
            'paymentCronActive','cronEveryMinute','archivedPaymentsPreserved','publicSiteNoGo',
-           'docsTUSReady','docsR2Ready','bankFlowReady','centralR2Ready'];
+           'docsTUSReady','docsR2Ready','bankFlowReady','centralR2Ready',
+           'deliveryPurgeGates','deliveryPrivateBridge','deliveryStorageReady','deliveryCodeLive'];
           result.passed=checks.every(k=>result[k]===true)&&result.archivedNumbers?.join(',')==='8,9';
           await mkdir('docs',{recursive:true});
           await writeFile('docs/VERIFICACION-INTEGRAL-LIVE-DESPLEGADO.json',JSON.stringify(result,null,2)+'\n');
