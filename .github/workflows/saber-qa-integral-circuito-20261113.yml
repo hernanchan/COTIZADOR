@@ -67,3 +67,5 @@ jobs:
             sleep 2
           done
           exit 1
+
+# Revalidación conjunta tras mejoras de Central, R2, seguimiento y UX.
