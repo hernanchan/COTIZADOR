@@ -57,8 +57,10 @@ test('pospago automático: no pide otra selección y solo envía si acreditó el
  assert.match(html,/leerOriginalesLive/);
  assert.match(html,/enviarPDFsTUSPagadosLive/);
  assert.match(html,/enviarPDFsR2PagadosLive/);
- assert.match(html,/data\.estado!=='pagado_esperando_archivos'/);
- assert.match(html,/data\.uploadAuthorized!==true/);
+ assert.match(html,/data\.estado==='pagado_esperando_archivos'/);
+ assert.match(html,/data\.uploadAuthorized===true/);
+ assert.match(html,/bankPending/);
+ assert.match(html,/t\.customerNotified===true/);
  assert.match(html,/setInterval/);
  assert.match(html,/borrarOriginalesLive/);
  assert.match(html,/no cierres esta pestaña|No cierres esta pestaña/);
