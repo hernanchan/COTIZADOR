@@ -34,6 +34,12 @@ section[hidden]{display:none!important}
 @media(max-width:700px){main{width:100%;max-width:100%;margin:0;padding:8px}section{padding:13px;margin-bottom:10px;border-radius:10px}h1{font-size:22px}h2{font-size:18px}#seccion-archivos{overflow:visible}#pdf{height:960px;min-height:0}#precio-entrega{padding:10px;gap:5px}#precio-entrega #precio,#precio-entrega #plazo-orientativo{font-size:21px}#plazo-explicacion,#promo-dia{padding:9px 11px;font-size:14px}button{max-width:100%;white-space:normal;min-height:46px}.payment-options button{display:block;width:100%;margin:8px 0!important}}`;
 export function paginaCotizarLive(req,env,{authorized=false}={}){
  const u=new URL(req.url);
+ // Única selección anticipada desde la vidriera: jamás determina precio ni pago.
+ const opcion=u.searchParams.get('servicio');
+ const servicioInicial=opcion==='fotos'||opcion==='stickers'?opcion:'auto';
+ const servicioQuery=servicioInicial==='auto'?'':'?servicio='+servicioInicial;
+ const tituloServicio=servicioInicial==='fotos'?'Cotizá tus fotos':
+  servicioInicial==='stickers'?'Cotizá tus stickers':'Cotizá tus impresiones y ploteos';
  if(req.method!=='GET'||u.protocol!=='https:'||u.hostname!==HOST||
     u.pathname!=='/cotizar'||
     env?.SABER_ENTORNO!=='produccion'||env?.DOCS_LIVE_UI_GATE!==ON||
@@ -47,7 +53,7 @@ export function paginaCotizarLive(req,env,{authorized=false}={}){
 <title>Librería Saber · Ingresar al cotizador</title><style>${baseCss}</style>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </head><body><header><strong>Librería Saber</strong><a class="volver-tienda" href="https://libreriasaber.com.ar/">← Volver a la tienda</a></header><main><section>
-<h1>Cotizá tus impresiones y ploteos</h1><p>Ingresá para preparar tu pedido. Tus PDF permanecen en tu dispositivo mientras elegís cómo imprimirlos.</p>
+<h1>${tituloServicio}</h1><p>Ingresá para preparar tu pedido. Tus PDF permanecen en tu dispositivo mientras elegís cómo imprimirlos.</p>
 <div class="cf-turnstile" data-sitekey="${key}" data-action="saber_pedido_live" data-callback="saberIngresoLive"></div>
 <p id="estado" role="status" aria-live="polite">Verificá el acceso para continuar.</p>
 </section></main><script>
@@ -59,7 +65,7 @@ window.saberIngresoLive=async token=>{
    headers:{'Content-Type':'application/json'},body:JSON.stringify({token})});
   const v=await r.json();
   if(!r.ok||v?.ok!==true)throw Error('No pudimos verificar el acceso.');
-  location.replace('/cotizar');
+  location.replace('/cotizar${servicioQuery}');
  }catch{label.textContent='El acceso no pudo verificarse. Volvé a intentarlo.'}
 };
 </script></body></html>`;
@@ -74,7 +80,7 @@ window.saberIngresoLive=async token=>{
  const html=`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cotizador de PDF · Librería Saber</title><style>${baseCss}</style></head><body>
 <header><strong>Librería Saber · Impresiones y ploteos</strong><a class="volver-tienda" href="https://libreriasaber.com.ar/">← Volver a la tienda</a></header>
-<main><section><h1>Prepará tus PDF, JPG o PNG</h1>
+<main><section><h1>${servicioInicial==='fotos'?'Prepará tus fotos':servicioInicial==='stickers'?'Prepará tus stickers':'Prepará tus PDF, JPG o PNG'}</h1>
 <p>Elegí los archivos y sus opciones de impresión. Las medidas y el tipo de trabajo se calculan por el contenido del PDF, no por el nombre ni por su peso.</p>
 <div id="precio-entrega" aria-label="Precio y fecha de entrega">
 <div><strong>TU PRECIO A PAGAR</strong><p id="precio" aria-live="polite">Pendiente de cotización</p></div>
@@ -82,7 +88,7 @@ window.saberIngresoLive=async token=>{
 </div>
 <p id="plazo-explicacion">Fecha orientativa desde la acreditación del pago, sujeta a disponibilidad, trabajo, horario y feriados. Al iniciar tu trabajo, en el seguimiento verás una fecha y hora más precisas.</p>
 <p id="promo-dia" hidden></p>
-</section><section id="seccion-archivos"><h2>1. Elegí los archivos</h2><p>Seleccioná una sola vez los PDF que querés imprimir. Con Mercado Pago se envían al acreditarse; con transferencia se reciben desde «Ya transferí», protegidos hasta verificar el banco.</p><iframe id="pdf" title="Elegir PDF, JPG o PNG y opciones de impresión" src="/cotizar/archivos" loading="eager" scrolling="no"></iframe>
+</section><section id="seccion-archivos"><h2>1. Elegí los archivos</h2><p>Seleccioná una sola vez los PDF que querés imprimir. Con Mercado Pago se envían al acreditarse; con transferencia se reciben desde «Ya transferí», protegidos hasta verificar el banco.</p><iframe id="pdf" title="Elegir PDF, JPG o PNG y opciones de impresión" src="/cotizar/archivos${servicioQuery}" loading="eager" scrolling="no"></iframe>
 <button type="button" id="siguiente" disabled>Siguiente · Tus datos</button>
 <p id="aviso-siguiente" aria-live="polite">Elegí y confirmá las opciones de impresión para continuar.</p>
 </section><section id="seccion-confirmacion" hidden><h2>2. Tus datos y el pago</h2>
