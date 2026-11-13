@@ -5,12 +5,11 @@
 import zipJs from './zip-tus-cliente.txt';
 import pdfJs from './pdf-orden-tus-cliente.txt';
 import universalJs from './paquete-universal-cliente.txt';
-import staffR2Js from './staff-r2-personal-ui.txt';
 export function paginaPaqueteUniversalPersonal(){
  return `<!doctype html><html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
-<title>ZIP mixto · Orden de trabajo · Librería Saber</title>
+<title>Descargar pedido · Librería Saber</title>
 <style>
 *{box-sizing:border-box}body{font:16px system-ui,Arial,sans-serif;background:#f1f5f9;color:#163951;max-width:850px;margin:25px auto;padding:20px}
 main{background:white;border:1px solid #d0dae5;border-radius:14px;padding:25px}
@@ -22,40 +21,19 @@ button:disabled{opacity:.45;cursor:not-allowed}
 small{color:#586c7d}
 </style></head><body><main>
 <h1 id="numero">Orden de trabajo · verificando…</h1>
-<p><a href="/personal/transferencias" style="color:#0c5688;font-weight:700">Transferencias por verificar</a></p>
+<p><a href="/personal/central" style="color:#0c5688;font-weight:700">Volver a la Central de Pedidos</a></p>
 <p id="detalle">Comprobando cantidad de originales y pago conciliado</p>
 <div class="warning"><strong>PREPRENSA PENDIENTE — NO IMPRIMIR.</strong>
-Esta descarga incluye los PDF originales sin modificar y la hoja A4 de instrucciones.
+La descarga reúne todos los PDF originales sin modificar y la hoja de instrucciones del pedido.
 Revisá en Adobe Acrobat escala, tamaño, páginas por cara, doble faz, rollo y material antes de producir.</div>
 <button id="zip" disabled>Descargar ZIP completo</button>
 <p><small>Para lotes grandes (hasta 10 PDF de 200 MiB), Chrome o Edge en computadora guardan el ZIP
 directamente al disco, sin acumularlo en memoria. Solo personal autorizado.</small></p>
 <p id="estado" role="status" aria-live="polite">Esperando verificación D1…</p>
-<section id="r2Inspeccion" style="margin-top:24px;border-top:2px solid #d0dae5;padding-top:18px" hidden>
-<h2>Inspección de archivos grandes (R2)</h2>
-<p>Los PDF de hasta 40 MiB usan TUS y no necesitan inspección R2. Para un archivo grande, primero revisá el original y registrá la inspección. Después se habilita el ZIP completo con originales e instrucciones A4.</p>
-<p><button type="button" id="r2Recargar">Ver pedidos acreditados (TUS y R2)</button></p>
-<div id="r2Lista" role="status" aria-live="polite"></div>
-<label>Referencia web <input id="r2Order" style="width:100%;padding:9px" placeholder="WEB-ENSAYO-…" /></label>
-<label>Identificador de archivo <input id="r2FileId" style="width:100%;padding:9px" placeholder="pdf_0" /></label>
-<p><button type="button" id="r2Consultar">Consultar original pendiente</button></p>
-<p id="r2Estado" role="status" aria-live="polite"></p>
-<div id="r2Detalle" hidden>
-<p id="r2Ficha" style="white-space:pre-wrap"></p>
-<a id="r2Descargar" href="#" style="display:inline-block;margin:6px 0 16px">Descargar SOLO el PDF original para revisar (sin instrucciones)</a>
-<p><small>Este enlace es para inspección, no es el paquete de producción. Después de registrar la inspección, usá «Descargar ZIP completo» arriba para recibir el original y la hoja de instrucciones.</small></p>
-<p><strong>Medidas originales y tamaño de impresión</strong></p>
-<p id="r2Formato" style="font-size:16px;font-weight:650">Consultando la configuración del pedido…</p>
-<p><small>Las dimensiones originales se leen de la cotización vinculada al mismo PDF (SHA-256). No hace falta ingresar una medida por página: un original mixto puede imprimirse entero ajustado a A4, tal como lo pidió el cliente. Revisá el PDF real antes de confirmar.</small></p>
-<p><label>Responsable <input id="r2Operador" style="width:100%;padding:9px" maxlength="60" /></label></p>
-<p><label><input type="checkbox" id="r2Verificado"> Revisé el PDF original y la cantidad de páginas; confirmé que el pedido se imprimirá en el formato final elegido por el cliente. Las medidas originales se contrastan automáticamente con su cotización y el archivo no queda autorizado para imprimir hasta la revisión de preprensa.</label></p>
-<button type="button" id="r2Aprobar">Registrar revisión del original</button>
-</div>
-</section>
+
 </main><script>
 ${zipJs}
 ${pdfJs}
 ${universalJs}
-${staffR2Js}
 </script></body></html>`;
 }
