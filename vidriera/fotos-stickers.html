@@ -18,7 +18,8 @@ main{max-width:1040px;margin:40px auto;padding:0 18px}
 h1{font-size:clamp(28px,4vw,42px);line-height:1.15;margin:8px 0 12px;color:var(--azul)}
 main>p{max-width:730px;color:#4d6575;margin:0 0 26px}
 .kicker{color:#b45b09;font-size:13px;font-weight:850;letter-spacing:.08em;text-transform:uppercase}
-.servicios{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.servicios{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+@media(min-width:701px) and (max-width:930px){.servicios{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .servicio{display:flex;flex-direction:column;min-height:260px;border-radius:16px;background:#fff;padding:26px;border:1px solid var(--linea);box-shadow:0 8px 24px #173c5210}
 .servicio h2{font-size:24px;color:var(--azul);margin:0 0 10px}
 .servicio p{color:#4a6273;margin:0 0 24px}
@@ -33,7 +34,7 @@ small{display:block;color:#5b7182;margin-top:24px;line-height:1.6}
 <main>
 <span class="kicker">Impresiones personalizadas</span>
 <h1>Fotos y stickers</h1>
-<p>Elegí qué necesitás. Podés adjuntar archivos desde tu celular o computadora y revisar el presupuesto antes de confirmarlo.</p>
+<p>Para fotos y stickers, cargá tus archivos y obtené un presupuesto online. Las Polaroids se encargan directamente por WhatsApp.</p>
 <div class="servicios">
 <section class="servicio" aria-labelledby="titulo-fotos">
 <h2 id="titulo-fotos">Imprimir fotos</h2>
@@ -45,6 +46,11 @@ small{display:block;color:#5b7182;margin-top:24px;line-height:1.6}
 <p>Planchas adhesivas A4 o A3. Adjuntá tu diseño y elegí la cantidad. El precio se confirma según el tarifario vigente.</p>
 <a href="https://pedidos.libreriasaber.com.ar/cotizar?servicio=stickers">Cotizar stickers</a>
 </section>
+<section class="servicio" aria-labelledby="titulo-polaroids">
+<h2 id="titulo-polaroids">Polaroids personalizadas</h2>
+<p><strong>6 fotos por hoja A4 · $3.000 por hoja.</strong> Enviá tus fotos por WhatsApp y nosotros preparamos las hojas. Confirmamos los detalles y el plazo de entrega antes de realizar el trabajo.</p>
+<a href="https://wa.me/5493513110130?text=Hola%2C%20Librer%C3%ADa%20Saber.%20Quiero%20encargar%20Polaroids%20personalizadas.%20Vi%20el%20precio%20de%20%243.000%20por%20hoja%20A4%20de%206%20fotos.%20%C2%BFC%C3%B3mo%20les%20env%C3%ADo%20las%20fotos%20y%20cu%C3%A1ndo%20podr%C3%ADan%20estar%20listas%3F" target="_blank" rel="noopener noreferrer">Encargar por WhatsApp</a>
+</section>
 </div>
-<small>El sistema calcula los precios con el tarifario aprobado. Los archivos no se envían a Librería Saber hasta completar las condiciones de recepción indicadas en el cotizador. Polaroids Express es un servicio separado.</small>
+<small>Las fotos y stickers se cotizan con el tarifario aprobado y se reciben según las condiciones del cotizador. Las Polaroids se encargan por WhatsApp: el editor automático todavía no está habilitado para pedidos.</small>
 </main></body></html>
