@@ -41,7 +41,7 @@ jobs:
            "SELECT name FROM sqlite_master WHERE type='table' AND name='central_live_order_archives'");
           const archives=(table?.[0]?.results||[]).length>0;
           const arch=archives?await call('/d1/database/'+db.uuid+'/query',process.env.D1TOKEN,
-           "SELECT name,type,notnull,dflt_value FROM pragma_table_info('central_live_order_archives') ORDER BY cid"):null;
+           "SELECT name FROM pragma_table_info('central_live_order_archives') ORDER BY cid"):null;
           const sql=[
            "SELECT n.number AS numero,o.status AS estado,o.created_at AS creado,",
            "f.file_id AS fileId,f.web_order_id AS webOrderId,f.transport AS transporte,",
