@@ -22,7 +22,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node --test integraciones/mercadopago/pruebas/central-recepcion-live.test.mjs integraciones/mercadopago/pruebas/central-live-bridge.test.mjs integraciones/mercadopago/pruebas/central-prevision-personal-live.test.mjs integraciones/mercadopago/pruebas/central-agenda-personal-live.test.mjs integraciones/mercadopago/pruebas/plazo-produccion-informativo.test.mjs integraciones/autocotizador/recepcion/plazo-produccion-cliente.test.mjs integraciones/autocotizador/recepcion/pagina-central-personal-live.test.mjs
+          node --test integraciones/mercadopago/pruebas/central-recepcion-live.test.mjs integraciones/mercadopago/pruebas/central-live-bridge.test.mjs integraciones/mercadopago/pruebas/central-prevision-personal-live.test.mjs integraciones/mercadopago/pruebas/central-agenda-personal-live.test.mjs integraciones/mercadopago/pruebas/plazo-produccion-informativo.test.mjs integraciones/autocotizador/recepcion/plazo-produccion-cliente.test.mjs integraciones/autocotizador/recepcion/pagina-central-personal-live.test.mjs integraciones/mercadopago/pruebas/central-mp-live-rescate.test.mjs integraciones/autocotizador/recepcion/rescate-personal-mp-live.test.mjs
           npm install --no-save --no-audit --no-fund esbuild@0.25.12
           ./node_modules/.bin/esbuild integraciones/mercadopago/pruebas/worker.js --bundle --platform=browser --format=esm --target=es2022 --outfile=/tmp/saber-central-live.mjs
           (cd integraciones/autocotizador/recepcion && npm install --no-audit --no-fund && npm run build:unificado)
@@ -33,7 +33,9 @@ jobs:
           grep -Fq '/personal/api/live-status' /tmp/saber-documentos-live.mjs
           grep -Fq '/personal/api/live-forecast' /tmp/saber-documentos-live.mjs
           grep -Fq '/personal/api/live-calendar' /tmp/saber-documentos-live.mjs
+          grep -Fq '/personal/api/live-reconcile' /tmp/saber-documentos-live.mjs
           grep -Fq 'staff-calendar' /tmp/saber-central-live.mjs
+          grep -Fq 'staff-reconcile' /tmp/saber-central-live.mjs
           grep -Fq 'staff-forecast' /tmp/saber-central-live.mjs
           echo SABER_STAFF_LIVE_2_BUNDLES_READY
       - name: Stage y promover ambos Workers con bindings heredados y rollback de código
@@ -115,7 +117,7 @@ jobs:
             sleep 2
           done
           test "$status" = 401
-          for path in '/personal/api/live-board' '/personal/api/live-status' '/personal/api/live-forecast' '/personal/api/live-calendar' '/personal/paquete' '/personal/transferencias';do
+          for path in '/personal/api/live-board' '/personal/api/live-status' '/personal/api/live-forecast' '/personal/api/live-calendar' '/personal/api/live-reconcile' '/personal/paquete' '/personal/transferencias';do
             result=$(curl -sS --max-time 15 -o /dev/null -w '%{http_code}' "https://pedidos.libreriasaber.com.ar$path")
             test "$result" = 401 || { echo "SABER_STAFF_PROTECTION_FAILED_$path $result";false; }
           done
