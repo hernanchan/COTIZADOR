@@ -81,7 +81,7 @@ window.saberRenovarPedido=async token=>{
  'if(!r.ok||data?.ok!==true||data.webOrderId!==saved.webOrderId||data.commercialOrderId!==saved.commercialOrderId||!Number.isSafeInteger(data.amountArs)||data.amountArs<1||data.fileCount!==saved.metas.length)throw Error("No se pudo verificar la orden existente");'+
  'order={webOrderId:saved.webOrderId,commercialOrderId:saved.commercialOrderId,amountArs:data.amountArs,fileCount:data.fileCount};'+
  'price.textContent="Orden pendiente · "+pesos(data.amountArs);'+
- 'if(data.estado==="pagado_esperando_archivos"){sessionStorage.setItem("saber-live-pedido-v1",JSON.stringify({webOrderId:order.webOrderId,commercialOrderId:order.commercialOrderId}));status.textContent="El pago ya está acreditado. Continuá con la recepción del PDF.";button.textContent="Enviar PDF pagado";button.disabled=false;button.dataset.paid="yes";return}'+
+ 'if(data.estado==="pagado_esperando_archivos"){sessionStorage.setItem("saber-live-pedido-v1",JSON.stringify({webOrderId:order.webOrderId,commercialOrderId:order.commercialOrderId}));status.textContent="Pago acreditado. Reanudando el envío automático del PDF original…";location.replace("/pedido/estado");return}'+
  'if(data.estado!=="pendiente"){status.textContent="Esta orden no está habilitada para volver a pagar. Contactá a Librería Saber.";return}'+
  'status.textContent="Tu orden está registrada. Podés intentar obtener el enlace de cobro sin crear otra.";button.disabled=false;'+
  '}catch(error){price.textContent="Orden aún no verificable";status.textContent=String(error.message||"Sin acceso a la orden").slice(0,140)}}'+
