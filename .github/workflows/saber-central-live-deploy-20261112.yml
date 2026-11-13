@@ -95,26 +95,34 @@ jobs:
           done
           jq -e '.result.bindings | any(.name=="SABER_R2_GRANDES_LIVE" and .type=="r2_bucket" and .bucket_name=="saber-documentos-produccion-privado") and any(.name=="SABER_CENTRAL" and .type=="service" and .service=="saber-pagos-produccion") and any(.name=="DOCS_LIVE_STAFF_SECRET" and .type=="secret_text") and any(.name=="DOCS_LIVE_STAFF_GATE" and .text=="GO_COMERCIAL_CONFIRMADO")' "$temp/saber-documentos-produccion.before.json" >/dev/null
           jq -e '.result.bindings | any(.name=="MP_LIVE_ACCESS_TOKEN" and .type=="secret_text") and any(.name=="CENTRAL_LIVE_R2_INSPECTION_GATE" and .text=="GO_COMERCIAL_CONFIRMADO")' "$temp/saber-pagos-produccion.before.json" >/dev/null
+          # Cloudflare scripts/versions devuelve 500/10013 aun con modulo minimo.
+          # API beta JSON comprobada: diagnostico 43458622780 con herencia
+          # EXPLICITA de la version activa, sin perder secretos ni bindings.
           for worker in saber-pagos-produccion saber-documentos-produccion;do
             src=/tmp/saber-central-live.mjs
             test "$worker" = saber-documentos-produccion && src=/tmp/saber-documentos-live.mjs
-            status=$(curl -sS --retry 2 --max-time 120 -w '%{http_code}' -o "$temp/$worker.stage.json" \
+            old=$(cat "$temp/$worker.old")
+            beta="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/workers/$worker/versions"
+            jq -nc --arg old "$old" --rawfile code "$src" \
+              --slurpfile settings "$temp/$worker.before.json" \
+              '{main_module:"index.mjs",bindings:[$settings[0].result.bindings[]|{name,type:"inherit",version_id:$old}],modules:[{name:"index.mjs",content_type:"application/javascript+module",content_base64:($code|@base64)}]}' > "$temp/$worker.stage-body.json"
+            status=$(curl -sS --max-time 150 -w '%{http_code}' -o "$temp/$worker.stage.json" \
               -H "Authorization: Bearer $TOKEN" \
-              -F "metadata=@$temp/$worker.metadata.json;type=application/json" \
-              -F "index.mjs=@$src;filename=index.mjs;type=application/javascript+module" \
-              "$root/$worker/versions?bindings_inherit=strict")
+              -H "Content-Type: application/json" \
+              --data-binary @"$temp/$worker.stage-body.json" \
+              "$beta?deploy=false")
             if [ "$status" != 200 ] || ! jq -e '.success==true and (.result.id|type=="string")' "$temp/$worker.stage.json" >/dev/null;then
-              echo "SABER_STAFF_STAGE_FAILED_$worker HTTP $status"
+              echo "SABER_STAFF_BETA_STAGE_FAILED_$worker HTTP $status"
               jq -c '{errors:[.errors[]?|{code,message}]}' "$temp/$worker.stage.json"
               exit 1
             fi
             id=$(jq -r '.result.id' "$temp/$worker.stage.json")
             printf '%s' "$id" > "$temp/$worker.candidate"
-            get "$root/$worker/versions/$id" > "$temp/$worker.version.json"
+            get "$beta/$id" > "$temp/$worker.version.json"
             jq -e '.success==true' "$temp/$worker.version.json" >/dev/null
-            jq -r '.result.resources.bindings[].name' "$temp/$worker.version.json" | sort > "$temp/$worker.stage.names"
+            jq -r '(.result.bindings//.result.resources.bindings)[].name' "$temp/$worker.version.json" | sort > "$temp/$worker.stage.names"
             diff "$temp/$worker.names" "$temp/$worker.stage.names"
-            echo "SABER_STAFF_STAGE_BINDINGS_INTACT_$worker"
+            echo "SABER_STAFF_BETA_STAGE_BINDINGS_INTACT_$worker"
           done
           changed=""
           rollback(){
