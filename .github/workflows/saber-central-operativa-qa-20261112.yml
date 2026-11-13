@@ -40,6 +40,7 @@ jobs:
             tests/r2-panel-staff-live-browser.test.mjs \
             integraciones/mercadopago/pruebas/transferencias-live-central.test.mjs \
             integraciones/autocotizador/recepcion/transferencias-personal-live.test.mjs \
+            integraciones/autocotizador/recepcion/imagenes-a-pdf-local.test.mjs \
             integraciones/autocotizador/recepcion/clasificar-ploteo-grande-por-rangos.test.mjs \
             integraciones/autocotizador/recepcion/clasificar-mosaico-grande-muestreo-local.test.mjs \
             integraciones/autocotizador/recepcion/carga-unica-pdf-regresion.test.mjs \
@@ -79,3 +80,4 @@ jobs:
 # 13/11: repetir tests del muestreador estructural tras corregir el canvas simulado de Node.
 # 13/11: QA final muestreo rápido con límite de 8s y fallback PDF.js limitado a 12s, selección 1-3,5-7.
 # 13/11: prueba de recursos comprimidos de PDF real: /ObjStm xref type 2, CAD y Pleno, sin publicar si falla.
+# 13/11: QA entrada JPG/PNG separada y recepción previa transferencia con seguridad D1, TUS/R2, sin pago.
