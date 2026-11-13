@@ -22,7 +22,14 @@ jobs:
                echo SABER_FOTOS_VIDRIERA_PUBLICA_OK
                break
             fi
-            if [ "$intento" = 12 ];then echo SABER_FOTOS_VIDRIERA_NO_PROPAGADA;exit 1;fi
+            if [ "$intento" = 12 ];then
+              echo SABER_FOTOS_VIDRIERA_NO_PROPAGADA
+              echo "ROOT_BYTES=$(wc -c </tmp/portada.html) ROOT_NEW_LINKS=$(grep -o 'fotos-stickers.html' /tmp/portada.html | wc -l)"
+              echo "PHOTO_PAGE_BYTES=$(wc -c </tmp/fotos.html) FOTO_BUTTONS=$(grep -o 'Cotizar fotos' /tmp/fotos.html | wc -l)"
+              curl -sS -L --max-time 20 -o /dev/null -w 'ROOT_STATUS=%{http_code} ROOT_FINAL=%{url_effective}\n' 'https://libreriasaber.com.ar/'
+              curl -sS -L --max-time 20 -o /dev/null -w 'PHOTO_STATUS=%{http_code} PHOTO_FINAL=%{url_effective}\n' 'https://libreriasaber.com.ar/fotos-stickers.html'
+              exit 1
+            fi
             sleep 3
           done
           for familia in fotos stickers;do
