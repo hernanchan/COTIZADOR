@@ -53,3 +53,18 @@ test('pantalla para retomar mismo pedido nunca crea orden y verifica acreditacio
   assert.equal(res.headers.get('Cache-Control'),'no-store,private');
   assert.match(html,/No se va a generar otro pedido/);
 });
+
+test('sesión vencida de transferencia NO ofrece Mercado Pago en la recuperación',async()=>{
+ const res=paginaContinuarPagoLive(new Request(url),env,{authorized:true});
+ const html=await res.text();
+ assert.match(html,/sessionStorage\.getItem\("saber-live-medio-v1"\)==="transferencia"/);
+ assert.match(html,/Ver seguimiento de transferencia/);
+ assert.match(html,/button\.dataset\.transfer="yes"/);
+ assert.match(html,/button\.dataset\.transfer==="yes"/);
+ assert.match(html,/action:"status",webOrderId:order\.webOrderId/);
+ assert.match(html,/No pagues por otro medio ni generes otra orden/);
+ assert.match(html,/>Continuar pedido<\/button>/);
+ assert.doesNotMatch(html,/>Continuar a Mercado Pago<\/button>/);
+ const nonce=html.match(/<script nonce="([a-f0-9]{32})">/)?.[1];
+ assert.doesNotThrow(()=>new Function(html.split('<script nonce="'+nonce+'">')[1].split('</script>')[0]));
+});
