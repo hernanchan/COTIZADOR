@@ -37,11 +37,26 @@ jobs:
           old=$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/deployments.json")
           test -n "$old"
           jq -r '.result.bindings[]|[.name,.type]|@tsv' "$tmp/settings.json" | sort > "$tmp/bindings-before"
-          get "$root/$worker" > "$tmp/active.mjs"
-          node --input-type=module - "$tmp/active.mjs" "$tmp/patched.mjs" <<'NODE'
+          get "$root/$worker" > "$tmp/active.multipart"
+          node --input-type=module - "$tmp/active.multipart" "$tmp/patched.mjs" <<'NODE'
           import fs from 'node:fs';
           import assert from 'node:assert/strict';
-          const original=fs.readFileSync(process.argv[2],'utf8');
+          const raw=fs.readFileSync(process.argv[2],'utf8');
+          const crlf=String.fromCharCode(13,10);
+          const boundary=raw.slice(0,raw.indexOf(crlf));
+          assert.match(boundary,/^--[a-f0-9]{40,}$/i,'INVALID_CLOUDFLARE_MULTIPART_BOUNDARY');
+          const parts=raw.split(boundary);
+          assert.equal(parts.length,3,'UNEXPECTED_NUMBER_OF_WORKER_MODULE_PARTS');
+          assert.equal(parts[0],'','UNEXPECTED_MULTIPART_PREFIX');
+          assert.ok(parts[2].startsWith('--'),'INVALID_MULTIPART_TERMINATOR');
+          const sep=parts[1].indexOf(crlf+crlf);
+          assert.ok(sep>0,'MISSING_MODULE_HEADERS');
+          assert.match(parts[1].slice(0,sep),/name="index\\.mjs"/,'NOT_THE_EXPECTED_MODULE');
+          const body=parts[1].slice(sep+4);
+          assert.ok(body.endsWith(crlf),'MISSING_MULTIPART_MODULE_DELIMITER');
+          const original=body.slice(0,-2);
+          assert.ok(original.length>100000,'TRUNCATED_LIVE_MODULE');
+          console.log('SABER_DOCS_LIVE_SINGLE_MODULE_EXTRACTED');
           const gate='<header><strong>Librer\\xEDa Saber</strong></header>';
           const buyer='<header><strong>Librer\\xEDa Saber \\xB7 Impresiones y ploteos</strong></header>';
           for(const label of [gate,buyer])assert.equal(original.split(label).length-1,1,'LIVE_HEADER_NOT_UNIQUE_ABORT');
