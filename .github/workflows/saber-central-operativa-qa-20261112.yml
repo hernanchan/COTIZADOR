@@ -75,3 +75,4 @@ jobs:
 # 13/11: QA limitar análisis de PDF 60 MiB a páginas elegidas antes de leer raster, sin cobro ni subida.
 # 13/11: QA bloqueo 1-3,5-7: timeout PDF.js de raster pesado, cancelacion y alternativa CAD/Pleno informada.
 # 13/11: probar cotización rápida PDF mosaico de tiras 55MB sin render completo ni permitir tipo CAD falso.
+# 13/11: reejecutar diagnóstico seguro del nuevo muestreador PDF antes de publicar.
