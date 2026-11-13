@@ -59,4 +59,42 @@ jobs:
           if(data?.[0]?.success!==true)throw Error('D1_SOLO_LECTURA_FALLO');
           const rows=data[0].results||[];
           console.log('SABER_R2_011_SOLO_ESTADOS='+JSON.stringify({found:rows.length>0,rows}));
+          const structure=await cloudflare('/d1/database/'+db.uuid+'/query',{
+            sql:"SELECT name,type FROM pragma_table_info('central_r2_live_inspections') ORDER BY cid"
+          });
+          console.log('SABER_R2_011_TABLA_INSPECCION_COLUMNAS='+JSON.stringify(
+            (structure?.[0]?.results||[]).map(x=>x.name)));
+          const quote=await cloudflare('/d1/database/'+db.uuid+'/query',{
+            sql:[
+              'SELECT n.number AS orden,',
+              "json_array_length(json_extract(f.work_json,'$.configuracion.paginas')) AS paginas,",
+              "json_extract(f.work_json,'$.configuracion.paginas[0].anchoCm') AS ancho_primera,",
+              "json_extract(f.work_json,'$.configuracion.paginas[0].altoCm') AS alto_primera,",
+              "(SELECT count(*) FROM json_each(json_extract(f.work_json,'$.configuracion.paginas')) p WHERE",
+              "abs(CAST(json_extract(p.value,'$.anchoCm') AS REAL)-21.0)>0.1 OR",
+              "abs(CAST(json_extract(p.value,'$.altoCm') AS REAL)-29.7)>0.1) AS paginas_fuera_tolerancia,",
+              "CASE WHEN EXISTS (SELECT 1 FROM central_r2_universal_order_links l JOIN orders o ON o.id=l.commercial_order_id",
+              "JOIN payment_reviews r ON r.order_id=o.id WHERE l.web_order_id=f.web_order_id",
+              "AND o.status='paid' AND o.paid_at IS NOT NULL",
+              "AND o.amount_ars=o.deposit_ars AND r.state='verified'",
+              "AND o.payment_id IS NULL AND o.preference_id IS NULL",
+              "AND EXISTS (SELECT 1 FROM central_live_bank_accreditations b WHERE b.order_id=o.id",
+              "AND b.amount_ars=o.amount_ars AND length(b.bank_reference)>=6",
+              "AND length(b.operator)>=2)) THEN 1 ELSE 0 END AS pago_sql_compatible,",
+              "CASE WHEN EXISTS (SELECT 1 FROM central_r2_large_pending p",
+              "JOIN central_r2_large_reservations q ON q.object_key=p.object_key",
+              "WHERE p.web_order_id=f.web_order_id AND p.file_id=f.file_id",
+              "AND p.sha256=f.sha256 AND p.bytes=f.bytes",
+              "AND p.status='awaiting_pdf_analysis'",
+              "AND q.state='reserved' AND q.web_order_id=p.web_order_id",
+              "AND q.file_id=p.file_id AND q.sha256=p.sha256 AND q.bytes=p.bytes)",
+              "THEN 1 ELSE 0 END AS reserva_sql_compatible",
+              'FROM central_work_order_numbers n JOIN orders o ON o.id=n.commercial_order_id',
+              'JOIN central_r2_universal_order_links l ON l.commercial_order_id=o.id',
+              'JOIN central_r2_universal_files f ON f.web_order_id=l.web_order_id',
+              'WHERE n.number=11'
+            ].join(' ')
+          });
+          if(quote?.[0]?.success!==true)throw Error('D1_CONDICIONES_011_FALLO');
+          console.log('SABER_R2_011_CONDICIONES='+JSON.stringify(quote[0].results||[]));
           EOF
