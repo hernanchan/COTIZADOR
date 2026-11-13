@@ -89,7 +89,7 @@ let stageTransition=null;
 function changeState(order,next,btn){
  if(stageDialog.open)return;
  const titles={en_preparacion:'Iniciar preparación',en_espera:'Poner en espera',
-  listo:'Marcar listo para retirar'};
+  listo:'Marcar listo para retirar',entregado:'Confirmar entrega y borrar originales'};
  if(!titles[next])return;
  stageTransition={order,next,btn};
  document.getElementById('stageTitle').textContent=titles[next]+' · Orden '+order.numeroOrden;
@@ -106,6 +106,8 @@ function changeState(order,next,btn){
    'Revisé los originales, medidas y la hoja de instrucciones antes de comenzar la producción.':
   next==='listo'?
    'Confirmo que este trabajo está listo para retirar.':
+  next==='entregado'?
+   'Confirmo que entregué el trabajo y autorizo borrar definitivamente todos sus originales PDF privados.':
    'Confirmo que corresponde pausar el trabajo y avisar al cliente.';
  document.getElementById('stageConfirmed').checked=false;
  document.getElementById('stageMessage').textContent='';
@@ -419,7 +421,15 @@ async function refresh(){
      const resume=element('button','Retomar preparación');
      resume.addEventListener('click',()=>void changeState(o,'en_preparacion',resume));tools.append(resume);
     }
-    if(state==='listo')card.append(element('small','Entrega: pendiente de habilitar eliminación segura de originales; no borrar ni cerrar todavía.'));
+    if(state==='listo'){
+     const deliver=element('button','Entregado · borrar originales');
+     deliver.disabled=o.deliveryEnabled!==true;
+     deliver.title=deliver.disabled?'La eliminación segura TUS/R2 aún no está habilitada':'Confirmar entrega y eliminación de archivos';
+     deliver.addEventListener('click',()=>void changeState(o,'entregado',deliver));
+     tools.append(deliver);
+     if(deliver.disabled)card.append(element('small','Entrega bloqueada hasta habilitar y validar la purga segura de TUS/R2.'));
+    }
+    if(state==='entregado')card.append(element('small','Entregado. Eliminación privada en curso o completada; la auditoría se conserva.'));
     card.append(tools);lane.append(card);total++;
    }
    board.append(lane);
