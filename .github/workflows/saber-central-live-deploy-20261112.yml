@@ -33,7 +33,7 @@ jobs:
           grep -Fq '/personal/api/live-status' /tmp/saber-documentos-live.mjs || { echo 'SABER_DEPLOY_MARKER_02_MISSING'; exit 1; }
           grep -Fq '/personal/api/live-forecast' /tmp/saber-documentos-live.mjs || { echo 'SABER_DEPLOY_MARKER_03_MISSING'; exit 1; }
           grep -Fq '/personal/api/live-calendar' /tmp/saber-documentos-live.mjs || { echo 'SABER_DEPLOY_MARKER_04_MISSING'; exit 1; }
-          grep -Fq 'Ya transferí' /tmp/saber-documentos-live.mjs || { echo 'SABER_DEPLOY_MARKER_05_MISSING'; exit 1; }
+          grep -Fq 'SABER_TRANSFER_CONFIRMACION_CLIENTE_V1' /tmp/saber-documentos-live.mjs || { echo 'SABER_DEPLOY_MARKER_05_MISSING'; exit 1; }
           grep -Fq 'actualizarAvisosTransferencia' /tmp/saber-documentos-live.mjs || { echo 'SABER_DEPLOY_MARKER_06_MISSING'; exit 1; }
           grep -Fq 'transfer-notify' /tmp/saber-central-live.mjs || { echo 'SABER_DEPLOY_MARKER_07_MISSING'; exit 1; }
           grep -Fq 'central_live_transfer_customer_notices' /tmp/saber-central-live.mjs || { echo 'SABER_DEPLOY_MARKER_08_MISSING'; exit 1; }
