@@ -131,3 +131,27 @@ test('rechazar selección fuera de rango, repetida o vacía sin subir original',
  assert.equal(mock.renders,0);
  assert.equal(f.reads.length,0);
 });
+
+test('el clasificador se puede cancelar sin esperar el render de raster infinito',async()=>{
+ const f=archivo(),mock=pdfjsMock();
+ const abort=new AbortController();
+ mock.lib.getDocument=()=>({promise:new Promise(()=>{}),destroy:()=>Promise.resolve()});
+ const pending=clasificarPloteoGrandePorRangos(f,{
+  paginas,seleccionadas:[1,2,3,5,6,7],pdfjs:mock.lib,
+  createCanvas:canvasFactory('cad'),signal:abort.signal
+ });
+ abort.abort();
+ assert.equal(await pending,null);
+ assert.equal(mock.renders,0);
+});
+test('el rango 1-3, 5-7 comprende seis páginas en el orden original',async()=>{
+ const f=archivo(),mock=pdfjsMock(),progress=[];
+ const selected=[1,2,3,5,6,7];
+ const result=await clasificarPloteoGrandePorRangos(f,{
+  paginas,seleccionadas:selected,pdfjs:mock.lib,
+  createCanvas:canvasFactory('cad'),onProgreso:p=>progress.push(p)
+ });
+ assert.deepEqual(result.paginas.map(p=>p.numero),selected);
+ assert.equal(mock.renders,6);
+ assert.equal(progress.at(-1).total,6);
+});
