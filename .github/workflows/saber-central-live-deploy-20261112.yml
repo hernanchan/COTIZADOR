@@ -200,3 +200,4 @@ jobs:
 # 13/11: corregir error D1 de orden 013 con causa especifica de referencia unica, campos preservados y QA 43428451405 SUCCESS.
 # 13/11: publicar corrector de ploteo PDF >48MiB 9 páginas con lectura visual por rangos y recuperar transferencia sin MP; QA 43431226306 SUCCESS.
 # 13/11: desplegar selector previo de páginas de PDF pesado: renderizar únicamente 1-3 si el cliente pide esas tres; QA 43433913203 SUCCESS.
+# 13/11: desplegar muestreo seguro de raster multipágina PDF grande, límite 8/12s, solicitud 1-3,5-7; QA 43439139934 SUCCESS.
