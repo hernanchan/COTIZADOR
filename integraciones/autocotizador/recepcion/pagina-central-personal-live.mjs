@@ -340,10 +340,12 @@ async function refresh(){
      const link=element('a','Descargar ZIP + instrucciones');link.className='action';
      link.href='/personal/paquete?webOrderId='+encodeURIComponent(o.webOrderId);
      link.target='_blank';link.rel='noopener noreferrer';tools.append(link);
-    }else if(o.r2Count>0){
-     const link=element('a','Verificar PDF R2');link.className='action';
+    }else if(o.r2Count>0&&o.stagedR2Count>0){
+     const link=element('a','Inspeccionar PDF R2 almacenado');link.className='action';
      link.href='/personal/paquete?webOrderId='+encodeURIComponent(o.webOrderId);
      link.target='_blank';link.rel='noopener noreferrer';tools.append(link);
+    }else if(o.pendingCount>0){
+     card.append(element('p','El original aún no está listo para verificar. Esperando el envío automático desde el navegador donde se realizó el pedido; no hay ZIP disponible.'));
     }
     if(state==='pendiente'&&o.pendingCount===0){
      const start=element('button','Iniciar preparación');
