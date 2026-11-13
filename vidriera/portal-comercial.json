@@ -1,6 +1,6 @@
 {
   "schema": "saber-portal-comercial-v1",
-  "enabled": false,
-  "release": "NO_GO",
-  "buyerUrl": null
+  "enabled": true,
+  "release": "GO_COMERCIAL_CONFIRMADO",
+  "buyerUrl": "https://pedidos.libreriasaber.com.ar/cotizar"
 }
