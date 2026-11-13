@@ -1,0 +1,76 @@
+name: Saber - auditar crons y pago ARS100 sin escribir
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-auditoria-cron-live-20261113.yml]
+permissions: {contents: write}
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+      D1TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: true}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Leer schedules y payment real sin modificar sistemas
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'EOF'
+          import {mkdir,writeFile} from 'node:fs/promises';
+          import {cotejarPagoRealMP} from './integraciones/publicacion/mercadopago-live-preflight.mjs';
+          const a=process.env.ACCOUNT,token=process.env.TOKEN,dbToken=process.env.D1TOKEN;
+          const out={at:new Date().toISOString(),mode:'GET_AND_D1_SELECT',scheduleStatus:'unknown',paymentStatus:'unknown'};
+          const cf=async(path,key=token,opts={})=>{
+           const r=await fetch('https://api.cloudflare.com/client/v4/accounts/'+a+path,{...opts,
+            headers:{Authorization:'Bearer '+key,...opts.headers},signal:AbortSignal.timeout(20000)});
+           const v=await r.json().catch(()=>null);
+           if(!r.ok||v?.success!==true)throw Error('CF_'+r.status);
+           return v.result;
+          };
+          try{
+           const s=await cf('/workers/scripts/saber-pagos-produccion/schedules');
+           out.schedules=Array.isArray(s?.schedules)?s.schedules.map(x=>x.cron):Array.isArray(s)?s.map(x=>x.cron):[];
+           out.scheduleStatus='readable';
+          }catch(e){out.scheduleStatus=String(e.message||e).slice(0,80)}
+          try{
+           const settings=await cf('/workers/scripts/saber-pagos-produccion/settings');
+           const b=k=>settings.bindings.find(x=>x.name===k);
+           const auth=await cf('/workers/secrets',token).catch(()=>null);
+           const d=await cf('/d1/database',dbToken);const db=d.find(x=>x.name==='saber-pagos-produccion');
+           if(!db?.uuid)throw Error('D1_NOT_FOUND');
+           const sql="SELECT id,status,amount_ars,deposit_ars,preference_id,payment_id FROM orders WHERE amount_ars=100 AND status='awaiting_payment' ORDER BY created_at DESC LIMIT 2";
+           const q=await cf('/d1/database/'+db.uuid+'/query',dbToken,{method:'POST',
+            headers:{'Content-Type':'application/json'},body:JSON.stringify({sql})});
+           const orders=q?.[0]?.results||[];
+           out.d1_ars100_count=orders.length;
+           if(orders.length!==1)throw Error('NON_UNIQUE_ORDER');
+           out.hasPreference=!!orders[0].preference_id;
+           out.sellerConfigured=!!b('MP_LIVE_SELLER_ID');
+           out.tokenStoredAsSecret=b('MP_LIVE_ACCESS_TOKEN')?.type==='secret_text';
+           // Cloudflare secrets never leave the production Worker; this read-only audit cannot call MP.
+           out.paymentStatus='D1_AWAITING_PAYMENT_NO_MP_TOKEN_EXPOSED';
+          }catch(e){out.paymentStatus=String(e.message||e).slice(0,80)}
+          await mkdir('docs',{recursive:true});
+          await writeFile('docs/INCIDENCIA-CRON-LIVE-ESTADO.json',JSON.stringify(out,null,2)+'\n');
+          console.log('SABER_LIVE_SCHEDULE_READONLY='+JSON.stringify({scheduleStatus:out.scheduleStatus,schedules:out.schedules,paymentStatus:out.paymentStatus}));
+          EOF
+      - name: Guardar informe anonimo
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/INCIDENCIA-CRON-LIVE-ESTADO.json || exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/INCIDENCIA-CRON-LIVE-ESTADO.json
+          if ! git diff --cached --quiet; then
+            git commit -m "ops: cron LIVE y orden ARS100 diagnostico solo lectura"
+            git push origin HEAD:integracion/tus-pedido-privado-20261101
+          fi
