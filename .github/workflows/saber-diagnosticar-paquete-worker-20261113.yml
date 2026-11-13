@@ -35,4 +35,13 @@ jobs:
             const head=sep>=0?part.slice(0,sep):part.slice(0,200);
             console.log('PART_HEADER',i,JSON.stringify(head.slice(0,260)));
           });
+          const oldA=String.raw`<header><strong>Librer\xEDa Saber</strong></header>`;
+          const oldB=String.raw`<header><strong>Librer\xEDa Saber \xB7 Impresiones y ploteos</strong></header>`;
+          const newA='href="https://libreriasaber.com.ar/" style="display:inline-flex;align-items:center;min-height:44px';
+          for(const [name,value] of [['OLD_GATE',oldA],['OLD_BUYER',oldB],['NEW_ANCHOR',newA]]){
+            console.log('SABER_LIVE_UI',name,s.split(value).length-1);
+          }
+          const response=await fetch('https://pedidos.libreriasaber.com.ar/cotizar?audit_regreso=1',{redirect:'manual'});
+          const html=await response.text();
+          console.log('SABER_PUBLIC_UI_HTTP',response.status,'RETURN_BUTTON',html.includes('← Volver a la tienda'),'LINK',html.includes('href="https://libreriasaber.com.ar/"'));
           NODE
