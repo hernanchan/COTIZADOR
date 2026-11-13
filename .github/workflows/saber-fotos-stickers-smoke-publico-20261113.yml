@@ -1,0 +1,35 @@
+name: Saber - comprobar portada fotos stickers y cotizador publico sin pedidos
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: ['.github/workflows/saber-fotos-stickers-smoke-publico-20261113.yml']
+permissions: {contents: read}
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Comprobar navegación sin sesión, archivos ni pagos
+        shell: bash
+        run: |
+          set -euo pipefail
+          for intento in $(seq 1 12);do
+            curl -fsS --max-time 20 "https://libreriasaber.com.ar/?qa_fotos=$intento" > /tmp/portada.html
+            curl -fsS --max-time 20 "https://libreriasaber.com.ar/fotos-stickers.html?qa_fotos=$intento" > /tmp/fotos.html || true
+            if grep -Fq 'href="fotos-stickers.html"' /tmp/portada.html &&
+               grep -Fq 'Cotizar fotos' /tmp/fotos.html &&
+               grep -Fq 'Cotizar stickers' /tmp/fotos.html;then
+               echo SABER_FOTOS_VIDRIERA_PUBLICA_OK
+               break
+            fi
+            if [ "$intento" = 12 ];then echo SABER_FOTOS_VIDRIERA_NO_PROPAGADA;exit 1;fi
+            sleep 3
+          done
+          for familia in fotos stickers;do
+            status=$(curl -sS --max-time 20 -w '%{http_code}' -o /tmp/cotizador.html "https://pedidos.libreriasaber.com.ar/cotizar?servicio=$familia") || status=000
+            test "$status" = 200
+            grep -Fq "location.replace('/cotizar?servicio=$familia')" /tmp/cotizador.html
+            grep -Fq 'Volver a la tienda' /tmp/cotizador.html
+            echo "SABER_COTIZADOR_ENTRADA_PUBLICA_OK_$familia"
+          done
+          echo SABER_SITIO_FOTOS_STICKERS_GO_NAVEGACION_NO_PAGOS
