@@ -67,6 +67,16 @@ button:disabled{opacity:.55}select{padding:10px;border:1px solid #b3cad9;border-
 <p id="etaMessage" class="eta-error" role="status" aria-live="polite"></p>
 <div class="eta-actions"><button type="button" id="etaCancel">Cancelar</button><button type="submit" id="etaSave">Guardar fecha y hora</button></div>
 </form></dialog>
+<dialog id="stageDialog" class="eta-dialog" aria-labelledby="stageTitle">
+<h2 id="stageTitle">Actualizar estado del trabajo</h2>
+<form id="stageForm">
+<p id="stageDescription"></p>
+<label for="stageOperator">Responsable<input id="stageOperator" type="text" minlength="2" maxlength="60" required placeholder="Nombre del operador"></label>
+<div id="stageReasonWrap" hidden><label for="stageReason">Motivo de la espera<textarea id="stageReason" minlength="5" maxlength="180" rows="2"></textarea></label></div>
+<label for="stageConfirmed"><input id="stageConfirmed" type="checkbox" required> <span id="stageConfirmText">Confirmo el cambio de estado.</span></label>
+<p id="stageMessage" class="eta-error" role="status" aria-live="polite"></p>
+<div class="eta-actions"><button id="stageCancel" type="button">Cancelar</button><button id="stageSave" type="submit">Guardar estado</button></div>
+</form></dialog>
 </main><script>
 'use strict';
 const columns=[['pendiente','Nuevos'],['en_preparacion','En preparación'],['en_espera','En espera'],['listo','Listos'],['entregado','Entregados']];
@@ -74,34 +84,64 @@ const board=document.getElementById('tablero'),info=document.getElementById('est
 const short=x=>String(x||'').trim(),price=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(n);
 const element=(tag,text)=>{const x=document.createElement(tag);if(text!==undefined)x.textContent=text;return x;};
 let working=false;let forecast=null;let agendaSnapshot=null;
-async function changeState(order,next,btn){
- const operator=window.prompt('Nombre de quien realiza el cambio de estado:');
- if(operator===null)return;
- if(operator.trim().length<2){window.alert('Ingresá el responsable.');return;}
- let reason='';
- if(next==='en_espera'){
-  const r=window.prompt('Motivo de la espera (mínimo cinco caracteres):');
-  if(r===null)return;reason=r.trim();
-  if(reason.length<5){window.alert('Falta el motivo.');return;}
+const stageDialog=document.getElementById('stageDialog');
+let stageTransition=null;
+function changeState(order,next,btn){
+ if(stageDialog.open)return;
+ const titles={en_preparacion:'Iniciar preparación',en_espera:'Poner en espera',
+  listo:'Marcar listo para retirar'};
+ if(!titles[next])return;
+ stageTransition={order,next,btn};
+ document.getElementById('stageTitle').textContent=titles[next]+' · Orden '+order.numeroOrden;
+ document.getElementById('stageDescription').textContent=
+  'Se actualizará el estado para el cliente y para la Central en el mismo momento.';
+ const operator=document.getElementById('stageOperator');
+ operator.value=sessionStorage.getItem('saber-central-operador')||'';
+ const reasonWrap=document.getElementById('stageReasonWrap');
+ reasonWrap.hidden=next!=='en_espera';
+ document.getElementById('stageReason').required=next==='en_espera';
+ document.getElementById('stageReason').value='';
+ document.getElementById('stageConfirmText').textContent=
+  next==='en_preparacion'?
+   'Revisé los originales, medidas y la hoja de instrucciones antes de comenzar la producción.':
+  next==='listo'?
+   'Confirmo que este trabajo está listo para retirar.':
+   'Confirmo que corresponde pausar el trabajo y avisar al cliente.';
+ document.getElementById('stageConfirmed').checked=false;
+ document.getElementById('stageMessage').textContent='';
+ stageDialog.showModal();
+}
+async function saveProductionState(e){
+ e.preventDefault();
+ if(!stageTransition)return;
+ const {order,next,btn}=stageTransition;
+ const operator=document.getElementById('stageOperator').value.trim();
+ const reason=document.getElementById('stageReason').value.trim();
+ const message=document.getElementById('stageMessage');
+ if(operator.length<2){message.textContent='Indicá el responsable.';return}
+ if(next==='en_espera'&&reason.length<5){message.textContent='Indicá el motivo de la espera.';return}
+ if(!document.getElementById('stageConfirmed').checked){
+  message.textContent='Confirmá la revisión requerida para este estado.';return;
  }
- const message=next==='en_preparacion'?
-  '¿Revisaste los PDF originales, medidas e instrucciones y confirmás INICIAR la producción?':
-  next==='listo'?'¿Confirmás que la orden está LISTA para retirar?':
-  '¿Confirmás que querés pausar este trabajo?';
- if(!window.confirm(message))return;
- btn.disabled=true;
+ const save=document.getElementById('stageSave');
+ save.disabled=true;btn.disabled=true;
+ message.textContent='Registrando estado…';
  try{
   const res=await fetch('/personal/api/live-status',{
    method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},
    body:JSON.stringify({orderId:order.orderId,from:order.productionState||'pendiente',
-    to:next,version:order.productionVersion||0,operator:operator.trim(),reason,confirmed:true})
+    to:next,version:order.productionVersion||0,operator,reason,confirmed:true})
   });
   const data=await res.json().catch(()=>null);
   if(!res.ok||data?.ok!==true)throw Error(data?.error||('HTTP '+res.status));
+  sessionStorage.setItem('saber-central-operador',operator);
+  stageDialog.close();stageTransition=null;
   await refresh();
- }catch(e){window.alert('No se cambió el estado: '+String(e.message||e));}
- finally{btn.disabled=false;}
+ }catch(error){message.textContent='No se guardó el estado: '+String(error.message||error)}
+ finally{save.disabled=false;btn.disabled=false}
 }
+document.getElementById('stageCancel').addEventListener('click',()=>stageDialog.close());
+document.getElementById('stageForm').addEventListener('submit',e=>void saveProductionState(e));
 const forecastLabels={por_confirmar:'A confirmar',hoy:'Durante el día de hoy',hoy_tarde:'Hoy por la tarde',proximo_dia:'Próximo día de atención'};
 async function revisarPlazoVisibleAlCliente(){
  const status=document.getElementById('previsionCliente');
