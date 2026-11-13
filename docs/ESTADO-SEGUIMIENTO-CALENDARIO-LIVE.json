@@ -1,11 +1,11 @@
 {
-  "at": "2026-11-13T01:37:47.291Z",
+  "at": "2026-11-13T01:41:04.351Z",
   "schema": "saber-tracking-live-v1",
   "readonly": true,
   "datePickerDeployed": true,
-  "originalCustodyDeployed": false,
+  "originalCustodyDeployed": true,
   "autoUploadDeployed": true,
-  "sessionAutoRecoveryDeployed": false,
+  "sessionAutoRecoveryDeployed": true,
   "buyerTrackingDeployed": true,
   "buyerTrackingVisible": true,
   "singleSelectionVisible": true,
@@ -14,5 +14,5 @@
   "trackingServerDeployed": true,
   "siteStillNoGo": true,
   "personalCentralProtected": true,
-  "ready": false
+  "ready": true
 }
