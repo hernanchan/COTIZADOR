@@ -40,7 +40,7 @@ function meta(text,objNumber){
 }
 export async function clasificarMosaicoGrandePorMuestras(file,{
  paginas,seleccionadas,canvasFactory=()=>document.createElement('canvas'),
- imageFactory=globalThis.createImageBitmap,onProgreso=()=>{}
+ imageFactory=globalThis.createImageBitmap,onProgreso=()=>{},onError=()=>{}
 }={}){
  if(!file||typeof file.slice!=='function'||
     !Number.isSafeInteger(file.size)||file.size<=48*MIB||file.size>200*MIB||
@@ -219,5 +219,5 @@ export async function clasificarMosaicoGrandePorMuestras(file,{
    paginas:Object.freeze(results),originalSubido:false,
    bytesLeidos:readTotal,solicitudesRango:reads,
    permiteImprimirSinRevisar:false});
- }catch{return null}
+ }catch(error){onError(String(error?.message||'ERROR_ANALISIS').slice(0,90));return null}
 }
