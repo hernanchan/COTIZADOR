@@ -1,0 +1,56 @@
+name: Saber - diagnosticar pruebas del deploy tracking sin desplegar
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-diagnosticar-tests-retorno-20261113.yml]
+permissions: {contents: write}
+jobs:
+  diagnosis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: true}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Ejecutar pruebas en aislamiento, registrar fallos
+        shell: bash
+        run: |
+          set +e
+          node --test \
+            integraciones/mercadopago/pruebas/mercadopago-live-central.test.mjs \
+            integraciones/mercadopago/pruebas/seguimiento-live-estado-central.test.mjs \
+            integraciones/autocotizador/recepcion/pagina-central-personal-live.test.mjs \
+            integraciones/autocotizador/recepcion/pagina-retorno-live.test.mjs \
+            integraciones/mercadopago/pruebas/central-mp-live-rescate.test.mjs \
+            integraciones/autocotizador/recepcion/rescate-personal-mp-live.test.mjs \
+            > /tmp/saber-test-check.log 2>&1
+          rc=$?
+          RC="$rc" node --input-type=module <<'EOF'
+          import {readFile,mkdir,writeFile} from 'node:fs/promises';
+          const log=await readFile('/tmp/saber-test-check.log','utf8');
+          const lines=log.split('\n');
+          const fails=lines.filter(x=>/not ok|error:|ERR_|failureType:|error:|AssertionError|test:|tests |pass |fail /.test(x)).slice(0,90);
+          const out={checkedAt:new Date().toISOString(),passed:process.env.RC==='0',exitCode:Number(process.env.RC),lines:fails};
+          await mkdir('docs',{recursive:true});
+          await writeFile('docs/ESTADO-TESTS-SEGUIMIENTO-CALENDARIO.json',JSON.stringify(out,null,2)+'\n');
+          console.log('SABER_TESTS_TRACKING_RESULT='+JSON.stringify({passed:out.passed,exitCode:out.exitCode}));
+          EOF
+      - name: Registrar resultado de pruebas sin credenciales
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/ESTADO-TESTS-SEGUIMIENTO-CALENDARIO.json || exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/ESTADO-TESTS-SEGUIMIENTO-CALENDARIO.json
+          git diff --cached --quiet && exit 0
+          git commit -m "ops: resultado pruebas de retorno y calendario"
+          for attempt in 1 2 3 4;do
+            git fetch origin integracion/tus-pedido-privado-20261101
+            git rebase origin/integracion/tus-pedido-privado-20261101
+            git push origin HEAD:integracion/tus-pedido-privado-20261101 && exit 0
+            sleep 2
+          done
+          exit 1
