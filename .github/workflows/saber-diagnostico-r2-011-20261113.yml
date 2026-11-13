@@ -114,4 +114,22 @@ jobs:
           });
           if(dimensions?.[0]?.success!==true)throw Error('D1_GEOMETRIA_FALLO');
           console.log('SABER_R2_011_PAGINAS_DISTINTAS='+JSON.stringify(dimensions[0].results||[]));
+          const target=await cloudflare('/d1/database/'+db.uuid+'/query',{
+            sql:[
+              'SELECT f.service AS servicio, f.transport AS transporte,',
+              "json_extract(f.work_json,'$.formatoFinal') AS formatoFinal,",
+              "json_extract(f.work_json,'$.destino') AS destino,",
+              "json_extract(f.work_json,'$.configuracion.caras') AS caras,",
+              "json_extract(f.work_json,'$.configuracion.paginasPorHoja') AS paginasPorHoja,",
+              "json_extract(f.work_json,'$.configuracion.copias') AS copias,",
+              "json_extract(f.work_json,'$.configuracion.modo') AS modo,",
+              "json_extract(f.work_json,'$.configuracion.formato') AS formatoConfigurado",
+              'FROM central_work_order_numbers n JOIN central_r2_universal_order_links l',
+              'ON l.commercial_order_id=n.commercial_order_id',
+              'JOIN central_r2_universal_files f ON f.web_order_id=l.web_order_id',
+              'WHERE n.number=11'
+            ].join(' ')
+          });
+          if(target?.[0]?.success!==true)throw Error('D1_IMPRESION_FALLO');
+          console.log('SABER_R2_011_FORMATO_SOLICITADO='+JSON.stringify(target[0].results||[]));
           EOF
