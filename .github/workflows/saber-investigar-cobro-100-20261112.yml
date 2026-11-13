@@ -1,0 +1,62 @@
+name: Saber - diagnostico anónimo pedido real ARS 100
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-investigar-cobro-100-20261112.yml]
+permissions: {contents: write}
+jobs:
+  diagnostico:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      CF_D1: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: true}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: SQL SELECT solo ARS 100, D1 produccion sin IDs sensibles
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'EOF'
+          import {mkdir,writeFile} from 'node:fs/promises';
+          const out={schema:'saber-incidente-100-v1',fecha:new Date().toISOString(),readonly:true};
+          const acc=process.env.CF_ACCOUNT,t=process.env.CF_D1;
+          async function cf(path,options={}){
+            const r=await fetch('https://api.cloudflare.com/client/v4/accounts/'+acc+path,{...options,
+              headers:{Authorization:'Bearer '+t,...options.headers},signal:AbortSignal.timeout(20000)});
+            const j=await r.json().catch(()=>null);
+            if(!r.ok||j?.success!==true)throw Error('CF_'+r.status);
+            return j.result;
+          }
+          try{
+            const dbs=await cf('/d1/database');
+            const db=dbs.find(x=>x.name==='saber-pagos-produccion');
+            if(!db?.uuid)throw Error('D1_NOT_FOUND');
+            const sql="SELECT o.status AS estado, CASE WHEN o.preference_id IS NULL THEN 0 ELSE 1 END AS tiene_preferencia,CASE WHEN o.payment_id IS NULL THEN 0 ELSE 1 END AS tiene_registro_pago,CASE WHEN EXISTS(SELECT 1 FROM payment_reviews r WHERE r.order_id=o.id AND r.state='verified') THEN 1 ELSE 0 END AS verificado,CASE WHEN EXISTS(SELECT 1 FROM central_r2_universal_order_links l WHERE l.commercial_order_id=o.id) THEN 1 ELSE 0 END AS vinculado, COUNT(*) AS cantidad FROM orders o WHERE o.amount_ars=100 AND datetime(o.created_at)>=datetime('now','-48 hours') GROUP BY estado,tiene_preferencia,tiene_registro_pago,verificado,vinculado ORDER BY cantidad DESC";
+            const results=await cf('/d1/database/'+db.uuid+'/query',{method:'POST',
+              headers:{'Content-Type':'application/json'},body:JSON.stringify({sql})});
+            if(results?.[0]?.success!==true)throw Error('QUERY_FAILED');
+            out.grupos=results[0].results||[];
+            out.total=out.grupos.reduce((v,r)=>v+Number(r.cantidad),0);
+          }catch(e){out.error=String(e.message||e).slice(0,60)}
+          await mkdir('docs',{recursive:true});
+          await writeFile('docs/INCIDENCIA-ARS100-PEDIDOS.json',JSON.stringify(out,null,2)+'\n');
+          console.log('SABER_INCIDENTE_100_RESUMEN '+JSON.stringify({total:out.total,error:out.error}));
+          EOF
+      - name: Registrar solo agregados, sin datos personales ni IDs de pago
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/INCIDENCIA-ARS100-PEDIDOS.json || exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/INCIDENCIA-ARS100-PEDIDOS.json
+          if ! git diff --cached --quiet;then
+            git commit -m "ops: auditoria anonima orden ARS 100 pendiente"
+            git push origin HEAD:integracion/tus-pedido-privado-20261101
+          fi
