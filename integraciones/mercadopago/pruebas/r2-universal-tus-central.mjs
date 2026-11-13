@@ -3,6 +3,7 @@
  * vincula recibos SHA-256 verificados a la orden comercial existente.
  */
 import {verificarPedidoUniversalCobrable,estadoPagoUniversal} from './r2-universal-checkout-central.mjs';
+import {puedeRecibirTransferenciaAvisada,BANK_PREUPLOAD_SQL} from './central-transferencia-recepcion-anticipada.mjs';
 const ON='PRIVATE_TEST_ONLY',LIVE='GO_COMERCIAL_CONFIRMADO',MIB=1048576;
 const postpayEnabled=env=>{
  const live=env?.SABER_ENTORNO==='produccion'&&
@@ -63,7 +64,10 @@ async function resolve(env,meta,subtle){
     !['bn','color'].includes(work.configuracion.modo))
   return null;
  const pay=await estadoPagoUniversal(env,link.commercial_order_id);
- if(!pay.verified)return null;
+ const bankPending=!pay.verified&&!pay.revoked&&postpayEnabled(env).live&&
+  await puedeRecibirTransferenciaAvisada(env,{
+   commercialOrderId:link.commercial_order_id,webOrderId:meta.orderId});
+ if(pay.revoked||(!pay.verified&&!bankPending))return null;
  const productionTable=await db.prepare("SELECT name FROM sqlite_master WHERE type='table' "+
    "AND name='central_production_status'").first();
  if(productionTable){
@@ -71,7 +75,7 @@ async function resolve(env,meta,subtle){
    .bind(link.commercial_order_id).first();
   if(state?.state==='entregado')return null;
  }
- return {check,row:found[0],work,expected:pages,pay};
+ return {check,row:found[0],work,expected:pages,pay,bankPending};
 }
 export async function autorizarTUSUniversalCentral(request,env,{
  readSigned,subtle=crypto.subtle
@@ -96,7 +100,8 @@ export async function autorizarTUSUniversalCentral(request,env,{
   bytes:p.bytes,sha256:p.sha256,name:p.name,pages:p.pages,
   mode:result.work.configuracion.modo,
   expectedMetrics:result.expected.map(x=>({anchoCm:x.anchoCm,altoCm:x.altoCm})),
-  uploadAuthorized:true,productionAuthorized:false});
+  uploadAuthorized:true,paymentVerified:result.pay.verified===true,
+  bankPending:result.bankPending===true,productionAuthorized:false});
 }
 export async function recibirTUSUniversalCentral(request,env,{
  readSigned,subtle=crypto.subtle
@@ -153,12 +158,17 @@ export async function recibirTUSUniversalCentral(request,env,{
   "SELECT 1 FROM central_live_bank_accreditations b "+
   "WHERE b.order_id=o.id AND b.amount_ars=o.amount_ars)))":
   "(o.payment_id IS NOT NULL AND o.preference_id IS NOT NULL)";
- const payWhere="EXISTS (SELECT 1 FROM central_r2_universal_order_links l "+
+ const paidWhere="EXISTS (SELECT 1 FROM central_r2_universal_order_links l "+
  "JOIN orders o ON o.id=l.commercial_order_id "+
  "JOIN payment_reviews rev ON rev.order_id=o.id "+
  "WHERE l.web_order_id=central_r2_universal_files.web_order_id "+
  "AND o.status='paid' AND o.paid_at IS NOT NULL AND o.deposit_ars=o.amount_ars "+
  "AND "+verifiedPayment+" AND rev.state='verified')";
+ // El original puede estar recibido y SHA-verificado ANTES de que el
+ // banco se acredite. La orden sigue awaiting_payment: ZIP y producción
+ // continúan bloqueados por la consulta de pago en el paquete.
+ const payWhere=postpayEnabled(env).live?
+  '('+paidWhere+' OR '+BANK_PREUPLOAD_SQL+')':paidWhere;
  try{
   const a=await db.batch([
    db.prepare('INSERT INTO central_r2_universal_tus_receipts '+
