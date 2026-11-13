@@ -1,0 +1,56 @@
+name: Saber - probar custodia unica y envio automatico sin cobros
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-validar-envio-unico-20261113.yml]
+permissions: {contents: write}
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: true}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Testear flujo y pagina cliente, sin tocar Cloudflare ni generar cobros
+        shell: bash
+        run: |
+          set +e
+          node --test \
+            integraciones/autocotizador/recepcion/custodia-local-originales-live.test.mjs \
+            integraciones/autocotizador/recepcion/flujo-presupuesto-live-cliente.test.mjs \
+            integraciones/autocotizador/recepcion/pagina-retorno-live.test.mjs \
+            integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs \
+            integraciones/autocotizador/recepcion/recepcion-tus-live-cliente.test.mjs \
+            integraciones/autocotizador/recepcion/recepcion-r2-live-cliente.test.mjs \
+            > /tmp/saber-single-selection.log 2>&1
+          rc=$?
+          RC="$rc" node --input-type=module <<'EOF'
+          import {readFile,mkdir,writeFile} from 'node:fs/promises';
+          const data=await readFile('/tmp/saber-single-selection.log','utf8');
+          const match=data.split('\n').filter(x=>/not ok|failureType|AssertionError|ERR_|error:|^# (tests|pass|fail)/.test(x)).slice(0,85);
+          const report={checkedAt:new Date().toISOString(),passed:process.env.RC==='0',
+            exitCode:Number(process.env.RC),testSummary:match};
+          await mkdir('docs',{recursive:true});
+          await writeFile('docs/VALIDACION-UNA-SELECCION-ARCHIVOS.json',JSON.stringify(report,null,2)+'\n');
+          console.log('SABER_ORIGINALES_UNA_VEZ='+JSON.stringify({passed:report.passed,exitCode:report.exitCode}));
+          EOF
+      - name: Publicar resultados anónimos de CI en rama de trabajo
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/VALIDACION-UNA-SELECCION-ARCHIVOS.json || exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/VALIDACION-UNA-SELECCION-ARCHIVOS.json
+          git diff --cached --quiet && exit 0
+          git commit -m "ops: resultado prueba flujo una seleccion PDF sin cobro"
+          for attempt in 1 2 3 4;do
+            git fetch origin integracion/tus-pedido-privado-20261101
+            git rebase origin/integracion/tus-pedido-privado-20261101
+            git push origin HEAD:integracion/tus-pedido-privado-20261101 && exit 0
+            sleep 2
+          done
+          exit 1
