@@ -66,3 +66,4 @@ jobs:
 # 13/11: cierre QA navegador luego de quitar la inspección previa de R2 y simplificar ZIP.
 # 13/11: validar sintaxis del bundle ZIP y rutas comerciales tras simplificar pantalla de personal.
 # Orden 013: error real de acreditacion bancaria, unicidad de movimiento y polling sin perder campos.
+# 13/11: QA corrección test duplicado vs índice D1 y cadena JS del panel bancario.
