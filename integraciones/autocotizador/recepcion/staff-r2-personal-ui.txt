@@ -5,7 +5,10 @@
  const q=id=>document.getElementById(id);
  const order=q('r2Order'),file=q('r2FileId'),status=q('r2Estado');
  const detail=q('r2Detalle'),fic=q('r2Ficha');
- order.value=new URL(location.href).searchParams.get('webOrderId')||'';
+ const params=new URL(location.href).searchParams;
+ order.value=params.get('webOrderId')||'';
+ const selectedFile=params.get('fileId')||'';
+ if(/^[A-Za-z0-9_-]{1,80}$/.test(selectedFile))file.value=selectedFile;
  let manifest=null;
  q('r2Recargar').addEventListener('click',async()=>{
   const list=q('r2Lista');list.replaceChildren();
@@ -29,7 +32,11 @@
     use.style.marginLeft='10px';
     use.addEventListener('click',()=>{
      order.value=x.webOrderId;
-     if(!file.value)file.value='pdf_0';
+     const chosen=Array.isArray(x.stagedR2FileIds)?x.stagedR2FileIds[0]:null;
+     if(typeof chosen==='string'&&/^[A-Za-z0-9_-]{1,80}$/.test(chosen))
+      file.value=chosen;
+     else if(!file.value)file.value='';
+     if(file.value)q('r2Consultar').click();
      section.scrollIntoView({behavior:'smooth'});
     });
     item.append(use);list.append(item);
@@ -86,7 +93,9 @@
    if(!response.ok||d?.ok!==true||d.inspected!==true)
     throw Error('La Central no aprobó la inspección. Revisá geometría y pago.');
    detail.hidden=true;
-   status.textContent='Inspección registrada. Reabrí el pedido para obtener el ZIP. Preprensa final pendiente.';
+   status.textContent='Inspección registrada. Actualizando el ZIP y la hoja de instrucciones…';
+   setTimeout(()=>location.reload(),1300);
   }catch(e){error(e)}finally{button.disabled=false}
  });
+if(file.value&&order.value)queueMicrotask(()=>q('r2Consultar').click());
 })();
