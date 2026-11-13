@@ -70,3 +70,5 @@ jobs:
           exit 1
 
 # Revalidación conjunta tras mejoras de Central, R2, seguimiento y UX.
+
+# Validación de entrega con gates OFF y cola D1/R2 reanudable.
