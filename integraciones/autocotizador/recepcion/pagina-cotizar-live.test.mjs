@@ -22,7 +22,7 @@ test('enlaces fotos y stickers preservan contexto en ingreso y en iframe, sin ex
   const entrada=paginaCotizarLive(new Request(url+query),env,{authorized:false});
   assert.equal(entrada.status,200);
   const intro=await entrada.text();
-  assert.match(intro,new RegExp('location\\.replace\\(\\'/cotizar\\?servicio='+servicio+'\\'\\)'));
+  assert.ok(intro.includes("location.replace('/cotizar?servicio="+servicio+"');"));
   assert.match(intro,servicio==='fotos'?/Cotizá tus fotos/:/Cotizá tus stickers/);
   const acceso=paginaCotizarLive(new Request(url+query),env,{authorized:true});
   assert.equal(acceso.status,200);
