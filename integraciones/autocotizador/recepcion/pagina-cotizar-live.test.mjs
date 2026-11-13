@@ -157,3 +157,18 @@ test('transferencia LIVE ofrece Ya transferí y avisa al banco sin activar pago'
  assert.match(html,/No se registró el aviso/);
  assert.doesNotMatch(html,/Ya transferí[^\n]*'pagado'/);
 });
+
+test('alias e importe bancario destacados, copia segura y aviso PDF grande',async()=>{
+ const r=paginaCotizarLive(new Request(url),{
+  ...env,DOCS_LIVE_RECEPCION_GATE:gate,DOCS_LIVE_PRICING_GATE:gate,
+  DOCS_LIVE_ORDER_GATE:gate,DOCS_LIVE_TRANSFER_GATE:gate,DOCS_LIVE_TUS_GATE:gate
+ },{authorized:true});
+ const html=await r.text();
+ assert.match(html,/className='transfer-box'/);
+ assert.match(html,/className='transfer-alias'/);
+ assert.match(html,/textContent=result\.alias/);
+ assert.match(html,/navigator\.clipboard\.writeText\(result\.alias\)/);
+ assert.match(html,/Copiar alias/);
+ assert.match(html,/PDF pesados, mantené esta pestaña abierta/);
+ assert.match(html,/NO acredita el pago automáticamente|Solo el personal confirma la acreditación bancaria/);
+});
