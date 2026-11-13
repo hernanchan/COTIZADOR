@@ -19,8 +19,8 @@ test('retorno LIVE no acredita pago por argumentos de Mercado Pago',async()=>{
  const r=paginaRetornoLive(new Request(host+'?status=approved&payment_id=123&merchant_order_id=777'),on);
  assert.equal(r.status,200);
  const html=await r.text();
- assert.match(html,/Volviste a Librería Saber/);
- assert.match(html,/no significa que el pago ya esté acreditado/);
+ assert.match(html,/Seguimiento de tu pedido/);
+ assert.match(html,/Consultando pago y estado del trabajo en Librería Saber/);
  assert.match(html,/action:'status'/);
  assert.match(html,/credentials:'same-origin'/);
  assert.match(html,/uploadAuthorized===true/);
