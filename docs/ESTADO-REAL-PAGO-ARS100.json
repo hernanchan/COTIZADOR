@@ -1,25 +1,26 @@
 {
-  "checkedAt": "2026-11-13T00:49:37.562Z",
+  "checkedAt": "2026-11-13T00:51:38.120Z",
   "readOnly": true,
   "amount": 100,
   "hostOfficialDeployed": true,
-  "diagnosticErrorsDeployed": true,
+  "diagnosticErrorsDeployed": false,
   "cronPresent": true,
   "cronEveryMinute": true,
   "orderStatus": [
     {
-      "status": "awaiting_payment",
+      "status": "paid",
       "n": 1
     }
   ],
   "cronHealth": {
-    "checked_at": "2026-11-13 00:48:46",
-    "checked": 0,
+    "checked_at": "2026-11-13 00:51:47",
+    "checked": 4,
     "recovered": 0,
-    "pending": 0,
+    "pending": 4,
     "review": 0,
     "errors": 0,
-    "state": "RESCATE_VENDEDOR_TYPE_ERROR"
+    "state": "ok"
   },
-  "verified100": 0
+  "verified100": 1,
+  "typeMessageDiagnosticDeployed": true
 }
