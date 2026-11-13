@@ -1,13 +1,13 @@
 {
   "schema": "saber-mp-live-auto-check-v1",
-  "date": "2026-11-13T00:40:52.593Z",
+  "date": "2026-11-13T00:42:21.788Z",
   "readonly": true,
   "cronActive": true,
   "crons": 1,
   "autoCodeDeployed": true,
   "sandboxIsolated": true,
   "staffFallbackReady": true,
-  "failureReasonDeployed": true,
+  "failureReasonDeployed": false,
   "orders100": [
     {
       "estado": "awaiting_payment",
@@ -15,7 +15,7 @@
     }
   ],
   "health": {
-    "checked_at": "2026-11-13 00:40:45",
+    "checked_at": "2026-11-13 00:41:45",
     "checked": 0,
     "recovered": 0,
     "pending": 0,
