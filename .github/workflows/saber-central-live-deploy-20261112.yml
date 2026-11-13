@@ -22,7 +22,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node --test integraciones/mercadopago/pruebas/central-recepcion-live.test.mjs integraciones/mercadopago/pruebas/central-live-bridge.test.mjs integraciones/mercadopago/pruebas/central-prevision-personal-live.test.mjs integraciones/mercadopago/pruebas/central-agenda-personal-live.test.mjs integraciones/mercadopago/pruebas/plazo-produccion-informativo.test.mjs integraciones/autocotizador/recepcion/plazo-produccion-cliente.test.mjs integraciones/autocotizador/recepcion/pagina-central-personal-live.test.mjs integraciones/mercadopago/pruebas/central-mp-live-rescate.test.mjs integraciones/mercadopago/pruebas/seguimiento-live-estado-central.test.mjs integraciones/mercadopago/pruebas/mercadopago-live-central.test.mjs integraciones/autocotizador/recepcion/pagina-retorno-live.test.mjs integraciones/autocotizador/recepcion/flujo-presupuesto-live-cliente.test.mjs integraciones/autocotizador/recepcion/custodia-local-originales-live.test.mjs integraciones/autocotizador/recepcion/pagina-continuar-pago-live.test.mjs integraciones/autocotizador/recepcion/rescate-personal-mp-live.test.mjs
+          node --test integraciones/mercadopago/pruebas/central-recepcion-live.test.mjs integraciones/mercadopago/pruebas/central-live-bridge.test.mjs integraciones/mercadopago/pruebas/central-prevision-personal-live.test.mjs integraciones/mercadopago/pruebas/central-agenda-personal-live.test.mjs integraciones/mercadopago/pruebas/plazo-produccion-informativo.test.mjs integraciones/autocotizador/recepcion/plazo-produccion-cliente.test.mjs integraciones/autocotizador/recepcion/pagina-central-personal-live.test.mjs integraciones/mercadopago/pruebas/transferencias-live-central.test.mjs integraciones/autocotizador/recepcion/transferencia-live-comprador.test.mjs integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs integraciones/autocotizador/recepcion/transferencias-personal-live.test.mjs integraciones/mercadopago/pruebas/central-mp-live-rescate.test.mjs integraciones/mercadopago/pruebas/seguimiento-live-estado-central.test.mjs integraciones/mercadopago/pruebas/mercadopago-live-central.test.mjs integraciones/autocotizador/recepcion/pagina-retorno-live.test.mjs integraciones/autocotizador/recepcion/flujo-presupuesto-live-cliente.test.mjs integraciones/autocotizador/recepcion/custodia-local-originales-live.test.mjs integraciones/autocotizador/recepcion/pagina-continuar-pago-live.test.mjs integraciones/autocotizador/recepcion/rescate-personal-mp-live.test.mjs
           npm install --no-save --no-audit --no-fund esbuild@0.25.12
           ./node_modules/.bin/esbuild integraciones/mercadopago/pruebas/worker.js --bundle --platform=browser --format=esm --target=es2022 --outfile=/tmp/saber-central-live.mjs
           (cd integraciones/autocotizador/recepcion && npm install --no-audit --no-fund && npm run build:unificado)
@@ -33,6 +33,10 @@ jobs:
           grep -Fq '/personal/api/live-status' /tmp/saber-documentos-live.mjs
           grep -Fq '/personal/api/live-forecast' /tmp/saber-documentos-live.mjs
           grep -Fq '/personal/api/live-calendar' /tmp/saber-documentos-live.mjs
+          grep -Fq 'Ya transferí' /tmp/saber-documentos-live.mjs
+          grep -Fq 'actualizarAvisosTransferencia' /tmp/saber-documentos-live.mjs
+          grep -Fq 'transfer-notify' /tmp/saber-central-live.mjs
+          grep -Fq 'central_live_transfer_customer_notices' /tmp/saber-central-live.mjs
           grep -Fq 'etaDate' /tmp/saber-documentos-live.mjs
           grep -Fq 'openOrderEta' /tmp/saber-documentos-live.mjs
           grep -Fq 'actualizarSeguimiento' /tmp/saber-documentos-live.mjs
