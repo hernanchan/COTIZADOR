@@ -75,11 +75,12 @@ const paginas=Array.from({length:6},(_,i)=>({
  numero:i+1,anchoCm:i<3?100.01:124.99,altoCm:60.96
 }));
 test('6 páginas seleccionadas se clasifican CAD con pequeñas muestras, sin render completo',async()=>{
- const file=fakePdf(),events=[];
+ const file=fakePdf(),events=[],errors=[];
  const result=await clasificarMosaicoGrandePorMuestras(file,{
   paginas,seleccionadas:[1,2,3,4,5,6],
-  canvasFactory,onProgreso:p=>events.push(p)
+  canvasFactory,onProgreso:p=>events.push(p),onError:e=>errors.push(e)
  });
+ assert.ok(result,errors.join('; '));
  assert.equal(result.altaConfianza,true);
  assert.deepEqual(result.paginas.map(p=>p.modo),Array(6).fill('cad'));
  assert.equal(result.metodo,'MUESTREO_RASTER_ESTRUCTURA');
@@ -90,10 +91,11 @@ test('6 páginas seleccionadas se clasifican CAD con pequeñas muestras, sin ren
  assert.ok(file.reads.every(([start,end])=>end-start<=512*1024));
 });
 test('misma estructura raster con rellenos extensos se identifica Pleno, nunca CAD',async()=>{
- const f=fakePdf({poster:true});
+ const f=fakePdf({poster:true}),errors=[];
  const result=await clasificarMosaicoGrandePorMuestras(f,{
-  paginas,seleccionadas:[1,2,3],canvasFactory
+  paginas,seleccionadas:[1,2,3],canvasFactory,onError:e=>errors.push(e)
  });
+ assert.ok(result,errors.join('; '));
  assert.equal(result.altaConfianza,true);
  assert.deepEqual(result.paginas.map(p=>p.modo),['poster','poster','poster']);
 });
