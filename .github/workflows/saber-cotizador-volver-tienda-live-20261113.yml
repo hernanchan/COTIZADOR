@@ -72,23 +72,28 @@ jobs:
           node --check "$tmp/patched.mjs"
           jq -nc --arg old "$old" --rawfile code "$tmp/patched.mjs" --slurpfile settings "$tmp/settings.json" \
            '{main_module:"index.mjs",bindings:[$settings[0].result.bindings[]|{name,type:"inherit",version_id:$old}],modules:[{name:"index.mjs",content_type:"application/javascript+module",content_base64:($code|@base64)}]}' > "$tmp/stage-body.json"
+          echo 'SABER_HOTFIX_PHASE_STAGE_START'
           status=$(curl -sS --max-time 150 -w '%{http_code}' -o "$tmp/stage.json" \
            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
            --data-binary @"$tmp/stage-body.json" "$beta?deploy=false")
           if [ "$status" != 200 ] || ! jq -e '.success==true and (.result.id|type=="string")' "$tmp/stage.json" >/dev/null;then
             echo "SABER_HOTFIX_STAGE_FAILED_HTTP_$status";jq -c '{errors:[.errors[]?|{code,message}]}' "$tmp/stage.json";exit 1
           fi
+          echo 'SABER_HOTFIX_PHASE_STAGE_OK'
           new=$(jq -er '.result.id' "$tmp/stage.json")
           get "$beta/$new" > "$tmp/staged.json"
           jq -r '(.result.bindings//.result.resources.bindings)[]|[.name,.type]|@tsv' "$tmp/staged.json" | sort > "$tmp/bindings-staged"
           diff "$tmp/bindings-before" "$tmp/bindings-staged"
+          echo 'SABER_HOTFIX_PHASE_BINDINGS_STAGED_OK'
           get "$root/$worker/deployments" > "$tmp/latest.json"
           actual=$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/latest.json")
           test "$actual" = "$old" || { echo 'LIVE_VERSION_CHANGED_DURING_PREPARATION_ABORT';exit 1; }
+          echo 'SABER_HOTFIX_PHASE_OLD_VERSION_STILL_ACTIVE'
           deployed=0
           rollback(){
             code=$?
             trap - ERR
+            echo "SABER_HOTFIX_FAILED_PHASE_${phase:-unknown}"
             if [ "$deployed" = 1 ];then
               echo 'SABER_HOTFIX_ROLLBACK_START'
               jq -nc --arg id "$old" '{strategy:"percentage",versions:[{version_id:$id,percentage:100}],annotations:{"workers/message":"Rollback retorno a tienda: error de comprobación"}}' |
@@ -100,17 +105,31 @@ jobs:
           }
           trap rollback ERR
           deployed=1
+          phase=promote
           jq -nc --arg id "$new" '{strategy:"percentage",versions:[{version_id:$id,percentage:100}],annotations:{"workers/message":"UI: volver a la tienda desde cotizador LIVE"}}' |
             curl -fsS --max-time 45 -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
              --data-binary @- "$root/$worker/deployments" > "$tmp/promoted.json"
           jq -e '.success==true' "$tmp/promoted.json" >/dev/null
+          echo 'SABER_HOTFIX_PHASE_PROMOTE_API_OK'
+          phase=verify_version
           get "$root/$worker/deployments" > "$tmp/final-deployments.json"
           current=$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/final-deployments.json")
+          for attempt in 1 2 3 4 5;do
+            test "$current" = "$new" && break
+            sleep 1
+            get "$root/$worker/deployments" > "$tmp/final-deployments.json"
+            current=$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/final-deployments.json")
+          done
           test "$current" = "$new"
+          echo 'SABER_HOTFIX_PHASE_VERSION_100_PERCENT_OK'
+          phase=verify_bindings
           get "$root/$worker/settings" > "$tmp/final-settings.json"
           jq -r '.result.bindings[]|[.name,.type]|@tsv' "$tmp/final-settings.json" | sort > "$tmp/bindings-after"
           diff "$tmp/bindings-before" "$tmp/bindings-after"
+          echo 'SABER_HOTFIX_PHASE_BINDINGS_PRESERVED_OK'
+          phase=verify_public
           curl -fsS --max-time 35 'https://pedidos.libreriasaber.com.ar/cotizar?verificar_regreso=1' -o "$tmp/client.html"
+          echo 'SABER_HOTFIX_PHASE_PUBLIC_HTTP_OK'
           grep -Fq 'Volver a la tienda' "$tmp/client.html"
           grep -Fq 'https://libreriasaber.com.ar/' "$tmp/client.html"
           trap - ERR
