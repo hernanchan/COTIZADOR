@@ -112,12 +112,16 @@ export async function conciliarPendientesMPLiveAutomatico(env,{fetcher=fetch}={}
  }catch{return {ok:false,error:'RESCATE_D1_NO_DISPONIBLE'}}
  if(!orders.length)return {ok:true,revisados:0,recuperados:0,pendientes:0,enRevision:0,errores:0};
  let seller;
- try{
-  seller=await getMP(env,'/users/me',fetcher);
-  if(String(seller?.id)!==String(env.MP_LIVE_SELLER_ID)||seller.test_user===true||
-    (Array.isArray(seller?.tags)&&seller.tags.includes('test_user')))
-   throw Error('SELLER_INCORRECTO');
- }catch{return {ok:false,error:'RESCATE_VENDEDOR_NO_VERIFICADO'}}
+ try{seller=await getMP(env,'/users/me',fetcher)}
+ catch(error){
+  const code=String(error?.message||'');
+  return {ok:false,error:/^MP_CONSULTA_[0-9]{3}$/.test(code)?
+   'RESCATE_'+code:'RESCATE_VENDEDOR_RED_O_RESPUESTA'};
+ }
+ if(String(seller?.id)!==String(env.MP_LIVE_SELLER_ID))
+  return {ok:false,error:'RESCATE_VENDEDOR_ID_DIFERENTE'};
+ if(seller.test_user===true||(Array.isArray(seller?.tags)&&seller.tags.includes('test_user')))
+  return {ok:false,error:'RESCATE_VENDEDOR_CUENTA_TEST'};
  const totals={recuperado:0,ya_conciliado:0,sin_confirmar:0,revision:0,error:0};
  // Concurrencia acotada; cada orden se valida y persiste de forma individual.
  for(let i=0;i<orders.length;i+=2){
