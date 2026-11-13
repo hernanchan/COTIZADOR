@@ -49,7 +49,7 @@ jobs:
           const button='<a href="https://libreriasaber.com.ar/" style="display:inline-flex;align-items:center;min-height:44px;padding:9px 13px;border:1px solid #c9d9e7;border-radius:9px;color:#fff;text-decoration:none;font:700 15px system-ui,Arial,sans-serif">← Volver a la tienda</a>';
           const patch=old=>old.replace('<header>','<header style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">').replace('</header>',button+'</header>');
           const output=original.replace(gate,patch(gate)).replace(buyer,patch(buyer));
-          assert.equal(output.split('Volver a la tienda').length-1,2,'HOTFIX_MUST_MODIFY_EXACTLY_TWO_HEADERS');
+          assert.equal(output.split('Volver a la tienda').length-original.split('Volver a la tienda').length,2,'HOTFIX_MUST_ADD_EXACTLY_TWO_HEADERS');
           assert.equal(output.length-original.length,patch(gate).length-gate.length+patch(buyer).length-buyer.length,'UNEXPECTED_DIFF_ABORT');
           fs.writeFileSync(process.argv[3],output);
           console.log('SABER_DOCS_LIVE_TWO_NAV_LINKS_PATCHED_IN_EXISTING_BUNDLE');
