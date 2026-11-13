@@ -1,26 +1,14 @@
 {
-  "checkedAt": "2026-11-13T02:43:07.438Z",
+  "checkedAt": "2026-11-13T02:44:37.930Z",
   "schema": "saber-e2e-integral-v1",
-  "passed": false,
-  "code": 1,
+  "passed": true,
+  "code": 0,
   "scenario": "Mercado Pago + transferencia | TUS <=40 MiB + R2 >40 MiB",
   "noRealPayments": true,
   "noRealFiles": true,
   "failures": [
-    "not ok 5 - LIVE presupuestar y crear orden sin transmitir originales",
-    "  failureType: 'testCodeFailure'",
-    "  error: |-",
-    "  code: 'ERR_ASSERTION'",
-    "  name: 'AssertionError'",
-    "#   throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);",
-    "# Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'pdf-lib' imported from /home/runner/work/COTIZADOR/COTIZADOR/integraciones/autocotizador/recepcion/verificacion-pdf-drive-servidor.mjs",
-    "#   code: 'ERR_MODULE_NOT_FOUND'",
-    "not ok 7 - integraciones/autocotizador/recepcion/paquete-live-operador.test.mjs",
-    "  failureType: 'testCodeFailure'",
-    "  error: 'test failed'",
-    "  code: 'ERR_TEST_FAILURE'",
-    "# tests 74",
-    "# pass 72",
-    "# fail 2"
+    "# tests 78",
+    "# pass 78",
+    "# fail 0"
   ]
 }
