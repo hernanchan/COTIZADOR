@@ -1,0 +1,65 @@
+name: Saber - QA integral comercial TUS R2 MP transferencia
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-qa-integral-circuito-20261113.yml]
+permissions: {contents: write}
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: true}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Recorrido integral sin cobros ni archivos personales reales
+        shell: bash
+        run: |
+          set +e
+          node --test \
+            integraciones/autocotizador/recepcion/circuito-comercial-completo-live.test.mjs \
+            integraciones/autocotizador/recepcion/flujo-presupuesto-live-cliente.test.mjs \
+            integraciones/autocotizador/recepcion/custodia-local-originales-live.test.mjs \
+            integraciones/autocotizador/recepcion/recepcion-tus-live-cliente.test.mjs \
+            integraciones/autocotizador/recepcion/recepcion-r2-live-cliente.test.mjs \
+            integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs \
+            integraciones/autocotizador/recepcion/pagina-retorno-live.test.mjs \
+            integraciones/autocotizador/recepcion/pagina-central-personal-live.test.mjs \
+            integraciones/autocotizador/recepcion/paquete-live-operador.test.mjs \
+            integraciones/mercadopago/pruebas/central-recepcion-live.test.mjs \
+            integraciones/mercadopago/pruebas/transferencias-live-central.test.mjs \
+            integraciones/autocotizador/recepcion/transferencia-live-comprador.test.mjs \
+            integraciones/mercadopago/pruebas/central-estado-personal-live.test.mjs \
+            > /tmp/circuito-integral.log 2>&1
+          rc=$?
+          RC="$rc" node --input-type=module <<'EOF'
+          import {readFile,writeFile,mkdir} from 'node:fs/promises';
+          const raw=await readFile('/tmp/circuito-integral.log','utf8');
+          const out={checkedAt:new Date().toISOString(),schema:'saber-e2e-integral-v1',
+           passed:process.env.RC==='0',code:Number(process.env.RC),
+           scenario:'Mercado Pago + transferencia | TUS <=40 MiB + R2 >40 MiB',
+           noRealPayments:true,noRealFiles:true,
+           failures:raw.split('\n').filter(s=>/not ok|ERR_|Error:|error:|failureType|AssertionError|^# (tests|pass|fail)/.test(s)).slice(0,75)};
+          await mkdir('docs',{recursive:true});
+          await writeFile('docs/QA-CIRCUITO-COMERCIAL-INTEGRAL.json',JSON.stringify(out,null,2)+'\n');
+          console.log('SABER_QA_INTEGRAL='+JSON.stringify({passed:out.passed,code:out.code,scenario:out.scenario}));
+          EOF
+      - name: Guardar evidencia no sensible de QA integral
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/QA-CIRCUITO-COMERCIAL-INTEGRAL.json || exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/QA-CIRCUITO-COMERCIAL-INTEGRAL.json
+          git diff --cached --quiet && exit 0
+          git commit -m "ops: evidencia QA integral comercial sin pagos reales"
+          for attempt in 1 2 3 4;do
+            git fetch origin integracion/tus-pedido-privado-20261101
+            git rebase origin/integracion/tus-pedido-privado-20261101
+            git push origin HEAD:integracion/tus-pedido-privado-20261101 && exit 0
+            sleep 2
+          done
+          exit 1
