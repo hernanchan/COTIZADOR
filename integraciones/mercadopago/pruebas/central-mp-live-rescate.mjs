@@ -16,9 +16,14 @@ function gate(env){
 async function getMP(env,path,fetcher){
  if(!/^(\/users\/me|\/v1\/payments\/[1-9][0-9]{3,19}|\/v1\/payments\/search\?external_reference=[a-f0-9-]{36}&status=approved&limit=10|\/merchant_orders\/[1-9][0-9]{3,19}|\/merchant_orders\/search\?preference_id=[a-zA-Z0-9-]{16,150})$/.test(path))
   throw Error('RUTA_MP_NO_ADMITIDA');
- const r=await fetcher('https://api.mercadopago.com'+path,{
-  method:'GET',redirect:'error',
-  headers:{Authorization:'Bearer '+env.MP_LIVE_ACCESS_TOKEN,Accept:'application/json'},
+ // El recurso /users/me es de Mercado Libre; su host oficial es
+ // api.mercadolibre.com, no el host de Payments API de Mercado Pago.
+ const endpoint=path==='/users/me'?
+  'https://api.mercadolibre.com/users/me':'https://api.mercadopago.com'+path;
+ const r=await fetcher(endpoint,{
+  method:'GET',redirect:'manual',
+  headers:{Authorization:'Bearer '+env.MP_LIVE_ACCESS_TOKEN,
+   'Content-Type':'application/json',Accept:'application/json'},
   signal:AbortSignal.timeout(12000)
  });
  if(!r.ok)throw Error('MP_CONSULTA_'+r.status);
