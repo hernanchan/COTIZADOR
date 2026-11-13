@@ -13,7 +13,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for intento in $(seq 1 12);do
+          for intento in $(seq 1 2);do
             curl -fsS --max-time 20 "https://libreriasaber.com.ar/?qa_fotos=$intento" > /tmp/portada.html
             curl -fsS --max-time 20 "https://libreriasaber.com.ar/fotos-stickers.html?qa_fotos=$intento" > /tmp/fotos.html || true
             if grep -Fq 'href="fotos-stickers.html"' /tmp/portada.html &&
@@ -22,7 +22,7 @@ jobs:
                echo SABER_FOTOS_VIDRIERA_PUBLICA_OK
                break
             fi
-            if [ "$intento" = 12 ];then
+            if [ "$intento" = 2 ];then
               echo SABER_FOTOS_VIDRIERA_NO_PROPAGADA
               echo "ROOT_BYTES=$(wc -c </tmp/portada.html) ROOT_NEW_LINKS=$(grep -o 'fotos-stickers.html' /tmp/portada.html | wc -l)"
               echo "PHOTO_PAGE_BYTES=$(wc -c </tmp/fotos.html) FOTO_BUTTONS=$(grep -o 'Cotizar fotos' /tmp/fotos.html | wc -l)"
