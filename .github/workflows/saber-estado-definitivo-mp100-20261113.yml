@@ -61,6 +61,30 @@ jobs:
            const reviews=await read("SELECT COUNT(*) AS n FROM orders o INNER JOIN payment_reviews r ON r.order_id=o.id AND r.state='verified' WHERE o.amount_ars=100 AND datetime(o.created_at)>=datetime('now','-48 hours')");
            result.verified100=reviews[0]?.n||0;
           }catch(e){result.d1Error=String(e.message||e).slice(0,50)}
+          // Esperar el siguiente cron tras el despliegue del diagnóstico, sin enviar solicitudes comerciales.
+          try{
+           const source=await fetch(base+'/workers/scripts/saber-pagos-produccion',{headers:{Authorization:'Bearer '+token}});
+           const code=await source.text();
+           const updated=code.includes('REDACTADO');
+           result.typeMessageDiagnosticDeployed=updated;
+           if(updated&&result.cronHealth?.state==='RESCATE_VENDEDOR_TYPE_ERROR'){
+            const databases=await cf('/d1/database',d1);
+            const db=databases.find(x=>x.name==='saber-pagos-produccion');
+            if(db?.uuid){
+             for(let attempt=0;attempt<9;attempt++){
+              await new Promise(resolve=>setTimeout(resolve,10000));
+              const q=await cf('/d1/database/'+db.uuid+'/query',d1,{method:'POST',headers:{'Content-Type':'application/json'},
+               body:JSON.stringify({sql:"SELECT checked_at,checked,recovered,pending,review,errors,state FROM central_mp_live_auto_health WHERE id=1"})});
+              const newer=q?.[0]?.results?.[0];
+              if(newer)result.cronHealth=newer;
+              if(newer&&newer.state!=='RESCATE_VENDEDOR_TYPE_ERROR')break;
+             }
+             const q=await cf('/d1/database/'+db.uuid+'/query',d1,{method:'POST',headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({sql:"SELECT status,COUNT(*) AS n FROM orders WHERE amount_ars=100 AND datetime(created_at)>=datetime('now','-48 hours') GROUP BY status"})});
+             result.orderStatus=q?.[0]?.results||result.orderStatus;
+            }
+           }
+          }catch(e){result.diagnosticPollError=String(e.message||e).slice(0,55)}
           await mkdir('docs',{recursive:true});
           await writeFile('docs/ESTADO-REAL-PAGO-ARS100.json',JSON.stringify(result,null,2)+'\n');
           console.log('ESTADO_PAGO_REAL='+JSON.stringify(result));
