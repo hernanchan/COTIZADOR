@@ -86,3 +86,4 @@ jobs:
 # 13/11: QA completo banco avisado antes de pago y dos imágenes independientes obra180/color 12x + BN.
 # 13/11: preacreditacion bank TUS/R2 - regresiones sin aviso impiden firmas y doble cobro; QA final.
 # 13/11: última regresión R2 staging con banco avisado y sin pago, sin ZIP antes de cobro.
+# 13/11: QA final Central por verificar muestra recibidos/total; rechazo de ZIP impago sin cambiar estados de pago.
