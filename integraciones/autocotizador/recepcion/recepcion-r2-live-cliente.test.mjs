@@ -76,3 +76,27 @@ test('origen de ensayo jamás habilita R2 productivo',async()=>{
   /COMPRADOR_NO_VERIFICABLE/);
  assert.equal(f.calls.length,0);
 });
+
+test('dos PDF R2 informan porcentaje de lote y 100% solo tras staging',async()=>{
+ const m2={...meta,fileId:'pdf_1',name:'Segundo.pdf',bytes:80*1048576};
+ const f2={...file,name:m2.name,size:m2.bytes};
+ const f=mock(true,[meta,m2]),events=[];
+ const result=await enviarPDFsR2PagadosLive({
+  selectedFiles:[file,f2],storage:f.storage,fetcher:f.fetcher,
+  origin:ORIGIN,hasher:async()=>SHA,onProgress:p=>events.push(p),
+  uploader:async params=>{
+   params.onProgress({phase:'transferencia',bytesUploaded:params.file.size/2,percent:50});
+   params.onProgress({phase:'verificando-integridad',
+    bytesUploaded:params.file.size,percent:100});
+   return {...verified,bytes:params.meta.bytes};
+  }
+ });
+ assert.equal(result.ok,true);
+ assert.equal(result.stagedFiles,2);
+ assert.equal(events.at(-1).phase,'archivo-verificado');
+ assert.equal(events.at(-1).batchPercent,100);
+ assert.equal(events.filter(e=>e.batchPercent===100).length,1);
+ assert.deepEqual(events.filter(e=>e.phase==='transferencia').map(e=>e.batchPercent),[21,71]);
+ assert.ok(events.slice(0,-1).every(e=>e.batchPercent<=99));
+ assert.equal(f.calls.length,1);
+});
