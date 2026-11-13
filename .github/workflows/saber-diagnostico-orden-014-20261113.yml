@@ -1,0 +1,65 @@
+name: Saber - diagnostico read-only orden 014 originales
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-diagnostico-orden-014-20261113.yml]
+permissions: {contents: read}
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+    steps:
+      - name: D1 solo lectura, sin datos personales ni claves
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'EOF'
+          const root='https://api.cloudflare.com/client/v4/accounts/'+process.env.ACCOUNT;
+          const headers={Authorization:'Bearer '+process.env.TOKEN,'Content-Type':'application/json'};
+          async function cf(path,body){
+           const r=await fetch(root+path,{method:body?'POST':'GET',headers,
+            ...(body?{body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(20000)});
+           const j=await r.json();if(!r.ok||j?.success!==true)throw Error('API_'+r.status);
+           return j.result;
+          }
+          const db=(await cf('/d1/database')).find(x=>x.name==='saber-pagos-produccion');
+          if(!db)throw Error('D1_NOT_FOUND');
+          const sql=String.raw\`SELECT n.number AS numero,
+            o.status AS pago_estado,pr.state AS revision_estado,
+            COALESCE(s.state,'pendiente') AS produccion_estado,
+            d.file_count AS esperados,
+            COUNT(f.file_id) AS total_archivos,
+            SUM(CASE WHEN f.received=1 THEN 1 ELSE 0 END) AS recibidos,
+            SUM(CASE WHEN f.transport='r2' THEN 1 ELSE 0 END) AS r2_archivos,
+            SUM(CASE WHEN f.transport='r2' AND NOT EXISTS (
+             SELECT 1 FROM central_r2_live_inspections i
+             WHERE i.web_order_id=f.web_order_id AND i.file_id=f.file_id AND i.sha256=f.sha256
+            ) THEN 1 ELSE 0 END) AS inspecciones_r2_pendientes,
+            SUM(CASE WHEN f.transport='r2' AND EXISTS (
+             SELECT 1 FROM central_r2_large_pending r
+             WHERE r.web_order_id=f.web_order_id AND r.file_id=f.file_id
+              AND r.sha256=f.sha256 AND r.bytes=f.bytes
+              AND r.status='awaiting_pdf_analysis' AND length(r.etag)>=8
+            ) THEN 1 ELSE 0 END) AS recibos_r2_staged,
+            SUM(CASE WHEN f.transport='tus' AND EXISTS (
+             SELECT 1 FROM central_r2_universal_tus_receipts t
+             WHERE t.web_order_id=f.web_order_id AND t.file_id=f.file_id
+              AND t.sha256=f.sha256 AND t.bytes=f.bytes
+            ) THEN 1 ELSE 0 END) AS recibos_tus
+           FROM central_work_order_numbers n
+           JOIN orders o ON o.id=n.commercial_order_id
+           JOIN central_r2_universal_order_links l ON l.commercial_order_id=o.id
+           JOIN central_r2_universal_drafts d ON d.web_order_id=l.web_order_id
+           JOIN central_r2_universal_files f ON f.web_order_id=l.web_order_id
+           LEFT JOIN payment_reviews pr ON pr.order_id=o.id
+           LEFT JOIN central_live_production_states s ON s.order_id=o.id
+           WHERE n.number=14
+           GROUP BY n.number,o.status,pr.state,s.state,d.file_count\`;
+          const x=await cf('/d1/database/'+db.uuid+'/query',{sql});
+          if(x?.[0]?.success!==true)throw Error('INVALID_QUERY');
+          console.log('SABER_014_CHECK='+JSON.stringify(x[0].results));
+          EOF
