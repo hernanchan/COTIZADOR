@@ -75,3 +75,5 @@ jobs:
 # Validación de entrega con gates OFF y cola D1/R2 reanudable.
 
 # Revalidación de purga LIVE tras integrar buckets productivos y tablas opcionales.
+
+# Comprobación final con service binding privado configurado y purga aún OFF.
