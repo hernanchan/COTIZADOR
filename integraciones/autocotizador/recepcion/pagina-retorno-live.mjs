@@ -16,10 +16,16 @@ export function paginaRetornoLive(request,env){
 <style>section{margin-top:22px;padding-top:12px;border-top:1px solid #dae5ee}input{display:block;margin:12px 0;max-width:100%}body{font-family:system-ui,Arial,sans-serif;background:#f5f8fc;color:#183650;margin:0;padding:24px}
 main{max-width:540px;margin:7vh auto;background:white;border:1px solid #dae5ee;border-radius:16px;padding:30px}
 h1{font-size:24px}a{color:#075b91}button{font:inherit;padding:10px 16px;background:#113c69;color:#fff;border:0;border-radius:9px;cursor:pointer}
-small{color:#526579}#estado{line-height:1.6}</style></head><body><main>
-<h1>Volviste a Librería Saber</h1>
-<p id="estado" role="status" aria-live="polite">Estamos verificando el estado de tu pedido. Volver desde Mercado Pago no significa que el pago ya esté acreditado.</p>
-<button type="button" id="revisar">Consultar nuevamente</button>
+small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padding:16px;border-radius:12px;border:1px solid #bad2e4}#seguimiento p{margin:8px 0;font-size:16px}#seguimiento strong{font-size:18px;color:#073b62}#resumenArchivos{font-weight:650}button:disabled{opacity:.6;cursor:wait}</style></head><body><main>
+<h1>Seguimiento de tu pedido</h1>
+<p id="estado" role="status" aria-live="polite">Consultando pago y estado del trabajo en Librería Saber…</p>
+<div id="seguimiento" role="status" aria-live="polite">
+<p id="numeroPedido"><strong>Identificando tu pedido…</strong></p>
+<p id="estadoTrabajo">Estado de preparación: consultando</p>
+<p id="resumenArchivos">Archivos: consultando</p>
+<p id="fechaRetiro">Entrega estimada: consultando</p>
+</div>
+<button type="button" id="revisar">Actualizar seguimiento</button>
 <section id="recibir" hidden>
 <h2>Enviar tus PDF después del pago</h2>
 <p>Volvé a seleccionar exactamente los archivos que presupuestaste. Verificaremos sus huellas digitales antes de subirlos.</p>
@@ -42,6 +48,29 @@ small{color:#526579}#estado{line-height:1.6}</style></head><body><main>
 (function(){
  const output=document.getElementById('estado');
  const button=document.getElementById('revisar');
+ const numero=document.getElementById('numeroPedido');
+ const trabajo=document.getElementById('estadoTrabajo');
+ const archivos=document.getElementById('resumenArchivos');
+ const entrega=document.getElementById('fechaRetiro');
+ const states={pendiente:'Pedido nuevo',en_preparacion:'En preparación',en_espera:'En espera',listo:'Listo para retirar',entregado:'Entregado'};
+ const modes={por_confirmar:'A confirmar',hoy:'Durante el día de hoy',hoy_tarde:'Hoy por la tarde',proximo_dia:'Próximo día de atención'};
+ const localDate=value=>new Intl.DateTimeFormat('es-AR',{timeZone:'America/Argentina/Cordoba',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(value))+' hs';
+ function actualizarSeguimiento(data){
+  const t=data.tracking;
+  numero.textContent=t?.numeroOrden?'Orden '+t.numeroOrden:'Tu pedido en Librería Saber';
+  const verified=data.estado==='pagado_esperando_archivos'&&data.uploadAuthorized===true;
+  trabajo.textContent=verified?'Estado del trabajo: '+(states[t?.productionState]||'Pedido pagado'):
+   data.estado==='revocado'?'El pago no se encuentra vigente.':'Aguardando acreditación del pago.';
+  const received=Number(data.fileCount||0)-Number(data.pendingFiles||0);
+  archivos.textContent=verified?'Archivos recibidos: '+received+' de '+data.fileCount+
+   (data.pendingFiles?' · Debés enviar '+data.pendingFiles+' archivo(s) para completar el pedido.':' · Todos los originales fueron recibidos.'):
+   'Los PDF se envían cuando el pago está confirmado.';
+  entrega.textContent=verified&&t?.readyAt?'Retiro estimado: '+localDate(t.readyAt):
+   verified?'Previsión orientativa: '+(modes[t?.forecastMode]||'A confirmar')+
+     '. La hora exacta se informa al comenzar la preparación.':
+   'El plazo se confirma después de acreditar el pago.';
+ }
+ let checking=false;
  const receiving=document.getElementById('recibir');
  const input=document.getElementById('originales');
  const send=document.getElementById('subir');
@@ -56,6 +85,7 @@ small{color:#526579}#estado{line-height:1.6}</style></head><body><main>
   env?.DOCS_LIVE_R2_STAGING_GATE===ON&&env?.DOCS_LIVE_RECEPCION_GATE===ON};
 
  async function revisar(){
+  if(checking)return;
   let order;
   try{order=JSON.parse(sessionStorage.getItem('saber-live-pedido-v1')||'null')}catch{}
   if(!order||!/^WEB-ENSAYO-[A-F0-9]{32}$/.test(order.webOrderId||'')||
@@ -63,7 +93,7 @@ small{color:#526579}#estado{line-height:1.6}</style></head><body><main>
    output.textContent='No encontramos la referencia de esta compra en esta pestaña. Consultá tu pedido desde el cotizador; no vuelvas a pagar por este mensaje.';
    return;
   }
-  button.disabled=true;
+  checking=true;button.disabled=true;
   try{
    const response=await fetch('/api/pedido/live/checkout',{method:'POST',credentials:'same-origin',
     headers:{'Content-Type':'application/json'},
@@ -76,6 +106,7 @@ small{color:#526579}#estado{line-height:1.6}</style></head><body><main>
    const data=await response.json();
    if(!response.ok||data?.ok!==true||data.webOrderId!==order.webOrderId||
      data.commercialOrderId!==order.commercialOrderId)throw Error('pendiente');
+   actualizarSeguimiento(data);
    const paid=data.estado==='pagado_esperando_archivos'&&data.uploadAuthorized===true;
    if(paid){
     try{
@@ -97,7 +128,7 @@ small{color:#526579}#estado{line-height:1.6}</style></head><body><main>
     ?'El pago no se encuentra vigente. Comunicate con Librería Saber antes de continuar.'
     :'El pago todavía está pendiente de acreditación. Podés consultar nuevamente.';
   }catch{output.textContent='No pudimos consultar la acreditación en este momento. Conservá tu comprobante y probá nuevamente; no repitas el pago.'}
-  finally{button.disabled=false}
+  finally{checking=false;button.disabled=false}
  }
  send.addEventListener('click',async()=>{
   send.disabled=true;
@@ -114,6 +145,7 @@ small{color:#526579}#estado{line-height:1.6}</style></head><body><main>
     ?'PDF pequeños verificados. Los archivos grandes todavía deben enviarse por el circuito R2.'
     :'PDF recibidos y verificados. Librería Saber continuará con la preparación.';
    input.disabled=true;
+   void revisar();
   }catch{
    progress.textContent='No se confirmó la recepción de todos los PDF. Conservá los originales y reintentá; no pagues nuevamente.';
    send.disabled=false;
@@ -135,12 +167,14 @@ small{color:#526579}#estado{line-height:1.6}</style></head><body><main>
     ?'PDF grandes almacenados y SHA verificado. Falta inspección de contenido antes de imprimir.'
     :'No se confirmó el envío.';
    inputR2.disabled=true;
+   void revisar();
   }catch{
    progressR2.textContent='Envío o verificación pendiente. Conservá los originales para reintentar. No pagues de nuevo.';
    sendR2.disabled=false;
   }
  });
  button.addEventListener('click',revisar);revisar();
+ setInterval(()=>{if(!document.hidden)void revisar()},15000);
 })();
 </script></body></html>`;
  return new Response(html,{status:200,headers:{'Content-Type':'text/html; charset=utf-8',
