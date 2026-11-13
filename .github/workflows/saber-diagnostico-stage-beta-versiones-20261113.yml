@@ -27,8 +27,7 @@ jobs:
           printf '%s' 'export default {async fetch(){return new Response("NO DESPLEGADO",{status:503})}};' > "$temp/index.mjs"
           jq -nc --arg old "$old" --rawfile code "$temp/index.mjs" \
             --slurpfile settings "$temp/settings.json" \
-            '{main_module:"index.mjs",bindings:[$settings[0].result.bindings[]|{name,type:"inherit",version_id:$old}], \
-              modules:[{name:"index.mjs",content_type:"application/javascript+module",content_base64:($code|@base64)}]}' > "$temp/body.json"
+            '{main_module:"index.mjs",bindings:[$settings[0].result.bindings[]|{name,type:"inherit",version_id:$old}],modules:[{name:"index.mjs",content_type:"application/javascript+module",content_base64:($code|@base64)}]}' > "$temp/body.json"
           status=$(curl -sS --max-time 110 -w '%{http_code}' -o "$temp/result.json" \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" --data-binary @"$temp/body.json" \
