@@ -19,7 +19,7 @@ button:disabled{opacity:.55}select{padding:10px;border:1px solid #b3cad9;border-
 .count{background:#fff;border-radius:16px;padding:0 9px}
 .card{background:white;border:1px solid #d0dce9;border-radius:11px;margin-bottom:11px;padding:14px;overflow-wrap:anywhere}
 .card strong{font-size:19px}.row{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
-.banner{border-left:4px solid #db8d21;padding:9px;background:#fff7e8;margin:10px 0}#previsionCliente{font-weight:650;color:#1c5369}#previsionCliente.warning{border-left:4px solid #c27919;background:#fff5e6;padding:10px;color:#6f4400}
+.banner{border-left:4px solid #db8d21;padding:9px;background:#fff7e8;margin:10px 0}.eta-dialog{width:min(520px,calc(100vw - 24px));border:1px solid #b8cbdc;border-radius:14px;padding:24px;color:#103452;box-shadow:0 12px 45px #142f4b44}.eta-dialog::backdrop{background:#10263a77}.eta-dialog label{display:block;font-weight:700;margin:12px 0}.eta-dialog input,.eta-dialog textarea{display:block;width:100%;font:inherit;color:#103452;padding:12px;border:1px solid #adc5d8;border-radius:9px;margin-top:6px;background:white}.eta-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}.eta-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:15px}.eta-actions button[type=button]{background:#657a89}.eta-hint{padding:9px;background:#f1f7fb;border-left:3px solid #17658f}.eta-error{color:#9a3100;font-weight:650;min-height:26px}@media(max-width:550px){.eta-fields{grid-template-columns:1fr}.eta-dialog{padding:18px}}#previsionCliente{font-weight:650;color:#1c5369}#previsionCliente.warning{border-left:4px solid #c27919;background:#fff5e6;padding:10px;color:#6f4400}
 @media(max-width:800px){.board{grid-template-columns:1fr;overflow:visible}.lane{min-height:80px}}
 </style></head><body><main>
 <header><h1>Central de Pedidos · Librería Saber</h1><div class="row">
@@ -48,6 +48,20 @@ button:disabled{opacity:.55}select{padding:10px;border:1px solid #b3cad9;border-
 <p class="banner">Solo se muestran pedidos con pago verificado. Antes de imprimir, comprobá cada original y la hoja de instrucciones.</p>
 <p id="estado" role="status">Consultando pedidos…</p>
 <div id="tablero" class="board"></div>
+<dialog id="etaDialog" class="eta-dialog" aria-labelledby="etaTitle">
+<h2 id="etaTitle">Definir fecha y hora de retiro</h2>
+<p>Elegí el día desde el calendario y la hora de retiro. Se informarán al cliente al guardar.</p>
+<form id="etaForm">
+<div class="eta-fields">
+<label for="etaDate">Fecha de retiro<input id="etaDate" type="date" required></label>
+<label for="etaTime">Hora de retiro<input id="etaTime" type="time" step="300" required></label>
+</div>
+<p id="etaHorario" class="eta-hint">Elegí un día para ver los horarios de atención.</p>
+<label for="etaOperator">Responsable<input id="etaOperator" type="text" maxlength="60" minlength="2" placeholder="Nombre del operador" required></label>
+<div id="etaReasonBlock" hidden><label for="etaReason">Motivo de la modificación o demora<textarea id="etaReason" maxlength="240" rows="2" placeholder="Se requiere al retrasar un retiro informado"></textarea></label></div>
+<p id="etaMessage" class="eta-error" role="status" aria-live="polite"></p>
+<div class="eta-actions"><button type="button" id="etaCancel">Cancelar</button><button type="submit" id="etaSave">Guardar fecha y hora</button></div>
+</form></dialog>
 </main><script>
 'use strict';
 const columns=[['pendiente','Nuevos'],['en_preparacion','En preparación'],['en_espera','En espera'],['listo','Listos'],['entregado','Entregados']];
