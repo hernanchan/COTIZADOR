@@ -61,3 +61,4 @@ jobs:
 
 # 13/11: UI unificada MP y transferencia, ZIP directo tras hash R2, sin inspección obligatoria previa.
 # 13/11: revalidar test VM de pantalla ZIP unificada luego de ajustar la expresión regular.
+# 13/11: cierre QA navegador luego de quitar la inspección previa de R2 y simplificar ZIP.
