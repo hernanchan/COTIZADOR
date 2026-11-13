@@ -1,0 +1,46 @@
+name: Saber - diagnostico no desplegar Cloudflare stage 10013
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-diagnostico-stage-cloudflare-10013-20261113.yml]
+permissions: {contents: read}
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+    steps:
+      - name: Stage no deploy modulo minimo con mismos bindings heredados
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-pagos-produccion"
+          temp=$(mktemp -d)
+          curl -fsS --max-time 30 -H "Authorization: Bearer $TOKEN" "$root/settings" > "$temp/settings.json"
+          curl -fsS --max-time 30 -H "Authorization: Bearer $TOKEN" "$root/deployments" > "$temp/deployments.json"
+          old=$(jq -er '.result.deployments[0].versions[0].version_id' "$temp/deployments.json")
+          jq '{main_module:"index.mjs",bindings:[.result.bindings[]|{name,type:"inherit"}]}' \
+            "$temp/settings.json" > "$temp/metadata.json"
+          cat > "$temp/index.mjs" <<'EOF'
+          // Diagnóstico Cloudflare. Jamás activar: si se ejecutase, responde 503.
+          export default {async fetch(){return new Response('No desplegar', {status:503})}};
+          EOF
+          status=$(curl -sS --max-time 100 -w '%{http_code}' \
+            -o "$temp/stage.json" -H "Authorization: Bearer $TOKEN" \
+            -F "metadata=@$temp/metadata.json;type=application/json" \
+            -F "index.mjs=@$temp/index.mjs;filename=index.mjs;type=application/javascript+module" \
+            "$root/versions?bindings_inherit=strict")
+          if [ "$status" = 200 ] && jq -e '.success==true and (.result.id|type=="string")' "$temp/stage.json" >/dev/null;then
+            result=MINIMAL_STAGE_OK
+          else
+            result=MINIMAL_STAGE_FAILED
+          fi
+          current=$(curl -fsS --max-time 30 -H "Authorization: Bearer $TOKEN" "$root/deployments" |
+            jq -er '.result.deployments[0].versions[0].version_id')
+          test "$current" = "$old" || { echo ERROR_DEPLOYMENT_CHANGED; exit 1; }
+          echo "SABER_STAGE_DIAG=$result HTTP=$status CURRENT_UNCHANGED=true"
+          jq -c '{errors:[.errors[]?|{code,message}]}' "$temp/stage.json"
+          # No POST /deployments. No activation. No binding changes.
