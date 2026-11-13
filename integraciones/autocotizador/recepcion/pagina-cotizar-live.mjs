@@ -299,11 +299,8 @@ action.addEventListener('click',async()=>{
      if(result.estado==='pagado_esperando_archivos'&&result.paymentVerified===true&&
         result.uploadAuthorized===true){
       if(interval)clearInterval(interval);
-      instructions.textContent='Transferencia acreditada. Se verificará la recepción segura de los PDF.';
-      const continueButton=document.createElement('button');
-      continueButton.type='button';continueButton.textContent='Continuar con archivos pagados';
-      continueButton.addEventListener('click',()=>location.assign('/pedido/estado'));
-      options.replaceChildren(continueButton,instructions);
+      instructions.textContent='Transferencia acreditada. Enviando automáticamente los PDF que elegiste antes de pagar…';
+      location.assign('/pedido/estado');
      }
     }catch{instructions.textContent='Seguimos esperando la verificación bancaria. No hagas otra transferencia.';}
     finally{checking=false}
