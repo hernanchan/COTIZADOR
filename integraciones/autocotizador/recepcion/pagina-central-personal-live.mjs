@@ -45,6 +45,11 @@ button:disabled{opacity:.55}select{padding:10px;border:1px solid #b3cad9;border-
 <p><small>Un día sin horario significa cerrado. Los feriados se atienden normalmente salvo que agregues la fecha aquí. Para abrir un feriado, quitá su fecha de la lista.</small></p>
 <button type="button" id="agendaGuardar">Guardar horario de atención</button>
 </details></section>
+<section class="forecast" aria-labelledby="transferNewTitle">
+<h2 id="transferNewTitle">Nuevas transferencias por verificar · <span id="transferNewCount">0</span></h2>
+<p>Solo aparecen cuando el cliente pulsa «Ya transferí». Para acreditar el pedido, comprobá primero el ingreso bancario.</p>
+<div id="transferNewList" role="status" aria-live="polite">Consultando avisos de clientes…</div>
+</section>
 <p class="banner">Solo se muestran pedidos con pago verificado. Antes de imprimir, comprobá cada original y la hoja de instrucciones.</p>
 <p id="estado" role="status">Consultando pedidos…</p>
 <div id="tablero" class="board"></div>
@@ -281,8 +286,19 @@ async function actualizarAvisosTransferencia(){
    {credentials:'same-origin',cache:'no-store'});
   const result=await response.json().catch(()=>null);
   if(!response.ok||result?.ok!==true||!Array.isArray(result.pending))throw Error('Sin conexión');
-  const reported=result.pending.filter(r=>r.customerNotified===true).length;
+  const avisadas=result.pending.filter(r=>r.customerNotified===true);
+  const reported=avisadas.length;
   const unreported=result.pending.length-reported;
+  document.getElementById('transferNewCount').textContent=String(reported);
+  const list=document.getElementById('transferNewList');
+  list.replaceChildren();
+  if(!reported)list.append(element('small','Sin nuevos avisos de transferencia.'));
+  for(const item of avisadas){
+   const link=element('a','Orden '+short(item.numero_orden||'---')+' · '+price(item.amount_ars)+
+    ' · '+short(item.nombre||'Cliente')+' · Verificar en el banco');
+   link.className='action';link.href='/personal/transferencias';
+   link.style.margin='5px';list.append(link);
+  }
   target.textContent='Transferencias avisadas por clientes: '+reported+
    (unreported?' · Solicitudes sin aviso: '+unreported:'');
   target.style.background=reported?'#ffe3a9':'#dde9f1';
