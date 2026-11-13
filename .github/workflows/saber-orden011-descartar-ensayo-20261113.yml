@@ -1,4 +1,4 @@
-name: Saber - descarte controlado y auditado orden 011 de ensayo
+name: Saber - archivar ensayo 011 sin alterar pagos ni archivos R2
 on:
   push:
     branches: [integracion/tus-pedido-privado-20261101]
@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: {persist-credentials: false}
-      - name: Verificar ensayo, borrar solo objeto 011 de R2 y archivar pedido sin borrar pagos
+      - name: Archivar solo orden 011 conservando auditoría financiera y archivo R2 pendiente
         shell: bash
         run: |
           set -euo pipefail
@@ -90,17 +90,10 @@ jobs:
             parts[0]!=='r2-v1'||parts[1]!==f.webOrderId||
             !parts[2].endsWith('.pdf')||!parts[2].slice(0,-4).match(/^[a-f0-9-]{36}$/i))
             throw Error('ORDER_011_OBJECT_KEY_MISMATCH');
-          // Aunque el token de deploy no pueda LISTAR R2, DELETE puede tener otro permiso.
-          // Si el borrado no fue confirmado, NO ocultar el pedido en D1.
-          const del=await fetch(root+'/r2/buckets/saber-documentos-produccion-privado/objects/'+f.objectKey,{
-            method:'DELETE',headers:{Authorization:'Bearer '+process.env.R2TOKEN},
-            signal:AbortSignal.timeout(30000)});
-          const delResult=await del.json().catch(()=>null);
-          if(!del.ok||delResult?.success!==true)
-           throw Error('R2_DELETE_NO_CONFIRMADO_HTTP_'+del.status);
-          if(delResult?.result?.key&&delResult.result.key!==f.objectKey)
-           throw Error('R2_DELETE_KEY_MISMATCH');
-          console.log('SABER_011_R2_DELETE_ACCEPTED');
+          // El token de Cloudflare no tiene acceso R2 (HTTP 403).
+          // Archivar la prueba en la Central sin falsificar estados de pago;
+          // el original se conserva hasta que un operador autorizado pueda eliminarlo.
+          console.log('SABER_011_R2_PURGA_PENDIENTE_FALTA_PERMISO');
           const archiveSQL=[
            "INSERT INTO central_live_order_archives(order_id,work_number,reason)",
            "SELECT o.id,11,'ENSAYO_TRANSF_SIN_DINERO_REAL_PDF_A4_DESCARTADO_20261113'",
@@ -115,6 +108,6 @@ jobs:
            "SELECT count(*) AS total FROM central_live_order_archives WHERE work_number=11 AND order_id='"+f.orderId+"'");
           if(verify?.[0]?.results?.[0]?.total!==1)throw Error('ARCHIVE_D1_NOT_VERIFIED');
           console.log('SABER_011_CLEANUP='+JSON.stringify({order:11,
-           r2DeleteAccepted:true,d1Archived:true,paymentLedgerPreserved:true,
+           r2DeleteAccepted:false,r2PendingPurge:true,d1Archived:true,paymentLedgerPreserved:true,
            priorR2ReadStatus:r2.readable,archiveOnly:true}));
           EOF
