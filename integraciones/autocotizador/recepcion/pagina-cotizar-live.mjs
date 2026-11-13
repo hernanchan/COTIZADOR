@@ -254,6 +254,8 @@ action.addEventListener('click',async()=>{
   });
   status.textContent='Validando precio y registrando orden…';
   const order=await flow.preparar();
+  // El medio de pago anterior no debe heredarse a una orden nueva.
+  sessionStorage.removeItem('saber-live-medio-v1');
   price.textContent='Orden '+order.numeroOrden+' · '+money(order.amountArs);
   status.textContent='Orden registrada. Los PDF están guardados en este navegador. Al pagar se enviarán automáticamente, sin seleccionarlos otra vez.';
   const options=document.createElement('div');
