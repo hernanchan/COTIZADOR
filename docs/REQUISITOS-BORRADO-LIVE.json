@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-11-13T03:08:10.323Z",
+  "checkedAt": "2026-11-13T03:17:45.208Z",
   "readOnly": true,
   "gateActivationPerformed": false,
   "centralStorageBindingNames": [
@@ -38,6 +38,10 @@
     {
       "name": "CENTRAL_R2_CANARY_ORDER_ID",
       "type": "plain_text"
+    },
+    {
+      "name": "SABER_DOCUMENTOS",
+      "type": "service"
     }
   ],
   "documentsStorageBindingNames": [
@@ -86,13 +90,15 @@
       "type": "r2_bucket"
     }
   ],
-  "centralDocumentsBridge": false,
-  "centralR2PrivateBucket": false,
-  "documentsTUSServiceKey": false,
+  "centralDocumentsBridge": true,
+  "documentsR2PrivateBucket": true,
+  "documentsTUSServiceKey": true,
   "documentsHMACKey": true,
   "centralHMACKey": true,
-  "centralPurgeGate": false,
-  "centralPurgeExecuteGate": false,
-  "documentsPurgeGate": false,
-  "prerequisitesReady": false
+  "centralPurgeGate": true,
+  "centralPurgeExecuteGate": true,
+  "documentsPurgeGate": true,
+  "centralPurgeEnabled": true,
+  "documentsPurgeEnabled": true,
+  "prerequisitesReady": true
 }
