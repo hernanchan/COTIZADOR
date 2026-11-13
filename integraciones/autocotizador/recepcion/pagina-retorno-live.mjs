@@ -16,7 +16,7 @@ export function paginaRetornoLive(request,env){
 <style>section{margin-top:22px;padding-top:12px;border-top:1px solid #dae5ee}input{display:block;margin:12px 0;max-width:100%}body{font-family:system-ui,Arial,sans-serif;background:#f5f8fc;color:#183650;margin:0;padding:24px}
 main{max-width:540px;margin:7vh auto;background:white;border:1px solid #dae5ee;border-radius:16px;padding:30px}
 h1{font-size:24px}a{color:#075b91}button{font:inherit;padding:10px 16px;background:#113c69;color:#fff;border:0;border-radius:9px;cursor:pointer}
-small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padding:16px;border-radius:12px;border:1px solid #bad2e4}#seguimiento p{margin:8px 0;font-size:16px}#seguimiento strong{font-size:18px;color:#073b62}#resumenArchivos{font-weight:650}button:disabled{opacity:.6;cursor:wait}#aviso-subida{border:2px solid #aa650c;background:#fff5dd;color:#593710;font-size:17px;font-weight:750;line-height:1.55;padding:14px;border-radius:10px;margin:15px 0}</style></head><body><main>
+small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padding:16px;border-radius:12px;border:1px solid #bad2e4}#seguimiento p{margin:8px 0;font-size:16px}#seguimiento strong{font-size:18px;color:#073b62}#resumenArchivos{font-weight:650}#progreso-envio{display:block;width:100%;height:20px;margin:12px 0 7px}#progreso-envio[hidden]{display:none}#porcentaje-envio{font-size:18px;font-weight:800;color:#0b517a}#reintentar{background:#0c5688;margin:10px 0}button[hidden]{display:none}button:disabled{opacity:.6;cursor:wait}#aviso-subida{border:2px solid #aa650c;background:#fff5dd;color:#593710;font-size:17px;font-weight:750;line-height:1.55;padding:14px;border-radius:10px;margin:15px 0}</style></head><body><main>
 <h1>Seguimiento de tu pedido</h1>
 <p id="estado" role="status" aria-live="polite">Consultando pago y estado del trabajo en Librería Saber…</p>
 <div id="seguimiento" role="status" aria-live="polite">
@@ -32,6 +32,9 @@ small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padd
 <p id="aviso-subida">PDF pesado en proceso: mantené esta pestaña abierta hasta que confirmemos «Archivo recibido». No cierres el navegador ni apagues el dispositivo. Si se interrumpe, conservá esta pestaña para reintentar; nunca vuelvas a pagar por el mismo pedido.</p>
 <p id="avance" role="status" aria-live="polite">Esperando confirmación del pago para iniciar la transferencia.</p>
 <p id="avanceR2" role="status" aria-live="polite"></p>
+<progress id="progreso-envio" max="100" value="0" hidden aria-label="Progreso total del envío de PDF"></progress>
+<p id="porcentaje-envio" role="status" aria-live="polite"></p>
+<button type="button" id="reintentar" hidden>Reintentar envío de archivos, sin volver a pagar</button>
 </section>
 <p><a href="/cotizar">Volver al cotizador</a></p>
 <small>Si Mercado Pago confirma el pago pero todavía no aparece acreditado, conservá el comprobante. No realices otro pago por este aviso.</small>
@@ -73,10 +76,39 @@ small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padd
  const receiving=document.getElementById('recibir');
  const progress=document.getElementById('avance');
  const progressR2=document.getElementById('avanceR2');
+ const bar=document.getElementById('progreso-envio');
+ const percentage=document.getElementById('porcentaje-envio');
+ const retry=document.getElementById('reintentar');
+ const uploadNotice=document.getElementById('aviso-subida');
  let autoSending=false,lastAutoAttempt=0,autoAttempts=0;
+ let lastOrder=null,lastData=null,lastMetas=null;
+ function showProgress(value,phase,channel){
+  if(Number.isFinite(value)&&value>=0&&value<=100){
+   bar.hidden=false;bar.value=value;
+   percentage.textContent='Envío '+channel+': '+value+' %'+
+    (value===100?' · Archivo recibido y verificado':
+    value===99?' · Esperando confirmación del servidor':'');
+  }
+  const labels={
+   hash:'Comprobando la integridad del PDF original',
+   upload:'Subiendo archivos protegidos',
+   autorizacion:'Autorizando recepción segura',
+   transferencia:'Transfiriendo partes del PDF',
+   'recuperacion-servidor':'Comprobando si el archivo ya está almacenado',
+   'recuperado-sin-reenvio':'Original recuperado sin repetir la subida',
+   'verificacion-almacenamiento':'Finalizando el almacenamiento',
+   'verificando-integridad':'Verificando integridad y registro en la Central',
+   'verificando-recibos':'Validando el recibo de cada archivo en la Central',
+   recibido:'Archivo recibido y verificado',
+   'archivo-verificado':'Archivo recibido y verificado'
+  };
+  return (labels[phase]||'Preparando recepción segura')+
+   (Number.isFinite(value)?' · '+value+' %':'');
+ }
  const receiptFlag=web=>('saber-live-r2-recibido-'+web);
  async function enviarAutomaticamente(order,data,metas){
   if(autoSending||data.estado!=='pagado_esperando_archivos'||data.uploadAuthorized!==true)return;
+  lastOrder=order;lastData=data;lastMetas=metas;
   const small=metas.filter(m=>m.transport==='tus');
   const large=metas.filter(m=>m.transport==='r2');
   const received=new Set(data.receivedFileIds||[]);
@@ -84,6 +116,8 @@ small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padd
   const pendingR2=large.some(m=>!received.has(m.fileId))&&
     sessionStorage.getItem(receiptFlag(order.webOrderId))!=='ok';
   if(!pendingTUS&&!pendingR2){
+   retry.hidden=true;
+   uploadNotice.hidden=true;
    if(data.pendingFiles===0){
     progress.textContent='PDF recibidos. El pedido ya está confirmado y Librería Saber puede prepararlo.';
     try{
@@ -91,12 +125,13 @@ small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padd
      await borrarOriginalesLive({webOrderId:order.webOrderId,commercialOrderId:order.commercialOrderId,metas});
     }catch{}
    }else if(large.length){
-    progress.textContent='PDF grande transferido. Esperando inspección técnica antes de imprimir.';
+    progress.textContent='Archivo recibido y verificado. Librería Saber realizará la inspección del PDF antes de imprimir.';
    }
    return;
   }
   if(Date.now()-lastAutoAttempt<Math.min(120000,15000*Math.max(1,autoAttempts)))return;
   lastAutoAttempt=Date.now();autoAttempts++;autoSending=true;receiving.hidden=false;
+  uploadNotice.hidden=false;retry.hidden=true;
   try{
    if((pendingTUS&&!tusReady)||(pendingR2&&!r2Ready))
     throw Error('Recepción temporalmente desactivada');
@@ -108,8 +143,7 @@ small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padd
     progress.textContent='Enviando automáticamente los archivos pequeños. No cierres esta pestaña.';
     const {enviarPDFsTUSPagadosLive}=await import('/pedido/recepcion-tus.js');
     await enviarPDFsTUSPagadosLive({selectedFiles,onProgress:p=>{
-     progress.textContent=p.phase==='hash'?'Verificando los PDF originales guardados…':
-      'Enviando PDF a Librería Saber en forma segura…';
+     progress.textContent=showProgress(p.percent,p.phase,'TUS');
     }});
     progress.textContent='Archivos pequeños recibidos y verificados por Librería Saber.';
    }
@@ -118,21 +152,29 @@ small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padd
     progressR2.textContent='Enviando automáticamente PDF grandes por R2. No cierres esta pestaña.';
     const {enviarPDFsR2PagadosLive}=await import('/pedido/recepcion-r2.js');
     const result=await enviarPDFsR2PagadosLive({selectedFiles,onProgress:p=>{
-     progressR2.textContent='Envío R2: '+(p.percent??0)+' % · verificación de integridad.';
+     progressR2.textContent=showProgress(p.batchPercent,p.phase,'R2');
     }});
     if(result?.ok!==true)throw Error('PDF_R2_AUN_SIN_RECIBO');
     sessionStorage.setItem(receiptFlag(order.webOrderId),'ok');
-    progressR2.textContent='PDF grande almacenado, pendiente de inspección de contenido.';
+    progressR2.textContent='Archivo recibido y verificado. El PDF grande está pendiente de inspección en Librería Saber.';
+    uploadNotice.hidden=true;retry.hidden=true;
    }
-   autoAttempts=0;
+   autoAttempts=0;retry.hidden=true;
    // Refrescar la situación verificada en D1; nunca inferir recepción por el redirect MP.
    void revisar();
   }catch(error){
-   progress.textContent='La transferencia automática todavía no se completó: '+
+   progress.textContent='La recepción no está completa: '+
     String(error?.message||'Fallo temporal').slice(0,110)+
-    '. Conservamos tus originales en este navegador y reintentaremos sin volver a pedirlos. No pagues otra vez.';
+    '. Usá «Reintentar envío» desde esta misma pestaña. Si persiste, contactá a Librería Saber con tu número de orden. NO pagues nuevamente.';
+   percentage.textContent='Pendiente de recepción · reintento disponible';
+   retry.hidden=false;
   }finally{autoSending=false;}
  }
+ retry.addEventListener('click',()=>{
+  if(autoSending||!lastOrder||!lastData||!lastMetas)return;
+  lastAutoAttempt=0;retry.hidden=true;
+  void enviarAutomaticamente(lastOrder,lastData,lastMetas);
+ });
  const tusReady=${env?.DOCS_LIVE_TUS_GATE===ON&&env?.DOCS_LIVE_RECEPCION_GATE===ON};
  const r2Ready=${env?.DOCS_LIVE_R2_GATE===ON&&env?.DOCS_LIVE_R2_UPLOAD_GATE===ON&&
   env?.DOCS_LIVE_R2_STAGING_GATE===ON&&env?.DOCS_LIVE_RECEPCION_GATE===ON};
@@ -168,6 +210,8 @@ small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padd
      if(saved.order.webOrderId!==order.webOrderId||saved.order.commercialOrderId!==order.commercialOrderId)
       throw Error('REFERENCIA_NO_COINCIDE');
      receiving.hidden=false;
+     uploadNotice.hidden=data.pendingFiles===0||
+      sessionStorage.getItem(receiptFlag(order.webOrderId))==='ok';
      output.textContent=data.pendingFiles===0?'Pago acreditado y archivos recibidos. Gracias por elegir Librería Saber.':
       sessionStorage.getItem(receiptFlag(order.webOrderId))==='ok'?
        'Pago acreditado. PDF grande almacenado; Librería Saber debe completar la inspección antes de habilitar el ZIP.':
