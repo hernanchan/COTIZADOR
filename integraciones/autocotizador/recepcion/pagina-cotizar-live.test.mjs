@@ -141,3 +141,19 @@ test('el módulo JavaScript comercial generado compila con teléfonos argentinos
  assert.match(body,/\/\^\\\+\?\[0-9 \(\)-\]\{10,26\}\$\//);
  assert.match(body,/replace\(\/\\D\/g/);
 });
+
+
+test('transferencia LIVE ofrece Ya transferí y avisa al banco sin activar pago',async()=>{
+ const res=paginaCotizarLive(new Request(url),{
+  ...env,DOCS_LIVE_RECEPCION_GATE:gate,DOCS_LIVE_PRICING_GATE:gate,
+  DOCS_LIVE_ORDER_GATE:gate,DOCS_LIVE_TRANSFER_GATE:gate,DOCS_LIVE_TUS_GATE:gate
+ },{authorized:true});
+ const html=await res.text();
+ assert.match(html,/Ya transferí · Avisar a Librería Saber/);
+ assert.match(html,/bankRequest\('notify'\)/);
+ assert.match(html,/notice\.paymentVerified!==false/);
+ assert.match(html,/notice\.uploadAuthorized!==false/);
+ assert.match(html,/notice\.customerNotified!==true/);
+ assert.match(html,/No se registró el aviso/);
+ assert.doesNotMatch(html,/Ya transferí[^\n]*'pagado'/);
+});
