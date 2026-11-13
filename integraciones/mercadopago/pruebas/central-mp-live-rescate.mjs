@@ -74,17 +74,11 @@ async function procesarUna(env,order,seller,fetcher){
   return 'ya_conciliado';
  return 'revision';
 }
-export async function rescatarPagosMPLiveCentral(request,env,{
- readSigned,fetcher=fetch
-}={}){
- if(!gate(env))return reply({ok:false,error:'RESCATE_NO_HABILITADO'},503);
- if(request.method!=='POST'||typeof readSigned!=='function')
-  return reply({ok:false,error:'RESCATE_FIRMA_REQUERIDA'},403);
- const signed=await readSigned(request,env);
- if(signed?.error)return reply({ok:false,error:'RESCATE_HMAC'},signed.status||401);
- if(signed.payload?.schema!=='saber-central-live-staff-reconcile-v1'||
-  signed.payload?.purpose!=='revisar-cobros-pendientes')
-  return reply({ok:false,error:'RESCATE_PARAMETROS'},422);
+/** Conciliación programada: sólo órdenes pendientes con vínculo D1 y pago MP confirmado.
+ * Idempotente; no solicita cobros. Ejecutable únicamente dentro de saber-pagos-produccion.
+ */
+export async function conciliarPendientesMPLiveAutomatico(env,{fetcher=fetch}={}){
+ if(!gate(env))return {ok:false,error:'RESCATE_NO_HABILITADO'};
  let orders;
  try{
   const q=await env.DB.prepare(
@@ -99,15 +93,15 @@ export async function rescatarPagosMPLiveCentral(request,env,{
   ).all();
   orders=q?.results||[];
   if(!Array.isArray(orders))throw Error('D1_RESPUESTA_INVALIDA');
- }catch{return reply({ok:false,error:'RESCATE_D1_NO_DISPONIBLE'},503)}
- if(!orders.length)return reply({ok:true,revisados:0,recuperados:0,pendientes:0,enRevision:0,errores:0});
+ }catch{return {ok:false,error:'RESCATE_D1_NO_DISPONIBLE'}}
+ if(!orders.length)return {ok:true,revisados:0,recuperados:0,pendientes:0,enRevision:0,errores:0};
  let seller;
  try{
   seller=await getMP(env,'/users/me',fetcher);
   if(String(seller?.id)!==String(env.MP_LIVE_SELLER_ID)||seller.test_user===true||
     (Array.isArray(seller?.tags)&&seller.tags.includes('test_user')))
    throw Error('SELLER_INCORRECTO');
- }catch{return reply({ok:false,error:'RESCATE_VENDEDOR_NO_VERIFICADO'},503)}
+ }catch{return {ok:false,error:'RESCATE_VENDEDOR_NO_VERIFICADO'}}
  const totals={recuperado:0,ya_conciliado:0,sin_confirmar:0,revision:0,error:0};
  // Concurrencia acotada; cada orden se valida y persiste de forma individual.
  for(let i=0;i<orders.length;i+=2){
@@ -115,7 +109,22 @@ export async function rescatarPagosMPLiveCentral(request,env,{
    procesarUna(env,o,seller,fetcher).catch(()=> 'error')));
   for(const outcome of outcomes)totals[outcome]=(totals[outcome]||0)+1;
  }
- return reply({ok:true,revisados:orders.length,
+ return {ok:true,revisados:orders.length,
   recuperados:totals.recuperado,yaConciliados:totals.ya_conciliado,
-  pendientes:totals.sin_confirmar,enRevision:totals.revision,errores:totals.error});
+  pendientes:totals.sin_confirmar,enRevision:totals.revision,errores:totals.error};
+}
+
+export async function rescatarPagosMPLiveCentral(request,env,{
+ readSigned,fetcher=fetch
+}={}){
+ if(!gate(env))return reply({ok:false,error:'RESCATE_NO_HABILITADO'},503);
+ if(request.method!=='POST'||typeof readSigned!=='function')
+  return reply({ok:false,error:'RESCATE_FIRMA_REQUERIDA'},403);
+ const signed=await readSigned(request,env);
+ if(signed?.error)return reply({ok:false,error:'RESCATE_HMAC'},signed.status||401);
+ if(signed.payload?.schema!=='saber-central-live-staff-reconcile-v1'||
+  signed.payload?.purpose!=='revisar-cobros-pendientes')
+  return reply({ok:false,error:'RESCATE_PARAMETROS'},422);
+ const result=await conciliarPendientesMPLiveAutomatico(env,{fetcher});
+ return reply(result,result.ok?200:503);
 }
