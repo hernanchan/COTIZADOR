@@ -1,0 +1,68 @@
+name: Saber - diagnostico solo lectura acreditacion orden 013
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-diagnostico-transferencia-013-20261113.yml]
+permissions: {contents: read}
+jobs:
+  diagnostico:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      D1TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - name: Inspeccionar solo condiciones bancarias y esquema D1 sin escribir ni revelar datos
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'EOF'
+          const base='https://api.cloudflare.com/client/v4/accounts/'+process.env.ACCOUNT;
+          async function api(path,body=null){
+           const r=await fetch(base+path,{method:body?'POST':'GET',
+            headers:{Authorization:'Bearer '+process.env.D1TOKEN,
+             ...(body?{'Content-Type':'application/json'}:{})},
+            ...(body?{body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(25000)});
+           const j=await r.json().catch(()=>null);
+           if(!r.ok||j?.success!==true)throw Error('D1_HTTP_'+r.status+'_'+String(j?.errors?.[0]?.message||'').slice(0,100));
+           return j.result;
+          }
+          const databases=await api('/d1/database');
+          const db=databases.find(d=>d.name==='saber-pagos-produccion');
+          if(!db?.uuid)throw Error('D1_NOT_FOUND');
+          async function q(sql){const r=await api('/d1/database/'+db.uuid+'/query',{sql});if(!r?.[0]?.success)throw Error('QUERY_FAILED');return r[0].results||[]}
+          const baseSql=[
+           "SELECT n.number AS numero,o.status AS estado_pago,o.amount_ars AS importe,",
+           "CASE WHEN o.paid_at IS NOT NULL THEN 1 ELSE 0 END AS tiene_fecha_pago,",
+           "CASE WHEN o.payment_id IS NULL AND o.preference_id IS NULL THEN 1 ELSE 0 END AS es_transferencia,",
+           "CASE WHEN t.order_id IS NOT NULL THEN 1 ELSE 0 END AS solicitud_creada,",
+           "CASE WHEN v.order_id IS NOT NULL THEN 1 ELSE 0 END AS aviso_cliente,",
+           "CASE WHEN b.order_id IS NOT NULL THEN 1 ELSE 0 END AS banco_acreditado,",
+           "CASE WHEN r.order_id IS NOT NULL THEN 1 ELSE 0 END AS revision_guardada,",
+           "COALESCE(r.state,'sin_revision') AS estado_revision",
+           "FROM central_work_order_numbers n JOIN orders o ON o.id=n.commercial_order_id",
+           "LEFT JOIN central_live_transfer_requests t ON t.order_id=o.id",
+           "LEFT JOIN central_live_transfer_customer_notices v ON v.order_id=o.id",
+           "LEFT JOIN central_live_bank_accreditations b ON b.order_id=o.id",
+           "LEFT JOIN payment_reviews r ON r.order_id=o.id",
+           "WHERE n.number=13"
+          ].join(' ');
+          const rows=await q(baseSql);
+          console.log('SABER_013_ESTADO='+JSON.stringify(rows));
+          const recent=await q(
+           "SELECT (SELECT count(*) FROM central_live_bank_accreditations) AS acreditaciones_total,"+
+           "(SELECT count(*) FROM central_live_bank_accreditations WHERE bank_reference IN "+
+           "(SELECT bank_reference FROM central_live_bank_accreditations GROUP BY bank_reference HAVING count(*)>1)) AS referencias_exactas_duplicadas,"+
+           "(SELECT count(*) FROM payment_reviews WHERE state='verified') AS reviews_verificadas");
+          console.log('SABER_013_BASE_RESUMEN='+JSON.stringify(recent));
+          for(const table of ['orders','payment_reviews','central_live_bank_accreditations','central_live_transfer_requests']){
+           const cols=await q("SELECT name,type,pk FROM pragma_table_info('"+table+"') ORDER BY cid");
+           console.log('SABER_013_COLS_'+table+'='+JSON.stringify(cols));
+           const schema=await q("SELECT sql FROM sqlite_master WHERE type='table' AND name='"+table+"'");
+           const stmt=String(schema?.[0]?.sql||'');
+           console.log('SABER_013_SCHEMA_'+table+'='+JSON.stringify(stmt).slice(0,1400));
+          }
+          EOF
