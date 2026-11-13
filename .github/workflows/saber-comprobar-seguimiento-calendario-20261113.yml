@@ -21,6 +21,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          sleep 25
           node --input-type=module <<'EOF'
           import {mkdir,writeFile} from 'node:fs/promises';
           const root='https://api.cloudflare.com/client/v4/accounts/'+process.env.ACCOUNT+'/workers/scripts/';
