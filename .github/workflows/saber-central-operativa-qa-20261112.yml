@@ -41,6 +41,7 @@ jobs:
             integraciones/mercadopago/pruebas/transferencias-live-central.test.mjs \
             integraciones/autocotizador/recepcion/transferencias-personal-live.test.mjs \
             integraciones/autocotizador/recepcion/clasificar-ploteo-grande-por-rangos.test.mjs \
+            integraciones/autocotizador/recepcion/clasificar-mosaico-grande-muestreo-local.test.mjs \
             integraciones/autocotizador/recepcion/carga-unica-pdf-regresion.test.mjs \
             integraciones/autocotizador/recepcion/pagina-continuar-pago-live.test.mjs
           echo SABER_CENTRAL_PERSONAL_HMAC_AND_BOTH_TRANSPORTS_QA_OK
@@ -73,3 +74,4 @@ jobs:
 # 13/11 QA casos originales: PDF MUNICIPAL FINAL 9 paginas raster grandes; renovacion sesion de transferencia; no repago.
 # 13/11: QA limitar análisis de PDF 60 MiB a páginas elegidas antes de leer raster, sin cobro ni subida.
 # 13/11: QA bloqueo 1-3,5-7: timeout PDF.js de raster pesado, cancelacion y alternativa CAD/Pleno informada.
+# 13/11: probar cotización rápida PDF mosaico de tiras 55MB sin render completo ni permitir tipo CAD falso.
