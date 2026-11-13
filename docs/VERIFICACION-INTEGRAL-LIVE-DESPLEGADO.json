@@ -1,7 +1,11 @@
 {
-  "checkedAt": "2026-11-13T02:54:38.309Z",
+  "checkedAt": "2026-11-13T03:18:15.799Z",
   "schema": "saber-postdeploy-integral-v1",
   "readOnly": true,
+  "deliveryPurgeGates": true,
+  "deliveryPrivateBridge": true,
+  "deliveryStorageReady": true,
+  "deliveryCodeLive": true,
   "docsTUSReady": true,
   "docsR2Ready": true,
   "bankFlowReady": true,
