@@ -213,3 +213,4 @@ jobs:
 # 13/11: protegido - subir TUS y R2 al Ya transferi sin acreditar pago; archivos antes de banco, 2 JPG separados con obra180, QA 43451362838 D1 43450391298 SUCCESS, rollback.
 # 13/11: segundo deploy del piloto protegido con imagenes separadas y banco aviso, QA 43451786688 y preflight D1 43450391298 SUCCESS; test E2E pospago corregido.
 # 13/11: reintento unico tras Cloudflare stage HTTP 500 codigo 10013 de saber-pagos, sin cambios de codigo ni secretos, QA 43451786688 SUCCESS.
+# 13/11: desplegar solo protegidos tras QA 43463870227 SUCCESS: eliminar referencia bancaria del panel, borrar TUS/R2 en Entregado ya verificado y ocultar entregados de Central sin borrar auditoria; heredar bindings por API beta.
