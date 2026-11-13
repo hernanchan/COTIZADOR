@@ -32,9 +32,9 @@ Revisá en Adobe Acrobat escala, tamaño, páginas por cara, doble faz, rollo y 
 directamente al disco, sin acumularlo en memoria. Solo personal autorizado.</small></p>
 <p id="estado" role="status" aria-live="polite">Esperando verificación D1…</p>
 <section id="r2Inspeccion" style="margin-top:24px;border-top:2px solid #d0dae5;padding-top:18px" hidden>
-<h2>Inspección R2 pendiente</h2>
-<p>Para habilitar el ZIP primero revisá el PDF grande original. El pago acreditado no autoriza imprimir sin preprensa.</p>
-<p><button type="button" id="r2Recargar">Ver pedidos pagados</button></p>
+<h2>Inspección de archivos grandes (R2)</h2>
+<p>Los PDF de hasta 40 MiB usan TUS y no necesitan inspección R2. Para un archivo grande, primero revisá el original y registrá la inspección. Después se habilita el ZIP completo con originales e instrucciones A4.</p>
+<p><button type="button" id="r2Recargar">Ver pedidos acreditados (TUS y R2)</button></p>
 <div id="r2Lista" role="status" aria-live="polite"></div>
 <label>Referencia web <input id="r2Order" style="width:100%;padding:9px" placeholder="WEB-ENSAYO-…" /></label>
 <label>Identificador de archivo <input id="r2FileId" style="width:100%;padding:9px" placeholder="pdf_0" /></label>
@@ -42,8 +42,9 @@ directamente al disco, sin acumularlo en memoria. Solo personal autorizado.</sma
 <p id="r2Estado" role="status" aria-live="polite"></p>
 <div id="r2Detalle" hidden>
 <p id="r2Ficha" style="white-space:pre-wrap"></p>
-<a id="r2Descargar" href="#" style="display:inline-block;margin:6px 0 16px">Descargar PDF original para revisar</a>
-<p><strong>Medidas medidas sobre el PDF original (cm)</strong></p>
+<a id="r2Descargar" href="#" style="display:inline-block;margin:6px 0 16px">Descargar SOLO el PDF original para revisar (sin instrucciones)</a>
+<p><small>Este enlace es para inspección, no es el paquete de producción. Después de registrar la inspección, usá «Descargar ZIP completo» arriba para recibir el original y la hoja de instrucciones.</small></p>
+<p><strong>Medidas verificadas sobre el PDF original (cm)</strong></p>
 <p><small>Una línea por página: 21 x 29,7. Para originales de tamaño uniforme, podés usar una sola línea y confirmar todas las páginas.</small></p>
 <textarea id="r2Medidas" rows="5" style="width:100%;font:inherit;padding:10px" placeholder="21 x 29,7"></textarea>
 <p><label><input type="checkbox" id="r2Uniforme"> Verifiqué que todas las páginas son del mismo tamaño</label></p>
