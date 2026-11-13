@@ -116,3 +116,17 @@ test('pantalla de personal no usa comprobante del cliente como prueba de pago',(
  assert.match(html,/personal\/transferencias.js/);
  assert.doesNotThrow(()=>new Function(js));
 });
+
+test('la pantalla bancaria conserva el número de operación al refrescar y evita alert genéricos',()=>{
+ const html=paginaTransferenciasPersonalLive(),js=jsTransferenciasPersonalLive();
+ assert.match(html,/Volver a Central/);
+ assert.match(js,/const drafts=new Map/);
+ assert.match(js,/if\(background&&drafts\.size\)return/);
+ assert.match(js,/reference\.value=saved\.reference/);
+ assert.match(js,/operator\.value=saved\.operator/);
+ assert.match(js,/TRANSFER_LIVE_REFERENCIA_YA_UTILIZADA/);
+ assert.match(js,/TRANSFER_LIVE_ACREDITACION_NO_COMPLETADA/);
+ assert.match(js,/Consultá el número de operación de este movimiento en el banco/);
+ assert.doesNotMatch(js,/alert\('No se acreditó/);
+ assert.doesNotThrow(()=>new Function(js));
+});
