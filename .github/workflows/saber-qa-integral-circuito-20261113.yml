@@ -77,3 +77,5 @@ jobs:
 # Revalidación de purga LIVE tras integrar buckets productivos y tablas opcionales.
 
 # Comprobación final con service binding privado configurado y purga aún OFF.
+
+# QA después de mostrar estado real de eliminación por pedido.
