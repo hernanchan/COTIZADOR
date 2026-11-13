@@ -24,13 +24,14 @@ jobs:
           import fs from 'node:fs';
           const h=fs.readFileSync('/tmp/worker-headers','utf8');
           const s=fs.readFileSync('/tmp/worker-body','utf8');
-          console.log('HTTP_CONTENT_TYPE',h.split('\\n').find(x=>x.toLowerCase().startsWith('content-type:'))?.trim());
-          const first=s.split('\\n')[0].trim();
+          const LF=String.fromCharCode(10),CR=String.fromCharCode(13);
+          console.log('HTTP_CONTENT_TYPE',h.split(LF).find(x=>x.toLowerCase().startsWith('content-type:'))?.trim());
+          const first=s.split(LF)[0].trim();
           console.log('BOUNDARY_LENGTH',first.length,'BODY_BYTES',s.length);
           const chunks=s.split(first);
           console.log('NUMBER_PARTS',chunks.length-2);
           chunks.slice(1,10).forEach((part,i)=>{
-            const sep=part.indexOf('\\r\\n\\r\\n');
+            const sep=part.indexOf(CR+LF+CR+LF);
             const head=sep>=0?part.slice(0,sep):part.slice(0,200);
             console.log('PART_HEADER',i,JSON.stringify(head.slice(0,260)));
           });
