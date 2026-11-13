@@ -275,6 +275,9 @@ async function refresh(){
 document.getElementById('actualizar').addEventListener('click',()=>void refresh());
 document.getElementById('previsionGuardar').addEventListener('click',()=>void saveForecast());
 document.getElementById('agendaGuardar').addEventListener('click',()=>void saveAgenda());
-void refresh();setInterval(()=>{if(!document.hidden)void refresh()},60000);
+void refresh();
+// El primer refresco comprueba de nuevo los cobros conciliados en segundo plano.
+setTimeout(()=>{if(!document.hidden)void refresh()},12000);
+setInterval(()=>{if(!document.hidden)void refresh()},60000);
 </script></body></html>`;
 }
