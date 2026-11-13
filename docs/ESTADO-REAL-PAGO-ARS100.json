@@ -1,0 +1,25 @@
+{
+  "checkedAt": "2026-11-13T00:47:56.193Z",
+  "readOnly": true,
+  "amount": 100,
+  "hostOfficialDeployed": true,
+  "diagnosticErrorsDeployed": true,
+  "cronPresent": true,
+  "cronEveryMinute": true,
+  "orderStatus": [
+    {
+      "status": "awaiting_payment",
+      "n": 1
+    }
+  ],
+  "cronHealth": {
+    "checked_at": "2026-11-13 00:47:45",
+    "checked": 0,
+    "recovered": 0,
+    "pending": 0,
+    "review": 0,
+    "errors": 0,
+    "state": "RESCATE_VENDEDOR_TYPE_ERROR"
+  },
+  "verified100": 0
+}
