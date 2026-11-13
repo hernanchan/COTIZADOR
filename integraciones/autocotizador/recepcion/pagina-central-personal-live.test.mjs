@@ -50,3 +50,15 @@ test('Central muestra aviso de transferencias informadas automáticamente sin de
  assert.match(html,/\/personal\/api\/live-transferencias-pendientes/);
  assert.match(html,/Transferencias avisadas por clientes/);
 });
+
+
+test('R2 no habilita inspección antes del almacenamiento real del PDF',()=>{
+ const html=paginaCentralPersonalLive();
+ assert.match(html,/o\.r2Count>0&&o\.stagedR2Count>0/);
+ assert.match(html,/Inspeccionar PDF R2 almacenado/);
+ assert.match(html,/Esperando el envío automático desde el navegador/);
+ assert.doesNotMatch(html,/element\('a','Verificar PDF R2'\)/);
+ const match=html.match(/<script>([\s\S]*?)<\/script>/);
+ assert.ok(match);
+ assert.doesNotThrow(()=>new Function(match[1]));
+});
