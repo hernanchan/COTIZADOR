@@ -39,6 +39,8 @@ export async function cambiarEstadoPersonalDocumentosLive(request,env,{authorize
   if(!response.ok||result?.ok!==true)return reply({ok:false,error:result?.error||'ESTADO_CENTRAL',status:response.status},response.status);
   if(result.orderId!==p.orderId||result.to!==p.to||result.version!==p.version+1)
    return reply({ok:false,error:'ESTADO_CENTRAL_INCONSISTENTE'},502);
-  return reply({ok:true,orderId:result.orderId,to:result.to,version:result.version});
+  return reply({ok:true,orderId:result.orderId,to:result.to,version:result.version,
+   ...(p.to==='entregado'?{purge:result.purge||'pending_retry',
+    originalsDeleted:result.originalsDeleted===true}:{})});
  }catch{return reply({ok:false,error:'ESTADO_CONEXION_CENTRAL'},503)}
 }
