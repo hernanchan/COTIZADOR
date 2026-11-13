@@ -5,6 +5,8 @@
  */
 import {sha256PdfLocalPorFragmentos} from './sha256-pdf-local-fragmentos.mjs';
 import {iniciarCheckoutLiveCliente} from './checkout-live-cliente.mjs';
+import {guardarOriginalesLive,leerOriginalesLive} from './custodia-local-originales-live.mjs';
+export {leerOriginalesLive,borrarOriginalesLive} from './custodia-local-originales-live.mjs';
 const MIB=1048576,WEB=/^WEB-ENSAYO-[A-F0-9]{32}$/;
 const SHA=/^[a-f0-9]{64}$/,UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 async function post(fetcher,path,body){
@@ -83,6 +85,11 @@ export function crearFlujoPresupuestoLive({
     throw Error('LIVE_FLUJO_ORDEN_INCONSISTENTE');
    order={webOrderId,commercialOrderId:result.commercialOrderId,
     amountArs:result.totalArs,fileCount:files.length,numeroOrden:result.numeroOrden};
+   // Los PDF originales deben persistir antes de permitir el pago.
+   setState('conservando_originales');
+   await guardarOriginalesLive({files,metas,webOrderId,
+    commercialOrderId:order.commercialOrderId,
+    onProgress:p=>onProgress({phase:p.phase,total:files.length})});
    // Guardar referencia y manifiesto en esta pestaña en cuanto Central confirma
    // la orden: recuperarla no puede depender de haber pulsado Mercado Pago.
    storage.setItem('saber-live-archivos-v1',JSON.stringify({
@@ -96,6 +103,8 @@ export function crearFlujoPresupuestoLive({
   const {numeroOrden,...orden}=order;
   if(!metas||metas.some(m=>!['bn','color'].includes(m.mode)||
     m.pages<1||m.pages>2000))throw Error('LIVE_METAS_POSTPAGO_INVALIDAS');
+  // Bloquear el pago si se perdió alguno de los File locales.
+  await leerOriginalesLive({webOrderId,commercialOrderId:order.commercialOrderId,metas});
   // Sin estos metadatos persistidos, no abrir Checkout: después del
   // redirect habría pago sin posibilidad de verificar los PDF originales.
   storage.setItem('saber-live-archivos-v1',JSON.stringify({
