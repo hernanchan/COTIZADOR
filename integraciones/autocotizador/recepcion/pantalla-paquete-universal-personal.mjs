@@ -44,13 +44,12 @@ directamente al disco, sin acumularlo en memoria. Solo personal autorizado.</sma
 <p id="r2Ficha" style="white-space:pre-wrap"></p>
 <a id="r2Descargar" href="#" style="display:inline-block;margin:6px 0 16px">Descargar SOLO el PDF original para revisar (sin instrucciones)</a>
 <p><small>Este enlace es para inspección, no es el paquete de producción. Después de registrar la inspección, usá «Descargar ZIP completo» arriba para recibir el original y la hoja de instrucciones.</small></p>
-<p><strong>Medidas verificadas sobre el PDF original (cm)</strong></p>
-<p><small>Una línea por página: 21 x 29,7. Para originales de tamaño uniforme, podés usar una sola línea y confirmar todas las páginas.</small></p>
-<textarea id="r2Medidas" rows="5" style="width:100%;font:inherit;padding:10px" placeholder="21 x 29,7"></textarea>
-<p><label><input type="checkbox" id="r2Uniforme"> Verifiqué que todas las páginas son del mismo tamaño</label></p>
+<p><strong>Medidas originales y tamaño de impresión</strong></p>
+<p id="r2Formato" style="font-size:16px;font-weight:650">Consultando la configuración del pedido…</p>
+<p><small>Las dimensiones originales se leen de la cotización vinculada al mismo PDF (SHA-256). No hace falta ingresar una medida por página: un original mixto puede imprimirse entero ajustado a A4, tal como lo pidió el cliente. Revisá el PDF real antes de confirmar.</small></p>
 <p><label>Responsable <input id="r2Operador" style="width:100%;padding:9px" maxlength="60" /></label></p>
-<p><label><input type="checkbox" id="r2Verificado"> Revisé el archivo real, todas sus páginas y sus medidas; las dimensiones son correctas.</label></p>
-<button type="button" id="r2Aprobar">Registrar inspección en Central</button>
+<p><label><input type="checkbox" id="r2Verificado"> Revisé el PDF original y la cantidad de páginas; confirmé que el pedido se imprimirá en el formato final elegido por el cliente. Las medidas originales se contrastan automáticamente con su cotización y el archivo no queda autorizado para imprimir hasta la revisión de preprensa.</label></p>
+<button type="button" id="r2Aprobar">Registrar revisión del original</button>
 </div>
 </section>
 </main><script>
