@@ -24,18 +24,26 @@
     const item=document.createElement('div');
     item.style.cssText='padding:9px 0;border-bottom:1px solid #dde5ec';
     const label=document.createElement('span');
+    const tusCount=Math.max(0,Number(x.fileCount)-Number(x.r2Count));
     label.textContent='Orden '+x.numeroOrden+' · '+x.estado+' · '+x.fileCount+
-     ' PDF · R2 '+x.r2Count+' · Pendientes '+x.pendingCount+' · $ '+Number(x.amountArs).toLocaleString('es-AR');
+     ' PDF · TUS '+tusCount+' · R2 '+x.r2Count+
+     ' · Inspecciones R2 pendientes '+x.pendingCount+' · $ '+
+     Number(x.amountArs).toLocaleString('es-AR');
     item.append(label);
     const use=document.createElement('button');
-    use.type='button';use.textContent='Usar referencia';
+    use.type='button';
+    use.textContent=Number(x.r2Count)===0?'Abrir pedido TUS':
+     Number(x.pendingCount)===0?'Abrir ZIP completo':'Inspeccionar PDF R2';
     use.style.marginLeft='10px';
     use.addEventListener('click',()=>{
+     if(Number(x.r2Count)===0||Number(x.pendingCount)===0){
+      location.assign('/personal/paquete?webOrderId='+encodeURIComponent(x.webOrderId));
+      return;
+     }
      order.value=x.webOrderId;
      const chosen=Array.isArray(x.stagedR2FileIds)?x.stagedR2FileIds[0]:null;
-     if(typeof chosen==='string'&&/^[A-Za-z0-9_-]{1,80}$/.test(chosen))
-      file.value=chosen;
-     else if(!file.value)file.value='';
+     file.value=typeof chosen==='string'&&/^[A-Za-z0-9_-]{1,80}$/.test(chosen)?
+      chosen:'';
      if(file.value)q('r2Consultar').click();
      section.scrollIntoView({behavior:'smooth'});
     });
