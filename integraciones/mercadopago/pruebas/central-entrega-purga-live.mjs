@@ -56,14 +56,19 @@ export async function planEntregaLive(env,orderId,{state='listo',version}={}){
    order.status!=='paid'||!order.paid_at||order.amount_ars!==order.deposit_ars||
    order.amount_ars!==order.link_amount||order.state!==state||order.version!==version||
    !Number.isSafeInteger(order.file_count)||order.file_count<1||order.file_count>10)return null;
+ const inspectionTable=await db.prepare(
+  "SELECT name FROM sqlite_master WHERE type='table' AND name='central_r2_live_inspections'").first();
+ const inspectionSql=inspectionTable?
+  "CASE WHEN EXISTS(SELECT 1 FROM central_r2_live_inspections i "+
+  "WHERE i.web_order_id=f.web_order_id AND i.file_id=f.file_id AND i.sha256=f.sha256) "+
+  "THEN 1 ELSE 0 END AS inspected ":
+  "0 AS inspected ";
  const rows=await db.prepare(
   "SELECT f.file_id,f.transport,f.web_order_id,f.sha256,f.bytes,f.received,"+
   "t.receipt_id AS tus_receipt,t.object_name AS tus_key,t.sha256 AS tus_sha,t.bytes AS tus_bytes,"+
   "r.receipt_id AS r2_receipt,r.object_key AS r2_key,r.etag AS r2_etag,"+
   "r.sha256 AS r2_sha,r.bytes AS r2_bytes,r.status AS r2_status,"+
-  "CASE WHEN EXISTS(SELECT 1 FROM central_r2_live_inspections i "+
-  "WHERE i.web_order_id=f.web_order_id AND i.file_id=f.file_id AND i.sha256=f.sha256) "+
-  "THEN 1 ELSE 0 END AS inspected "+
+  inspectionSql+
   "FROM central_r2_universal_files f "+
   "LEFT JOIN central_r2_universal_tus_receipts t ON t.web_order_id=f.web_order_id AND t.file_id=f.file_id "+
   "LEFT JOIN central_r2_large_pending r ON r.web_order_id=f.web_order_id AND r.file_id=f.file_id "+
