@@ -29,7 +29,7 @@ jobs:
             if [ "$status" = 200 ];then
               jq -c --arg key "$name" 'if .success==true then
                if $key=="express_pages" then {name:.result.name,production_branch:.result.production_branch,domains:.result.domains,preview_automatic_deployments_enabled:.result.preview_automatic_deployments_enabled,production_deployments_enabled:.result.production_deployments_enabled}
-               elif $key=="central_settings" or $key=="express_worker_settings" then {bindings:[.result.bindings[]?|{name,type,value:(if .type=="plain_text" or .type=="text" then .text else null end)}]}
+               elif $key=="central_settings" or $key=="express_worker_settings" then {bindings:[.result.bindings[]?|{name,type}]}
                elif $key=="central_deployments" or $key=="express_worker_deployments" then {deployments:[.result.deployments[0].versions[]?|{version_id,percentage}]}
                else {ok:true} end
                else {success:.success,errors:[.errors[]?|{code,message}]} end' "$tmp/$name.json" | sed "s/^/SABER_EXPRESS_REMOTE $name /"
