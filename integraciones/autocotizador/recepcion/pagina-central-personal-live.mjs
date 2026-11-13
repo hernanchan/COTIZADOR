@@ -24,7 +24,8 @@ button:disabled{opacity:.55}select{padding:10px;border:1px solid #b3cad9;border-
 </style></head><body><main>
 <header><h1>Central de Pedidos · Librería Saber</h1><div class="row">
 <a class="action" href="/personal/transferencias">Transferencias por verificar</a>
-<button id="actualizar">Actualizar</button></div></header>
+<button id="actualizar">Actualizar</button><button id="revisarMPLive" type="button">Verificar cobros Mercado Pago</button></div></header>
+<p id="rescateMP" role="status" aria-live="polite"></p>
 <section class="forecast" aria-labelledby="previsionTitle"><h2 id="previsionTitle">Previsión general de entrega</h2><p id="previsionEstado" role="status">Consultando previsión…</p><p id="previsionCliente" role="status" aria-live="polite">Verificando lo que ve el cliente…</p><div class="row"><label for="previsionModo">Plazo orientativo para pedidos nuevos</label><select id="previsionModo"><option value="por_confirmar">A confirmar</option><option value="hoy">Durante el día de hoy</option><option value="hoy_tarde">Hoy por la tarde</option><option value="proximo_dia">Próximo día de atención</option></select><button id="previsionGuardar" type="button">Guardar previsión</button></div><small>La fecha y hora exactas se fijan por pedido al comenzar la preparación. No se asignan automáticamente.</small></section>
 <section class="forecast" aria-labelledby="agendaTitle">
 <h2 id="agendaTitle">Días y horarios de atención</h2>
@@ -196,6 +197,24 @@ async function saveAgenda(){
  }catch(e){window.alert('No se guardó la agenda: '+String(e.message||e));}
  finally{button.disabled=false;}
 }
+async function revisarCobrosMPLive(){
+ const button=document.getElementById('revisarMPLive');
+ const estado=document.getElementById('rescateMP');
+ if(!window.confirm('¿Consultar a Mercado Pago los cobros pendientes? Solo se acreditarán pagos aprobados cuyo vendedor, importe y orden coincidan. No genera nuevos cobros.'))return;
+ button.disabled=true;
+ estado.textContent='Verificando cobros pendientes directamente con Mercado Pago…';
+ try{
+  const r=await fetch('/personal/api/live-reconcile',{method:'POST',credentials:'same-origin',
+   headers:{'Content-Type':'application/json'},body:'{}',signal:AbortSignal.timeout(60000)});
+  const d=await r.json().catch(()=>null);
+  if(!r.ok||d?.ok!==true)throw Error(d?.error||('HTTP '+r.status));
+  estado.textContent='Verificados: '+d.revisados+' · Pagos recuperados: '+d.recuperados+
+   ' · Sin pago confirmado: '+d.pendientes+' · Requieren revisión: '+d.enRevision+
+   ' · Errores de consulta: '+d.errores+'.';
+  await refresh();
+ }catch(e){estado.textContent='No se completó la verificación: '+String(e.message||e)+'. No se generó ningún cobro.';}
+ finally{button.disabled=false;}
+}
 async function refresh(){
 
  if(working)return;working=true;info.textContent='Actualizando pedidos pagados…';
@@ -273,6 +292,7 @@ async function refresh(){
  finally{working=false;}
 }
 document.getElementById('actualizar').addEventListener('click',()=>void refresh());
+document.getElementById('revisarMPLive').addEventListener('click',()=>void revisarCobrosMPLive());
 document.getElementById('previsionGuardar').addEventListener('click',()=>void saveForecast());
 document.getElementById('agendaGuardar').addEventListener('click',()=>void saveAgenda());
 void refresh();setInterval(()=>{if(!document.hidden)void refresh()},60000);
