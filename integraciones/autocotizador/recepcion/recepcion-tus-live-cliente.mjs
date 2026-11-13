@@ -43,7 +43,7 @@ export function leerPedidoPostpagoLive(storage){
 export async function enviarPDFsTUSPagadosLive({
  selectedFiles,storage=sessionStorage,origin=location.origin,
  fetcher=fetch,hasher=sha256PdfLocalPorFragmentos,
- onProgress=()=>{},
+ onProgress=()=>{},allowPendingBank=false,
  loadUploader=()=>import('https://releases.transloadit.com/uppy/v3.6.1/uppy.min.mjs')
 }={}){
  if(origin!==HOST||!Array.isArray(selectedFiles)||
@@ -75,13 +75,19 @@ export async function enviarPDFsTUSPagadosLive({
  if(verified.some(v=>!v.used))throw Error('LIVE_TUS_ARCHIVO_EXTRA');
  if(total>60*MIB)throw Error('LIVE_TUS_CUPO_EXCEDIDO');
  // Esta respuesta procede de la conciliación en D1, nunca de parámetros MP.
- const status=await post(fetcher,'/api/pedido/live/checkout',{
+ const path=allowPendingBank?'/api/pedido/live/transfer':'/api/pedido/live/checkout';
+ const status=await post(fetcher,path,{
   action:'status',webOrderId:order.webOrderId,commercialOrderId:order.commercialOrderId});
+ const bankPending=allowPendingBank&&status.estado==='transferencia_informada'&&
+  status.customerNotified===true&&status.paymentVerified===false&&
+  status.uploadAuthorized===false;
+ const paid=status.estado==='pagado_esperando_archivos'&&
+  status.uploadAuthorized===true;
  if(status.webOrderId!==order.webOrderId||
   status.commercialOrderId!==order.commercialOrderId||
-  status.estado!=='pagado_esperando_archivos'||status.uploadAuthorized!==true||
-  status.productionAuthorized!==false||status.fileCount!==metas.length)
-  throw Error('LIVE_TUS_PAGO_NO_CONCILIADO');
+  !(bankPending||paid)||status.productionAuthorized!==false||
+  (paid&&status.fileCount!==metas.length))
+  throw Error('LIVE_TUS_PAGO_O_AVISO_NO_CONCILIADO');
  const started=await post(fetcher,'/api/pedido/live/tus/iniciar',{orderId:order.webOrderId,
   metas:work.map(t=>({fileId:t.meta.fileId,name:t.meta.name,sha256:t.meta.sha256,
    bytes:t.meta.bytes,pages:t.meta.pages,mode:t.meta.mode}))});
