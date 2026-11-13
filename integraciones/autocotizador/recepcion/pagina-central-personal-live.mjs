@@ -23,7 +23,7 @@ button:disabled{opacity:.55}select{padding:10px;border:1px solid #b3cad9;border-
 @media(max-width:800px){.board{grid-template-columns:1fr;overflow:visible}.lane{min-height:80px}}
 </style></head><body><main>
 <header><h1>Central de Pedidos · Librería Saber</h1><div class="row">
-<a class="action" href="/personal/transferencias">Transferencias por verificar</a>
+<a class="action" id="transferenciasAviso" href="/personal/transferencias" role="status" aria-live="polite">Transferencias informadas: consultando…</a>
 <button id="actualizar">Actualizar</button></div></header>
 <section class="forecast" aria-labelledby="previsionTitle"><h2 id="previsionTitle">Previsión general de entrega</h2><p id="previsionEstado" role="status">Consultando previsión…</p><p id="previsionCliente" role="status" aria-live="polite">Verificando lo que ve el cliente…</p><div class="row"><label for="previsionModo">Plazo orientativo para pedidos nuevos</label><select id="previsionModo"><option value="por_confirmar">A confirmar</option><option value="hoy">Durante el día de hoy</option><option value="hoy_tarde">Hoy por la tarde</option><option value="proximo_dia">Próximo día de atención</option></select><button id="previsionGuardar" type="button">Guardar previsión</button></div><small>La fecha y hora exactas se fijan por pedido al comenzar la preparación. No se asignan automáticamente.</small></section>
 <section class="forecast" aria-labelledby="agendaTitle">
@@ -274,6 +274,25 @@ async function saveAgenda(){
  }catch(e){window.alert('No se guardó la agenda: '+String(e.message||e));}
  finally{button.disabled=false;}
 }
+async function actualizarAvisosTransferencia(){
+ const target=document.getElementById('transferenciasAviso');
+ try{
+  const response=await fetch('/personal/api/live-transferencias-pendientes',
+   {credentials:'same-origin',cache:'no-store'});
+  const result=await response.json().catch(()=>null);
+  if(!response.ok||result?.ok!==true||!Array.isArray(result.pending))throw Error('Sin conexión');
+  const reported=result.pending.filter(r=>r.customerNotified===true).length;
+  const unreported=result.pending.length-reported;
+  target.textContent='Transferencias avisadas por clientes: '+reported+
+   (unreported?' · Solicitudes sin aviso: '+unreported:'');
+  target.style.background=reported?'#ffe3a9':'#dde9f1';
+  target.style.color='#143b61';
+  target.title=reported?'Hay pagos informados que deben verificarse en la cuenta bancaria':
+   'Todavía no hay avisos de transferencia; no significa que todos los pagos estén acreditados';
+ }catch{
+  target.textContent='No se pudo consultar los avisos de transferencias';
+ }
+}
 async function refresh(){
 
  if(working)return;working=true;info.textContent='Actualizando pedidos pagados…';
@@ -354,6 +373,8 @@ document.getElementById('actualizar').addEventListener('click',()=>void refresh(
 document.getElementById('previsionGuardar').addEventListener('click',()=>void saveForecast());
 document.getElementById('agendaGuardar').addEventListener('click',()=>void saveAgenda());
 void refresh();
+void actualizarAvisosTransferencia();
+setInterval(()=>{if(!document.hidden)void actualizarAvisosTransferencia()},15000);
 // El primer refresco comprueba de nuevo los cobros conciliados en segundo plano.
 setTimeout(()=>{if(!document.hidden)void refresh()},12000);
 setInterval(()=>{if(!document.hidden)void refresh()},60000);
