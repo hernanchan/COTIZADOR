@@ -229,7 +229,8 @@ test('una referencia usada en otro movimiento es conflicto específico, sin modi
  const original=f.db.prepare;
  let batches=0;
  f.db.prepare=sql=>{
-  if(sql.includes("REPLACE(bank_reference,' ','-')")){
+  if(sql.startsWith("SELECT order_id FROM central_live_bank_accreditations ")&&
+     sql.includes("REPLACE(bank_reference,' ','-')")){
    return {bind(){return this},first:async()=>({order_id:'123e4567-e89b-42d3-a456-426614174999'})};
   }
   return original(sql);
