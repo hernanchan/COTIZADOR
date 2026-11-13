@@ -193,3 +193,4 @@ jobs:
 # Entregados informa borrado confirmado/pendiente sin revelar Storage.
 
 # UI: listado automático R2 en paquete sin ID y seguimiento de staging real.
+# 13/11: incorporar revisión de PDF mixto a A4 sin medidas manuales, alias destacado y aviso de subida tras QA 43412759252.
