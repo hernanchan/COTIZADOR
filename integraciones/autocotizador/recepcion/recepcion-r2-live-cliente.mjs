@@ -20,7 +20,7 @@ export async function enviarPDFsR2PagadosLive({
  selectedFiles,storage=typeof sessionStorage==='undefined'?null:sessionStorage,
  origin=typeof location==='undefined'?null:location.origin,
  fetcher=fetch,hasher=sha256PdfLocalPorFragmentos,
- uploader=enviarArchivoR2Grande,onProgress=()=>{}
+ uploader=enviarArchivoR2Grande,onProgress=()=>{},allowPendingBank=false
 }={}){
  if(origin!==ORIGIN||!Array.isArray(selectedFiles)||
   typeof fetcher!=='function'||typeof hasher!=='function'||
@@ -51,13 +51,27 @@ export async function enviarPDFsR2PagadosLive({
   match.used=true;jobs.push({file:match.file,meta:m});
  }
  if(originals.some(x=>!x.used))throw Error('LIVE_R2_ORIGINAL_EXTRA');
- const status=await post(fetcher,{action:'status',
+ const status=allowPendingBank?await (async()=>{
+  const r=await fetcher('/api/pedido/live/transfer',{method:'POST',
+   credentials:'same-origin',redirect:'error',
+   headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    action:'status',webOrderId:order.webOrderId,
+    commercialOrderId:order.commercialOrderId})});
+  const d=await r.json().catch(()=>null);
+  if(!r.ok||d?.ok!==true)throw Error('LIVE_R2_AVISO_BANCARIO_NO_VALIDO');
+  return d;
+ })():await post(fetcher,{action:'status',
   webOrderId:order.webOrderId,commercialOrderId:order.commercialOrderId});
+ const bankPending=allowPendingBank&&status.estado==='transferencia_informada'&&
+  status.customerNotified===true&&status.paymentVerified===false&&
+  status.uploadAuthorized===false;
+ const paid=status.estado==='pagado_esperando_archivos'&&
+  status.uploadAuthorized===true;
  if(status.webOrderId!==order.webOrderId||
   status.commercialOrderId!==order.commercialOrderId||
-  status.estado!=='pagado_esperando_archivos'||status.uploadAuthorized!==true||
-  status.productionAuthorized!==false||status.fileCount!==metas.length)
-  throw Error('LIVE_R2_PAGO_NO_CONCILIADO');
+  !(bankPending||paid)||status.productionAuthorized!==false||
+  (paid&&status.fileCount!==metas.length))
+  throw Error('LIVE_R2_PAGO_O_AVISO_NO_CONCILIADO');
  const results=[];
  const batchBytes=jobs.reduce((sum,j)=>sum+j.file.size,0);
  let confirmedBytes=0;
