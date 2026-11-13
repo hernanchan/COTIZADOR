@@ -60,6 +60,22 @@ jobs:
            if(t.length)result.cronHealth=(await read("SELECT checked_at,checked,recovered,pending,review,errors,state FROM central_mp_live_auto_health WHERE id=1"))[0]||null;
            const reviews=await read("SELECT COUNT(*) AS n FROM orders o INNER JOIN payment_reviews r ON r.order_id=o.id AND r.state='verified' WHERE o.amount_ars=100 AND datetime(o.created_at)>=datetime('now','-48 hours')");
            result.verified100=reviews[0]?.n||0;
+           const detailSql=[
+            "SELECT o.status AS estado,p.state AS pago_verificado,",
+            "COALESCE(n.number,0) AS numero_orden,d.file_count AS archivos_esperados,",
+            "COUNT(f.file_id) AS archivos_registrados,",
+            "SUM(CASE WHEN f.received=1 THEN 1 ELSE 0 END) AS originales_recibidos,",
+            "SUM(CASE WHEN f.transport='tus' THEN 1 ELSE 0 END) AS archivos_tus,",
+            "SUM(CASE WHEN f.transport='r2' THEN 1 ELSE 0 END) AS archivos_r2",
+            "FROM orders o JOIN payment_reviews p ON p.order_id=o.id",
+            "JOIN central_r2_universal_order_links l ON l.commercial_order_id=o.id",
+            "JOIN central_r2_universal_drafts d ON d.web_order_id=l.web_order_id",
+            "JOIN central_r2_universal_files f ON f.web_order_id=l.web_order_id",
+            "LEFT JOIN central_work_order_numbers n ON n.commercial_order_id=o.id",
+            "WHERE o.amount_ars=100 AND datetime(o.created_at)>=datetime('now','-48 hours')",
+            "GROUP BY o.status,p.state,n.number,d.file_count"
+           ].join(' ');
+           result.centralEligibility=await read(detailSql);
           }catch(e){result.d1Error=String(e.message||e).slice(0,50)}
           // Esperar el siguiente cron tras el despliegue del diagnóstico, sin enviar solicitudes comerciales.
           try{
