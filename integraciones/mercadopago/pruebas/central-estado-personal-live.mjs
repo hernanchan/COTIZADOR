@@ -40,9 +40,22 @@ export async function cambiarEstadoCentralPersonalLive(request,env,{readSigned}=
    typeof p.reason!=='string'||p.reason.length>180||
    (p.to==='en_espera'&&p.reason.trim().length<5))
   return reply({ok:false,error:'ESTADO_PARAMETROS'},422);
- // La purga LIVE no está conectada al nuevo estado: no marcar entregado
- // sin ejecutar la política de eliminación de originales.
- if(p.to==='entregado')return reply({ok:false,error:'ESTADO_ENTREGA_REQUIERE_PURGA'},409);
+ // Preparar cola inmutable ANTES de marcar entregado: si falla D1, no se
+ // cambia el estado. Si la transición falla, la cola no puede borrar nada,
+ // porque el procesador exige estado='entregado' y versión exacta.
+ let purge=null;
+ if(p.to==='entregado'){
+  if(env.CENTRAL_LIVE_PURGE_GATE!==GO||
+     env.CENTRAL_LIVE_PURGE_EXECUTE_GATE!==GO)
+   return reply({ok:false,error:'ESTADO_ENTREGA_PURGA_DESACTIVADA'},503);
+  try{
+   const {encolarEntregaLive}=await import('./central-entrega-purga-live.mjs');
+   purge=await encolarEntregaLive(env,p.orderId,p.version+1,{preflight:true});
+  }catch{return reply({ok:false,error:'ESTADO_ENTREGA_PURGA_NO_PREPARADA'},503)}
+  if(!['pending','deleted'].includes(purge?.state)||
+    !Number.isSafeInteger(purge.totalFiles)||purge.totalFiles<1)
+   return reply({ok:false,error:'ESTADO_ENTREGA_PURGA_NO_PREPARADA'},409);
+ }
  const db=env.DB;
  try{
   const paid=await db.prepare(
@@ -74,6 +87,19 @@ export async function cambiarEstadoCentralPersonalLive(request,env,{readSigned}=
   ]);
   if(results?.[0]?.meta?.changes!==1||results?.[1]?.meta?.changes!==1)
     return reply({ok:false,error:'ESTADO_D1_CONCURRENCIA'},409);
+  if(p.to==='entregado'){
+   // Entregado es definitivo; si Storage falla se conserva la cola para cron.
+   // No se promete borrado hasta verificar la ausencia de todos los objetos.
+   let cleanup;
+   try{
+    const {procesarEntregaLive}=await import('./central-entrega-purga-live.mjs');
+    cleanup=await procesarEntregaLive(env,p.orderId);
+   }catch{cleanup={state:'pending_retry',deleted:0}}
+   return reply({ok:true,orderId:p.orderId,from:p.from,to:p.to,
+    version:p.version+1,operator:p.operator.trim(),
+    purge:cleanup?.state||'pending_retry',
+    originalsDeleted:cleanup?.state==='deleted'});
+  }
   return reply({ok:true,orderId:p.orderId,from:p.from,to:p.to,version:p.version+1,operator:p.operator.trim()});
  }catch{return reply({ok:false,error:'ESTADO_D1_NO_DISPONIBLE'},503)}
 }
