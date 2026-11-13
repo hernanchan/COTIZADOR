@@ -1,0 +1,54 @@
+name: Saber - prueba catálogo público productos solo lectura
+on:
+  push:
+    branches: [qa/catalogo-publico-20261113]
+    paths: ['.github/workflows/saber-catalogo-publico-qa-20261113.yml']
+permissions: {contents: read}
+jobs:
+  diagnostico:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verificar cuatro imágenes locales y su publicación
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,pathlib,imghdr
+          root=pathlib.Path('vidriera')
+          m=json.loads((root/'fotos-productos.json').read_text())
+          assert m['schema']=='saber-fotos-productos-local-v1'
+          for code,asset in m['images'].items():
+              p=root/asset
+              assert p.exists() and p.is_file() and p.stat().st_size>500, (code,asset)
+              print('IMAGEN_LOCAL_OK',code,asset,p.stat().st_size)
+          PY
+          for path in /assets/productos/b33e5bd35000d1bf.jpg /assets/productos/e0c783d035cdfa9a.png /assets/productos/202f3ac8f5fa4993.png /assets/productos/0443ba378bdc7e65.jpg;do
+            status=$(curl -fsSL --connect-timeout 12 --max-time 25 -w '%{http_code}' -o /tmp/product-img "https://libreriasaber.com.ar$path") || status=000
+            test "$status" = 200
+            test "$(wc -c </tmp/product-img)" -gt 500
+            echo "IMAGEN_PUBLICADA_OK $path"
+          done
+      - name: Verificar planilla CSV publicada y correspondencia de productos
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://docs.google.com/spreadsheets/d/e/2PACX-1vQx2zW0YP23ZjZMvLwkX_mkbPQgVPL_aUUtcI_n1ApZ6P9F4fBuKFOl-jB4qFmxwoeYsszAZSKbaUVn/pub?gid=419356696&single=true&output=csv'
+          curl -fsSL --connect-timeout 12 --max-time 35 -A 'Mozilla/5.0' "$url" -o /tmp/saber-catalog.csv
+          python3 - <<'PY'
+          import csv,json,pathlib,re
+          with open('/tmp/saber-catalog.csv',encoding='utf-8-sig',newline='') as f: rows=list(csv.DictReader(f))
+          assert len(rows)>0, 'CSV vacío'
+          required={'Activo','Categoría','Producto','Descripción','Precio','Oferta','Foto','Código'}
+          assert required.issubset(rows[0].keys()), 'Faltan columnas esperadas'
+          active=[x for x in rows if x['Activo'].strip().lower() in {'si','true','1','x'}]
+          photos=json.loads(pathlib.Path('vidriera/fotos-productos.json').read_text())['images']
+          assert len(active)>=1,'No hay productos activos'
+          for item in active:
+              code=item['Código'].strip()
+              ok=code in photos
+              print('PRODUCTO_ACTIVO',code,'CON_FOTO_LOCAL' if ok else 'SIN_FOTO_LOCAL')
+          print('SABER_CATALOGO_PUBLICADO_OK ACTIVOS',len(active),'CON_FOTO_LOCAL',sum(x['Código'].strip() in photos for x in active))
+          PY
+          echo SABER_CATALOGO_LECTURA_OK_SIN_CAMBIOS
