@@ -29,7 +29,7 @@ export async function transferenciaLiveComprador(req,env,{
  let p;try{p=JSON.parse(raw)}catch{}
  if(!p||typeof p!=='object'||Array.isArray(p)||
     Object.keys(p).sort().join(',')!=='action,commercialOrderId,webOrderId'||
-    !['start','status'].includes(p.action)||!UUID.test(p.commercialOrderId||'')||
+    !['start','status','notify'].includes(p.action)||!UUID.test(p.commercialOrderId||'')||
     !WEB.test(p.webOrderId||''))return reply({ok:false,error:'TRANSFER_LIVE_IDENTIDAD'},422);
  const signed={
   schema:'saber-central-live-transfer-'+p.action+'-v1',
@@ -56,15 +56,17 @@ export async function transferenciaLiveComprador(req,env,{
  if(data.webOrderId!==p.webOrderId||data.commercialOrderId!==p.commercialOrderId||
     !Number.isSafeInteger(data.amountArs)||data.amountArs<1||
     data.productionAuthorized!==false||
-    (data.estado==='transferencia_pendiente'?
+    (['transferencia_pendiente','transferencia_informada'].includes(data.estado)?
       data.paymentVerified!==false||data.uploadAuthorized!==false||
-      !/^[A-Za-z0-9._-]{6,50}$/.test(data.alias||''):
+      !/^[A-Za-z0-9._-]{6,50}$/.test(data.alias||'')||
+      (data.estado==='transferencia_informada'&&data.customerNotified!==true)||
+      (p.action==='notify'&&data.customerNotified!==true):
      data.estado!=='pagado_esperando_archivos'||
       data.paymentVerified!==true||data.uploadAuthorized!==true))
   return reply({ok:false,error:'TRANSFER_LIVE_RESPUESTA_INCONSISTENTE'},502);
  return reply({ok:true,webOrderId:p.webOrderId,commercialOrderId:p.commercialOrderId,
   amountArs:data.amountArs,estado:data.estado,
-  ...(data.estado==='transferencia_pendiente'?{alias:data.alias}:{}),
+  ...(['transferencia_pendiente','transferencia_informada'].includes(data.estado)?{alias:data.alias,customerNotified:data.customerNotified===true}:{}),
   paymentVerified:data.paymentVerified,uploadAuthorized:data.uploadAuthorized,
   productionAuthorized:false});
 }
