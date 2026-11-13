@@ -19,10 +19,11 @@ export async function listarRecepcionUniversalLive(request,env,{authorized=false
  let rows;
  try{
   const existing=(await env.DB.prepare(
-   "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('central_live_bank_accreditations','central_order_contacts','central_order_customer_details')"
+   "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('central_live_bank_accreditations','central_order_contacts','central_order_customer_details','central_live_order_archives')"
   ).all()).results||[];
   const names=new Set(existing.map(v=>v.name));
   const bank=names.has('central_live_bank_accreditations');
+  const hasArchives=names.has('central_live_order_archives');
   const hasPhone=names.has('central_order_contacts');
   const hasCustomer=names.has('central_order_customer_details');
   const hasProduction=(await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='central_live_production_states'").first())!=null;
@@ -62,6 +63,7 @@ export async function listarRecepcionUniversalLive(request,env,{authorized=false
    "WHERE o.status='paid' AND o.paid_at IS NOT NULL "+
    'AND o.amount_ars=o.deposit_ars AND o.amount_ars=l.amount_ars '+
    paymentClause+
+   (hasArchives?'AND NOT EXISTS(SELECT 1 FROM central_live_order_archives a WHERE a.order_id=o.id) ':'')+
    'GROUP BY l.commercial_order_id,l.web_order_id,n.number'+
    (hasPhone?',c.phone':'')+(hasCustomer?',k.name,k.address':'')+
    (hasProduction?',s.state,s.version':'')+','+
