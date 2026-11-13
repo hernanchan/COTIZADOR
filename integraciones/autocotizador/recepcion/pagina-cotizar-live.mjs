@@ -314,8 +314,32 @@ action.addEventListener('click',async()=>{
       throw Error('Respuesta de transferencia inválida.');
      button.disabled=true;
      instructions.textContent='Transferí exactamente '+money(result.amountArs)+
-      ' al alias '+result.alias+'. El pedido entrará en producción solo cuando Librería Saber verifique la acreditación en su banco. No alcanza con enviar un comprobante.';
-     bank.remove();
+      ' al alias '+result.alias+'. Después presioná «Ya transferí». Eso avisará a Librería Saber para verificar en el banco; NO acredita el pago automáticamente.';
+     const notified=document.createElement('button');
+     notified.type='button';notified.textContent='Ya transferí · Avisar a Librería Saber';
+     notified.setAttribute('aria-label','Ya transferí. Avisar a Librería Saber para verificar el pago.');
+     notified.addEventListener('click',async()=>{
+      notified.disabled=true;instructions.textContent='Avisando a Librería Saber que realizaste la transferencia…';
+      try{
+       const notice=await bankRequest('notify');
+       if(notice.estado==='pagado_esperando_archivos'&&notice.paymentVerified===true){
+        instructions.textContent='Transferencia acreditada. Enviando automáticamente los PDF…';
+        location.assign('/pedido/estado');return;
+       }
+       if(notice.estado!=='transferencia_informada'||notice.paymentVerified!==false||
+          notice.uploadAuthorized!==false||notice.customerNotified!==true)
+        throw Error('No se pudo confirmar el aviso.');
+       instructions.textContent='Aviso recibido. Librería Saber ya puede ver tu transferencia en «Por verificar». '+
+        'El pago sigue pendiente de comprobación bancaria; no realices otra transferencia. '+
+        'Conservá esta pestaña abierta para el envío automático de los archivos después de acreditarse.';
+       notified.remove();
+      }catch(error){
+       notified.disabled=false;instructions.textContent='No se registró el aviso. '+
+        'No transfieras otra vez: tocá «Ya transferí» para volver a avisarnos. '+
+        String(error.message||'').slice(0,95);
+      }
+     });
+     bank.replaceWith(notified);
      interval=setInterval(check,30000);
     }catch(error){
      bank.disabled=false;
