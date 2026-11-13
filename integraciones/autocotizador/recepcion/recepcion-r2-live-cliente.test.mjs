@@ -30,7 +30,7 @@ test('sin pago no llama uploader y no reserva cuota',async()=>{
  await assert.rejects(enviarPDFsR2PagadosLive({
   selectedFiles:[file],storage:f.storage,fetcher:f.fetcher,
   origin:ORIGIN,hasher:async()=>SHA,
-  uploader:async()=>{uploads++}}),/PAGO_NO_CONCILIADO/);
+  uploader:async()=>{uploads++}}),/PAGO_O_AVISO_NO_CONCILIADO/);
  assert.equal(f.calls.length,1);assert.equal(uploads,0);
 });
 test('PDF alterado o cambiado se rechaza antes de consultar Central',async()=>{
