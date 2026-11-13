@@ -37,6 +37,7 @@ jobs:
           grep -Fq 'staff-calendar' /tmp/saber-central-live.mjs
           grep -Fq 'staff-reconcile' /tmp/saber-central-live.mjs
           grep -Fq 'SABER_MP_LIVE_CRON_ACREDITADOS' /tmp/saber-central-live.mjs
+          grep -Fq 'central_mp_live_auto_health' /tmp/saber-central-live.mjs
           ! grep -Fq 'Verificar cobros Mercado Pago' /tmp/saber-documentos-live.mjs
           grep -Fq 'staff-forecast' /tmp/saber-central-live.mjs
           echo SABER_STAFF_LIVE_2_BUNDLES_READY
@@ -129,3 +130,26 @@ jobs:
           echo SABER_STAFF_SITE_ANTERIOR_NO_GO_CONFIRMED
           echo SABER_STAFF_CENTRAL_LIVE_PROTECTED_READY_NO_NEW_ORDERS_NO_CHARGES
           trap - ERR
+
+      - name: Activar sincronización automática de cobros LIVE cada minuto
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$ACCOUNT" && test -n "$TOKEN"
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-pagos-produccion"
+          curl -fsS --max-time 30 -H "Authorization: Bearer $TOKEN" "$root" > /tmp/saber-live-code-check.js
+          grep -Fq 'SABER_MP_LIVE_CRON_ACREDITADOS' /tmp/saber-live-code-check.js
+          grep -Fq 'central_mp_live_auto_health' /tmp/saber-live-code-check.js
+          curl -fsS --max-time 30 -H "Authorization: Bearer $TOKEN" "$root/schedules" > /tmp/saber-live-before-schedules.json
+          jq -e '.success==true and (.result.schedules | type=="array") and
+            (.result.schedules | length==0 or (length==1 and .[0].cron=="* * * * *"))' /tmp/saber-live-before-schedules.json >/dev/null
+          curl -fsS --max-time 35 -X PUT -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary '[{"cron":"* * * * *"}]' \
+            "$root/schedules" > /tmp/saber-live-activate-schedules.json
+          jq -e '.success==true and (.result.schedules|length==1 and .[0].cron=="* * * * *")' \
+            /tmp/saber-live-activate-schedules.json >/dev/null
+          curl -fsS --max-time 30 -H "Authorization: Bearer $TOKEN" "$root/schedules" > /tmp/saber-live-verified-schedules.json
+          jq -e '.success==true and (.result.schedules|length==1 and .[0].cron=="* * * * *")' \
+            /tmp/saber-live-verified-schedules.json >/dev/null
+          echo SABER_PAGO_LIVE_AUTO_CADA_MINUTO_HABILITADO
