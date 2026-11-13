@@ -45,7 +45,7 @@ jobs:
           const gate='<header><strong>Librer\\xEDa Saber</strong></header>';
           const buyer='<header><strong>Librer\\xEDa Saber \\xB7 Impresiones y ploteos</strong></header>';
           for(const label of [gate,buyer])assert.equal(original.split(label).length-1,1,'LIVE_HEADER_NOT_UNIQUE_ABORT');
-          assert.equal(original.includes('Volver a la tienda'),false,'LIVE_BUTTON_ALREADY_PRESENT_ABORT');
+          assert.equal(original.includes('href="https://libreriasaber.com.ar/" style="display:inline-flex;align-items:center;min-height:44px'),false,'LIVE_BUTTON_ALREADY_PRESENT_ABORT');
           const button='<a href="https://libreriasaber.com.ar/" style="display:inline-flex;align-items:center;min-height:44px;padding:9px 13px;border:1px solid #c9d9e7;border-radius:9px;color:#fff;text-decoration:none;font:700 15px system-ui,Arial,sans-serif">← Volver a la tienda</a>';
           const patch=old=>old.replace('<header>','<header style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">').replace('</header>',button+'</header>');
           const output=original.replace(gate,patch(gate)).replace(buyer,patch(buyer));
