@@ -1,0 +1,21 @@
+{
+  "checkedAt": "2026-11-13T02:52:44.404Z",
+  "schema": "saber-postdeploy-integral-v1",
+  "readOnly": true,
+  "buyerFlowActive": true,
+  "bankNoticeActive": true,
+  "customerTrackingActive": true,
+  "operatorStageDialogActive": true,
+  "r2InspectionDirectActive": true,
+  "archiveFilterActive": true,
+  "r2IdentifiersActive": true,
+  "paymentCronActive": true,
+  "cronEveryMinute": true,
+  "archivedNumbers": [
+    8,
+    9
+  ],
+  "archivedPaymentsPreserved": true,
+  "publicSiteNoGo": true,
+  "passed": true
+}
