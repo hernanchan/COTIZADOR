@@ -87,9 +87,10 @@ export async function planEntregaLive(env,orderId,{state='listo',version}={}){
    new Set(files.map(x=>x.object_key)).size!==files.length)return null;
  return {orderId,webOrderId:order.web_order_id,version,files};
 }
-export async function encolarEntregaLive(env,orderId,version){
+export async function encolarEntregaLive(env,orderId,version,{preflight=false}={}){
  if(!active(env))return {state:'off'};
- const plan=await planEntregaLive(env,orderId,{state:'entregado',version});
+ const plan=await planEntregaLive(env,orderId,preflight?
+  {state:'listo',version:version-1}:{state:'entregado',version});
  if(!plan)return {state:'not_eligible'};
  const db=env.DB;await tables(db);
  const entries=plan.files.map(f=>db.prepare(
