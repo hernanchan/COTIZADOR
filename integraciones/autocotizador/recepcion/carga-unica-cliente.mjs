@@ -843,7 +843,7 @@ async function analizarPaginasSolicitadas(e){
   };
   const visual=(await clasificarMosaicoGrandePorMuestras(e.archivoOriginal,{
    paginas:e.paginas,seleccionadas:pedidas.map(p=>p.numero),
-   onProgreso:progreso
+   signal:controller.signal,maxMs:8000,onProgreso:progreso
   }))||(await clasificarPloteoGrandePorRangos(e.archivoOriginal,{
    paginas:e.paginas,seleccionadas:pedidas.map(p=>p.numero),
    signal:controller.signal,maxAnalysisMs:12000,
