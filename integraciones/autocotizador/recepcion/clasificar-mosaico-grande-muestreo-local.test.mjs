@@ -60,7 +60,6 @@ function fakePdf({poster=false}={}){
  };
 }
 function canvasFactory(){
- return ()=>{
   let data=new Uint8ClampedArray(720*216*4);
   const context={
    fillStyle:'#fff',fillRect(){data.fill(255)},
@@ -69,7 +68,6 @@ function canvasFactory(){
    getImageData(){return {data}}
   };
   return {width:0,height:0,getContext(){return context}};
- };
 }
 const paginas=Array.from({length:6},(_,i)=>({
  numero:i+1,anchoCm:i<3?100.01:124.99,altoCm:60.96
