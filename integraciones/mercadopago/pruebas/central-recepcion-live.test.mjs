@@ -7,7 +7,7 @@ const web='WEB-ENSAYO-'+'A'.repeat(32);
 const order='123e4567-e89b-42d3-a456-426614174000';
 const rows=[
  {order_id:order,web_order_id:web,work_number:18,file_count:2,total_ars:4700,
-  paid_at:'2026-11-10 18:30:00',received_count:1,pending_count:1,tus_count:1,r2_count:1,staged_r2_count:1,estado_produccion:'pendiente',version_produccion:0},
+  paid_at:'2026-11-10 18:30:00',received_count:1,pending_count:1,tus_count:1,r2_count:1,staged_r2_count:1,staged_r2_ids:'pdf_0_aa123',estado_produccion:'pendiente',version_produccion:0},
  {order_id:'123e4567-e89b-42d3-a456-426614174001',
   web_order_id:'WEB-ENSAYO-'+'B'.repeat(32),work_number:19,file_count:1,total_ars:1000,
   paid_at:'2026-11-10 18:40:00',received_count:1,pending_count:0,tus_count:1,r2_count:0,staged_r2_count:0,estado_produccion:'pendiente',version_produccion:0}
@@ -45,6 +45,7 @@ test('solo pagos D1 verificados; Nuevos espera originales o preprensa sin descar
  assert.equal(body.orders[1].zipEnabled,true);
  assert.equal(body.productionAuthorized,false);
  assert.equal(body.orders[0].stagedR2Count,1);
+ assert.deepEqual(body.orders[0].stagedR2FileIds,['pdf_0_aa123']);
  assert.match(queries[2],/FROM central_r2_large_pending r/);
  assert.equal(queries.length,3);
  assert.match(queries[2],/p\.state='verified'/);
@@ -147,4 +148,15 @@ test('tablero de personal firmado incluye también TUS sin abrir el listado anó
  assert.ok(data.orders.every(o=>o.productionState==='pendiente'));
  assert.ok(data.orders.every(o=>o.productionVersion===0));
  assert.equal(data.orders[1].tusCount,1);assert.equal(data.orders[1].r2Count,0);
+});
+
+test('órdenes archivadas no se incluyen en Nuevos aunque sus pagos queden auditados',async()=>{
+ const {env,queries}=envWith();
+ const prior=env.DB.prepare;
+ env.DB.prepare=sql=>sql.includes('sqlite_master')?
+  {all:async()=>({results:[{name:'central_live_order_archives'}]}),first:async()=>null}:prior(sql);
+ const result=await listarRecepcionUniversalLive(new Request(url),env,{authorized:true});
+ assert.equal(result.status,200);
+ const boardSQL=queries.find(q=>q.includes('FROM central_r2_universal_order_links l'));
+ assert.match(boardSQL,/NOT EXISTS\(SELECT 1 FROM central_live_order_archives a WHERE a.order_id=o.id\)/);
 });
