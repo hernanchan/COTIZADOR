@@ -1,0 +1,134 @@
+name: Saber - activar entrega y purga LIVE segura TUS R2
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-activar-entrega-live-20261113.yml]
+permissions: {contents: write}
+concurrency: {group: saber-entrega-live-activacion, cancel-in-progress: false}
+jobs:
+  activate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: true}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Compilar, activar gates privados y preservar todos los bindings
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts"
+          temp=$(mktemp -d)
+          mkdir -p docs
+          phase=starting
+          trap 'code=$?; printf "{\\"phase\\":\\"%s\\",\\"code\\":%s}\\n" "$phase" "$code" > docs/ACTIVACION-ENTREGA-LIVE.json' EXIT
+          get(){ curl -fsS --retry 2 --max-time 40 -H "Authorization: Bearer $TOKEN" "$1"; }
+          phase=verify_qa
+          node -e "const q=require('./docs/QA-CIRCUITO-COMERCIAL-INTEGRAL.json');if(!q.passed||q.code!==0)process.exit(1)"
+          phase=compile
+          npm install --no-save --no-audit --no-fund esbuild@0.25.12 >/dev/null
+          ./node_modules/.bin/esbuild integraciones/mercadopago/pruebas/worker.js --bundle --platform=browser --format=esm --target=es2022 --outfile="$temp/pay.mjs" >/dev/null
+          (cd integraciones/autocotizador/recepcion && npm install --no-audit --no-fund && npm run build:unificado) >/dev/null
+          cp integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs "$temp/docs.mjs"
+          node --check "$temp/pay.mjs"
+          node --check "$temp/docs.mjs"
+          grep -Fq 'central_live_purge_files' "$temp/pay.mjs"
+          grep -Fq 'reintentarEntregasLive' "$temp/pay.mjs"
+          grep -Fq 'DOCS_LIVE_TUS_SERVICE_KEY' "$temp/docs.mjs"
+          grep -Fq '/internal/live/purge-file' "$temp/docs.mjs"
+          phase=verify_bindings
+          for worker in saber-pagos-produccion saber-documentos-produccion;do
+            get "$root/$worker/settings" > "$temp/$worker.before.json"
+            get "$root/$worker/deployments" > "$temp/$worker.deployment.json"
+            jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$temp/$worker.deployment.json" > "$temp/$worker.old"
+            jq -e '.success==true and (.result.bindings|any(.name=="SABER_ENTORNO" and .text=="produccion") and any(.name=="CENTRAL_BRIDGE_KEY" and .type=="secret_text"))' "$temp/$worker.before.json" >/dev/null
+            jq -r '.result.bindings[].name' "$temp/$worker.before.json" | sort > "$temp/$worker.before.names"
+            jq '{main_module:"index.mjs",bindings:[.result.bindings[]|{name,type:"inherit"}]}' "$temp/$worker.before.json" > "$temp/$worker.meta.json"
+          done
+          jq -e '.result.bindings|any(.name=="SABER_DOCUMENTOS" and .type=="service" and .service=="saber-documentos-produccion") and any(.name=="CENTRAL_LIVE_R2_INSPECTION_GATE" and .text=="GO_COMERCIAL_CONFIRMADO")' "$temp/saber-pagos-produccion.before.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="SABER_R2_GRANDES_LIVE" and .type=="r2_bucket" and .bucket_name=="saber-documentos-produccion-privado") and any(.name=="DOCS_LIVE_TUS_SERVICE_KEY" and .type=="secret_text") and any(.name=="DOCS_LIVE_TUS_GATE" and .text=="GO_COMERCIAL_CONFIRMADO") and any(.name=="DOCS_LIVE_R2_GATE" and .text=="GO_COMERCIAL_CONFIRMADO")' "$temp/saber-documentos-produccion.before.json" >/dev/null
+          for name in CENTRAL_LIVE_PURGE_GATE CENTRAL_LIVE_PURGE_EXECUTE_GATE;do
+            jq -e --arg n "$name" '.result.bindings|all(.name!=$n)' "$temp/saber-pagos-produccion.before.json" >/dev/null
+          done
+          jq -e '.result.bindings|all(.name!="DOCS_LIVE_PURGE_GATE")' "$temp/saber-documentos-produccion.before.json" >/dev/null
+          jq '.bindings += [{"name":"CENTRAL_LIVE_PURGE_GATE","type":"plain_text","text":"GO_COMERCIAL_CONFIRMADO"},{"name":"CENTRAL_LIVE_PURGE_EXECUTE_GATE","type":"plain_text","text":"GO_COMERCIAL_CONFIRMADO"}]' "$temp/saber-pagos-produccion.meta.json" > "$temp/pay.meta.json"
+          mv "$temp/pay.meta.json" "$temp/saber-pagos-produccion.meta.json"
+          jq '.bindings += [{"name":"DOCS_LIVE_PURGE_GATE","type":"plain_text","text":"GO_COMERCIAL_CONFIRMADO"}]' "$temp/saber-documentos-produccion.meta.json" > "$temp/docs.meta.json"
+          mv "$temp/docs.meta.json" "$temp/saber-documentos-produccion.meta.json"
+          phase=stage_both
+          for worker in saber-documentos-produccion saber-pagos-produccion;do
+            src="$temp/docs.mjs";test "$worker" != saber-pagos-produccion || src="$temp/pay.mjs"
+            http=$(curl -sS --max-time 120 -w '%{http_code}' -o "$temp/$worker.stage.json" \
+              -H "Authorization: Bearer $TOKEN" \
+              -F "metadata=@$temp/$worker.meta.json;type=application/json" \
+              -F "index.mjs=@$src;filename=index.mjs;type=application/javascript+module" \
+              "$root/$worker/versions?bindings_inherit=strict")
+            if [ "$http" != 200 ] || ! jq -e '.success==true and (.result.id|type=="string")' "$temp/$worker.stage.json" >/dev/null;then
+              jq -c --arg http "$http" '{http:$http,errors:[.errors[]?|{code,message}]}' "$temp/$worker.stage.json" > docs/ACTIVACION-ENTREGA-ERROR.json
+              exit 1
+            fi
+            id=$(jq -r '.result.id' "$temp/$worker.stage.json")
+            printf '%s' "$id" > "$temp/$worker.candidate"
+            get "$root/$worker/versions/$id" > "$temp/$worker.version.json"
+            jq -r '.result.resources.bindings[].name|select(.!="CENTRAL_LIVE_PURGE_GATE" and .!="CENTRAL_LIVE_PURGE_EXECUTE_GATE" and .!="DOCS_LIVE_PURGE_GATE")' "$temp/$worker.version.json" | sort > "$temp/$worker.stage.names"
+            diff "$temp/$worker.before.names" "$temp/$worker.stage.names"
+          done
+          phase=promote_both
+          changed=""
+          rollback(){
+            for worker in $changed;do
+              old=$(cat "$temp/$worker.old")
+              jq -nc --arg id "$old" '{strategy:"percentage",versions:[{version_id:$id,percentage:100}]}' |
+               curl -fsS --max-time 45 -X POST -H "Authorization: Bearer $TOKEN" \
+                -H "Content-Type: application/json" --data-binary @- "$root/$worker/deployments" >/dev/null || true
+            done
+          }
+          trap 'code=$?; rollback; printf "{\\"phase\\":\\"%s\\",\\"code\\":%s}\\n" "$phase" "$code" > docs/ACTIVACION-ENTREGA-LIVE.json' ERR
+          for worker in saber-documentos-produccion saber-pagos-produccion;do
+            id=$(cat "$temp/$worker.candidate")
+            jq -nc --arg id "$id" '{strategy:"percentage",versions:[{version_id:$id,percentage:100}]}' |
+             curl -fsS --max-time 45 -X POST -H "Authorization: Bearer $TOKEN" \
+              -H "Content-Type: application/json" --data-binary @- "$root/$worker/deployments" > "$temp/$worker.promoted.json"
+            jq -e '.success==true' "$temp/$worker.promoted.json" >/dev/null
+            changed="$worker $changed"
+          done
+          phase=verify_live
+          for worker in saber-documentos-produccion saber-pagos-produccion;do
+            get "$root/$worker/settings" > "$temp/$worker.after.json"
+            jq -r '.result.bindings[].name|select(.!="CENTRAL_LIVE_PURGE_GATE" and .!="CENTRAL_LIVE_PURGE_EXECUTE_GATE" and .!="DOCS_LIVE_PURGE_GATE")' "$temp/$worker.after.json" | sort > "$temp/$worker.after.names"
+            diff "$temp/$worker.before.names" "$temp/$worker.after.names"
+            id=$(cat "$temp/$worker.candidate")
+            get "$root/$worker/deployments" > "$temp/$worker.after-deploy.json"
+            test "$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$temp/$worker.after-deploy.json")" = "$id"
+          done
+          jq -e '.result.bindings|any(.name=="CENTRAL_LIVE_PURGE_GATE" and .text=="GO_COMERCIAL_CONFIRMADO") and any(.name=="CENTRAL_LIVE_PURGE_EXECUTE_GATE" and .text=="GO_COMERCIAL_CONFIRMADO")' "$temp/saber-pagos-produccion.after.json" >/dev/null
+          jq -e '.result.bindings|any(.name=="DOCS_LIVE_PURGE_GATE" and .text=="GO_COMERCIAL_CONFIRMADO")' "$temp/saber-documentos-produccion.after.json" >/dev/null
+          curl -fsS --max-time 20 'https://libreriasaber.com.ar/portal-comercial.json?entregaqa=1' > "$temp/portal.json"
+          jq -e '.release=="NO_GO" and .enabled==false' "$temp/portal.json" >/dev/null
+          trap - ERR
+          phase=done
+          echo 'SABER_ENTREGA_PURGA_TUS_R2_LIVE_GO_PRIVADA'
+      - name: Guardar resultado de activación sin secretos
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/ACTIVACION-ENTREGA-LIVE.json || exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/ACTIVACION-ENTREGA-LIVE.json
+          test ! -f docs/ACTIVACION-ENTREGA-ERROR.json || git add docs/ACTIVACION-ENTREGA-ERROR.json
+          git diff --cached --quiet && exit 0
+          git commit -m "ops: resultado de habilitación de entrega LIVE privada"
+          for attempt in 1 2 3 4;do
+            git fetch origin integracion/tus-pedido-privado-20261101
+            git rebase origin/integracion/tus-pedido-privado-20261101
+            git push origin HEAD:integracion/tus-pedido-privado-20261101 && exit 0
+            sleep 2
+          done
+          exit 1
