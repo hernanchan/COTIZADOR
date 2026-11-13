@@ -19,11 +19,12 @@ export async function listarRecepcionUniversalLive(request,env,{authorized=false
  let rows;
  try{
   const existing=(await env.DB.prepare(
-   "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('central_live_bank_accreditations','central_order_contacts','central_order_customer_details','central_live_order_archives','central_live_purge_files')"
+   "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('central_live_bank_accreditations','central_order_contacts','central_order_customer_details','central_live_order_archives','central_live_purge_files','central_live_test_exclusions')"
   ).all()).results||[];
   const names=new Set(existing.map(v=>v.name));
   const bank=names.has('central_live_bank_accreditations');
   const hasArchives=names.has('central_live_order_archives');
+  const hasTestExclusions=names.has('central_live_test_exclusions');
   const hasPurge=names.has('central_live_purge_files');
   const hasPhone=names.has('central_order_contacts');
   const hasCustomer=names.has('central_order_customer_details');
@@ -73,6 +74,7 @@ export async function listarRecepcionUniversalLive(request,env,{authorized=false
    'AND o.amount_ars=o.deposit_ars AND o.amount_ars=l.amount_ars '+
    paymentClause+
    (hasArchives?'AND NOT EXISTS(SELECT 1 FROM central_live_order_archives a WHERE a.order_id=o.id) ':'')+
+   (hasTestExclusions?'AND NOT EXISTS(SELECT 1 FROM central_live_test_exclusions e WHERE e.order_id=o.id) ':'')+
    'GROUP BY l.commercial_order_id,l.web_order_id,n.number'+
    (hasPhone?',c.phone':'')+(hasCustomer?',k.name,k.address':'')+
    (hasProduction?',s.state,s.version':'')+','+
