@@ -4909,6 +4909,20 @@ export default {
    const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
    const signed=await leerFirmaInternaLive(req,env);
    if(signed?.error)return json({ok:false,error:'LIVE_BOARD_FIRMA'},signed.status||401);
+   // Respaldo automático ante ausencia del webhook: no afecta la respuesta del tablero.
+   // La firma HMAC ya se verificó; no hay acceso público ni nuevos cobros.
+   if(env?.SABER_ENTORNO==='produccion'&&env?.CENTRAL_DB_ENV==='produccion'){
+    try{
+     await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_mp_live_staff_rechecks (id INTEGER PRIMARY KEY CHECK(id=1),checked_at TEXT NOT NULL)").run();
+     const slot=await env.DB.prepare("INSERT INTO central_mp_live_staff_rechecks(id,checked_at) VALUES(1,datetime('now')) ON CONFLICT(id) DO UPDATE SET checked_at=excluded.checked_at WHERE central_mp_live_staff_rechecks.checked_at<=datetime('now','-40 seconds')").run();
+     if(slot?.meta?.changes&&typeof ctx?.waitUntil==='function'){
+      ctx.waitUntil(import('./central-mp-live-rescate.mjs')
+       .then(({conciliarPendientesMPLiveAutomatico})=>conciliarPendientesMPLiveAutomatico(env))
+       .then(out=>{if(out?.recuperados)console.log('SABER_MP_LIVE_STAFF_AUTO_ACREDITADOS',out.recuperados)})
+       .catch(()=>console.warn('SABER_MP_LIVE_STAFF_AUTO_REVISION')));
+     }
+    }catch{console.warn('SABER_MP_LIVE_STAFF_AUTO_GUARDIA_INDISPONIBLE')}
+   }
    const {listarRecepcionUniversalLive}=await import('./central-recepcion-live.mjs');
    return listarRecepcionUniversalLive(
     new Request('https://pagos.libreriasaber.com.ar/admin/api/central/live-recepcion'),
