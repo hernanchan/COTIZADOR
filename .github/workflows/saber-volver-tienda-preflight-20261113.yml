@@ -46,5 +46,9 @@ jobs:
               console.log('SABER_UI_NEAR_LABEL',JSON.stringify(needle),j,text.slice(Math.max(0,index-100),Math.min(index+170,text.length)).replaceAll('\\n',' ').replaceAll('\\r',' '));
             }
           }
+          const marker='Impresiones y ploteos';
+          let last=-1,position=-1;
+          while((position=text.indexOf(marker,position+1))>=0)last=position;
+          if(last>=0)console.log('SABER_UI_LIVE_HEADER_CONTEXT',text.slice(Math.max(0,last-320),Math.min(text.length,last+650)).replaceAll('\\n',' '));
           console.log('SABER_UI_RETURN_DIAGNOSTIC_READONLY_NO_DEPLOY');
           NODE
