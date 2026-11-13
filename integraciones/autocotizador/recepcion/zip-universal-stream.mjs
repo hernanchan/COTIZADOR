@@ -35,6 +35,18 @@ export async function escribirZipUniversal({entries,output,onProgress=()=>{},
     typeof onProgress!=='function'||!Number.isSafeInteger(maxBytes)||
     maxBytes<1024*1024||maxBytes>ZIP_MAX)
   throw Error('ZIP_UNIVERSAL_CONFIGURACION');
+ // Paquete de producción: 1-10 originales correlativos y SIEMPRE una hoja
+ // de instrucciones, última entrada. Sin ella, no se genera ningún ZIP.
+ const originals=entries.length-1;
+ for(let i=0;i<originals;i++){
+  if(entries[i]?.name!=='PDF_'+String(i+1).padStart(2,'0')+'.pdf'||
+     !/^[a-f0-9]{64}$/.test(entries[i]?.expectedSha256||''))
+   throw Error('ZIP_UNIVERSAL_ORIGINAL_FALTANTE');
+ }
+ if(!/^ORDEN_[0-9]{3,}_INSTRUCCIONES\.pdf$/.test(entries[originals]?.name||'')||
+    entries[originals]?.expectedSha256!==null||
+    entries[originals]?.expectedBytes<400)
+  throw Error('ZIP_UNIVERSAL_INSTRUCCIONES_OBLIGATORIAS');
  const names=new Set();let totalExpected=0;
  const safeEntries=entries.map((x)=>{
   if(!validOriginal(x))throw Error('ZIP_UNIVERSAL_ENTRADA');
