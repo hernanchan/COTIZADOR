@@ -199,6 +199,7 @@ export async function checkoutMPLiveCentral(request,env,{
      notification_url:env.MP_LIVE_WEBHOOK_URL,
      back_urls:{success:env.MP_LIVE_RETURN_URL,pending:env.MP_LIVE_RETURN_URL,
       failure:env.MP_LIVE_RETURN_URL},
+     auto_return:'approved',
      expires:true,expiration_date_from:new Date(now()).toISOString(),
      expiration_date_to:new Date(now()+Math.max(1000,86400000-age)).toISOString(),
      metadata:{purpose:'libreria_saber_produccion',payment_mode:'full'}}
