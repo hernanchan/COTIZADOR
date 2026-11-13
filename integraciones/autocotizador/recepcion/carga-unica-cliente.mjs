@@ -729,7 +729,11 @@ async function analizarArchivoPDF(e,file){
     e.metodoClasificacion='MOSAICO_RASTER_LOCAL';
    }else{
     const visual=(await clasificarPloteoGrandeVisualLimitado(file,{paginas:e.paginas}))||
-     (await clasificarPloteoGrandePorRangos(file,{paginas:e.paginas}));
+     (await clasificarPloteoGrandePorRangos(file,{paginas:e.paginas,
+      onProgreso:({terminadas,total})=>{
+       $('estado').textContent='Analizando visualmente el plano '+terminadas+' de '+total+
+        ' páginas, sin subir el original…';
+      }}));
     if(visual?.altaConfianza===true&&visual.paginas.length===e.paginas.length){
      for(const pagina of visual.paginas)e.paginas[pagina.numero-1].modo=pagina.modo;
      e.clasificacionAutomatica=e.paginas.every(p=>['cad','poster'].includes(p.modo));
