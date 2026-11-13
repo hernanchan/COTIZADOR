@@ -31,7 +31,7 @@ jobs:
              signal:AbortSignal.timeout(25000)
             });
             const j=await r.json().catch(()=>null);
-            if(!r.ok||j?.success!==true)throw Error('CF_'+r.status);
+            if(!r.ok||j?.success!==true)throw Error('CF_'+r.status+' '+String(j?.errors?.[0]?.message||'SIN_DETALLE').slice(0,140));
             return j.result;
           }
           const dbs=await call('/d1/database',process.env.D1TOKEN);
@@ -94,6 +94,9 @@ jobs:
           // Archivar la prueba en la Central sin falsificar estados de pago;
           // el original se conserva hasta que un operador autorizado pueda eliminarlo.
           console.log('SABER_011_R2_PURGA_PENDIENTE_FALTA_PERMISO');
+          const tableDef=await call('/d1/database/'+db.uuid+'/query',process.env.D1TOKEN,
+             "SELECT sql FROM sqlite_master WHERE type='table' AND name='central_live_order_archives'");
+          console.log('SABER_011_ARCHIVE_TABLE='+String(tableDef?.[0]?.results?.[0]?.sql||'NO_SCHEMA').slice(0,700));
           const archiveSQL=[
            "INSERT INTO central_live_order_archives(order_id,work_number,reason)",
            "SELECT o.id,11,'ENSAYO_TRANSF_SIN_DINERO_REAL_PDF_A4_DESCARTADO_20261113'",
