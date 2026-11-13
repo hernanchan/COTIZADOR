@@ -16,7 +16,7 @@ const INPUT={
 };
 const req=()=>new Request('https://pagos.libreriasaber.com.ar/internal/central/live/r2-stage',{method:'POST'});
 function fixture({method='transferencia',paid=true,reserved=true,
- received=0,old=false,invalid=false}={}){
+ received=0,old=false,invalid=false,bankNotice=false}={}){
  const state={received,old,queries:[],batches:0,updates:0};
  const DB={
   prepare(sql){
@@ -33,6 +33,8 @@ function fixture({method='transferencia',paid=true,reserved=true,
        object_key:INPUT.objectKey,name:NAME,bytes:INPUT.bytes,
        sha256:SHA,etag:INPUT.etag,pages_claimed:112,
        status:'awaiting_pdf_analysis'}:null;
+     if(sql.startsWith('SELECT o.id FROM central_r2_universal_order_links'))
+      return bankNotice?{id:UUID}:null;
      if(sql.includes("sqlite_master"))return {name:'central_live_bank_accreditations'};
      return null;
     },
@@ -128,4 +130,27 @@ test('reintento de R2 ya almacenado completa recibo anterior sin volver a cargar
  assert.equal(retry.status,200);
  assert.equal((await retry.json()).idempotent,true);
  assert.equal(f.state.updates,1);
+});
+
+test('transferencia AVISADA sin pago: guarda R2 SHA con pago pendiente, ZIP aún bloqueado',async()=>{
+ const f=fixture({paid:false,bankNotice:true});
+ const r=await registrarR2LivePendiente(req(),f.env,f.deps);
+ assert.equal(r.status,201,JSON.stringify(await r.clone().json()));
+ const out=await r.json();
+ assert.equal(out.originalReceived,true);
+ assert.equal(out.productionAuthorized,false);
+ assert.equal(f.state.batches,1);
+ assert.equal(f.state.received,1);
+ const queries=f.state.queries.map(x=>x.sql).join('\n');
+ assert.match(queries,/central_live_transfer_customer_notices/);
+ assert.match(queries,/o.status='awaiting_payment'/);
+ assert.match(queries,/o.paid_at IS NULL/);
+ assert.doesNotMatch(queries,/pr.state='verified'/);
+});
+test('transferencia sin aviso D1 no permite reservar recibo R2 impago',async()=>{
+ const f=fixture({paid:false,bankNotice:false});
+ const r=await registrarR2LivePendiente(req(),f.env,f.deps);
+ assert.equal(r.status,402);
+ assert.equal(f.state.batches,0);
+ assert.equal(f.state.received,0);
 });
