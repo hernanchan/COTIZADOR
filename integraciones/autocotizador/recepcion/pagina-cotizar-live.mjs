@@ -24,6 +24,7 @@ button:disabled{opacity:.47;cursor:not-allowed}#estado{min-height:25px}small{col
 #plazo-explicacion{font-size:15px;color:#536579;margin:0;padding:10px 20px 4px;background:#f4f9fe;border-left:2px solid #c3d9ea;border-right:2px solid #c3d9ea}
 #promo-dia{font-size:15px;font-weight:650;color:#69420b;margin:0;padding:4px 20px 12px;background:#f4f9fe;border-left:2px solid #c3d9ea;border-right:2px solid #c3d9ea;border-bottom:2px solid #c3d9ea;border-radius:0 0 12px 12px}
 #promo-dia[hidden]{display:none}
+.transfer-box{width:100%;max-width:720px;padding:18px;border:2px solid #1a689b;border-radius:13px;background:#edf7ff;display:grid;gap:10px}.transfer-box strong{color:#123b5d}.transfer-amount{font-size:clamp(23px,3vw,30px);font-weight:900;color:#0b3f68}.transfer-alias{display:block;width:100%;padding:13px;background:white;border:2px dashed #427aa6;border-radius:9px;font-size:clamp(23px,3vw,32px);font-weight:850;letter-spacing:.025em;overflow-wrap:anywhere;color:#133d66;user-select:all}.transfer-box p{margin:0}.transfer-warning{font-size:16px;color:#193f5c;font-weight:650;line-height:1.55}
 section[hidden]{display:none!important}
 #siguiente{margin-top:12px}
 #volver-archivos{display:block;background:#fff;color:#18547c;border:1px solid #9eb7cd;margin:0 0 20px;max-width:100%}.payment-options{display:flex;align-items:center;flex-wrap:wrap;gap:11px;margin-top:14px}.payment-options>p{flex-basis:100%;max-width:720px}.payment-options button{margin:0!important}
@@ -95,6 +96,7 @@ window.saberIngresoLive=async token=>{
 <p id="estado" role="status" aria-live="polite">Seleccioná tus archivos para comenzar.</p>
 <button type="button" id="continuar" disabled>${enabled?'Confirmar presupuesto':'Recepción de pedidos temporalmente desactivada'}</button>
 <p><small>Antes de pagar, guardamos una copia privada de los PDF en este navegador. Al acreditarse el pago, los transferimos automáticamente a Librería Saber. Si el dispositivo no puede conservarlos, no permitimos pagar.</small></p>
+<p class="transfer-warning">IMPORTANTE: Si enviás PDF pesados, mantené esta pestaña abierta después del pago hasta que aparezca «Archivo recibido». No cierres el navegador, no apagues el dispositivo y evitá cambiar de red durante la subida.</p>
 </section></main><script type="module" nonce="${scriptNonce}">
 import {crearFlujoPresupuestoLive} from '/cotizar/flujo-live.js';
 const phone=document.getElementById('telefono');
@@ -274,7 +276,7 @@ action.addEventListener('click',async()=>{
    const bank=document.createElement('button');
    bank.type='button';bank.textContent='Pagar por transferencia';
    bank.style.marginLeft='0';
-   const instructions=document.createElement('p');
+   const instructions=document.createElement('div');
    instructions.setAttribute('role','status');
    options.append(bank,instructions);
    const bankRequest=async(action)=>{
@@ -315,8 +317,25 @@ action.addEventListener('click',async()=>{
       throw Error('Respuesta de transferencia inválida.');
      button.disabled=true;
      sessionStorage.setItem('saber-live-medio-v1','transferencia');
-     instructions.textContent='Transferí exactamente '+money(result.amountArs)+
-      ' al alias '+result.alias+'. Después presioná «Ya transferí». Eso avisará a Librería Saber para verificar en el banco; NO acredita el pago automáticamente.';
+     instructions.className='transfer-box';
+     instructions.replaceChildren();
+     const heading=document.createElement('strong');heading.textContent='DATOS PARA TRANSFERIR';
+     const amount=document.createElement('span');amount.className='transfer-amount';
+     amount.textContent='Importe: '+money(result.amountArs);
+     const aliasLabel=document.createElement('strong');aliasLabel.textContent='ALIAS DE LIBRERÍA SABER';
+     const alias=document.createElement('span');alias.className='transfer-alias';
+     alias.textContent=result.alias;
+     const copy=document.createElement('button');copy.type='button';
+     copy.textContent='Copiar alias';
+     copy.addEventListener('click',async()=>{
+      try{await navigator.clipboard.writeText(result.alias);copy.textContent='Alias copiado';}
+      catch{copy.textContent='Seleccioná el alias para copiarlo';}
+     });
+     const detail=document.createElement('p');
+     detail.textContent='Transferí el importe exacto al alias indicado. Después presioná «Ya transferí» para avisar a Librería Saber. Solo el personal confirma la acreditación bancaria.';
+     const warning=document.createElement('p');warning.className='transfer-warning';
+     warning.textContent='Si adjuntaste PDF pesados, mantené la pestaña y el navegador abiertos después de acreditar el pago, hasta ver «Archivo recibido». No realices otra transferencia.';
+     instructions.append(heading,amount,aliasLabel,alias,copy,detail,warning);
      const notified=document.createElement('button');
      notified.type='button';notified.textContent='Ya transferí · Avisar a Librería Saber';
      notified.dataset.saberTransferNotice='SABER_TRANSFER_CONFIRMACION_CLIENTE_V1';
