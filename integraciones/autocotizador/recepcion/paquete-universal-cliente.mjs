@@ -154,6 +154,10 @@ async function descargarZIP(){
 button?.addEventListener('click',()=>void descargarZIP());
 (async()=>{
  try{
+  if(liveStaff&&!webOrderId){
+   state.textContent='Elegí una orden pagada en la lista de inspección R2 que aparece abajo, o ingresá desde la Central de Pedidos. No hace falta copiar referencias.';
+   return;
+  }
   if(!WEB.test(webOrderId))throw Error('Número de pedido inválido');
   const r=await post(packageAPI,{webOrderId});
   const x=await r.json();
