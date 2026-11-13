@@ -16,6 +16,26 @@ test('ambas pantallas LIVE tienen enlace visible para volver a tienda, sin tocar
   assert.doesNotMatch(html,/target="_blank"/);
  }
 });
+test('enlaces fotos y stickers preservan contexto en ingreso y en iframe, sin exponer parámetros ajenos',async()=>{
+ for(const servicio of ['fotos','stickers']){
+  const query='?servicio='+servicio;
+  const entrada=paginaCotizarLive(new Request(url+query),env,{authorized:false});
+  assert.equal(entrada.status,200);
+  const intro=await entrada.text();
+  assert.ok(intro.includes("location.replace('/cotizar?servicio="+servicio+"');"));
+  assert.match(intro,servicio==='fotos'?/Cotizá tus fotos/:/Cotizá tus stickers/);
+  const acceso=paginaCotizarLive(new Request(url+query),env,{authorized:true});
+  assert.equal(acceso.status,200);
+  const html=await acceso.text();
+  assert.ok(html.includes('src="/cotizar/archivos?servicio='+servicio+'"'));
+  assert.match(html,/id="precio-entrega"/);
+  assert.match(html,/id="continuar"/);
+ }
+ const ajeno=await paginaCotizarLive(new Request(url+'?servicio=%3Cscript%3E'),env,{authorized:true}).text();
+ assert.match(ajeno,/src="\/cotizar\/archivos"/);
+ assert.doesNotMatch(ajeno,/<script>\s*<script>/);
+});
+
 test('sin gate ni host productivo el portal no se publica',()=>{
  for(const [where,patch] of [
   [url,{DOCS_LIVE_UI_GATE:'NO_GO'}],

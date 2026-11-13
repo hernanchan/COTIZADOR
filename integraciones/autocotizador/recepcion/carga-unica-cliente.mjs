@@ -25,6 +25,10 @@ function actualizarModoLote(){
 }
 
 const UNIVERSAL_COMPRADOR_LIVE=location.pathname==='/cotizar/archivos'&&window.parent!==window;
+const SERVICIO_INICIAL_LIVE=UNIVERSAL_COMPRADOR_LIVE&&['fotos','stickers'].includes(new URLSearchParams(location.search).get('servicio'))?
+ new URLSearchParams(location.search).get('servicio'):'auto';
+// Para 30 imágenes fotográficas, agrupar hasta 10 páginas en cada PDF sin subir JPG/PNG originales.
+if(SERVICIO_INICIAL_LIVE==='fotos')modoLote='comun';
 const MAX_PDF_CARGA=(location.pathname==='/prueba-v2/carga-inteligente'||UNIVERSAL_COMPRADOR_LIVE)?10:30;
 const MAX_PDF_TUS_BYTES=LIMITE_TUS_PDF_BYTES;
 const MAX_PDF_R2_PREPAGO_BYTES=LIMITE_R2_PDF_BYTES;
@@ -873,6 +877,10 @@ document.querySelectorAll('input[name="modoImpresionLote"]').forEach(input=>{
   cambio();
  });
 });
+if(SERVICIO_INICIAL_LIVE==='fotos'){
+ const radio=document.querySelector('input[name="modoImpresionLote"][value="comun"]');
+ if(radio)radio.checked=true;
+}
 actualizarModoLote();
 $('archivos').addEventListener('change',async ev=>{
  if(!modoLote){$('estado').textContent='Elegí cómo querés configurar los archivos antes de subirlos.';return;}
@@ -904,7 +912,7 @@ $('archivos').addEventListener('change',async ev=>{
 
  // Mantener fichas compactas al cargar un lote; cada PDF se edita sólo si hace falta.
  if(!entries.length)abierto=-1;
- for(const f of files)entries.push({name:f.name,archivoOriginal:f,paginas:null,seleccion:'sin-confirmar',error:null,copias:1,modo:'bn',caras:'simple',papelPoster:'obra80',anillado:'ninguno',grupoAnillado:'',paginasPorHoja:1,materialColor:'',paginasSeleccionadas:'',servicio:'auto',productoFoto:'',productoGrafica:'',corteVariante:'gt3',corteMetros:1});
+ for(const f of files)entries.push({name:f.name,archivoOriginal:f,paginas:null,seleccion:SERVICIO_INICIAL_LIVE==='fotos'?'a4':'sin-confirmar',error:null,copias:1,modo:SERVICIO_INICIAL_LIVE==='fotos'?'color':'bn',caras:'simple',papelPoster:'obra80',anillado:'ninguno',grupoAnillado:'',paginasPorHoja:1,materialColor:'',paginasSeleccionadas:'',servicio:SERVICIO_INICIAL_LIVE,productoFoto:SERVICIO_INICIAL_LIVE==='fotos'?(productosFoto[0]?.id||''):'',productoGrafica:'',corteVariante:'gt3',corteMetros:1});
  render();
  const start=entries.length-files.length;
  // Lotes pequeños: lectura de hasta tres PDF en paralelo, sin cargar Google.
