@@ -42,6 +42,7 @@ jobs:
           grep -Fq 'FALLO_NO_IDENTIFICADO' /tmp/saber-central-live.mjs
           grep -Fq 'RESCATE_VENDEDOR_ID_DIFERENTE' /tmp/saber-central-live.mjs
           grep -Fq 'RESCATE_VENDEDOR_JSON_INVALIDO' /tmp/saber-central-live.mjs
+          grep -Fq 'api.mercadolibre.com/users/me' /tmp/saber-central-live.mjs
           grep -Fq 'SABER_MP_LIVE_CRON_AISLADO' /tmp/saber-central-live.mjs
           grep -Fq 'SABER_MP_LIVE_STAFF_AUTO_ACREDITADOS' /tmp/saber-central-live.mjs
           grep -Fq 'setTimeout' /tmp/saber-documentos-live.mjs
