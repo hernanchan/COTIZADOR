@@ -34,6 +34,7 @@ jobs:
             integraciones/mercadopago/pruebas/transferencias-live-central.test.mjs \
             integraciones/autocotizador/recepcion/transferencia-live-comprador.test.mjs \
             integraciones/mercadopago/pruebas/central-estado-personal-live.test.mjs \
+            integraciones/mercadopago/pruebas/central-entrega-purga-live.test.mjs \
             > /tmp/circuito-integral.log 2>&1
           rc=$?
           RC="$rc" node --input-type=module <<'EOF'
