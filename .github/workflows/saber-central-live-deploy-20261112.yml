@@ -196,3 +196,4 @@ jobs:
 # 13/11: incorporar revisión de PDF mixto a A4 sin medidas manuales, alias destacado y aviso de subida tras QA 43412759252.
 # 13/11: segunda promoción reversible: excluir de Nuevos el ensayo 011 registrado en D1, QA 43414989441 SUCCESS.
 # 13/11: despliegue final controlado tras QA 43417868966 SUCCESS: progreso por lote TUS/R2, reintento sin repago y ZIP con instrucciones obligatorias.
+# 13/11: publicar Central unificada MP/transferencia + ZIP directo R2 SHA verificado tras QA 43424849092 SUCCESS.
