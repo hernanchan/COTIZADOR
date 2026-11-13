@@ -115,8 +115,14 @@ export async function conciliarPendientesMPLiveAutomatico(env,{fetcher=fetch}={}
  try{seller=await getMP(env,'/users/me',fetcher)}
  catch(error){
   const code=String(error?.message||'');
-  return {ok:false,error:/^MP_CONSULTA_[0-9]{3}$/.test(code)?
-   'RESCATE_'+code:'RESCATE_VENDEDOR_RED_O_RESPUESTA'};
+  const kind=error?.name;
+  const reason=/^MP_CONSULTA_[0-9]{3}$/.test(code)?'RESCATE_'+code:
+   code==='RUTA_MP_NO_ADMITIDA'?'RESCATE_MP_RUTA_NO_ADMITIDA':
+   kind==='TimeoutError'||kind==='AbortError'?'RESCATE_VENDEDOR_TIMEOUT':
+   kind==='SyntaxError'?'RESCATE_VENDEDOR_JSON_INVALIDO':
+   kind==='TypeError'?'RESCATE_VENDEDOR_TYPE_ERROR':
+   'RESCATE_VENDEDOR_EXCEPCION';
+  return {ok:false,error:reason};
  }
  if(String(seller?.id)!==String(env.MP_LIVE_SELLER_ID))
   return {ok:false,error:'RESCATE_VENDEDOR_ID_DIFERENTE'};
