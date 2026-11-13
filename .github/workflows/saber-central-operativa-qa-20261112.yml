@@ -48,3 +48,5 @@ jobs:
 # Revalidacion de sintaxis de rutas central privadas.
 
 # 13/11: QA corregir PDF original mixto -> salida A4, alias visible, aviso no cerrar, inspección sin 112 líneas. No deploy.
+
+# 13/11: regresión exclusión auditada de ensayo 011 para cola LIVE, sin deploy.
