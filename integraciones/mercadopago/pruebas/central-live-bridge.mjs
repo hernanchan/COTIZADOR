@@ -11,6 +11,7 @@ const routeSchema=new Map([
  ['/internal/central/live/status','saber-mp-live-status-v1'],
  ['/internal/central/live/transfer-start','saber-central-live-transfer-start-v1'],
  ['/internal/central/live/transfer-status','saber-central-live-transfer-status-v1'],
+ ['/internal/central/live/transfer-notify','saber-central-live-transfer-notify-v1'],
  ['/internal/central/live/transfer-staff-pending','saber-central-live-transfer-staff-pending-v1'],
  ['/internal/central/live/transfer-staff-approve','saber-central-live-transfer-staff-approve-v1'],
  ['/internal/central/live/order','saber-central-r2-universal-create-order-v1'],
@@ -83,6 +84,7 @@ export async function leerFirmaInternaLive(request,env,{
  let payload;try{payload=JSON.parse(raw)}catch{}
  const orderRoute=url.pathname==='/internal/central/live/order';
  const transferRoute=url.pathname==='/internal/central/live/transfer-start'||
+  url.pathname==='/internal/central/live/transfer-notify'||
   url.pathname==='/internal/central/live/transfer-status';
  const pricingRoute=url.pathname==='/internal/central/live/pricing';
  const sellerDiag=url.pathname==='/internal/central/live/diag-seller';
