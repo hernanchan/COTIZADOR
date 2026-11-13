@@ -101,6 +101,7 @@ export function crearFlujoPresupuestoLive({
    storage.setItem('saber-live-pedido-v1',JSON.stringify({
     webOrderId,commercialOrderId:order.commercialOrderId
    }));
+   storage.setItem('saber-live-numero-v1',order.numeroOrden);
    setState('presupuestado');
    return Object.freeze({...order});
   }catch(error){setState('error');throw error}
