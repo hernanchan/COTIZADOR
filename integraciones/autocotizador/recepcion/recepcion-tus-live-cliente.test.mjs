@@ -67,7 +67,7 @@ test('archivo reemplazado se rechaza antes de consultar pago ni Storage',async()
 test('pago pendiente no autoriza ninguna firma de Storage',async()=>{
  const {calls,fetcher}=makeFetch(false),uploads=[];
  await assert.rejects(enviarPDFsTUSPagadosLive(
-  opts(makeStore(),fetcher,uploaderFactory(uploads))),/PAGO_NO_CONCILIADO/);
+  opts(makeStore(),fetcher,uploaderFactory(uploads))),/PAGO_O_AVISO_NO_CONCILIADO/);
  assert.equal(calls.length,1);assert.equal(uploads.length,0);
 });
 test('pago conciliado autoriza TUS productivo y guarda recibo sin nuevo checkout',async()=>{
