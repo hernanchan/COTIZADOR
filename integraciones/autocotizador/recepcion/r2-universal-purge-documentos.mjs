@@ -56,8 +56,10 @@ async function signedRequest(request,env,{
 export async function eliminarOriginalUniversalTUS(env,p,{
  fetcher=fetch,read=leerObjetoTUSPrivado,subtle=crypto.subtle
 }={}){
- if(!validate(p)||!tusPrivadoConfigurado(env)||
-    !enabled(env)||
+ if(!validate(p)||!enabled(env)||
+    !(tusPrivadoConfigurado(env)||
+      (env?.SABER_ENTORNO==='produccion'&&env?.DOCS_LIVE_PURGE_GATE===LIVE&&
+       env?.DOCS_LIVE_TUS_GATE===LIVE))||
     typeof env?.DOCS_TUS_SUPABASE_SERVICE_KEY!=='string'||
     env.DOCS_TUS_SUPABASE_SERVICE_KEY.length<32)
   throw Error('UNIVERSAL_PURGE_TUS_OFF');
