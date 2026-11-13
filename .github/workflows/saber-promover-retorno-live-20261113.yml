@@ -1,0 +1,103 @@
+name: Saber - promover version UI regreso tienda LIVE sin recompilar ni cobros
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: ['.github/workflows/saber-promover-retorno-live-20261113.yml']
+permissions: {contents: read}
+concurrency: {group: saber-retorno-tienda-docs-version, cancel-in-progress: false}
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+    steps:
+      - name: Promover una sola version ya verificada, esperar propagación y revertir si falla
+        shell: bash
+        run: |
+          set -eEuo pipefail
+          : "${ACCOUNT:?}" "${TOKEN:?}"
+          worker=saber-documentos-produccion
+          old=a3a2170a-4538-4f20-a16a-613834c84bfe
+          new=ea93f875-ff6c-4901-adbc-0d0d73234892
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/$worker"
+          beta="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/workers/$worker/versions"
+          tmp=$(mktemp -d)
+          get(){ curl -fsS --retry 2 --connect-timeout 10 --max-time 40 -H "Authorization: Bearer $TOKEN" "$1"; }
+          get "$root/deployments" > "$tmp/deploy-before.json"
+          actual=$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/deploy-before.json")
+          test "$actual" = "$old" || { echo SABER_GO_NO_GO_ACTIVE_VERSION_CHANGED; exit 1; }
+          get "$root/settings" > "$tmp/settings-before.json"
+          jq -e '.success==true and (.result.bindings|any(.name=="SABER_ENTORNO" and .text=="produccion") and any(.name=="DOCS_LIVE_SESSION_GATE" and .text=="GO_COMERCIAL_CONFIRMADO") and any(.name=="SABER_CENTRAL" and .type=="service"))' "$tmp/settings-before.json" >/dev/null
+          jq -r '.result.bindings[]|[.name,.type]|@tsv' "$tmp/settings-before.json" | sort > "$tmp/names-before"
+          get "$beta?per_page=4" > "$tmp/versions.json"
+          latest=$(jq -er '.result.items[0].id // .result[0].id' "$tmp/versions.json")
+          test "$latest" = "$new" || { echo SABER_GO_NO_GO_STAGED_VERSION_CHANGED; exit 1; }
+          get "$beta/$new" > "$tmp/version.json"
+          jq -e --arg id "$new" '.success==true and .result.id==$id' "$tmp/version.json" >/dev/null
+          jq -r '(.result.bindings//.result.resources.bindings)[]|[.name,.type]|@tsv' "$tmp/version.json" | sort > "$tmp/names-new"
+          diff "$tmp/names-before" "$tmp/names-new"
+          get "$root" > "$tmp/latest.multipart"
+          node --input-type=module - "$tmp/latest.multipart" <<'NODE'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          const source=fs.readFileSync(process.argv[2],'utf8');
+          const label='href="https://libreriasaber.com.ar/" style="display:inline-flex;align-items:center;min-height:44px';
+          assert.equal(source.split(label).length-1,2,'EXPECTED_TWO_BACK_LINKS_IN_LATEST_CANDIDATE');
+          console.log('SABER_CANDIDATE_TWO_RETURN_LINKS_VERIFIED');
+          NODE
+          changed=0
+          phase=promotion
+          rollback(){
+            code=$?
+            trap - ERR
+            echo "SABER_RETURN_UI_FAILURE_PHASE_$phase"
+            if [ "$changed" = 1 ];then
+              jq -nc --arg id "$old" '{strategy:"percentage",versions:[{version_id:$id,percentage:100}],annotations:{"workers/message":"Rollback UI regreso a tienda"}}' |
+                curl -fsS --max-time 45 -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+                  --data-binary @- "$root/deployments" >/dev/null ||
+                  echo 'SABER_RETURN_UI_ROLLBACK_NOT_CONFIRMED'
+            fi
+            exit "$code"
+          }
+          trap rollback ERR
+          changed=1
+          jq -nc --arg id "$new" '{strategy:"percentage",versions:[{version_id:$id,percentage:100}],annotations:{"workers/message":"Regreso a tienda cotizador documentos UI"}}' |
+            curl -fsS --max-time 45 -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+              --data-binary @- "$root/deployments" > "$tmp/promoted.json"
+          jq -e '.success==true' "$tmp/promoted.json" >/dev/null
+          echo 'SABER_RETURN_UI_PROMOTION_ACCEPTED'
+          phase=verify_deployment
+          active=''
+          for attempt in 1 2 3 4 5 6;do
+            get "$root/deployments" > "$tmp/deployed.json"
+            active=$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/deployed.json") || active=''
+            [ "$active" = "$new" ] && break
+            sleep 1
+          done
+          test "$active" = "$new"
+          echo 'SABER_RETURN_UI_VERSION_100_PERCENT_CONFIRMED'
+          phase=verify_bindings
+          get "$root/settings" > "$tmp/settings-after.json"
+          jq -r '.result.bindings[]|[.name,.type]|@tsv' "$tmp/settings-after.json" | sort > "$tmp/names-after"
+          diff "$tmp/names-before" "$tmp/names-after"
+          echo 'SABER_RETURN_UI_BINDINGS_UNCHANGED'
+          phase=verify_public_http
+          ok=0
+          for attempt in $(seq 1 15);do
+            status=$(curl -sS --max-time 20 -w '%{http_code}' -o "$tmp/public.html" \
+              "https://pedidos.libreriasaber.com.ar/cotizar?volver_a_tienda_verificacion=$attempt") || status=000
+            if [ "$status" = 200 ] &&
+              grep -Fq 'Volver a la tienda' "$tmp/public.html" &&
+              grep -Fq 'href="https://libreriasaber.com.ar/"' "$tmp/public.html";then
+              ok=1;break
+            fi
+            sleep 2
+          done
+          test "$ok" = 1
+          echo 'SABER_RETURN_UI_PUBLIC_HTML_CONFIRMED'
+          trap - ERR
+          changed=0
+          echo 'SABER_RETURN_UI_GO_LIVE_PUBLISHED_ONLY_DOCUMENTS_WORKER'
