@@ -83,3 +83,5 @@ jobs:
             sleep 2
           done
           exit 1
+
+# Reconsulta automática después de desplegar la corrección de la API vendedora.
