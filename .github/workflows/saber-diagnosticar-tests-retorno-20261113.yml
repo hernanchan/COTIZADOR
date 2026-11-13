@@ -54,3 +54,5 @@ jobs:
             sleep 2
           done
           exit 1
+
+# Reejecutar tras actualizar expectativas del seguimiento y la agenda.
