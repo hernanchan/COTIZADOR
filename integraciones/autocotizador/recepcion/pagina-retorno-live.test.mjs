@@ -46,3 +46,23 @@ test('retorno de pago incluye seguimiento real, orden y archivos pendientes sin 
  assert.match(html,/\/api\/pedido\/live\/checkout/);
  assert.doesNotMatch(html,/searchParams\.get\('payment_id'\)/);
 });
+
+test('pospago automático: no pide otra selección y solo envía si acreditó el pago',async()=>{
+ const response=paginaRetornoLive(new Request(host),on);
+ assert.equal(response.status,200);
+ const html=await response.text();
+ assert.match(html,/Recepción automática de originales/);
+ assert.doesNotMatch(html,/type="file"/);
+ assert.doesNotMatch(html,/Volvé a seleccionar|Seleccioná nuevamente|Enviar PDF después del pago/);
+ assert.match(html,/leerOriginalesLive/);
+ assert.match(html,/enviarPDFsTUSPagadosLive/);
+ assert.match(html,/enviarPDFsR2PagadosLive/);
+ assert.match(html,/data\.estado!=='pagado_esperando_archivos'/);
+ assert.match(html,/data\.uploadAuthorized!==true/);
+ assert.match(html,/setInterval/);
+ assert.match(html,/borrarOriginalesLive/);
+ assert.match(html,/no cierres esta pestaña|No cierres esta pestaña/);
+ const script=html.match(/<script type="module">([\s\S]*?)<\/script>/);
+ assert.ok(script,'No se encontró JS de envío automático');
+ assert.doesNotThrow(()=>new Function(script[1]),'JavaScript pospago inválido');
+});
