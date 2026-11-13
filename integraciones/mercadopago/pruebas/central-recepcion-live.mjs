@@ -19,11 +19,12 @@ export async function listarRecepcionUniversalLive(request,env,{authorized=false
  let rows;
  try{
   const existing=(await env.DB.prepare(
-   "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('central_live_bank_accreditations','central_order_contacts','central_order_customer_details','central_live_order_archives')"
+   "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('central_live_bank_accreditations','central_order_contacts','central_order_customer_details','central_live_order_archives','central_live_purge_files')"
   ).all()).results||[];
   const names=new Set(existing.map(v=>v.name));
   const bank=names.has('central_live_bank_accreditations');
   const hasArchives=names.has('central_live_order_archives');
+  const hasPurge=names.has('central_live_purge_files');
   const hasPhone=names.has('central_order_contacts');
   const hasCustomer=names.has('central_order_customer_details');
   const hasProduction=(await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='central_live_production_states'").first())!=null;
@@ -41,10 +42,14 @@ export async function listarRecepcionUniversalLive(request,env,{authorized=false
   const selectProduction=hasProduction?'COALESCE(s.state,\'pendiente\') AS estado_produccion,COALESCE(s.version,0) AS version_produccion,':
    "'pendiente' AS estado_produccion,0 AS version_produccion,";
   const joinProduction=hasProduction?'LEFT JOIN central_live_production_states s ON s.order_id=o.id ':'';
+  const selectPurge=hasPurge?
+   "(SELECT COUNT(*) FROM central_live_purge_files q WHERE q.order_id=o.id) AS purge_total,"+
+   "(SELECT COUNT(*) FROM central_live_purge_files q WHERE q.order_id=o.id AND q.state='deleted') AS purge_deleted,":
+   "0 AS purge_total,0 AS purge_deleted,";
   rows=await env.DB.prepare(
    'SELECT l.commercial_order_id AS order_id,l.web_order_id AS web_order_id,'+
    'n.number AS work_number,d.file_count AS file_count,d.total_ars AS total_ars,'+
-   'o.paid_at AS paid_at,'+selectContact+selectProduction+
+   'o.paid_at AS paid_at,'+selectContact+selectProduction+selectPurge+
    'SUM(CASE WHEN f.received=1 THEN 1 ELSE 0 END) AS received_count,'+
    'SUM(CASE WHEN f.received=0 THEN 1 ELSE 0 END) AS pending_count,'+
    "SUM(CASE WHEN f.transport='tus' THEN 1 ELSE 0 END) AS tus_count,"+
@@ -117,6 +122,9 @@ export async function listarRecepcionUniversalLive(request,env,{authorized=false
     'PAGADO_ESPERANDO_ORIGINALES',
    lane:x.estado_produccion||'pendiente',productionState:x.estado_produccion||'pendiente',
    productionVersion:x.version_produccion||0,
+   purgeStatus:x.estado_produccion!=='entregado'?'not_applicable':
+    x.purge_total===x.file_count&&x.purge_deleted===x.file_count?'deleted':
+    x.purge_total===x.file_count?'pending_retry':'missing_queue',
    deliveryEnabled:env.CENTRAL_LIVE_PURGE_GATE==='GO_COMERCIAL_CONFIRMADO'&&
     env.CENTRAL_LIVE_PURGE_EXECUTE_GATE==='GO_COMERCIAL_CONFIRMADO',
    readyForProduction:false,
