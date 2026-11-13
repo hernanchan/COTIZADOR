@@ -1,0 +1,1 @@
+{"http":"400","errors":[{"code":10021,"message":"Uncaught SyntaxError: Invalid or unexpected token\n  at index.mjs:1:2\n"}]}
