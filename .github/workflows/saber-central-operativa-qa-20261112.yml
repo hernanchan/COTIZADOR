@@ -37,7 +37,9 @@ jobs:
             integraciones/autocotizador/recepcion/zip-universal-stream.test.mjs \
             integraciones/autocotizador/recepcion/pagina-central-personal-live.test.mjs \
             integraciones/mercadopago/pruebas/r2-universal-live-stage-central.test.mjs \
-            tests/r2-panel-staff-live-browser.test.mjs
+            tests/r2-panel-staff-live-browser.test.mjs \
+            integraciones/mercadopago/pruebas/transferencias-live-central.test.mjs \
+            integraciones/autocotizador/recepcion/transferencias-personal-live.test.mjs
           echo SABER_CENTRAL_PERSONAL_HMAC_AND_BOTH_TRANSPORTS_QA_OK
       - name: Compilar Central y Documentos completos sin desplegar
         run: |
@@ -63,3 +65,4 @@ jobs:
 # 13/11: revalidar test VM de pantalla ZIP unificada luego de ajustar la expresión regular.
 # 13/11: cierre QA navegador luego de quitar la inspección previa de R2 y simplificar ZIP.
 # 13/11: validar sintaxis del bundle ZIP y rutas comerciales tras simplificar pantalla de personal.
+# Orden 013: error real de acreditacion bancaria, unicidad de movimiento y polling sin perder campos.
