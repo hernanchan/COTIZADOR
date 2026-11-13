@@ -37,15 +37,17 @@ jobs:
            out.centralStorageBindingNames=pay.filter(x=>/R2|DOCUMENTOS|SUPABASE|TUS/i.test(x.name)).map(x=>({name:x.name,type:x.type}));
            out.documentsStorageBindingNames=docs.filter(x=>/R2|DOCUMENTOS|SUPABASE|TUS/i.test(x.name)).map(x=>({name:x.name,type:x.type}));
            out.centralDocumentsBridge=bind(pay,'SABER_DOCUMENTOS','service');
-           out.centralR2PrivateBucket=bind(pay,'SABER_R2_GRANDES','r2_bucket');
-           out.documentsTUSServiceKey=bind(docs,'DOCS_TUS_SUPABASE_SERVICE_KEY','secret_text');
+           out.documentsR2PrivateBucket=bind(docs,'SABER_R2_GRANDES_LIVE','r2_bucket');
+           out.documentsTUSServiceKey=bind(docs,'DOCS_LIVE_TUS_SERVICE_KEY','secret_text');
            out.documentsHMACKey=bind(docs,'CENTRAL_BRIDGE_KEY','secret_text');
            out.centralHMACKey=bind(pay,'CENTRAL_BRIDGE_KEY','secret_text');
            out.centralPurgeGate=bind(pay,'CENTRAL_LIVE_PURGE_GATE');
            out.centralPurgeExecuteGate=bind(pay,'CENTRAL_LIVE_PURGE_EXECUTE_GATE');
            out.documentsPurgeGate=bind(docs,'DOCS_LIVE_PURGE_GATE');
-           out.prerequisitesReady=['centralDocumentsBridge','centralR2PrivateBucket',
-            'documentsTUSServiceKey','documentsHMACKey','centralHMACKey'].every(k=>out[k]);
+           out.centralPurgeEnabled=pay.some(x=>x.name==='CENTRAL_LIVE_PURGE_GATE'&&x.text==='GO_COMERCIAL_CONFIRMADO')&&pay.some(x=>x.name==='CENTRAL_LIVE_PURGE_EXECUTE_GATE'&&x.text==='GO_COMERCIAL_CONFIRMADO');
+           out.documentsPurgeEnabled=docs.some(x=>x.name==='DOCS_LIVE_PURGE_GATE'&&x.text==='GO_COMERCIAL_CONFIRMADO');
+           out.prerequisitesReady=['centralDocumentsBridge','documentsR2PrivateBucket',
+            'documentsTUSServiceKey','documentsHMACKey','centralHMACKey','centralPurgeEnabled','documentsPurgeEnabled'].every(k=>out[k]);
           }catch(e){out.error=String(e.message||e).slice(0,70);out.prerequisitesReady=false}
           await mkdir('docs',{recursive:true});
           await writeFile('docs/REQUISITOS-BORRADO-LIVE.json',JSON.stringify(out,null,2)+'\n');
