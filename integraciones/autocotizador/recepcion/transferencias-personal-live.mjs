@@ -41,18 +41,23 @@ export async function transferenciasPersonalLive(request,env,{
   if(raw.length>1100)return reply({ok:false,error:'TRANSFER_STAFF_TAMANO'},413);
   let p;try{p=JSON.parse(raw)}catch{}
   if(!p||typeof p!=='object'||Array.isArray(p)||
-     Object.keys(p).sort().join(',')!=='amount_ars,bank_reference,confirmed,operator,order_id'||
+     !['amount_ars,confirmed,operator,order_id',
+       'amount_ars,bank_reference,confirmed,operator,order_id']
+      .includes(Object.keys(p).sort().join(','))||
      !UUID.test(p.order_id||'')||!Number.isSafeInteger(p.amount_ars)||p.amount_ars<1||
      p.confirmed!==true||typeof p.operator!=='string'||p.operator.trim().length<2||
-     p.operator.trim().length>60||typeof p.bank_reference!=='string')
+     p.operator.trim().length>60||
+     (Object.hasOwn(p,'bank_reference')&&typeof p.bank_reference!=='string'))
    return reply({ok:false,error:'TRANSFER_STAFF_DATOS_INVALIDOS'},422);
-  const reference=p.bank_reference.trim().toUpperCase().replace(/\s+/g,' ');
-  if(!REF.test(reference)||/\.(?:PDF|PNG|JPE?G|WEBP)$/.test(reference))
+  const legacy=Object.hasOwn(p,'bank_reference');
+  const reference=legacy?p.bank_reference.trim().toUpperCase().replace(/\s+/g,' '):null;
+  if(legacy&&(!REF.test(reference)||/\.(?:PDF|PNG|JPE?G|WEBP)$/.test(reference)))
    return reply({ok:false,error:'TRANSFER_STAFF_REFERENCIA_INVALIDA'},422);
   kind='approve';
   payload={schema:'saber-central-live-transfer-staff-approve-v1',
    order_id:p.order_id,amount_ars:p.amount_ars,
-   operator:p.operator.trim(),bank_reference:reference,confirmed:true};
+   operator:p.operator.trim(),confirmed:true};
+  if(legacy)payload.bank_reference=reference;
  }
  const body=JSON.stringify(payload),ts=now(),id=nonce();
  if(!Number.isSafeInteger(ts)||ts<1e9||ts>9999999999||!UUID.test(id))
