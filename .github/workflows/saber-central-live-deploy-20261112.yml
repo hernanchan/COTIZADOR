@@ -37,6 +37,7 @@ jobs:
           grep -Fq 'actualizarAvisosTransferencia' /tmp/saber-documentos-live.mjs
           grep -Fq 'transfer-notify' /tmp/saber-central-live.mjs
           grep -Fq 'central_live_transfer_customer_notices' /tmp/saber-central-live.mjs
+          grep -Fq 'Transferencias avisadas por clientes' /tmp/saber-documentos-live.mjs
           grep -Fq 'etaDate' /tmp/saber-documentos-live.mjs
           grep -Fq 'openOrderEta' /tmp/saber-documentos-live.mjs
           grep -Fq 'actualizarSeguimiento' /tmp/saber-documentos-live.mjs
