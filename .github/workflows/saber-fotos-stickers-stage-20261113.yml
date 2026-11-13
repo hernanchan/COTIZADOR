@@ -1,0 +1,99 @@
+name: Saber - preparar Fotos y Stickers LIVE sin publicar
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: ['.github/workflows/saber-fotos-stickers-stage-20261113.yml']
+permissions: {contents: read}
+concurrency: {group: saber-fotos-stickers-stage, cancel-in-progress: false}
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Pruebas y compilación local del Worker completo
+        run: |
+          set -euo pipefail
+          node --test integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs
+          (cd integraciones/autocotizador/recepcion && npm install --no-fund --no-audit && npm run build:unificado)
+          node --check integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq '?servicio=' integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs
+          echo SABER_FOTOS_STICKERS_COMPILED_SAFE
+      - name: Comparar Worker actual, heredar permisos y preparar versión NO desplegada
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${ACCOUNT:?}" "${TOKEN:?}"
+          worker=saber-documentos-produccion
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/$worker"
+          beta="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/workers/$worker/versions"
+          candidate="integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs"
+          temp=$(mktemp -d)
+          get(){ curl -fsS --retry 2 --connect-timeout 10 --max-time 40 -H "Authorization: Bearer $TOKEN" "$1"; }
+          get "$root/deployments" > "$temp/deployments.json"
+          old=$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$temp/deployments.json")
+          test -n "$old"
+          get "$root/settings" > "$temp/settings.json"
+          jq -e '.success==true and (.result.bindings|any(.name=="SABER_ENTORNO" and .text=="produccion") and any(.name=="DOCS_LIVE_UI_GATE" and .text=="GO_COMERCIAL_CONFIRMADO") and any(.name=="SABER_CENTRAL" and .type=="service") and any(.name=="SABER_R2_GRANDES_LIVE" and .type=="r2_bucket"))' "$temp/settings.json" >/dev/null
+          jq -r '.result.bindings[] | [.name,.type] | @tsv' "$temp/settings.json" | sort > "$temp/bindings-old"
+          get "$root" > "$temp/current.multipart"
+          node --input-type=module - "$temp/current.multipart" "$temp/current.mjs" <<'NODE'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          const raw=fs.readFileSync(process.argv[2],'utf8'),crlf=String.fromCharCode(13,10);
+          const boundary=raw.slice(0,raw.indexOf(crlf)),parts=raw.split(boundary);
+          assert.match(boundary,/^--[a-f0-9]{40,}$/i);
+          assert.equal(parts.length,3);
+          const sep=parts[1].indexOf(crlf+crlf);
+          assert.ok(sep>0&&parts[1].slice(0,sep).includes('name="index.mjs"'));
+          const source=parts[1].slice(sep+4);
+          assert.ok(source.endsWith(crlf));
+          fs.writeFileSync(process.argv[3],source.slice(0,-2));
+          NODE
+          node --check "$temp/current.mjs"
+          node --input-type=module - "$temp/current.mjs" "$candidate" <<'NODE'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          const old=fs.readFileSync(process.argv[2],'utf8');
+          const proposed=fs.readFileSync(process.argv[3],'utf8');
+          const markers=[
+            '/cotizar/archivos','/api/pedido/live/borrador','/api/pedido/live/orden',
+            '/personal/central','/personal/api/live-status','/personal/api/live-calendar',
+            'SABER_SMART_UNIVERSAL_PDF','SABER_SMART_PREPARAR_ENVIO',
+            'Descargar ZIP + instrucciones','SABER_TRANSFER_CONFIRMACION_CLIENTE_V1',
+            'DOCS_LIVE_TUS_SERVICE_KEY','/internal/live/purge-file',
+            'SABER_POSTPAGO_SIN_SEGUNDA_SELECCION_V1','saber-live-numero-v1',
+            'href="https://libreriasaber.com.ar/"'
+          ];
+          for(const needle of markers){
+            assert.ok(old.includes(needle),'ACTIVE_WORKER_MISSING_MARKER_'+needle);
+            assert.ok(proposed.includes(needle),'CANDIDATE_MISSING_MARKER_'+needle);
+          }
+          assert.ok(proposed.includes('servicio=fotos')||proposed.includes('?servicio='));
+          assert.ok(proposed.length>old.length*.88&&proposed.length<old.length*1.12,'UNEXPECTED_WORKER_CODE_SIZE');
+          console.log('SABER_LIVE_MARKERS_PRESERVED',markers.length,'ACTIVE_BYTES',old.length,'STAGED_BYTES',proposed.length);
+          NODE
+          jq -nc --arg old "$old" --rawfile code "$candidate" --slurpfile settings "$temp/settings.json" \
+            '{main_module:"index.mjs",bindings:[$settings[0].result.bindings[]|{name,type:"inherit",version_id:$old}],modules:[{name:"index.mjs",content_type:"application/javascript+module",content_base64:($code|@base64)}]}' > "$temp/stage-body.json"
+          http=$(curl -sS --max-time 150 -w '%{http_code}' -o "$temp/stage-result.json" \
+             -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+             --data-binary @"$temp/stage-body.json" "$beta?deploy=false")
+          if [ "$http" != 200 ] || ! jq -e '.success==true and (.result.id|type=="string")' "$temp/stage-result.json" >/dev/null;then
+            echo "SABER_FOTOS_STAGE_API_FAILED_HTTP_$http"
+            jq -c '{errors:[.errors[]?|{code,message}]}' "$temp/stage-result.json"
+            exit 1
+          fi
+          staged=$(jq -er '.result.id' "$temp/stage-result.json")
+          get "$beta/$staged" > "$temp/version.json"
+          jq -r '(.result.bindings//.result.resources.bindings)[]|[.name,.type]|@tsv' "$temp/version.json" | sort > "$temp/bindings-staged"
+          diff "$temp/bindings-old" "$temp/bindings-staged"
+          get "$root/deployments" > "$temp/after.json"
+          still=$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$temp/after.json")
+          test "$still" = "$old"
+          echo "SABER_FOTOS_STICKERS_STAGED_NOT_PUBLISHED active=$old staged=$staged"
