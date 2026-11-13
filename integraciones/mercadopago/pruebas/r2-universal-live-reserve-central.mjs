@@ -47,7 +47,8 @@ export async function reservarR2Live(request,env,{
   readSigned:async()=>({payload:gate})});
  if(!pre?.ok)return pre;
  const proof=await pre.json();
- if(proof?.ok!==true||proof.paymentVerified!==true||
+ if(proof?.ok!==true||
+    !(proof.paymentVerified===true||proof.bankPending===true&&proof.paymentVerified===false)||
     proof.webOrderId!==p.orderId||proof.fileId!==p.fileId||
     proof.sha256!==p.sha256||proof.bytes!==p.bytes)
   return reply({ok:false,error:'LIVE_R2_QUOTA_PAGO_INCONSISTENTE'},402);
