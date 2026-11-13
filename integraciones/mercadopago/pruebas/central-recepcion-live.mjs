@@ -116,7 +116,10 @@ export async function listarRecepcionUniversalLive(request,env,{authorized=false
     'R2_ALMACENADO_PENDIENTE_ANALISIS_PDF':
     'PAGADO_ESPERANDO_ORIGINALES',
    lane:x.estado_produccion||'pendiente',productionState:x.estado_produccion||'pendiente',
-   productionVersion:x.version_produccion||0,readyForProduction:false,
+   productionVersion:x.version_produccion||0,
+   deliveryEnabled:env.CENTRAL_LIVE_PURGE_GATE==='GO_COMERCIAL_CONFIRMADO'&&
+    env.CENTRAL_LIVE_PURGE_EXECUTE_GATE==='GO_COMERCIAL_CONFIRMADO',
+   readyForProduction:false,
    zipEnabled:x.pending_count===0});
  }
  return reply({ok:true,orders:ready,source:'production-d1-verified-payments-only',
