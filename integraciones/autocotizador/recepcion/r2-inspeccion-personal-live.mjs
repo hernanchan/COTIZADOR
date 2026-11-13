@@ -116,8 +116,8 @@ export async function inspeccionR2PersonalLive(request,env,{authorized=false}={}
    return respond({ok:false,error:'STAFF_R2_FICHA'},502);
   if(source)return respond({ok:true,webOrderId:d.webOrderId,
     fileId:d.fileId,bytes:d.bytes,sha256:d.sha256,
-    paginasDeclaradas:d.paginasDeclaradas,
-    instruction:'Inspeccioná el PDF real antes de aprobar. Los datos del presupuesto no sustituyen las medidas comprobadas.'});
+    paginasDeclaradas:d.paginasDeclaradas,formatoFinal:d.formatoFinal,
+    instruction:'Revisá el PDF original, verificá sus páginas y respetá el tamaño de impresión solicitado. La preprensa sigue pendiente.'});
   const head=await env.SABER_R2_GRANDES_LIVE.head(d.objectKey);
   if(!head||head.size!==d.bytes)
    return respond({ok:false,error:'STAFF_R2_OBJETO_NO_DISPONIBLE'},503);
