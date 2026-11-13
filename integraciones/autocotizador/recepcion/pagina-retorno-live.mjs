@@ -55,7 +55,12 @@ small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padd
   trabajo.textContent=verified?'Estado del trabajo: '+(states[t?.productionState]||'Pedido pagado'):
    data.estado==='revocado'?'El pago no se encuentra vigente.':'Aguardando acreditación del pago.';
   const received=Number(data.fileCount||0)-Number(data.pendingFiles||0);
-  archivos.textContent=verified?'Archivos recibidos: '+received+' de '+data.fileCount+
+  let currentOrder;try{currentOrder=JSON.parse(sessionStorage.getItem('saber-live-pedido-v1')||'null')}catch{}
+  const stagedR2=currentOrder?.webOrderId===data.webOrderId&&
+   sessionStorage.getItem('saber-live-r2-recibido-'+currentOrder.webOrderId)==='ok';
+  archivos.textContent=verified&&stagedR2&&data.pendingFiles>0?
+   'PDF grande almacenado en R2. Pendiente de inspección por Librería Saber. No lo vuelvas a enviar.':
+   verified?'Archivos recibidos: '+received+' de '+data.fileCount+
    (data.pendingFiles?' · Enviando automáticamente '+data.pendingFiles+' archivo(s). No cierres la pestaña.':' · Todos los originales fueron recibidos.'):
    'Los PDF se envían cuando el pago está confirmado.';
   entrega.textContent=verified&&t?.readyAt?'Retiro estimado: '+localDate(t.readyAt):
