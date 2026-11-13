@@ -1,0 +1,90 @@
+name: Saber - publicar solo interfaz fotos y stickers en Worker Documentos
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: ['.github/workflows/saber-fotos-stickers-promover-20261113.yml']
+permissions: {contents: read}
+concurrency: {group: saber-fotos-stickers-promocion-live, cancel-in-progress: false}
+jobs:
+  activate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+    steps:
+      - name: Promover versión verificada preservando bindings y revertir ante cualquier fallo
+        shell: bash
+        run: |
+          set -eEuo pipefail
+          : "${ACCOUNT:?}" "${TOKEN:?}"
+          worker=saber-documentos-produccion
+          old=ea93f875-ff6c-4901-adbc-0d0d73234892
+          new=f2a727bf-2fc1-4284-b8c8-4738cf77d87d
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/$worker"
+          beta="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/workers/$worker/versions"
+          tmp=$(mktemp -d)
+          get(){ curl -fsS --retry 2 --connect-timeout 10 --max-time 40 -H "Authorization: Bearer $TOKEN" "$1"; }
+          get "$root/deployments" > "$tmp/before.json"
+          current=$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/before.json")
+          test "$current" = "$old" || { echo SABER_FOTOS_NO_GO_ACTIVE_CHANGED; exit 1; }
+          get "$root/settings" > "$tmp/settings-before.json"
+          jq -e '.success==true and (.result.bindings|any(.name=="DOCS_LIVE_UI_GATE" and .text=="GO_COMERCIAL_CONFIRMADO") and any(.name=="SABER_CENTRAL" and .type=="service") and any(.name=="SABER_R2_GRANDES_LIVE" and .type=="r2_bucket"))' "$tmp/settings-before.json" >/dev/null
+          jq -r '.result.bindings[]|[.name,.type]|@tsv' "$tmp/settings-before.json" | sort > "$tmp/names-before"
+          get "$beta/$new" > "$tmp/new-version.json"
+          jq -e --arg id "$new" '.success==true and .result.id==$id' "$tmp/new-version.json" >/dev/null
+          jq -r '(.result.bindings//.result.resources.bindings)[]|[.name,.type]|@tsv' "$tmp/new-version.json" | sort > "$tmp/names-stage"
+          diff "$tmp/names-before" "$tmp/names-stage"
+          changed=0;phase=promote
+          rollback(){
+            code=$?
+            trap - ERR
+            echo "SABER_FOTOS_GO_LIVE_FAILED_PHASE_$phase"
+            if [ "$changed" = 1 ];then
+              jq -nc --arg id "$old" '{strategy:"percentage",versions:[{version_id:$id,percentage:100}],annotations:{"workers/message":"Rollback UI fotos y stickers"}}' |
+                curl -fsS --max-time 45 -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+                  --data-binary @- "$root/deployments" >/dev/null ||
+                  echo 'SABER_FOTOS_ROLLBACK_UNCONFIRMED'
+            fi
+            exit "$code"
+          }
+          trap rollback ERR
+          changed=1
+          jq -nc --arg id "$new" '{strategy:"percentage",versions:[{version_id:$id,percentage:100}],annotations:{"workers/message":"Fotos y stickers UI cotizador LIVE, sin cambio de pagos"}}' |
+            curl -fsS --max-time 45 -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+              --data-binary @- "$root/deployments" > "$tmp/published.json"
+          jq -e '.success==true' "$tmp/published.json" >/dev/null
+          phase=version
+          for attempt in 1 2 3 4 5 6;do
+            get "$root/deployments" > "$tmp/current.json"
+            now=$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/current.json") || now=''
+            test "$now" = "$new" && break
+            sleep 1
+          done
+          test "$now" = "$new"
+          echo SABER_FOTOS_VERSION_100_PERCENT_VERIFIED
+          phase=bindings
+          get "$root/settings" > "$tmp/settings-after.json"
+          jq -r '.result.bindings[]|[.name,.type]|@tsv' "$tmp/settings-after.json" | sort > "$tmp/names-after"
+          diff "$tmp/names-before" "$tmp/names-after"
+          echo SABER_FOTOS_ALL_BINDINGS_PRESERVED
+          phase=public_anonymous
+          for servicio in fotos stickers;do
+            ok=0
+            for attempt in $(seq 1 12);do
+              response=$(curl -sS --max-time 20 -w '%{http_code}' -o "$tmp/entry.html" \
+                "https://pedidos.libreriasaber.com.ar/cotizar?servicio=$servicio&qa=$attempt") || response=000
+              if [ "$response" = 200 ] &&
+                 grep -Fq "location.replace('/cotizar?servicio=$servicio')" "$tmp/entry.html" &&
+                 grep -Fq 'Volver a la tienda' "$tmp/entry.html";then
+                ok=1; break
+              fi
+              sleep 2
+            done
+            test "$ok" = 1 || { echo "SABER_FOTOS_NO_GO_PUBLIC_ENTRY_$servicio";exit 1; }
+            echo "SABER_FOTOS_PUBLIC_ENTRY_OK_$servicio"
+          done
+          trap - ERR
+          changed=0
+          echo SABER_FOTOS_STICKERS_WORKER_LIVE_OK_NO_PAYMENT_CHANGE
