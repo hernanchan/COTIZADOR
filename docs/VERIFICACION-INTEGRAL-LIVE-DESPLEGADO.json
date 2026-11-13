@@ -1,7 +1,11 @@
 {
-  "checkedAt": "2026-11-13T02:52:44.404Z",
+  "checkedAt": "2026-11-13T02:54:38.309Z",
   "schema": "saber-postdeploy-integral-v1",
   "readOnly": true,
+  "docsTUSReady": true,
+  "docsR2Ready": true,
+  "bankFlowReady": true,
+  "centralR2Ready": true,
   "buyerFlowActive": true,
   "bankNoticeActive": true,
   "customerTrackingActive": true,
