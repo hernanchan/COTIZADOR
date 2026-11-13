@@ -92,3 +92,4 @@ jobs:
 # 13/11: regresión E2E canal pospago sin pago exige el nuevo código de aviso bancario, sin conceder bypass.
 # 13/11: QA quitar referencia bancaria ingresada, proteger auditoria; entregados ocultos y purga confirmada TUS/R2, sin modificar historico.
 # 13/11: segunda QA referencia bancaria opcional con identificador interno, scope D1 de entregados y tests auditoria.
+# 13/11: QA final entregados se filtran SQL y contador purga sin borrar D1; referencia bancaria campo oculto.
