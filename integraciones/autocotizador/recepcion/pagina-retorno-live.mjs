@@ -157,7 +157,7 @@ small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padd
     }});
     if(result?.ok!==true)throw Error('PDF_R2_AUN_SIN_RECIBO');
     sessionStorage.setItem(receiptFlag(order.webOrderId),'ok');
-    progressR2.textContent='Archivo recibido y verificado. El PDF grande está pendiente de inspección en Librería Saber.';
+    progressR2.textContent='Archivo recibido y verificado. Librería Saber revisará el original y las instrucciones antes de imprimir.';
     uploadNotice.hidden=true;retry.hidden=true;
    }
    autoAttempts=0;retry.hidden=true;
