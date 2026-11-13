@@ -1,12 +1,13 @@
 {
   "schema": "saber-mp-live-auto-check-v1",
-  "date": "2026-11-13T00:37:08.113Z",
+  "date": "2026-11-13T00:38:49.359Z",
   "readonly": true,
   "cronActive": true,
   "crons": 1,
   "autoCodeDeployed": true,
   "sandboxIsolated": true,
   "staffFallbackReady": true,
+  "failureReasonDeployed": true,
   "orders100": [
     {
       "estado": "awaiting_payment",
@@ -14,14 +15,14 @@
     }
   ],
   "health": {
-    "checked_at": "2026-11-13 00:36:45",
+    "checked_at": "2026-11-13 00:38:45",
     "checked": 0,
     "recovered": 0,
     "pending": 0,
     "review": 0,
     "errors": 0,
-    "state": "failed"
+    "state": "RESCATE_VENDEDOR_NO_VERIFICADO"
   },
   "staffRechecksTablePresent": true,
-  "lastStaffRecheck": "2026-11-13 00:34:58"
+  "lastStaffRecheck": "2026-11-13 00:37:30"
 }
