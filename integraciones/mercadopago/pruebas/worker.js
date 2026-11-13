@@ -4840,7 +4840,8 @@ export default {
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS central_mp_live_auto_health (id INTEGER PRIMARY KEY CHECK(id=1),checked_at TEXT NOT NULL,checked INTEGER NOT NULL,recovered INTEGER NOT NULL,pending INTEGER NOT NULL,review INTEGER NOT NULL,errors INTEGER NOT NULL,state TEXT NOT NULL)").run();
       await env.DB.prepare("INSERT INTO central_mp_live_auto_health(id,checked_at,checked,recovered,pending,review,errors,state) VALUES(1,datetime('now'),?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET checked_at=excluded.checked_at,checked=excluded.checked,recovered=excluded.recovered,pending=excluded.pending,review=excluded.review,errors=excluded.errors,state=excluded.state")
        .bind(result?.revisados||0,result?.recuperados||0,result?.pendientes||0,
-        result?.enRevision||0,result?.errores||0,result?.ok?'ok':'failed').run();
+        result?.enRevision||0,result?.errores||0,result?.ok?'ok':
+        String(result?.error||'FALLO_NO_IDENTIFICADO').replace(/[^A-Z0-9_]/gi,'').slice(0,64)).run();
      }catch{console.warn('SABER_MP_LIVE_CRON_AUDITORIA_INDISPONIBLE')}
      if(!result?.ok||result?.errores||result?.enRevision)
       console.warn('SABER_MP_LIVE_CRON_REVISION',{
