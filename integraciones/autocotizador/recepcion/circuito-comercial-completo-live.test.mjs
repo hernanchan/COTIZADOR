@@ -133,8 +133,8 @@ async function runCase(method,bytes){
   selectedFiles:[src],storage:store,origin:HOST,fetcher,hasher:async()=>SHA,
   loadUploader:async()=>fakeUppy()
  });
- await assert.rejects(send(),/PAGO_NO_CONCILIADO/,
-  'No se admite subir originales antes de acreditar el pago');
+ await assert.rejects(send(),/PAGO_O_AVISO_NO_CONCILIADO/,
+  'Canal pospago sin pago bloqueado; recepción bancaria anticipada exige permiso distinto');
  paid=true; // Aprobación simulada del proveedor o conciliación bancaría por personal
  const delivered=await send();
  assert.equal(delivered.ok,true);
