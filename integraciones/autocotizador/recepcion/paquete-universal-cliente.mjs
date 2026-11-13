@@ -41,6 +41,29 @@ export function convertirTrabajoZIPUniversal(t){
   medidasOriginalesCm:c.paginas.map(p=>({pagina:p.numero,anchoCm:p.anchoCm,altoCm:p.altoCm})),
   descripcion:'Pedido PDF universal. Original y preprensa requieren control antes de imprimir.'};
 }
+function resumirPaginasElegidas(paginas){
+ if(!Array.isArray(paginas)||paginas.length===0)return 'SIN PÁGINAS: revisar';
+ const ranges=[];
+ let start=null,last=null;
+ const push=()=>{
+  if(start!==null)ranges.push(start===last?String(start):String(start)+'-'+String(last));
+ };
+ for(const n of paginas){
+  if(!Number.isSafeInteger(n)||n<1)throw Error('Páginas seleccionadas inválidas');
+  if(last!==null&&n===last+1){last=n;continue}
+  push();start=n;last=n;
+ }
+ push();
+ return ranges.join(', ');
+}
+function validarZIPDeProduccion(entries,ficha,instruccion){
+ if(entries.length!==ficha.trabajos.length+1||
+    entries.length<2||entries.length>11||
+    entries.some((entry,i)=>i<ficha.trabajos.length&&entry.name!==name(i))||
+    entries.at(-1)?.name!=='ORDEN_'+ficha.numeroOrden+'_INSTRUCCIONES.pdf'||
+    !(instruccion instanceof Blob)||instruccion.size<400)
+  throw Error('ZIP incompleto: falta original o instrucciones de impresión');
+}
 function filas(t,i){
  const config=t.configuracion,details=t.detalle;
  const values=[
@@ -48,7 +71,7 @@ function filas(t,i){
   ['Original del cliente',t.nombreOriginal],
   ['Servicio',t.servicio==='ploteos'?'Ploteo CAD/Póster':'Impresión A4/A3'],
   ['Páginas originales',config.paginas.length],
-  ['Páginas elegidas',t.paginasElegidas.join(', ')],
+  ['Páginas elegidas',resumirPaginasElegidas(t.paginasElegidas)],
   ['Tamaño final',t.formatoFinal==='original'?'Tamaño real / 100 %':String(t.formatoFinal).toUpperCase()+' (aplicar a TODAS las páginas, incluso originales mixtos)'],
   ['Copias',config.copias],
   ['Color',config.modo==='bn'?'Blanco y negro':'Color'],
@@ -122,6 +145,7 @@ async function descargarZIP(){
    entries.push({name:'ORDEN_'+ficha.numeroOrden+'_INSTRUCCIONES.pdf',
     expectedBytes:instruccion.size,expectedSha256:null,
     open:async()=>instruccion.stream()});
+   validarZIPDeProduccion(entries,ficha,instruccion);
    const written=await escribirZipUniversal({entries,output:writer,
     onProgress:p=>{state.textContent='ZIP '+p.file+'/'+p.count+' · '+
      Math.round(p.bytes/MiB)+' / '+Math.round(p.totalBytes/MiB)+' MiB'}});
@@ -140,6 +164,7 @@ async function descargarZIP(){
     entries.push({name:name(i),blob});
    }
    entries.push({name:'ORDEN_'+ficha.numeroOrden+'_INSTRUCCIONES.pdf',blob:instruccion});
+   validarZIPDeProduccion(entries,ficha,instruccion);
    const zip=await crearZipSinCompresion(entries,{maxBytes:160*MiB});
    const url=URL.createObjectURL(zip),a=document.createElement('a');
    a.href=url;a.download=nombre;document.body.append(a);a.click();a.remove();
