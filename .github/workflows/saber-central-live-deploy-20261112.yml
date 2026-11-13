@@ -48,7 +48,7 @@ jobs:
           grep -Fq 'stageDialog' /tmp/saber-documentos-live.mjs
           grep -Fq 'saber-live-numero-v1' /tmp/saber-documentos-live.mjs
           grep -Fq 'etaDate' /tmp/saber-documentos-live.mjs
-          grep -Fq 'Inspeccionar PDF R2 almacenado' /tmp/saber-documentos-live.mjs || { echo 'SABER_DEPLOY_MARKER_10_MISSING'; exit 1; }
+          grep -Fq 'Descargar ZIP + instrucciones' /tmp/saber-documentos-live.mjs || { echo 'SABER_DEPLOY_MARKER_10_MISSING'; exit 1; }
           grep -Fq 'openOrderEta' /tmp/saber-documentos-live.mjs || { echo 'SABER_DEPLOY_MARKER_11_MISSING'; exit 1; }
           grep -Fq 'actualizarSeguimiento' /tmp/saber-documentos-live.mjs || { echo 'SABER_DEPLOY_MARKER_12_MISSING'; exit 1; }
           grep -Fq 'saber-live-originales-privados-v1' /tmp/saber-documentos-live.mjs || { echo 'SABER_DEPLOY_MARKER_13_MISSING'; exit 1; }
