@@ -38,5 +38,13 @@ jobs:
           }
           const h=text.indexOf('<header');
           console.log('SABER_SAFE_HEADER_SHAPE',h<0?'NO_LITERAL_HEADER':text.slice(h,Math.min(h+200,text.length)).replace(/[\\r\\n]/g,' '));
+          for(const needle of ['Librería Saber','Impresiones y ploteos','Librer\\u00eda Saber']){
+            let index=-1;
+            for(let j=0;j<5;j++){
+              index=text.indexOf(needle,index+1);
+              if(index<0)break;
+              console.log('SABER_UI_NEAR_LABEL',JSON.stringify(needle),j,text.slice(Math.max(0,index-100),Math.min(index+170,text.length)).replaceAll('\\n',' ').replaceAll('\\r',' '));
+            }
+          }
           console.log('SABER_UI_RETURN_DIAGNOSTIC_READONLY_NO_DEPLOY');
           NODE
