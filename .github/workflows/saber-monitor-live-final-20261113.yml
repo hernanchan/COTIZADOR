@@ -1,0 +1,43 @@
+name: Saber - cierre publicación LIVE check final
+on:
+  push:
+    branches: [qa/catalogo-publico-20261113]
+    paths: ['.github/workflows/saber-monitor-live-final-20261113.yml']
+permissions: {contents: read}
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      CF_DEPLOY: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+      CF_DB: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: main, persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Esperar activación pública del enlace viejo (GET solamente)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 25); do
+            if curl -fsSL --connect-timeout 10 --max-time 15 \
+               'https://libreriasaber.com.ar/portal-comercial.json' -o /tmp/portal.json; then
+              if jq -e '.schema=="saber-portal-comercial-v1" and .enabled==true and .release=="GO_COMERCIAL_CONFIRMADO" and .buyerUrl=="https://pedidos.libreriasaber.com.ar/cotizar"' /tmp/portal.json >/dev/null; then
+                echo "SABER_PORTAL_COMERCIAL_GO_PUBLIC_OK"; exit 0
+              fi
+            fi
+            echo "SABER_PORTAL_PROPAGACION_PENDIENTE intento=$i"
+            sleep 7
+          done
+          echo "SABER_PORTAL_PUBLIC_GO_NOT_FOUND"
+          exit 1
+      - name: Revalidar monitor integral existente sin cambios ni nuevos pedidos
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check integraciones/publicacion/monitor-postpublicacion-20261112.mjs
+          node integraciones/publicacion/monitor-postpublicacion-20261112.mjs
+          echo "SABER_RELEASE_CIERRE_MONITOR_INTEGRAL_OK"
