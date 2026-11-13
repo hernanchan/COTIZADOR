@@ -52,7 +52,10 @@ function mockedCentral(){
    }
    approvals++;
    assert.equal(json.schema,'saber-central-live-transfer-staff-approve-v1');
-   assert.equal(json.bank_reference,'REFERENCIA-BANCO-ABC');
+   if(Object.hasOwn(json,'bank_reference'))
+    assert.equal(json.bank_reference,'REFERENCIA-BANCO-ABC');
+   else assert.deepEqual(Object.keys(json).sort(),
+    ['amount_ars','confirmed','operator','order_id','schema']);
    assert.equal(json.confirmed,true);
    return Response.json({ok:true,paymentVerified:true,productionAuthorized:false,
     order_id:ID,amount_ars:7524});
@@ -112,21 +115,40 @@ test('pantalla de personal no usa comprobante del cliente como prueba de pago',(
  assert.match(html,/No acreditar por capturas o comprobantes/);
  assert.match(js,/confirm\('/);
  assert.match(js,/confirmed:true/);
- assert.match(js,/bank_reference/);
+ assert.doesNotMatch(js,/bank_reference\s*:/);
+ assert.doesNotMatch(js,/Identificador real del movimiento/);
  assert.match(html,/personal\/transferencias.js/);
  assert.doesNotThrow(()=>new Function(js));
 });
 
-test('la pantalla bancaria conserva el número de operación al refrescar y evita alert genéricos',()=>{
+test('la pantalla bancaria conserva al operador y evita alert genéricos',()=>{
  const html=paginaTransferenciasPersonalLive(),js=jsTransferenciasPersonalLive();
  assert.match(html,/Volver a Central/);
  assert.match(js,/const drafts=new Map/);
  assert.match(js,/if\(background&&drafts\.size\)return/);
- assert.match(js,/reference\.value=saved\.reference/);
+ assert.doesNotMatch(js,/reference\.value/);
  assert.match(js,/operator\.value=saved\.operator/);
  assert.match(js,/TRANSFER_LIVE_REFERENCIA_YA_UTILIZADA/);
  assert.match(js,/TRANSFER_LIVE_ACREDITACION_NO_COMPLETADA/);
- assert.match(js,/Consultá el número de operación de este movimiento en el banco/);
+ assert.match(js,/operator\.value=saved\.operator/);
  assert.doesNotMatch(js,/alert\('No se acreditó/);
  assert.doesNotThrow(()=>new Function(js));
+});
+
+test('nueva acreditación sin referencia manual conserva HMAC, operador y consentimiento',async()=>{
+ const m=mockedCentral();
+ const res=await transferenciasPersonalLive(request(approvePath,'POST',{
+  order_id:ID,amount_ars:7524,operator:'Responsable',confirmed:true
+ }),env,deps(m));
+ assert.equal(res.status,200);
+ assert.equal((await res.json()).paymentVerified,true);
+ assert.equal(m.approvals,1);
+});
+test('interfaz elimina completamente el campo y envía solo importe y confirmación de operador',()=>{
+ const h=paginaTransferenciasPersonalLive(),js=jsTransferenciasPersonalLive();
+ assert.doesNotMatch(h,/referencia bancaria única/i);
+ assert.doesNotMatch(js,/Número de operación bancaria \(único\)/);
+ assert.doesNotMatch(js,/bank_reference:ref/);
+ assert.match(js,/operator:op,confirmed:true/);
+ assert.match(js,/comprobé el ingreso en la cuenta bancaria/);
 });
