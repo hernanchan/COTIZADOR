@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-11-13T03:07:07.357Z",
+  "checkedAt": "2026-11-13T03:10:20.623Z",
   "schema": "saber-e2e-integral-v1",
   "passed": true,
   "code": 0,
@@ -7,8 +7,8 @@
   "noRealPayments": true,
   "noRealFiles": true,
   "failures": [
-    "# tests 84",
-    "# pass 84",
+    "# tests 88",
+    "# pass 88",
     "# fail 0"
   ]
 }
