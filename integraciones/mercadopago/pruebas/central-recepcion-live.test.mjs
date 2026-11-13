@@ -160,3 +160,16 @@ test('órdenes archivadas no se incluyen en Nuevos aunque sus pagos queden audit
  const boardSQL=queries.find(q=>q.includes('FROM central_r2_universal_order_links l'));
  assert.match(boardSQL,/NOT EXISTS\(SELECT 1 FROM central_live_order_archives a WHERE a.order_id=o.id\)/);
 });
+
+test('ensayos anulados salen del listado activo sin borrar la conciliación del pago',async()=>{
+ const {env,queries}=envWith();
+ const base=env.DB.prepare;
+ env.DB.prepare=sql=>sql.includes('sqlite_master')?
+  {all:async()=>({results:[{name:'central_live_test_exclusions'}]}),first:async()=>null}:base(sql);
+ const result=await listarRecepcionUniversalLive(new Request(url),env,{authorized:true});
+ assert.equal(result.status,200);
+ const query=queries.find(x=>x.includes('FROM central_r2_universal_order_links l'));
+ assert.match(query,/NOT EXISTS\(SELECT 1 FROM central_live_test_exclusions e WHERE e.order_id=o.id\)/);
+ assert.match(query,/p\.state='verified'/);
+ assert.match(query,/o\.status='paid'/);
+});
