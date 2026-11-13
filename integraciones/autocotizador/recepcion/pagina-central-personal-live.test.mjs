@@ -23,3 +23,19 @@ test('aviso no modifica la previsión, órdenes, precios, ni el tablero; script 
  assert.match(html,/id="previsionGuardar"/);
  assert.match(html,/id="tablero"/);
 });
+
+test('Definir hora usa calendario nativo, respeta agenda y evita cuatro ventanas prompt',()=>{
+ const html=paginaCentralPersonalLive();
+ assert.match(html,/id="etaDate" type="date"/);
+ assert.match(html,/id="etaTime" type="time"/);
+ assert.match(html,/id="etaOperator" type="text"/);
+ assert.match(html,/id="etaReasonBlock" hidden/);
+ assert.match(html,/etaDialog\.showModal\(\)/);
+ assert.match(html,/agendaSnapshot\.weekly/);
+ assert.match(html,/agenda\.closedDates/);
+ assert.match(html,/time\.addEventListener\('click',\(\)=>openOrderEta\(o\)\)/);
+ assert.doesNotMatch(html,/window\.prompt\('Fecha y hora estimada/);
+ const js=html.match(/<script>([\s\S]*?)<\/script>/);
+ assert.ok(js);
+ assert.doesNotThrow(()=>new Function(js[1]),'JavaScript del calendario inválido');
+});
