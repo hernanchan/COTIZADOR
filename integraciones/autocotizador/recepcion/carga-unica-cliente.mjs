@@ -8,6 +8,7 @@ import {decidirTamanoCliente} from './decision-tamano-impresion.mjs';
 import {clasificarPaginasPloteo} from './clasificar-paginas-ploteo.mjs';
 import {clasificarMosaicoRasterPDFGrande} from './clasificar-ploteo-grande-raster-local.mjs';
 import {clasificarPloteoGrandeVisualLimitado} from './clasificar-ploteo-grande-visual-limitado.mjs';
+import {clasificarPloteoGrandePorRangos} from './clasificar-ploteo-grande-por-rangos.mjs';
 import {prepararLoteParcial,recomponerLoteParcial} from './cotizar-lote-parcial.mjs';
 import {solicitarCotizacionPrivada} from './solicitar-cotizacion-privada.mjs';
 import {decidirTransportePDF,LIMITE_TUS_PDF_BYTES,LIMITE_R2_PDF_BYTES} from './seleccionar-transporte-pdf.mjs';
@@ -727,11 +728,12 @@ async function analizarArchivoPDF(e,file){
     e.clasificacionAutomatica=true;
     e.metodoClasificacion='MOSAICO_RASTER_LOCAL';
    }else{
-    const visual=await clasificarPloteoGrandeVisualLimitado(file,{paginas:e.paginas});
+    const visual=(await clasificarPloteoGrandeVisualLimitado(file,{paginas:e.paginas}))||
+     (await clasificarPloteoGrandePorRangos(file,{paginas:e.paginas}));
     if(visual?.altaConfianza===true&&visual.paginas.length===e.paginas.length){
      for(const pagina of visual.paginas)e.paginas[pagina.numero-1].modo=pagina.modo;
      e.clasificacionAutomatica=e.paginas.every(p=>['cad','poster'].includes(p.modo));
-     if(e.clasificacionAutomatica)e.metodoClasificacion='VISUAL_PDFJS_LIMITADO';
+     if(e.clasificacionAutomatica)e.metodoClasificacion=visual.metodo||'VISUAL_PDFJS_LIMITADO';
     }
    }
   }
