@@ -42,6 +42,22 @@ jobs:
             request('/workers/scripts/saber-pagos-produccion')
            ]);
            const d=await docs.text(),p=await pay.text();
+           const settings=async script=>{
+            const r=await request('/workers/scripts/'+script+'/settings');
+            const data=await r.json();
+            if(data?.success!==true||!Array.isArray(data?.result?.bindings))throw Error('SETTINGS_OFF');
+            return data.result.bindings;
+           };
+           const docsBindings=await settings('saber-documentos-produccion');
+           const payBindings=await settings('saber-pagos-produccion');
+           const gate=(bindings,name)=>bindings.some(x=>x.name===name&&x.text==='GO_COMERCIAL_CONFIRMADO');
+           result.docsTUSReady=['DOCS_LIVE_TUS_GATE','DOCS_LIVE_RECEPCION_GATE','DOCS_LIVE_ORDER_GATE'].every(x=>gate(docsBindings,x));
+           result.docsR2Ready=['DOCS_LIVE_R2_GATE','DOCS_LIVE_R2_UPLOAD_GATE','DOCS_LIVE_R2_STAGING_GATE','DOCS_LIVE_RECEPCION_GATE'].every(x=>gate(docsBindings,x))&&
+            docsBindings.some(x=>x.name==='SABER_R2_GRANDES_LIVE'&&x.type==='r2_bucket'&&x.bucket_name==='saber-documentos-produccion-privado');
+           result.bankFlowReady=gate(docsBindings,'DOCS_LIVE_TRANSFER_GATE')&&
+            ['CENTRAL_LIVE_TRANSFER_GATE','CENTRAL_LIVE_TRANSFER_APPROVAL_GATE','CENTRAL_LIVE_TUS_GATE','CENTRAL_LIVE_POSTPAY_GATE'].every(x=>gate(payBindings,x));
+           result.centralR2Ready=['CENTRAL_LIVE_R2_GATE','CENTRAL_LIVE_R2_QUOTA_GATE','CENTRAL_LIVE_R2_STAGING_GATE',
+            'CENTRAL_LIVE_R2_INSPECTION_GATE','CENTRAL_LIVE_POSTPAY_GATE'].every(x=>gate(payBindings,x));
            result.buyerFlowActive=d.includes('saber-live-numero-v1')&&d.includes('saber-live-originales-privados-v1');
            result.bankNoticeActive=d.includes('SABER_TRANSFER_CONFIRMACION_CLIENTE_V1')&&d.includes('transferNewList');
            result.customerTrackingActive=d.includes('Recibimos tu aviso')&&d.includes('enviarAutomaticamente');
@@ -68,7 +84,8 @@ jobs:
           }catch(e){result.error=String(e.message||e).slice(0,80)}
           const checks=['buyerFlowActive','bankNoticeActive','customerTrackingActive','operatorStageDialogActive',
            'r2InspectionDirectActive','archiveFilterActive','r2IdentifiersActive',
-           'paymentCronActive','cronEveryMinute','archivedPaymentsPreserved','publicSiteNoGo'];
+           'paymentCronActive','cronEveryMinute','archivedPaymentsPreserved','publicSiteNoGo',
+           'docsTUSReady','docsR2Ready','bankFlowReady','centralR2Ready'];
           result.passed=checks.every(k=>result[k]===true)&&result.archivedNumbers?.join(',')==='8,9';
           await mkdir('docs',{recursive:true});
           await writeFile('docs/VERIFICACION-INTEGRAL-LIVE-DESPLEGADO.json',JSON.stringify(result,null,2)+'\n');
