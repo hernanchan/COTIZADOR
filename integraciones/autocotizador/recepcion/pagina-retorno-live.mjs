@@ -48,13 +48,15 @@ small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padd
  const localDate=value=>new Intl.DateTimeFormat('es-AR',{timeZone:'America/Argentina/Cordoba',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(value))+' hs';
  function actualizarSeguimiento(data){
   const t=data.tracking;
-  numero.textContent=t?.numeroOrden?'Orden '+t.numeroOrden:'Tu pedido en Librería Saber';
+  const known=sessionStorage.getItem('saber-live-numero-v1');
+  numero.textContent=t?.numeroOrden?'Orden '+t.numeroOrden:
+   /^[0-9]{3,8}$/.test(known||'')?'Orden '+known:'Tu pedido en Librería Saber';
   const verified=data.estado==='pagado_esperando_archivos'&&data.uploadAuthorized===true;
   trabajo.textContent=verified?'Estado del trabajo: '+(states[t?.productionState]||'Pedido pagado'):
    data.estado==='revocado'?'El pago no se encuentra vigente.':'Aguardando acreditación del pago.';
   const received=Number(data.fileCount||0)-Number(data.pendingFiles||0);
   archivos.textContent=verified?'Archivos recibidos: '+received+' de '+data.fileCount+
-   (data.pendingFiles?' · Debés enviar '+data.pendingFiles+' archivo(s) para completar el pedido.':' · Todos los originales fueron recibidos.'):
+   (data.pendingFiles?' · Enviando automáticamente '+data.pendingFiles+' archivo(s). No cierres la pestaña.':' · Todos los originales fueron recibidos.'):
    'Los PDF se envían cuando el pago está confirmado.';
   entrega.textContent=verified&&t?.readyAt?'Retiro estimado: '+localDate(t.readyAt):
    verified?'Previsión orientativa: '+(modes[t?.forecastMode]||'A confirmar')+
@@ -170,7 +172,25 @@ small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padd
     }
    }else{
     receiving.hidden=true;
-    output.textContent=data.estado==='revocado'?
+    if(sessionStorage.getItem('saber-live-medio-v1')==='transferencia'&&data.estado==='pendiente'){
+     try{
+      const tr=await fetch('/api/pedido/live/transfer',{method:'POST',credentials:'same-origin',
+       headers:{'Content-Type':'application/json'},
+       body:JSON.stringify({action:'status',webOrderId:order.webOrderId,
+        commercialOrderId:order.commercialOrderId})});
+      const t=await tr.json().catch(()=>null);
+      if(tr.ok&&t?.ok===true&&t.commercialOrderId===order.commercialOrderId&&
+       t.paymentVerified===false&&t.uploadAuthorized===false){
+       output.textContent=t.customerNotified===true?
+        'Recibimos tu aviso «Ya transferí». Librería Saber verificará el ingreso bancario. No vuelvas a transferir.':
+        'Transferencia elegida. Aún no recibimos tu aviso de pago.';
+       trabajo.textContent=t.customerNotified===true?
+        'Estado: transferencia informada, pendiente de verificación bancaria':
+        'Estado: esperando aviso de transferencia';
+       entrega.textContent='El trabajo comenzará después de verificarse el pago y recibir los originales.';
+      }else output.textContent='Esperando comprobación bancaria. No vuelvas a pagar.';
+     }catch{output.textContent='Consultando verificación bancaria. Conservá esta pestaña abierta.'}
+    }else output.textContent=data.estado==='revocado'?
      'El pago no se encuentra vigente. Contactá a Librería Saber.':
      'Esperando acreditación en Mercado Pago. Consultaremos automáticamente sin generar otro cobro.';
    }
