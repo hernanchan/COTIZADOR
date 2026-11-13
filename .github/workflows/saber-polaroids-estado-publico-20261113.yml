@@ -1,0 +1,35 @@
+name: Saber - Polaroids Express diagnóstico público solo lectura
+on:
+  push:
+    branches: [qa/catalogo-publico-20261113]
+    paths: ['.github/workflows/saber-polaroids-estado-publico-20261113.yml']
+permissions: {contents: read}
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verificar configuración y rutas GET sin transmitir imágenes
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in config ping receptor express;do
+            case "$name" in
+              config) route=/polaroids/recepcion-config.json;;
+              ping) route=/api/polaroids-ping;;
+              receptor) route=/api/polaroids-receiver;;
+              express) route=/api/polaroids-express;;
+            esac
+            curl -sSL --connect-timeout 12 --max-time 30 \
+              -w '%{http_code}' "https://libreriasaber.com.ar$route" -o "/tmp/saber-$name.json" > "/tmp/saber-$name.status" || echo 000 > "/tmp/saber-$name.status"
+          done
+          python3 - <<'PY'
+          import pathlib,json
+          for name in ['config','ping','receptor','express']:
+              status=pathlib.Path('/tmp/saber-'+name+'.status').read_text().strip()
+              content=pathlib.Path('/tmp/saber-'+name+'.json').read_text() if pathlib.Path('/tmp/saber-'+name+'.json').exists() else ''
+              try: obj=json.loads(content)
+              except ValueError: obj={}
+              safe={k:obj.get(k) for k in ['enabled','showInShop','rollout','ok','connection','receptionEnabled','route','testOnly','maxPhotos','pdfForClient','error'] if k in obj}
+              print('SABER_POLAROID_GET',name,status,'JSON',bool(obj),'INFO',json.dumps(safe,ensure_ascii=False))
+          PY
