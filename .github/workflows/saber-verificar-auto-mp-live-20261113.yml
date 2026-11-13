@@ -42,6 +42,7 @@ jobs:
            const code=await codeRes.text();
            report.autoCodeDeployed=code.includes('SABER_MP_LIVE_CRON_ACREDITADOS')&&code.includes('central_mp_live_auto_health');
            report.sandboxIsolated=code.includes('SABER_MP_LIVE_CRON_AISLADO');
+           report.staffFallbackReady=code.includes('SABER_MP_LIVE_STAFF_AUTO_ACREDITADOS');
           }catch(e){report.cronError=String(e.message||e).slice(0,80)}
           try{
            const dbs=await cf('/d1/database',d);
