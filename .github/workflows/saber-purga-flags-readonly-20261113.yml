@@ -24,7 +24,7 @@ jobs:
           curl -fsS --max-time 25 -H "Authorization: Bearer $D1TOKEN" "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/d1/database" > /tmp/dbs.json
           db=$(jq -r '.result[]|select(.name=="saber-pagos-produccion")|.uuid' /tmp/dbs.json)
           test -n "$db"
-          for query in "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('central_live_purge_files','central_live_purge_audit','central_live_production_states')" "SELECT COUNT(*) AS n FROM central_live_production_states WHERE state='entregado'";do
+          for query in "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('central_live_purge_files','central_live_purge_audit','central_live_production_states')" "SELECT COUNT(*) AS n FROM central_live_production_states WHERE state='entregado'" "SELECT state,COUNT(*) AS n FROM central_live_purge_files GROUP BY state ORDER BY state" "SELECT COUNT(*) AS n FROM central_live_production_states s WHERE s.state='entregado' AND NOT EXISTS(SELECT 1 FROM central_live_purge_files p WHERE p.order_id=s.order_id)" "SELECT COUNT(*) AS n FROM central_live_purge_files p JOIN central_live_production_states s ON s.order_id=p.order_id WHERE s.state='entregado' AND p.state!='deleted'";do
             result=$(curl -fsS --max-time 25 -H "Authorization: Bearer $D1TOKEN" -H 'Content-Type: application/json' \
               -d "$(jq -nc --arg sql "$query" '{sql:$sql}')" "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/d1/database/$db/query")
             echo "$result" | jq -c '{success,results:[.result[].results]}'
