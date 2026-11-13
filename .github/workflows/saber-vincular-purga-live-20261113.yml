@@ -19,9 +19,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          phase=starting
+          mkdir -p docs
+          trap 'code=$?; printf "{\"phase\":\"%s\",\"code\":%s}\n" "$phase" "$code" > docs/VINCULO-PURGA-LIVE-RESULTADO.json' EXIT
           root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts"
           temp=$(mktemp -d)
           get(){ curl -fsS --retry 2 --max-time 35 -H "Authorization: Bearer $TOKEN" "$1"; }
+          phase=read_settings
           get "$root/saber-pagos-produccion/settings" > "$temp/pay.json"
           get "$root/saber-documentos-produccion/settings" > "$temp/docs.json"
           get "$root/saber-pagos-produccion/deployments" > "$temp/old.json"
@@ -32,9 +36,11 @@ jobs:
             echo 'SABER_SERVICE_ALREADY_BOUND';exit 0
           fi
           jq -e '.result.bindings|all(.name!="SABER_DOCUMENTOS")' "$temp/pay.json" >/dev/null
+          phase=prepare_metadata
           jq '{main_module:"index.mjs",bindings:([.result.bindings[]|{name,type:"inherit"}]+[{"name":"SABER_DOCUMENTOS","type":"service","service":"saber-documentos-produccion"}])}' "$temp/pay.json" > "$temp/meta.json"
           get "$root/saber-pagos-produccion" > "$temp/index.mjs"
           grep -Fq 'central_live_purge_files' "$temp/index.mjs"
+          phase=stage_version
           status=$(curl -sS --max-time 120 -w '%{http_code}' -o "$temp/stage.json" \
            -H "Authorization: Bearer $TOKEN" \
            -F "metadata=@$temp/meta.json;type=application/json" \
@@ -44,6 +50,7 @@ jobs:
             echo "SABER_SERVICE_BIND_STAGE_FAILED_HTTP_$status";exit 1
           fi
           id=$(jq -r '.result.id' "$temp/stage.json")
+          phase=verify_stage
           get "$root/saber-pagos-produccion/versions/$id" > "$temp/staged.json"
           jq -e '.result.resources.bindings|any(.name=="SABER_DOCUMENTOS" and .type=="service")' "$temp/staged.json" >/dev/null
           jq -r '.result.bindings[].name' "$temp/pay.json" | sort > "$temp/before.names"
@@ -56,13 +63,35 @@ jobs:
               -H "Content-Type: application/json" --data-binary @- "$root/saber-pagos-produccion/deployments" >/dev/null || true
           }
           trap rollback ERR
+          phase=deploy_version
           jq -nc --arg id "$id" '{strategy:"percentage",versions:[{version_id:$id,percentage:100}]}' |
            curl -fsS --max-time 45 -X POST -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" --data-binary @- "$root/saber-pagos-produccion/deployments" > "$temp/deployed.json"
           jq -e '.success==true' "$temp/deployed.json" >/dev/null
+          phase=verify_deployment
           get "$root/saber-pagos-produccion/settings" > "$temp/after.json"
           jq -e '.result.bindings|any(.name=="SABER_DOCUMENTOS" and .type=="service" and .service=="saber-documentos-produccion")' "$temp/after.json" >/dev/null
           jq -r '.result.bindings[].name|select(.!="SABER_DOCUMENTOS")' "$temp/after.json" | sort > "$temp/after.names"
           diff "$temp/before.names" "$temp/after.names"
           trap - ERR
+          phase=done
           echo 'SABER_SERVICE_BIND_ADDED_PURGE_STILL_OFF'
+
+      - name: Guardar fase de diagnóstico sin secretos
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/VINCULO-PURGA-LIVE-RESULTADO.json || exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/VINCULO-PURGA-LIVE-RESULTADO.json
+          git diff --cached --quiet && exit 0
+          git commit -m "ops: fase de instalación del puente privado para purga"
+          for attempt in 1 2 3 4;do
+            git fetch origin integracion/tus-pedido-privado-20261101
+            git rebase origin/integracion/tus-pedido-privado-20261101
+            git push origin HEAD:integracion/tus-pedido-privado-20261101 && exit 0
+            sleep 2
+          done
+          exit 1
