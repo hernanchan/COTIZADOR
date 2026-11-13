@@ -435,6 +435,45 @@ function render(){
    resumen.textContent=(e.paginasSeleccionadas?(e.paginasSeleccionadas+' de '+e.paginas.length):(e.paginas.length+' pág.'))+' · '+tipo+(d.confirmado?' '+(d.tamanoFinal==='original'?'original':d.tamanoFinal.toUpperCase()):'')+' · '+e.copias+(e.servicio==='grafica'?' lote(s)':' copia(s)')+((d.confirmado||independiente)?extra+nup:'');
   }else resumen.textContent=e.error?'Error de lectura':'Analizando PDF…';
   principal.append(resumen);
+  // La selección es visible ANTES del render de las páginas raster pesadas.
+  const esPlanoGrande=e.paginas&&e.servicio==='auto'&&
+   e.archivoOriginal?.size>48*1024*1024&&e.paginas.length>4&&
+   requiereClasificacionVisualPloteo(e.paginas);
+  if(esPlanoGrande){
+   const panelPaginas=document.createElement('div');
+   panelPaginas.className='selector-paginas-grande';
+   panelPaginas.style.cssText='display:grid;gap:7px;padding:12px;margin-top:9px;'+
+    'border:1px solid #a6c7db;border-radius:9px;background:#edf6fc';
+   const etiqueta=texto('label','¿Qué páginas querés imprimir?');
+   etiqueta.style.fontWeight='700';
+   const input=document.createElement('input');
+   input.type='text';input.value=e.paginasSeleccionadas||'';
+   input.placeholder='Ej.: 1-3 (vacío = todas las páginas)';
+   input.setAttribute('aria-label','Páginas a cotizar e imprimir de '+e.name);
+   input.disabled=leyendo;
+   input.oninput=()=>{
+    e.paginasSeleccionadas=input.value.trim();
+    version++;ultimoPresupuesto=null;
+    $('prepararPedido').disabled=true;
+    $('estado').textContent='Páginas elegidas. Pulsá «Calcular estas páginas» para presupuestar.';
+   };
+   const calcular=texto('button','Calcular estas páginas');
+   calcular.type='button';calcular.className='editar';
+   calcular.disabled=leyendo;
+   calcular.onclick=()=>{
+    if(leyendo)return;
+    e.paginasSeleccionadas=input.value.trim();
+    void analizarPaginasSolicitadas(e);
+   };
+   panelPaginas.append(etiqueta,input,calcular);
+   if(e.elegirPaginasAntesDeAnalizar)
+    panelPaginas.append(texto('small','Elegí primero las páginas. Así evitamos analizar las láminas que no vas a imprimir. El PDF original queda completo.'));
+   if(e.avisoClasificacion){
+    const aviso=texto('small',e.avisoClasificacion);
+    aviso.className='advertencia';panelPaginas.append(aviso);
+   }
+   principal.append(panelPaginas);
+  }
   if(advertenciaRecepcion){
    const aviso=texto('p','PDF NO ADMITIDO · '+advertenciaRecepcion);
    aviso.className='advertencia-recepcion';
@@ -624,11 +663,15 @@ function render(){
   const medidas=e.paginas.map(p=>p.anchoCm.toFixed(2)+' × '+p.altoCm.toFixed(2)+' cm');
   const origin=texto('p','Tamaño original: '+(new Set(medidas).size===1?medidas[0]:(multiples?'Varios tamaños · '+[...new Set(medidas)].join(' / '):medidas[0]))+' · '+e.paginas.length+' página(s)');origin.className='origen';panel.append(origin);
   const paginas=paginasElegidas(e);
-  const paginasLabel=texto('label','Páginas a imprimir (vacío = todas)');
-  const paginasInput=document.createElement('input');paginasInput.type='text';paginasInput.placeholder='Ej.: 1-3,5';paginasInput.value=e.paginasSeleccionadas;
-  paginasInput.setAttribute('aria-label','Páginas a imprimir de '+e.name);
-  paginasInput.onchange=()=>{e.paginasSeleccionadas=paginasInput.value.trim();cambio()};
-  paginasLabel.append(paginasInput);panel.append(paginasLabel);
+  if(!esPlanoGrande){
+   const paginasLabel=texto('label','Páginas a imprimir (vacío = todas)');
+   const paginasInput=document.createElement('input');
+   paginasInput.type='text';paginasInput.placeholder='Ej.: 1-3,5';
+   paginasInput.value=e.paginasSeleccionadas;
+   paginasInput.setAttribute('aria-label','Páginas a imprimir de '+e.name);
+   paginasInput.onchange=()=>{e.paginasSeleccionadas=paginasInput.value.trim();cambio()};
+   paginasLabel.append(paginasInput);panel.append(paginasLabel);
+  }
   if(!paginas){const err=texto('p','Selección inválida. Usá 1-3,5 y números que existan en el PDF.');err.className='advertencia';panel.append(err);card.append(panel);bloque.append(card);continue}
   const aviso=clasificarDestino(paginas);
   if(aviso.requiereConfirmacion){const n=texto('p','Confirmá el tamaño de impresión: el PDF puede tener medidas distintas a las que querés.');n.className='advertencia';panel.append(n)}
@@ -786,6 +829,8 @@ async function analizarPaginasSolicitadas(e){
  }
  leyendo=true;e.avisoClasificacion='';
  render();
+ $('estado').textContent='Preparando análisis de '+pedidas.length+
+  ' página(s) elegida(s). El original no se sube todavía…';
  try{
   const visual=await clasificarPloteoGrandePorRangos(e.archivoOriginal,{
    paginas:e.paginas,seleccionadas:pedidas.map(p=>p.numero),
