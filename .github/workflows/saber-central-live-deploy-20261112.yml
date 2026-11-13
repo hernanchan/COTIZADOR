@@ -85,6 +85,7 @@ jobs:
             curl -fsS --retry 2 --connect-timeout 10 --max-time 35 -H "Authorization: Bearer $TOKEN" "$1"
           }
           for worker in saber-pagos-produccion saber-documentos-produccion;do
+            echo "SABER_DEPLOY_READING_SETTINGS_$worker"
             get "$root/$worker/settings" > "$temp/$worker.before.json"
             get "$root/$worker/deployments" > "$temp/$worker.deployed-before.json"
             jq -er '.result.deployments[0].versions | if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$temp/$worker.deployed-before.json" > "$temp/$worker.old"
