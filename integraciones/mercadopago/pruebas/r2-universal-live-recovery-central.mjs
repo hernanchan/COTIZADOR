@@ -4,6 +4,7 @@
 import {verificarPedidoUniversalCobrable,estadoPagoUniversal}
  from './r2-universal-checkout-central.mjs';
 import {r2GateGeneralOCanary} from './r2-live-canary-order.mjs';
+import {puedeRecibirTransferenciaAvisada} from './central-transferencia-recepcion-anticipada.mjs';
 const GO='GO_COMERCIAL_CONFIRMADO',MIB=1048576;
 const reply=(x,status=200)=>Response.json(x,{status,headers:{
  'Cache-Control':'no-store,private','X-Content-Type-Options':'nosniff'}});
@@ -50,15 +51,18 @@ export async function consultarRecuperacionR2Live(request,env,{
      work.configuracion?.paginas?.length!==p.pages)
    return reply({ok:false,error:'LIVE_R2_RECOVERY_ARCHIVO_AJENO'},409);
   const payment=await estadoPagoUniversal(env,link.commercial_order_id);
-  if(!payment.verified||payment.revoked)
-   return reply({ok:false,error:'LIVE_R2_RECOVERY_PAGO'},402);
+  const bankPending=!payment.verified&&!payment.revoked&&
+   await puedeRecibirTransferenciaAvisada(env,{
+    commercialOrderId:link.commercial_order_id,webOrderId:p.orderId});
+  if(payment.revoked||(!payment.verified&&!bankPending))
+   return reply({ok:false,error:'LIVE_R2_RECOVERY_PAGO_O_AVISO'},402);
   const reserve=await db.prepare(
    'SELECT object_key,web_order_id,file_id,sha256,bytes,state '+
    'FROM central_r2_large_reservations WHERE web_order_id=? AND file_id=?'
   ).bind(p.orderId,p.fileId).first();
   if(!reserve)return reply({ok:true,found:false,state:'not_started',
    webOrderId:p.orderId,fileId:p.fileId,uploadPossible:true,
-   paymentVerified:true,productionAuthorized:false});
+   paymentVerified:payment.verified===true,bankPending,productionAuthorized:false});
   if(reserve.web_order_id!==p.orderId||reserve.file_id!==p.fileId||
      reserve.sha256!==p.sha256||reserve.bytes!==p.bytes||
      reserve.state!=='reserved'||
@@ -76,6 +80,6 @@ export async function consultarRecuperacionR2Live(request,env,{
   return reply({ok:true,found:true,state:staged?'staged':'reserved',
    webOrderId:p.orderId,fileId:p.fileId,
    sha256:p.sha256,bytes:p.bytes,objectKey:reserve.object_key,
-   paymentVerified:true,uploadPossible:false,productionAuthorized:false});
+   paymentVerified:payment.verified===true,bankPending,uploadPossible:false,productionAuthorized:false});
  }catch{return reply({ok:false,error:'LIVE_R2_RECOVERY_D1'},503)}
 }
