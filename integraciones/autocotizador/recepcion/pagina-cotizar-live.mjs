@@ -259,7 +259,7 @@ action.addEventListener('click',async()=>{
   button.type='button';button.textContent='Pagar con Mercado Pago';
   button.addEventListener('click',async()=>{
    button.disabled=true;
-   try{const url=await flow.iniciarPago();location.assign(url)}
+   try{const url=await flow.iniciarPago();sessionStorage.setItem('saber-live-medio-v1','mercadopago');location.assign(url)}
    catch(e){
     button.disabled=false;
     const reason=String(e?.message||'').slice(0,160);
@@ -313,6 +313,7 @@ action.addEventListener('click',async()=>{
         result.uploadAuthorized!==false||!result.alias)
       throw Error('Respuesta de transferencia inválida.');
      button.disabled=true;
+     sessionStorage.setItem('saber-live-medio-v1','transferencia');
      instructions.textContent='Transferí exactamente '+money(result.amountArs)+
       ' al alias '+result.alias+'. Después presioná «Ya transferí». Eso avisará a Librería Saber para verificar en el banco; NO acredita el pago automáticamente.';
      const notified=document.createElement('button');
@@ -334,6 +335,7 @@ action.addEventListener('click',async()=>{
         'El pago sigue pendiente de comprobación bancaria; no realices otra transferencia. '+
         'Conservá esta pestaña abierta para el envío automático de los archivos después de acreditarse.';
        notified.remove();
+       location.assign('/pedido/estado');
       }catch(error){
        notified.disabled=false;instructions.textContent='No se registró el aviso. '+
         'No transfieras otra vez: tocá «Ya transferí» para volver a avisarnos. '+
