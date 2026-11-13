@@ -1,0 +1,74 @@
+name: Saber - comprobar seguimiento y calendario LIVE sin pedidos
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-comprobar-seguimiento-calendario-20261113.yml]
+permissions: {contents: write}
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: true}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Consultar código real y página pública de seguimiento solo GET
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'EOF'
+          import {mkdir,writeFile} from 'node:fs/promises';
+          const root='https://api.cloudflare.com/client/v4/accounts/'+process.env.ACCOUNT+'/workers/scripts/';
+          const headers={Authorization:'Bearer '+process.env.TOKEN};
+          const result={at:new Date().toISOString(),schema:'saber-tracking-live-v1',readonly:true};
+          const grab=async url=>{
+           const r=await fetch(url,{headers:url.startsWith(root)?headers:{},signal:AbortSignal.timeout(25000)});
+           if(!r.ok)throw Error('HTTP_'+r.status);
+           return r.text();
+          };
+          try{
+           const [documents,payments,returnPage,portal]=await Promise.all([
+            grab(root+'saber-documentos-produccion'),
+            grab(root+'saber-pagos-produccion'),
+            grab('https://pedidos.libreriasaber.com.ar/pedido/estado'),
+            grab('https://libreriasaber.com.ar/portal-comercial.json')
+           ]);
+           result.datePickerDeployed=documents.includes('etaDate')&&documents.includes('openOrderEta');
+           result.buyerTrackingDeployed=documents.includes('actualizarSeguimiento')&&documents.includes('MP_LIVE_SEGUIMIENTO_INCONSISTENTE');
+           result.buyerTrackingVisible=returnPage.includes('id="seguimiento"')&&returnPage.includes('id="fechaRetiro"');
+           result.autoReturnDeployed=payments.includes('auto_return')&&payments.includes('approved');
+           result.trackingServerDeployed=payments.includes('leerSeguimientoLiveCentral');
+           result.siteStillNoGo=JSON.parse(portal).release==='NO_GO'&&JSON.parse(portal).enabled===false;
+           const unauth=await fetch('https://pedidos.libreriasaber.com.ar/personal/central',{redirect:'manual'});
+           result.personalCentralProtected=unauth.status===401;
+           result.ready=Object.entries(result).filter(([k,v])=>k.endsWith('Deployed')||k.endsWith('Visible')||k.startsWith('siteStill')||k.startsWith('personalCentral')).every(([,v])=>v===true);
+          }catch(e){result.error=String(e.message||e).slice(0,80);result.ready=false}
+          await mkdir('docs',{recursive:true});
+          await writeFile('docs/ESTADO-SEGUIMIENTO-CALENDARIO-LIVE.json',JSON.stringify(result,null,2)+'\n');
+          console.log('SABER_TRACKING_LIVE_CHECK='+JSON.stringify(result));
+          if(!result.ready)process.exitCode=1;
+          EOF
+      - name: Registrar resultado anónimo sin órdenes ni datos de clientes
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/ESTADO-SEGUIMIENTO-CALENDARIO-LIVE.json || exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/ESTADO-SEGUIMIENTO-CALENDARIO-LIVE.json
+          if ! git diff --cached --quiet;then
+            git commit -m "ops: estado de seguimiento y calendario en LIVE"
+            for attempt in 1 2 3 4;do
+              git fetch origin integracion/tus-pedido-privado-20261101
+              git rebase origin/integracion/tus-pedido-privado-20261101
+              git push origin HEAD:integracion/tus-pedido-privado-20261101 && exit 0
+              sleep 2
+            done
+            exit 1
+          fi
