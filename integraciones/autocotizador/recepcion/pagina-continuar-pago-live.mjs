@@ -58,7 +58,7 @@ window.saberRenovarPedido=async token=>{
  'button:disabled{opacity:.6;cursor:wait}p{overflow-wrap:anywhere}small{color:#465c70}</style></head><body><main>'+
  '<h1>Retomar el pedido pendiente</h1><p id="precio">Comprobando tu pedido…</p>'+
  '<p id="estado" role="status" aria-live="polite">No se va a generar otro pedido.</p>'+
- '<button id="pagar" type="button" disabled>Continuar a Mercado Pago</button>'+
+ '<button id="pagar" type="button" disabled>Continuar pedido</button>'+
  '<p><small>Usamos la misma orden. Si ya pagaste, no vuelvas a pagar.</small></p>'+
  '</main><script nonce="'+nonce+'">'+
  '(function(){'+
@@ -83,9 +83,22 @@ window.saberRenovarPedido=async token=>{
  'price.textContent="Orden pendiente · "+pesos(data.amountArs);'+
  'if(data.estado==="pagado_esperando_archivos"){sessionStorage.setItem("saber-live-pedido-v1",JSON.stringify({webOrderId:order.webOrderId,commercialOrderId:order.commercialOrderId}));status.textContent="Pago acreditado. Reanudando el envío automático del PDF original…";location.replace("/pedido/estado");return}'+
  'if(data.estado!=="pendiente"){status.textContent="Esta orden no está habilitada para volver a pagar. Contactá a Librería Saber.";return}'+
+ 'if(sessionStorage.getItem("saber-live-medio-v1")==="transferencia"){'+
+ 'status.textContent="Verificando la transferencia de esta misma orden…";'+
+ 'const tr=await fetch("/api/pedido/live/transfer",{method:"POST",credentials:"same-origin",redirect:"error",'+
+ 'headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"status",webOrderId:order.webOrderId,commercialOrderId:order.commercialOrderId})});'+
+ 'const bank=await tr.json().catch(()=>null);'+
+ 'if(!tr.ok||bank?.ok!==true||bank.webOrderId!==order.webOrderId){'+
+ 'status.textContent="No pudimos comprobar la transferencia. No pagues por otro medio ni generes otra orden.";return}'+
+ 'if(bank.estado==="pagado_esperando_archivos"&&bank.paymentVerified===true){location.replace("/pedido/estado");return}'+
+ 'if(!["transferencia_pendiente","transferencia_informada"].includes(bank.estado)){'+
+ 'status.textContent="La transferencia no está en un estado recuperable. Consultá a Librería Saber.";return}'+
+ 'status.textContent="La transferencia está registrada. No vuelvas a pagar.";'+
+ 'button.textContent="Ver seguimiento de transferencia";button.dataset.transfer="yes";button.disabled=false;return}'+
+ 'button.textContent="Continuar a Mercado Pago";'+
  'status.textContent="Tu orden está registrada. Podés intentar obtener el enlace de cobro sin crear otra.";button.disabled=false;'+
  '}catch(error){price.textContent="Orden aún no verificable";status.textContent=String(error.message||"Sin acceso a la orden").slice(0,140)}}'+
- 'button.addEventListener("click",async()=>{if(!order)return;if(button.dataset.paid==="yes"){location.assign("/pedido/estado");return}button.disabled=true;status.textContent="Consultando Mercado Pago para esta misma orden…";'+
+ 'button.addEventListener("click",async()=>{if(!order)return;if(button.dataset.transfer==="yes"||button.dataset.paid==="yes"){location.assign("/pedido/estado");return}button.disabled=true;status.textContent="Consultando Mercado Pago para esta misma orden…";'+
  'try{const {r,data}=await post("start",order);if(!r.ok||data?.ok!==true){const etapa=String(data?.etapa||"checkout").slice(0,40);const codigo=String(data?.codigo||data?.error||"no_autorizado").slice(0,90);throw Error("No se pudo abrir Mercado Pago: "+etapa+" / "+codigo)}'+
  'if(data.webOrderId!==order.webOrderId||data.commercialOrderId!==order.commercialOrderId||data.amountArs!==order.amountArs||data.fileCount!==order.fileCount||data.uploadAuthorized!==false||data.productionAuthorized!==false||!safeMp(data.checkoutUrl))throw Error("Mercado Pago devolvió una respuesta incompatible. No pagues otra vez.");'+
  'sessionStorage.setItem("saber-live-pedido-v1",JSON.stringify({webOrderId:order.webOrderId,commercialOrderId:order.commercialOrderId}));location.assign(data.checkoutUrl);'+
