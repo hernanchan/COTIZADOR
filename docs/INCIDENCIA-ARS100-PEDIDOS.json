@@ -1,0 +1,16 @@
+{
+  "schema": "saber-incidente-100-v1",
+  "fecha": "2026-11-13T00:05:44.746Z",
+  "readonly": true,
+  "grupos": [
+    {
+      "estado": "awaiting_payment",
+      "tiene_preferencia": 1,
+      "tiene_registro_pago": 0,
+      "verificado": 0,
+      "vinculado": 1,
+      "cantidad": 1
+    }
+  ],
+  "total": 1
+}
