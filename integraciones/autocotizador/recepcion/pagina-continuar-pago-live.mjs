@@ -51,7 +51,7 @@ window.saberRenovarPedido=async token=>{
  const nonce=crypto.randomUUID().replaceAll('-','');
  const html='<!doctype html><html lang="es"><head><meta charset="utf-8">'+
  '<meta name="viewport" content="width=device-width,initial-scale=1">'+
- '<title>Continuar pedido · Librería Saber</title><style>'+
+ '<title>Continuar pedido · Librería Saber</title><meta name="saber-flujo" content="SABER_POSTPAGO_SIN_SEGUNDA_SELECCION_V1"><style>' +
  'body{font:17px/1.5 system-ui,Arial,sans-serif;background:#f3f6fa;color:#153d65;margin:0;padding:28px}'+
  'main{max-width:650px;margin:8vh auto;background:white;border:1px solid #ccdbea;border-radius:14px;padding:26px}'+
  'h1{font-size:25px}button{background:#075c90;color:white;border:0;border-radius:9px;padding:14px 18px;font:inherit;cursor:pointer}'+
