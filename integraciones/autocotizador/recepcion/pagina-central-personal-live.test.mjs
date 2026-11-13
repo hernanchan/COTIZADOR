@@ -62,3 +62,17 @@ test('R2 no habilita inspección antes del almacenamiento real del PDF',()=>{
  assert.ok(match);
  assert.doesNotThrow(()=>new Function(match[1]));
 });
+
+test('operación diaria: aviso bancario automático y estados en un formulario, sin ventanas múltiples',()=>{
+ const html=paginaCentralPersonalLive();
+ assert.match(html,/id="transferNewTitle"/);
+ assert.match(html,/id="transferNewList"/);
+ assert.match(html,/id="stageDialog"/);
+ assert.match(html,/id="stageOperator"/);
+ assert.match(html,/id="stageConfirmed"/);
+ assert.match(html,/revisé los originales|Revisé los originales/);
+ assert.match(html,/id="stageSave"/);
+ assert.match(html,/setInterval\(\(\)=>\{if\(!document\.hidden\)void refresh\(\)\},15000\)/);
+ assert.doesNotMatch(html,/window\.prompt\('Nombre de quien realiza el cambio de estado'/);
+ assert.match(html,/o\.stagedR2FileIds\?\.length/);
+});
