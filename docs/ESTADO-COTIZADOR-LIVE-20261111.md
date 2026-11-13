@@ -234,3 +234,14 @@ El titular autorizó expresamente preparar una **habilitación restringida de R2
 - QA 43431226306 SUCCESS: tests de 60 MiB y 9 páginas raster CAD con PDF.js simulado, caso Pleno y fallo; pruebas de pantalla, renovación de transferencia sin MP y build completo.
 - Despliegue reversible 43431418029 SUCCESS: los dos Workers protegidos de pagos y documentos desplegados al 100 % con bindings conservados, web principal y main sin publicar.
 - Pendiente E2E: hay validación visual real del PDF en esta sesión y QA con analizador PDF.js simulado, pero todavía NO se ha comprobado EN CHROME el precio con este mismo archivo tras despliegue. Paso siguiente: abrir /cotizar, seleccionar sólo este PDF, esperar análisis completo de 9 páginas y verificar etiqueta CAD + importe SIN pagar; después probar ZIP/pagos. Nunca inventar acreditación bancaria de prueba en la contabilidad real: se requiere simulador aislado si no hay dinero real.
+
+
+## Optimización de demora PDF MUNICIPAL FINAL.pdf — 13/11/2026
+
+- El usuario observó demora excesiva en /cotizar con PDF MUNICIPAL FINAL.pdf (>48 MiB, nueve páginas); screenshot mostraba "Analizando PDF..." sin avance visible. El cliente quiere cotizar sólo páginas 1-3.
+- Causa de UX/performance: el cliente analizaba visualmente las nueve páginas antes de presentar el selector de páginas. PDF.js puede tardar al renderizar raster mosaico pesado; no atribuirlo a la red ni inventar duración en Chrome.
+- Corregido y desplegado: para PDF >48MiB y >4 páginas de ploteo, primero se leen únicamente dimensiones locales por File.slice; la tarjeta muestra (sin abrir Más opciones) "¿Qué páginas querés imprimir?", un input "Ej.: 1-3 (vacío = todas las páginas)" y "Calcular estas páginas". PDF.js clasifica solo la lista elegida, con progreso X de N y número original; se cotiza con selección real y se preserva completo el PDF original de nueve páginas. Cambiar la selección invalida el presupuesto anterior hasta recalcular. Fallo visual no inventa CAD/Pleno ni habilita cobro; permite reintentar.
+- Contrato: seleccionarPaginas filtra los números originales sin cambiar su identidad; la hoja de instrucciones indica páginas 1-3, no imprimir las otras seis. La clasificación local nunca acredita preprensa ni sube el archivo antes del pago.
+- QA 43433913203 SUCCESS: test con seleccionadas=[1,2,3] renderiza exactamente tres páginas y rechaza selecciones inválidas; el cliente compilado contiene el selector previo, más regresiones existentes de pagos/Central.
+- Deploy 43434018991 SUCCESS en dos Workers protegidos y reversibles, sin publicar main ni web principal.
+- Pendiente comprobación E2E en Chrome: volver a /cotizar con Ctrl+F5 y cargar PDF nuevamente del equipo, esperar solo lectura de medidas, introducir 1-3 y pulsar Calcular estas páginas; verificar CAD y precio para solo tres y registrar tiempo real. La QA usó PDF.js simulado: NO hay tiempo de respuesta real ni cotización confirmada de este PDF aún.
