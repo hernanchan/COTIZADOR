@@ -31,7 +31,7 @@ test('Definir hora usa calendario nativo, respeta agenda y evita cuatro ventanas
  assert.match(html,/id="etaOperator" type="text"/);
  assert.match(html,/id="etaReasonBlock" hidden/);
  assert.match(html,/etaDialog\.showModal\(\)/);
- assert.match(html,/agendaSnapshot\.weekly/);
+ assert.match(html,/agenda\.weekly/);
  assert.match(html,/agenda\.closedDates/);
  assert.match(html,/time\.addEventListener\('click',\(\)=>openOrderEta\(o\)\)/);
  assert.doesNotMatch(html,/window\.prompt\('Fecha y hora estimada/);
