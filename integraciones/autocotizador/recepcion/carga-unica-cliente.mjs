@@ -466,6 +466,22 @@ function render(){
     void analizarPaginasSolicitadas(e);
    };
    panelPaginas.append(etiqueta,input,calcular);
+   const elegidasActuales=paginasElegidas(e);
+   if(elegidasActuales?.some(p=>!['cad','poster'].includes(p.modo))){
+    const manual=document.createElement('div');manual.className='clasificacion-asistida';
+    manual.style.cssText='display:flex;gap:8px;flex-wrap:wrap;padding-top:7px';
+    const aviso=texto('small','Si conocés el tipo de ploteo, elegilo ahora sin esperar el análisis. El original se revisa antes de imprimir.');
+    aviso.style.flexBasis='100%';manual.append(aviso);
+    for(const [modo,titulo] of [['cad','Plano técnico · CAD'],['poster','Póster · Pleno']]){
+     const opcion=texto('button',titulo);opcion.type='button';opcion.className='editar';
+     opcion.onclick=()=>{
+      e.paginasSeleccionadas=input.value.trim();
+      fijarTipoPloteoInformado(e,modo);
+     };
+     manual.append(opcion);
+    }
+    panelPaginas.append(manual);
+   }
    if(e.elegirPaginasAntesDeAnalizar)
     panelPaginas.append(texto('small','Elegí primero las páginas. Así evitamos analizar las láminas que no vas a imprimir. El PDF original queda completo.'));
    if(e.avisoClasificacion){
@@ -527,13 +543,15 @@ function render(){
      bloque.append(aclaracion);
      bloque.append(texto('p','Medidas originales: '+unicas.join(' / ')+
       '. Se presupuestará al tamaño real, sin reducir el plano.'));
-     const clasificacionConfirmada=e.clasificacionAutomatica===true&&
+     const clasificacionConfirmada=(e.clasificacionAutomatica===true||
+      e.tipoPloteoElegidoPorCliente===true)&&
       elegidas.every(p=>['cad','poster'].includes(p.modo));
      if(clasificacionConfirmada){
       const clase=eleccion.variasClases?'MIXTO CAD Y PLENO':
        eleccion.tipo==='cad'?'CAD · Plano técnico':'PLENO · Póster';
-      bloque.append(texto('p','Clasificación automática: '+clase+
-       '. El precio se calcula para el tipo detectado.'));
+      bloque.append(texto('p',e.tipoPloteoElegidoPorCliente===true?
+       'Tipo informado por el cliente: '+clase+'. Precio preliminar sujeto a revisión del original antes de imprimir.':
+       'Clasificación automática: '+clase+'. El precio se calcula para el tipo detectado.'));
       if(e.metodoClasificacion==='MOSAICO_RASTER_LOCAL')
        bloque.append(texto('small','El PDF contiene una plancha de imágenes rasterizadas. '+
         'El análisis local es preliminar; se revisará el original antes de imprimir.'));
@@ -814,6 +832,22 @@ async function analizarArchivoPDF(e,file){
   e.error=null;
  }catch(ex){e.error=String(ex.message||ex);e.paginas=null}
 }
+function fijarTipoPloteoInformado(e,modo){
+ if(!['cad','poster'].includes(modo)||!e?.paginas)return;
+ const pedidas=paginasElegidas(e);
+ if(!pedidas?.length)return;
+ e.analisisAbort?.abort();
+ e.analisisAbort=null;
+ leyendo=false;
+ for(const p of pedidas)p.modo=modo;
+ e.tipoPloteoElegidoPorCliente=true;
+ e.clasificacionAutomatica=false;
+ e.metodoClasificacion='TIPO_INFORMADO_POR_CLIENTE';
+ e.elegirPaginasAntesDeAnalizar=false;
+ e.avisoClasificacion='Tipo informado para las páginas '+e.paginasSeleccionadas+
+  '. Precio preliminar sujeto a revisión del original antes de imprimir.';
+ cambio();
+}
 async function analizarPaginasSolicitadas(e){
  if(leyendo||!e?.paginas||!e.archivoOriginal)return;
  const pedidas=paginasElegidas(e);
@@ -828,17 +862,20 @@ async function analizarPaginasSolicitadas(e){
   cambio();return;
  }
  leyendo=true;e.avisoClasificacion='';
+ const controller=new AbortController();e.analisisAbort=controller;
  render();
  $('estado').textContent='Preparando análisis de '+pedidas.length+
   ' página(s) elegida(s). El original no se sube todavía…';
  try{
   const visual=await clasificarPloteoGrandePorRangos(e.archivoOriginal,{
    paginas:e.paginas,seleccionadas:pedidas.map(p=>p.numero),
+   signal:controller.signal,maxAnalysisMs:12000,
    onProgreso:({terminadas,total,numeroPagina})=>{
     $('estado').textContent='Analizando visualmente el plano '+terminadas+' de '+total+
      ' (página '+numeroPagina+' del original). Sin subir el PDF…';
    }
   });
+  if(controller.signal.aborted)return;
   if(!visual?.altaConfianza||visual.paginas.length!==pedidas.length)
    throw Error('No se completó el análisis de las páginas elegidas');
   for(const pagina of visual.paginas)e.paginas[pagina.numero-1].modo=pagina.modo;
@@ -846,11 +883,10 @@ async function analizarPaginasSolicitadas(e){
   e.metodoClasificacion='VISUAL_PDFJS_RANGOS';
   e.elegirPaginasAntesDeAnalizar=false;
  }catch{
-  // Un análisis incompleto NO habilita precio ni inventa clase CAD/Pleno.
-  e.avisoClasificacion='No pudimos clasificar estas páginas automáticamente. '+
-   'Podés reintentar o solicitar revisión, sin perder el PDF cargado.';
+  if(!controller.signal.aborted)e.avisoClasificacion='El análisis visual no terminó. Elegí CAD o Pleno si conocés el tipo de trabajo, o solicitá revisión. El PDF sigue cargado.';
  }finally{
-  leyendo=false;render();cotizar();
+  if(e.analisisAbort===controller)e.analisisAbort=null;
+  if(!controller.signal.aborted){leyendo=false;render();cotizar()}
  }
 }
 document.querySelectorAll('input[name="modoImpresionLote"]').forEach(input=>{
