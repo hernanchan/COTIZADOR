@@ -1,0 +1,65 @@
+name: Saber - verificar D1 para subida anticipada bancaria sin cambios
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-preflight-subida-bancaria-20261113.yml]
+permissions: {contents: read}
+jobs:
+  readonly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      D1TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - name: Validar tablas, SQL, hora y estados sin leer identidades ni escribir
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'EOF'
+          import {BANK_PREUPLOAD_SQL} from './integraciones/mercadopago/pruebas/central-transferencia-recepcion-anticipada.mjs';
+          const root='https://api.cloudflare.com/client/v4/accounts/'+process.env.ACCOUNT;
+          async function cf(path,body){
+           const res=await fetch(root+path,{method:body?'POST':'GET',headers:{
+            Authorization:'Bearer '+process.env.D1TOKEN,
+            ...(body?{'Content-Type':'application/json'}:{})},
+            ...(body?{body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(20000)});
+           const json=await res.json().catch(()=>null);
+           if(!res.ok||json?.success!==true)throw Error('CF_D1_HTTP_'+res.status);
+           return json.result;
+          }
+          const dbs=await cf('/d1/database');
+          const db=dbs.find(x=>x.name==='saber-pagos-produccion');
+          if(!db?.uuid)throw Error('D1_NOT_FOUND');
+          async function query(sql){
+           const q=await cf('/d1/database/'+db.uuid+'/query',{sql});
+           if(q?.[0]?.success!==true)throw Error('D1_QUERY_INVALID');
+           return q[0].results||[];
+          }
+          const needed=['orders','central_r2_universal_files',
+           'central_r2_universal_order_links','central_live_transfer_requests',
+           'central_live_transfer_customer_notices',
+           'central_live_test_exclusions','central_r2_large_reservations',
+           'central_r2_large_pending','central_r2_universal_tus_receipts',
+           'payment_reviews'];
+          const names=await query("SELECT name FROM sqlite_master WHERE type='table' AND name IN ("+
+           needed.map(n=>"'"+n+"'").join(',')+")");
+          const present=new Set(names.map(x=>x.name));
+          const missing=needed.filter(n=>!present.has(n));
+          if(missing.length)throw Error('D1_MISSING_TABLES_'+missing.join('_'));
+          await query("SELECT central_r2_universal_files.web_order_id FROM "+
+           "central_r2_universal_files WHERE "+BANK_PREUPLOAD_SQL+" LIMIT 0");
+          const statuses=await query("SELECT state,COUNT(*) AS total FROM "+
+           "central_live_transfer_requests GROUP BY state ORDER BY state");
+          const all=await query("SELECT COUNT(*) AS invalid_dates FROM orders "+
+           "WHERE created_at IS NOT NULL AND datetime(created_at) IS NULL");
+          console.log('SABER_PREUPLOAD_D1_OK='+JSON.stringify({
+           tables:needed.length,sqlVerified:true,
+           statusKinds:statuses.map(x=>x.state),
+           invalidDateCount:all?.[0]?.invalid_dates,
+           noWrites:true
+          }));
+          EOF
