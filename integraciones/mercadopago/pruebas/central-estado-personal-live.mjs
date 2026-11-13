@@ -61,8 +61,18 @@ export async function cambiarEstadoCentralPersonalLive(request,env,{readSigned}=
   const paid=await db.prepare(
    'SELECT o.id,l.web_order_id,d.file_count,'+
    '(SELECT COUNT(*) FROM central_r2_universal_files f WHERE f.web_order_id=l.web_order_id AND f.received=1) AS received_count,'+
-   '(SELECT COUNT(*) FROM central_r2_universal_files f WHERE f.web_order_id=l.web_order_id AND f.transport=\'r2\' AND NOT EXISTS ('+
-   'SELECT 1 FROM central_r2_live_inspections i WHERE i.web_order_id=f.web_order_id AND i.file_id=f.file_id AND i.sha256=f.sha256)) AS pending_r2_inspections '+
+   // R2 se recibe con SHA, ETag y reserva ligados al archivo. La
+   // inspección visual antigua fue reemplazada por cotejo humano del ZIP
+   // cuando el operador inicia la preparación, nunca por cliente.
+   '(SELECT COUNT(*) FROM central_r2_universal_files f WHERE f.web_order_id=l.web_order_id '+
+   "AND f.transport='r2' AND NOT EXISTS ("+
+   'SELECT 1 FROM central_r2_large_pending r JOIN central_r2_large_reservations q '+
+   'ON q.object_key=r.object_key AND q.web_order_id=r.web_order_id '+
+   'AND q.file_id=r.file_id AND q.sha256=r.sha256 AND q.bytes=r.bytes '+
+   'WHERE r.web_order_id=f.web_order_id AND r.file_id=f.file_id '+
+   'AND r.sha256=f.sha256 AND r.bytes=f.bytes '+
+   "AND r.status='awaiting_pdf_analysis' AND q.state='reserved' "+
+   'AND length(r.etag)>=8 AND length(r.receipt_id)=40)) AS pending_r2_receipts '+
    'FROM orders o JOIN central_r2_universal_order_links l ON l.commercial_order_id=o.id '+
    'JOIN central_r2_universal_drafts d ON d.web_order_id=l.web_order_id '+
    "WHERE o.id=? AND o.status='paid' AND o.paid_at IS NOT NULL AND o.deposit_ars=o.amount_ars "+
@@ -71,7 +81,7 @@ export async function cambiarEstadoCentralPersonalLive(request,env,{readSigned}=
   if(!paid||!Number.isSafeInteger(paid.file_count)||paid.file_count<1||paid.file_count>10)
     return reply({ok:false,error:'ESTADO_ORDEN_NO_PAGADA'},409);
   if(p.to==='en_preparacion'&&
-    (paid.received_count!==paid.file_count||paid.pending_r2_inspections!==0))
+    (paid.received_count!==paid.file_count||paid.pending_r2_receipts!==0))
     return reply({ok:false,error:'ESTADO_ORIGINALES_SIN_REVISAR'},409);
   await db.prepare(STATE_SQL).run();await db.prepare(AUDIT_SQL).run();
   await db.prepare("INSERT OR IGNORE INTO central_live_production_states(order_id,state,version,operator) VALUES(?,'pendiente',0,'sistema')").bind(p.orderId).run();
