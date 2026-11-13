@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {pagoUnicoDeOrdenComerciante,rescatarPagosMPLiveCentral}
+import {readFile} from 'node:fs/promises';
+import {pagoUnicoDeOrdenComerciante,rescatarPagosMPLiveCentral,conciliarPendientesMPLiveAutomatico}
  from './central-mp-live-rescate.mjs';
 const GO='GO_COMERCIAL_CONFIRMADO';
 const ID='123e4567-e89b-42d3-a456-426614174000';
@@ -104,4 +105,22 @@ test('si el importe no coincide NO se acredita',async()=>{
  assert.equal(data.recuperados,0);
  assert.equal(data.enRevision,1);
  assert.equal(wrote,false);
+});
+
+test('cron LIVE llama conciliación automáticamente y nunca ejecuta sincronización Sandbox en producción',async()=>{
+ const worker=await readFile(new URL('./worker.js',import.meta.url),'utf8');
+ assert.match(worker,/SABER_ENTORNO==='produccion'&&env\?\.CENTRAL_DB_ENV==='produccion'/);
+ assert.match(worker,/conciliarPendientesMPLiveAutomatico\(env\)/);
+ assert.match(worker,/else\{\s*ctx\.waitUntil\(runScheduledReconciliation/);
+});
+test('automático no requiere intervención humana y no consulta MP si no hay órdenes pendientes',async()=>{
+ let calls=0;
+ const fakeDB={prepare(sql){
+  assert.match(sql,/SELECT o\.id,o\.status/);
+  return {all:async()=>({results:[]})};
+ },batch(){throw Error('NO_DEBE_ESCRIBIR')}};
+ const r=await conciliarPendientesMPLiveAutomatico({...envBase,DB:fakeDB},{
+  fetcher:()=>{calls++;throw Error('SIN_ORDENES')}});
+ assert.deepEqual(r,{ok:true,revisados:0,recuperados:0,pendientes:0,enRevision:0,errores:0});
+ assert.equal(calls,0);
 });
