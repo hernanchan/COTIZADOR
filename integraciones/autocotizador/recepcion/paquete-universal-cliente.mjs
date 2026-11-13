@@ -198,21 +198,11 @@ button?.addEventListener('click',()=>void descargarZIP());
       !SHA.test(t.sha256||'')||!['tus','r2'].includes(t.transporte)))
    throw Error('La ficha del pedido no es válida');
   ficha=x;number.textContent='Orden '+x.numeroOrden;
-  detail.textContent=x.trabajos.length+' PDF · 
+  detail.textContent=x.trabajos.length+' PDF · $'+x.importe+
+   ' · Pago acreditado · originales recibidos';
   state.textContent='Pedido completo. Descargá el ZIP con los originales y las instrucciones. Revisá las opciones de impresión antes de producir.';
   button.disabled=false;
  }catch(e){
   state.textContent='El ZIP todavía no está disponible. Comprobá en la Central que el pago esté acreditado y que todos los archivos hayan llegado. '+String(e?.message||e);
- }
-})();
-+x.importe+
-   ' · Pago acreditado · originales recibidos';
-  state.textContent='Todos los originales tienen recibo verificado. Descargá el ZIP y controlá la preprensa.';
-  button.disabled=false;
- }catch(e){
-  const r2File=new URL(location.href).searchParams.get('fileId')||'';
-  state.textContent=liveStaff&&/^[A-Za-z0-9_-]{1,80}$/.test(r2File)?
-   'Primero inspeccioná el PDF R2 en el panel de abajo. El ZIP se habilita automáticamente después de registrar la inspección.':
-   'No se habilita el ZIP: '+String(e?.message||e);
  }
 })();
