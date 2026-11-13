@@ -1,0 +1,11 @@
+{
+  "at": "2026-11-13T00:15:49.133Z",
+  "mode": "GET_AND_D1_SELECT",
+  "scheduleStatus": "readable",
+  "paymentStatus": "D1_AWAITING_PAYMENT_NO_MP_TOKEN_EXPOSED",
+  "schedules": [],
+  "d1_ars100_count": 1,
+  "hasPreference": true,
+  "sellerConfigured": true,
+  "tokenStoredAsSecret": true
+}
