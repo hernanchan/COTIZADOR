@@ -125,7 +125,9 @@ export async function conciliarPendientesMPLiveAutomatico(env,{fetcher=fetch}={}
    code==='RUTA_MP_NO_ADMITIDA'?'RESCATE_MP_RUTA_NO_ADMITIDA':
    kind==='TimeoutError'||kind==='AbortError'?'RESCATE_VENDEDOR_TIMEOUT':
    kind==='SyntaxError'?'RESCATE_VENDEDOR_JSON_INVALIDO':
-   kind==='TypeError'?'RESCATE_VENDEDOR_TYPE_ERROR':
+   kind==='TypeError'?'RESCATE_VENDEDOR_TYPE_'+
+    code.replace(/https?:\/\/[^ ]+/gi,'URL').replace(/[a-z0-9_-]{20,}/gi,'REDACTADO')
+      .replace(/[^a-zA-Z0-9 ]/g,'').trim().replace(/\s+/g,'_').slice(0,56):
    'RESCATE_VENDEDOR_EXCEPCION';
   return {ok:false,error:reason};
  }
