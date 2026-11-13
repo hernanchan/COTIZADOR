@@ -27,18 +27,9 @@ small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padd
 </div>
 <button type="button" id="revisar">Actualizar seguimiento</button>
 <section id="recibir" hidden>
-<h2>Enviar tus PDF después del pago</h2>
-<p>Volvé a seleccionar exactamente los archivos que presupuestaste. Verificaremos sus huellas digitales antes de subirlos.</p>
-<p id="indicacion"></p>
-<input type="file" id="originales" accept=".pdf,application/pdf" multiple>
-<button type="button" id="subir">Verificar y enviar PDF</button>
-<p id="avance" role="status" aria-live="polite"></p>
-</section>
-<section id="recibirR2" hidden>
-<h2>Enviar PDF grandes (R2)</h2>
-<p>Seleccioná nuevamente los PDF de más de 40 MiB. La subida empieza solamente después del pago acreditado y usa transferencia reanudable.</p>
-<input type="file" id="originalesR2" accept=".pdf,application/pdf" multiple>
-<button type="button" id="subirR2">Enviar archivos grandes</button>
+<h2>Recepción automática de originales</h2>
+<p>Estamos enviando los PDF que elegiste al presupuestar. No necesitas volver a seleccionarlos ni pagar otra vez.</p>
+<p id="avance" role="status" aria-live="polite">Esperando confirmación del pago para iniciar la transferencia.</p>
 <p id="avanceR2" role="status" aria-live="polite"></p>
 </section>
 <p><a href="/cotizar">Volver al cotizador</a></p>
@@ -72,14 +63,68 @@ small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padd
  }
  let checking=false;
  const receiving=document.getElementById('recibir');
- const input=document.getElementById('originales');
- const send=document.getElementById('subir');
  const progress=document.getElementById('avance');
- const hint=document.getElementById('indicacion');
- const receivingR2=document.getElementById('recibirR2');
- const inputR2=document.getElementById('originalesR2');
- const sendR2=document.getElementById('subirR2');
  const progressR2=document.getElementById('avanceR2');
+ let autoSending=false,lastAutoAttempt=0,autoAttempts=0;
+ const receiptFlag=web=>('saber-live-r2-recibido-'+web);
+ async function enviarAutomaticamente(order,data,metas){
+  if(autoSending||data.estado!=='pagado_esperando_archivos'||data.uploadAuthorized!==true)return;
+  const small=metas.filter(m=>m.transport==='tus');
+  const large=metas.filter(m=>m.transport==='r2');
+  const received=new Set(data.receivedFileIds||[]);
+  const pendingTUS=small.some(m=>!received.has(m.fileId));
+  const pendingR2=large.some(m=>!received.has(m.fileId))&&
+    sessionStorage.getItem(receiptFlag(order.webOrderId))!=='ok';
+  if(!pendingTUS&&!pendingR2){
+   if(data.pendingFiles===0){
+    progress.textContent='PDF recibidos. El pedido ya está confirmado y Librería Saber puede prepararlo.';
+    try{
+     const {borrarOriginalesLive}=await import('/cotizar/flujo-live.js');
+     await borrarOriginalesLive({webOrderId:order.webOrderId,commercialOrderId:order.commercialOrderId,metas});
+    }catch{}
+   }else if(large.length){
+    progress.textContent='PDF grande transferido. Esperando inspección técnica antes de imprimir.';
+   }
+   return;
+  }
+  if(Date.now()-lastAutoAttempt<Math.min(120000,15000*Math.max(1,autoAttempts)))return;
+  lastAutoAttempt=Date.now();autoAttempts++;autoSending=true;receiving.hidden=false;
+  try{
+   if((pendingTUS&&!tusReady)||(pendingR2&&!r2Ready))
+    throw Error('Recepción temporalmente desactivada');
+   const {leerOriginalesLive}=await import('/cotizar/flujo-live.js');
+   const all=await leerOriginalesLive({webOrderId:order.webOrderId,commercialOrderId:order.commercialOrderId,metas});
+   const originals=metas.map((meta,i)=>({meta,file:all[i]}));
+   if(pendingTUS){
+    const selectedFiles=originals.filter(x=>x.meta.transport==='tus').map(x=>x.file);
+    progress.textContent='Enviando automáticamente los archivos pequeños. No cierres esta pestaña.';
+    const {enviarPDFsTUSPagadosLive}=await import('/pedido/recepcion-tus.js');
+    await enviarPDFsTUSPagadosLive({selectedFiles,onProgress:p=>{
+     progress.textContent=p.phase==='hash'?'Verificando los PDF originales guardados…':
+      'Enviando PDF a Librería Saber en forma segura…';
+    }});
+    progress.textContent='Archivos pequeños recibidos y verificados por Librería Saber.';
+   }
+   if(pendingR2){
+    const selectedFiles=originals.filter(x=>x.meta.transport==='r2').map(x=>x.file);
+    progressR2.textContent='Enviando automáticamente PDF grandes por R2. No cierres esta pestaña.';
+    const {enviarPDFsR2PagadosLive}=await import('/pedido/recepcion-r2.js');
+    const result=await enviarPDFsR2PagadosLive({selectedFiles,onProgress:p=>{
+     progressR2.textContent='Envío R2: '+(p.percent??0)+' % · verificación de integridad.';
+    }});
+    if(result?.ok!==true)throw Error('PDF_R2_AUN_SIN_RECIBO');
+    sessionStorage.setItem(receiptFlag(order.webOrderId),'ok');
+    progressR2.textContent='PDF grande almacenado, pendiente de inspección de contenido.';
+   }
+   autoAttempts=0;
+   // Refrescar la situación verificada en D1; nunca inferir recepción por el redirect MP.
+   void revisar();
+  }catch(error){
+   progress.textContent='La transferencia automática todavía no se completó: '+
+    String(error?.message||'Fallo temporal').slice(0,110)+
+    '. Conservamos tus originales en este navegador y reintentaremos sin volver a pedirlos. No pagues otra vez.';
+  }finally{autoSending=false;}
+ }
  const tusReady=${env?.DOCS_LIVE_TUS_GATE===ON&&env?.DOCS_LIVE_RECEPCION_GATE===ON};
  const r2Ready=${env?.DOCS_LIVE_R2_GATE===ON&&env?.DOCS_LIVE_R2_UPLOAD_GATE===ON&&
   env?.DOCS_LIVE_R2_STAGING_GATE===ON&&env?.DOCS_LIVE_RECEPCION_GATE===ON};
@@ -112,67 +157,26 @@ small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padd
     try{
      const {leerPedidoPostpagoLive}=await import(tusReady?'/pedido/recepcion-tus.js':'/pedido/recepcion-r2.js');
      const saved=leerPedidoPostpagoLive(sessionStorage);
-     if(saved.order.webOrderId!==order.webOrderId)throw Error('identidad');
-     const small=saved.metas.filter(m=>m.transport==='tus');
-     const large=saved.metas.filter(m=>m.transport==='r2');
-     receiving.hidden=small.length===0||!tusReady;
-     receivingR2.hidden=large.length===0||!r2Ready;
-     hint.textContent=small.length+' PDF pequeños'+(large.length?' y '+large.length+' PDF grandes.':'');
-     if((small.length&&!tusReady)||(large.length&&!r2Ready))
-      output.textContent='Pago acreditado. Algunas rutas de recepción están temporalmente desactivadas. Contactá a Librería Saber; no pagues nuevamente.';
-    }catch{receiving.hidden=true;output.textContent='Pago acreditado. La recepción de archivos está temporalmente indisponible o faltan las referencias de los PDF. Contactá a Librería Saber; no pagues nuevamente.';return}
-   }else{receiving.hidden=true;receivingR2.hidden=true;}
-   if(!output.textContent.includes('temporalmente desactivadas'))output.textContent=paid
-    ?'Pago acreditado. Seleccioná los PDF en esta página para completar su recepción.'
-    :data.estado==='revocado'
-    ?'El pago no se encuentra vigente. Comunicate con Librería Saber antes de continuar.'
-    :'El pago todavía está pendiente de acreditación. Podés consultar nuevamente.';
+     if(saved.order.webOrderId!==order.webOrderId||saved.order.commercialOrderId!==order.commercialOrderId)
+      throw Error('REFERENCIA_NO_COINCIDE');
+     receiving.hidden=false;
+     output.textContent=data.pendingFiles===0?'Pago acreditado y archivos recibidos. Gracias por elegir Librería Saber.':
+      'Pago acreditado. Estamos recibiendo automáticamente los archivos que elegiste antes de pagar.';
+     void enviarAutomaticamente(order,data,saved.metas);
+    }catch{
+     receiving.hidden=false;
+     progress.textContent='El pago está acreditado, pero no se puede recuperar la referencia de los archivos en esta pestaña. Comunicate con Librería Saber sin pagar nuevamente.';
+     output.textContent='Pago acreditado. Archivo pendiente de recepción.';
+    }
+   }else{
+    receiving.hidden=true;
+    output.textContent=data.estado==='revocado'?
+     'El pago no se encuentra vigente. Contactá a Librería Saber.':
+     'Esperando acreditación en Mercado Pago. Consultaremos automáticamente sin generar otro cobro.';
+   }
   }catch{output.textContent='No pudimos consultar la acreditación en este momento. Conservá tu comprobante y probá nuevamente; no repitas el pago.'}
   finally{checking=false;button.disabled=false}
  }
- send.addEventListener('click',async()=>{
-  send.disabled=true;
-  progress.textContent='Comprobando tus PDF originales…';
-  try{
-   const {enviarPDFsTUSPagadosLive}=await import('/pedido/recepcion-tus.js');
-   const result=await enviarPDFsTUSPagadosLive({
-    selectedFiles:[...input.files],
-    onProgress:p=>{progress.textContent=p.phase==='hash'
-     ?'Comprobando integridad local del PDF…'
-     :'Recibiendo y verificando documentos…'}
-   });
-   progress.textContent=result.pendingR2
-    ?'PDF pequeños verificados. Los archivos grandes todavía deben enviarse por el circuito R2.'
-    :'PDF recibidos y verificados. Librería Saber continuará con la preparación.';
-   input.disabled=true;
-   void revisar();
-  }catch{
-   progress.textContent='No se confirmó la recepción de todos los PDF. Conservá los originales y reintentá; no pagues nuevamente.';
-   send.disabled=false;
-  }
- });
- sendR2.addEventListener('click',async()=>{
-  if(!r2Ready)return;
-  sendR2.disabled=true;
-  progressR2.textContent='Comprobando integridad de archivos grandes…';
-  try{
-   const {enviarPDFsR2PagadosLive}=await import('/pedido/recepcion-r2.js');
-   const result=await enviarPDFsR2PagadosLive({
-    selectedFiles:[...inputR2.files],
-    onProgress:p=>{progressR2.textContent=p.phase==='hash'
-      ?'Identificando PDF original…'
-      :'Transferencia y verificación R2: '+(p.percent??0)+'%'}
-   });
-   progressR2.textContent=result.ok
-    ?'PDF grandes almacenados y SHA verificado. Falta inspección de contenido antes de imprimir.'
-    :'No se confirmó el envío.';
-   inputR2.disabled=true;
-   void revisar();
-  }catch{
-   progressR2.textContent='Envío o verificación pendiente. Conservá los originales para reintentar. No pagues de nuevo.';
-   sendR2.disabled=false;
-  }
- });
  button.addEventListener('click',revisar);revisar();
  setInterval(()=>{if(!document.hidden)void revisar()},15000);
 })();
