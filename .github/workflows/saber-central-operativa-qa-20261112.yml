@@ -60,3 +60,4 @@ jobs:
 # 13/11 QA etapa cierre: porcentaje TUS/R2 real, reintento sin repago, ZIP con instrucciones como condición obligatoria.
 
 # 13/11: UI unificada MP y transferencia, ZIP directo tras hash R2, sin inspección obligatoria previa.
+# 13/11: revalidar test VM de pantalla ZIP unificada luego de ajustar la expresión regular.
