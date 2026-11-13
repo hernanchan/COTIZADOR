@@ -1,5 +1,6 @@
-/** Recepción preliminar de original R2 con SHA verificado por Worker documental.
- * Exige pago D1 y reserva existente. NUNCA autoriza preprensa o ZIP.
+/** Recepción definitiva de bytes R2 con SHA verificado por Worker documental.
+ * Exige pago D1 y reserva existente. Habilita la descarga del ZIP de originales,
+ * NUNCA autoriza impresión: la preprensa sigue siendo responsabilidad del operador.
  */
 import {validarPreRecepcionR2} from './r2-grandes-central-pendientes.mjs';
 import {r2GateGeneralOCanary} from './r2-live-canary-order.mjs';
@@ -17,7 +18,7 @@ export async function registrarR2LivePendiente(request,env,{
    (env?.CENTRAL_LIVE_R2_GATE!==GO||env?.CENTRAL_LIVE_R2_STAGING_GATE!==GO)&&
    env?.CENTRAL_R2_CANARY_MODE!=='SOLO_PEDIDO_R2_CONTROLADO'||
    env?.CENTRAL_LIVE_ORDER_GATE!==GO||
-   typeof env?.DB?.prepare!=='function')
+   typeof env?.DB?.prepare!=='function'||typeof env?.DB?.batch!=='function')
   return respond({ok:false,error:'LIVE_R2_STAGE_OFF'},503);
  if(typeof readSigned!=='function')
   return respond({ok:false,error:'LIVE_R2_STAGE_HMAC_OFF'},503);
@@ -43,7 +44,7 @@ export async function registrarR2LivePendiente(request,env,{
   if(!valid.ok)return respond({ok:false,error:'LIVE_R2_STAGE_FICHA_D1'},409);
   const work=valid.works.find(x=>x.fileId===p.fileId);
   const row=valid.rows.find(x=>x.file_id===p.fileId);
-  if(!row||!work||row.transport!=='r2'||row.received!==0||
+  if(!row||!work||row.transport!=='r2'||![0,1].includes(row.received)||
     row.name!==p.name||row.sha256!==p.sha256||row.bytes!==p.bytes||
     !Array.isArray(work.configuracion?.paginas)||
     work.configuracion.paginas.length!==p.pagesDeclaradas)
@@ -68,10 +69,29 @@ export async function registrarR2LivePendiente(request,env,{
     old.object_key===p.objectKey&&old.name===p.name&&old.bytes===p.bytes&&
     old.sha256===p.sha256&&old.etag===p.etag&&
     old.pages_claimed===p.pagesDeclaradas&&old.status==='awaiting_pdf_analysis';
-   return same?respond({ok:true,saved:true,idempotent:true,
+   if(!same)return respond({ok:false,error:'LIVE_R2_STAGE_CONFLICTO'},409);
+   // Si la subida anterior quedó staged por una versión vieja, completar
+   // su recepción con la misma prueba SHA verificada, sin repetir la carga.
+   if(row.received===0){
+    const marked=await db.prepare(
+     "UPDATE central_r2_universal_files SET received=1 WHERE web_order_id=? "+
+     "AND file_id=? AND transport='r2' AND received=0 AND sha256=? AND bytes=? "+
+     "AND EXISTS(SELECT 1 FROM central_r2_large_pending s "+
+     "JOIN central_r2_large_reservations q ON q.object_key=s.object_key "+
+     "WHERE s.web_order_id=? AND s.file_id=? AND s.receipt_id=? "+
+     "AND s.object_key=? AND s.sha256=? AND s.etag=? AND s.bytes=? "+
+     "AND s.status='awaiting_pdf_analysis' AND q.state='reserved' "+
+     "AND q.web_order_id=s.web_order_id AND q.file_id=s.file_id "+
+     "AND q.sha256=s.sha256 AND q.bytes=s.bytes)")
+     .bind(p.orderId,p.fileId,p.sha256,p.bytes,
+      p.orderId,p.fileId,p.receiptId,p.objectKey,p.sha256,p.etag,p.bytes).run();
+    if(marked?.meta?.changes!==1)
+     return respond({ok:false,error:'LIVE_R2_STAGE_RECIBO_NO_CONFIRMADO'},409);
+   }
+   return respond({ok:true,saved:true,idempotent:true,
     webOrderId:p.orderId,fileId:p.fileId,status:'awaiting_pdf_analysis',
-    stagedForCentral:true,registeredInD1:false,productionAuthorized:false}):
-    respond({ok:false,error:'LIVE_R2_STAGE_CONFLICTO'},409);
+    originalReceived:true,stagedForCentral:true,
+    registeredInD1:false,productionAuthorized:false});
   }
   // D1 ya concilió el cobro. Persistencia atómica exige el mismo método,
   // sin confiar en un comprobante del navegador.
@@ -101,13 +121,35 @@ export async function registrarR2LivePendiente(request,env,{
    "WHERE l.web_order_id=? AND o.status='paid' AND o.paid_at IS NOT NULL "+
    "AND pr.state='verified' AND o.amount_ars=o.deposit_ars "+
    paymentCondition+')';
-  const write=await db.prepare(sql).bind(p.receiptId,p.orderId,p.fileId,
-   p.objectKey,p.sha256,p.etag,p.bytes,p.name,p.pagesDeclaradas,
-   p.objectKey,p.orderId,p.fileId,p.sha256,p.bytes,p.orderId).run();
-  if(write?.meta?.changes!==1)
-   return respond({ok:false,error:'LIVE_R2_STAGE_PAGO_O_CUPO_CAMBIO'},409);
+  // La recepción R2 se confirma transaccionalmente con el asiento de
+  // almacenamiento: nunca dejar el operador obligado a verificar TUS/R2.
+  const markReceived="UPDATE central_r2_universal_files SET received=1 "+
+   "WHERE web_order_id=? AND file_id=? AND transport='r2' "+
+   "AND received=0 AND sha256=? AND bytes=? "+
+   "AND EXISTS(SELECT 1 FROM central_r2_large_pending s "+
+   "JOIN central_r2_large_reservations q ON q.object_key=s.object_key "+
+   "WHERE s.web_order_id=? AND s.file_id=? AND s.receipt_id=? "+
+   "AND s.object_key=? AND s.sha256=? AND s.etag=? AND s.bytes=? "+
+   "AND s.status='awaiting_pdf_analysis' AND q.state='reserved' "+
+   "AND q.web_order_id=s.web_order_id AND q.file_id=s.file_id "+
+   "AND q.sha256=s.sha256 AND q.bytes=s.bytes) "+
+   "AND EXISTS(SELECT 1 FROM central_r2_universal_order_links l "+
+   "JOIN orders o ON o.id=l.commercial_order_id "+
+   "JOIN payment_reviews pr ON pr.order_id=o.id "+
+   "WHERE l.web_order_id=? AND o.status='paid' AND o.paid_at IS NOT NULL "+
+   "AND pr.state='verified' AND o.amount_ars=o.deposit_ars "+paymentCondition+")";
+  const writes=await db.batch([
+   db.prepare(sql).bind(p.receiptId,p.orderId,p.fileId,
+    p.objectKey,p.sha256,p.etag,p.bytes,p.name,p.pagesDeclaradas,
+    p.objectKey,p.orderId,p.fileId,p.sha256,p.bytes,p.orderId),
+   db.prepare(markReceived).bind(p.orderId,p.fileId,p.sha256,p.bytes,
+    p.orderId,p.fileId,p.receiptId,p.objectKey,p.sha256,p.etag,p.bytes,p.orderId)
+  ]);
+  if(writes?.length!==2||writes.some(w=>w?.meta?.changes!==1))
+   return respond({ok:false,error:'LIVE_R2_STAGE_RECIBO_NO_CONFIRMADO'},409);
  }catch{return respond({ok:false,error:'LIVE_R2_STAGE_D1'},503)}
  return respond({ok:true,saved:true,idempotent:false,
   webOrderId:p.orderId,fileId:p.fileId,status:'awaiting_pdf_analysis',
-  stagedForCentral:true,registeredInD1:false,productionAuthorized:false},201);
+  originalReceived:true,stagedForCentral:true,
+  registeredInD1:false,productionAuthorized:false},201);
 }
