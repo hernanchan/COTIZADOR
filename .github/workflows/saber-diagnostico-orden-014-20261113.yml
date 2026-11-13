@@ -78,4 +78,16 @@ jobs:
           const v=await cf('/d1/database/'+db.uuid+'/query',{sql:sql2});
           if(v?.[0]?.success!==true)throw Error('INVALID_SQL2');
           console.log('SABER_014_RECEIPT_PREFLIGHT='+JSON.stringify(v[0].results));
+          // Solo estado y conteo de archivos de la orden 014; sin IDs privados ni objetos.
+          const sql3=`SELECT s.state AS estado_produccion,
+            COUNT(p.file_id) AS archivos_purgados_total,
+            SUM(CASE WHEN p.state='deleted' THEN 1 ELSE 0 END) AS archivos_borrados,
+            SUM(CASE WHEN p.state!='deleted' THEN 1 ELSE 0 END) AS archivos_pendientes
+           FROM central_work_order_numbers n
+           JOIN central_live_production_states s ON s.order_id=n.commercial_order_id
+           LEFT JOIN central_live_purge_files p ON p.order_id=n.commercial_order_id
+           WHERE n.number=14 GROUP BY s.state`;
+          const z=await cf('/d1/database/'+db.uuid+'/query',{sql:sql3});
+          if(z?.[0]?.success!==true)throw Error('INVALID_PURGE_QUERY');
+          console.log('SABER_014_PURGE_CHECK='+JSON.stringify(z[0].results));
           EOF
