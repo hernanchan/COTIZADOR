@@ -153,7 +153,11 @@ export async function listarTransferenciasLiveCentral(request,env,{authorized=fa
   const rows=await env.DB.prepare(
    "SELECT t.order_id,t.amount_ars,t.created_at,n.number AS numero_orden,"+
    "c.phone AS telefono,d.name AS nombre,d.address AS direccion,"+
-   "v.reported_at AS aviso_cliente "+
+   "v.reported_at AS aviso_cliente,"+
+   "(SELECT COUNT(*) FROM central_r2_universal_files f "+
+   "WHERE f.web_order_id=l.web_order_id) AS archivos_total,"+
+   "(SELECT COUNT(*) FROM central_r2_universal_files f "+
+   "WHERE f.web_order_id=l.web_order_id AND f.received=1) AS archivos_recibidos "+
    "FROM central_live_transfer_requests t JOIN orders o ON o.id=t.order_id "+
    "JOIN central_r2_universal_order_links l ON l.commercial_order_id=o.id "+
    "LEFT JOIN central_work_order_numbers n ON n.commercial_order_id=o.id "+
