@@ -79,3 +79,5 @@ jobs:
 # Comprobación final con service binding privado configurado y purga aún OFF.
 
 # QA después de mostrar estado real de eliminación por pedido.
+
+# Revalidación tras corregir pantalla sin ID y estado de staging R2 al cliente.
