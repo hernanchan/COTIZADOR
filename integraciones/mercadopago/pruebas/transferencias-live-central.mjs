@@ -43,6 +43,7 @@ export function transportesTransferenciaLiveHabilitados(rows,env){
 export async function ensureLiveBankTables(db){
  await db.prepare("CREATE TABLE IF NOT EXISTS central_live_transfer_requests (order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE RESTRICT,amount_ars INTEGER NOT NULL CHECK(amount_ars>0),state TEXT NOT NULL CHECK(state='awaiting_bank_verification'),created_at TEXT NOT NULL DEFAULT (datetime('now')))").run();
  await db.prepare("CREATE TABLE IF NOT EXISTS central_live_bank_accreditations (order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE RESTRICT,amount_ars INTEGER NOT NULL CHECK(amount_ars>0),operator TEXT NOT NULL,bank_reference TEXT NOT NULL UNIQUE,recorded_at TEXT NOT NULL DEFAULT(datetime('now')))").run();
+ await db.prepare("CREATE TABLE IF NOT EXISTS central_live_transfer_customer_notices (order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE RESTRICT,reported_at TEXT NOT NULL DEFAULT(datetime('now')))").run();
  await db.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_live_bank_ref_normalized ON central_live_bank_accreditations(REPLACE(bank_reference,' ','-'))").run();
 }
 const paidState=async(db,orderId)=>{
@@ -66,7 +67,8 @@ export async function manejarTransferenciaLiveCentral(request,env,{readSigned,ve
  const signed=await readSigned(request,env);
  if(signed?.error)return respond({ok:false,error:'TRANSFER_LIVE_HMAC'},signed.status||401);
  const p=signed.payload;
- const action=new URL(request.url).pathname.endsWith('/transfer-start')?'start':'status';
+ const pathname=new URL(request.url).pathname;
+ const action=pathname.endsWith('/transfer-start')?'start':pathname.endsWith('/transfer-notify')?'notify':pathname.endsWith('/transfer-status')?'status':null;
  if(!validateSigned(p,action))return respond({ok:false,error:'TRANSFER_LIVE_ORDEN_INVALIDA'},422);
  let checked;
  try{checked=await verifyOrder(env,p.commercialOrderId,{webOrderId:p.webOrderId})}
@@ -106,15 +108,32 @@ export async function manejarTransferenciaLiveCentral(request,env,{readSigned,ve
   if(!saved||saved.amount_ars!==checked.amountArs)
    return respond({ok:false,error:'TRANSFER_LIVE_NO_SOLICITADA'},action==='start'?409:404);
   const paid=await paidState(env.DB,checked.commercialOrderId);
-  if(action==='status'&&paid)
+  if((action==='status'||action==='notify')&&paid)
    return respond({ok:true,commercialOrderId:checked.commercialOrderId,
     webOrderId:p.webOrderId,amountArs:checked.amountArs,estado:'pagado_esperando_archivos',
     paymentVerified:true,uploadAuthorized:true,productionAuthorized:false});
   if(saved.status!=='awaiting_payment'||saved.payment_id||saved.preference_id||
      saved.state!=='awaiting_bank_verification')
    return respond({ok:false,error:'TRANSFER_LIVE_ESTADO_INCOMPATIBLE'},409);
+  if(action==='notify'){
+   // El comprador sólo informa haber realizado la transferencia.
+   // NUNCA modifica orders, payment_reviews ni bank_accreditations.
+   await env.DB.prepare(
+    "INSERT OR IGNORE INTO central_live_transfer_customer_notices(order_id) "+
+    "SELECT t.order_id FROM central_live_transfer_requests t "+
+    "JOIN orders o ON o.id=t.order_id "+
+    "WHERE t.order_id=? AND t.amount_ars=? AND t.state='awaiting_bank_verification' "+
+    "AND o.status='awaiting_payment' AND o.amount_ars=t.amount_ars "+
+    "AND o.payment_id IS NULL AND o.preference_id IS NULL"
+   ).bind(checked.commercialOrderId,checked.amountArs).run();
+  }
+  const notice=await env.DB.prepare(
+   'SELECT reported_at FROM central_live_transfer_customer_notices WHERE order_id=?'
+  ).bind(checked.commercialOrderId).first();
   return respond({ok:true,commercialOrderId:checked.commercialOrderId,
-   webOrderId:p.webOrderId,amountArs:checked.amountArs,estado:'transferencia_pendiente',
+   webOrderId:p.webOrderId,amountArs:checked.amountArs,
+   estado:notice?'transferencia_informada':'transferencia_pendiente',
+   customerNotified:Boolean(notice),
    alias:env.CENTRAL_LIVE_TRANSFER_ALIAS,paymentVerified:false,
    uploadAuthorized:false,productionAuthorized:false});
  }catch{return respond({ok:false,error:'TRANSFER_LIVE_CENTRAL_NO_DISPONIBLE'},503)}
@@ -132,17 +151,21 @@ export async function listarTransferenciasLiveCentral(request,env,{authorized=fa
   await ensureLiveBankTables(env.DB);
   const rows=await env.DB.prepare(
    "SELECT t.order_id,t.amount_ars,t.created_at,n.number AS numero_orden,"+
-   "c.phone AS telefono,d.name AS nombre,d.address AS direccion "+
+   "c.phone AS telefono,d.name AS nombre,d.address AS direccion,"+
+   "v.reported_at AS aviso_cliente "+
    "FROM central_live_transfer_requests t JOIN orders o ON o.id=t.order_id "+
    "JOIN central_r2_universal_order_links l ON l.commercial_order_id=o.id "+
    "LEFT JOIN central_work_order_numbers n ON n.commercial_order_id=o.id "+
    "LEFT JOIN central_order_contacts c ON c.order_id=o.id "+
    "LEFT JOIN central_order_customer_details d ON d.order_id=o.id "+
+   "LEFT JOIN central_live_transfer_customer_notices v ON v.order_id=t.order_id "+
    "WHERE t.state='awaiting_bank_verification' AND o.status='awaiting_payment' "+
    "AND o.payment_id IS NULL AND o.preference_id IS NULL AND t.amount_ars=o.amount_ars "+
-   "ORDER BY t.created_at ASC LIMIT 100"
+   "ORDER BY CASE WHEN v.reported_at IS NULL THEN 1 ELSE 0 END ASC,COALESCE(v.reported_at,t.created_at) ASC LIMIT 100"
   ).all();
-  return respond({ok:true,pending:rows.results||[]});
+  return respond({ok:true,pending:(rows.results||[]).map(({aviso_cliente,...row})=>({
+   ...row,customerNotified:Boolean(aviso_cliente),reportedAt:aviso_cliente||null
+  }))});
  }catch{return respond({ok:false,error:'TRANSFER_LIVE_PENDIENTES_NO_DISPONIBLES'},503)}
 }
 export async function aprobarTransferenciaLiveCentral(request,env,{
