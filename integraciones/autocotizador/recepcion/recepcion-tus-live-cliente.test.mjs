@@ -87,3 +87,59 @@ test('pago conciliado autoriza TUS productivo y guarda recibo sin nuevo checkout
   'https://abcdefghijklmnop.storage.supabase.co/storage/v1/upload/resumable/sign');
  assert.equal(result.productionAuthorized,false);
 });
+
+test('dos PDF TUS muestran porcentaje acumulado sin 100% antes de verificar D1',async()=>{
+ const m2={...meta,fileId:'pdf_1',name:'Segundo.pdf',bytes:400};
+ const f2={...file,name:'Segundo.pdf',size:400};
+ const seen=[],calls=[];
+ const fetcher=async(path,opts)=>{
+  calls.push(path);
+  if(path.endsWith('/checkout'))return Response.json({
+   ok:true,webOrderId:WEB,commercialOrderId:UUID,estado:'pagado_esperando_archivos',
+   uploadAuthorized:true,productionAuthorized:false,fileCount:2});
+  if(path.endsWith('/iniciar'))return Response.json({
+   ok:true,orderId:WEB,bucket:'saber-tus-live',projectRef:'abcdefghijklmnop',
+   publishableKey:'PUBLIC_LIVE_KEY_NOT_REAL_BUT_LONG_ENOUGH_12345',
+   paymentAuthorized:false,productionAuthorized:false,
+   sessions:[meta,m2].map((m,i)=>({fileId:m.fileId,bytes:m.bytes,pages:m.pages,
+    objectName:'v2/'+WEB+'/'+UUID.replace(/.$/,String(i))+'.pdf',
+    signature:'SIGNED_PRIVATE_UPLOAD_TOKEN_'+i+'123',proof:'S'.repeat(50)+i}))
+  });
+  if(path.endsWith('/confirmar'))return Response.json({
+   ok:true,webOrderId:WEB,savedFiles:2,productionAuthorized:false,
+   receipts:[meta,m2].map(m=>({fileId:m.fileId,saved:true}))});
+  throw Error(path);
+ };
+ class Uppy{
+  constructor(){this.files=[];this.listeners=new Map()}
+  use(){return this}
+  on(name,callback){this.listeners.set(name,callback)}
+  addFile(f){const id='mock_'+this.files.length;
+   this.files.push({...f,id,size:f.data.size});return id}
+  setFileMeta(){}
+  async upload(){
+   const cb=this.listeners.get('upload-progress');
+   cb(this.files[0],{bytesUploaded:100});
+   cb(this.files[1],{bytesUploaded:100});
+   cb(this.files[0],{bytesUploaded:200});
+   cb(this.files[1],{bytesUploaded:400});
+   return {successful:this.files,failed:[]};
+  }
+  close(){}
+ }
+ const result=await enviarPDFsTUSPagadosLive({
+  selectedFiles:[file,f2],storage:makeStore([meta,m2]),
+  origin:'https://pedidos.libreriasaber.com.ar',
+  fetcher,hasher:async()=>SHA,onProgress:p=>seen.push(p),
+  loadUploader:async()=>({Uppy,Tus:class {}})
+ });
+ assert.equal(result.ok,true);
+ const progress=seen.filter(p=>p.phase==='upload');
+ assert.deepEqual(progress.map(p=>p.bytesUploaded),[100,200,300,600]);
+ assert.deepEqual(progress.map(p=>p.percent),[16,33,50,99]);
+ assert.equal(seen.at(-2).phase,'verificando-recibos');
+ assert.equal(seen.at(-2).percent,99);
+ assert.equal(seen.at(-1).phase,'recibido');
+ assert.equal(seen.at(-1).percent,100);
+ assert.equal(calls.filter(x=>x.endsWith('/confirmar')).length,1);
+});
