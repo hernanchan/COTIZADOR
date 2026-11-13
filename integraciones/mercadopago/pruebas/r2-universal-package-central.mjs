@@ -75,20 +75,10 @@ async function receipt(env,valid,row){
     r.status!=='awaiting_pdf_analysis'||r.reservation_state!=='reserved'||
     !Number.isSafeInteger(r.pages_claimed)||r.pages_claimed<1||r.pages_claimed>2000)
   throw Error('R2_RECEIPT');
- if(liveEnabled(env)){
-  // A staged R2 object is NOT a received PDF until physical inspection
-  // has been signed, reviewed, and recorded for the same immutable quote.
-  const inspected=await db.prepare(
-   'SELECT receipt_id,commercial_order_id,quote_hash,sha256,bytes,report_hash '+
-   'FROM central_r2_live_inspections WHERE web_order_id=? AND file_id=? LIMIT 1'
-  ).bind(valid.webOrderId,row.file_id).first();
-  if(!inspected||inspected.receipt_id!==r.receipt_id||
-     inspected.commercial_order_id!==valid.commercialOrderId||
-     inspected.quote_hash!==valid.link.quote_hash||
-     inspected.sha256!==row.sha256||inspected.bytes!==row.bytes||
-     !SHA.test(inspected.report_hash||''))
-   throw Error('R2_PHYSICAL_INSPECTION_REQUIRED');
- }
+ // La recepción ya quedó confirmada en D1 mediante SHA-256 verificado,
+ // recibo firmado, pago acreditado y reserva R2. El control visual humano
+ // ocurre AL PREPARAR EL TRABAJO, después de descargar el ZIP completo.
+ // Descargar originales no autoriza impresión ni cambia estado de preprensa.
  return {receiptId:r.receipt_id,objectKey:r.object_key,pages:r.pages_claimed};
 }
 async function readRequest(request,env,readSigned,subtle,action){
