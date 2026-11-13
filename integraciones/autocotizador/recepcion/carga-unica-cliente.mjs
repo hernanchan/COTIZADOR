@@ -717,10 +717,17 @@ async function analizarArchivoPDF(e,file){
   e.tipoPloteoElegidoPorCliente=false;
   e.clasificacionAutomatica=false;
   e.metodoClasificacion=null;
+  e.elegirPaginasAntesDeAnalizar=false;
+  e.avisoClasificacion='';
   // PDF >40 MiB: preferir clasificación estructural por rangos (<512 KiB).
   // Si no alcanza y el documento es pequeño en número de páginas y bytes,
   // permitir miniaturas visuales LOCALES. Nunca subir un original sin pago.
-  if(file.size>MAX_PDF_TUS_BYTES&&requiereClasificacionVisualPloteo(e.paginas)){
+  if(file.size>48*1024*1024&&e.paginas.length>4&&
+     requiereClasificacionVisualPloteo(e.paginas)){
+   // Leer las medidas, pero NO renderizar las nueve páginas hasta saber
+   // cuáles quiere imprimir el cliente.
+   e.elegirPaginasAntesDeAnalizar=true;
+  }else if(file.size>MAX_PDF_TUS_BYTES&&requiereClasificacionVisualPloteo(e.paginas)){
    const hallazgo=await clasificarMosaicoRasterPDFGrande(file);
    if(hallazgo?.altaConfianza===true&&hallazgo.modo==='poster'&&
       e.paginas.length===1){
@@ -763,6 +770,43 @@ async function analizarArchivoPDF(e,file){
   e.seleccion=decision.seleccionInicial;
   e.error=null;
  }catch(ex){e.error=String(ex.message||ex);e.paginas=null}
+}
+async function analizarPaginasSolicitadas(e){
+ if(leyendo||!e?.paginas||!e.archivoOriginal)return;
+ const pedidas=paginasElegidas(e);
+ if(!pedidas||!pedidas.length){
+  e.avisoClasificacion='Seleccioná páginas válidas, por ejemplo 1-3.';
+  render();return;
+ }
+ if(pedidas.every(p=>['cad','poster'].includes(p.modo))){
+  e.elegirPaginasAntesDeAnalizar=false;
+  e.clasificacionAutomatica=true;
+  e.avisoClasificacion='';
+  cambio();return;
+ }
+ leyendo=true;e.avisoClasificacion='';
+ render();
+ try{
+  const visual=await clasificarPloteoGrandePorRangos(e.archivoOriginal,{
+   paginas:e.paginas,seleccionadas:pedidas.map(p=>p.numero),
+   onProgreso:({terminadas,total,numeroPagina})=>{
+    $('estado').textContent='Analizando visualmente el plano '+terminadas+' de '+total+
+     ' (página '+numeroPagina+' del original). Sin subir el PDF…';
+   }
+  });
+  if(!visual?.altaConfianza||visual.paginas.length!==pedidas.length)
+   throw Error('No se completó el análisis de las páginas elegidas');
+  for(const pagina of visual.paginas)e.paginas[pagina.numero-1].modo=pagina.modo;
+  e.clasificacionAutomatica=pedidas.every(p=>['cad','poster'].includes(p.modo));
+  e.metodoClasificacion='VISUAL_PDFJS_RANGOS';
+  e.elegirPaginasAntesDeAnalizar=false;
+ }catch{
+  // Un análisis incompleto NO habilita precio ni inventa clase CAD/Pleno.
+  e.avisoClasificacion='No pudimos clasificar estas páginas automáticamente. '+
+   'Podés reintentar o solicitar revisión, sin perder el PDF cargado.';
+ }finally{
+  leyendo=false;render();cotizar();
+ }
 }
 document.querySelectorAll('input[name="modoImpresionLote"]').forEach(input=>{
  input.addEventListener('change',()=>{
