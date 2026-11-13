@@ -3,7 +3,11 @@
  * TUS original. No public route, no R2 deletions, no session-based authority.
  */
 import {leerObjetoTUSPrivado,tusPrivadoConfigurado} from './tus-pedido-worker.mjs';
-const ON='PRIVATE_TEST_ONLY',PROJECT='qkbbqzbannyhuanngjpw',BUCKET='saber-tus-lab';
+const ON='PRIVATE_TEST_ONLY',LIVE='GO_COMERCIAL_CONFIRMADO',PROJECT='qkbbqzbannyhuanngjpw',BUCKET='saber-tus-lab';
+const enabled=env=>(env?.DOCS_R2_UNIVERSAL_PURGE_ENABLED===ON&&
+ env?.DOCS_R2_UNIVERSAL_PURGE_SCOPE==='NEW_ORDERS_ONLY'&&env?.DOCS_TUS_PURGE_ENABLED===ON)||
+ (env?.SABER_ENTORNO==='produccion'&&env?.DOCS_LIVE_PURGE_GATE===LIVE&&
+ env?.DOCS_LIVE_TUS_GATE===LIVE&&env?.DOCS_LIVE_RECEPCION_GATE===LIVE);
 const WEB=/^WEB-ENSAYO-[A-F0-9]{32}$/;
 const ID=/^[A-Za-z0-9_-]{1,80}$/;
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
@@ -53,9 +57,7 @@ export async function eliminarOriginalUniversalTUS(env,p,{
  fetcher=fetch,read=leerObjetoTUSPrivado,subtle=crypto.subtle
 }={}){
  if(!validate(p)||!tusPrivadoConfigurado(env)||
-    env?.DOCS_R2_UNIVERSAL_PURGE_ENABLED!==ON||
-    env?.DOCS_TUS_PURGE_ENABLED!==ON||
-    env?.DOCS_R2_UNIVERSAL_PURGE_SCOPE!=='NEW_ORDERS_ONLY'||
+    !enabled(env)||
     typeof env?.DOCS_TUS_SUPABASE_SERVICE_KEY!=='string'||
     env.DOCS_TUS_SUPABASE_SERVICE_KEY.length<32)
   throw Error('UNIVERSAL_PURGE_TUS_OFF');
@@ -105,9 +107,7 @@ export async function atenderBorradoUniversalTUS(request,env,{
  verify=signedRequest,remove=eliminarOriginalUniversalTUS,
  now,subtle
 }={}){
- if(env?.DOCS_R2_UNIVERSAL_PURGE_ENABLED!==ON||
-    env?.DOCS_R2_UNIVERSAL_PURGE_SCOPE!=='NEW_ORDERS_ONLY'||
-    env?.DOCS_TUS_PURGE_ENABLED!==ON)
+ if(!enabled(env))
   return reply({ok:false,error:'UNIVERSAL_PURGE_OFF'},503);
  let p;try{p=await verify(request,env,{...(now?{now}:{}),...(subtle?{subtle}:{})})}
  catch{return reply({ok:false,error:'UNIVERSAL_PURGE_HMAC_INVALIDA'},401)}
