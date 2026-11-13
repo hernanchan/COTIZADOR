@@ -39,7 +39,10 @@ jobs:
             integraciones/mercadopago/pruebas/r2-universal-live-stage-central.test.mjs \
             tests/r2-panel-staff-live-browser.test.mjs \
             integraciones/mercadopago/pruebas/transferencias-live-central.test.mjs \
-            integraciones/autocotizador/recepcion/transferencias-personal-live.test.mjs
+            integraciones/autocotizador/recepcion/transferencias-personal-live.test.mjs \
+            integraciones/autocotizador/recepcion/clasificar-ploteo-grande-por-rangos.test.mjs \
+            integraciones/autocotizador/recepcion/carga-unica-pdf-regresion.test.mjs \
+            integraciones/autocotizador/recepcion/pagina-continuar-pago-live.test.mjs
           echo SABER_CENTRAL_PERSONAL_HMAC_AND_BOTH_TRANSPORTS_QA_OK
       - name: Compilar Central y Documentos completos sin desplegar
         run: |
@@ -67,3 +70,4 @@ jobs:
 # 13/11: validar sintaxis del bundle ZIP y rutas comerciales tras simplificar pantalla de personal.
 # Orden 013: error real de acreditacion bancaria, unicidad de movimiento y polling sin perder campos.
 # 13/11: QA corrección test duplicado vs índice D1 y cadena JS del panel bancario.
+# 13/11 QA casos originales: PDF MUNICIPAL FINAL 9 paginas raster grandes; renovacion sesion de transferencia; no repago.
