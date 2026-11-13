@@ -1,0 +1,85 @@
+name: Saber - estado definitivo cobro 100 MP LIVE
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-estado-definitivo-mp100-20261113.yml]
+permissions: {contents: write}
+jobs:
+  diagnosis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+      D1TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: true}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Read only deployed Worker, cron and D1 state
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'EOF'
+          import {mkdir,writeFile} from 'node:fs/promises';
+          const account=process.env.ACCOUNT, token=process.env.TOKEN,d1=process.env.D1TOKEN;
+          const result={checkedAt:new Date().toISOString(),readOnly:true,amount:100};
+          const base='https://api.cloudflare.com/client/v4/accounts/'+account;
+          const cf=async(path,auth=token,opts={})=>{
+           const r=await fetch(base+path,{...opts,
+            headers:{Authorization:'Bearer '+auth,...opts.headers},signal:AbortSignal.timeout(20000)});
+           const j=await r.json().catch(()=>null);
+           if(!r.ok||j?.success!==true)throw Error('CF_HTTP_'+r.status);
+           return j.result;
+          };
+          try{
+           const src=await fetch(base+'/workers/scripts/saber-pagos-produccion',{
+            headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(20000)});
+           if(!src.ok)throw Error('WORKER_HTTP_'+src.status);
+           const code=await src.text();
+           result.hostOfficialDeployed=code.includes('api.mercadolibre.com/users/me');
+           result.diagnosticErrorsDeployed=code.includes('RESCATE_VENDEDOR_TYPE_ERROR');
+           result.cronPresent=code.includes('SABER_MP_LIVE_CRON_AISLADO');
+           const sched=await cf('/workers/scripts/saber-pagos-produccion/schedules');
+           result.cronEveryMinute=(sched.schedules||[]).some(x=>x.cron==='* * * * *');
+          }catch(e){result.workerError=String(e.message||e).slice(0,50)}
+          try{
+           const dbs=await cf('/d1/database',d1);
+           const db=dbs.find(x=>x.name==='saber-pagos-produccion');
+           if(!db?.uuid)throw Error('D1_MISSING');
+           const read=async sql=>{
+            const q=await cf('/d1/database/'+db.uuid+'/query',d1,{
+             method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sql})});
+            if(!q?.[0]?.success)throw Error('QUERY_FAILED');
+            return q[0].results||[];
+           };
+           result.orderStatus=await read("SELECT status,COUNT(*) AS n FROM orders WHERE amount_ars=100 AND datetime(created_at)>=datetime('now','-48 hours') GROUP BY status");
+           const t=await read("SELECT name FROM sqlite_master WHERE type='table' AND name='central_mp_live_auto_health'");
+           if(t.length)result.cronHealth=(await read("SELECT checked_at,checked,recovered,pending,review,errors,state FROM central_mp_live_auto_health WHERE id=1"))[0]||null;
+           const reviews=await read("SELECT COUNT(*) AS n FROM orders o INNER JOIN payment_reviews r ON r.order_id=o.id AND r.state='verified' WHERE o.amount_ars=100 AND datetime(o.created_at)>=datetime('now','-48 hours')");
+           result.verified100=reviews[0]?.n||0;
+          }catch(e){result.d1Error=String(e.message||e).slice(0,50)}
+          await mkdir('docs',{recursive:true});
+          await writeFile('docs/ESTADO-REAL-PAGO-ARS100.json',JSON.stringify(result,null,2)+'\n');
+          console.log('ESTADO_PAGO_REAL='+JSON.stringify(result));
+          EOF
+      - name: Publicar solo datos de estado y sin IDs de pagos o cuentas
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/ESTADO-REAL-PAGO-ARS100.json || exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/ESTADO-REAL-PAGO-ARS100.json
+          git diff --cached --quiet && exit 0
+          git commit -m "ops: estado verificado en producción del pago ARS100"
+          for attempt in 1 2 3 4;do
+            git fetch origin integracion/tus-pedido-privado-20261101
+            git rebase origin/integracion/tus-pedido-privado-20261101
+            git push origin HEAD:integracion/tus-pedido-privado-20261101 && exit 0
+            sleep 2
+          done
+          exit 1
