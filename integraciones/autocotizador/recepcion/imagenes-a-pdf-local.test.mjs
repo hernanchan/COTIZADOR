@@ -23,7 +23,7 @@ function png(width,height){
 }
 const photo=(name='foto.png')=>new File([png(16,12)],name,{type:'image/png'});
 test('11 imágenes crean 2 PDF (10+1) con páginas íntegramente embebidas',async()=>{
- const a=await normalizarArchivosImpresion(Array.from({length:11},(_,i)=>photo('foto'+i+'.png')));
+ const a=await normalizarArchivosImpresion(Array.from({length:11},(_,i)=>photo('foto'+i+'.png')),{agruparImagenes:true});
  assert.equal(a.images,11);assert.equal(a.files.length,2);
  const pdf1=await PDFDocument.load(await a.files[0].arrayBuffer());
  const pdf2=await PDFDocument.load(await a.files[1].arrayBuffer());
@@ -44,4 +44,30 @@ test('rechaza extensión que no coincida con bytes, SVG y exceso de imágenes',a
  ]),/Sólo se admiten/);
  await assert.rejects(normalizarArchivosImpresion(
   Array.from({length:31},()=>photo())),/Máximo 30/);
+});
+
+test('configuraciones separadas: dos JPG/PNG generan dos PDF individuales y nombres distintos',async()=>{
+ const a=await normalizarArchivosImpresion([photo('COLOR OBRA 180.png'),photo('BN COMUN.png')]);
+ assert.equal(a.images,2);
+ assert.equal(a.files.length,2);
+ assert.match(a.files[0].name,/COLOR OBRA 180/);
+ assert.match(a.files[1].name,/BN COMUN/);
+ assert.notEqual(a.files[0].name,a.files[1].name);
+ for(const file of a.files){
+  const doc=await PDFDocument.load(await file.arrayBuffer());
+  assert.equal(doc.getPageCount(),1,'Cada imagen debe tener una ficha individual');
+ }
+});
+test('dos fotos de mismo nombre se diferencian por índice en modo individual',async()=>{
+ const a=await normalizarArchivosImpresion([photo('imagen.png'),photo('imagen.png')]);
+ assert.notEqual(a.files[0].name,a.files[1].name);
+ assert.equal(a.files.length,2);
+});
+test('configuración común explícita sigue permitiendo grupos de 10 fotos',async()=>{
+ const a=await normalizarArchivosImpresion(Array.from({length:21},(_,i)=>photo('img'+i+'.png')),
+  {agruparImagenes:true});
+ assert.equal(a.files.length,3);
+ const pages=await Promise.all(a.files.map(async f=>
+  (await PDFDocument.load(await f.arrayBuffer())).getPageCount()));
+ assert.deepEqual(pages,[10,10,1]);
 });
