@@ -26,6 +26,7 @@ jobs:
           node --test \
             integraciones/mercadopago/pruebas/central-recepcion-live.test.mjs \
             integraciones/mercadopago/pruebas/central-entrega-purga-live.test.mjs \
+            integraciones/mercadopago/pruebas/central-retencion-abandonados-live.test.mjs \
             integraciones/mercadopago/pruebas/central-estado-personal-live.test.mjs \
             integraciones/autocotizador/recepcion/purga-archivo-live-documentos.test.mjs \
             integraciones/mercadopago/pruebas/central-live-bridge.test.mjs \
@@ -95,3 +96,4 @@ jobs:
 # 13/11: segunda QA referencia bancaria opcional con identificador interno, scope D1 de entregados y tests auditoria.
 # 13/11: QA final entregados se filtran SQL y contador purga sin borrar D1; referencia bancaria campo oculto.
 # 13/11: orden 014 R2 1/1 pagada, sin inspeccion manual: iniciar preparación y purga entregado con comprobante de reserva y SHA.
+# 13/11: reintentos borrado entregados ejecutan en cron produccion; auditoria 48h protegida solo lectura una vez/h, sin borrar transferencias ni pagos.
