@@ -59,17 +59,31 @@ export async function enviarPDFsR2PagadosLive({
   status.productionAuthorized!==false||status.fileCount!==metas.length)
   throw Error('LIVE_R2_PAGO_NO_CONCILIADO');
  const results=[];
+ const batchBytes=jobs.reduce((sum,j)=>sum+j.file.size,0);
+ let confirmedBytes=0;
  for(let i=0;i<jobs.length;i++){
   const {file,meta}=jobs[i];
   const result=await uploader({file,orderId:order.webOrderId,
    fetcher,storage,origin,mode:'live',requireCentralStaging:true,
    meta:{fileId:meta.fileId,name:meta.name,mode:meta.mode,
     bytes:meta.bytes,sha256:meta.sha256,pages:meta.pages},
-   onProgress:p=>onProgress({index:i+1,total:jobs.length,...p})});
+   onProgress:p=>{
+    const current=Math.min(file.size,Math.max(0,Number(p.bytesUploaded)||0));
+    const bytesUploaded=confirmedBytes+current;
+    const batchPercent=Math.min(99,Math.floor(100*bytesUploaded/batchBytes));
+    onProgress({index:i+1,total:jobs.length,...p,
+     batchBytesUploaded:bytesUploaded,batchTotalBytes:batchBytes,
+     batchPercent});
+   }});
   if(result?.sha256Verificado!==true||result.sha256!==meta.sha256||
     result.bytes!==meta.bytes||result.stagedForCentral!==true||
     result.contenidoPdfVerificado!==false||result.registeredInD1!==false)
    throw Error('LIVE_R2_CENTRAL_NO_VERIFICO');
+  confirmedBytes+=file.size;
+  onProgress({phase:'archivo-verificado',index:i+1,total:jobs.length,
+   batchBytesUploaded:confirmedBytes,batchTotalBytes:batchBytes,
+   batchPercent:i===jobs.length-1?100:Math.min(99,Math.floor(100*confirmedBytes/batchBytes)),
+   fileId:meta.fileId});
   results.push({fileId:meta.fileId,sha256Verificado:true,
    preprensaPendiente:true});
  }
