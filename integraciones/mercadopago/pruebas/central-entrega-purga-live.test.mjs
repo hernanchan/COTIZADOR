@@ -69,7 +69,7 @@ test('cola inmutable se crea ANTES de entregar y nunca borra si sigue listo',asy
  const queued=await encolarEntregaLive(f.env,id,4,{preflight:true});
  assert.equal(queued.state,'pending');
  assert.equal(queued.totalFiles,1);
- const processed=await procesarEntregaLive(f.env,id,{bucket:f.bucket});
+ const processed=await procesarEntregaLive(f.env,id,{deleteFile:async(_env,_id,row)=>{assert.equal(row.object_key,key);await f.bucket.delete(row.object_key)}});
  assert.equal(processed.state,'pending_retry');
  assert.equal(f.queue[0].state,'pending');
  assert.equal(f.operations.some(x=>x.sql.includes("SET state='deleted'")),false);
@@ -78,7 +78,7 @@ test('una entrega confirmada borra R2 y verifica ausencia; el recibo de pago per
  const f=fixture({state:'entregado',version:4});
  const queued=await encolarEntregaLive(f.env,id,4);
  assert.equal(queued.state,'pending');
- const result=await procesarEntregaLive(f.env,id,{bucket:f.bucket});
+ const result=await procesarEntregaLive(f.env,id,{deleteFile:async(_env,_id,row)=>{assert.equal(row.object_key,key);await f.bucket.delete(row.object_key)}});
  assert.equal(result.state,'deleted');
  assert.equal(result.verifiedDeleted,1);
  assert.equal(f.queue[0].state,'deleted');
@@ -89,6 +89,6 @@ test('sin gate LIVE nunca consulta ni elimina originales',async()=>{
  f.env.CENTRAL_LIVE_PURGE_GATE='NO_GO';
  assert.equal(await planEntregaLive(f.env,id,{state:'listo',version:3}),null);
  assert.equal((await encolarEntregaLive(f.env,id,4,{preflight:true})).state,'off');
- assert.equal((await procesarEntregaLive(f.env,id,{bucket:f.bucket})).state,'off');
+ assert.equal((await procesarEntregaLive(f.env,id,{deleteFile:async(_env,_id,row)=>{assert.equal(row.object_key,key);await f.bucket.delete(row.object_key)}})).state,'off');
  assert.equal(f.operations.length,0);
 });
