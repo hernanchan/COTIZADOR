@@ -34,6 +34,8 @@ jobs:
            };
            const [pay,docs]=await Promise.all([get('saber-pagos-produccion'),get('saber-documentos-produccion')]);
            const bind=(list,name,type)=>list.some(x=>x.name===name&&(!type||x.type===type));
+           out.centralStorageBindingNames=pay.filter(x=>/R2|DOCUMENTOS|SUPABASE|TUS/i.test(x.name)).map(x=>({name:x.name,type:x.type}));
+           out.documentsStorageBindingNames=docs.filter(x=>/R2|DOCUMENTOS|SUPABASE|TUS/i.test(x.name)).map(x=>({name:x.name,type:x.type}));
            out.centralDocumentsBridge=bind(pay,'SABER_DOCUMENTOS','service');
            out.centralR2PrivateBucket=bind(pay,'SABER_R2_GRANDES','r2_bucket');
            out.documentsTUSServiceKey=bind(docs,'DOCS_TUS_SUPABASE_SERVICE_KEY','secret_text');
