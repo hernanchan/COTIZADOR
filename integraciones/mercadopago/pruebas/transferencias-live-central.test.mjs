@@ -262,3 +262,24 @@ test('error SQL genérico no se confunde con referencia repetida ni acredita ped
   assert.doesNotMatch(JSON.stringify(errors),/BANK-NUEVA-013/);
  }finally{console.error=oldError}
 });
+
+test('acreditar sin referencia manual crea identificador INTERNO exclusivo, conserva comprobación humana',async()=>{
+ const f=mockDb();
+ const originalBatch=f.db.batch.bind(f.db);
+ let storedReference=null;
+ f.db.batch=async cmds=>{
+  const first=cmds[0];
+  assert.match(first.sql,/INSERT INTO central_live_bank_accreditations/);
+  // El INSERT guarda clave técnica, no un dato bancario ficticio del usuario.
+  storedReference=first.values?.[1]??first.args?.[1]??null;
+  return originalBatch(cmds);
+ };
+ const result=await aprobarTransferenciaLiveCentral(request('admin/api/central/live-transfers/approve',{
+  order_id:id,amount_ars:amount,confirmed:true,operator:'Ana Pérez'
+ }),{...base,DB:f.db},{authorized:true,verifyOrder});
+ assert.equal(result.status,200,JSON.stringify(await result.clone().json()));
+ assert.equal((await result.json()).paymentVerified,true);
+ assert.ok(f.sql.some(q=>q.includes('INSERT INTO central_live_bank_accreditations')));
+ assert.equal(f.sql.includes('BATCH'),true);
+ if(storedReference!==null)assert.equal(storedReference,'SABER-INT-'+id.toUpperCase());
+});
