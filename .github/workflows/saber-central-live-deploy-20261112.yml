@@ -39,6 +39,8 @@ jobs:
           grep -Fq 'SABER_MP_LIVE_CRON_ACREDITADOS' /tmp/saber-central-live.mjs
           grep -Fq 'central_mp_live_auto_health' /tmp/saber-central-live.mjs
           grep -Fq 'SABER_MP_LIVE_CRON_AISLADO' /tmp/saber-central-live.mjs
+          grep -Fq 'SABER_MP_LIVE_STAFF_AUTO_ACREDITADOS' /tmp/saber-central-live.mjs
+          grep -Fq 'setTimeout' /tmp/saber-documentos-live.mjs
           ! grep -Fq 'Verificar cobros Mercado Pago' /tmp/saber-documentos-live.mjs
           grep -Fq 'staff-forecast' /tmp/saber-central-live.mjs
           echo SABER_STAFF_LIVE_2_BUNDLES_READY
