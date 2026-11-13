@@ -125,7 +125,7 @@ async function runCase(method,bytes){
    assert.equal(paid,true);
    assert.equal(orderId,WEB);assert.equal(mode,'live');
    assert.equal(requireCentralStaging,true);
-   assert.equal(meta.fileId,meta().fileId);
+   assert.equal(meta.fileId,JSON.parse(store.getItem('saber-live-archivos-v1')).metas[0].fileId);
    return {sha256Verificado:true,sha256:SHA,bytes:file.size,
     stagedForCentral:true,contenidoPdfVerificado:false,registeredInD1:false};
   }
