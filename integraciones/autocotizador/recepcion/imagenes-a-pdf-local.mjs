@@ -16,7 +16,7 @@ function formato(bytes,nombre){
  if(/\.jpe?g$/i.test(nombre)&&jpg)return 'jpg';
  throw Error('La imagen '+nombre+' no coincide con un JPG o PNG válido.');
 }
-async function crearPdfImagenes(imagenes,num){
+async function crearPdfImagenes(imagenes,num,{independiente=false}={}){
  const pdf=await PDFDocument.create();
  for(const file of imagenes){
   if(!Number.isSafeInteger(file.size)||file.size<50||file.size>MAX_BYTES_IMAGEN)
@@ -39,27 +39,32 @@ async function crearPdfImagenes(imagenes,num){
  const bytes=await pdf.save({useObjectStreams:true});
  if(bytes.length<100||bytes.length>MAX_BYTES_PDF)
   throw Error('El PDF de imágenes supera el máximo de 200 MB.');
- const name='imagenes-'+String(num).padStart(2,'0')+'-'+imagenes.length+'-fotos.pdf';
+ const original=independiente?String(imagenes[0]?.name||'imagen').replace(/\.(jpe?g|png)$/i,'').replace(/[^\p{L}\p{N}._ -]/gu,'_').slice(0,75):'';
+ const name=independiente?'imagen-'+String(num).padStart(2,'0')+'-'+original+'.pdf':
+  'imagenes-'+String(num).padStart(2,'0')+'-'+imagenes.length+'-fotos.pdf';
  return new File([bytes],name,{type:'application/pdf'});
 }
-/** Devuelve PDF originales sin cambios y convierte grupos contiguos de hasta 10 imágenes.
- * Se respetan la posición y el orden de selección; no sube originales JPG/PNG.
+/** Devuelve PDF originales sin cambios. Por defecto cada JPG/PNG es un trabajo
+ * autónomo, con modo, copias y papel propios. Sólo al elegir explícitamente
+ * configuración común se agrupan fotos contiguas (hasta 10 por PDF).
+ * Se conserva el orden original y ninguna imagen se envía al servidor.
  */
-export async function normalizarArchivosImpresion(files){
+export async function normalizarArchivosImpresion(files,{agruparImagenes=false}={}){
  if(!Array.isArray(files)||files.length<1) return {files:[],images:0};
+ if(typeof agruparImagenes!=='boolean')throw Error('Modo de imágenes inválido');
  const imageCount=files.filter(esImagen).length;
  if(imageCount>MAX_FOTOS)throw Error('Máximo 30 imágenes JPG/PNG por selección.');
  const result=[],grupo=[];
  let number=0;
  const flush=async()=>{
   if(!grupo.length)return;
-  result.push(await crearPdfImagenes(grupo,++number));
+  result.push(await crearPdfImagenes(grupo,++number,{independiente:!agruparImagenes}));
   grupo.length=0;
  };
  for(const file of files){
   if(esImagen(file)){
    grupo.push(file);
-   if(grupo.length===MAX_GRUPO)await flush();
+   if(!agruparImagenes||grupo.length===MAX_GRUPO)await flush();
   }else if(esPdf(file)){
    await flush();
    result.push(file);
