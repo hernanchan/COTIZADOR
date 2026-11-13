@@ -223,3 +223,41 @@ test('un notify sin firma HMAC nunca llega a D1',async()=>{
  assert.equal(res.status,401);
  assert.equal(f.sql.length,0);
 });
+
+test('una referencia usada en otro movimiento es conflicto específico, sin modificar D1',async()=>{
+ const f=mockDb();
+ const original=f.db.prepare;
+ let batches=0;
+ f.db.prepare=sql=>{
+  if(sql.includes("REPLACE(bank_reference,' ','-')")){
+   return {bind(){return this},first:async()=>({order_id:'123e4567-e89b-42d3-a456-426614174999'})};
+  }
+  return original(sql);
+ };
+ f.db.batch=async()=>{batches++;throw Error('BATCH_NO_DEBE_EJECUTARSE')};
+ const r=await aprobarTransferenciaLiveCentral(request('admin/api/central/live-transfers/approve',{
+  order_id:id,amount_ars:amount,confirmed:true,operator:'Ana Pérez',
+  bank_reference:'BANK-EXISTENTE-011'
+ }),{...base,DB:f.db},{authorized:true,verifyOrder});
+ assert.equal(r.status,409);
+ assert.equal((await r.json()).error,'TRANSFER_LIVE_REFERENCIA_YA_UTILIZADA');
+ assert.equal(batches,0);
+});
+test('error SQL genérico no se confunde con referencia repetida ni acredita pedido',async()=>{
+ const f=mockDb();
+ let batches=0;
+ f.db.batch=async()=>{batches++;throw Error('database temporarily unavailable')};
+ const oldError=console.error;
+ const errors=[];console.error=(...args)=>errors.push(args);
+ try{
+  const r=await aprobarTransferenciaLiveCentral(request('admin/api/central/live-transfers/approve',{
+   order_id:id,amount_ars:amount,confirmed:true,operator:'Ana Pérez',
+   bank_reference:'BANK-NUEVA-013'
+  }),{...base,DB:f.db},{authorized:true,verifyOrder});
+  assert.equal(r.status,503);
+  assert.equal((await r.json()).error,'TRANSFER_LIVE_ACREDITACION_NO_COMPLETADA');
+  assert.equal(batches,1);
+  assert.equal(errors.length,1);
+  assert.doesNotMatch(JSON.stringify(errors),/BANK-NUEVA-013/);
+ }finally{console.error=oldError}
+});
