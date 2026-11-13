@@ -20,8 +20,20 @@ jobs:
             -H "Authorization: Bearer $TOKEN" \
             "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-documentos-produccion" \
             -o /tmp/worker-body
+          curl -fsS --max-time 35 -H "Authorization: Bearer $TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/saber-documentos-produccion/deployments" \
+            -o /tmp/worker-deployments
+          curl -fsS --max-time 35 -H "Authorization: Bearer $TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/workers/saber-documentos-produccion/versions?per_page=10" \
+            -o /tmp/worker-versions
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
+          const deployments=JSON.parse(fs.readFileSync('/tmp/worker-deployments','utf8'));
+          const active=deployments.result?.deployments?.[0]?.versions?.map(v=>({id:v.version_id,percentage:v.percentage}));
+          console.log('SABER_WORKER_ACTIVE_VERSIONS',JSON.stringify(active));
+          const versions=JSON.parse(fs.readFileSync('/tmp/worker-versions','utf8'));
+          const items=Array.isArray(versions.result)?versions.result:(versions.result?.items||[]);
+          console.log('SABER_WORKER_RECENT_VERSIONS',JSON.stringify(items.slice(0,9).map(v=>({id:v.id,created_on:v.created_on,number:v.number,message:v.annotations?.['workers/message']||'',urls:v.urls?.slice(0,2)}))));
           const h=fs.readFileSync('/tmp/worker-headers','utf8');
           const s=fs.readFileSync('/tmp/worker-body','utf8');
           const LF=String.fromCharCode(10),CR=String.fromCharCode(13);
