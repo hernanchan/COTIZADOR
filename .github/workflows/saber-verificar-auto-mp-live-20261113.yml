@@ -68,7 +68,7 @@ jobs:
             report.lastStaffRecheck=last?.[0]?.results?.[0]?.checked_at||null;
            }
           }catch(e){report.d1Error=String(e.message||e).slice(0,80)}
-          if(report.failureReasonDeployed&&report.health?.state==='failed'){
+          if(report.failureReasonDeployed&&['failed','RESCATE_VENDEDOR_NO_VERIFICADO'].includes(report.health?.state)){
            const dbs=await cf('/d1/database',d);
            const db=dbs.find(x=>x.name==='saber-pagos-produccion');
            if(db?.uuid){
@@ -80,7 +80,7 @@ jobs:
               return q?.[0]?.results||[];
              };
              const current=(await read("SELECT checked_at,checked,recovered,pending,review,errors,state FROM central_mp_live_auto_health WHERE id=1"))[0];
-             if(current&&current.state!=='failed'){report.health=current;break}
+             if(current&&!['failed','RESCATE_VENDEDOR_NO_VERIFICADO'].includes(current.state)){report.health=current;break}
              if(current)report.health=current;
             }
             report.orders100=await read("SELECT status AS estado, COUNT(*) AS cantidad FROM orders WHERE amount_ars=100 AND datetime(created_at)>=datetime('now','-48 hours') GROUP BY status");
