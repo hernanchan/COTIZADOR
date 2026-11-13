@@ -16,7 +16,7 @@ export async function listarRecepcionUniversalLive(request,env,{authorized=false
     env?.CENTRAL_LIVE_BRIDGE_ENABLED!==GO||
     typeof env?.DB?.prepare!=='function')
   return reply({ok:false,error:'LIVE_LISTA_OFF'},503);
- let rows;
+ let rows,hasProduction=false,hasPurge=false;
  try{
   const existing=(await env.DB.prepare(
    "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('central_live_bank_accreditations','central_order_contacts','central_order_customer_details','central_live_order_archives','central_live_purge_files','central_live_test_exclusions')"
@@ -25,10 +25,10 @@ export async function listarRecepcionUniversalLive(request,env,{authorized=false
   const bank=names.has('central_live_bank_accreditations');
   const hasArchives=names.has('central_live_order_archives');
   const hasTestExclusions=names.has('central_live_test_exclusions');
-  const hasPurge=names.has('central_live_purge_files');
+  hasPurge=names.has('central_live_purge_files');
   const hasPhone=names.has('central_order_contacts');
   const hasCustomer=names.has('central_order_customer_details');
-  const hasProduction=(await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='central_live_production_states'").first())!=null;
+  hasProduction=(await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='central_live_production_states'").first())!=null;
   const paymentClause=bank?
    "AND ((o.payment_id IS NOT NULL AND o.preference_id IS NOT NULL) OR "+
    "(o.payment_id IS NULL AND o.preference_id IS NULL AND EXISTS "+
