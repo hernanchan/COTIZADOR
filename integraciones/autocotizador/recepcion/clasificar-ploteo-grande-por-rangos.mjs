@@ -12,7 +12,7 @@ const MIB=1048576,MAX_READ=128*MIB,MAX_CALLS=1500,MAX_PAGES=12;
 const WORKER='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 export async function clasificarPloteoGrandePorRangos(file,{
- paginas,pdfjs=globalThis.pdfjsLib,
+ paginas,seleccionadas=null,pdfjs=globalThis.pdfjsLib,
  createCanvas=()=>document.createElement('canvas'),
  onProgreso=()=>{}
 }={}){
@@ -26,6 +26,10 @@ export async function clasificarPloteoGrandePorRangos(file,{
     typeof pdfjs?.getDocument!=='function'||
     typeof pdfjs?.PDFDataRangeTransport!=='function')
   return null;
+ const targets=seleccionadas===null?paginas.map(p=>p.numero):seleccionadas;
+ if(!Array.isArray(targets)||!targets.length||targets.length>MAX_PAGES||
+    targets.some(n=>!Number.isSafeInteger(n)||n<1||n>paginas.length)||
+    new Set(targets).size!==targets.length)return null;
  let readBytes=0,calls=0,failed=null,task=null,doc=null;
  let rejectRanges;
  const failedRanges=new Promise((_,reject)=>{rejectRanges=reject});
@@ -67,7 +71,7 @@ export async function clasificarPloteoGrandePorRangos(file,{
   doc=await Promise.race([task.promise,failedRanges]);
   if(doc.numPages!==paginas.length||doc.numPages>MAX_PAGES)return null;
   const resultado=[];
-  for(let n=1;n<=doc.numPages;n++){
+  for(const n of targets){
    const page=await Promise.race([doc.getPage(n),failedRanges]);
    const viewportRaw=page.getViewport({scale:1});
    if(!Number.isFinite(viewportRaw.width)||!Number.isFinite(viewportRaw.height)||
@@ -93,7 +97,8 @@ export async function clasificarPloteoGrandePorRangos(file,{
       return null;
     resultado.push(Object.freeze({numero:n,modo:cls.modo,
      cobertura:cls.cobertura,plenoContinuo:cls.plenoContinuo}));
-    onProgreso({terminadas:n,total:doc.numPages});
+    onProgreso({terminadas:resultado.length,total:targets.length,
+     numeroPagina:n,originales:doc.numPages});
    }finally{
     canvas.width=0;canvas.height=0;
     page.cleanup?.();
