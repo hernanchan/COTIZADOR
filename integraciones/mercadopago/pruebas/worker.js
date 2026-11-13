@@ -4848,7 +4848,24 @@ export default {
        error:result?.error||null,errores:result?.errores||0,enRevision:result?.enRevision||0});
      if(result?.recuperados)console.log('SABER_MP_LIVE_CRON_ACREDITADOS',result.recuperados);
     }).catch(()=>console.warn('SABER_MP_LIVE_CRON_INDISPONIBLE')));
-   // Mantener aisladas las tareas antiguas de purga y conciliación Sandbox.
+   // Purga LIVE de entregados: antes el RETURN impedía reintentar
+   // borrados con error en el cron de producción. Independiente de MP.
+   if(env.CENTRAL_LIVE_PURGE_GATE==='GO_COMERCIAL_CONFIRMADO'&&
+      env.CENTRAL_LIVE_PURGE_EXECUTE_GATE==='GO_COMERCIAL_CONFIRMADO')
+    ctx.waitUntil(import('./central-entrega-purga-live.mjs')
+     .then(({reintentarEntregasLive})=>reintentarEntregasLive(env))
+     .then(r=>{if(r?.checked)console.log('SABER_PURGA_ENTREGADOS_REINTENTOS',r.checked)})
+     .catch(()=>console.warn('SABER_PURGA_ENTREGADOS_CRON_ERROR')));
+   // Revisión de retención de 48h solo D1 SELECT. No confundir
+   // un pedido impago con un archivo que pueda borrarse sin bloquear cobro.
+   ctx.waitUntil(import('./central-retencion-abandonados-live.mjs')
+    .then(({revisarRetencion48hLive})=>revisarRetencion48hLive(env))
+    .then(r=>{
+     if(r?.enabled&&!r.ok)console.warn('SABER_RETENCION_48H_AUDITORIA_ERROR',r.reason);
+     else if(r?.unpaidFilesReview>0)
+      console.warn('SABER_RETENCION_48H_REQUIERE_REVISION',r.unpaidFilesReview);
+    }).catch(()=>console.warn('SABER_RETENCION_48H_CRON_ERROR')));
+   // Mantener aislados los procesos Sandbox obsoletos.
    console.log('SABER_MP_LIVE_CRON_AISLADO');
    return;
   }else{
