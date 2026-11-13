@@ -40,7 +40,8 @@ function meta(text,objNumber){
 }
 export async function clasificarMosaicoGrandePorMuestras(file,{
  paginas,seleccionadas,canvasFactory=()=>document.createElement('canvas'),
- imageFactory=globalThis.createImageBitmap,onProgreso=()=>{},onError=()=>{}
+ imageFactory=globalThis.createImageBitmap,onProgreso=()=>{},onError=()=>{},
+ signal=null,maxMs=8000
 }={}){
  if(!file||typeof file.slice!=='function'||
     !Number.isSafeInteger(file.size)||file.size<=48*MIB||file.size>200*MIB||
@@ -50,8 +51,10 @@ export async function clasificarMosaicoGrandePorMuestras(file,{
     new Set(seleccionadas).size!==seleccionadas.length||
     seleccionadas.some(n=>!isPos(n)||n>paginas.length)||
     typeof canvasFactory!=='function')return null;
+ const started=Date.now(),budget=Math.min(15000,Math.max(2000,Number(maxMs)||8000));
  let readTotal=0,reads=0;
  async function read(start,length){
+  if(signal?.aborted||Date.now()-started>budget)throw Error('PDF_MUESTREO_TIMEOUT');
   if(!Number.isSafeInteger(start)||!Number.isSafeInteger(length)||
      start<0||length<1||length>512*1024||start+length>file.size||
      ++reads>650||readTotal+length>8*MIB)
@@ -115,6 +118,7 @@ export async function clasificarMosaicoGrandePorMuestras(file,{
   if(kids.length!==paginas.length||Number(scalar(tree,'Count'))!==kids.length)return null;
   const results=[];
   for(const pageNo of seleccionadas){
+   if(signal?.aborted||Date.now()-started>budget)throw Error('PDF_MUESTREO_TIMEOUT');
    const page=(await getObject(kids[pageNo-1],3200)).info.dict;
    if(!/\/Type\s*\/Page\b/.test(page))return null;
    const resources=reference(page,'Resources');
@@ -133,6 +137,7 @@ export async function clasificarMosaicoGrandePorMuestras(file,{
    let valid=0;
    try{
     for(const [j,fraction] of SAMPLES.entries()){
+     if(signal?.aborted||Date.now()-started>budget)throw Error('PDF_MUESTREO_TIMEOUT');
      const entry=refs[Math.min(refs.length-1,Math.floor(refs.length*fraction))];
      const image=await getObject(entry.xref,1500);
      const d=image.info.dict;
