@@ -20,6 +20,8 @@ function fixture({state='listo',version=3,received=1,inspected=1,changed=false,d
   prepare(sql){const q={sql,values:[],bind(...v){this.values=v;return this},
    async first(){
     if(sql.includes('FROM orders o JOIN central_r2_universal_order_links'))return order;
+    if(sql.includes("sqlite_master")&&sql.includes("central_r2_live_inspections"))
+     return {name:'central_r2_live_inspections'};
     if(sql.includes('SELECT COUNT(*) AS total'))return {total:queue.length,
      deleted:queue.filter(x=>x.state==='deleted').length};
     return null;
