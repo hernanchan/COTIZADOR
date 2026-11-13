@@ -4990,6 +4990,11 @@ export default {
    const {aprobarTransferenciaLiveCentral}=await import('./transferencias-live-central.mjs');
    return aprobarTransferenciaLiveCentral(req,env,{authorized:tokenOK(req,env)});
   }
+  if(url.pathname==='/internal/central/live/staff-reconcile'){
+   const {rescatarPagosMPLiveCentral}=await import('./central-mp-live-rescate.mjs');
+   const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
+   return rescatarPagosMPLiveCentral(req,env,{readSigned:leerFirmaInternaLive});
+  }
   if(url.pathname==='/internal/central/live/checkout'){
    const {checkoutMPLiveCentral}=await import('./mercadopago-live-central.mjs');
    const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
