@@ -1,0 +1,75 @@
+name: Saber - preflight gates comerciales LIVE (solo lectura)
+on:
+  push:
+    branches: [qa/catalogo-publico-20261113]
+    paths: ['.github/workflows/saber-gates-produccion-preflight-20261113.yml']
+permissions: {contents: read}
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      CF_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+    steps:
+      - name: Read-only gates, central, comprador, autenticación
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          const a=process.env.CF_ACCOUNT,t=process.env.CF_TOKEN;
+          assert.match(a||'',/^[a-f0-9]{32}$/i);
+          assert.ok(t?.length>20);
+          const base='https://api.cloudflare.com/client/v4/accounts/'+a;
+          async function cf(s){
+            const res=await fetch(base+'/workers/scripts/'+s+'/settings',{
+              headers:{Authorization:'Bearer '+t},
+              signal:AbortSignal.timeout(25000)
+            });
+            const body=await res.json();
+            assert.equal(res.status,200,'STATUS_'+s);
+            assert.equal(body.success,true,'CF_'+s);
+            return new Map(body.result.bindings.map(x=>[x.name,x]));
+          }
+          const [mp,docs]=await Promise.all([cf('saber-pagos-produccion'),cf('saber-documentos-produccion')]);
+          const go='GO_COMERCIAL_CONFIRMADO';
+          for(const [label,m] of [['MP',mp],['DOCS',docs]]){
+            assert.equal(m.get('SABER_ENTORNO')?.text,'produccion',label+'_ENTORNO');
+            assert.equal(m.get('CENTRAL_DB_ENV')?.text,'produccion',label+'_D1');
+          }
+          for(const name of ['MP_LIVE_GATE','CENTRAL_LIVE_BRIDGE_ENABLED',
+            'CENTRAL_LIVE_ORDER_GATE','CENTRAL_LIVE_PRICING_GATE','CENTRAL_LIVE_POSTPAY_GATE',
+            'CENTRAL_LIVE_R2_GATE','CENTRAL_LIVE_R2_QUOTA_GATE','CENTRAL_LIVE_R2_STAGING_GATE',
+            'CENTRAL_LIVE_R2_INSPECTION_GATE','CENTRAL_LIVE_TUS_GATE','CENTRAL_LIVE_TRANSFER_GATE',
+            'CENTRAL_LIVE_TRANSFER_APPROVAL_GATE']){
+              assert.equal(mp.get(name)?.text,go,'MP_GATE_'+name);
+          }
+          for(const name of ['DOCS_LIVE_UI_GATE','DOCS_MP_LIVE_GATE','DOCS_LIVE_RECEPCION_GATE',
+            'DOCS_LIVE_SESSION_GATE','DOCS_LIVE_ORDER_GATE','DOCS_LIVE_PRICING_GATE',
+            'DOCS_LIVE_R2_GATE','DOCS_LIVE_R2_STAGING_GATE','DOCS_LIVE_R2_UPLOAD_GATE',
+            'DOCS_LIVE_STAFF_GATE','DOCS_LIVE_PACKAGE_GATE','DOCS_LIVE_TUS_GATE',
+            'DOCS_LIVE_TRANSFER_GATE']){
+              assert.equal(docs.get(name)?.text,go,'DOCS_GATE_'+name);
+          }
+          assert.equal(docs.get('SABER_R2_GRANDES_LIVE')?.type,'r2_bucket');
+          assert.equal(docs.get('SABER_R2_GRANDES_LIVE')?.bucket_name,'saber-documentos-produccion-privado');
+          assert.equal(docs.get('SABER_CENTRAL')?.type,'service');
+          assert.equal(docs.get('SABER_CENTRAL')?.service,'saber-pagos-produccion');
+          assert.equal(mp.get('MP_LIVE_ACCESS_TOKEN')?.type,'secret_text');
+          console.log('SABER_LIVE_GATES_PAYMENT_R2_TUS_TRANSFER_STAFF_OK');
+          const site='https://pedidos.libreriasaber.com.ar';
+          for(const p of ['/cotizar','/pedido/continuar','/pedido/estado']){
+            const r=await fetch(site+p,{redirect:'manual',signal:AbortSignal.timeout(17000)});
+            assert.equal(r.status,200,'BUYER_'+p);
+            const html=await r.text();
+            assert.match(html,/Librería Saber|Retomá tu pedido|Pedido/i);
+            if(p==='/cotizar')assert.match(html,/saberIngresoLive|seccion-archivos/);
+          }
+          const protectedRoute=await fetch(site+'/personal/api/live-r2-inspection-original',{redirect:'manual'});
+          assert.equal(protectedRoute.status,401);
+          const iframe=await fetch(site+'/cotizar/archivos',{redirect:'manual'});
+          assert.equal(iframe.status,503);
+          console.log('SABER_BUYER_PORTAL_AND_ADMIN_PROTECTION_OK');
+          JS
