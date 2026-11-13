@@ -80,7 +80,7 @@ small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padd
  const percentage=document.getElementById('porcentaje-envio');
  const retry=document.getElementById('reintentar');
  const uploadNotice=document.getElementById('aviso-subida');
- let autoSending=false,lastAutoAttempt=0,autoAttempts=0;
+ let autoSending=false,lastAutoAttempt=0,autoAttempts=0,lastBankPending=false;
  let lastOrder=null,lastData=null,lastMetas=null;
  function showProgress(value,phase,channel){
   if(Number.isFinite(value)&&value>=0&&value<=100){
@@ -106,9 +106,10 @@ small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padd
    (Number.isFinite(value)?' · '+value+' %':'');
  }
  const receiptFlag=web=>('saber-live-r2-recibido-'+web);
- async function enviarAutomaticamente(order,data,metas){
-  if(autoSending||data.estado!=='pagado_esperando_archivos'||data.uploadAuthorized!==true)return;
-  lastOrder=order;lastData=data;lastMetas=metas;
+ async function enviarAutomaticamente(order,data,metas,bankPending=false){
+  const paid=data.estado==='pagado_esperando_archivos'&&data.uploadAuthorized===true;
+  if(autoSending||(!paid&&!bankPending))return;
+  lastOrder=order;lastData=data;lastMetas=metas;lastBankPending=bankPending;
   const small=metas.filter(m=>m.transport==='tus');
   const large=metas.filter(m=>m.transport==='r2');
   const received=new Set(data.receivedFileIds||[]);
@@ -120,7 +121,9 @@ small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padd
    retry.hidden=true;
    uploadNotice.hidden=true;
    if(data.pendingFiles===0){
-    progress.textContent='PDF recibidos. El pedido ya está confirmado y Librería Saber puede prepararlo.';
+    progress.textContent=bankPending?
+     'Todos los PDF están recibidos y protegidos. La transferencia sigue pendiente de verificación. Podés cerrar esta pestaña.':
+     'PDF recibidos. El pedido ya está confirmado y Librería Saber puede prepararlo.';
     try{
      const {borrarOriginalesLive}=await import('/cotizar/flujo-live.js');
      await borrarOriginalesLive({webOrderId:order.webOrderId,commercialOrderId:order.commercialOrderId,metas});
@@ -143,7 +146,7 @@ small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padd
     const selectedFiles=originals.filter(x=>x.meta.transport==='tus').map(x=>x.file);
     progress.textContent='Enviando automáticamente los archivos pequeños. No cierres esta pestaña.';
     const {enviarPDFsTUSPagadosLive}=await import('/pedido/recepcion-tus.js');
-    await enviarPDFsTUSPagadosLive({selectedFiles,onProgress:p=>{
+    await enviarPDFsTUSPagadosLive({selectedFiles,allowPendingBank:bankPending,onProgress:p=>{
      progress.textContent=showProgress(p.percent,p.phase,'TUS');
     }});
     progress.textContent='Archivos pequeños recibidos y verificados por Librería Saber.';
@@ -152,7 +155,7 @@ small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padd
     const selectedFiles=originals.filter(x=>x.meta.transport==='r2').map(x=>x.file);
     progressR2.textContent='Enviando automáticamente PDF grandes por R2. No cierres esta pestaña.';
     const {enviarPDFsR2PagadosLive}=await import('/pedido/recepcion-r2.js');
-    const result=await enviarPDFsR2PagadosLive({selectedFiles,onProgress:p=>{
+    const result=await enviarPDFsR2PagadosLive({selectedFiles,allowPendingBank:bankPending,onProgress:p=>{
      progressR2.textContent=showProgress(p.batchPercent,p.phase,'R2');
     }});
     if(result?.ok!==true)throw Error('PDF_R2_AUN_SIN_RECIBO');
@@ -174,7 +177,7 @@ small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padd
  retry.addEventListener('click',()=>{
   if(autoSending||!lastOrder||!lastData||!lastMetas)return;
   lastAutoAttempt=0;retry.hidden=true;
-  void enviarAutomaticamente(lastOrder,lastData,lastMetas);
+  void enviarAutomaticamente(lastOrder,lastData,lastMetas,lastBankPending);
  });
  const tusReady=${env?.DOCS_LIVE_TUS_GATE===ON&&env?.DOCS_LIVE_RECEPCION_GATE===ON};
  const r2Ready=${env?.DOCS_LIVE_R2_GATE===ON&&env?.DOCS_LIVE_R2_UPLOAD_GATE===ON&&
@@ -241,6 +244,29 @@ small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padd
         'Estado: transferencia informada, pendiente de verificación bancaria':
         'Estado: esperando aviso de transferencia';
        entrega.textContent='El trabajo comenzará después de verificarse el pago y recibir los originales.';
+       if(t.customerNotified===true){
+        // El aviso habilita sólo recepción privada: D1 revalida la
+        // autorización en cada parte, nunca acredita la transferencia.
+        try{
+         const {leerPedidoPostpagoLive}=await import(tusReady?
+          '/pedido/recepcion-tus.js':'/pedido/recepcion-r2.js');
+         const saved=leerPedidoPostpagoLive(sessionStorage);
+         if(saved.order.webOrderId!==order.webOrderId||
+            saved.order.commercialOrderId!==order.commercialOrderId)
+          throw Error('REFERENCIA_AJENA');
+         receiving.hidden=false;
+         uploadNotice.hidden=data.pendingFiles===0;
+         archivos.textContent='Archivos recibidos: '+(data.fileCount-data.pendingFiles)+
+          ' de '+data.fileCount+'. Envío privado antes de acreditar el pago.';
+         output.textContent=data.pendingFiles===0?
+          'Todos los archivos recibidos. Transferencia pendiente de comprobación bancaria. Podés cerrar esta pestaña.':
+          'Transferencia avisada. Estamos subiendo tus PDF de manera privada, sin esperar la acreditación. Mantené esta pestaña abierta hasta completar la recepción.';
+         void enviarAutomaticamente(order,data,saved.metas,true);
+        }catch(error){
+         receiving.hidden=false;
+         progress.textContent='Aviso bancario registrado. No pudimos recuperar los originales del navegador; no vuelvas a transferir. Conservá tu número de orden.';
+        }
+       }
       }else output.textContent='Esperando comprobación bancaria. No vuelvas a pagar.';
      }catch{output.textContent='Consultando verificación bancaria. Conservá esta pestaña abierta.'}
     }else output.textContent=data.estado==='revocado'?
