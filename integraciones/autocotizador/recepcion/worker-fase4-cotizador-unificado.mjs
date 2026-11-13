@@ -2419,6 +2419,7 @@ export default {
        'X-Robots-Tag':'noindex,nofollow'}});
     }
     if(page==='/personal/api/live-calendar'||
+       page==='/personal/api/live-reconcile'||
        page==='/personal/api/live-forecast'||
        page==='/personal/api/live-status'||
        page==='/personal/central'||page==='/personal/api/live-board'||
@@ -2443,6 +2444,10 @@ export default {
       if(page==='/personal/api/live-calendar'){
        const {agendaPersonalDocumentosLive}=await import('./agenda-personal-live-documentos.mjs');
        return agendaPersonalDocumentosLive(request,env,{authorized:true});
+      }
+      if(page==='/personal/api/live-reconcile'){
+       const {rescatePersonalMPLive}=await import('./rescate-personal-mp-live.mjs');
+       return rescatePersonalMPLive(request,env,{authorized:true});
       }
       if(page==='/personal/api/live-forecast'){
        const {previsionPersonalDocumentosLive}=await import('./prevision-personal-live-documentos.mjs');
