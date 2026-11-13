@@ -34,6 +34,7 @@ jobs:
           grep -Fq '/personal/api/live-forecast' /tmp/saber-documentos-live.mjs
           grep -Fq '/personal/api/live-calendar' /tmp/saber-documentos-live.mjs
           grep -Fq 'etaDate' /tmp/saber-documentos-live.mjs
+          grep -Fq 'openOrderEta' /tmp/saber-documentos-live.mjs
           grep -Fq 'actualizarSeguimiento' /tmp/saber-documentos-live.mjs
           grep -Fq '/personal/api/live-reconcile' /tmp/saber-documentos-live.mjs
           grep -Fq 'staff-calendar' /tmp/saber-central-live.mjs
