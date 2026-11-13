@@ -16,7 +16,7 @@ export function paginaRetornoLive(request,env){
 <style>section{margin-top:22px;padding-top:12px;border-top:1px solid #dae5ee}input{display:block;margin:12px 0;max-width:100%}body{font-family:system-ui,Arial,sans-serif;background:#f5f8fc;color:#183650;margin:0;padding:24px}
 main{max-width:540px;margin:7vh auto;background:white;border:1px solid #dae5ee;border-radius:16px;padding:30px}
 h1{font-size:24px}a{color:#075b91}button{font:inherit;padding:10px 16px;background:#113c69;color:#fff;border:0;border-radius:9px;cursor:pointer}
-small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padding:16px;border-radius:12px;border:1px solid #bad2e4}#seguimiento p{margin:8px 0;font-size:16px}#seguimiento strong{font-size:18px;color:#073b62}#resumenArchivos{font-weight:650}button:disabled{opacity:.6;cursor:wait}</style></head><body><main>
+small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padding:16px;border-radius:12px;border:1px solid #bad2e4}#seguimiento p{margin:8px 0;font-size:16px}#seguimiento strong{font-size:18px;color:#073b62}#resumenArchivos{font-weight:650}button:disabled{opacity:.6;cursor:wait}#aviso-subida{border:2px solid #aa650c;background:#fff5dd;color:#593710;font-size:17px;font-weight:750;line-height:1.55;padding:14px;border-radius:10px;margin:15px 0}</style></head><body><main>
 <h1>Seguimiento de tu pedido</h1>
 <p id="estado" role="status" aria-live="polite">Consultando pago y estado del trabajo en Librería Saber…</p>
 <div id="seguimiento" role="status" aria-live="polite">
@@ -28,7 +28,8 @@ small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padd
 <button type="button" id="revisar">Actualizar seguimiento</button>
 <section id="recibir" hidden>
 <h2>Recepción automática de originales</h2>
-<p>Estamos enviando los PDF que elegiste al presupuestar. No necesitas volver a seleccionarlos ni pagar otra vez.</p>
+<p>Estamos enviando los PDF que elegiste al presupuestar. No necesitás volver a seleccionarlos ni pagar otra vez.</p>
+<p id="aviso-subida">PDF pesado en proceso: mantené esta pestaña abierta hasta que confirmemos «Archivo recibido». No cierres el navegador ni apagues el dispositivo. Si se interrumpe, conservá esta pestaña para reintentar; nunca vuelvas a pagar por el mismo pedido.</p>
 <p id="avance" role="status" aria-live="polite">Esperando confirmación del pago para iniciar la transferencia.</p>
 <p id="avanceR2" role="status" aria-live="polite"></p>
 </section>
