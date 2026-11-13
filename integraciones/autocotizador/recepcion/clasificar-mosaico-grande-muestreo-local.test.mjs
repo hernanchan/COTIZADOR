@@ -4,8 +4,8 @@ import {deflateSync} from 'node:zlib';
 import {clasificarMosaicoGrandePorMuestras} from './clasificar-mosaico-grande-muestreo-local.mjs';
 
 const MIB=1048576,SIZE=55*MIB;
-function fakePdf({poster=false}={}){
- const parts=[],offsets=new Map();let position=0;
+function fakePdf({poster=false,compressedResources=false}={}){
+ const parts=[],offsets=new Map(),compressed=new Map();let position=0;
  const push=b=>{const buf=Buffer.from(b);parts.push({start:position,buf});position+=buf.length};
  const obj=(n,text,stream=null)=>{
   offsets.set(n,position);
@@ -18,7 +18,21 @@ function fakePdf({poster=false}={}){
  obj(2,'<< /Type /Pages /Kids [ 3 0 R 4 0 R 5 0 R 6 0 R 7 0 R 8 0 R ] /Count 6 >>');
  for(let i=3;i<=8;i++)obj(i,'<< /Type /Page /Resources '+(i+6)+' 0 R /Parent 2 0 R >>');
  const images=Array.from({length:30},(_,i)=>'/Im'+(i+1)+' '+(20+i)+' 0 R').join('\n');
- for(let i=9;i<=14;i++)obj(i,'<< /XObject << '+images+' >> >>');
+ if(compressedResources){
+  const resources=Array.from({length:6},()=>('<< /XObject << '+images+' >> >>'));
+  const headers=[],contentParts=[];let contentLen=0;
+  for(let i=0;i<6;i++){
+   headers.push((9+i)+' '+contentLen);
+   const data=resources[i]+'\n';
+   contentParts.push(data);contentLen+=Buffer.byteLength(data);
+   compressed.set(9+i,{container:90,index:i});
+  }
+  const header=headers.join(' ')+' ';
+  const uncompressed=Buffer.from(header+contentParts.join(''));
+  const zipped=deflateSync(uncompressed);
+  obj(90,'<< /Type /ObjStm /N 6 /First '+Buffer.byteLength(header)+
+   ' /Filter /FlateDecode /Length '+zipped.length+' >>',zipped);
+ }else for(let i=9;i<=14;i++)obj(i,'<< /XObject << '+images+' >> >>');
  obj(80,'[ /Indexed /DeviceRGB 1 81 0 R ]');
  obj(81,'<< /Length 6 >>',Uint8Array.of(255,255,255,190,60,60));
  for(let i=20;i<50;i++){
@@ -32,9 +46,14 @@ function fakePdf({poster=false}={}){
  const xrefOffset=SIZE-1600,table=Buffer.alloc(100*7);
  offsets.set(99,xrefOffset);
  for(let i=0;i<100;i++){
-  if(!offsets.has(i))continue;
-  table[i*7]=1;
-  table.writeUInt32BE(offsets.get(i),i*7+1);
+  if(offsets.has(i)){
+   table[i*7]=1;
+   table.writeUInt32BE(offsets.get(i),i*7+1);
+  }else if(compressed.has(i)){
+   table[i*7]=2;
+   table.writeUInt32BE(compressed.get(i).container,i*7+1);
+   table.writeUInt16BE(compressed.get(i).index,i*7+5);
+  }
  }
  const xdata=deflateSync(table);
  const xref=Buffer.concat([Buffer.from('99 0 obj\n<< /Type /XRef /Size 100 /Root 1 0 R /W [1 4 2] '+
@@ -106,4 +125,24 @@ test('PDF sin evidencia suficiente o selección inconsistente nunca cotiza',asyn
   paginas,seleccionadas:[1,1],canvasFactory
  }),null);
  assert.equal(f.reads.length,0);
+});
+
+test('xref tipo 2: recursos PDF en ObjStm comprimido se clasifican sin subir PDF',async()=>{
+ const file=fakePdf({compressedResources:true}),errors=[];
+ const result=await clasificarMosaicoGrandePorMuestras(file,{
+  paginas,seleccionadas:[1,2,3,4,5,6],
+  canvasFactory,onError:e=>errors.push(e)
+ });
+ assert.ok(result,errors.join('; '));
+ assert.deepEqual(result.paginas.map(p=>p.modo),Array(6).fill('cad'));
+ assert.ok(result.bytesLeidos<8*MIB);
+ assert.ok(result.solicitudesRango<650);
+});
+test('PDF ObjStm puede contener pleno: no inferir CAD por estructura',async()=>{
+ const file=fakePdf({poster:true,compressedResources:true}),errors=[];
+ const result=await clasificarMosaicoGrandePorMuestras(file,{
+  paginas,seleccionadas:[1,2,3],canvasFactory,onError:e=>errors.push(e)
+ });
+ assert.ok(result,errors.join('; '));
+ assert.deepEqual(result.paginas.map(p=>p.modo),Array(3).fill('poster'));
 });
