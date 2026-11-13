@@ -16,8 +16,8 @@ const order={ok:true,webOrderId,commercialOrderId,numeroOrden:'018',
 const checkout={ok:true,webOrderId,commercialOrderId,amountArs:5000,fileCount:1,
  uploadAuthorized:false,productionAuthorized:false,
  checkoutUrl:'https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=abc'};
-function fixture({originOverride=origin,draftOverride={},orderOverride={}}={}){
- const calls=[],store=new Map(),state=[];
+function fixture({originOverride=origin,draftOverride={},orderOverride={},localSaveFails=false}={}){
+ const calls=[],store=new Map(),state=[],originals=new Map();
  const fetcher=async(path,opts)=>{
   calls.push({path,opts});
   if(path.endsWith('/borrador'))return Response.json({...draft,...draftOverride});
@@ -35,6 +35,16 @@ function fixture({originOverride=origin,draftOverride={},orderOverride={}}={}){
   nombre:'Ana Pérez',direccion:'Poeta Lugones 123, Córdoba',
   fetcher,hasher:async()=>sha,uuid:()=>draftId,
   storage:{setItem:(key,val)=>store.set(key,val)},
+  custodiarOriginales:async({files,metas,webOrderId})=>{
+   if(localSaveFails)throw Error('ALMACENAMIENTO_LOCAL_SIN_ESPACIO');
+   originals.set(webOrderId,files.map((file,i)=>({file,sha256:metas[i].sha256})));
+   return {ok:true,savedFiles:files.length};
+  },
+  recuperarOriginales:async({webOrderId,metas})=>{
+   const saved=originals.get(webOrderId);
+   if(!saved||saved.length!==metas.length)throw Error('ORIGINAL_LOCAL_DISTINTO_O_AUSENTE');
+   return saved.map((row,i)=>{if(row.sha256!==metas[i].sha256)throw Error('ORIGINAL_MODIFICADO');return row.file;});
+  },
   onState:v=>state.push(v)
  });
  return {calls,store,state,build};
@@ -108,4 +118,12 @@ test('flujo LIVE no crea borrador ni orden si faltan datos obligatorios',()=>{
   assert.throws(()=>crearFlujoPresupuestoLive(props),/LIVE_FLUJO_IDENTIDAD_INVALIDA/);
   assert.equal(f.calls.length,0);
  }
+});
+
+test('prohíbe pagar si no se pudieron custodiar los originales y conserva D1 sin cobro',async()=>{
+ const fixtureFail=fixture({localSaveFails:true});
+ const flow=fixtureFail.build();
+ await assert.rejects(flow.preparar(),/ALMACENAMIENTO_LOCAL_SIN_ESPACIO/);
+ assert.equal(fixtureFail.calls.filter(c=>c.path.endsWith('/checkout')).length,0);
+ assert.equal(fixtureFail.store.has('saber-live-archivos-v1'),false);
 });
