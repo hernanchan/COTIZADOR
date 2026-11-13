@@ -1,0 +1,28 @@
+name: Saber - validar boton volver a tienda sin despliegue
+on:
+  push:
+    branches: [fix/volver-tienda-cotizador-live-20261113]
+    paths:
+      - '.github/workflows/saber-cotizador-volver-tienda-ci-20261113.yml'
+      - 'integraciones/autocotizador/recepcion/pagina-cotizar-live.mjs'
+      - 'integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs'
+  pull_request:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths:
+      - 'integraciones/autocotizador/recepcion/pagina-cotizar-live.mjs'
+      - 'integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs'
+permissions: {contents: read}
+jobs:
+  test-ui-sin-cobros:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Sintaxis de pagina cotizador
+        run: |
+          node --check integraciones/autocotizador/recepcion/pagina-cotizar-live.mjs
+          node --check integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs
+      - name: Tests de navegacion y gates LIVE sin enviar pedidos ni pagos
+        run: node --test integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs
