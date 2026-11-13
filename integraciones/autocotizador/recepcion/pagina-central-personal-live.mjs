@@ -139,31 +139,95 @@ async function saveForecast(){
  }catch(e){window.alert('No se guardó la previsión: '+String(e.message||e));}
  finally{button.disabled=false;}
 }
-async function saveOrderEta(o,button){
- const existing=forecast?.estimates?.find(e=>e.orderId===o.orderId);
- const typed=window.prompt('Fecha y hora estimada para orden '+o.numeroOrden+' (AAAA-MM-DD HH:MM, hora Córdoba):');
- if(typed===null)return;
- const value=typed.trim();
- if(!/^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}$/.test(value)){window.alert('Usá AAAA-MM-DD HH:MM.');return;}
- const iso=new Date(value.replace(' ','T')+':00-03:00').toISOString();
- let reason='';
- if(existing?.readyAt&&new Date(iso)>new Date(existing.readyAt)){
-  const answer=window.prompt('Motivo por el que se retrasa el pedido (mínimo 5 caracteres):');
-  if(answer===null)return;reason=answer.trim();if(reason.length<5){window.alert('Indicá el motivo.');return;}
- }
- const operator=window.prompt('Responsable que confirma esta hora:');
- if(operator===null)return;
- if(operator.trim().length<2){window.alert('Indicá el responsable.');return;}
- if(!window.confirm('¿Guardar la hora estimada '+value+' para la orden '+o.numeroOrden+'?'))return;
- button.disabled=true;
- try{
-  const res=await fetch('/personal/api/live-forecast',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'order',expectedRevision:existing?.version||0,mode:null,orderId:o.orderId,readyAt:iso,operator:operator.trim(),reason})});
-  const data=await res.json().catch(()=>null);
-  if(!res.ok||data?.ok!==true)throw Error(data?.error||('HTTP '+res.status));
-  await refresh();
- }catch(e){window.alert('No se guardó la hora: '+String(e.message||e));}
- finally{button.disabled=false;}
+
+const etaDialog=document.getElementById('etaDialog'),etaDate=document.getElementById('etaDate'),
+ etaTime=document.getElementById('etaTime'),etaOperator=document.getElementById('etaOperator'),
+ etaReason=document.getElementById('etaReason'),etaMessage=document.getElementById('etaMessage'),
+ etaHorario=document.getElementById('etaHorario');
+let etaOrder=null;
+function cordobaLocal(date){
+ const f=new Intl.DateTimeFormat('en-GB',{timeZone:'America/Argentina/Cordoba',
+  year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(date);
+ const p=Object.fromEntries(f.map(x=>[x.type,x.value]));
+ return p.year+'-'+p.month+'-'+p.day+'T'+p.hour+':'+p.minute;
 }
+function etaHorarioActual(){
+ const date=etaDate.value,time=etaTime.value,agenda=agendaSnapshot;
+ if(!date){etaHorario.textContent='Elegí una fecha para consultar horarios.';return null}
+ if(!agenda?.configured){etaHorario.textContent='Agenda sin horarios verificados: comprobá el horario antes de confirmar.';return null}
+ if((agenda.closedDates||[]).includes(date)){
+  etaHorario.textContent='El local está cerrado en esta fecha (feriado o cierre especial).';return false;
+ }
+ const day=new Date(date+'T12:00:00-03:00').getUTCDay();
+ const key=['sun','mon','tue','wed','thu','fri','sat'][day];
+ const windows=String(agenda.weekly?.[key]||'').split(',').map(s=>s.trim()).filter(Boolean);
+ if(!windows.length){etaHorario.textContent='Día sin atención. Elegí otra fecha.';return false}
+ etaHorario.textContent='Horario del día: '+windows.join(' y ')+'.';
+ if(!time)return null;
+ const minutes=word=>{
+  const parts=word.split(':');
+  return parts.length===2&&parts.every(n=>/^[0-9]{2}$/.test(n))?
+   Number(parts[0])*60+Number(parts[1]):NaN;
+ };
+ return windows.some(w=>{
+  const edges=w.split('-').map(v=>minutes(v.trim()));
+  return edges.length===2&&minutes(time)>=edges[0]&&minutes(time)<=edges[1];
+ });
+}
+function etaReasonActual(){
+ const existing=forecast?.estimates?.find(e=>e.orderId===etaOrder?.orderId);
+ const value=etaDate.value&&etaTime.value?Date.parse(etaDate.value+'T'+etaTime.value+':00-03:00'):NaN;
+ const postponed=Boolean(existing?.readyAt)&&Number.isFinite(value)&&value>Date.parse(existing.readyAt);
+ document.getElementById('etaReasonBlock').hidden=!postponed;
+ etaReason.required=postponed;
+ if(!postponed)etaReason.value='';
+}
+function openOrderEta(o){
+ etaOrder=o;etaMessage.textContent='';
+ document.getElementById('etaTitle').textContent='Retiro estimado · Orden '+o.numeroOrden;
+ const existing=forecast?.estimates?.find(e=>e.orderId===o.orderId);
+ const saved=existing?.readyAt?cordobaLocal(new Date(existing.readyAt)):'';
+ etaDate.min=cordobaLocal(new Date()).slice(0,10);
+ etaDate.max=cordobaLocal(new Date(Date.now()+45*24*60*60*1000)).slice(0,10);
+ etaDate.value=saved.slice(0,10);
+ etaTime.value=saved.slice(11,16);
+ etaOperator.value=sessionStorage.getItem('saber-eta-responsable')||'';
+ etaReason.value='';
+ etaHorarioActual();etaReasonActual();etaDialog.showModal();
+}
+async function guardarEtaConCalendario(event){
+ event.preventDefault();
+ if(!etaOrder)return;
+ const date=etaDate.value,time=etaTime.value,operator=etaOperator.value.trim();
+ if(!date||!time){etaMessage.textContent='Elegí fecha y hora.';return}
+ if(etaHorarioActual()===false){etaMessage.textContent='Elegí un día y hora dentro del horario de atención.';return}
+ const value=Date.parse(date+'T'+time+':00-03:00'),now=Date.now();
+ if(!Number.isFinite(value)||value<now+5*60000||value>now+45*24*3600000){
+  etaMessage.textContent='Elegí una fecha futura entre 5 minutos y 45 días.';return;
+ }
+ if(operator.length<2||operator.length>60){etaMessage.textContent='Ingresá el responsable.';return}
+ const previous=forecast?.estimates?.find(e=>e.orderId===etaOrder.orderId);
+ const delayed=Boolean(previous?.readyAt)&&value>Date.parse(previous.readyAt);
+ const reason=delayed?etaReason.value.trim():'';
+ if(delayed&&reason.length<5){etaMessage.textContent='Indicá el motivo del retraso (mínimo cinco caracteres).';return}
+ const button=document.getElementById('etaSave');button.disabled=true;
+ etaMessage.textContent='Guardando la fecha de retiro…';
+ try{
+  const response=await fetch('/personal/api/live-forecast',{method:'POST',credentials:'same-origin',
+   headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    action:'order',expectedRevision:previous?.version||0,mode:null,
+    orderId:etaOrder.orderId,readyAt:new Date(value).toISOString(),operator,reason})});
+  const result=await response.json().catch(()=>null);
+  if(!response.ok||result?.ok!==true)throw Error(result?.error||('HTTP '+response.status));
+  sessionStorage.setItem('saber-eta-responsable',operator);
+  etaDialog.close();etaOrder=null;await refresh();
+ }catch(error){etaMessage.textContent='No se pudo guardar: '+String(error.message||error)}
+ finally{button.disabled=false}
+}
+etaDate.addEventListener('change',()=>{etaMessage.textContent='';etaHorarioActual();etaReasonActual()});
+etaTime.addEventListener('change',()=>{etaMessage.textContent='';etaHorarioActual();etaReasonActual()});
+document.getElementById('etaCancel').addEventListener('click',()=>etaDialog.close());
+document.getElementById('etaForm').addEventListener('submit',e=>void guardarEtaConCalendario(e));
 const agendaDays=[['mon','Mon','Lunes'],['tue','Tue','Martes'],['wed','Wed','Miércoles'],['thu','Thu','Jueves'],['fri','Fri','Viernes'],['sat','Sat','Sábado'],['sun','Sun','Domingo']];
 async function loadAgenda(force=false){
  if(document.getElementById('agendaEditor').open&&agendaSnapshot&&!force)return;
@@ -251,7 +315,7 @@ async function refresh(){
     const tools=element('div');tools.className='row';
     if(['pendiente','en_preparacion','en_espera'].includes(state)){
      const time=element('button',estimate?.readyAt?'Modificar hora estimada':'Definir hora estimada');
-     time.addEventListener('click',()=>void saveOrderEta(o,time));tools.append(time);
+     time.addEventListener('click',()=>openOrderEta(o));tools.append(time);
     }
     if(o.pendingCount===0&&/^WEB-ENSAYO-[A-F0-9]{32}$/.test(o.webOrderId)){
      const link=element('a','Descargar ZIP + instrucciones');link.className='action';
