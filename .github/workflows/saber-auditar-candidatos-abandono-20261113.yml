@@ -13,11 +13,14 @@ jobs:
       ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
       TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
     steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
       - name: Inspeccionar tabla orders y conteos anonimos de archivos pendientes >48h
         shell: bash
         run: |
           set -euo pipefail
           node --input-type=module <<'EOF'
+          import {CONSULTA_RETENCION_48H} from './integraciones/mercadopago/pruebas/central-retencion-abandonados-live.mjs';
           const root='https://api.cloudflare.com/client/v4/accounts/'+process.env.ACCOUNT;
           const headers={Authorization:'Bearer '+process.env.TOKEN,'Content-Type':'application/json'};
           async function call(path,payload){const r=await fetch(root+path,{method:payload?'POST':'GET',headers,...(payload?{body:JSON.stringify(payload)}:{}),signal:AbortSignal.timeout(20000)});const j=await r.json();if(!r.ok||!j?.success)throw Error('CF_'+r.status);return j.result;}
@@ -29,4 +32,6 @@ jobs:
           console.log('SABER_ABANDONO_CANTIDADES='+JSON.stringify(await query(sql)));
           const v=await query("SELECT COUNT(*) AS candidatos FROM orders o JOIN central_r2_universal_order_links l ON l.commercial_order_id=o.id JOIN central_r2_universal_files f ON f.web_order_id=l.web_order_id WHERE o.status='awaiting_payment' AND o.paid_at IS NULL AND datetime(o.created_at)<datetime('now','-48 hours') AND NOT EXISTS(SELECT 1 FROM central_live_transfer_requests t WHERE t.order_id=o.id) AND NOT EXISTS(SELECT 1 FROM central_live_transfer_customer_notices n WHERE n.order_id=o.id) AND NOT EXISTS(SELECT 1 FROM payment_reviews p WHERE p.order_id=o.id) AND f.received=1");
           console.log('SABER_ABANDONO_CANDIDATOS='+JSON.stringify(v));
+          const target=await query(CONSULTA_RETENCION_48H);
+          console.log('SABER_RETENCION_48H_CRON_SQL='+JSON.stringify(target));
           EOF
