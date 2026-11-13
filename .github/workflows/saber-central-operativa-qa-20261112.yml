@@ -87,3 +87,4 @@ jobs:
 # 13/11: preacreditacion bank TUS/R2 - regresiones sin aviso impiden firmas y doble cobro; QA final.
 # 13/11: última regresión R2 staging con banco avisado y sin pago, sin ZIP antes de cobro.
 # 13/11: QA final Central por verificar muestra recibidos/total; rechazo de ZIP impago sin cambiar estados de pago.
+# 13/11: regresión E2E canal pospago sin pago exige el nuevo código de aviso bancario, sin conceder bypass.
