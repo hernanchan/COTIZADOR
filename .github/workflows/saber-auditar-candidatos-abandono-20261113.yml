@@ -1,0 +1,32 @@
+name: Saber - auditoria solo lectura 48h impagos
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-auditar-candidatos-abandono-20261113.yml]
+permissions: {contents: read}
+jobs:
+  readonly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+    steps:
+      - name: Inspeccionar tabla orders y conteos anonimos de archivos pendientes >48h
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'EOF'
+          const root='https://api.cloudflare.com/client/v4/accounts/'+process.env.ACCOUNT;
+          const headers={Authorization:'Bearer '+process.env.TOKEN,'Content-Type':'application/json'};
+          async function call(path,payload){const r=await fetch(root+path,{method:payload?'POST':'GET',headers,...(payload?{body:JSON.stringify(payload)}:{}),signal:AbortSignal.timeout(20000)});const j=await r.json();if(!r.ok||!j?.success)throw Error('CF_'+r.status);return j.result;}
+          const db=(await call('/d1/database')).find(x=>x.name==='saber-pagos-produccion');if(!db)throw Error('NO_DB');
+          async function query(sql){const r=await call('/d1/database/'+db.uuid+'/query',{sql});if(r?.[0]?.success!==true)throw Error('D1_BAD_QUERY');return r[0].results;}
+          const schema=await query("SELECT name,sql FROM sqlite_master WHERE type='table' AND name IN ('orders','central_live_transfer_requests','central_live_transfer_customer_notices','central_r2_universal_files','central_live_purge_files','payment_reviews','live_checkout_attempts')");
+          console.log('SABER_ABANDONO_TABLAS='+JSON.stringify(schema.map(x=>({name:x.name,sqlContainsStatusCheck:/CHECK\\s*\\(.*status/i.test(x.sql),definition:x.name==='orders'?x.sql?.slice(0,2100):null}))));
+          const sql="SELECT o.status,COUNT(DISTINCT o.id) AS pedidos,COUNT(f.file_id) AS files,SUM(CASE WHEN f.received=1 THEN 1 ELSE 0 END) AS recibidos,COUNT(DISTINCT CASE WHEN t.order_id IS NOT NULL THEN o.id END) AS transferencias,COUNT(DISTINCT CASE WHEN n.order_id IS NOT NULL THEN o.id END) AS avisos FROM orders o JOIN central_r2_universal_order_links l ON l.commercial_order_id=o.id JOIN central_r2_universal_files f ON f.web_order_id=l.web_order_id LEFT JOIN central_live_transfer_requests t ON t.order_id=o.id LEFT JOIN central_live_transfer_customer_notices n ON n.order_id=o.id WHERE datetime(o.created_at)<datetime('now','-48 hours') GROUP BY o.status ORDER BY o.status";
+          console.log('SABER_ABANDONO_CANTIDADES='+JSON.stringify(await query(sql)));
+          const v=await query("SELECT COUNT(*) AS candidatos FROM orders o JOIN central_r2_universal_order_links l ON l.commercial_order_id=o.id JOIN central_r2_universal_files f ON f.web_order_id=l.web_order_id WHERE o.status='awaiting_payment' AND o.paid_at IS NULL AND datetime(o.created_at)<datetime('now','-48 hours') AND NOT EXISTS(SELECT 1 FROM central_live_transfer_requests t WHERE t.order_id=o.id) AND NOT EXISTS(SELECT 1 FROM central_live_transfer_customer_notices n WHERE n.order_id=o.id) AND NOT EXISTS(SELECT 1 FROM payment_reviews p WHERE p.order_id=o.id) AND f.received=1");
+          console.log('SABER_ABANDONO_CANDIDATOS='+JSON.stringify(v));
+          EOF
