@@ -1,0 +1,14 @@
+{
+  "checkedAt": "2026-11-13T03:07:24.541Z",
+  "readOnly": true,
+  "gateActivationPerformed": false,
+  "centralDocumentsBridge": false,
+  "centralR2PrivateBucket": false,
+  "documentsTUSServiceKey": false,
+  "documentsHMACKey": true,
+  "centralHMACKey": true,
+  "centralPurgeGate": false,
+  "centralPurgeExecuteGate": false,
+  "documentsPurgeGate": false,
+  "prerequisitesReady": false
+}
