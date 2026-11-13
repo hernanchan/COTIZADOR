@@ -433,7 +433,12 @@ async function refresh(){
      tools.append(deliver);
      if(deliver.disabled)card.append(element('small','Entrega bloqueada hasta habilitar y validar la purga segura de TUS/R2.'));
     }
-    if(state==='entregado')card.append(element('small','Entregado. Eliminación privada en curso o completada; la auditoría se conserva.'));
+    if(state==='entregado')card.append(element('small',
+     o.purgeStatus==='deleted'?
+      'Entregado · Todos los PDF originales eliminados y verificados.':
+      o.purgeStatus==='pending_retry'?
+      'Entregado · Borrado de originales pendiente de reintento automático.':
+      'Entregado · Atención: falta confirmar la cola de borrado. Revisar en Central.'));
     card.append(tools);lane.append(card);total++;
    }
    board.append(lane);
