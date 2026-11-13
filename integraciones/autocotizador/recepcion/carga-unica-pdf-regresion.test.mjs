@@ -281,3 +281,10 @@ test('A4 de 500 páginas y 100 MiB va a R2 universal, sin cambiar a plotter',()=
  assert.equal(sent[1].cantidad,1);
  assert.doesNotMatch(source,/SABER_SMART_R2_PREPAGO/,'No existe vía alternativa exclusiva de ploteo');
 });
+
+test('ploteo >48 MiB y nueve páginas intenta análisis visual por rangos',async()=>{
+ const src=await readFile(new URL('./carga-unica-cliente.mjs',import.meta.url),'utf8');
+ assert.match(src,/clasificarPloteoGrandePorRangos\(file,\{paginas:e\.paginas/);
+ assert.match(src,/Analizando visualmente el plano/);
+ assert.match(src,/clasificarMosaicoRasterPDFGrande\(file\)/);
+});
