@@ -49,7 +49,7 @@ function filas(t,i){
   ['Servicio',t.servicio==='ploteos'?'Ploteo CAD/Póster':'Impresión A4/A3'],
   ['Páginas originales',config.paginas.length],
   ['Páginas elegidas',t.paginasElegidas.join(', ')],
-  ['Tamaño final',t.formatoFinal==='original'?'Tamaño real / 100 %':String(t.formatoFinal).toUpperCase()],
+  ['Tamaño final',t.formatoFinal==='original'?'Tamaño real / 100 %':String(t.formatoFinal).toUpperCase()+' (aplicar a TODAS las páginas, incluso originales mixtos)'],
   ['Copias',config.copias],
   ['Color',config.modo==='bn'?'Blanco y negro':'Color'],
   ['Caras',config.caras==='double'?'Doble faz':'Simple faz'],
@@ -71,6 +71,8 @@ function filas(t,i){
  }else{
   values.push(['Escala documental',
    config.paginasPorHoja>1?'Múltiples páginas por hoja. Vista previa obligatoria':
+   t.formatoFinal==='a4'?
+    'PAPEL A4: ajustar proporcionalmente CADA página al A4, orientar automáticamente, no recortar. Originales Legal u otros tamaños también van en A4; comprobar vista previa.':
    ['a5','personalizado_a4'].includes(t.formatoFinal)?
     'Tamaño real / 100 %; no ampliar':'Ajustar proporcionalmente sin recortar']);
  }
