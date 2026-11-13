@@ -6,6 +6,16 @@ const gate='GO_COMERCIAL_CONFIRMADO';
 const env={SABER_ENTORNO:'produccion',DOCS_LIVE_UI_GATE:gate,
  DOCS_MP_LIVE_GATE:gate,DOCS_LIVE_SESSION_GATE:gate,
  DOCS_LIVE_TURNSTILE_SITE_KEY:'0x4AAAAABBBBBCCCCCDDDD123456789'};
+test('ambas pantallas LIVE tienen enlace visible para volver a tienda, sin tocar el pago',async()=>{
+ for(const authorized of [false,true]){
+  const res=paginaCotizarLive(new Request(url),env,{authorized});
+  assert.equal(res.status,200);
+  const html=await res.text();
+  assert.match(html,/<a class="volver-tienda" href="https:\/\/libreriasaber\.com\.ar\/">← Volver a la tienda<\/a>/);
+  assert.match(html,/\.volver-tienda\{/);
+  assert.doesNotMatch(html,/target="_blank"/);
+ }
+});
 test('sin gate ni host productivo el portal no se publica',()=>{
  for(const [where,patch] of [
   [url,{DOCS_LIVE_UI_GATE:'NO_GO'}],

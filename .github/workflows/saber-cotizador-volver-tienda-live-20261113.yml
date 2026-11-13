@@ -1,0 +1,103 @@
+name: Saber - hotfix retorno a tienda solo Worker documentos LIVE
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: ['.github/workflows/saber-cotizador-volver-tienda-live-20261113.yml']
+permissions: {contents: read}
+concurrency: {group: saber-retorno-tienda-docs-live, cancel-in-progress: false}
+jobs:
+  hotfix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Probar codigo fuente LIVE sin cobros
+        run: |
+          node --check integraciones/autocotizador/recepcion/pagina-cotizar-live.mjs
+          node --test integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs
+      - name: Parchar SOLO los dos encabezados del Worker activo, conservar bindings y rollback
+        shell: bash
+        run: |
+          set -eEuo pipefail
+          : "${ACCOUNT:?}" "${TOKEN:?}"
+          worker=saber-documentos-produccion
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts"
+          beta="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/workers/$worker/versions"
+          tmp=$(mktemp -d)
+          get(){ curl -fsS --retry 2 --connect-timeout 10 --max-time 45 -H "Authorization: Bearer $TOKEN" "$1"; }
+          get "$root/$worker/settings" > "$tmp/settings.json"
+          get "$root/$worker/deployments" > "$tmp/deployments.json"
+          jq -e '.success==true and (.result.bindings|any(.name=="SABER_ENTORNO" and .text=="produccion") and any(.name=="DOCS_LIVE_SESSION_GATE" and .text=="GO_COMERCIAL_CONFIRMADO") and any(.name=="SABER_CENTRAL" and .type=="service"))' "$tmp/settings.json" >/dev/null
+          old=$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/deployments.json")
+          test -n "$old"
+          jq -r '.result.bindings[]|[.name,.type]|@tsv' "$tmp/settings.json" | sort > "$tmp/bindings-before"
+          get "$root/$worker" > "$tmp/active.mjs"
+          node --input-type=module - "$tmp/active.mjs" "$tmp/patched.mjs" <<'NODE'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          const original=fs.readFileSync(process.argv[2],'utf8');
+          const gate='<header><strong>Librer\\xEDa Saber</strong></header>';
+          const buyer='<header><strong>Librer\\xEDa Saber \\xB7 Impresiones y ploteos</strong></header>';
+          for(const label of [gate,buyer])assert.equal(original.split(label).length-1,1,'LIVE_HEADER_NOT_UNIQUE_ABORT');
+          assert.equal(original.includes('Volver a la tienda'),false,'LIVE_BUTTON_ALREADY_PRESENT_ABORT');
+          const button='<a href="https://libreriasaber.com.ar/" style="display:inline-flex;align-items:center;min-height:44px;padding:9px 13px;border:1px solid #c9d9e7;border-radius:9px;color:#fff;text-decoration:none;font:700 15px system-ui,Arial,sans-serif">← Volver a la tienda</a>';
+          const patch=old=>old.replace('<header>','<header style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">').replace('</header>',button+'</header>');
+          const output=original.replace(gate,patch(gate)).replace(buyer,patch(buyer));
+          assert.equal(output.split('Volver a la tienda').length-1,2,'HOTFIX_MUST_MODIFY_EXACTLY_TWO_HEADERS');
+          assert.equal(output.length-original.length,patch(gate).length-gate.length+patch(buyer).length-buyer.length,'UNEXPECTED_DIFF_ABORT');
+          fs.writeFileSync(process.argv[3],output);
+          console.log('SABER_DOCS_LIVE_TWO_NAV_LINKS_PATCHED_IN_EXISTING_BUNDLE');
+          NODE
+          node --check "$tmp/patched.mjs"
+          jq -nc --arg old "$old" --rawfile code "$tmp/patched.mjs" --slurpfile settings "$tmp/settings.json" \
+           '{main_module:"index.mjs",bindings:[$settings[0].result.bindings[]|{name,type:"inherit",version_id:$old}],modules:[{name:"index.mjs",content_type:"application/javascript+module",content_base64:($code|@base64)}]}' > "$tmp/stage-body.json"
+          status=$(curl -sS --max-time 150 -w '%{http_code}' -o "$tmp/stage.json" \
+           -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+           --data-binary @"$tmp/stage-body.json" "$beta?deploy=false")
+          if [ "$status" != 200 ] || ! jq -e '.success==true and (.result.id|type=="string")' "$tmp/stage.json" >/dev/null;then
+            echo "SABER_HOTFIX_STAGE_FAILED_HTTP_$status";jq -c '{errors:[.errors[]?|{code,message}]}' "$tmp/stage.json";exit 1
+          fi
+          new=$(jq -er '.result.id' "$tmp/stage.json")
+          get "$beta/$new" > "$tmp/staged.json"
+          jq -r '(.result.bindings//.result.resources.bindings)[]|[.name,.type]|@tsv' "$tmp/staged.json" | sort > "$tmp/bindings-staged"
+          diff "$tmp/bindings-before" "$tmp/bindings-staged"
+          get "$root/$worker/deployments" > "$tmp/latest.json"
+          actual=$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/latest.json")
+          test "$actual" = "$old" || { echo 'LIVE_VERSION_CHANGED_DURING_PREPARATION_ABORT';exit 1; }
+          deployed=0
+          rollback(){
+            code=$?
+            trap - ERR
+            if [ "$deployed" = 1 ];then
+              echo 'SABER_HOTFIX_ROLLBACK_START'
+              jq -nc --arg id "$old" '{strategy:"percentage",versions:[{version_id:$id,percentage:100}],annotations:{"workers/message":"Rollback retorno a tienda: error de comprobación"}}' |
+               curl -fsS --max-time 45 -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+                --data-binary @- "$root/$worker/deployments" >/dev/null ||
+                echo 'SABER_HOTFIX_ROLLBACK_NOT_CONFIRMED'
+            fi
+            exit "$code"
+          }
+          trap rollback ERR
+          deployed=1
+          jq -nc --arg id "$new" '{strategy:"percentage",versions:[{version_id:$id,percentage:100}],annotations:{"workers/message":"UI: volver a la tienda desde cotizador LIVE"}}' |
+            curl -fsS --max-time 45 -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+             --data-binary @- "$root/$worker/deployments" > "$tmp/promoted.json"
+          jq -e '.success==true' "$tmp/promoted.json" >/dev/null
+          get "$root/$worker/deployments" > "$tmp/final-deployments.json"
+          current=$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/final-deployments.json")
+          test "$current" = "$new"
+          get "$root/$worker/settings" > "$tmp/final-settings.json"
+          jq -r '.result.bindings[]|[.name,.type]|@tsv' "$tmp/final-settings.json" | sort > "$tmp/bindings-after"
+          diff "$tmp/bindings-before" "$tmp/bindings-after"
+          curl -fsS --max-time 35 'https://pedidos.libreriasaber.com.ar/cotizar?verificar_regreso=1' -o "$tmp/client.html"
+          grep -Fq 'Volver a la tienda' "$tmp/client.html"
+          grep -Fq 'https://libreriasaber.com.ar/' "$tmp/client.html"
+          trap - ERR
+          deployed=0
+          echo 'SABER_DOCS_LIVE_RETURN_BUTTON_PUBLISHED_AND_VERIFIED_NO_PAYMENT_CHANGES'

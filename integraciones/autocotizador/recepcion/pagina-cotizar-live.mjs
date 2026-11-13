@@ -9,8 +9,8 @@ function headers(csp){
  'X-Robots-Tag':'noindex,nofollow','Referrer-Policy':'no-referrer'};
 }
 const baseCss=`*{box-sizing:border-box}body{margin:0;background:#f3f6fa;color:#1a3852;font:16px/1.45 system-ui,Arial,sans-serif}
-header{background:#153d65;color:white;padding:19px max(18px,calc((100vw - 1100px)/2))}
-header strong{font-size:21px}main{max-width:1100px;margin:22px auto;padding:0 16px}
+header{background:#153d65;color:white;padding:19px max(18px,calc((100vw - 1100px)/2));display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+header strong{font-size:21px}.volver-tienda{display:inline-flex;align-items:center;min-height:44px;padding:9px 13px;border:1px solid #c9d9e7;border-radius:9px;color:white;text-decoration:none;font-size:15px;font-weight:700}.volver-tienda:hover,.volver-tienda:focus-visible{background:#fff;color:#153d65}main{max-width:1100px;margin:22px auto;padding:0 16px}
 section{border:1px solid #d5e1eb;background:white;border-radius:14px;padding:22px;margin-bottom:15px}
 h1{font-size:25px;margin:0 0 10px}h2{font-size:18px;margin:0 0 10px}p{margin:9px 0;color:#3e5569}
 label{font-weight:600;display:block}input{font:inherit;width:100%;max-width:520px;padding:12px;border:1px solid #aabcca;border-radius:9px;display:block;margin:8px 0 15px}
@@ -46,7 +46,7 @@ export function paginaCotizarLive(req,env,{authorized=false}={}){
   const html=`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Librería Saber · Ingresar al cotizador</title><style>${baseCss}</style>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-</head><body><header><strong>Librería Saber</strong></header><main><section>
+</head><body><header><strong>Librería Saber</strong><a class="volver-tienda" href="https://libreriasaber.com.ar/">← Volver a la tienda</a></header><main><section>
 <h1>Cotizá tus impresiones y ploteos</h1><p>Ingresá para preparar tu pedido. Tus PDF permanecen en tu dispositivo mientras elegís cómo imprimirlos.</p>
 <div class="cf-turnstile" data-sitekey="${key}" data-action="saber_pedido_live" data-callback="saberIngresoLive"></div>
 <p id="estado" role="status" aria-live="polite">Verificá el acceso para continuar.</p>
@@ -73,7 +73,7 @@ window.saberIngresoLive=async token=>{
   env?.DOCS_LIVE_TUS_GATE===ON;
  const html=`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cotizador de PDF · Librería Saber</title><style>${baseCss}</style></head><body>
-<header><strong>Librería Saber · Impresiones y ploteos</strong></header>
+<header><strong>Librería Saber · Impresiones y ploteos</strong><a class="volver-tienda" href="https://libreriasaber.com.ar/">← Volver a la tienda</a></header>
 <main><section><h1>Prepará tus PDF, JPG o PNG</h1>
 <p>Elegí los archivos y sus opciones de impresión. Las medidas y el tipo de trabajo se calculan por el contenido del PDF, no por el nombre ni por su peso.</p>
 <div id="precio-entrega" aria-label="Precio y fecha de entrega">
