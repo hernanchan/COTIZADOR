@@ -59,7 +59,7 @@ export async function operarInspeccionR2LiveInterna(req,env,{
   return json({ok:true,schema:'saber-r2-staff-inspection-source-v1',
    webOrderId:p.webOrderId,fileId:p.fileId,objectKey:row.object_key,
    sha256:row.sha256,bytes:row.bytes,
-   paginasDeclaradas:m.paginasDeclaradas,
+   paginasDeclaradas:m.paginasDeclaradas,formatoFinal:m.formatoFinal,
    productionAuthorized:false,inspected:false});
  }
  if(typeof env?.CENTRAL_LIVE_R2_INSPECTION_KEY!=='string'||
