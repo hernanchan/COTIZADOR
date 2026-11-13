@@ -386,9 +386,10 @@ async function refresh(){
     card.append(element('p',customer));
     if(o.telefonoContacto)card.append(element('p','Tel.: '+short(o.telefonoContacto)));
     if(o.direccionCliente)card.append(element('p',short(o.direccionCliente)));
-    card.append(element('p','PDF '+o.receivedCount+'/'+o.fileCount+' recibidos · TUS '+o.tusCount+' · R2 '+o.r2Count));
-    const note=o.pendingCount>0?'Pendiente de recepción de '+o.pendingCount+' archivo(s)':
-      'Originales recibidos; revisar preprensa antes de imprimir';
+    card.append(element('p','Archivos PDF recibidos: '+o.receivedCount+' de '+o.fileCount));
+    const note=o.pendingCount>0?
+      'Pago acreditado. Esperando el envío de '+o.pendingCount+' archivo(s) del cliente.':
+      'Archivos listos para descargar. Revisar originales e instrucciones antes de imprimir.';
     card.append(element('p',note));
     const estimate=forecast.estimates.find(e=>e.orderId===o.orderId);
     if(estimate?.readyAt)card.append(element('p','Retiro estimado: '+formatDate(estimate.readyAt)+' (provisional)'));
@@ -398,17 +399,13 @@ async function refresh(){
      const time=element('button',estimate?.readyAt?'Modificar hora estimada':'Definir hora estimada');
      time.addEventListener('click',()=>openOrderEta(o));tools.append(time);
     }
-    if(o.pendingCount===0&&/^WEB-ENSAYO-[A-F0-9]{32}$/.test(o.webOrderId)){
+    if(o.zipEnabled===true&&o.pendingCount===0&&
+       /^WEB-ENSAYO-[A-F0-9]{32}$/.test(o.webOrderId)){
      const link=element('a','Descargar ZIP + instrucciones');link.className='action';
      link.href='/personal/paquete?webOrderId='+encodeURIComponent(o.webOrderId);
      link.target='_blank';link.rel='noopener noreferrer';tools.append(link);
-    }else if(o.r2Count>0&&o.stagedR2Count>0){
-     const link=element('a','Inspeccionar PDF R2 almacenado');link.className='action';
-     link.href='/personal/paquete?webOrderId='+encodeURIComponent(o.webOrderId)+
-      (o.stagedR2FileIds?.length?'&fileId='+encodeURIComponent(o.stagedR2FileIds[0]):'');
-     link.target='_blank';link.rel='noopener noreferrer';tools.append(link);
     }else if(o.pendingCount>0){
-     card.append(element('p','El original aún no está listo para verificar. Esperando el envío automático desde el navegador donde se realizó el pedido; no hay ZIP disponible.'));
+     card.append(element('small','El ZIP aparecerá automáticamente cuando termine de recibirse el archivo. No hay pasos técnicos adicionales.'));
     }
     if(state==='pendiente'&&o.pendingCount===0){
      const start=element('button','Iniciar preparación');
