@@ -1,7 +1,91 @@
 {
-  "checkedAt": "2026-11-13T03:07:24.541Z",
+  "checkedAt": "2026-11-13T03:08:10.323Z",
   "readOnly": true,
   "gateActivationPerformed": false,
+  "centralStorageBindingNames": [
+    {
+      "name": "CENTRAL_LIVE_R2_GATE",
+      "type": "plain_text"
+    },
+    {
+      "name": "CENTRAL_LIVE_R2_INSPECTION_GATE",
+      "type": "plain_text"
+    },
+    {
+      "name": "CENTRAL_LIVE_R2_INSPECTION_KEY",
+      "type": "secret_text"
+    },
+    {
+      "name": "CENTRAL_LIVE_R2_QUOTA_GATE",
+      "type": "plain_text"
+    },
+    {
+      "name": "CENTRAL_LIVE_R2_STAGING_GATE",
+      "type": "plain_text"
+    },
+    {
+      "name": "CENTRAL_LIVE_TUS_GATE",
+      "type": "plain_text"
+    },
+    {
+      "name": "CENTRAL_R2_CANARY_EXPIRES_AT",
+      "type": "plain_text"
+    },
+    {
+      "name": "CENTRAL_R2_CANARY_MODE",
+      "type": "plain_text"
+    },
+    {
+      "name": "CENTRAL_R2_CANARY_ORDER_ID",
+      "type": "plain_text"
+    }
+  ],
+  "documentsStorageBindingNames": [
+    {
+      "name": "DOCS_LIVE_R2_GATE",
+      "type": "plain_text"
+    },
+    {
+      "name": "DOCS_LIVE_R2_RECEIPT_KEY",
+      "type": "secret_text"
+    },
+    {
+      "name": "DOCS_LIVE_R2_STAGING_GATE",
+      "type": "plain_text"
+    },
+    {
+      "name": "DOCS_LIVE_R2_UPLOAD_GATE",
+      "type": "plain_text"
+    },
+    {
+      "name": "DOCS_LIVE_TUS_BUCKET",
+      "type": "plain_text"
+    },
+    {
+      "name": "DOCS_LIVE_TUS_GATE",
+      "type": "plain_text"
+    },
+    {
+      "name": "DOCS_LIVE_TUS_PROJECT_URL",
+      "type": "plain_text"
+    },
+    {
+      "name": "DOCS_LIVE_TUS_PUBLISHABLE_KEY",
+      "type": "plain_text"
+    },
+    {
+      "name": "DOCS_LIVE_TUS_RECEIPT_KEY",
+      "type": "secret_text"
+    },
+    {
+      "name": "DOCS_LIVE_TUS_SERVICE_KEY",
+      "type": "secret_text"
+    },
+    {
+      "name": "SABER_R2_GRANDES_LIVE",
+      "type": "r2_bucket"
+    }
+  ],
   "centralDocumentsBridge": false,
   "centralR2PrivateBucket": false,
   "documentsTUSServiceKey": false,
