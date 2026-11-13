@@ -75,3 +75,21 @@ test('aviso permanente de no cerrar navegador durante la recepción postpago',as
  assert.match(html,/hasta que confirmemos «Archivo recibido»/);
  assert.match(html,/nunca vuelvas a pagar por el mismo pedido/);
 });
+
+test('seguimiento informa progreso real, reintento y recepción distinta de inspección R2',async()=>{
+ const response=paginaRetornoLive(new Request(host),on);
+ const html=await response.text();
+ assert.match(html,/id="progreso-envio"/);
+ assert.match(html,/id="porcentaje-envio"/);
+ assert.match(html,/id="reintentar"/);
+ assert.match(html,/retry\.addEventListener\('click'/);
+ assert.match(html,/lastAutoAttempt=0/);
+ assert.match(html,/showProgress\(p\.percent,p\.phase,'TUS'\)/);
+ assert.match(html,/showProgress\(p\.batchPercent,p\.phase,'R2'\)/);
+ assert.match(html,/Archivo recibido y verificado/);
+ assert.match(html,/pendiente de inspección en Librería Saber/);
+ assert.doesNotMatch(html,/void flow\.iniciarPago\(\)/);
+ const script=html.match(/<script type="module">([\s\S]*?)<\/script>/);
+ assert.ok(script);
+ assert.doesNotThrow(()=>new Function(script[1]));
+});
