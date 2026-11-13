@@ -96,6 +96,17 @@ export async function pagoMPLiveComprador(request,env,{
    fileCount:result.fileCount,estado:'pendiente',checkoutUrl:result.checkoutUrl,
    uploadAuthorized:false,productionAuthorized:false},200);
  }
+ const tracking=result.tracking;
+ const trackingStates=['pendiente','en_preparacion','en_espera','listo','entregado'];
+ const trackingModes=['por_confirmar','hoy','hoy_tarde','proximo_dia'];
+ if(tracking!=null&&(
+   result.estado!=='pagado_esperando_archivos'||
+   typeof tracking!=='object'||Array.isArray(tracking)||
+   !(tracking.numeroOrden===null||typeof tracking.numeroOrden==='string'&&/^[0-9]{3,8}$/.test(tracking.numeroOrden))||
+   !trackingStates.includes(tracking.productionState)||
+   !trackingModes.includes(tracking.forecastMode)||
+   !(tracking.readyAt===null||typeof tracking.readyAt==='string'&&Number.isFinite(Date.parse(tracking.readyAt)))
+ ))return reply({ok:false,error:'MP_LIVE_SEGUIMIENTO_INCONSISTENTE'},502);
  const statuses=['pendiente','pagado_esperando_archivos','revocado'];
  if(!statuses.includes(result.estado)||!Number.isSafeInteger(result.fileCount)||
     result.fileCount<1||result.fileCount>10||
@@ -112,5 +123,6 @@ export async function pagoMPLiveComprador(request,env,{
   commercialOrderId:p.commercialOrderId,amountArs:result.amountArs,
   fileCount:result.fileCount,pendingFiles:result.pendingFiles,
   receivedFileIds:result.receivedFileIds,estado:result.estado,
+  tracking:tracking||null,
   uploadAuthorized:result.uploadAuthorized,productionAuthorized:false},200);
 }
