@@ -143,3 +143,16 @@ test('la vista de personal diferencia TUS, inspección R2 y ZIP con instruccione
  assert.match(flow,/transport:m\.bytes<=40\*MIB\?'tus':'r2'/);
  assert.match(pack,/ORDEN_'\+ficha\.numeroOrden\+'_INSTRUCCIONES\.pdf/);
 });
+
+test('112 páginas originales mixtas, destino A4: revisión sin 112 campos manuales',async()=>{
+ const page=await readFile(new URL('./pantalla-paquete-universal-personal.mjs',import.meta.url),'utf8');
+ const script=await readFile(new URL('./staff-r2-personal-ui.txt',import.meta.url),'utf8');
+ const pack=await readFile(new URL('./paquete-universal-cliente.mjs',import.meta.url),'utf8');
+ assert.doesNotMatch(page,/id="r2Medidas"|id="r2Uniforme"/);
+ assert.match(page,/No hace falta ingresar una medida por página/);
+ assert.match(script,/manifest\.paginasDeclaradas\.map/);
+ assert.match(script,/A4 \(ajustar todas las páginas, sin recortar\)/);
+ assert.doesNotThrow(()=>new Function(script));
+ assert.match(pack,/PAPEL A4: ajustar proporcionalmente CADA página al A4/);
+ assert.match(pack,/Originales Legal u otros tamaños también van en A4/);
+});
