@@ -1,8 +1,9 @@
 /**
  * Transferencia bancaria LIVE, aislada de Mercado Pago y de Sandbox.
  * Solicitud: HMAC desde comprador, solo deja pendiente. Nunca acredita con un
- * comprobante del cliente. Acreditación: operador privado + referencia bancaria
- * única verificada contra la cuenta de Librería Saber.
+ * comprobante del cliente. Acreditación: verificación real del banco por
+ * operador privado, importe exacto y identificador interno único de auditoría.
+ * No exige al personal copiar un número de referencia bancaria.
  *
  * TUS y R2 usan el mismo circuito de cobro; R2 solo se ofrece cuando
  * sus compuertas de recepción, reserva y staging están habilitadas.
@@ -185,14 +186,24 @@ export async function aprobarTransferenciaLiveCentral(request,env,{
  if(raw.length>1100)return respond({ok:false,error:'TRANSFER_LIVE_INPUT_LARGO'},413);
  let p;try{p=JSON.parse(raw)}catch{}
  if(!p||typeof p!=='object'||Array.isArray(p)||
-    Object.keys(p).sort().join(',')!=='amount_ars,bank_reference,confirmed,operator,order_id'||
+    !['amount_ars,confirmed,operator,order_id',
+      'amount_ars,bank_reference,confirmed,operator,order_id']
+     .includes(Object.keys(p).sort().join(','))||
     !UUID.test(p.order_id||'')||!Number.isSafeInteger(p.amount_ars)||p.amount_ars<1||
     p.confirmed!==true||typeof p.operator!=='string'||
     p.operator.trim().length<2||p.operator.trim().length>60||
-    typeof p.bank_reference!=='string')return respond({ok:false,error:'TRANSFER_LIVE_DATOS_INVALIDOS'},422);
- const reference=p.bank_reference.trim().toUpperCase().replace(/\s+/g,' ');
+    (Object.hasOwn(p,'bank_reference')&&typeof p.bank_reference!=='string'))
+   return respond({ok:false,error:'TRANSFER_LIVE_DATOS_INVALIDOS'},422);
+ const legacyBankReference=Object.hasOwn(p,'bank_reference');
+ // La columna bank_reference es NOT NULL y UNIQUE en D1 histórico.
+ // Los nuevos cobros guardan una clave INTERNA basada en el ID de la orden,
+ // no un número de operación bancaria inventado ni introducido por el cliente.
+ const reference=legacyBankReference?
+  p.bank_reference.trim().toUpperCase().replace(/\s+/g,' '):
+  'SABER-INT-'+p.order_id.toUpperCase();
  const operator=p.operator.trim();
- if(!bankReference.test(reference)||/\.(?:PDF|PNG|JPE?G|WEBP)$/.test(reference))
+ if(legacyBankReference&&
+    (!bankReference.test(reference)||/\.(?:PDF|PNG|JPE?G|WEBP)$/.test(reference)))
   return respond({ok:false,error:'TRANSFER_LIVE_REFERENCIA_BANCARIA_INVALIDA'},422);
  try{
   await ensureLiveBankTables(env.DB);
@@ -218,10 +229,12 @@ export async function aprobarTransferenciaLiveCentral(request,env,{
     .bind(reference).first()
   ]);
   if(review||prior)return respond({ok:false,error:'TRANSFER_LIVE_YA_REVISADA'},409);
-  // Una referencia bancaria no identifica más de una acreditación, aun
-  // cuando cambien espacios por guiones. Informar la causa real ANTES de batch.
+  // Compatibilidad con formularios abiertos: referencias bancarias reales
+  // antiguas conservan la validación de duplicados. El formulario nuevo
+  // registra sólo una clave interna única por orden.
   if(usedReference)return respond({
-   ok:false,error:'TRANSFER_LIVE_REFERENCIA_YA_UTILIZADA'},409);
+   ok:false,error:legacyBankReference?
+    'TRANSFER_LIVE_REFERENCIA_YA_UTILIZADA':'TRANSFER_LIVE_YA_REVISADA'},409);
   // Transacción: registro bancario exclusivo + actualización paid + revisión D1.
   const applied=await env.DB.batch([
    env.DB.prepare(
