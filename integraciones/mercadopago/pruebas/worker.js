@@ -4848,6 +4848,7 @@ export default {
      if(result?.recuperados)console.log('SABER_MP_LIVE_CRON_ACREDITADOS',result.recuperados);
     }).catch(()=>console.warn('SABER_MP_LIVE_CRON_INDISPONIBLE')));
    // Mantener aisladas las tareas antiguas de purga y conciliación Sandbox.
+   console.log('SABER_MP_LIVE_CRON_AISLADO');
    return;
   }else{
    ctx.waitUntil(runScheduledReconciliation(env).catch(e=>console.error("Scheduled payment sync failed",String(e?.message||"unknown").slice(0,120))));
