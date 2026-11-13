@@ -41,6 +41,8 @@ test('pantalla para retomar mismo pedido nunca crea orden y verifica acreditacio
   assert.match(html,/post\("start",order\)/);
   assert.match(html,/sessionStorage\.setItem\("saber-live-pedido-v1"/);
   assert.match(html,/\/pedido\/estado/);
+  assert.match(html,/location\.replace\(\"\/pedido\/estado\"\)/);
+  assert.doesNotMatch(html,/button\.textContent=\"Enviar PDF pagado\"/);
   assert.doesNotMatch(html,/\/api\/pedido\/live\/(borrador|orden)/);
   const nonce=html.match(/<script nonce="([a-f0-9]{32})">/)?.[1];
   assert.ok(nonce);
