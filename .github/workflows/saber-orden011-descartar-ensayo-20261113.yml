@@ -1,4 +1,4 @@
-name: Saber - preflight seguro descarte orden 011 sin escrituras
+name: Saber - descarte controlado y auditado orden 011 de ensayo
 on:
   push:
     branches: [integracion/tus-pedido-privado-20261101]
@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: {persist-credentials: false}
-      - name: Solo lectura metadatos D1 R2 de orden 011
+      - name: Verificar ensayo, borrar solo objeto 011 de R2 y archivar pedido sin borrar pagos
         shell: bash
         run: |
           set -euo pipefail
@@ -43,7 +43,10 @@ jobs:
           const arch=archives?await call('/d1/database/'+db.uuid+'/query',process.env.D1TOKEN,
            "SELECT name FROM pragma_table_info('central_live_order_archives') ORDER BY cid"):null;
           const sql=[
-           "SELECT n.number AS numero,o.status AS estado,o.created_at AS creado,",
+           "SELECT n.number AS numero,o.status AS estado,o.created_at AS creado,o.id AS orderId,", 
+           "CASE WHEN o.payment_id IS NULL AND o.preference_id IS NULL THEN 1 ELSE 0 END AS sinMP,", 
+           "CASE WHEN EXISTS(SELECT 1 FROM payment_reviews v WHERE v.order_id=o.id AND v.state='verified') THEN 1 ELSE 0 END AS verified,", 
+           "CASE WHEN EXISTS(SELECT 1 FROM central_live_bank_accreditations b WHERE b.order_id=o.id AND b.amount_ars=o.amount_ars AND length(b.bank_reference)>=6 AND length(b.operator)>=2) THEN 1 ELSE 0 END AS banco,", 
            "f.file_id AS fileId,f.web_order_id AS webOrderId,f.transport AS transporte,",
            "f.bytes AS bytes,f.sha256 AS sha256,f.received AS recibido,",
            "p.object_key AS objectKey,p.etag AS etag,p.status AS stage,",
@@ -62,7 +65,7 @@ jobs:
           if(rows.length!==1)throw Error('ORDER_011_NOT_SINGLE');
           const f=rows[0];
           if(f.numero!==11||f.transporte!=='r2'||f.bytes!==44868597||
-             f.estado!=='paid'||f.recibido!==0||f.stage!=='awaiting_pdf_analysis'||
+             f.estado!=='paid'||f.sinMP!==1||f.verified!==1||f.banco!==1||f.recibido!==0||f.stage!=='awaiting_pdf_analysis'||
              f.reserva!=='reserved'||!f.objectKey?.startsWith('r2-v1/'+f.webOrderId+'/'))
             throw Error('ORDER_011_MISMATCH');
           const url='/r2/buckets/saber-documentos-produccion-privado/objects?prefix='+
@@ -77,10 +80,38 @@ jobs:
              bytesMatch:item?.size===f.bytes,etagMatch:typeof item?.etag==='string'&&
              item.etag.replaceAll('"','')===String(f.etag||'').replaceAll('"','')};
           }catch(e){r2={readable:false,error:String(e.message||e).slice(0,75)}}
-          console.log('SABER_011_PREFLIGHT='+JSON.stringify({
-           workNumber:11,approvedForDeletion:false,archives,
-           archiveColumns:(arch?.[0]?.results||[]).map(x=>x.name),
-           archived:f.archived,created:f.creado?.slice(0,10),
-           r2,deletePerformed:false
-          }));
+          if(!archives||!['order_id','work_number','reason','archived_at'].every(
+              c=>(arch?.[0]?.results||[]).some(x=>x.name===c)))throw Error('ARCHIVE_TABLE_UNEXPECTED');
+          if(f.archived===1){
+           console.log('SABER_011_ALREADY_ARCHIVED_NO_ACTION');process.exit(0);
+          }
+          if(!/^[a-f0-9-]{36}$/i.test(f.orderId)||!/^r2-v1\\/WEB-ENSAYO-[A-F0-9]{32}\\/[a-f0-9-]{36}\\.pdf$/.test(f.objectKey))
+            throw Error('ORDER_011_OBJECT_KEY_MISMATCH');
+          // Aunque el token de deploy no pueda LISTAR R2, DELETE puede tener otro permiso.
+          // Si el borrado no fue confirmado, NO ocultar el pedido en D1.
+          const del=await fetch(root+'/r2/buckets/saber-documentos-produccion-privado/objects/'+f.objectKey,{
+            method:'DELETE',headers:{Authorization:'Bearer '+process.env.R2TOKEN},
+            signal:AbortSignal.timeout(30000)});
+          const delResult=await del.json().catch(()=>null);
+          if(!del.ok||delResult?.success!==true)
+           throw Error('R2_DELETE_NO_CONFIRMADO_HTTP_'+del.status);
+          if(delResult?.result?.key&&delResult.result.key!==f.objectKey)
+           throw Error('R2_DELETE_KEY_MISMATCH');
+          console.log('SABER_011_R2_DELETE_ACCEPTED');
+          const archiveSQL=[
+           "INSERT INTO central_live_order_archives(order_id,work_number,reason)",
+           "SELECT o.id,11,'ENSAYO_TRANSF_SIN_DINERO_REAL_PDF_A4_DESCARTADO_20261113'",
+           "FROM orders o JOIN central_work_order_numbers n ON n.commercial_order_id=o.id",
+           "WHERE n.number=11 AND o.id='"+f.orderId+"' AND o.status='paid'",
+           "AND NOT EXISTS(SELECT 1 FROM central_live_order_archives x WHERE x.order_id=o.id)"
+          ].join(' ');
+          const archived=await call('/d1/database/'+db.uuid+'/query',process.env.D1TOKEN,archiveSQL);
+          if(archived?.[0]?.success!==true||archived?.[0]?.meta?.changes!==1)
+           throw Error('ARCHIVE_D1_NOT_SAVED');
+          const verify=await call('/d1/database/'+db.uuid+'/query',process.env.D1TOKEN,
+           "SELECT count(*) AS total FROM central_live_order_archives WHERE work_number=11 AND order_id='"+f.orderId+"'");
+          if(verify?.[0]?.results?.[0]?.total!==1)throw Error('ARCHIVE_D1_NOT_VERIFIED');
+          console.log('SABER_011_CLEANUP='+JSON.stringify({order:11,
+           r2DeleteAccepted:true,d1Archived:true,paymentLedgerPreserved:true,
+           priorR2ReadStatus:r2.readable,archiveOnly:true}));
           EOF
