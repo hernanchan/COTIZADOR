@@ -73,6 +73,8 @@ export async function listarRecepcionUniversalLive(request,env,{authorized=false
    "WHERE o.status='paid' AND o.paid_at IS NOT NULL "+
    'AND o.amount_ars=o.deposit_ars AND o.amount_ars=l.amount_ars '+
    paymentClause+
+   // Entregados salen del tablero, pero la historia permanece en D1.
+   (hasProduction?"AND (s.state IS NULL OR s.state!='entregado') ":'')+
    (hasArchives?'AND NOT EXISTS(SELECT 1 FROM central_live_order_archives a WHERE a.order_id=o.id) ':'')+
    (hasTestExclusions?'AND NOT EXISTS(SELECT 1 FROM central_live_test_exclusions e WHERE e.order_id=o.id) ':'')+
    'GROUP BY l.commercial_order_id,l.web_order_id,n.number'+
@@ -132,6 +134,23 @@ export async function listarRecepcionUniversalLive(request,env,{authorized=false
    readyForProduction:false,
    zipEnabled:x.pending_count===0});
  }
+ // Monitor seguro: si la purga TUS/R2 queda incompleta la Central avisa
+ // del total sin volver a listar las órdenes entregadas ni exponer archivos.
+ let cleanupPendingCount=null;
+ if(hasProduction){
+  try{
+   const pending=hasPurge?
+    "NOT EXISTS(SELECT 1 FROM central_live_purge_files p WHERE p.order_id=s.order_id) "+
+    "OR EXISTS(SELECT 1 FROM central_live_purge_files p "+
+    "WHERE p.order_id=s.order_id AND p.state!='deleted')":
+    '1=1';
+   const result=await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM central_live_production_states s "+
+    "WHERE s.state='entregado' AND ("+pending+")").first();
+   if(Number.isSafeInteger(result?.n)&&result.n>=0)
+    cleanupPendingCount=result.n;
+  }catch{/* No asegurar un borrado si D1 no responde. */}
+ }
  return reply({ok:true,orders:ready,source:'production-d1-verified-payments-only',
-  productionAuthorized:false,downloadAuthorized:false});
+  cleanupPendingCount,productionAuthorized:false,downloadAuthorized:false});
 }
