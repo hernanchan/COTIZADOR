@@ -81,7 +81,7 @@ window.saberIngresoLive=async token=>{
 </div>
 <p id="plazo-explicacion">Fecha orientativa desde la acreditación del pago, sujeta a disponibilidad, trabajo, horario y feriados. Al iniciar tu trabajo, en el seguimiento verás una fecha y hora más precisas.</p>
 <p id="promo-dia" hidden></p>
-</section><section id="seccion-archivos"><h2>1. Subí tus archivos</h2><p>Seleccioná los PDF, JPG o PNG que querés imprimir. Podés elegir varios en una sola carga.</p><iframe id="pdf" title="Elegir PDF, JPG o PNG y opciones de impresión" src="/cotizar/archivos" loading="eager" scrolling="no"></iframe>
+</section><section id="seccion-archivos"><h2>1. Elegí los archivos</h2><p>Seleccioná una sola vez los PDF que querés imprimir. Una vez aprobado el pago, el sistema los enviará automáticamente, sin volver a pedirlos.</p><iframe id="pdf" title="Elegir PDF, JPG o PNG y opciones de impresión" src="/cotizar/archivos" loading="eager" scrolling="no"></iframe>
 <button type="button" id="siguiente" disabled>Siguiente · Tus datos</button>
 <p id="aviso-siguiente" aria-live="polite">Elegí y confirmá las opciones de impresión para continuar.</p>
 </section><section id="seccion-confirmacion" hidden><h2>2. Tus datos y el pago</h2>
@@ -93,7 +93,7 @@ window.saberIngresoLive=async token=>{
 <input id="direccion" autocomplete="street-address" maxlength="180" placeholder="Calle y número">
 <p id="estado" role="status" aria-live="polite">Seleccioná tus archivos para comenzar.</p>
 <button type="button" id="continuar" disabled>${enabled?'Confirmar presupuesto':'Recepción de pedidos temporalmente desactivada'}</button>
-<p><small>La confirmación de pago se verifica en Librería Saber. No se envía ningún original por cotizar.</small></p>
+<p><small>Antes de pagar, guardamos una copia privada de los PDF en este navegador. Al acreditarse el pago, los transferimos automáticamente a Librería Saber. Si el dispositivo no puede conservarlos, no permitimos pagar.</small></p>
 </section></main><script type="module" nonce="${scriptNonce}">
 import {crearFlujoPresupuestoLive} from '/cotizar/flujo-live.js';
 const phone=document.getElementById('telefono');
@@ -247,12 +247,12 @@ action.addEventListener('click',async()=>{
  try{
   flow=crearFlujoPresupuestoLive({
    ...pending,webOrderId:orderId(),telefono,nombre,direccion,
-   onProgress:p=>{status.textContent='Identificando PDF '+p.index+' · '+(p.porcentaje||0)+' %';}
+   onProgress:p=>{status.textContent=p.phase==='guardando'||p.phase==='guardado'?'Conservando los originales en este dispositivo, sin subirlos antes del pago…':'Identificando PDF '+p.index+' · '+(p.porcentaje||0)+' %';}
   });
   status.textContent='Validando precio y registrando orden…';
   const order=await flow.preparar();
   price.textContent='Orden '+order.numeroOrden+' · '+money(order.amountArs);
-  status.textContent='Orden registrada. Para pagar, continuá con Mercado Pago.';
+  status.textContent='Orden registrada. Los PDF están guardados en este navegador. Al pagar se enviarán automáticamente, sin seleccionarlos otra vez.';
   const options=document.createElement('div');
   options.className='payment-options';
   const button=document.createElement('button');
