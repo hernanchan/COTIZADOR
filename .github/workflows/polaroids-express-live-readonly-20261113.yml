@@ -1,0 +1,43 @@
+name: Saber - diagnóstico remoto Express y Central (solo lectura)
+on:
+  push:
+    branches: [polaroids/express-pdf-unico-20261023]
+    paths: ['.github/workflows/polaroids-express-live-readonly-20261113.yml']
+permissions: {contents: read}
+jobs:
+  read:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+    steps:
+      - name: Consultar estados Cloudflare sin escrituras ni secretos
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${ACCOUNT:?}" "${TOKEN:?}"
+          api="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT"
+          tmp=$(mktemp -d)
+          get(){
+            local name="$1" url="$2"
+            local status
+            status=$(curl -sS --connect-timeout 10 --max-time 35 -w '%{http_code}' -o "$tmp/$name.json" \
+               -H "Authorization: Bearer $TOKEN" "$url") || status=000
+            echo "SABER_EXPRESS_CF_API_HTTP $name $status"
+            if [ "$status" = 200 ];then
+              jq -c --arg key "$name" 'if .success==true then
+               if $key=="express_pages" then {name:.result.name,production_branch:.result.production_branch,domains:.result.domains,preview_automatic_deployments_enabled:.result.preview_automatic_deployments_enabled,production_deployments_enabled:.result.production_deployments_enabled}
+               elif $key=="central_settings" or $key=="express_worker_settings" then {bindings:[.result.bindings[]?|{name,type,value:(if .type=="plain_text" or .type=="text" then .text else null end)}]}
+               elif $key=="central_deployments" or $key=="express_worker_deployments" then {deployments:[.result.deployments[0].versions[]?|{version_id,percentage}]}
+               else {ok:true} end
+               else {success:.success,errors:[.errors[]?|{code,message}]} end' "$tmp/$name.json" | sed "s/^/SABER_EXPRESS_REMOTE $name /"
+            fi
+          }
+          get express_pages "$api/pages/projects/saber-polaroids-express-pruebas"
+          get central_settings "$api/workers/scripts/saber-pagos-pruebas/settings"
+          get central_deployments "$api/workers/scripts/saber-pagos-pruebas/deployments"
+          get express_worker_settings "$api/workers/scripts/saber-polaroids-express-pruebas/settings"
+          get express_worker_deployments "$api/workers/scripts/saber-polaroids-express-pruebas/deployments"
+          echo 'SABER_EXPRESS_DIAGNOSTIC_READ_ONLY_DONE'
