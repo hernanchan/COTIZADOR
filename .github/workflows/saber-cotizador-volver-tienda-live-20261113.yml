@@ -51,7 +51,7 @@ jobs:
           assert.ok(parts[2].startsWith('--'),'INVALID_MULTIPART_TERMINATOR');
           const sep=parts[1].indexOf(crlf+crlf);
           assert.ok(sep>0,'MISSING_MODULE_HEADERS');
-          assert.match(parts[1].slice(0,sep),/name="index\\.mjs"/,'NOT_THE_EXPECTED_MODULE');
+          assert.ok(parts[1].slice(0,sep).includes('name="index.mjs"'),'NOT_THE_EXPECTED_MODULE');
           const body=parts[1].slice(sep+4);
           assert.ok(body.endsWith(crlf),'MISSING_MULTIPART_MODULE_DELIMITER');
           const original=body.slice(0,-2);
