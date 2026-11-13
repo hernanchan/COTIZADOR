@@ -883,7 +883,13 @@ $('archivos').addEventListener('change',async ev=>{
  let files,imagenes=0;
  try{
   $('estado').textContent='Preparando PDF e imágenes para impresión en este dispositivo…';
-  const normalizados=await normalizarArchivosImpresion(elegidos);
+  // Configuración individual = UNA ficha/PDF por imagen; nunca unir JPG/PNG
+  // que requieren cantidad, modo o gramaje diferentes.
+  const agruparImagenes=modoLote==='comun';
+  if(!agruparImagenes&&entries.length+elegidos.length>MAX_PDF_CARGA)
+   throw Error('En configuración separada se admiten hasta '+MAX_PDF_CARGA+
+    ' archivos individuales. Para composiciones fotográficas grandes elegí configuración común.');
+  const normalizados=await normalizarArchivosImpresion(elegidos,{agruparImagenes});
   files=normalizados.files;imagenes=normalizados.images;
   if(entries.length+files.length>MAX_PDF_CARGA)
    throw Error('Máximo '+MAX_PDF_CARGA+' archivos imprimibles. Dividí el lote.');
@@ -892,7 +898,9 @@ $('archivos').addEventListener('change',async ev=>{
   $('estado').textContent=String(error.message||error);
   return;
  }
- if(imagenes)$('estado').textContent=imagenes+' imágenes convertidas localmente a PDF para cotizar. Podés elegir 1, 2, 4 o 9 páginas por cara.';
+ if(imagenes)$('estado').textContent=modoLote==='individual'?
+  imagenes+' imagen(es) convertidas a trabajos separados. Cada una mantiene sus propias copias, color y papel.':
+  imagenes+' imagen(es) agrupadas en PDF con configuración común. Podés elegir composición de 1, 2, 4 o 9 páginas por cara.';
 
  // Mantener fichas compactas al cargar un lote; cada PDF se edita sólo si hace falta.
  if(!entries.length)abierto=-1;
