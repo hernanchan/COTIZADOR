@@ -143,3 +143,42 @@ test('dos PDF TUS muestran porcentaje acumulado sin 100% antes de verificar D1',
  assert.equal(seen.at(-1).percent,100);
  assert.equal(calls.filter(x=>x.endsWith('/confirmar')).length,1);
 });
+
+test('transferencia avisada inicia TUS de imagen/PDF chico antes de verificar banco',async()=>{
+ const {calls,fetcher:original}=makeFetch(false),uploads=[];
+ const fetcher=async(path,opts)=>{
+  if(path==='/api/pedido/live/transfer'){
+   calls.push({path,body:JSON.parse(opts.body)});
+   return Response.json({ok:true,webOrderId:WEB,commercialOrderId:UUID,
+    estado:'transferencia_informada',customerNotified:true,
+    paymentVerified:false,uploadAuthorized:false,productionAuthorized:false});
+  }
+  return original(path,opts);
+ };
+ const result=await enviarPDFsTUSPagadosLive({
+  ...opts(makeStore(),fetcher,uploaderFactory(uploads)),allowPendingBank:true
+ });
+ assert.equal(result.ok,true);
+ assert.equal(result.productionAuthorized,false);
+ assert.deepEqual(calls.map(x=>x.path),[
+  '/api/pedido/live/transfer','/api/pedido/live/tus/iniciar',
+  '/api/pedido/live/tus/confirmar']);
+ assert.equal(uploads.filter(x=>x.type==='upload').length,1);
+});
+test('TUS sin aviso de transferencia rechaza antes de emitir cualquier firma',async()=>{
+ const {calls,fetcher:original}=makeFetch(false),uploads=[];
+ const fetcher=async(path,opts)=>{
+  if(path==='/api/pedido/live/transfer'){
+   calls.push({path,body:JSON.parse(opts.body)});
+   return Response.json({ok:true,webOrderId:WEB,commercialOrderId:UUID,
+    estado:'transferencia_pendiente',customerNotified:false,
+    paymentVerified:false,uploadAuthorized:false,productionAuthorized:false});
+  }
+  return original(path,opts);
+ };
+ await assert.rejects(enviarPDFsTUSPagadosLive({
+  ...opts(makeStore(),fetcher,uploaderFactory(uploads)),allowPendingBank:true
+ }),/PAGO_O_AVISO_NO_CONCILIADO/);
+ assert.deepEqual(calls.map(x=>x.path),['/api/pedido/live/transfer']);
+ assert.equal(uploads.length,0);
+});
