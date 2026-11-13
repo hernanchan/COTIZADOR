@@ -82,7 +82,7 @@ window.saberIngresoLive=async token=>{
 </div>
 <p id="plazo-explicacion">Fecha orientativa desde la acreditación del pago, sujeta a disponibilidad, trabajo, horario y feriados. Al iniciar tu trabajo, en el seguimiento verás una fecha y hora más precisas.</p>
 <p id="promo-dia" hidden></p>
-</section><section id="seccion-archivos"><h2>1. Elegí los archivos</h2><p>Seleccioná una sola vez los PDF que querés imprimir. Una vez aprobado el pago, el sistema los enviará automáticamente, sin volver a pedirlos.</p><iframe id="pdf" title="Elegir PDF, JPG o PNG y opciones de impresión" src="/cotizar/archivos" loading="eager" scrolling="no"></iframe>
+</section><section id="seccion-archivos"><h2>1. Elegí los archivos</h2><p>Seleccioná una sola vez los PDF que querés imprimir. Con Mercado Pago se envían al acreditarse; con transferencia se reciben desde «Ya transferí», protegidos hasta verificar el banco.</p><iframe id="pdf" title="Elegir PDF, JPG o PNG y opciones de impresión" src="/cotizar/archivos" loading="eager" scrolling="no"></iframe>
 <button type="button" id="siguiente" disabled>Siguiente · Tus datos</button>
 <p id="aviso-siguiente" aria-live="polite">Elegí y confirmá las opciones de impresión para continuar.</p>
 </section><section id="seccion-confirmacion" hidden><h2>2. Tus datos y el pago</h2>
@@ -95,8 +95,8 @@ window.saberIngresoLive=async token=>{
 <input id="direccion" autocomplete="street-address" maxlength="180" placeholder="Calle y número">
 <p id="estado" role="status" aria-live="polite">Seleccioná tus archivos para comenzar.</p>
 <button type="button" id="continuar" disabled>${enabled?'Confirmar presupuesto':'Recepción de pedidos temporalmente desactivada'}</button>
-<p><small>Antes de pagar, guardamos una copia privada de los PDF en este navegador. Al acreditarse el pago, los transferimos automáticamente a Librería Saber. Si el dispositivo no puede conservarlos, no permitimos pagar.</small></p>
-<p class="transfer-warning">IMPORTANTE: Si enviás PDF pesados, mantené esta pestaña abierta después del pago hasta que aparezca «Archivo recibido». No cierres el navegador, no apagues el dispositivo y evitá cambiar de red durante la subida.</p>
+<p><small>Antes de pagar, guardamos una copia privada de los PDF en este navegador. Con transferencia se envían al pulsar «Ya transferí»; con Mercado Pago al acreditarse. Si el dispositivo no puede conservarlos, no permitimos pagar.</small></p>
+<p class="transfer-warning">IMPORTANTE: Si enviás PDF pesados, mantené esta pestaña abierta durante la subida hasta que aparezca «Archivo recibido». No cierres el navegador, no apagues el dispositivo y evitá cambiar de red durante la subida.</p>
 </section></main><script type="module" nonce="${scriptNonce}">
 import {crearFlujoPresupuestoLive} from '/cotizar/flujo-live.js';
 const phone=document.getElementById('telefono');
@@ -336,7 +336,7 @@ action.addEventListener('click',async()=>{
      const detail=document.createElement('p');
      detail.textContent='Transferí el importe exacto al alias indicado. Después presioná «Ya transferí» para avisar a Librería Saber. Solo el personal confirma la acreditación bancaria.';
      const warning=document.createElement('p');warning.className='transfer-warning';
-     warning.textContent='Si adjuntaste PDF pesados, mantené la pestaña y el navegador abiertos después de acreditar el pago, hasta ver «Archivo recibido». No realices otra transferencia.';
+     warning.textContent='Después de pulsar «Ya transferí», empezaremos a recibir tus PDF. Mantené la pestaña abierta hasta ver «Archivo recibido». La impresión quedará pendiente de verificación bancaria.';
      instructions.append(heading,amount,aliasLabel,alias,copy,detail,warning);
      const notified=document.createElement('button');
      notified.type='button';notified.textContent='Ya transferí · Avisar a Librería Saber';
@@ -353,9 +353,9 @@ action.addEventListener('click',async()=>{
        if(notice.estado!=='transferencia_informada'||notice.paymentVerified!==false||
           notice.uploadAuthorized!==false||notice.customerNotified!==true)
         throw Error('No se pudo confirmar el aviso.');
-       instructions.textContent='Aviso recibido. Librería Saber ya puede ver tu transferencia en «Por verificar». '+
-        'El pago sigue pendiente de comprobación bancaria; no realices otra transferencia. '+
-        'Conservá esta pestaña abierta para el envío automático de los archivos después de acreditarse.';
+       instructions.textContent='Aviso recibido. Enviaremos ahora tus PDF de forma privada. '+
+        'La acreditación bancaria sigue pendiente; no vuelvas a transferir. '+
+        'Mantené la pestaña abierta hasta que aparezca «Archivos recibidos».';
        notified.remove();
        location.assign('/pedido/estado');
       }catch(error){
