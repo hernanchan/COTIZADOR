@@ -168,7 +168,9 @@ small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padd
       throw Error('REFERENCIA_NO_COINCIDE');
      receiving.hidden=false;
      output.textContent=data.pendingFiles===0?'Pago acreditado y archivos recibidos. Gracias por elegir Librería Saber.':
-      'Pago acreditado. Estamos recibiendo automáticamente los archivos que elegiste antes de pagar.';
+      sessionStorage.getItem(receiptFlag(order.webOrderId))==='ok'?
+       'Pago acreditado. PDF grande almacenado; Librería Saber debe completar la inspección antes de habilitar el ZIP.':
+       'Pago acreditado. Estamos recibiendo automáticamente los archivos que elegiste antes de pagar.';
      void enviarAutomaticamente(order,data,saved.metas);
     }catch{
      receiving.hidden=false;
