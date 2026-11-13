@@ -25,6 +25,8 @@ jobs:
           node --check integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs
           node --test \
             integraciones/mercadopago/pruebas/central-recepcion-live.test.mjs \
+            integraciones/mercadopago/pruebas/central-entrega-purga-live.test.mjs \
+            integraciones/autocotizador/recepcion/purga-archivo-live-documentos.test.mjs \
             integraciones/mercadopago/pruebas/central-live-bridge.test.mjs \
             integraciones/mercadopago/pruebas/central-live-hmac-e2e.test.mjs \
             integraciones/autocotizador/recepcion/paquete-live-operador.test.mjs \
@@ -88,3 +90,4 @@ jobs:
 # 13/11: última regresión R2 staging con banco avisado y sin pago, sin ZIP antes de cobro.
 # 13/11: QA final Central por verificar muestra recibidos/total; rechazo de ZIP impago sin cambiar estados de pago.
 # 13/11: regresión E2E canal pospago sin pago exige el nuevo código de aviso bancario, sin conceder bypass.
+# 13/11: QA quitar referencia bancaria ingresada, proteger auditoria; entregados ocultos y purga confirmada TUS/R2, sin modificar historico.
