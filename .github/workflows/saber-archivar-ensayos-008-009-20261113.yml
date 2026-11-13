@@ -1,0 +1,91 @@
+name: Saber - archivar ensayos cobrados 008 y 009 sin perder auditoría
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-archivar-ensayos-008-009-20261113.yml]
+permissions: {contents: write}
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: true}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Archivar SOLO órdenes 008 y 009 sin borrar cobros ni alterar su estado contable
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'EOF'
+          import {mkdir,writeFile} from 'node:fs/promises';
+          const root='https://api.cloudflare.com/client/v4/accounts/'+process.env.ACCOUNT;
+          const res={checkedAt:new Date().toISOString(),numbersRequested:[8,9],archivedNumbers:[],auditable:true,paymentRecordsUntouched:true};
+          const cf=async(path,method='GET',sql)=>{
+           const r=await fetch(root+path,{method,headers:{
+            Authorization:'Bearer '+process.env.TOKEN,
+            ...(sql?{'Content-Type':'application/json'}:{})
+           },body:sql?JSON.stringify({sql}):undefined,signal:AbortSignal.timeout(20000)});
+           const j=await r.json().catch(()=>null);
+           if(!r.ok||j?.success!==true)throw Error('CLOUDFLARE_HTTP_'+r.status);
+           return j.result;
+          };
+          try{
+           const dbs=await cf('/d1/database');
+           const db=dbs.find(x=>x.name==='saber-pagos-produccion');
+           if(!db?.uuid)throw Error('DB_PRODUCCION_NO_ENCONTRADA');
+           const path='/d1/database/'+db.uuid+'/query';
+           const query=async sql=>{
+            const x=await cf(path,'POST',sql);
+            if(x?.[0]?.success!==true)throw Error('D1_QUERY_FAIL');
+            return x[0]?.results||[];
+           };
+           await query("CREATE TABLE IF NOT EXISTS central_live_order_archives (order_id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE RESTRICT,work_number INTEGER NOT NULL UNIQUE,reason TEXT NOT NULL CHECK(reason='ensayo_real_cobrado_sin_archivos'),archived_at TEXT NOT NULL DEFAULT (datetime('now')))");
+           const selection=[
+            "INSERT OR IGNORE INTO central_live_order_archives(order_id,work_number,reason)",
+            "SELECT o.id,n.number,'ensayo_real_cobrado_sin_archivos'",
+            "FROM central_work_order_numbers n JOIN orders o ON o.id=n.commercial_order_id",
+            "JOIN central_r2_universal_order_links l ON l.commercial_order_id=o.id",
+            "JOIN central_r2_universal_files f ON f.web_order_id=l.web_order_id",
+            "JOIN payment_reviews p ON p.order_id=o.id AND p.state='verified'",
+            "LEFT JOIN central_live_production_states st ON st.order_id=o.id",
+            "WHERE ((n.number=8 AND o.amount_ars=100) OR (n.number=9 AND o.amount_ars=600))",
+            "AND o.status='paid' AND COALESCE(st.state,'pendiente')='pendiente'",
+            "AND NOT EXISTS (SELECT 1 FROM central_r2_large_pending rp WHERE rp.web_order_id=l.web_order_id)",
+            "GROUP BY o.id,n.number HAVING COUNT(f.file_id)=1 AND SUM(f.received)=0"
+           ].join(' ');
+           await query(selection);
+           const archived=await query("SELECT a.work_number, o.status AS payment_state, o.amount_ars, o.payment_id IS NOT NULL AS mp_transaction_present FROM central_live_order_archives a JOIN orders o ON o.id=a.order_id WHERE a.work_number IN (8,9) ORDER BY a.work_number");
+           res.archivedNumbers=archived.map(x=>x.work_number);
+           res.paidStillVerified=archived.every(x=>x.payment_state==='paid'&&x.amount_ars===(x.work_number===8?100:600));
+           res.mpOperationPreserved=archived.find(x=>x.work_number===8)?.mp_transaction_present===1;
+           res.complete=res.archivedNumbers.join(',')==='8,9'&&res.paidStillVerified&&res.mpOperationPreserved;
+           if(!res.complete)res.blocker='No se archivó alguno de los pedidos: comprobar condiciones seguras; no se borra ningún pago';
+          }catch(e){res.error=String(e?.message||e).slice(0,110);res.complete=false}
+          await mkdir('docs',{recursive:true});
+          await writeFile('docs/ARCHIVO-ENSAYOS-008-009.json',JSON.stringify(res,null,2)+'\n');
+          console.log('SABER_ARCHIVO_ENSAYOS='+JSON.stringify(res));
+          if(!res.complete)process.exitCode=1;
+          EOF
+      - name: Publicar estado anónimo de archivo de pruebas
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/ARCHIVO-ENSAYOS-008-009.json || exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/ARCHIVO-ENSAYOS-008-009.json
+          git diff --cached --quiet && exit 0
+          git commit -m "ops: resultado archivo seguro de ensayos 008 y 009"
+          for attempt in 1 2 3 4;do
+            git fetch origin integracion/tus-pedido-privado-20261101
+            git rebase origin/integracion/tus-pedido-privado-20261101
+            git push origin HEAD:integracion/tus-pedido-privado-20261101 && exit 0
+            sleep 2
+          done
+          exit 1
