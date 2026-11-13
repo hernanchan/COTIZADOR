@@ -39,3 +39,14 @@ test('Definir hora usa calendario nativo, respeta agenda y evita cuatro ventanas
  assert.ok(js);
  assert.doesNotThrow(()=>new Function(js[1]),'JavaScript del calendario inválido');
 });
+
+
+test('Central muestra aviso de transferencias informadas automáticamente sin declararlas pagadas',()=>{
+ const html=paginaCentralPersonalLive();
+ assert.match(html,/id="transferenciasAviso"/);
+ assert.match(html,/actualizarAvisosTransferencia/);
+ assert.match(html,/customerNotified===true/);
+ assert.match(html,/setInterval\(\(\)=>\{if\(!document\.hidden\)void actualizarAvisosTransferencia\(\)\},15000\)/);
+ assert.match(html,/\/personal\/api\/live-transferencias-pendientes/);
+ assert.match(html,/Transferencias avisadas por clientes/);
+});
