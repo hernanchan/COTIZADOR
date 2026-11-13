@@ -139,6 +139,10 @@ async function saveProductionState(e){
   sessionStorage.setItem('saber-central-operador',operator);
   stageDialog.close();stageTransition=null;
   await refresh();
+  if(next==='entregado')
+   info.textContent=data.originalsDeleted===true?
+    'Orden '+order.numeroOrden+' entregada. Borrado de originales TUS/R2 confirmado.':
+    'Orden '+order.numeroOrden+' entregada. Borrado de originales pendiente: el sistema reintentará automáticamente.';
  }catch(error){message.textContent='No se guardó el estado: '+String(error.message||error)}
  finally{save.disabled=false;btn.disabled=false}
 }
