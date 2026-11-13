@@ -63,7 +63,7 @@ small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padd
   const stagedR2=currentOrder?.webOrderId===data.webOrderId&&
    sessionStorage.getItem('saber-live-r2-recibido-'+currentOrder.webOrderId)==='ok';
   archivos.textContent=verified&&stagedR2&&data.pendingFiles>0?
-   'PDF grande almacenado en R2. Pendiente de inspección por Librería Saber. No lo vuelvas a enviar.':
+   'Archivo grande almacenado. Confirmando su recepción sin repetir el pago.':
    verified?'Archivos recibidos: '+received+' de '+data.fileCount+
    (data.pendingFiles?' · Enviando automáticamente '+data.pendingFiles+' archivo(s). No cierres la pestaña.':' · Todos los originales fueron recibidos.'):
    'Los PDF se envían cuando el pago está confirmado.';
@@ -113,8 +113,9 @@ small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padd
   const large=metas.filter(m=>m.transport==='r2');
   const received=new Set(data.receivedFileIds||[]);
   const pendingTUS=small.some(m=>!received.has(m.fileId));
-  const pendingR2=large.some(m=>!received.has(m.fileId))&&
-    sessionStorage.getItem(receiptFlag(order.webOrderId))!=='ok';
+  // Recuperar recibos R2 anteriores aunque sessionStorage diga 'ok'.
+  // El estado verdadero está en D1; el mismo PDF se confirma sin reenvío.
+  const pendingR2=large.some(m=>!received.has(m.fileId));
   if(!pendingTUS&&!pendingR2){
    retry.hidden=true;
    uploadNotice.hidden=true;
@@ -214,7 +215,7 @@ small{color:#526579}#estado{line-height:1.6}#seguimiento{background:#eff7fd;padd
       sessionStorage.getItem(receiptFlag(order.webOrderId))==='ok';
      output.textContent=data.pendingFiles===0?'Pago acreditado y archivos recibidos. Gracias por elegir Librería Saber.':
       sessionStorage.getItem(receiptFlag(order.webOrderId))==='ok'?
-       'Pago acreditado. PDF grande almacenado; Librería Saber debe completar la inspección antes de habilitar el ZIP.':
+       'Pago acreditado. Confirmando el archivo grande ya almacenado; no pagues ni generes otra orden.':
        'Pago acreditado. Estamos recibiendo automáticamente los archivos que elegiste antes de pagar.';
      void enviarAutomaticamente(order,data,saved.metas);
     }catch{
