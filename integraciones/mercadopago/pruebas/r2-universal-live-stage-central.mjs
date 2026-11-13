@@ -10,7 +10,8 @@ const GO='GO_COMERCIAL_CONFIRMADO',MIB=1048576;
 const respond=(v,status=200)=>Response.json(v,{status,headers:{
  'Cache-Control':'no-store,private','X-Content-Type-Options':'nosniff'}});
 export async function registrarR2LivePendiente(request,env,{
- readSigned,subtle=crypto.subtle
+ readSigned,subtle=crypto.subtle,
+ verify=verificarPedidoUniversalCobrable,payment=estadoPagoUniversal
 }={}){
  if(env?.SABER_ENTORNO!=='produccion'||env?.CENTRAL_DB_ENV!=='produccion'||
    env?.MP_LIVE_GATE!==GO||env?.CENTRAL_LIVE_BRIDGE_ENABLED!==GO||
@@ -39,7 +40,7 @@ export async function registrarR2LivePendiente(request,env,{
    'SELECT commercial_order_id FROM central_r2_universal_order_links WHERE web_order_id=?'
   ).bind(p.orderId).first();
   if(!link)return respond({ok:false,error:'LIVE_R2_STAGE_ORDEN_AJENA'},404);
-  valid=await verificarPedidoUniversalCobrable(env,link.commercial_order_id,{
+  valid=await verify(env,link.commercial_order_id,{
    webOrderId:p.orderId,subtle});
   if(!valid.ok)return respond({ok:false,error:'LIVE_R2_STAGE_FICHA_D1'},409);
   const work=valid.works.find(x=>x.fileId===p.fileId);
@@ -49,7 +50,7 @@ export async function registrarR2LivePendiente(request,env,{
     !Array.isArray(work.configuracion?.paginas)||
     work.configuracion.paginas.length!==p.pagesDeclaradas)
    return respond({ok:false,error:'LIVE_R2_STAGE_ORIGINAL_AJENO'},409);
-  paid=await estadoPagoUniversal(env,link.commercial_order_id);
+  paid=await payment(env,link.commercial_order_id);
   if(!paid.verified||paid.revoked)
    return respond({ok:false,error:'LIVE_R2_STAGE_PAGO_NO_CONCILIADO'},402);
   const reserve=await db.prepare(
