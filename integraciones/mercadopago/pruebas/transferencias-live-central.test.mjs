@@ -26,15 +26,16 @@ const readSigned=async()=>({payload:{schema:'saber-central-live-transfer-start-v
  webOrderId:web,commercialOrderId:id}});
 const verifyOrder=async()=>order;
 function mockDb({withMpAttempt=false,state='awaiting_payment',paid=false,priorBank=false}={}){
- const sql=[];
+ const sql=[];let noticeExists=false;
  const db={
   prepare(q){
    sql.push(q);
    return {
     bind(){return this},
-    async run(){return {meta:{changes:1}}},
+    async run(){if(q.includes('INSERT OR IGNORE INTO central_live_transfer_customer_notices'))noticeExists=true;return {meta:{changes:1}}},
     async first(){
      if(q.includes("name='live_checkout_attempts'"))return withMpAttempt?{name:'live_checkout_attempts'}:null;
+     if(q.includes('SELECT reported_at FROM central_live_transfer_customer_notices'))return noticeExists?{reported_at:'2026-11-11 10:07:00'}:null;
      if(q.includes('FROM live_checkout_attempts WHERE'))return withMpAttempt?{order_id:id}:null;
      if(q.includes('FROM central_live_transfer_requests t JOIN orders o'))
       return {amount_ars:amount,state:'awaiting_bank_verification',
@@ -190,6 +191,35 @@ test('sin sesión administrativa, no exponer transferencias reales',async()=>{
  const f=mockDb();
  const req=new Request('https://pagos.libreriasaber.com.ar/admin/api/central/live-transfers/pending');
  const res=await listarTransferenciasLiveCentral(req,{...base,DB:f.db},{authorized:false});
+ assert.equal(res.status,401);
+ assert.equal(f.sql.length,0);
+});
+
+test('Ya transferí registra aviso único SIN acreditar dinero ni autorizar el envío',async()=>{
+ const f=mockDb();
+ for(let i=0;i<2;i++){
+  const res=await manejarTransferenciaLiveCentral(request('transfer-notify'),{...base,DB:f.db},
+   {readSigned:signedPayload('notify'),verifyOrder});
+  assert.equal(res.status,200);
+  const data=await res.json();
+  assert.equal(data.estado,'transferencia_informada');
+  assert.equal(data.customerNotified,true);
+  assert.equal(data.paymentVerified,false);
+  assert.equal(data.uploadAuthorized,false);
+  assert.equal(data.productionAuthorized,false);
+ }
+ assert.ok(f.sql.some(x=>x.includes('INSERT OR IGNORE INTO central_live_transfer_customer_notices')));
+ assert.ok(!f.sql.some(x=>x.includes("UPDATE orders SET status='paid'")));
+ assert.ok(!f.sql.some(x=>x.includes('INSERT INTO payment_reviews')));
+ assert.ok(!f.sql.some(x=>x.includes('INSERT INTO central_live_bank_accreditations')));
+ const status=await manejarTransferenciaLiveCentral(request('transfer-status'),{...base,DB:f.db},
+  {readSigned:signedPayload('status'),verifyOrder});
+ assert.equal((await status.json()).estado,'transferencia_informada');
+});
+test('un notify sin firma HMAC nunca llega a D1',async()=>{
+ const f=mockDb();
+ const res=await manejarTransferenciaLiveCentral(request('transfer-notify'),{...base,DB:f.db},
+  {readSigned:async()=>({error:'firma incorrecta',status:401}),verifyOrder});
  assert.equal(res.status,401);
  assert.equal(f.sql.length,0);
 });
