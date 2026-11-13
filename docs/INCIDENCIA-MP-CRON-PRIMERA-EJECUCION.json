@@ -1,0 +1,15 @@
+{
+  "schema": "saber-primer-cron-mp-live-v1",
+  "at": "2026-11-13T00:24:05.151Z",
+  "readonly": true,
+  "attempts": 12,
+  "cronActive": true,
+  "codeReady": true,
+  "health": null,
+  "orders100": [
+    {
+      "estado": "awaiting_payment",
+      "cantidad": 1
+    }
+  ]
+}
