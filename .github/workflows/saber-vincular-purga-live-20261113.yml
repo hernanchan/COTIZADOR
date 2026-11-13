@@ -47,6 +47,7 @@ jobs:
            -F "index.mjs=@$temp/index.mjs;filename=index.mjs;type=application/javascript+module" \
            "$root/saber-pagos-produccion/versions?bindings_inherit=strict")
           if [ "$status" != 200 ] || ! jq -e '.success==true and (.result.id|type=="string")' "$temp/stage.json" >/dev/null;then
+            jq -c --arg http "$status" '{http:$http,errors:[.errors[]?|{code,message}]}' "$temp/stage.json" > docs/VINCULO-PURGA-ERROR.json
             echo "SABER_SERVICE_BIND_STAGE_FAILED_HTTP_$status";exit 1
           fi
           id=$(jq -r '.result.id' "$temp/stage.json")
@@ -86,6 +87,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/VINCULO-PURGA-LIVE-RESULTADO.json
+          test ! -f docs/VINCULO-PURGA-ERROR.json || git add docs/VINCULO-PURGA-ERROR.json
           git diff --cached --quiet && exit 0
           git commit -m "ops: fase de instalación del puente privado para purga"
           for attempt in 1 2 3 4;do
