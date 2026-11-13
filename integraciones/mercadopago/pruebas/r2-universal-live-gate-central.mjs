@@ -4,6 +4,7 @@
 import {verificarPedidoUniversalCobrable,estadoPagoUniversal}
  from './r2-universal-checkout-central.mjs';
 import {r2GateGeneralOCanary} from './r2-live-canary-order.mjs';
+import {puedeRecibirTransferenciaAvisada} from './central-transferencia-recepcion-anticipada.mjs';
 const G='GO_COMERCIAL_CONFIRMADO',M=1048576;
 const WEB=/^WEB-ENSAYO-[A-F0-9]{32}$/;
 const ID=/^[A-Za-z0-9_-]{1,80}$/;
@@ -38,7 +39,7 @@ export async function autorizarOriginalR2Live(request,env,{readSigned,subtle=cry
   return respond({ok:false,error:'LIVE_R2_FICHA_INVALIDA',uploadAuthorized:false},422);
  if(!r2GateGeneralOCanary(env,p.orderId,['CENTRAL_LIVE_R2_GATE']))
   return respond({ok:false,error:'LIVE_R2_ORDEN_NO_HABILITADA',uploadAuthorized:false},503);
- let result,paid,mode,expectedMetrics;
+ let result,paid,mode,expectedMetrics,bankPending=false;
  try{
   const link=await env.DB.prepare(
    'SELECT commercial_order_id FROM central_r2_universal_order_links WHERE web_order_id=?'
@@ -63,12 +64,15 @@ export async function autorizarOriginalR2Live(request,env,{readSigned,subtle=cry
    anchoCm:x.anchoCm,altoCm:x.altoCm
   }));
   paid=await estadoPagoUniversal(env,link.commercial_order_id);
-  if(!paid.verified||paid.revoked)
-   return respond({ok:false,error:'LIVE_R2_PAGO_NO_CONCILIADO',uploadAuthorized:false},402);
+  if(!paid.verified&&!paid.revoked)
+   bankPending=await puedeRecibirTransferenciaAvisada(env,{
+    commercialOrderId:link.commercial_order_id,webOrderId:p.orderId});
+  if(paid.revoked||(!paid.verified&&!bankPending))
+   return respond({ok:false,error:'LIVE_R2_PAGO_O_AVISO_NO_VALIDO',uploadAuthorized:false},402);
  }catch{return respond({ok:false,error:'LIVE_R2_D1_INDISPONIBLE',uploadAuthorized:false},503)}
  return respond({ok:true,webOrderId:p.orderId,fileId:p.fileId,
   sha256:p.sha256,bytes:p.bytes,pages:p.pages,transport:'r2',
   mode,expectedMetrics,
-  paymentVerified:true,uploadAuthorized:false,productionAuthorized:false,
+  paymentVerified:paid.verified===true,bankPending,uploadAuthorized:false,productionAuthorized:false,
   next:'reserve-capacity-before-multipart'});
 }
