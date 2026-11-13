@@ -47,7 +47,8 @@ export async function consultarPagoArchivoR2Live(env,meta,{
  if(!data||data.ok!==true||data.webOrderId!==meta.orderId||
   data.fileId!==meta.fileId||data.sha256!==meta.sha256||
   data.bytes!==meta.bytes||data.pages!==meta.pages||
-  data.transport!=='r2'||data.paymentVerified!==true||
+  data.transport!=='r2'||
+  !(data.paymentVerified===true||data.paymentVerified===false&&data.bankPending===true)||
   !['bn','color'].includes(data.mode)||
   !Array.isArray(data.expectedMetrics)||data.expectedMetrics.length!==meta.pages||
   data.expectedMetrics.some(m=>!Number.isFinite(m.anchoCm)||
