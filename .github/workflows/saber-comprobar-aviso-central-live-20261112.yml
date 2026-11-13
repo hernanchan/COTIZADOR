@@ -39,6 +39,19 @@ jobs:
            const a=await fetch('https://pedidos.libreriasaber.com.ar/personal/central',{redirect:'manual',signal:AbortSignal.timeout(15000)});
            if(a.status!==401)throw Error('ACCESO_PERSONAL_NO_PROTEGIDO_'+a.status);
            report.estado='AVISO_DESPLEGADO_Y_CENTRAL_PROTEGIDA';
+           const path='/personal/api/live-reconcile';
+           const route=await fetch('https://pedidos.libreriasaber.com.ar'+path,{redirect:'manual',signal:AbortSignal.timeout(15000)});
+           report.personalReconcileUnauthorizedStatus=route.status;
+           const paymentsUrl='https://api.cloudflare.com/client/v4/accounts/'+account+'/workers/scripts/saber-pagos-produccion';
+           const p=await fetch(paymentsUrl,{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(20000)});
+           if(!p.ok)throw Error('PAGOS_WORKER_HTTP_'+p.status);
+           const paymentCode=await p.text();
+           report.docsRouteExists=code.includes('/personal/api/live-reconcile');
+           report.centralRouteExists=paymentCode.includes('/internal/central/live/staff-reconcile');
+           report.paymentRecoveryLogicExists=paymentCode.includes('merchant_orders/search?');
+           if(route.status!==401||!report.docsRouteExists||!report.centralRouteExists||!report.paymentRecoveryLogicExists)
+            throw Error('RESCATE_LIVE_AUN_NO_DESPLEGADO');
+           report.estado='RESCATE_MP_LIVE_DESPLEGADO_Y_PROTEGIDO';
           }catch(e){report.estado=String(e.message||e).slice(0,90)}
           await mkdir('docs',{recursive:true});
           await writeFile('docs/ESTADO-AVISO-CENTRAL-LIVE-20261112.json',JSON.stringify(report,null,2)+'\n');
