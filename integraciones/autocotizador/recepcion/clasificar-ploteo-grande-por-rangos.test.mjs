@@ -106,3 +106,28 @@ test('si lectura falla o excede 12 páginas no inventa clasificación',async()=>
   paginas,pdfjs:broken.lib,createCanvas:canvasFactory('cad')
  }),null);
 });
+
+test('nueve páginas originales pero sólo 1-3 solicitadas: renderiza exactamente tres',async()=>{
+ const f=archivo(),mock=pdfjsMock(),progress=[];
+ const result=await clasificarPloteoGrandePorRangos(f,{
+  paginas,seleccionadas:[1,2,3],pdfjs:mock.lib,
+  createCanvas:canvasFactory('cad'),onProgreso:p=>progress.push(p)
+ });
+ assert.equal(result.altaConfianza,true);
+ assert.deepEqual(result.paginas.map(p=>p.numero),[1,2,3]);
+ assert.equal(mock.renders,3,'No procesar las seis páginas no solicitadas');
+ assert.equal(f.reads.length,1);
+ assert.equal(result.originalSubido,false);
+ assert.deepEqual(progress.map(p=>[p.terminadas,p.total,p.numeroPagina]),
+  [[1,3,1],[2,3,2],[3,3,3]]);
+});
+test('rechazar selección fuera de rango, repetida o vacía sin subir original',async()=>{
+ const f=archivo(),mock=pdfjsMock();
+ for(const seleccionadas of [[],[1,1],[0,1],[1,10],[1,'2']]){
+  assert.equal(await clasificarPloteoGrandePorRangos(f,{
+   paginas,seleccionadas,pdfjs:mock.lib,createCanvas:canvasFactory('cad')
+  }),null);
+ }
+ assert.equal(mock.renders,0);
+ assert.equal(f.reads.length,0);
+});
