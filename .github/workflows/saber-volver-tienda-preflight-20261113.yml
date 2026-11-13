@@ -50,5 +50,11 @@ jobs:
           let last=-1,position=-1;
           while((position=text.indexOf(marker,position+1))>=0)last=position;
           if(last>=0)console.log('SABER_UI_LIVE_HEADER_CONTEXT',JSON.stringify(text.slice(Math.max(0,last-320),Math.min(text.length,last+650))));
-          console.log('SABER_UI_RETURN_DIAGNOSTIC_READONLY_NO_DEPLOY');
+          for(const needle of [String.raw`<header><strong>Librer\xEDa Saber</strong></header>`,
+            String.raw`<header><strong>Librer\xEDa Saber \xB7 Impresiones y ploteos</strong></header>`]){
+            const count=text.split(needle).length-1;
+            console.log('SABER_UI_ENCODED_HEADER_MATCH',count);
+            assert.equal(count,1,'Encabezado activo distinto: cancelar despliegue');
+          }
+          console.log('SABER_UI_RETURN_PREFLIGHT_OK_NO_DEPLOY_NO_PAYMENT');
           NODE
