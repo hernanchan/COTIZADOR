@@ -188,3 +188,5 @@ jobs:
           echo SABER_PAGO_LIVE_AUTO_CADA_MINUTO_HABILITADO
 
 # Último código de entrega LIVE; flags de borrado OFF hasta activación controlada.
+
+# Entregados informa borrado confirmado/pendiente sin revelar Storage.
