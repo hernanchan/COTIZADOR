@@ -173,3 +173,23 @@ test('ensayos anulados salen del listado activo sin borrar la conciliación del 
  assert.match(query,/p\.state='verified'/);
  assert.match(query,/o\.status='paid'/);
 });
+
+test('consulta SQL excluye entregados y avisa purga pendiente sin borrar pagos',async()=>{
+ const {env,queries}=envWith();
+ const original=env.DB.prepare.bind(env.DB);
+ env.DB.prepare=sql=>{
+  if(sql.includes("name='central_live_production_states'"))
+   return {first:async()=>({name:'central_live_production_states'})};
+  if(sql.includes('SELECT COUNT(*) AS n FROM central_live_production_states s'))
+   return {first:async()=>({n:2})};
+  return original(sql);
+ };
+ const res=await listarRecepcionUniversalLive(new Request(url),env,{authorized:true});
+ assert.equal(res.status,200);
+ const data=await res.json();
+ assert.equal(data.cleanupPendingCount,2);
+ const boardSql=queries.find(s=>s.includes('FROM central_r2_universal_order_links l'));
+ assert.match(boardSql,/s\.state!='entregado'/);
+ assert.match(boardSql,/LEFT JOIN central_live_production_states s/);
+ assert.doesNotMatch(boardSql,/DELETE FROM|UPDATE orders/);
+});
