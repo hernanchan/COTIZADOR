@@ -206,11 +206,18 @@ export async function aprobarTransferenciaLiveCentral(request,env,{
   if(!checked?.ok||checked.amountArs!==p.amount_ars||
      !transportesTransferenciaLiveHabilitados(checked.rows,env))
    return respond({ok:false,error:'TRANSFER_LIVE_FICHA_NO_CONCILIADA'},409);
-  const [review,prior]=await Promise.all([
+  const [review,prior,usedReference]=await Promise.all([
    env.DB.prepare('SELECT state FROM payment_reviews WHERE order_id=?').bind(order.id).first(),
-   env.DB.prepare('SELECT order_id FROM central_live_bank_accreditations WHERE order_id=?').bind(order.id).first()
+   env.DB.prepare('SELECT order_id FROM central_live_bank_accreditations WHERE order_id=?').bind(order.id).first(),
+   env.DB.prepare("SELECT order_id FROM central_live_bank_accreditations "+
+    "WHERE REPLACE(bank_reference,' ','-')=REPLACE(?,' ','-') LIMIT 1")
+    .bind(reference).first()
   ]);
   if(review||prior)return respond({ok:false,error:'TRANSFER_LIVE_YA_REVISADA'},409);
+  // Una referencia bancaria no identifica más de una acreditación, aun
+  // cuando cambien espacios por guiones. Informar la causa real ANTES de batch.
+  if(usedReference)return respond({
+   ok:false,error:'TRANSFER_LIVE_REFERENCIA_YA_UTILIZADA'},409);
   // Transacción: registro bancario exclusivo + actualización paid + revisión D1.
   const applied=await env.DB.batch([
    env.DB.prepare(
@@ -238,5 +245,12 @@ export async function aprobarTransferenciaLiveCentral(request,env,{
    return respond({ok:false,error:'TRANSFER_LIVE_REVISION_INCOMPLETA'},409);
   return respond({ok:true,order_id:order.id,amount_ars:p.amount_ars,
    estado:'pagado',paymentVerified:true,productionAuthorized:false});
- }catch{return respond({ok:false,error:'TRANSFER_LIVE_REFERENCIA_REPETIDA_O_CONCURRENCIA'},409)}
+ }catch(error){
+  // No mentir sobre referencias duplicadas: un error SQL de esquema, red o
+  // consulta previa NO prueba concurrencia. D1.batch es transaccional.
+  console.error('SABER_LIVE_TRANSFER_ACREDITACION_FALLO',
+   {constraint:/UNIQUE|SQLITE_CONSTRAINT/i.test(String(error?.message||'')),
+    databaseError:true});
+  return respond({ok:false,error:'TRANSFER_LIVE_ACREDITACION_NO_COMPLETADA'},503);
+ }
 }
