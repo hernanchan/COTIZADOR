@@ -11,8 +11,8 @@ jobs:
     timeout-minutes: 10
     environment: {name: saber-cloudflare-pruebas, deployment: false}
     env:
-      ACCOUNT: \${{ secrets.SABER_CF_ACCOUNT_ID }}
-      TOKEN: \${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -25,7 +25,7 @@ jobs:
         shell: bash
         run: |
           set -eEuo pipefail
-          : "\${ACCOUNT:?}" "\${TOKEN:?}"
+          : "${ACCOUNT:?}" "${TOKEN:?}"
           worker=saber-documentos-produccion
           root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts"
           beta="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/workers/$worker/versions"
