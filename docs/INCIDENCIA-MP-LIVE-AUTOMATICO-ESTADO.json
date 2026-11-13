@@ -1,11 +1,11 @@
 {
   "schema": "saber-mp-live-auto-check-v1",
-  "date": "2026-11-13T00:22:02.448Z",
+  "date": "2026-11-13T00:27:23.741Z",
   "readonly": true,
   "cronActive": true,
   "crons": 1,
   "autoCodeDeployed": true,
-  "sandboxIsolated": false,
+  "sandboxIsolated": true,
   "orders100": [
     {
       "estado": "awaiting_payment",
