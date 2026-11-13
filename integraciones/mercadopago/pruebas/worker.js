@@ -4858,7 +4858,10 @@ export default {
      .catch(()=>console.warn('SABER_PURGA_ENTREGADOS_CRON_ERROR')));
    // Revisión de retención de 48h solo D1 SELECT. No confundir
    // un pedido impago con un archivo que pueda borrarse sin bloquear cobro.
-   ctx.waitUntil(import('./central-retencion-abandonados-live.mjs')
+   const scheduledAt=Number.isFinite(event?.scheduledTime)?
+    event.scheduledTime:Date.now();
+   if(new Date(scheduledAt).getUTCMinutes()===0)
+    ctx.waitUntil(import('./central-retencion-abandonados-live.mjs')
     .then(({revisarRetencion48hLive})=>revisarRetencion48hLive(env))
     .then(r=>{
      if(r?.enabled&&!r.ok)console.warn('SABER_RETENCION_48H_AUDITORIA_ERROR',r.reason);
