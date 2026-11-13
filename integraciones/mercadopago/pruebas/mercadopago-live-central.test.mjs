@@ -131,7 +131,7 @@ test('retorno HTTPS admite comprador productivo y rechaza URL insegura sin crear
  const fetcher=async(url,options)=>{
   if(new URL(url).pathname==='/checkout/preferences'&&options?.method==='POST'){
    const body=JSON.parse(options.body);
-   observed.push(body.back_urls);
+   observed.push(body.back_urls);assert.equal(body.auto_return,'approved','El pago aprobado debe retornar automáticamente a seguimiento');
    vigencias.push({expires:body.expires,inicio:body.expiration_date_from,fin:body.expiration_date_to});
   }
   return f.mpFetch(url,options);
