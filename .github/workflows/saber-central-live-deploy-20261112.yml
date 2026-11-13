@@ -186,3 +186,5 @@ jobs:
           jq -e '.success==true and (.result.schedules|length==1 and .[0].cron=="* * * * *")' \
             /tmp/saber-live-verified-schedules.json >/dev/null
           echo SABER_PAGO_LIVE_AUTO_CADA_MINUTO_HABILITADO
+
+# Último código de entrega LIVE; flags de borrado OFF hasta activación controlada.
