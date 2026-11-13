@@ -1,0 +1,50 @@
+name: Saber - comprobar tarjeta Polaroids por WhatsApp pública
+on:
+  push:
+    branches: [qa/catalogo-publico-20261113]
+    paths: ['.github/workflows/saber-polaroids-whatsapp-public-20261113.yml']
+permissions: {contents: read}
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Verificar tarjeta y destinos sin enviar pedidos
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://libreriasaber.com.ar/fotos-stickers'
+          for i in $(seq 1 15); do
+            if curl -fsSL --connect-timeout 12 --max-time 25 "$url" -o /tmp/saber-photos-page; then
+              if grep -Fq 'Encargar por WhatsApp' /tmp/saber-photos-page; then break; fi
+            fi
+            echo "SABER_POLAROIDS_PUBLIC_PENDING iteration=$i"
+            sleep 8
+          done
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          from urllib.parse import urlparse,parse_qs,unquote
+          text=Path('/tmp/saber-photos-page').read_text()
+          assert '<h2 id="titulo-polaroids">Polaroids personalizadas</h2>' in text
+          assert '6 fotos por hoja A4 · $3.000 por hoja.' in text
+          assert 'Encargar por WhatsApp' in text
+          assert 'cotizar?servicio=fotos' in text
+          assert 'cotizar?servicio=stickers' in text
+          assert 'editor automático todavía no está habilitado' in text
+          assert 'polaroids/editor.html' not in text
+          class Links(HTMLParser):
+              def __init__(self): super().__init__();self.links=[]
+              def handle_starttag(self,tag,attrs):
+                  if tag=='a': self.links.append(dict(attrs).get('href',''))
+          p=Links();p.feed(text)
+          urls=[x for x in p.links if x.startswith('https://wa.me/')]
+          assert len(urls)==1,urls
+          target=urlparse(urls[0])
+          assert target.netloc=='wa.me' and target.path=='/5493513110130'
+          m=parse_qs(target.query).get('text',[''])[0]
+          assert 'Polaroids personalizadas' in m and '$3.000' in m
+          print('SABER_POLAROIDS_WHATSAPP_PUBLIC_OK')
+          print('SABER_FOTOS_STICKERS_UNCHANGED_OK')
+          print('SABER_NO_EDITOR_OR_PAYMENT_CHANGED_OK')
+          PY
