@@ -1,0 +1,19 @@
+{
+  "checkedAt": "2026-11-13T02:14:19.557Z",
+  "workNumber": 9,
+  "readOnly": true,
+  "files": [
+    {
+      "work_number": 9,
+      "payment_state": "paid",
+      "file_position": 0,
+      "transport": "r2",
+      "received": 0,
+      "stage_exists": 0,
+      "stage_status": null,
+      "reservation_state": null,
+      "inspection_exists": 0
+    }
+  ],
+  "found": true
+}
