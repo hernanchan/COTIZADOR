@@ -37,7 +37,8 @@ function valid(r,web){
  if(!key||key[1]!==web||('DOC-'+key[2]).toLowerCase()!==r.receipt_id.toLowerCase())return false;
  if(r.transport==='r2')return r.bytes>40*1048576&&r.bytes<=200*1048576&&
   typeof r.etag==='string'&&r.etag.length>=8&&
-  r.r2_status==='awaiting_pdf_analysis'&&r.inspected===1;
+  r.r2_status==='awaiting_pdf_analysis'&&r.reservation_state==='reserved'&&
+  Number.isSafeInteger(r.pages_claimed)&&r.pages_claimed>=1&&r.pages_claimed<=2000;
  return r.bytes<=40*1048576;
 }
 async function tables(db){await db.prepare(Q).run();await db.prepare(A).run()}
@@ -56,23 +57,23 @@ export async function planEntregaLive(env,orderId,{state='listo',version}={}){
    order.status!=='paid'||!order.paid_at||order.amount_ars!==order.deposit_ars||
    order.amount_ars!==order.link_amount||order.state!==state||order.version!==version||
    !Number.isSafeInteger(order.file_count)||order.file_count<1||order.file_count>10)return null;
- const inspectionTable=await db.prepare(
-  "SELECT name FROM sqlite_master WHERE type='table' AND name='central_r2_live_inspections'").first();
- const inspectionSql=inspectionTable?
-  "CASE WHEN EXISTS(SELECT 1 FROM central_r2_live_inspections i "+
-  "WHERE i.web_order_id=f.web_order_id AND i.file_id=f.file_id AND i.sha256=f.sha256) "+
-  "THEN 1 ELSE 0 END AS inspected ":
-  "0 AS inspected ";
+ // La ruta comercial obtiene el ZIP y coteja sus originales al iniciar
+ // preparación. Para borrar al entregar no exigir una inspección manual de
+ // R2 que ya no está disponible; verificar en cambio su recibo inmutable,
+ // la reserva y el SHA/ETag y tamaño de la recepción aprobada.
  const rows=await db.prepare(
   "SELECT f.file_id,f.transport,f.web_order_id,f.sha256,f.bytes,f.received,"+
   "t.receipt_id AS tus_receipt,t.object_name AS tus_key,t.sha256 AS tus_sha,t.bytes AS tus_bytes,"+
   "r.receipt_id AS r2_receipt,r.object_key AS r2_key,r.etag AS r2_etag,"+
   "r.sha256 AS r2_sha,r.bytes AS r2_bytes,r.status AS r2_status,"+
-  inspectionSql+
+  "r.pages_claimed, q.state AS reservation_state "+
   "FROM central_r2_universal_files f "+
   "LEFT JOIN central_r2_universal_tus_receipts t ON t.web_order_id=f.web_order_id AND t.file_id=f.file_id "+
   "LEFT JOIN central_r2_large_pending r ON r.web_order_id=f.web_order_id AND r.file_id=f.file_id "+
   "AND r.sha256=f.sha256 AND r.bytes=f.bytes "+
+  "LEFT JOIN central_r2_large_reservations q ON q.object_key=r.object_key "+
+  "AND q.web_order_id=f.web_order_id AND q.file_id=f.file_id "+
+  "AND q.sha256=f.sha256 AND q.bytes=f.bytes "+
   "WHERE f.web_order_id=? ORDER BY f.ordinal"
  ).bind(order.web_order_id).all();
  const source=rows.results||[];
@@ -83,7 +84,8 @@ export async function planEntregaLive(env,orderId,{state='listo',version}={}){
    sha256:x.sha256,bytes:x.bytes,
    receipt_id:r2?x.r2_receipt:x.tus_receipt,
    object_key:r2?x.r2_key:x.tus_key,etag:r2?x.r2_etag:null,
-   r2_status:x.r2_status,inspected:x.inspected,
+   r2_status:x.r2_status,reservation_state:x.reservation_state,
+   pages_claimed:x.pages_claimed,
    matched:r2?x.r2_sha===x.sha256&&x.r2_bytes===x.bytes:
     x.tus_sha===x.sha256&&x.tus_bytes===x.bytes};
  });
