@@ -1,14 +1,19 @@
 {
-  "checkedAt": "2026-11-13T02:49:57.662Z",
+  "checkedAt": "2026-11-13T03:06:19.845Z",
   "schema": "saber-e2e-integral-v1",
-  "passed": true,
-  "code": 0,
+  "passed": false,
+  "code": 1,
   "scenario": "Mercado Pago + transferencia | TUS <=40 MiB + R2 >40 MiB",
   "noRealPayments": true,
   "noRealFiles": true,
   "failures": [
-    "# tests 80",
-    "# pass 80",
-    "# fail 0"
+    "not ok 60 - estado listo exige pasos previos; entregado bloqueado hasta purga segura",
+    "  failureType: 'testCodeFailure'",
+    "  error: |-",
+    "  code: 'ERR_ASSERTION'",
+    "  name: 'AssertionError'",
+    "# tests 84",
+    "# pass 83",
+    "# fail 1"
   ]
 }
