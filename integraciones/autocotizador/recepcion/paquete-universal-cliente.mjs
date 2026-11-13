@@ -182,7 +182,7 @@ button?.addEventListener('click',()=>void descargarZIP());
 (async()=>{
  try{
   if(liveStaff&&!webOrderId){
-   state.textContent='Elegí una orden pagada en la lista de inspección R2 que aparece abajo, o ingresá desde la Central de Pedidos. No hace falta copiar referencias.';
+   state.textContent='Abrí el pedido desde la Central de Pedidos y usá «Descargar ZIP + instrucciones».';
    return;
   }
   if(!WEB.test(webOrderId))throw Error('Número de pedido inválido');
@@ -198,9 +198,15 @@ button?.addEventListener('click',()=>void descargarZIP());
       !SHA.test(t.sha256||'')||!['tus','r2'].includes(t.transporte)))
    throw Error('La ficha del pedido no es válida');
   ficha=x;number.textContent='Orden '+x.numeroOrden;
-  detail.textContent=x.trabajos.length+' PDF · $'+x.importe+
-   ' · '+x.trabajos.filter(t=>t.transporte==='r2').length+' R2 y '+
-   x.trabajos.filter(t=>t.transporte==='tus').length+' TUS';
+  detail.textContent=x.trabajos.length+' PDF · 
+  state.textContent='Pedido completo. Descargá el ZIP con los originales y las instrucciones. Revisá las opciones de impresión antes de producir.';
+  button.disabled=false;
+ }catch(e){
+  state.textContent='El ZIP todavía no está disponible. Comprobá en la Central que el pago esté acreditado y que todos los archivos hayan llegado. '+String(e?.message||e);
+ }
+})();
++x.importe+
+   ' · Pago acreditado · originales recibidos';
   state.textContent='Todos los originales tienen recibo verificado. Descargá el ZIP y controlá la preprensa.';
   button.disabled=false;
  }catch(e){
