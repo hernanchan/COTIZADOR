@@ -13,6 +13,7 @@ const WORKER='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.
 
 export async function clasificarPloteoGrandePorRangos(file,{
  paginas,seleccionadas=null,pdfjs=globalThis.pdfjsLib,
+ signal=null,maxAnalysisMs=12000,
  createCanvas=()=>document.createElement('canvas'),
  onProgreso=()=>{}
 }={}){
@@ -31,6 +32,18 @@ export async function clasificarPloteoGrandePorRangos(file,{
     targets.some(n=>!Number.isSafeInteger(n)||n<1||n>paginas.length)||
     new Set(targets).size!==targets.length)return null;
  let readBytes=0,calls=0,failed=null,task=null,doc=null;
+ let timedOut=false,timer=null,onAbort=null;
+ const stopped=new Promise((_,reject)=>{
+  timer=setTimeout(()=>{timedOut=true;reject(Error('PLOTEO_ANALISIS_LENTO'))},
+   Math.min(30000,Math.max(3000,Number(maxAnalysisMs)||12000)));
+  if(signal){
+   onAbort=()=>{timedOut=true;reject(Error('PLOTEO_ANALISIS_CANCELADO'))};
+   signal.addEventListener('abort',onAbort,{once:true});
+   if(signal.aborted)onAbort();
+  }
+ });
+ void stopped.catch(()=>{});
+ const wait=p=>Promise.race([p,failedRanges,stopped]);
  let rejectRanges;
  const failedRanges=new Promise((_,reject)=>{rejectRanges=reject});
  void failedRanges.catch(()=>{});
@@ -47,7 +60,7 @@ export async function clasificarPloteoGrandePorRangos(file,{
   return value;
  };
  try{
-  const initial=await get(0,Math.min(65536,file.size));
+  const initial=await Promise.race([get(0,Math.min(65536,file.size)),stopped]);
   if(new TextDecoder().decode(initial.subarray(0,5))!=='%PDF-')return null;
   if(typeof window!=='undefined'&&typeof document!=='undefined'&&
      pdfjs.GlobalWorkerOptions)pdfjs.GlobalWorkerOptions.workerSrc=WORKER;
@@ -68,11 +81,11 @@ export async function clasificarPloteoGrandePorRangos(file,{
   };
   task=pdfjs.getDocument({range:transport,disableAutoFetch:true,disableStream:true,
    rangeChunkSize:65536,isEvalSupported:false,disableFontFace:true,stopAtErrors:true});
-  doc=await Promise.race([task.promise,failedRanges]);
+  doc=await wait(task.promise);
   if(doc.numPages!==paginas.length||doc.numPages>MAX_PAGES)return null;
   const resultado=[];
   for(const n of targets){
-   const page=await Promise.race([doc.getPage(n),failedRanges]);
+   const page=await wait(doc.getPage(n));
    const viewportRaw=page.getViewport({scale:1});
    if(!Number.isFinite(viewportRaw.width)||!Number.isFinite(viewportRaw.height)||
        viewportRaw.width<=0||viewportRaw.height<=0)return null;
@@ -87,8 +100,8 @@ export async function clasificarPloteoGrandePorRangos(file,{
     if(!context)return null;
     context.fillStyle='#fff';
     context.fillRect(0,0,canvas.width,canvas.height);
-    await Promise.race([page.render({canvasContext:context,viewport,
-     background:'rgb(255,255,255)'}).promise,failedRanges]);
+    await wait(page.render({canvasContext:context,viewport,
+     background:'rgb(255,255,255)'}).promise);
     const pixels=context.getImageData(0,0,canvas.width,canvas.height).data;
     const cls=ajustarPlanoTecnicoPorPagina(
      clasificarCoberturaPloteo(pixels,{ancho:canvas.width,alto:canvas.height}));
@@ -110,7 +123,15 @@ export async function clasificarPloteoGrandePorRangos(file,{
    permiteImprimirSinRevisar:false});
  }catch{return null}
  finally{
-  try{await doc?.destroy?.()}catch{}
-  try{await task?.destroy?.()}catch{}
+  clearTimeout(timer);
+  if(signal&&onAbort)signal.removeEventListener('abort',onAbort);
+  // Evitar que la limpieza asíncrona de un parser atascado mantenga bloqueada
+  // la pantalla. Detener el worker sin esperar el resultado si venció el plazo.
+  if(timedOut){
+   try{void task?.destroy?.()?.catch?.(()=>{})}catch{}
+  }else{
+   try{await doc?.destroy?.()}catch{}
+   try{await task?.destroy?.()}catch{}
+  }
  }
 }
