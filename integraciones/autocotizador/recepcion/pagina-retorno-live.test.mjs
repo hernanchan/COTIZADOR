@@ -30,3 +30,19 @@ test('retorno LIVE no acredita pago por argumentos de Mercado Pago',async()=>{
  assert.equal(r.headers.get('Cache-Control'),'no-store, private');
  assert.match(r.headers.get('Content-Security-Policy'),/connect-src 'self'/);
 });
+
+test('retorno de pago incluye seguimiento real, orden y archivos pendientes sin admitir acreditación por URL',async()=>{
+ const on={SABER_ENTORNO:'produccion',DOCS_MP_LIVE_GATE:'GO_COMERCIAL_CONFIRMADO',DOCS_LIVE_TUS_GATE:'GO_COMERCIAL_CONFIRMADO',DOCS_LIVE_RECEPCION_GATE:'GO_COMERCIAL_CONFIRMADO'};
+ const response=paginaRetornoLive(new Request('https://pedidos.libreriasaber.com.ar/pedido/estado?status=approved&payment_id=9999'),on);
+ assert.equal(response.status,200);
+ const html=await response.text();
+ assert.match(html,/Seguimiento de tu pedido/);
+ assert.match(html,/id="numeroPedido"/);
+ assert.match(html,/id="estadoTrabajo"/);
+ assert.match(html,/id="resumenArchivos"/);
+ assert.match(html,/id="fechaRetiro"/);
+ assert.match(html,/actualizarSeguimiento\(data\)/);
+ assert.match(html,/setInterval\(\(\)=>\{if\(!document\.hidden\)void revisar\(\)\},15000\)/);
+ assert.match(html,/\/api\/pedido\/live\/checkout/);
+ assert.doesNotMatch(html,/searchParams\.get\('payment_id'\)/);
+});
