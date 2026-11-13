@@ -87,7 +87,8 @@ test('seguimiento informa progreso real, reintento y recepción distinta de insp
  assert.match(html,/showProgress\(p\.percent,p\.phase,'TUS'\)/);
  assert.match(html,/showProgress\(p\.batchPercent,p\.phase,'R2'\)/);
  assert.match(html,/Archivo recibido y verificado/);
- assert.match(html,/pendiente de inspección en Librería Saber/);
+ assert.match(html,/Librería Saber revisará el original y las instrucciones antes de imprimir/);
+ assert.match(html,/const pendingR2=large\.some\(m=>!received\.has\(m\.fileId\)\)/);
  assert.doesNotMatch(html,/void flow\.iniciarPago\(\)/);
  const script=html.match(/<script type="module">([\s\S]*?)<\/script>/);
  assert.ok(script);
