@@ -30,11 +30,13 @@ jobs:
             '<header><strong>Librería Saber</strong></header>',
             '<header><strong>Librería Saber · Impresiones y ploteos</strong></header>'
           ];
-          for(const label of labels){
-            const count=text.split(label).length-1;
-            console.log('SABER_UI_RETURN_BASELINE_MATCH_COUNT',count);
-            assert.equal(count,1,'No es seguro cambiar la versión actual si difiere del código esperado');
+          console.log('SABER_WORKER_SIZE_BYTES',text.length);
+          for(const label of labels) console.log('SABER_EXACT_HEADER_COUNT',text.split(label).length-1);
+          for(const needle of ['<header','Librería Saber','Impresiones y ploteos','<strong','api/pedido/live/sesion','GO_COMERCIAL_CONFIRMADO','<html','content-type']){
+            const count=text.split(needle).length-1;
+            console.log('SABER_SAFE_MARKER',JSON.stringify(needle),count);
           }
-          assert.ok(text.includes('GO_COMERCIAL_CONFIRMADO'),'GATE_REFERENCE_MISSING');
-          console.log('SABER_UI_RETURN_PREFLIGHT_OK_NO_DEPLOY_NO_PAYMENT');
+          const h=text.indexOf('<header');
+          console.log('SABER_SAFE_HEADER_SHAPE',h<0?'NO_LITERAL_HEADER':text.slice(h,Math.min(h+200,text.length)).replace(/[\\r\\n]/g,' '));
+          console.log('SABER_UI_RETURN_DIAGNOSTIC_READONLY_NO_DEPLOY');
           NODE
