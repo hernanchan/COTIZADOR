@@ -4828,7 +4828,20 @@ async function documentSandboxEligibility(env,orderId,allowExistingPreference=fa
 }
 export default {
  async scheduled(event,env,ctx){
-  ctx.waitUntil(runScheduledReconciliation(env).catch(e=>console.error("Scheduled payment sync failed",String(e?.message||"unknown").slice(0,120))));
+  // LIVE: las órdenes aprobadas deben llegar a la Central sin acción del mostrador.
+  // Nunca ejecutar la sincronización de pagos Sandbox con credenciales LIVE.
+  if(env?.SABER_ENTORNO==='produccion'&&env?.CENTRAL_DB_ENV==='produccion'){
+   ctx.waitUntil(import('./central-mp-live-rescate.mjs')
+    .then(({conciliarPendientesMPLiveAutomatico})=>conciliarPendientesMPLiveAutomatico(env))
+    .then(result=>{
+     if(!result?.ok||result?.errores||result?.enRevision)
+      console.warn('SABER_MP_LIVE_CRON_REVISION',{
+       error:result?.error||null,errores:result?.errores||0,enRevision:result?.enRevision||0});
+     if(result?.recuperados)console.log('SABER_MP_LIVE_CRON_ACREDITADOS',result.recuperados);
+    }).catch(()=>console.warn('SABER_MP_LIVE_CRON_INDISPONIBLE')));
+  }else{
+   ctx.waitUntil(runScheduledReconciliation(env).catch(e=>console.error("Scheduled payment sync failed",String(e?.message||"unknown").slice(0,120))));
+  }
   ctx.waitUntil(centralProcessTUSPurgeQueue(env).catch(()=>{}));
   if(env.CENTRAL_R2_UNIVERSAL_PURGE_ENABLED==='PRIVATE_TEST_ONLY'&&
      env.CENTRAL_R2_UNIVERSAL_PURGE_EXECUTE_ENABLED==='PRIVATE_TEST_ONLY')
