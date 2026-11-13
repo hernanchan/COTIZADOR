@@ -13,7 +13,7 @@ header{background:#153d65;color:white;padding:19px max(18px,calc((100vw - 1100px
 header strong{font-size:21px}main{max-width:1100px;margin:22px auto;padding:0 16px}
 section{border:1px solid #d5e1eb;background:white;border-radius:14px;padding:22px;margin-bottom:15px}
 h1{font-size:25px;margin:0 0 10px}h2{font-size:18px;margin:0 0 10px}p{margin:9px 0;color:#3e5569}
-label{font-weight:600}input{font:inherit;width:100%;max-width:330px;padding:12px;border:1px solid #aabcca;border-radius:9px;display:block;margin:8px 0 15px}
+label{font-weight:600;display:block}input{font:inherit;width:100%;max-width:520px;padding:12px;border:1px solid #aabcca;border-radius:9px;display:block;margin:8px 0 15px}
 button{font:inherit;border:0;background:#0c5688;color:white;border-radius:9px;padding:13px 17px;font-weight:700;cursor:pointer}
 button:disabled{opacity:.47;cursor:not-allowed}#estado{min-height:25px}small{color:#586c7e}
 #pdf{display:block;width:100%;height:960px;min-height:0;border:0;overflow:hidden;background:#fff}
@@ -26,7 +26,7 @@ button:disabled{opacity:.47;cursor:not-allowed}#estado{min-height:25px}small{col
 #promo-dia[hidden]{display:none}
 section[hidden]{display:none!important}
 #siguiente{margin-top:12px}
-#volver-archivos{background:#fff;color:#18547c;border:1px solid #9eb7cd;margin:0 0 18px}
+#volver-archivos{display:block;background:#fff;color:#18547c;border:1px solid #9eb7cd;margin:0 0 20px;max-width:100%}.payment-options{display:flex;align-items:center;flex-wrap:wrap;gap:11px;margin-top:14px}.payment-options>p{flex-basis:100%;max-width:720px}.payment-options button{margin:0!important}
 #precio-entrega:has(+ #plazo-explicacion){border-bottom:0;border-radius:12px 12px 0 0}
 #plazo-explicacion:not(:has(+ #promo-dia:not([hidden]))){border-bottom:2px solid #c3d9ea;border-radius:0 0 12px 12px;padding-bottom:12px}
 @media(max-width:650px){#precio-entrega{grid-template-columns:1fr}}
@@ -85,7 +85,8 @@ window.saberIngresoLive=async token=>{
 <button type="button" id="siguiente" disabled>Siguiente · Tus datos</button>
 <p id="aviso-siguiente" aria-live="polite">Elegí y confirmá las opciones de impresión para continuar.</p>
 </section><section id="seccion-confirmacion" hidden><h2>2. Tus datos y el pago</h2>
-<button type="button" id="volver-archivos">Volver a mis archivos</button><label for="nombre">Nombre y apellido o responsable *</label>
+<button type="button" id="volver-archivos">Volver a mis archivos</button>
+<label for="nombre">Nombre y apellido o responsable *</label>
 <input id="nombre" autocomplete="name" maxlength="100" placeholder="Nombre de quien retira" required>
 <label for="telefono">Teléfono de contacto (con código de área) *</label>
 <input id="telefono" inputmode="tel" autocomplete="tel" maxlength="26" placeholder="351 555 5555" required>
@@ -272,7 +273,7 @@ action.addEventListener('click',async()=>{
   if(bankEnabled){
    const bank=document.createElement('button');
    bank.type='button';bank.textContent='Pagar por transferencia';
-   bank.style.marginLeft='10px';
+   bank.style.marginLeft='0';
    const instructions=document.createElement('p');
    instructions.setAttribute('role','status');
    options.append(bank,instructions);
