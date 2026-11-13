@@ -66,3 +66,12 @@ test('pospago automático: no pide otra selección y solo envía si acreditó el
  assert.ok(script,'No se encontró JS de envío automático');
  assert.doesNotThrow(()=>new Function(script[1]),'JavaScript pospago inválido');
 });
+
+test('aviso permanente de no cerrar navegador durante la recepción postpago',async()=>{
+ const r=paginaRetornoLive(new Request(host),on);
+ const html=await r.text();
+ assert.match(html,/id="aviso-subida"/);
+ assert.match(html,/mantené esta pestaña abierta/);
+ assert.match(html,/hasta que confirmemos «Archivo recibido»/);
+ assert.match(html,/nunca vuelvas a pagar por el mismo pedido/);
+});
