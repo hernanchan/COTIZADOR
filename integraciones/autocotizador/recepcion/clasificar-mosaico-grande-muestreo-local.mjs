@@ -80,11 +80,15 @@ export async function clasificarMosaicoGrandePorMuestras(file,{
      (index&&Number(index[1])!==size)||m.streamOffset===null)return null;
   const xdata=await inflate(await read(offset+m.streamOffset,len),size*7+32);
   if(xdata.byteLength!==size*7)return null;
-  const offsets=new Map();
+  const offsets=new Map(),compressed=new Map(),objstmCache=new Map();
   const view=new DataView(xdata.buffer,xdata.byteOffset,xdata.byteLength);
   for(let i=0;i<size;i++){
    const at=i*7,type=view.getUint8(at),position=view.getUint32(at+1,false);
    if(type===1&&position>0&&position<file.size)offsets.set(i,position);
+   // Los PDF de CAD reales guardan los recursos /XObject dentro de
+   // /ObjStm, no necesariamente como objetos PDF directos.
+   if(type===2&&position>0&&position<size)
+    compressed.set(i,{container:position,index:view.getUint16(at+5,false)});
   }
   // El tamaño del objeto queda acotado por el siguiente offset, sin leer
   // cientos de imágenes ni copiar el PDF completo al navegador.
@@ -95,6 +99,50 @@ export async function clasificarMosaicoGrandePorMuestras(file,{
    return sorted[lo]||file.size;
   }
   async function getObject(n,limit=65536){
+   const inStream=compressed.get(n);
+   if(inStream){
+    let objstm=objstmCache.get(inStream.container);
+    if(!objstm){
+     // La tabla comprimida es tipo 2: (objeto contenedor, índice).
+     // Solo descomprimir /ObjStm FlateDecode acotados, nunca un PDF completo.
+     if(!offsets.has(inStream.container))
+      throw Error('PDF_OBJSTM_CONTENEDOR_NO_DIRECTO');
+     const parent=await getObject(inStream.container,1200);
+     const header=parent.info.dict;
+     const number=scalar(header,'N'),first=scalar(header,'First');
+     const length=scalar(header,'Length');
+     if(!/\/Type\s*\/ObjStm\b/.test(header)||
+        !/\/Filter\s*\/FlateDecode\b/.test(header)||
+        !isPos(number)||number>64||!isPos(first)||first>8192||
+        !isPos(length)||length>65536)
+      throw Error('PDF_OBJSTM_NO_ADMITIDO');
+     const raw=await streamOf(parent,65536);
+     const inflated=await inflate(raw,256*1024);
+     if(inflated.length<=first)throw Error('PDF_OBJSTM_TRUNCADO');
+     const tokens=decoder.decode(inflated.subarray(0,first)).trim()
+      .split(/\s+/).map(Number);
+     if(tokens.length!==number*2||
+        tokens.some(t=>!Number.isSafeInteger(t)||t<0))
+      throw Error('PDF_OBJSTM_INDICE_INVALIDO');
+     objstm={inflated,first,number,tokens};
+     objstmCache.set(inStream.container,objstm);
+     // No conservar acumulaciones innecesarias: como máximo cuatro
+     // contenedores de recursos para este análisis corto.
+     if(objstmCache.size>4)objstmCache.delete(objstmCache.keys().next().value);
+    }
+    if(inStream.index>=objstm.number||
+       objstm.tokens[inStream.index*2]!==n)
+     throw Error('PDF_OBJSTM_REFERENCIA_INCORRECTA');
+    const start=objstm.first+objstm.tokens[inStream.index*2+1];
+    const end=inStream.index+1<objstm.number?
+     objstm.first+objstm.tokens[inStream.index*2+3]:
+     objstm.inflated.length;
+    if(start<objstm.first||end<=start||end>objstm.inflated.length||
+       end-start>limit)
+     throw Error('PDF_OBJSTM_OBJETO_NO_ADMITIDO');
+    const content=decoder.decode(objstm.inflated.subarray(start,end));
+    return {at:null,info:{dict:content,streamOffset:null},bytes:null};
+   }
    const at=offsets.get(n);
    if(!isPos(at))throw Error('PDF_OBJETO_NO_DIRECTO');
    const size=Math.min(nextOffset(at)-at,limit);
