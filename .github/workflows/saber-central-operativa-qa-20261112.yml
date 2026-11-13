@@ -72,3 +72,4 @@ jobs:
 # 13/11: QA corrección test duplicado vs índice D1 y cadena JS del panel bancario.
 # 13/11 QA casos originales: PDF MUNICIPAL FINAL 9 paginas raster grandes; renovacion sesion de transferencia; no repago.
 # 13/11: QA limitar análisis de PDF 60 MiB a páginas elegidas antes de leer raster, sin cobro ni subida.
+# 13/11: QA bloqueo 1-3,5-7: timeout PDF.js de raster pesado, cancelacion y alternativa CAD/Pleno informada.
