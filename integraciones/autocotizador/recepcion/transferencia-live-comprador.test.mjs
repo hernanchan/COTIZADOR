@@ -76,3 +76,28 @@ test('rechaza bandera de pago inventada y origen ajeno',async()=>{
  assert.equal((await transferenciaLiveComprador(req(input,'https://sitio-falso.example'),g.env,g.options)).status,403);
  assert.equal(g.requests.length,0);
 });
+
+test('acción notify «Ya transferí» usa HMAC, informa al staff y NO acredita',async()=>{
+ const f=fixture({reply:{ok:true,webOrderId:web,commercialOrderId:order,
+  amountArs:2500,estado:'transferencia_informada',alias:'SABER.CORDOBA',
+  customerNotified:true,paymentVerified:false,uploadAuthorized:false,productionAuthorized:false}});
+ const res=await transferenciaLiveComprador(req({...input,action:'notify'}),f.env,f.options);
+ assert.equal(res.status,200);
+ const data=await res.json();
+ assert.equal(data.customerNotified,true);
+ assert.equal(data.estado,'transferencia_informada');
+ assert.equal(data.paymentVerified,false);
+ assert.equal(data.uploadAuthorized,false);
+ assert.ok(f.requests[0].url.endsWith('/internal/central/live/transfer-notify'));
+ assert.deepEqual(await f.requests[0].json(),{
+  schema:'saber-central-live-transfer-notify-v1',
+  webOrderId:web,commercialOrderId:order
+ });
+});
+test('no acepta que «Ya transferí» falsifique la acreditación',async()=>{
+ const f=fixture({reply:{ok:true,webOrderId:web,commercialOrderId:order,
+  amountArs:2500,estado:'transferencia_informada',alias:'SABER.CORDOBA',
+  customerNotified:true,paymentVerified:true,uploadAuthorized:true,productionAuthorized:false}});
+ const res=await transferenciaLiveComprador(req({...input,action:'notify'}),f.env,f.options);
+ assert.equal(res.status,502);
+});
