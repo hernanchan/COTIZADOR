@@ -100,3 +100,33 @@ test('dos PDF R2 informan porcentaje de lote y 100% solo tras staging',async()=>
  assert.ok(events.slice(0,-1).every(e=>e.batchPercent<=99));
  assert.equal(f.calls.length,1);
 });
+
+test('transferencia YA AVISADA envía R2 antes de acreditar banco, sin habilitar producción',async()=>{
+ const m=mock(false),calls=[],receipt={...verified};
+ m.fetcher=async(url,req)=>{
+  calls.push(url);
+  assert.equal(url,'/api/pedido/live/transfer');
+  assert.equal(JSON.parse(req.body).action,'status');
+  return Response.json({ok:true,webOrderId:WEB,commercialOrderId:ID,
+   estado:'transferencia_informada',customerNotified:true,
+   paymentVerified:false,uploadAuthorized:false,productionAuthorized:false});
+ };
+ const result=await enviarPDFsR2PagadosLive({
+  selectedFiles:[file],storage:m.storage,fetcher:m.fetcher,origin:ORIGIN,
+  hasher:async()=>SHA,allowPendingBank:true,uploader:async()=>receipt
+ });
+ assert.equal(result.ok,true);assert.equal(result.productionAuthorized,false);
+ assert.deepEqual(calls,['/api/pedido/live/transfer']);
+});
+test('R2 no acepta aviso bancario ausente como permiso de subida',async()=>{
+ const m=mock(false);
+ m.fetcher=async()=>Response.json({ok:true,webOrderId:WEB,commercialOrderId:ID,
+  estado:'transferencia_pendiente',customerNotified:false,
+  paymentVerified:false,uploadAuthorized:false,productionAuthorized:false});
+ let uploads=0;
+ await assert.rejects(enviarPDFsR2PagadosLive({
+  selectedFiles:[file],storage:m.storage,fetcher:m.fetcher,origin:ORIGIN,
+  hasher:async()=>SHA,allowPendingBank:true,uploader:async()=>{uploads++;return verified}
+ }),/PAGO_O_AVISO_NO_CONCILIADO/);
+ assert.equal(uploads,0);
+});
