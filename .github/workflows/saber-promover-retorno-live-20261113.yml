@@ -33,7 +33,7 @@ jobs:
           jq -e '.success==true and (.result.bindings|any(.name=="SABER_ENTORNO" and .text=="produccion") and any(.name=="DOCS_LIVE_SESSION_GATE" and .text=="GO_COMERCIAL_CONFIRMADO") and any(.name=="SABER_CENTRAL" and .type=="service"))' "$tmp/settings-before.json" >/dev/null
           jq -r '.result.bindings[]|[.name,.type]|@tsv' "$tmp/settings-before.json" | sort > "$tmp/names-before"
           get "$beta?per_page=4" > "$tmp/versions.json"
-          latest=$(jq -er '.result.items[0].id // .result[0].id' "$tmp/versions.json")
+          latest=$(jq -er 'if (.result|type)=="array" then .result[0].id else .result.items[0].id end' "$tmp/versions.json")
           test "$latest" = "$new" || { echo SABER_GO_NO_GO_STAGED_VERSION_CHANGED; exit 1; }
           get "$beta/$new" > "$tmp/version.json"
           jq -e --arg id "$new" '.success==true and .result.id==$id' "$tmp/version.json" >/dev/null
