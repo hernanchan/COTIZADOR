@@ -317,6 +317,7 @@ action.addEventListener('click',async()=>{
       ' al alias '+result.alias+'. Después presioná «Ya transferí». Eso avisará a Librería Saber para verificar en el banco; NO acredita el pago automáticamente.';
      const notified=document.createElement('button');
      notified.type='button';notified.textContent='Ya transferí · Avisar a Librería Saber';
+     notified.dataset.saberTransferNotice='SABER_TRANSFER_CONFIRMACION_CLIENTE_V1';
      notified.setAttribute('aria-label','Ya transferí. Avisar a Librería Saber para verificar el pago.');
      notified.addEventListener('click',async()=>{
       notified.disabled=true;instructions.textContent='Avisando a Librería Saber que realizaste la transferencia…';
