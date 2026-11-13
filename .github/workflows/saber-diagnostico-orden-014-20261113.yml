@@ -62,4 +62,20 @@ jobs:
           const x=await cf('/d1/database/'+db.uuid+'/query',{sql});
           if(x?.[0]?.success!==true)throw Error('INVALID_QUERY');
           console.log('SABER_014_CHECK='+JSON.stringify(x[0].results));
+          const sql2=String.raw`SELECT COUNT(*) AS r2_validos
+           FROM central_work_order_numbers n
+           JOIN central_r2_universal_order_links l ON l.commercial_order_id=n.commercial_order_id
+           JOIN central_r2_universal_files f ON f.web_order_id=l.web_order_id AND f.transport='r2'
+           JOIN central_r2_large_pending r ON r.web_order_id=f.web_order_id
+              AND r.file_id=f.file_id AND r.sha256=f.sha256 AND r.bytes=f.bytes
+           JOIN central_r2_large_reservations q ON q.object_key=r.object_key
+              AND q.web_order_id=r.web_order_id AND q.file_id=r.file_id
+              AND q.sha256=r.sha256 AND q.bytes=r.bytes
+           WHERE n.number=14 AND f.received=1
+           AND r.status='awaiting_pdf_analysis' AND q.state='reserved'
+           AND length(r.etag)>=8 AND length(r.receipt_id)=40
+           AND r.pages_claimed BETWEEN 1 AND 2000`;
+          const v=await cf('/d1/database/'+db.uuid+'/query',{sql:sql2});
+          if(v?.[0]?.success!==true)throw Error('INVALID_SQL2');
+          console.log('SABER_014_RECEIPT_PREFLIGHT='+JSON.stringify(v[0].results));
           EOF
