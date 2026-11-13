@@ -1,0 +1,16 @@
+{
+  "checkedAt": "2026-11-13T02:30:28.616Z",
+  "numbersRequested": [
+    8,
+    9
+  ],
+  "archivedNumbers": [
+    8,
+    9
+  ],
+  "auditable": true,
+  "paymentRecordsUntouched": true,
+  "paidStillVerified": true,
+  "mpOperationPreserved": true,
+  "complete": true
+}
