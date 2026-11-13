@@ -5016,6 +5016,7 @@ export default {
    return aprobarTransferenciaLiveCentral(synthetic,env,{authorized:true});
   }
   if(url.pathname==='/internal/central/live/transfer-start'||
+     url.pathname==='/internal/central/live/transfer-notify'||
      url.pathname==='/internal/central/live/transfer-status'){
    const {manejarTransferenciaLiveCentral}=await import('./transferencias-live-central.mjs');
    const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
