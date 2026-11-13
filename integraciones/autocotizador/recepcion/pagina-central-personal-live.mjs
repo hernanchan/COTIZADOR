@@ -79,7 +79,7 @@ button:disabled{opacity:.55}select{padding:10px;border:1px solid #b3cad9;border-
 </form></dialog>
 </main><script>
 'use strict';
-const columns=[['pendiente','Nuevos'],['en_preparacion','En preparación'],['en_espera','En espera'],['listo','Listos'],['entregado','Entregados']];
+const columns=[['pendiente','Nuevos'],['en_preparacion','En preparación'],['en_espera','En espera'],['listo','Listos']];
 const board=document.getElementById('tablero'),info=document.getElementById('estado');
 const short=x=>String(x||'').trim(),price=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(n);
 const element=(tag,text)=>{const x=document.createElement(tag);if(text!==undefined)x.textContent=text;return x;};
@@ -430,17 +430,15 @@ async function refresh(){
      tools.append(deliver);
      if(deliver.disabled)card.append(element('small','Entrega bloqueada hasta habilitar y validar la purga segura de TUS/R2.'));
     }
-    if(state==='entregado')card.append(element('small',
-     o.purgeStatus==='deleted'?
-      'Entregado · Todos los PDF originales eliminados y verificados.':
-      o.purgeStatus==='pending_retry'?
-      'Entregado · Borrado de originales pendiente de reintento automático.':
-      'Entregado · Atención: falta confirmar la cola de borrado. Revisar en Central.'));
     card.append(tools);lane.append(card);total++;
    }
    board.append(lane);
   }
-  info.textContent=total+' pedido(s) pagados verificados · Actualizado '+new Date().toLocaleTimeString('es-AR')+'.';
+  info.textContent=total+' pedido(s) activos · Actualizado '+
+   new Date().toLocaleTimeString('es-AR')+'.'+
+   (Number.isSafeInteger(data.cleanupPendingCount)&&data.cleanupPendingCount>0?
+     ' Atención: '+data.cleanupPendingCount+
+     ' pedido(s) ya entregados tienen originales pendientes de eliminación o sin cola. El sistema reintentará los que estén en cola.':'');
  }catch(e){info.textContent=String(e.message||e)+' No se modificó ningún pedido.'}
  finally{working=false;}
 }
