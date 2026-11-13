@@ -33,6 +33,7 @@ jobs:
             integraciones/mercadopago/pruebas/central-recepcion-live.test.mjs \
             integraciones/mercadopago/pruebas/transferencias-live-central.test.mjs \
             integraciones/autocotizador/recepcion/transferencia-live-comprador.test.mjs \
+            integraciones/autocotizador/recepcion/purga-archivo-live-documentos.test.mjs \
             integraciones/mercadopago/pruebas/central-estado-personal-live.test.mjs \
             integraciones/mercadopago/pruebas/central-entrega-purga-live.test.mjs \
             > /tmp/circuito-integral.log 2>&1
