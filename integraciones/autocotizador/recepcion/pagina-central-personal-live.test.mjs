@@ -78,3 +78,16 @@ test('operación diaria: aviso bancario automático y estados en un formulario, 
  assert.doesNotMatch(html,/window\.prompt\('Nombre de quien realiza el cambio de estado'/);
  assert.match(html,/o\.zipEnabled===true/);
 });
+
+test('al entregar, la Central oculta la columna Entregados pero conserva alertas de purga',()=>{
+ const html=paginaCentralPersonalLive();
+ assert.match(html,/\['listo','Listos'\]/);
+ assert.doesNotMatch(html,/\['entregado','Entregados'\]/);
+ assert.match(html,/entregado:'Confirmar entrega y borrar originales'/);
+ assert.match(html,/Entregado · borrar originales/);
+ assert.match(html,/data\.cleanupPendingCount/);
+ assert.match(html,/originales pendientes de eliminación/);
+ const js=html.match(/<script>([\s\S]*?)<\/script>/);
+ assert.ok(js);
+ assert.doesNotThrow(()=>new Function(js[1]));
+});
