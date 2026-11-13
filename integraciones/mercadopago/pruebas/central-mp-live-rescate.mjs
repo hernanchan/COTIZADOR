@@ -14,7 +14,7 @@ function gate(env){
   typeof env?.DB?.prepare==='function'&&typeof env?.DB?.batch==='function';
 }
 async function getMP(env,path,fetcher){
- if(!/^(\/users\/me|\/v1\/payments\/[1-9][0-9]{3,19}|\/merchant_orders\/[1-9][0-9]{3,19}|\/merchant_orders\/search\?preference_id=[a-zA-Z0-9-]{16,150})$/.test(path))
+ if(!/^(\/users\/me|\/v1\/payments\/[1-9][0-9]{3,19}|\/v1\/payments\/search\?external_reference=[a-f0-9-]{36}&status=approved&limit=10|\/merchant_orders\/[1-9][0-9]{3,19}|\/merchant_orders\/search\?preference_id=[a-zA-Z0-9-]{16,150})$/.test(path))
   throw Error('RUTA_MP_NO_ADMITIDA');
  const r=await fetcher('https://api.mercadopago.com'+path,{
   method:'GET',redirect:'error',
@@ -36,14 +36,30 @@ export function pagoUnicoDeOrdenComerciante(search,order){
  if(approved.length!==1)return null;
  return {merchantId:String(merchant.id),paymentId:String(approved[0].id)};
 }
+/** Búsqueda oficial de MP por external_reference; no depender sólo de Merchant Orders.
+ * Nunca aceptar resultados cuyo ID, estado y referencia no sean inequívocos.
+ */
+export function pagoUnicoDeBusqueda(search,order){
+ const rows=Array.isArray(search?.results)?search.results:[];
+ const approved=rows.filter(x=>x&&numeric(x.id)&&x.status==='approved'&&
+  x.external_reference===order.id&&numeric(x.order?.id));
+ if(approved.length!==1)return null;
+ return {paymentId:String(approved[0].id),merchantId:String(approved[0].order.id)};
+}
 async function procesarUna(env,order,seller,fetcher){
  if(!uuid(order.id)||order.status!=='awaiting_payment'||order.payment_id!=null||
    !order.preference_id||!Number.isSafeInteger(order.amount_ars)||order.amount_ars<=0||
    order.deposit_ars!==order.amount_ars||order.review_state==='revoked')
   return 'revision';
- const qp=new URLSearchParams({preference_id:order.preference_id}).toString();
- const search=await getMP(env,'/merchant_orders/search?'+qp,fetcher);
- const match=pagoUnicoDeOrdenComerciante(search,order);
+ const paymentSearchPath='/v1/payments/search?external_reference='+order.id+'&status=approved&limit=10';
+ const search=await getMP(env,paymentSearchPath,fetcher);
+ let match=pagoUnicoDeBusqueda(search,order);
+ if(!match){
+  // Respaldo sólo cuando no existe un pago aprobado único en la búsqueda principal.
+  const qp=new URLSearchParams({preference_id:order.preference_id}).toString();
+  const merchantSearch=await getMP(env,'/merchant_orders/search?'+qp,fetcher);
+  match=pagoUnicoDeOrdenComerciante(merchantSearch,order);
+ }
  if(!match)return 'sin_confirmar';
  const [payment,merchantOrder]=await Promise.all([
   getMP(env,'/v1/payments/'+match.paymentId,fetcher),
