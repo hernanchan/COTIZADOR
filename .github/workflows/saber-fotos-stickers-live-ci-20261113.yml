@@ -24,6 +24,10 @@ jobs:
           node --check integraciones/autocotizador/recepcion/carga-unica-cliente.mjs
           node --check integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs
           node --test integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs
+      - name: Instalar dependencias de cotizacion para QA
+        run: |
+          cd integraciones/autocotizador/recepcion
+          npm install --no-audit --no-fund
       - name: Cotizacion y ficha comercial para fotos/stickers sin pagos reales
         run: |
           node --test integraciones/autocotizador/recepcion/carga-unica-pdf-regresion.test.mjs
