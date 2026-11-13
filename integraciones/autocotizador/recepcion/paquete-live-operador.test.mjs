@@ -129,3 +129,17 @@ test('ruta staff LIVE selecciona API de ZIP, pero deja Sandbox sin cambios',asyn
  assert.match(worker,/DOCS_LIVE_STAFF_SECRET/);
  assert.match(worker,/WWW-Authenticate/);
 });
+
+test('la vista de personal diferencia TUS, inspección R2 y ZIP con instrucciones',async()=>{
+ const page=await readFile(new URL('./pantalla-paquete-universal-personal.mjs',import.meta.url),'utf8');
+ const staff=await readFile(new URL('./staff-r2-personal-ui.txt',import.meta.url),'utf8');
+ const flow=await readFile(new URL('./flujo-presupuesto-live-cliente.mjs',import.meta.url),'utf8');
+ const pack=await readFile(new URL('./paquete-universal-cliente.mjs',import.meta.url),'utf8');
+ assert.match(page,/SOLO el PDF original para revisar \(sin instrucciones\)/);
+ assert.match(page,/Después se habilita el ZIP completo con originales e instrucciones A4/);
+ assert.match(staff,/Number\(x\.r2Count\)===0\?'Abrir pedido TUS'/);
+ assert.match(staff,/location\.assign\('\/personal\/paquete\?webOrderId='/);
+ assert.match(staff,/file\.value=typeof chosen/);
+ assert.match(flow,/transport:m\.bytes<=40\*MIB\?'tus':'r2'/);
+ assert.match(pack,/ORDEN_'\+ficha\.numeroOrden\+'_INSTRUCCIONES\.pdf/);
+});
