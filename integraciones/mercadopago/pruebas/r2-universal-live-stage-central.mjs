@@ -4,6 +4,7 @@
  */
 import {validarPreRecepcionR2} from './r2-grandes-central-pendientes.mjs';
 import {r2GateGeneralOCanary} from './r2-live-canary-order.mjs';
+import {puedeRecibirTransferenciaAvisada} from './central-transferencia-recepcion-anticipada.mjs';
 import {verificarPedidoUniversalCobrable,estadoPagoUniversal}
  from './r2-universal-checkout-central.mjs';
 const GO='GO_COMERCIAL_CONFIRMADO',MIB=1048576;
@@ -34,7 +35,7 @@ export async function registrarR2LivePendiente(request,env,{
    ['CENTRAL_LIVE_R2_GATE','CENTRAL_LIVE_R2_STAGING_GATE']))
   return respond({ok:false,error:'LIVE_R2_STAGE_PEDIDO_NO_HABILITADO'},503);
  const db=env.DB;
- let valid,paid;
+ let valid,paid,bankPending=false;
  try{
   const link=await db.prepare(
    'SELECT commercial_order_id FROM central_r2_universal_order_links WHERE web_order_id=?'
@@ -51,8 +52,11 @@ export async function registrarR2LivePendiente(request,env,{
     work.configuracion.paginas.length!==p.pagesDeclaradas)
    return respond({ok:false,error:'LIVE_R2_STAGE_ORIGINAL_AJENO'},409);
   paid=await payment(env,link.commercial_order_id);
-  if(!paid.verified||paid.revoked)
-   return respond({ok:false,error:'LIVE_R2_STAGE_PAGO_NO_CONCILIADO'},402);
+  if(!paid.verified&&!paid.revoked)
+   bankPending=await puedeRecibirTransferenciaAvisada(env,{
+    commercialOrderId:link.commercial_order_id,webOrderId:p.orderId});
+  if(paid.revoked||(!paid.verified&&!bankPending))
+   return respond({ok:false,error:'LIVE_R2_STAGE_PAGO_O_AVISO_NO_VALIDO'},402);
   const reserve=await db.prepare(
    'SELECT web_order_id,file_id,sha256,bytes,state FROM central_r2_large_reservations '+
    'WHERE object_key=?'
@@ -96,20 +100,31 @@ export async function registrarR2LivePendiente(request,env,{
   }
   // D1 ya concilió el cobro. Persistencia atómica exige el mismo método,
   // sin confiar en un comprobante del navegador.
-  if(!['mercadopago','transferencia'].includes(paid.method))
+  if(!bankPending&&!['mercadopago','transferencia'].includes(paid.method))
    return respond({ok:false,error:'LIVE_R2_STAGE_METODO_NO_VERIFICADO'},402);
-  const bank=paid.method==='transferencia';
+  const bank=bankPending||paid.method==='transferencia';
   if(bank){
    const table=await db.prepare("SELECT name FROM sqlite_master WHERE type='table' "+
     "AND name='central_live_bank_accreditations'").first();
    if(!table)return respond({ok:false,error:'LIVE_R2_STAGE_BANCO_SIN_AUDITORIA'},409);
   }
-  const paymentCondition=bank?
+  const paymentCondition=bankPending?
+   'AND o.payment_id IS NULL AND o.preference_id IS NULL '+
+   'AND EXISTS(SELECT 1 FROM central_live_transfer_requests t '+
+   'JOIN central_live_transfer_customer_notices n ON n.order_id=t.order_id '+
+   "WHERE t.order_id=o.id AND t.state='awaiting_bank_verification') "+
+   "AND datetime(o.created_at)>=datetime('now','-72 hours') "+
+   'AND NOT EXISTS(SELECT 1 FROM central_live_test_exclusions e WHERE e.order_id=o.id)':
+   bank?
    'AND o.payment_id IS NULL AND o.preference_id IS NULL '+
    'AND EXISTS (SELECT 1 FROM central_live_bank_accreditations a WHERE '+
    'a.order_id=o.id AND a.amount_ars=o.amount_ars '+
    'AND length(a.bank_reference)>=6 AND length(a.operator)>=2)':
    'AND o.payment_id IS NOT NULL AND o.preference_id IS NOT NULL';
+  const paymentJoin=bankPending?'':'JOIN payment_reviews pr ON pr.order_id=o.id ';
+  const paymentStatus=bankPending?
+   "o.status='awaiting_payment' AND o.paid_at IS NULL ":
+   "o.status='paid' AND o.paid_at IS NOT NULL AND pr.state='verified' ";
   const sql='INSERT INTO central_r2_large_pending '+
    '(receipt_id,web_order_id,file_id,object_key,sha256,etag,bytes,name,pages_claimed) '+
    'SELECT ?,?,?,?,?,?,?,?,? WHERE '+
@@ -118,9 +133,9 @@ export async function registrarR2LivePendiente(request,env,{
    'AND q.sha256=? AND q.bytes=?) AND '+
    'EXISTS (SELECT 1 FROM central_r2_universal_order_links l '+
    'JOIN orders o ON o.id=l.commercial_order_id '+
-   'JOIN payment_reviews pr ON pr.order_id=o.id '+
-   "WHERE l.web_order_id=? AND o.status='paid' AND o.paid_at IS NOT NULL "+
-   "AND pr.state='verified' AND o.amount_ars=o.deposit_ars "+
+   paymentJoin+
+   'WHERE l.web_order_id=? AND '+paymentStatus+
+   'AND o.amount_ars=o.deposit_ars '+
    paymentCondition+')';
   // La recepción R2 se confirma transaccionalmente con el asiento de
   // almacenamiento: nunca dejar el operador obligado a verificar TUS/R2.
@@ -136,9 +151,9 @@ export async function registrarR2LivePendiente(request,env,{
    "AND q.sha256=s.sha256 AND q.bytes=s.bytes) "+
    "AND EXISTS(SELECT 1 FROM central_r2_universal_order_links l "+
    "JOIN orders o ON o.id=l.commercial_order_id "+
-   "JOIN payment_reviews pr ON pr.order_id=o.id "+
-   "WHERE l.web_order_id=? AND o.status='paid' AND o.paid_at IS NOT NULL "+
-   "AND pr.state='verified' AND o.amount_ars=o.deposit_ars "+paymentCondition+")";
+   paymentJoin+
+   "WHERE l.web_order_id=? AND "+paymentStatus+
+   "AND o.amount_ars=o.deposit_ars "+paymentCondition+")";
   const writes=await db.batch([
    db.prepare(sql).bind(p.receiptId,p.orderId,p.fileId,
     p.objectKey,p.sha256,p.etag,p.bytes,p.name,p.pagesDeclaradas,
