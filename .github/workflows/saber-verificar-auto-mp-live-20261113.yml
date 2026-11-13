@@ -58,6 +58,14 @@ jobs:
               body:JSON.stringify({sql:"SELECT checked_at,checked,recovered,pending,review,errors,state FROM central_mp_live_auto_health WHERE id=1"})});
             report.health=health?.[0]?.results?.[0]||null;
            }else report.health=null;
+           const staff=await cf('/d1/database/'+db.uuid+'/query',d,{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({sql:"SELECT name FROM sqlite_master WHERE type='table' AND name='central_mp_live_staff_rechecks'"})});
+           report.staffRechecksTablePresent=Boolean(staff?.[0]?.results?.length);
+           if(report.staffRechecksTablePresent){
+            const last=await cf('/d1/database/'+db.uuid+'/query',d,{method:'POST',headers:{'Content-Type':'application/json'},
+             body:JSON.stringify({sql:"SELECT checked_at FROM central_mp_live_staff_rechecks WHERE id=1"})});
+            report.lastStaffRecheck=last?.[0]?.results?.[0]?.checked_at||null;
+           }
           }catch(e){report.d1Error=String(e.message||e).slice(0,80)}
           await mkdir('docs',{recursive:true});
           await writeFile('docs/INCIDENCIA-MP-LIVE-AUTOMATICO-ESTADO.json',JSON.stringify(report,null,2)+'\n');
