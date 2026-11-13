@@ -31,7 +31,10 @@ jobs:
             integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs \
             integraciones/autocotizador/recepcion/pagina-retorno-live.test.mjs \
             integraciones/autocotizador/recepcion/r2-inspeccion-personal-live.test.mjs \
-            integraciones/mercadopago/pruebas/r2-live-inspection-finalize.test.mjs
+            integraciones/mercadopago/pruebas/r2-live-inspection-finalize.test.mjs \
+            integraciones/autocotizador/recepcion/recepcion-r2-live-cliente.test.mjs \
+            integraciones/autocotizador/recepcion/recepcion-tus-live-cliente.test.mjs \
+            integraciones/autocotizador/recepcion/zip-universal-stream.test.mjs
           echo SABER_CENTRAL_PERSONAL_HMAC_AND_BOTH_TRANSPORTS_QA_OK
       - name: Compilar Central y Documentos completos sin desplegar
         run: |
@@ -50,3 +53,5 @@ jobs:
 # 13/11: QA corregir PDF original mixto -> salida A4, alias visible, aviso no cerrar, inspección sin 112 líneas. No deploy.
 
 # 13/11: regresión exclusión auditada de ensayo 011 para cola LIVE, sin deploy.
+
+# 13/11 QA etapa cierre: porcentaje TUS/R2 real, reintento sin repago, ZIP con instrucciones como condición obligatoria.
