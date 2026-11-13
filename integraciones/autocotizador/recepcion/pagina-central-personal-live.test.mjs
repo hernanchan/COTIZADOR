@@ -52,12 +52,14 @@ test('Central muestra aviso de transferencias informadas automáticamente sin de
 });
 
 
-test('R2 no habilita inspección antes del almacenamiento real del PDF',()=>{
+test('MP y transferencia comparten ZIP sin TUS/R2 en la operación diaria',()=>{
  const html=paginaCentralPersonalLive();
- assert.match(html,/o\.r2Count>0&&o\.stagedR2Count>0/);
- assert.match(html,/Inspeccionar PDF R2 almacenado/);
- assert.match(html,/Esperando el envío automático desde el navegador/);
- assert.doesNotMatch(html,/element\('a','Verificar PDF R2'\)/);
+ assert.match(html,/o\.zipEnabled===true&&o\.pendingCount===0/);
+ assert.match(html,/Descargar ZIP \+ instrucciones/);
+ assert.match(html,/Pago acreditado\. Esperando el envío/);
+ assert.match(html,/Archivos PDF recibidos/);
+ assert.doesNotMatch(html,/Inspeccionar PDF R2 almacenado/);
+ assert.doesNotMatch(html,/TUS '\+o\.tusCount|R2 '\+o\.r2Count/);
  const match=html.match(/<script>([\s\S]*?)<\/script>/);
  assert.ok(match);
  assert.doesNotThrow(()=>new Function(match[1]));
@@ -74,5 +76,5 @@ test('operación diaria: aviso bancario automático y estados en un formulario, 
  assert.match(html,/id="stageSave"/);
  assert.match(html,/setInterval\(\(\)=>\{if\(!document\.hidden\)void refresh\(\)\},15000\)/);
  assert.doesNotMatch(html,/window\.prompt\('Nombre de quien realiza el cambio de estado'/);
- assert.match(html,/o\.stagedR2FileIds\?\.length/);
+ assert.match(html,/o\.zipEnabled===true/);
 });
