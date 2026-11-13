@@ -237,6 +237,7 @@ export async function manifiestoInspeccionR2Live(req,env,{
    expectedSha256:row.sha256,expectedBytes:row.bytes,
    paginasDeclaradas:pages.map(x=>({numero:x.numero,
     anchoCm:x.anchoCm,altoCm:x.altoCm,modo:x.modo})),
+   formatoFinal:work.formatoFinal||'original',
    quoteHash:valid.link.quote_hash,amountArs:valid.amountArs,
    quoteSnapshot:null,productionAuthorized:false
   },downloadAuthorized:false,productionAuthorized:false});
