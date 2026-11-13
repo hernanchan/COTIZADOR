@@ -215,3 +215,4 @@ jobs:
 # 13/11: reintento unico tras Cloudflare stage HTTP 500 codigo 10013 de saber-pagos, sin cambios de codigo ni secretos, QA 43451786688 SUCCESS.
 # 13/11: desplegar solo protegidos tras QA 43463870227 SUCCESS: eliminar referencia bancaria del panel, borrar TUS/R2 en Entregado ya verificado y ocultar entregados de Central sin borrar auditoria; heredar bindings por API beta.
 # 13/11: fix orden 014 ESTADO_ORIGINALES_SIN_REVISAR R2 1/1 con SHA+ETag+reserva D1 preflight 43473190740, QA 43473039164 SUCCESS, coherencia purga entregado y ZIP; solo protegidos sin alterar pagos.
+# 13/11: restaurar en CRON LIVE reintentos de borrado Entregado + control hourly pedidos abandonados >48h (solo lectura, transferencias protegidas); QA 43475835291 SUCCESS, SQL D1 43475996808 SUCCESS; sin activar purga irreversible de orden cobrable.
