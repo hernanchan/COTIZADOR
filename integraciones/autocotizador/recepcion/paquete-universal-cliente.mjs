@@ -172,5 +172,10 @@ button?.addEventListener('click',()=>void descargarZIP());
    x.trabajos.filter(t=>t.transporte==='tus').length+' TUS';
   state.textContent='Todos los originales tienen recibo verificado. Descargá el ZIP y controlá la preprensa.';
   button.disabled=false;
- }catch(e){state.textContent='No se habilita el ZIP: '+String(e?.message||e)}
+ }catch(e){
+  const r2File=new URL(location.href).searchParams.get('fileId')||'';
+  state.textContent=liveStaff&&/^[A-Za-z0-9_-]{1,80}$/.test(r2File)?
+   'Primero inspeccioná el PDF R2 en el panel de abajo. El ZIP se habilita automáticamente después de registrar la inspección.':
+   'No se habilita el ZIP: '+String(e?.message||e);
+ }
 })();
