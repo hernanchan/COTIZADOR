@@ -1,30 +1,13 @@
 {
-  "checkedAt": "2026-11-13T01:13:01.037Z",
-  "passed": false,
-  "exitCode": 1,
+  "checkedAt": "2026-11-13T01:14:01.629Z",
+  "passed": true,
+  "exitCode": 0,
   "lines": [
     "# Subtest: Central LIVE avisa cuando el horario guardado no coincide con el comunicado al cliente",
     "# Subtest: aviso no modifica la previsión, órdenes, precios, ni el tablero; script sigue siendo JS válido",
     "# Subtest: Definir hora usa calendario nativo, respeta agenda y evita cuatro ventanas prompt",
-    "not ok 3 - Definir hora usa calendario nativo, respeta agenda y evita cuatro ventanas prompt",
-    "  failureType: 'testCodeFailure'",
-    "  error: |-",
-    "  code: 'ERR_ASSERTION'",
-    "  name: 'AssertionError'",
-    "    Test.run (node:internal/test_runner/test:1047:25)",
-    "    Test.processPendingSubtests (node:internal/test_runner/test:744:18)",
-    "    Test.postRun (node:internal/test_runner/test:1173:19)",
-    "    Test.run (node:internal/test_runner/test:1101:12)",
-    "    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)",
     "# Subtest: retorno cerrado no expone pagina ni consulta pagos",
     "# Subtest: retorno LIVE no acredita pago por argumentos de Mercado Pago",
-    "not ok 5 - retorno LIVE no acredita pago por argumentos de Mercado Pago",
-    "  failureType: 'testCodeFailure'",
-    "  error: |-",
-    "  code: 'ERR_ASSERTION'",
-    "  name: 'AssertionError'",
-    "    async Test.run (node:internal/test_runner/test:1054:7)",
-    "    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)",
     "# Subtest: retorno de pago incluye seguimiento real, orden y archivos pendientes sin admitir acreditación por URL",
     "# Subtest: personal no autorizado no puede iniciar reconciliación",
     "# Subtest: no admite origen ajeno, datos extras ni GET",
@@ -59,7 +42,7 @@
     "# Subtest: sin tablas habilitadas no inventa hora ni estado",
     "# Subtest: estados inválidos no se trasladan al cliente",
     "# tests 38",
-    "# pass 36",
-    "# fail 2"
+    "# pass 38",
+    "# fail 0"
   ]
 }
