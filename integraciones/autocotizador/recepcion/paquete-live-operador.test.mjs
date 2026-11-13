@@ -130,31 +130,29 @@ test('ruta staff LIVE selecciona API de ZIP, pero deja Sandbox sin cambios',asyn
  assert.match(worker,/WWW-Authenticate/);
 });
 
-test('la vista de personal diferencia TUS, inspección R2 y ZIP con instrucciones',async()=>{
+test('vista de personal: un solo ZIP, sin pasos técnicos ni inspección de transportes',async()=>{
  const page=await readFile(new URL('./pantalla-paquete-universal-personal.mjs',import.meta.url),'utf8');
- const staff=await readFile(new URL('./staff-r2-personal-ui.txt',import.meta.url),'utf8');
+ const board=await readFile(new URL('./pagina-central-personal-live.mjs',import.meta.url),'utf8');
  const flow=await readFile(new URL('./flujo-presupuesto-live-cliente.mjs',import.meta.url),'utf8');
  const pack=await readFile(new URL('./paquete-universal-cliente.mjs',import.meta.url),'utf8');
- assert.match(page,/SOLO el PDF original para revisar \(sin instrucciones\)/);
- assert.match(page,/Después se habilita el ZIP completo con originales e instrucciones A4/);
- assert.match(staff,/Number\(x\.r2Count\)===0\?'Abrir pedido TUS'/);
- assert.match(staff,/location\.assign\('\/personal\/paquete\?webOrderId='/);
- assert.match(staff,/file\.value=typeof chosen/);
+ assert.match(page,/Descargar ZIP completo/);
+ assert.doesNotMatch(page,/r2Inspeccion|staffR2Js|Consultar original pendiente|Medidas originales y tamaño de impresión/);
+ assert.match(board,/o\.zipEnabled===true&&o\.pendingCount===0/);
+ assert.match(board,/Descargar ZIP \+ instrucciones/);
+ assert.doesNotMatch(board,/Inspeccionar PDF R2 almacenado/);
+ assert.doesNotMatch(board,/TUS '\+o\.tusCount/);
  assert.match(flow,/transport:m\.bytes<=40\*MIB\?'tus':'r2'/);
  assert.match(pack,/ORDEN_'\+ficha\.numeroOrden\+'_INSTRUCCIONES\.pdf/);
 });
-
-test('112 páginas originales mixtas, destino A4: revisión sin 112 campos manuales',async()=>{
+test('original PDF mixto y salida A4: sin copiar medidas ni inspección técnica antes del ZIP',async()=>{
  const page=await readFile(new URL('./pantalla-paquete-universal-personal.mjs',import.meta.url),'utf8');
- const script=await readFile(new URL('./staff-r2-personal-ui.txt',import.meta.url),'utf8');
  const pack=await readFile(new URL('./paquete-universal-cliente.mjs',import.meta.url),'utf8');
- assert.doesNotMatch(page,/id="r2Medidas"|id="r2Uniforme"/);
- assert.match(page,/No hace falta ingresar una medida por página/);
- assert.match(script,/manifest\.paginasDeclaradas\.map/);
- assert.match(script,/A4 \(ajustar todas las páginas, sin recortar\)/);
- assert.doesNotThrow(()=>new Function(script));
+ const central=await readFile(new URL('../../mercadopago/pruebas/r2-universal-package-central.mjs',import.meta.url),'utf8');
+ assert.doesNotMatch(page,/r2Medidas|r2Uniforme|r2Aprobar/);
  assert.match(pack,/PAPEL A4: ajustar proporcionalmente CADA página al A4/);
  assert.match(pack,/Originales Legal u otros tamaños también van en A4/);
+ assert.doesNotMatch(central,/R2_PHYSICAL_INSPECTION_REQUIRED/);
+ assert.match(central,/preprensaPendiente:true/);
 });
 
 test('ambas rutas de ZIP bloquean descarga sin instrucciones y resumen 112 páginas',async()=>{
