@@ -40,9 +40,9 @@ jobs:
             grab('https://libreriasaber.com.ar/portal-comercial.json')
            ]);
            result.datePickerDeployed=documents.includes('etaDate')&&documents.includes('openOrderEta');
-           result.originalCustodyDeployed=documents.includes('saber-live-originales-privados-v1')&&documents.includes('guardarOriginalesLive');
+           result.originalCustodyDeployed=documents.includes('saber-live-originales-privados-v1')&&documents.includes('ALMACENAMIENTO_LOCAL_NO_DISPONIBLE');
            result.autoUploadDeployed=documents.includes('enviarAutomaticamente')&&documents.includes('leerOriginalesLive');
-           result.sessionAutoRecoveryDeployed=documents.includes('Pago acreditado. Reanudando el envío automático');
+           result.sessionAutoRecoveryDeployed=documents.includes('SABER_POSTPAGO_SIN_SEGUNDA_SELECCION_V1');
            result.buyerTrackingDeployed=documents.includes('actualizarSeguimiento')&&documents.includes('MP_LIVE_SEGUIMIENTO_INCONSISTENTE');
            result.buyerTrackingVisible=returnPage.includes('id="seguimiento"')&&returnPage.includes('id="fechaRetiro"');
            result.singleSelectionVisible=returnPage.includes('Recepción automática de originales')&&
