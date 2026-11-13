@@ -1,0 +1,95 @@
+name: Saber - verificacion integral de version LIVE desplegada
+on:
+  push:
+    branches: [integracion/tus-pedido-privado-20261101]
+    paths: [.github/workflows/saber-verificar-version-integral-20261113.yml]
+permissions: {contents: write}
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+      D1TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: true}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Leer Worker y D1 de produccion, sin crear pagos
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'EOF'
+          import {mkdir,writeFile} from 'node:fs/promises';
+          const root='https://api.cloudflare.com/client/v4/accounts/'+process.env.ACCOUNT;
+          const result={checkedAt:new Date().toISOString(),schema:'saber-postdeploy-integral-v1',readOnly:true};
+          const request=async(path,key=process.env.TOKEN,method='GET',sql)=>{
+           const r=await fetch(root+path,{method,headers:{Authorization:'Bearer '+key,
+             ...(sql?{'Content-Type':'application/json'}:{})},
+            body:sql?JSON.stringify({sql}):undefined,signal:AbortSignal.timeout(25000)});
+           if(!r.ok)throw Error('CF_HTTP_'+r.status);
+           if(!sql)return r;
+           const j=await r.json();
+           if(j?.success!==true||j.result?.[0]?.success!==true)throw Error('D1_READ_FAILED');
+           return j.result[0].results||[];
+          };
+          try{
+           const [docs,pay]=await Promise.all([
+            request('/workers/scripts/saber-documentos-produccion'),
+            request('/workers/scripts/saber-pagos-produccion')
+           ]);
+           const d=await docs.text(),p=await pay.text();
+           result.buyerFlowActive=d.includes('saber-live-numero-v1')&&d.includes('saber-live-originales-privados-v1');
+           result.bankNoticeActive=d.includes('SABER_TRANSFER_CONFIRMACION_CLIENTE_V1')&&d.includes('transferNewList');
+           result.customerTrackingActive=d.includes('Recibimos tu aviso')&&d.includes('enviarAutomaticamente');
+           result.operatorStageDialogActive=d.includes('stageDialog')&&d.includes('stageConfirmed');
+           result.r2InspectionDirectActive=d.includes('Inspeccionar PDF R2 almacenado')&&d.includes('stagedR2FileIds');
+           result.archiveFilterActive=p.includes('central_live_order_archives');
+           result.r2IdentifiersActive=p.includes('stagedR2FileIds');
+           result.paymentCronActive=p.includes('SABER_MP_LIVE_CRON_AISLADO');
+           const schedule=await request('/workers/scripts/saber-pagos-produccion/schedules');
+           const sched=await schedule.json();
+           result.cronEveryMinute=sched?.success===true&&(sched?.result?.schedules||[]).some(x=>x.cron==='* * * * *');
+           const dbList=await request('/d1/database',process.env.D1TOKEN);
+           const dbs=await dbList.json();const db=dbs.result?.find(x=>x.name==='saber-pagos-produccion');
+           if(!db?.uuid)throw Error('D1_PRODUCCION_AUSENTE');
+           const history=await request('/d1/database/'+db.uuid+'/query',process.env.D1TOKEN,'POST',
+             "SELECT a.work_number,o.status,p.state AS review_state FROM central_live_order_archives a JOIN orders o ON o.id=a.order_id JOIN payment_reviews p ON p.order_id=o.id WHERE a.work_number IN (8,9) ORDER BY a.work_number");
+           result.archivedNumbers=history.map(x=>x.work_number);
+           result.archivedPaymentsPreserved=history.length===2&&
+            history.every(x=>x.status==='paid'&&x.review_state==='verified');
+           const portal=await fetch('https://libreriasaber.com.ar/portal-comercial.json',{signal:AbortSignal.timeout(15000)});
+           if(!portal.ok)throw Error('PUBLIC_PORTAL_HTTP_'+portal.status);
+           const config=await portal.json();
+           result.publicSiteNoGo=config.release==='NO_GO'&&config.enabled===false;
+          }catch(e){result.error=String(e.message||e).slice(0,80)}
+          const checks=['buyerFlowActive','bankNoticeActive','customerTrackingActive','operatorStageDialogActive',
+           'r2InspectionDirectActive','archiveFilterActive','r2IdentifiersActive',
+           'paymentCronActive','cronEveryMinute','archivedPaymentsPreserved','publicSiteNoGo'];
+          result.passed=checks.every(k=>result[k]===true)&&result.archivedNumbers?.join(',')==='8,9';
+          await mkdir('docs',{recursive:true});
+          await writeFile('docs/VERIFICACION-INTEGRAL-LIVE-DESPLEGADO.json',JSON.stringify(result,null,2)+'\n');
+          console.log('SABER_POSTDEPLOY='+JSON.stringify({passed:result.passed,checks:checks.map(k=>[k,result[k]])}));
+          if(!result.passed)process.exitCode=1;
+          EOF
+      - name: Guardar evidencia sin identificadores personales
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/VERIFICACION-INTEGRAL-LIVE-DESPLEGADO.json || exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/VERIFICACION-INTEGRAL-LIVE-DESPLEGADO.json
+          git diff --cached --quiet && exit 0
+          git commit -m "ops: verificacion de codigo LIVE, cron y archivo de ensayos"
+          for attempt in 1 2 3 4;do
+            git fetch origin integracion/tus-pedido-privado-20261101
+            git rebase origin/integracion/tus-pedido-privado-20261101
+            git push origin HEAD:integracion/tus-pedido-privado-20261101 && exit 0
+            sleep 2
+          done
+          exit 1
