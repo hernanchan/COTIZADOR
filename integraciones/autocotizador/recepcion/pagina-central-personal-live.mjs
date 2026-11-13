@@ -342,7 +342,8 @@ async function refresh(){
      link.target='_blank';link.rel='noopener noreferrer';tools.append(link);
     }else if(o.r2Count>0&&o.stagedR2Count>0){
      const link=element('a','Inspeccionar PDF R2 almacenado');link.className='action';
-     link.href='/personal/paquete?webOrderId='+encodeURIComponent(o.webOrderId);
+     link.href='/personal/paquete?webOrderId='+encodeURIComponent(o.webOrderId)+
+      (o.stagedR2FileIds?.length?'&fileId='+encodeURIComponent(o.stagedR2FileIds[0]):'');
      link.target='_blank';link.rel='noopener noreferrer';tools.append(link);
     }else if(o.pendingCount>0){
      card.append(element('p','El original aún no está listo para verificar. Esperando el envío automático desde el navegador donde se realizó el pedido; no hay ZIP disponible.'));
@@ -379,6 +380,6 @@ void actualizarAvisosTransferencia();
 setInterval(()=>{if(!document.hidden)void actualizarAvisosTransferencia()},15000);
 // El primer refresco comprueba de nuevo los cobros conciliados en segundo plano.
 setTimeout(()=>{if(!document.hidden)void refresh()},12000);
-setInterval(()=>{if(!document.hidden)void refresh()},60000);
+setInterval(()=>{if(!document.hidden)void refresh()},15000);
 </script></body></html>`;
 }
