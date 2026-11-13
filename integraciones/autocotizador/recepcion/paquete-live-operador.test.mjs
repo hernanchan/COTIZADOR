@@ -156,3 +156,13 @@ test('112 páginas originales mixtas, destino A4: revisión sin 112 campos manua
  assert.match(pack,/PAPEL A4: ajustar proporcionalmente CADA página al A4/);
  assert.match(pack,/Originales Legal u otros tamaños también van en A4/);
 });
+
+test('ambas rutas de ZIP bloquean descarga sin instrucciones y resumen 112 páginas',async()=>{
+ const pack=await readFile(new URL('./paquete-universal-cliente.mjs',import.meta.url),'utf8');
+ const stream=await readFile(new URL('./zip-universal-stream.mjs',import.meta.url),'utf8');
+ assert.match(pack,/validarZIPDeProduccion\(entries,ficha,instruccion\)/);
+ assert.equal(pack.match(/validarZIPDeProduccion\(entries,ficha,instruccion\);/g)?.length,2);
+ assert.match(pack,/resumirPaginasElegidas\(t\.paginasElegidas\)/);
+ assert.match(stream,/ZIP_UNIVERSAL_INSTRUCCIONES_OBLIGATORIAS/);
+ assert.match(stream,/ZIP_UNIVERSAL_ORIGINAL_FALTANTE/);
+});
