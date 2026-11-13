@@ -1,0 +1,32 @@
+name: Saber - diagnosticar rutas publicas Express sin fotografias
+on:
+  push:
+    branches: [polaroids/express-pdf-unico-20261023]
+    paths: ['.github/workflows/polaroids-express-public-smoke-20261113.yml']
+permissions: {contents: read}
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Comprobar solo GET paginas y rutas de ensayo
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://saber-polaroids-express-pruebas.pages.dev'
+          for item in / /polaroids/editor /polaroids/recepcion-config.json /api/polaroids-express /api/polaroids-order;do
+            file=$(mktemp)
+            code=$(curl -sSL --connect-timeout 10 --max-time 20 -w '%{http_code}' -o "$file" "$base$item") || code=000
+            export SABER_FILE="$file" SABER_ROUTE="$item" SABER_CODE="$code"
+            python3 - <<'PY'
+          import os,json,pathlib
+          t=pathlib.Path(os.environ['SABER_FILE']).read_text(errors='replace')
+          try: data=json.loads(t)
+          except: data={}
+          safe={k:data[k] for k in ('ok','enabled','service','maxPhotos','pdfForClient','error','receptionEnabled','showInShop','rollout') if k in data}
+          print('SABER_EXPRESS_PUBLIC',os.environ['SABER_ROUTE'],os.environ['SABER_CODE'],'BYTES',len(t),
+                'JSON',json.dumps(safe,ensure_ascii=False),'HAS_EDITOR',('Polaroids' in t))
+          PY
+            rm -f "$file"
+          done
+          echo SABER_EXPRESS_PUBLIC_GET_ONLY_FINISHED
