@@ -77,6 +77,8 @@ export async function manejarTransferenciaLiveCentral(request,env,{readSigned,ve
  if(!transportesTransferenciaLiveHabilitados(checked.rows,env))
   return respond({ok:false,error:'TRANSFER_LIVE_RECEPCION_NO_HABILITADA'},409);
  try{
+  // Crear tabla de avisos también en pedidos iniciados antes de este despliegue.
+  await ensureLiveBankTables(env.DB);
   if(action==='start'){
    const order=checked.link;
    const created=Date.parse(String(order.created_at||'').replace(' ','T')+'Z');
@@ -84,7 +86,6 @@ export async function manejarTransferenciaLiveCentral(request,env,{readSigned,ve
     return respond({ok:false,error:'TRANSFER_LIVE_COTIZACION_VENCIDA'},409);
    if(order.status!=='awaiting_payment'||order.preference_id||order.payment_id)
     return respond({ok:false,error:'TRANSFER_LIVE_PAGO_PREEXISTENTE'},409);
-   await ensureLiveBankTables(env.DB);
    const mpAttempt=await env.DB.prepare(
     "SELECT name FROM sqlite_master WHERE type='table' AND name='live_checkout_attempts'"
    ).first();
