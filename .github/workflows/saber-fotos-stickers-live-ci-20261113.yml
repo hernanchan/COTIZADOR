@@ -1,0 +1,38 @@
+name: Saber - QA Fotos y Stickers LIVE sin despliegue
+on:
+  push:
+    branches: [integracion/fotos-stickers-live-20261113]
+    paths:
+      - '.github/workflows/saber-fotos-stickers-live-ci-20261113.yml'
+      - 'integraciones/autocotizador/recepcion/pagina-cotizar-live.mjs'
+      - 'integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs'
+      - 'integraciones/autocotizador/recepcion/carga-unica-cliente.mjs'
+  pull_request:
+    branches: [integracion/tus-pedido-privado-20261101]
+permissions: {contents: read}
+jobs:
+  probar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Sintaxis y pagina comercial
+        run: |
+          node --check integraciones/autocotizador/recepcion/pagina-cotizar-live.mjs
+          node --check integraciones/autocotizador/recepcion/carga-unica-cliente.mjs
+          node --check integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs
+          node --test integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs
+      - name: Cotizacion y ficha comercial para fotos/stickers sin pagos reales
+        run: |
+          node --test integraciones/autocotizador/recepcion/carga-unica-pdf-regresion.test.mjs
+          node --test tests/r2-universal-checkout-postpago.test.mjs
+      - name: Construir bundle de documentos sin publicar
+        run: |
+          cd integraciones/autocotizador/recepcion
+          npm install --no-audit --no-fund
+          npm run build:unificado
+          node --check dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq '?servicio=' dist/saber-documentos-cotizador-fase4.mjs
+          echo SABER_FOTOS_STICKERS_BUNDLE_READY_NO_DEPLOY
