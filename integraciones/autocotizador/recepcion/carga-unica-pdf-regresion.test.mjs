@@ -288,3 +288,16 @@ test('ploteo >48 MiB y nueve páginas intenta análisis visual por rangos',async
  assert.match(src,/Analizando visualmente el plano/);
  assert.match(src,/clasificarMosaicoRasterPDFGrande\(file\)/);
 });
+
+test('plano de 9 páginas y 60 MB permite elegir 1-3 ANTES del render pesado',()=>{
+ assert.match(source,/file\.size>48\*1024\*1024&&e\.paginas\.length>4/);
+ assert.match(source,/e\.elegirPaginasAntesDeAnalizar=true/);
+ assert.match(source,/¿Qué páginas querés imprimir\?/);
+ assert.match(source,/Ej\.: 1-3 \(vacío = todas las páginas\)/);
+ assert.match(source,/Calcular estas páginas/);
+ assert.match(source,/void analizarPaginasSolicitadas\(e\)/);
+ assert.match(source,/seleccionadas:pedidas\.map\(p=>p\.numero\)/);
+ assert.match(source,/if\(!esPlanoGrande\)\{/);
+ assert.match(source,/version\+\+;ultimoPresupuesto=null/);
+ assert.match(source,/Preparando análisis de/);
+});
