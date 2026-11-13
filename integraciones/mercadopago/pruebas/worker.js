@@ -4860,6 +4860,11 @@ export default {
    ctx.waitUntil(import("./r2-universal-purge-central.mjs")
     .then(({reintentarBorradosUniversal})=>reintentarBorradosUniversal(env))
     .catch(()=>{}));
+  if(env.CENTRAL_LIVE_PURGE_GATE==='GO_COMERCIAL_CONFIRMADO'&&
+     env.CENTRAL_LIVE_PURGE_EXECUTE_GATE==='GO_COMERCIAL_CONFIRMADO')
+   ctx.waitUntil(import('./central-entrega-purga-live.mjs')
+    .then(({reintentarEntregasLive})=>reintentarEntregasLive(env))
+    .catch(()=>{}));
   if(env.CENTRAL_R2_PURGE_EXECUTE_ENABLED==='PRIVATE_TEST_ONLY')
    ctx.waitUntil(import("./r2-borrado-entregado-central.mjs")
     .then(({reintentarBorradosR2})=>reintentarBorradosR2(env)).catch(()=>{}));
