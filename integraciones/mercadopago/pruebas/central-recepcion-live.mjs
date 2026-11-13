@@ -53,7 +53,11 @@ export async function listarRecepcionUniversalLive(request,env,{authorized=false
    "SELECT 1 FROM central_r2_large_pending r WHERE "+
    "r.web_order_id=f.web_order_id AND r.file_id=f.file_id "+
    "AND r.sha256=f.sha256 AND r.bytes=f.bytes "+
-   "AND r.status='awaiting_pdf_analysis') THEN 1 ELSE 0 END) AS staged_r2_count "+
+   "AND r.status='awaiting_pdf_analysis') THEN 1 ELSE 0 END) AS staged_r2_count,"+
+   "GROUP_CONCAT(CASE WHEN f.transport='r2' AND f.received=0 AND EXISTS ("+
+   "SELECT 1 FROM central_r2_large_pending st WHERE st.web_order_id=f.web_order_id "+
+   "AND st.file_id=f.file_id AND st.sha256=f.sha256 AND st.bytes=f.bytes "+
+   "AND st.status='awaiting_pdf_analysis') THEN f.file_id ELSE NULL END) AS staged_r2_ids "+
    'FROM central_r2_universal_order_links l '+
    'JOIN central_r2_universal_drafts d ON d.web_order_id=l.web_order_id '+
    'JOIN central_r2_universal_files f ON f.web_order_id=l.web_order_id '+
@@ -93,12 +97,18 @@ export async function listarRecepcionUniversalLive(request,env,{authorized=false
      !Number.isSafeInteger(x.version_produccion)||x.version_produccion<0)
    return reply({ok:false,error:'LIVE_LISTA_ESTADO_INCONSISTENTE'},409);
   if(r2StaffOnly&&!staffAll&&x.r2_count===0)continue;
+  const stagedIds=typeof x.staged_r2_ids==='string'&&x.staged_r2_ids?
+   x.staged_r2_ids.split(','):[];
+  if(stagedIds.some(id=>!/^[A-Za-z0-9_-]{1,80}$/.test(id))||
+    new Set(stagedIds).size!==stagedIds.length||
+    (typeof x.staged_r2_ids==='string'&&stagedIds.length!==x.staged_r2_count))
+   return reply({ok:false,error:'LIVE_LISTA_R2_IDS_INCONSISTENTES'},409);
   ready.push({orderId:x.order_id,webOrderId:x.web_order_id,
    numeroOrden:String(x.work_number).padStart(3,'0'),
    amountArs:x.total_ars,fileCount:x.file_count,
    receivedCount:x.received_count,pendingCount:x.pending_count,
    tusCount:x.tus_count,r2Count:x.r2_count,
-   stagedR2Count:x.staged_r2_count,paidAt:x.paid_at,
+   stagedR2Count:x.staged_r2_count,stagedR2FileIds:stagedIds,paidAt:x.paid_at,
    nombreCliente:x.nombre_cliente||null,telefonoContacto:x.telefono_contacto||null,
    direccionCliente:x.direccion_cliente||null,
    estado:x.pending_count===0?'ORIGINALES_RECIBIDOS_PREPRENSA_PENDIENTE':
