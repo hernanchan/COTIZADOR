@@ -49,6 +49,10 @@ async function json(req,max=16000){
 }
 const expected=claim=>({orderId:claim.orderId,fileId:claim.fileId,
  name:claim.name,bytes:claim.bytes,sha256:claim.sha256,pages:claim.pages});
+// Una transferencia avisada permite recepción privada, NO pago ni impresión.
+const puedeSubir=proof=>proof?.paymentVerified===true||
+ proof?.paymentVerified===false&&proof?.bankPending===true;
+
 export async function manejarR2MultipartLive(req,env,{
  authorized=false,verify=consultarPagoArchivoR2Live,
  reserve=reservarCapacidadR2Live,stage=informarR2LivePendiente,
@@ -84,7 +88,7 @@ export async function manejarR2MultipartLive(req,env,{
     name:input.meta.name,bytes:input.meta.bytes,
     sha256:input.meta.sha256,pages:input.meta.pages};
    const paid=await verify(env,m);
-   if(paid.paymentVerified!==true||paid.mode!==input.meta.mode)
+   if(!puedeSubir(paid)||paid.mode!==input.meta.mode)
     return respond({ok:false,error:'LIVE_R2_RECOVERY_PAGO'},402);
    const saved=await recover(env,m);
    if(saved.found===false&&saved.state==='not_started')
@@ -127,7 +131,7 @@ export async function manejarR2MultipartLive(req,env,{
    const paid=await verify(env,{orderId:input.orderId,
     fileId:input.meta.fileId,name:input.meta.name,bytes:input.meta.bytes,
     sha256:input.meta.sha256,pages:input.meta.pages});
-   if(paid.mode!==input.meta.mode||paid.paymentVerified!==true||
+   if(paid.mode!==input.meta.mode||!puedeSubir(paid)||
     paid.uploadAuthorized!==false)
     return respond({ok:false,error:'LIVE_R2_FICHA_DISTINTA'},409);
    const id=uuid();
@@ -138,8 +142,8 @@ export async function manejarR2MultipartLive(req,env,{
     sha256:input.meta.sha256,pages:input.meta.pages,objectKey});
    if(quota.reserved!==true||quota.objectKey!==objectKey)
     return respond({ok:false,error:'LIVE_R2_CUPO'},409);
-   // El primer byte R2 solo se almacena después de reserva D1
-   // y pago reconciliado, jamás por presupuestar.
+   // El primer byte R2 solo se almacena después de reserva D1 y
+   // pago reconciliado O aviso bancario D1; jamás sólo por presupuestar.
    const session=await iniciarR2Grande({...settings,
     orderId:input.orderId,meta:input.meta,uuid:()=>id});
    return respond({ok:true,session,objectKey,
@@ -154,7 +158,7 @@ export async function manejarR2MultipartLive(req,env,{
   if(!await buyer(req,env,claim.orderId))
    return respond({ok:false,error:'LIVE_R2_COMPRADOR_AJENO'},403);
   const paid=await verify(env,expected(claim));
-  if(paid.paymentVerified!==true||paid.mode!==claim.mode||
+  if(!puedeSubir(paid)||paid.mode!==claim.mode||
     paid.uploadAuthorized!==false)
    return respond({ok:false,error:'LIVE_R2_PAGO_CAMBIO'},402);
   if(action==='parte'){
