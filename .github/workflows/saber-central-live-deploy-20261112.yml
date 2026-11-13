@@ -36,6 +36,8 @@ jobs:
           grep -Fq '/personal/api/live-reconcile' /tmp/saber-documentos-live.mjs
           grep -Fq 'staff-calendar' /tmp/saber-central-live.mjs
           grep -Fq 'staff-reconcile' /tmp/saber-central-live.mjs
+          grep -Fq 'SABER_MP_LIVE_CRON_ACREDITADOS' /tmp/saber-central-live.mjs
+          ! grep -Fq 'Verificar cobros Mercado Pago' /tmp/saber-documentos-live.mjs
           grep -Fq 'staff-forecast' /tmp/saber-central-live.mjs
           echo SABER_STAFF_LIVE_2_BUNDLES_READY
       - name: Stage y promover ambos Workers con bindings heredados y rollback de código
