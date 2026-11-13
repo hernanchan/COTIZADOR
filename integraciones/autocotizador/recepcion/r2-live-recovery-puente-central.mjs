@@ -43,7 +43,8 @@ export async function consultarReservaR2Live(env,meta,{
  if(!response.ok)throw Error('LIVE_R2_RECOVERY_RECHAZADA');
  const data=await response.json().catch(()=>null);
  if(data?.ok!==true||data.webOrderId!==meta.orderId||
-  data.fileId!==meta.fileId||data.paymentVerified!==true||
+  data.fileId!==meta.fileId||
+   !(data.paymentVerified===true||data.paymentVerified===false&&data.bankPending===true)||
   data.productionAuthorized!==false)throw Error('LIVE_R2_RECOVERY_RESPUESTA');
  if(data.found===false){
   if(data.state!=='not_started'||data.uploadPossible!==true)
