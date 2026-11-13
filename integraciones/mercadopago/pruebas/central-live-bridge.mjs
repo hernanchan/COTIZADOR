@@ -90,7 +90,9 @@ export async function leerFirmaInternaLive(request,env,{
  const sellerDiag=url.pathname==='/internal/central/live/diag-seller';
  const keys=staffReconcile?'purpose,schema':
   bankStaffPending?'purpose,schema':
-  bankStaffApprove?'amount_ars,bank_reference,confirmed,operator,order_id,schema':
+  bankStaffApprove?(Object.hasOwn(payload||{},'bank_reference')?
+   'amount_ars,bank_reference,confirmed,operator,order_id,schema':
+   'amount_ars,confirmed,operator,order_id,schema'):
   boardRoute?'purpose,schema':
   staffStatus?'confirmed,from,operator,orderId,reason,schema,to,version':
   staffForecast?'action,expectedRevision,mode,operator,orderId,readyAt,reason,schema':
@@ -120,8 +122,9 @@ export async function leerFirmaInternaLive(request,env,{
       !Number.isSafeInteger(payload.amount_ars)||payload.amount_ars<1||
       payload.confirmed!==true||typeof payload.operator!=='string'||
       payload.operator.trim().length<2||payload.operator.trim().length>60||
-      typeof payload.bank_reference!=='string'||
-      payload.bank_reference.trim().length<6||payload.bank_reference.trim().length>80):
+      (Object.hasOwn(payload,'bank_reference')&&
+       (typeof payload.bank_reference!=='string'||
+        payload.bank_reference.trim().length<6||payload.bank_reference.trim().length>80))):
      boardRoute?payload.purpose!=='listar-pedidos-entrantes':
      staffCalendar?(!['read','save'].includes(payload.action)||
        !Number.isSafeInteger(payload.expectedRevision)||payload.expectedRevision<0||
