@@ -1,8 +1,6 @@
 name: Saber - PUBLICAR ficha de precios en Central LIVE con rollback
 on:
-  push:
-    branches: [admin/precios-live-protegido-20261113]
-    paths: ['.github/workflows/saber-publicar-ficha-precios-live-20261113.yml']
+  workflow_dispatch:
 permissions: {contents: read}
 concurrency: {group: saber-staff-pricing-live-deploy, cancel-in-progress: false}
 jobs:
