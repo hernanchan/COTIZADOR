@@ -13,6 +13,9 @@ jobs:
     env:
       ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
       TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+      CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      CF_DEPLOY: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+      CF_DB: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with: {persist-credentials: false}
