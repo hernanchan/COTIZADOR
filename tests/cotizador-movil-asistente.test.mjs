@@ -40,10 +40,10 @@ test('la vista móvil es una capa sin reemplazar archivo, cotización ni handoff
  assert.doesNotMatch(html,/src="\/prueba-carga-unica.js"/);
 });
 test('el asistente funciona únicamente dentro del iframe comprador y en ancho móvil',()=>{
- assert.match(clientJs,/location\.pathname !== '\/cotizar\/archivos'/);
- assert.match(clientJs,/window\.parent === window/);
+ assert.match(clientJs,/location\.pathname\s*!==\s*'\/cotizar\/archivos'/);
+ assert.match(clientJs,/window\.parent\s*===\s*window/);
  assert.match(clientJs,/matchMedia\('\(max-width: 720px\), \(pointer: coarse\)'\)/);
- assert.match(clientJs,/const forced = new URLSearchParams\(location.search\).get\('vista'\) === 'movil'/);
+ assert.match(clientJs,/const forced\s*=\s*new URLSearchParams\(location.search\).get\('vista'\)\s*===\s*'movil'/);
  assert.match(clientJs,/media\.matches/);
  assert.match(clientJs,/body\.classList\.remove\('saber-mobile'\)/);
  assert.match(clientJs,/SABER_MOBILE_STAGE/);
@@ -105,4 +105,16 @@ test('fotos/stickers mantienen la selección y la modalidad de prueba en mismo o
   assert.ok(html.includes('src="/cotizar/archivos?servicio='+servicio+'&vista=movil"'));
   assert.match(html,/const enabled=false/);
  }
+});
+
+test('cada archivo tiene cuatro pantallas específicas, sin clonar controles ni crear pagos',()=>{
+ assert.match(clientJs,/PASO '\+stage\+' DE 6'/);
+ for(const heading of ['Tamaño y tipo','Color y papel','Caras y distribución','Copias y terminación','Revisá tu presupuesto'])
+  assert.ok(clientJs.includes(heading),'Falta pantalla '+heading);
+ assert.match(clientJs,/fieldPart|partFor/);
+ assert.match(clientJs,/child\.dataset\.mobileHidden/);
+ assert.match(clientJs,/activeFile<numFiles\(\)-1/);
+ assert.match(clientJs,/stage===6/);
+ assert.match(clientJs,/querySelector\('.panel-edicion'\)/);
+ assert.doesNotMatch(clientJs,/fetch\s*\(|\.submit\s*\(|iniciarPago|mercadopago\.com/i);
 });
