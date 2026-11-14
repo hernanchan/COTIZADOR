@@ -3,7 +3,7 @@
  * sin bind de D1/R2/TUS/MP, sin APIs ni transferencias de archivos.
  * Probar la usabilidad desde cualquier celular antes de habilitar la UI LIVE.
  */
-const html = String.raw\`<!doctype html>
+const html = String.raw`<!doctype html>
 <html lang="es">
 <head>
 <meta charset="utf-8">
@@ -230,7 +230,7 @@ h1{font-size:26px;color:var(--navy);letter-spacing:-.035em;line-height:1.15;marg
  refresh();
 })();
 </script>
-</body></html>\`;
+</body></html>`;
 
 export default {
  async fetch(request) {
