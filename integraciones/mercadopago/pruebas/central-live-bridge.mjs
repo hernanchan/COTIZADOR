@@ -62,6 +62,7 @@ export async function leerFirmaInternaLive(request,env,{
     !Number.isSafeInteger(time)||Math.abs(time-Number(ts))>300)
    return {error:'Identidad o fecha LIVE inválida',status:401};
  const raw=await request.text();
+ const staffPricing=url.pathname==='/internal/central/live/staff-pricing';
  const draftRoute=url.pathname==='/internal/central/live/draft';
  const tusReceipt=url.pathname==='/internal/central/live/tus-received';
  const tusGate=url.pathname==='/internal/central/live/tus-gate';
@@ -88,7 +89,7 @@ export async function leerFirmaInternaLive(request,env,{
   url.pathname==='/internal/central/live/transfer-notify'||
   url.pathname==='/internal/central/live/transfer-status';
  const pricingRoute=url.pathname==='/internal/central/live/pricing';
- const staffPricing=url.pathname==='/internal/central/live/staff-pricing';
+
  const sellerDiag=url.pathname==='/internal/central/live/diag-seller';
  const keys=staffPricing?'action,changes,confirmed,expectedRevision,operator,schema':
   staffReconcile?'purpose,schema':
