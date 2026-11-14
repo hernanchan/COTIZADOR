@@ -4,7 +4,7 @@
 
 - Está **prohibido** cambiar por iniciativa del asistente una regla comercial o un módulo ajeno al pedido. No inferir autorización a partir de un chat anterior.
 - Las aprobaciones de cambio no se fabrican mediante llamadas a GitHub ejecutadas por el asistente con la cuenta del propietario.
-- **No confundir el control automático con una barrera GitHub efectiva:** el workflow necesita Rulesets activos y un status check requerido. Hasta entonces reportar la limitación de seguridad.
+- **No confundir el control automático con una barrera GitHub efectiva:** el workflow necesita Rulesets activos que requieran el estado de commit `saber/contrato`. Hasta entonces reportar la limitación de seguridad.
 - No tocar la visibilidad del repositorio, la web pública o los secretos como efecto de editar documentación o código.
 - El contrato mismo está protegido: modificaciones de reglas requieren el mismo procedimiento que otras modificaciones críticas.
 
