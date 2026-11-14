@@ -5,7 +5,7 @@
 (() => {
  'use strict';
  if (location.pathname !== '/cotizar/archivos' || window.parent === window) return;
- const media = matchMedia('(max-width: 720px), (pointer: coarse)');
+ const media = matchMedia('(max-width: 720px), (max-width: 1024px) and (pointer: coarse)');
  // La prueba explícita debe ser móvil incluso si el teléfono está horizontal.
  const forced = new URLSearchParams(location.search).get('vista') === 'movil';
  const active = () => forced || media.matches;
