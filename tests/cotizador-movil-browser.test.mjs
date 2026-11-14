@@ -52,14 +52,51 @@ try{
   assert.notEqual(active.upload,'none',label+': selector de PDF oculto');
   assert.equal(active.config,'none',label+': opciones anteriores visibles antes de tiempo');
   assert.equal(await page.locator('body').getAttribute('class'),'preview-movil mobile-wizard-ready');
-  // Solo simulación de la fila para evaluar el asistente, NO la lectura ni el precio.
+  // Tarjeta de prueba ya detectada: controles con la MISMA estructura del render real,
+  // sin afirmar que leímos un PDF ni consultamos precios en este test de interfaz.
   await frame.locator('#lista').evaluate(el=>{
-   el.innerHTML='<section class="grupo-pedido"><section class="archivo"><strong class="nombre">Apunte de ejemplo.pdf</strong><div class="resumen-archivo">48 páginas · Impresión A4 · B/N · 1 copia</div></section></section>';
+   el.innerHTML=[
+    '<section class="grupo-pedido">',
+      '<h3 class="titulo-grupo">Impresiones A4 · 1 archivo</h3>',
+      '<section class="archivo"><div class="fila"><div class="fila-principal">',
+       '<strong class="nombre">Apunte de ejemplo.pdf</strong>',
+       '<div class="resumen-archivo">48 páginas · Impresión A4 · B/N · 1 copia</div>',
+       '<div class="tamano-rapido"><button class="tamano-opcion seleccionada">A4</button></div>',
+      '</div><span class="precio-archivo">Pendiente</span>',
+      '<div class="acciones-archivo"><button aria-expanded="true">Cerrar detalles</button></div></div>',
+      '<fieldset class="composicion-visible"><legend>Páginas por cara</legend>',
+       '<div class="composicion-opciones"><label>1 página<input type="radio" checked></label>',
+       '<label>2 páginas<input type="radio"></label></div></fieldset>',
+      '<div class="panel-edicion"><p class="origen">Tamaño detectado: 21 × 29,7 cm · 48 páginas</p>',
+       '<div class="controles">',
+        '<label>Servicio<select><option>Impresiones / ploteos</option></select></label>',
+        '<label>Tamaño de impresión<select><option value="a4" selected>A4</option></select></label>',
+        '<label>Copias<input type="number" value="1"></label>',
+        '<label>Impresión<select><option>B/N</option><option>Color</option></select></label>',
+        '<label>Caras<select><option>Simple faz</option><option>Doble faz</option></select></label>',
+        '<label>Anillado<select><option>Sin anillado</option><option>Por archivo</option></select></label>',
+       '</div></div></section></section>'
+   ].join('');
   });
-  await frame.getByRole('button',{name:'Configurar archivos'}).click();
+  await frame.getByRole('button',{name:'Configurar mis archivos'}).click();
   assert.equal(await frame.locator('body').getAttribute('data-mobile-stage'),'2',label+': paso 2 inaccesible');
-  await frame.getByRole('button',{name:'Revisar precio y pedido'}).click();
+  assert.equal(await frame.locator('.panel-edicion label').filter({hasText:'Tamaño de impresión'}).isVisible(),true);
+  assert.equal(await frame.locator('.panel-edicion label').filter({hasText:'Impresión'}).isVisible(),false);
+  await frame.getByRole('button',{name:'Elegir color y papel'}).click();
   assert.equal(await frame.locator('body').getAttribute('data-mobile-stage'),'3',label+': paso 3 inaccesible');
+  assert.equal(await frame.locator('.panel-edicion label').filter({hasText:'Impresión'}).isVisible(),true);
+  assert.equal(await frame.locator('.panel-edicion label').filter({hasText:'Anillado'}).isVisible(),false);
+  await frame.getByRole('button',{name:'Elegir caras'}).click();
+  assert.equal(await frame.locator('body').getAttribute('data-mobile-stage'),'4',label+': paso 4 inaccesible');
+  assert.equal(await frame.locator('.panel-edicion label').filter({hasText:'Caras'}).isVisible(),true);
+  assert.equal(await frame.locator('.composicion-visible').isVisible(),true);
+  await frame.getByRole('button',{name:'Copias y terminación'}).click();
+  assert.equal(await frame.locator('body').getAttribute('data-mobile-stage'),'5',label+': paso 5 inaccesible');
+  assert.equal(await frame.locator('.panel-edicion label').filter({hasText:'Copias'}).isVisible(),true);
+  assert.equal(await frame.locator('.panel-edicion label').filter({hasText:'Anillado'}).isVisible(),true);
+  await frame.getByRole('button',{name:'Revisar presupuesto'}).click();
+  assert.equal(await frame.locator('body').getAttribute('data-mobile-stage'),'6',label+': paso 6 inaccesible');
+  assert.equal(await frame.locator('.mobile-review-row').count(),1);
   await page.frames()[1].evaluate(()=>window.parent.postMessage({
    type:'SABER_SMART_PRICE_STATE',estado:'listo',total:1500,sendable:true
   },location.origin));
@@ -72,7 +109,7 @@ try{
   assert.equal(bar.visible,true,label+': precio no permanece visible');
   assert.equal(bar.disabled,true,label+': demo habilita pagos');
   assert.equal(errors.length,0,label+': errores JS: '+errors.join('|'));
-  console.log('SABER_MOBILE_BROWSER_VISIBLE',label,width,height,active.stage,'→3',bar.amount,'CHECKOUT_BLOCKED');
+  console.log('SABER_MOBILE_BROWSER_VISIBLE',label,width,height,active.stage,'→6',bar.amount,'CHECKOUT_BLOCKED');
   tests++;
   await context.close();
  }
