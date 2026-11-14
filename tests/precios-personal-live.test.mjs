@@ -127,8 +127,10 @@ test('el puente HMAC verifica firma y contrato de edición, sin exponerla al cli
  let checked=null;
  const centro={SABER_ENTORNO:'produccion',CENTRAL_DB_ENV:'produccion',MP_LIVE_GATE:GO,
   CENTRAL_LIVE_BRIDGE_ENABLED:GO,CENTRAL_BRIDGE_KEY:e.CENTRAL_BRIDGE_KEY};
+ let bridgeException='';
  const fetchService=async req=>{
-  checked=await leerFirmaInternaLive(req,centro,{now:()=>1794545000});
+  try {checked=await leerFirmaInternaLive(req,centro,{now:()=>1794545000});}
+  catch(error){bridgeException=String(error?.message||error);throw error;}
   return new Response(JSON.stringify({ok:!checked.error,error:checked.error||null}),{status:checked.error?403:200});
  };
  const r=await preciosPersonalLiveApi(
@@ -136,7 +138,7 @@ test('el puente HMAC verifica firma y contrato de edición, sin exponerla al cli
   {...e,SABER_CENTRAL:{fetch:fetchService}},
   {nonce:()=> 'cc75687e-8bb9-4f82-b06f-1beab68061c9',now:()=>1794545000}
  );
- assert.equal(r.status,200,'HMAC bridge response: '+JSON.stringify(await r.clone().json().catch(()=>({unreadable:true}))));
+ assert.equal(r.status,200,'HMAC bridge error='+bridgeException+' response: '+JSON.stringify(await r.clone().json().catch(()=>({unreadable:true}))));
  assert.equal(checked.payload.action,'read');
  assert.equal(checked.payload.schema,'saber-central-live-staff-pricing-v1');
  assert.equal(checked.payload.operator,'');
