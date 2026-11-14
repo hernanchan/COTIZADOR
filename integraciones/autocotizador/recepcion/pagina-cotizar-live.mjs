@@ -33,7 +33,7 @@ section[hidden]{display:none!important}
 @media(max-width:650px){#precio-entrega{grid-template-columns:1fr}}
 @media(max-width:700px){main{width:100%;max-width:100%;margin:0;padding:8px}section{padding:13px;margin-bottom:10px;border-radius:10px}h1{font-size:22px}h2{font-size:18px}#seccion-archivos{overflow:visible}#pdf{height:960px;min-height:0}#precio-entrega{padding:10px;gap:5px}#precio-entrega #precio,#precio-entrega #plazo-orientativo{font-size:21px}#plazo-explicacion,#promo-dia{padding:9px 11px;font-size:14px}button{max-width:100%;white-space:normal;min-height:46px}.payment-options button{display:block;width:100%;margin:8px 0!important}}`;
 const mobileCss=`
-@media(max-width:720px), (pointer:coarse){
+@media(max-width:720px){
  body{background:#f2f6fa}
  header{padding:11px 13px}
  header strong{font-size:18px}
@@ -67,6 +67,7 @@ const previewCss=`
 body.preview-movil{background:#f3f7fb}
 body.preview-movil header{padding:12px 15px;gap:8px}
 body.preview-movil header strong{font-size:18px}
+body.preview-movil header strong:before{content:'SBR';display:inline-grid;place-items:center;vertical-align:middle;margin-right:10px;background:#ee9b35;color:#123b60;font-size:12px;font-weight:900;width:40px;height:40px;border:2px solid white;border-radius:50%}
 body.preview-movil main{max-width:590px;margin:0 auto;padding:8px 9px 110px}
 body.preview-movil main>section{padding:11px;margin:7px 0 11px}
 body.preview-movil #aviso-demo-real{padding:9px 12px!important;font-size:13px}
