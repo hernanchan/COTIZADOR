@@ -1,7 +1,7 @@
 /** Adaptador visual comprador LIVE: un solo scroll y un solo total.
  * No modifica clasificación, precios, archivos ni pagos.
  */
-export function prepararCotizadorArchivosLive(htmlEntrada){
+export function prepararCotizadorArchivosLive(htmlEntrada,{previewMovil=false}={}){
  if(typeof htmlEntrada!=='string'||!htmlEntrada.includes('id="zonaArchivos"'))
   throw Error('HTML_COTIZADOR_NO_COMPATIBLE');
  const html=htmlEntrada
@@ -52,7 +52,13 @@ export function prepararCotizadorArchivosLive(htmlEntrada){
            requestAnimationFrame(send);
           })();
           </script></body></html>`);
- if(!html.includes('SABER_SMART_RESIZE')||!html.includes('id="archivos"'))
+ // El mismo motor de cotización se entrega a PC y móvil. El JS del asistente
+ // decide la interfaz por viewport, sin alterar precio, subida ni checkout.
+ const adaptado=html.replace('</body></html>',
+  '<script src="/cotizar/movil.js" defer></script></body></html>');
+ if(!adaptado.includes('SABER_SMART_RESIZE')||
+    !adaptado.includes('id="archivos"')||
+    !adaptado.includes('src="/cotizar/movil.js"'))
   throw Error('HTML_COTIZADOR_NO_ADAPTADO');
- return html;
+ return adaptado;
 }

@@ -1,0 +1,44 @@
+name: Saber - verificacion REAL navegador movil PC (sin deploy)
+on:
+  push:
+    branches: [ux/cotizador-movil-asistente-20261114]
+    paths:
+      - '.github/workflows/saber-cotizador-movil-browser-qa-20261114.yml'
+      - 'integraciones/autocotizador/recepcion/asistente-movil-live.txt'
+      - 'integraciones/autocotizador/recepcion/pagina-cotizar-live.mjs'
+      - 'integraciones/autocotizador/recepcion/pagina-archivos-live.mjs'
+      - 'tests/cotizador-movil-browser.test.mjs'
+      - 'tests/cotizador-movil-asistente.test.mjs'
+      - 'tests/cotizador-movil-publicacion-browser.test.mjs'
+permissions: {contents: read}
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Compilar y validar script original y test
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp integraciones/autocotizador/recepcion/asistente-movil-live.txt /tmp/saber-mobile.mjs
+          node --check /tmp/saber-mobile.mjs
+          node --check integraciones/autocotizador/recepcion/pagina-cotizar-live.mjs
+          node --check tests/cotizador-movil-browser.test.mjs
+          node --test tests/cotizador-movil-asistente.test.mjs
+      - name: Instalar navegador Chromium para prueba real
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund playwright@1.58.2
+          npx playwright install chromium
+      - name: Ver DOM y estilos en telefono vertical/horizontal y desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/cotizador-movil-browser.test.mjs
+          node tests/cotizador-movil-publicacion-browser.test.mjs
+          echo SABER_MOBILE_BROWSER_RENDER_QA_SUCCESS_NO_DEPLOY

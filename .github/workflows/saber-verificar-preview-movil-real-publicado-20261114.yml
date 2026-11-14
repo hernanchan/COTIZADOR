@@ -1,0 +1,68 @@
+name: Saber - verificar preview móvil LIVE publicado (solo lectura)
+on:
+  push:
+    branches: [ux/cotizador-movil-asistente-20261114]
+    paths: ['.github/workflows/saber-verificar-preview-movil-real-publicado-20261114.yml']
+permissions: {contents: read}
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      CF_DEPLOY: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+      CF_DB: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verificar binario REAL, versión 100%, bindings y rutas sin credenciales
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${CF_ACCOUNT:?}" "${CF_DEPLOY:?}"
+          root="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/scripts/saber-documentos-produccion"
+          tmp=$(mktemp -d)
+          curl -fsS --max-time 30 -H "Authorization: Bearer $CF_DEPLOY" "$root" > "$tmp/code"
+          curl -fsS --max-time 30 -H "Authorization: Bearer $CF_DEPLOY" "$root/deployments" > "$tmp/deploy"
+          curl -fsS --max-time 30 -H "Authorization: Bearer $CF_DEPLOY" "$root/settings" > "$tmp/settings"
+          jq -e '.success==true and (.result.deployments[0].versions|length==1 and .[0].percentage==100)' "$tmp/deploy" >/dev/null
+          jq -e '.success==true and (.result.bindings|any(.name=="DOCS_LIVE_PRICING_GATE" and .text=="GO_COMERCIAL_CONFIRMADO") and any(.name=="DOCS_LIVE_STAFF_SECRET" and .type=="secret_text") and any(.name=="SABER_CENTRAL" and .type=="service") and any(.name=="SABER_R2_GRANDES_LIVE" and .type=="r2_bucket"))' "$tmp/settings" >/dev/null
+          DIR="$tmp" node --input-type=module <<'JS'
+          import fs from 'node:fs';import crypto from 'node:crypto';import assert from 'node:assert/strict';
+          const raw=fs.readFileSync(process.env.DIR+'/code','utf8');
+          const crlf='\r\n',boundary=raw.slice(0,raw.indexOf(crlf));
+          assert.match(boundary,/^--[a-f0-9]{40,}$/i);
+          const actual=raw.split(boundary).map(x=>{
+           const i=x.indexOf(crlf+crlf);return i>0&&x.slice(0,i).includes('name="index.mjs"')?x.slice(i+4).replace(/\r\n$/,''):null;
+          }).find(Boolean);
+          assert.ok(actual?.length>2000000);
+          const sha=crypto.createHash('sha256').update(actual).digest('hex').slice(0,16);
+          assert.equal(sha,'eda953a38f3f5092','PREVIEW_MOBILE_NOT_ACTIVE_OR_UNEXPECTED_CODE');
+          assert.ok(actual.includes('/cotizar/movil.js'));
+          assert.ok(actual.includes('SABER_SMART_PRICE_STATE'));
+          assert.ok(actual.includes('/personal/precios'));
+          assert.ok(actual.includes('/pedido/continuar'));
+          console.log('SABER_PREVIEW_REAL_MOBILE_ACTIVE_SHA_MATCHED',sha);
+          JS
+          for path in '/cotizar?vista=movil' '/cotizar' '/cotizar?servicio=stickers&vista=movil' '/pedido/estado' '/pedido/continuar';do
+            status=$(curl -sS --max-time 18 -o /dev/null -w '%{http_code}' "https://pedidos.libreriasaber.com.ar$path")
+            [ "$status" = 200 ] || { echo "MOBILE_PREVIEW_BUYER_HTTP_$status $path";false; }
+            echo "SABER_PREVIEW_200 $path"
+          done
+          for path in '/personal/central' '/personal/precios' '/personal/api/live-pricing';do
+            status=$(curl -sS --max-time 18 -o /dev/null -w '%{http_code}' "https://pedidos.libreriasaber.com.ar$path")
+            [ "$status" = 401 ] || { echo "MOBILE_PREVIEW_STAFF_HTTP_$status $path";false; }
+            echo "SABER_PREVIEW_401 $path"
+          done
+          status=$(curl -sS --max-time 18 -o /dev/null -w '%{http_code}' 'https://pedidos.libreriasaber.com.ar/cotizar/archivos?vista=movil')
+          [ "$status" = 503 ]
+          echo SABER_PREVIEW_AUTH_PROTECTED_NO_SESSION_NO_API_ACCESS
+      - name: Monitor integrado SOLO lectura (web, Central, TUS/R2, D1 y MP)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node integraciones/publicacion/monitor-postpublicacion-20261112.mjs
+          echo SABER_PREVIEW_MOBILE_REAL_QUOTE_PUBLISHED_VERIFIED_NO_PAYMENTS

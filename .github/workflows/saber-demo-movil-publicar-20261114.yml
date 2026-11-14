@@ -1,0 +1,76 @@
+name: Saber - vista previa móvil aislada (sin pedidos ni pagos)
+on:
+  push:
+    branches: [ux/cotizador-movil-asistente-20261114]
+    paths:
+      - '.github/workflows/saber-demo-movil-publicar-20261114.yml'
+      - 'integraciones/autocotizador/recepcion/cotizador-movil-demo-aislado.mjs'
+      - 'integraciones/autocotizador/recepcion/wrangler-movil-demo.toml'
+  workflow_dispatch:
+permissions: {contents: read}
+concurrency: {group: saber-demo-movil-independiente, cancel-in-progress: false}
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verificar aislamiento, HTML y rutas sin datos privados
+        shell: bash
+        run: |
+          set -euo pipefail
+          file=integraciones/autocotizador/recepcion/cotizador-movil-demo-aislado.mjs
+          node --check "$file"
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import worker from './integraciones/autocotizador/recepcion/cotizador-movil-demo-aislado.mjs';
+          const r=await worker.fetch(new Request('https://demo.invalid/'));
+          assert.equal(r.status,200);
+          assert.equal(r.headers.get('Cache-Control'),'no-store');
+          assert.match(r.headers.get('Content-Security-Policy'),/connect-src 'none'/);
+          const html=await r.text();
+          for(const t of ['Vista previa móvil','Paso 1 de 4','Seleccioná tus PDF o fotos',
+           'A color','Doble faz','Con anillado','Revisá tu pedido','Mercado Pago o transferencia'])
+           assert.ok(html.includes(t),'DEMO_MARKER_'+t);
+          assert.ok(!/fetch\s*\(|XMLHttpRequest|sendBeacon|WebSocket|FormData/.test(html),
+           'NO_NETWORK_API_ALLOWED');
+          assert.ok(!/https?:\/\//.test(html),'NO_EXTERNAL_URLS_ALLOWED');
+          assert.equal((await worker.fetch(new Request('https://demo.invalid/pago'))).status,404);
+          assert.equal((await worker.fetch(new Request('https://demo.invalid/',{method:'POST'}))).status,404);
+          console.log('SABER_MOBILE_DEMO_STATIC_SAFE_200_NO_PAYMENTS_NO_UPLOADS');
+          JS
+      - name: Publicar UNICAMENTE demo visual en Worker nuevo, sin bindings
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${CLOUDFLARE_ACCOUNT_ID:?}" "${CLOUDFLARE_API_TOKEN:?}"
+          npm install --no-save --no-audit --no-fund wrangler@4.55.0 >/dev/null
+          ./node_modules/.bin/wrangler deploy --config integraciones/autocotizador/recepcion/wrangler-movil-demo.toml
+          echo SABER_MOBILE_DEMO_WORKER_ISOLATED_DEPLOY_OK
+      - name: Confirmar enlace público de DEMO y controles de seguridad
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://saber-cotizador-movil-demo.libreriasaber.workers.dev/'
+          status=000
+          for i in 1 2 3 4 5 6;do
+            status=$(curl -sS --connect-timeout 6 --max-time 20 -D /tmp/demo.headers -o /tmp/demo.html -w '%{http_code}' "$url") || status=000
+            [ "$status" = 200 ] && grep -Fq 'Solo diseño. No se suben archivos' /tmp/demo.html && break
+            sleep 2
+          done
+          [ "$status" = 200 ]
+          grep -Fq 'Solo diseño. No se suben archivos' /tmp/demo.html
+          grep -qi '^x-robots-tag: noindex,nofollow,noarchive' /tmp/demo.headers
+          grep -qi "connect-src 'none'" /tmp/demo.headers
+          blocked=$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$url/api/pedido/live/orden")
+          [ "$blocked" = 404 ]
+          echo "SABER_MOBILE_DEMO_LINK_VERIFIED $url"
+          echo SABER_MOBILE_DEMO_NO_PII_NO_PAYMENTS_PRODUCTION_UNTOUCHED

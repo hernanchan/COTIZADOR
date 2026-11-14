@@ -1,0 +1,6 @@
+# Ensayo VISUAL aislado: NO modificar los Workers saber-documentos/pagos-produccion.
+name = "saber-cotizador-movil-demo"
+main = "./cotizador-movil-demo-aislado.mjs"
+compatibility_date = "2026-11-14"
+workers_dev = true
+send_metrics = false

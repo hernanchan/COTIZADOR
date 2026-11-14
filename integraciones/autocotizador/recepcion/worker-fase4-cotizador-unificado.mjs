@@ -28,6 +28,7 @@ import {registrarPdfCompuestoCentralFirmado} from './registrar-pdf-compuesto-cen
 import {verificarVinculoCotizadorV2} from './verificar-vinculo-cotizador-v2.mjs';
 import {paginaCotizadorV2PruebaPrivada,paginaCotizadorTUSClientePruebas} from './pantalla-cotizador-v2-prueba-privada.mjs';
 import {prepararCotizadorArchivosLive} from './pagina-archivos-live.mjs';
+import asistenteMovilLiveJs from './asistente-movil-live.txt';
 import portadaSaberDirectoHtml from '../../../vidriera/index.html';
 import ofertasSaberDirectoHtml from '../../../vidriera/ofertas.html';
 import {prepararVistaDisenoPrivada,prepararVistaDisenoAbierta} from './saber-directo-vista-previa.mjs';
@@ -2364,6 +2365,7 @@ export default {
       return plazoProduccionCliente(request,env);
     }
     if(page==='/cotizar/archivos'||page==='/cotizar/archivos.js'||
+       page==='/cotizar/movil.js'||
        page==='/cotizar/flujo-live.js'||page==='/api/pedido/live/materiales'||
        page==='/api/pedido/live/cotizar'){
       const live=env?.SABER_ENTORNO==='produccion'&&
@@ -2374,12 +2376,17 @@ export default {
       if(!live||!await autorizadoCompradorLive(request,env))
        return testResponse({ok:false,error:'LIVE_COTIZADOR_CERRADO'},503);
       if(page==='/cotizar/archivos'&&request.method==='GET'){
-       const html=prepararCotizadorArchivosLive(paginaCargaUnica());
+       const previewMovil=new URL(request.url).searchParams.get('vista')==='movil';
+       const html=prepararCotizadorArchivosLive(paginaCargaUnica(),{previewMovil});
        return new Response(html,{headers:{
         'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store,private',
         'Content-Security-Policy':"default-src 'none'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'",
         'X-Content-Type-Options':'nosniff','X-Robots-Tag':'noindex,nofollow'}});
       }
+      if(page==='/cotizar/movil.js'&&request.method==='GET')
+       return new Response(asistenteMovilLiveJs,{headers:{
+        'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-store,private',
+        'X-Content-Type-Options':'nosniff','X-Robots-Tag':'noindex,nofollow'}});
       if(page==='/cotizar/archivos.js'&&request.method==='GET')
        return new Response(cargaClienteJs,{headers:{
         'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-store,private',

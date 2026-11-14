@@ -1,0 +1,325 @@
+/* Asistente visual de comprador para pantallas pequeñas.
+ * Únicamente muestra/oculta secciones del analizador ya existente.
+ * No crea pedidos, no calcula importes, no interviene en el pago.
+ */
+(() => {
+ 'use strict';
+ if (location.pathname !== '/cotizar/archivos' || window.parent === window) return;
+ const media = matchMedia('(max-width: 720px), (max-width: 1024px) and (pointer: coarse)');
+ // La prueba explícita debe ser móvil incluso si el teléfono está horizontal.
+ const forced = new URLSearchParams(location.search).get('vista') === 'movil';
+ const active = () => forced || media.matches;
+ const $ = id => document.getElementById(id);
+ const list = $('lista');
+ const input = $('archivos');
+ const main = document.querySelector('main');
+ if (!list || !input || !main) return;
+
+ const css = document.createElement('style');
+ css.textContent = `
+ body.saber-mobile main {padding:2px 2px 24px!important}
+ body.saber-mobile #zonaArchivos {padding:18px 14px!important;background:#f1f7fc}
+ body.saber-mobile #modoConfiguracion>p {font-size:13px;color:#5f7689}
+ body.saber-mobile .grupo-pedido .titulo-grupo{font-size:15px;font-weight:850}
+ body.saber-mobile #zonaArchivos>p {font-size:14px}
+ body.saber-mobile #zonaArchivos label[for=archivos]{display:block;padding:7px 0;font-size:18px}
+ body.saber-mobile #zonaArchivos input[type=file]{min-height:68px;background:#fff;border:2px solid #145c89;border-radius:10px}
+ body.saber-mobile #zonaArchivos input[type=file] {font-size:16px;min-height:64px}
+ body.saber-mobile #modoConfiguracion {padding:12px!important}
+ body.saber-mobile .modo-elecciones {display:grid;grid-template-columns:1fr!important;gap:10px}
+ body.saber-mobile .opciones-comunes {display:grid;grid-template-columns:1fr!important}
+ body.saber-mobile .opciones-comunes label {min-width:0!important}
+ body.saber-mobile .grupo-pedido {padding:7px!important;margin:8px 0!important}
+ body.saber-mobile .grupo-pedido .archivo {margin:5px 0!important}
+ body.saber-mobile .fila {grid-template-columns:minmax(0,1fr) auto!important;padding:12px 10px!important}
+ body.saber-mobile .fila .fila-principal {grid-column:1/-1}
+ body.saber-mobile .panel-edicion {padding:12px!important}
+ body.saber-mobile .panel-edicion .controles {grid-template-columns:1fr!important}
+ body.saber-mobile .archivo .eleccion-plotter-opciones {display:grid;grid-template-columns:1fr}
+ body.saber-mobile .archivo .eleccion-plotter-boton {width:100%;min-height:50px}
+ body.saber-mobile .archivo .composicion-opciones {display:grid;grid-template-columns:1fr 1fr}
+ body.saber-mobile .archivo .composicion-opcion {min-width:0;flex-basis:auto}
+ body.saber-mobile button, body.saber-mobile select {min-height:46px}
+ body.saber-mobile .saber-wizard {display:block!important;background:#fff;border:1px solid #cbdcea;border-radius:13px;
+   margin:5px 0 14px;padding:14px;color:#143e60;box-shadow:0 3px 12px #103c6120}
+ body.saber-mobile .saber-wizard h2 {margin:4px 0 7px;font-size:21px}
+ body.saber-mobile .saber-wizard p {font-size:14px;margin:4px 0;color:#536c81}
+ body.saber-mobile .saber-wizard .step {font-weight:750;font-size:13px;color:#17658e;letter-spacing:.03em}
+ body.saber-mobile .saber-wizard .track {height:5px;background:#dce8f1;border-radius:4px;margin:10px 0 14px;overflow:hidden}
+ body.saber-mobile .saber-wizard .progress {height:100%;width:33.33%;background:#1770a2;transition:width .15s}
+ /* La navegación pertenece al FINAL de las opciones, nunca a la cabecera. */
+ body:not(.saber-mobile) #accionesAsistenteMovil{display:none!important}
+ body.saber-mobile #accionesAsistenteMovil{display:grid;grid-template-columns:1fr 1.6fr;
+   gap:10px;margin:13px 0 24px;padding:13px 8px 16px;
+   background:#fff;border:1px solid #c7dbea;border-radius:12px}
+ body.saber-mobile #accionesAsistenteMovil button{width:100%;min-height:54px;
+   padding:11px 13px;border-radius:10px;font-size:16px;font-weight:750}
+ body.saber-mobile #accionesAsistenteMovil button.secondary{background:#edf5fa;color:#164e75;
+   border:1px solid #aac5d8}
+ body.saber-mobile #accionesAsistenteMovil button:disabled{opacity:.48}
+ body.saber-mobile[data-mobile-stage="1"] #modoConfiguracion,
+ body.saber-mobile[data-mobile-stage="1"] #configComunGlobal,
+ body.saber-mobile[data-mobile-stage="1"] #anilladosConjuntos,
+ body.saber-mobile[data-mobile-stage="1"] #lista,
+ body.saber-mobile[data-mobile-stage="1"] #resumenPedido,
+ body.saber-mobile[data-mobile-stage="2"] #zonaArchivos,
+ body.saber-mobile[data-mobile-stage="3"] #zonaArchivos,
+ body.saber-mobile[data-mobile-stage="4"] #zonaArchivos,
+ body.saber-mobile[data-mobile-stage="5"] #zonaArchivos,
+ body.saber-mobile[data-mobile-stage="6"] #zonaArchivos,
+ body.saber-mobile[data-mobile-stage="6"] #lista,
+ body.saber-mobile #modoConfiguracion,
+ body.saber-mobile #configComunGlobal,
+ body.saber-mobile #anilladosConjuntos,
+ body.saber-mobile #resumenPedido{display:none!important}
+ body.saber-mobile .archivo [data-mobile-hidden="true"]{display:none!important}
+ body.saber-mobile .archivo .acciones-archivo{display:none!important}
+ body.saber-mobile .archivo .panel-edicion label{font-weight:750;font-size:16px;gap:7px}
+ body.saber-mobile .archivo .panel-edicion input,
+ body.saber-mobile .archivo .panel-edicion select{min-height:50px;font-size:16px}
+ body.saber-mobile .saber-wizard .micro-help{display:block;border-radius:9px;
+   background:#eaf4fb;padding:10px 11px;font-size:13px;margin:11px 0}
+ body.saber-mobile .saber-wizard .micro-help[hidden]{display:none!important}
+ body.saber-mobile #lista .archivo[hidden],body.saber-mobile #lista .grupo-pedido[hidden] {display:none!important}
+ body.saber-mobile .mobile-review-row {border:1px solid #d4e1ec;border-radius:9px;padding:12px;margin:9px 0;background:white}
+ body.saber-mobile .mobile-review-row strong {display:block;font-size:15px;overflow-wrap:anywhere}
+ body.saber-mobile .mobile-review-row small {display:block;color:#45657d;line-height:1.5}
+ body.saber-mobile .mobile-review-row .warning {display:block;color:#9a3100;font-weight:700}
+ body.saber-mobile .saber-wizard .file-count {font-size:14px;font-weight:650}
+ body.saber-mobile .saber-wizard .alert {color:#8d3308;font-weight:700}
+ `;
+ document.head.append(css);
+
+ const nav = document.createElement('section');
+ nav.id = 'asistenteMovil';
+ nav.className = 'saber-wizard';
+ nav.hidden = true;
+ nav.setAttribute('aria-label','Asistente de cotización');
+ const tag = document.createElement('div');tag.className='step';
+ const track = document.createElement('div');track.className='track';
+ const progress = document.createElement('div');progress.className='progress';track.append(progress);
+ const title = document.createElement('h2');
+ const description = document.createElement('p');
+ const fileCount = document.createElement('p');fileCount.className='file-count';
+ const review = document.createElement('div');review.id='asistenteResumen';
+ const actions = document.createElement('nav');
+ actions.id='accionesAsistenteMovil';
+ actions.className='actions';
+ actions.setAttribute('aria-label','Continuar o volver al terminar este paso');
+ function btn(text,action,secondary=false){
+   const button=document.createElement('button');button.type='button';button.textContent=text;
+   if(secondary)button.className='secondary';
+   button.addEventListener('click',action);return button;
+ }
+ const prev=btn('Atrás',()=>goBack(),true);
+ const next=btn('Continuar',()=>goForward());
+ const edit=btn('Modificar opciones',()=>go(2),true);
+ const help=document.createElement('p');help.className='micro-help';help.hidden=true;
+ nav.append(tag,track,title,description,fileCount,help,review);
+ main.insertBefore(nav,$('zonaArchivos'));
+ // Anclar debajo de los controles, no arriba junto al título del paso.
+ list.insertAdjacentElement('afterend',actions);
+ let stage=1,activeFile=0,sendable=false,price=null,opening=false,warning='';
+ const numFiles=()=>list.querySelectorAll('.archivo').length;
+ const cards=()=>[...list.querySelectorAll('.archivo')];
+ const postStage=()=>window.parent.postMessage({type:'SABER_MOBILE_STAGE',stage},location.origin);
+ const money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(n);
+ function fieldName(label){
+  return String(label.childNodes[0]?.textContent||'').replace(/\s+/g,' ').trim().toLowerCase();
+ }
+ function partFor(node){
+  if(node.matches('label')){
+   const t=fieldName(node);
+   if(/^(impresión|material|papel|producto y variante|tipo de corte)/.test(t))return 3;
+   if(/^(caras|páginas por cara)/.test(t))return 4;
+   if(/^(copias|cantidad|anillado|grupo de anillado|metros lineales)/.test(t))return 5;
+   return 2;
+  }
+  if(node.matches('.composicion-visible,.composicion-por-cara'))return 4;
+  if(node.matches('.tamano-rapido,.pregunta-tamano,.eleccion-plotter,.selector-paginas-grande'))return 2;
+  const t=String(node.textContent||'').slice(0,160).toLowerCase();
+  if(t.includes('anillado')||t.includes('los pdf del grupo'))return 5;
+  if(t.includes('doble faz')||t.includes('páginas por cara'))return 4;
+  return 2;
+ }
+ function partition(card){
+  // Se ocultan CONTROLES ORIGINALES por tema; jamás se clonan,
+  // de modo que sus validaciones y eventos siguen siendo los del cotizador.
+  const extras=card.querySelectorAll('.fila-principal>.tamano-rapido,.fila-principal>.pregunta-tamano,.fila-principal>.eleccion-plotter,.fila-principal>.selector-paginas-grande,:scope>.composicion-visible');
+  for(const el of extras){
+   const part=partFor(el);el.dataset.mobilePart=String(part);
+   el.dataset.mobileHidden=String(part!==stage);
+  }
+  const panel=card.querySelector('.panel-edicion');
+  if(!panel)return;
+  for(const child of panel.children){
+   if(child.matches('.controles')){
+    let count=0;
+    for(const field of child.children){
+     const part=partFor(field);
+     field.dataset.mobilePart=String(part);
+     field.dataset.mobileHidden=String(part!==stage);
+     if(part===stage)count++;
+    }
+    child.dataset.mobileHidden=String(count===0);
+   }else{
+    const part=partFor(child);
+    child.dataset.mobilePart=String(part);
+    child.dataset.mobileHidden=String(part!==stage);
+   }
+  }
+ }
+ function showCard(){
+  const all=cards(),editing=stage>=2&&stage<=5;
+  activeFile=Math.min(Math.max(0,activeFile),Math.max(0,all.length-1));
+  all.forEach((card,i)=>{
+   card.hidden=editing&&i!==activeFile;
+   if(editing&&i===activeFile)partition(card);
+   else if(!editing)card.querySelectorAll('[data-mobile-hidden]').forEach(el=>{el.dataset.mobileHidden='false'});
+  });
+  list.querySelectorAll('.grupo-pedido').forEach(group=>{
+   group.hidden=editing&&!group.querySelector('.archivo:not([hidden])');
+  });
+  if(!editing||!all.length||opening)return;
+  const current=all[activeFile];
+  if(current.querySelector('.panel-edicion'))return;
+  const button=current.querySelector('.acciones-archivo button[aria-expanded="false"]');
+  if(button){
+   opening=true;
+   queueMicrotask(()=>{button.click();opening=false});
+  }
+ }
+ function reviewRows(){
+  review.replaceChildren();
+  for(const card of cards()){
+   const div=document.createElement('div');div.className='mobile-review-row';
+   const name=document.createElement('strong');
+   name.textContent=card.querySelector('.nombre')?.textContent||'Archivo seleccionado';
+   const details=document.createElement('small');
+   details.textContent=card.querySelector('.resumen-archivo')?.textContent||'Análisis pendiente';
+   div.append(name,details);
+   const warn=card.querySelector('.advertencia-recepcion,.advertencia');
+   if(warn){
+    const note=document.createElement('small');note.className='warning';
+    note.textContent=warn.textContent?.slice(0,190)||'Revisá este archivo';
+    div.append(note);
+   }
+   review.append(div);
+  }
+ }
+ function checkFile(){
+  const card=cards()[activeFile];
+  if(!card)return 'Primero elegí un archivo.';
+  if(card.querySelector('.advertencia-recepcion'))return 'Revisá este PDF antes de continuar.';
+  if(!card.querySelector('.panel-edicion'))return 'Todavía estamos analizando el archivo.';
+  if(stage===2){
+   const labels=[...card.querySelectorAll('.panel-edicion .controles>label')];
+   const size=labels.find(x=>fieldName(x).startsWith('tamaño de impresión'));
+   if(size?.querySelector('select')?.value==='sin-confirmar')
+    return 'Confirmá el tamaño de impresión detectado.';
+   const question=card.querySelector('.pregunta-tamano');
+   if(question&&!question.querySelector('.tamano-opcion.seleccionada'))
+    return 'Elegí A4, A3 o mantener tamaño real.';
+  }
+  return '';
+ }
+ function refresh(){
+  if(!active())return;
+  document.body.classList.add('saber-mobile');
+  actions.hidden=false;
+  document.body.dataset.mobileStage=String(stage);
+  nav.hidden=false;tag.textContent='PASO '+stage+' DE 6';
+  progress.style.width=String(stage*100/6)+'%';
+  const headings=[
+   ['Elegí los archivos','Podés cargar varios PDF, JPG o PNG juntos.'],
+   ['Tamaño y tipo','Revisá qué detectó el cotizador: medida, impresión o ploteo.'],
+   ['Color y papel','Elegí blanco y negro o color, y el material cuando corresponda.'],
+   ['Caras y distribución','Elegí simple o doble faz y páginas por cara.'],
+   ['Copias y terminación','Cantidad, anillado y opciones finales de este archivo.'],
+   ['Revisá tu presupuesto','Comprobá las opciones y el importe antes de continuar.']
+  ][stage-1];
+  title.textContent=headings[0];description.textContent=headings[1];
+  fileCount.textContent=(stage>=2&&stage<=5&&numFiles())
+   ?'Archivo '+(activeFile+1)+' de '+numFiles():'';
+  help.hidden=true;help.textContent='';actions.replaceChildren();review.replaceChildren();
+  showCard();
+  if(stage===1)$('zonaArchivos').insertAdjacentElement('afterend',actions);
+  else if(stage>=2&&stage<=5)list.insertAdjacentElement('afterend',actions);
+  else review.insertAdjacentElement('afterend',actions);
+  if(stage===1){
+   next.textContent='Configurar mis archivos';next.disabled=numFiles()===0;
+   actions.style.gridTemplateColumns='1fr';actions.append(next);
+  }else if(stage>=2&&stage<=5){
+   actions.style.gridTemplateColumns='1fr 1.6fr';
+   next.textContent=stage===2?'Elegir color y papel':stage===3?'Elegir caras':
+    stage===4?'Copias y terminación':
+     activeFile<numFiles()-1?'Siguiente archivo':'Revisar presupuesto';
+   next.disabled=numFiles()===0;actions.append(prev,next);
+   const card=cards()[activeFile];
+   const controls=card?[...card.querySelectorAll('.panel-edicion .controles>[data-mobile-part],.composicion-visible[data-mobile-part]')]:[];
+   if((stage===3||stage===4)&&card?.querySelector('.panel-edicion')&&
+      !controls.some(x=>x.dataset.mobilePart===String(stage))){
+    help.hidden=false;help.textContent='Este servicio no requiere otras opciones en este paso. Podés continuar.';
+   }
+   if(warning){help.hidden=false;help.textContent=warning;}
+  }else{
+   actions.style.gridTemplateColumns='1fr';
+   fileCount.textContent=numFiles()+' archivo(s) · '+(price!==null?money(price):'Total pendiente');
+   reviewRows();
+   description.textContent=sendable&&price!==null
+    ?'Presupuesto listo para revisar. En esta prueba no se genera ningún pedido.'
+    :'Faltan opciones o cotización. Volvé a la configuración para revisarlas.';
+   actions.append(edit);
+  }
+ }
+ function go(n){
+  if((n>=2&&n<=6)&&numFiles()<1)return;
+  if(n<1||n>6)return;
+  stage=n;warning='';
+  if(n===1||n===6)list.querySelectorAll('.archivo,.grupo-pedido').forEach(x=>{x.hidden=false});
+  refresh();postStage();
+  nav.scrollIntoView({behavior:'instant',block:'start'});
+ }
+ function goBack(){
+  if(stage===6){activeFile=Math.max(0,numFiles()-1);go(5);return}
+  if(stage===2&&activeFile>0){activeFile--;go(5);return}
+  go(stage-1);
+ }
+ function goForward(){
+  if(stage===1){go(2);return}
+  if(stage>=2&&stage<=5){
+   warning=checkFile();
+   if(warning){refresh();return}
+   if(stage===5){
+    if(activeFile<numFiles()-1){activeFile++;go(2);return}
+    go(6);return;
+   }
+   go(stage+1);
+  }
+ }
+ function enable(){
+  if(active()){refresh();postStage()}
+  else{
+   actions.hidden=true;
+   document.body.classList.remove('saber-mobile');
+   document.body.removeAttribute('data-mobile-stage');
+   nav.hidden=true;
+   list.querySelectorAll('.archivo,.grupo-pedido').forEach(el=>{el.hidden=false});
+   list.querySelectorAll('[data-mobile-hidden]').forEach(el=>{el.dataset.mobileHidden='false'});
+   window.parent.postMessage({type:'SABER_MOBILE_STAGE',stage:0},location.origin);
+  }
+ }
+ const observer=new MutationObserver(()=>{if(active())refresh()});
+ observer.observe(list,{subtree:true,childList:true});
+ input.addEventListener('change',()=>{if(active()){stage=1;activeFile=0;warning='';refresh();postStage()}});
+ window.addEventListener('message',event=>{
+  if(event.origin!==location.origin||event.source!==window.parent||
+     event.data?.type!=='SABER_MOBILE_PRICE_CONFIRM')return;
+  sendable=event.data.sendable===true;
+  price=Number.isSafeInteger(event.data.total)&&event.data.total>0?event.data.total:null;
+  if(active()&&stage===6)refresh();
+ });
+ if(media.addEventListener)media.addEventListener('change',enable);
+ else media.addListener(enable);
+ enable();
+})();

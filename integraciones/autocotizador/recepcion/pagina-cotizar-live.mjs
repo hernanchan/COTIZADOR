@@ -32,12 +32,77 @@ section[hidden]{display:none!important}
 #plazo-explicacion:not(:has(+ #promo-dia:not([hidden]))){border-bottom:2px solid #c3d9ea;border-radius:0 0 12px 12px;padding-bottom:12px}
 @media(max-width:650px){#precio-entrega{grid-template-columns:1fr}}
 @media(max-width:700px){main{width:100%;max-width:100%;margin:0;padding:8px}section{padding:13px;margin-bottom:10px;border-radius:10px}h1{font-size:22px}h2{font-size:18px}#seccion-archivos{overflow:visible}#pdf{height:960px;min-height:0}#precio-entrega{padding:10px;gap:5px}#precio-entrega #precio,#precio-entrega #plazo-orientativo{font-size:21px}#plazo-explicacion,#promo-dia{padding:9px 11px;font-size:14px}button{max-width:100%;white-space:normal;min-height:46px}.payment-options button{display:block;width:100%;margin:8px 0!important}}`;
+const mobileCss=`
+@media(max-width:720px){
+ body{background:#f2f6fa}
+ header{padding:11px 13px}
+ header strong{font-size:18px}
+ header .volver-tienda{font-size:13px;padding:7px 10px}
+ main{padding:6px 8px 0}
+ #seccion-archivos>h2,#seccion-archivos>p:first-of-type{display:none}
+ #seccion-archivos{padding:9px 9px 16px!important}
+ #pdf{height:530px;min-height:0!important;transition:height .1s}
+ #siguiente{display:block;width:100%}
+ body.mobile-wizard-ready #siguiente{display:none}
+ #aviso-siguiente{font-size:14px;padding:9px 8px;margin:0}
+ #precio-entrega{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:7px;padding:10px}
+ #precio-entrega strong{font-size:11px!important}
+ #precio-entrega #precio,#precio-entrega #plazo-orientativo{font-size:17px!important;line-height:1.4}
+ #plazo-explicacion{font-size:13px}
+ #barra-movil:not([hidden]){display:flex;position:fixed;left:0;right:0;bottom:0;
+   z-index:80;align-items:center;gap:12px;justify-content:space-between;
+   padding:12px max(14px,env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom));
+   background:#fff;border-top:2px solid #c4d9e9;box-shadow:0 -4px 22px #103c6129}
+ #barra-movil>div{min-width:0;flex:1}
+ #barra-movil small{display:block;font-size:12px;color:#43657e;font-weight:700}
+ #barra-movil strong{display:block;font-size:17px;overflow-wrap:anywhere;line-height:1.3}
+ #barra-movil button{min-width:125px;max-width:50%;padding:12px 13px;min-height:50px;font-size:15px}
+ body:has(#barra-movil:not([hidden])) main{padding-bottom:120px}
+ #seccion-confirmacion h2{font-size:22px}
+ #seccion-confirmacion label{font-size:16px}
+}
+`;
+const previewCss=`
+/* Vista de evaluación: diferente de PC aun en teléfono horizontal. */
+body:is(.preview-movil,.mobile-wizard-ready){background:#f3f7fb}
+body:is(.preview-movil,.mobile-wizard-ready) header{padding:12px 15px;gap:8px}
+body:is(.preview-movil,.mobile-wizard-ready) header strong{font-size:18px}
+body:is(.preview-movil,.mobile-wizard-ready) header strong:before{content:'SBR';display:inline-grid;place-items:center;vertical-align:middle;margin-right:10px;background:#ee9b35;color:#123b60;font-size:12px;font-weight:900;width:40px;height:40px;border:2px solid white;border-radius:50%}
+body:is(.preview-movil,.mobile-wizard-ready) main{max-width:590px;margin:0 auto;padding:8px 9px 110px}
+body:is(.preview-movil,.mobile-wizard-ready) main>section{padding:11px;margin:7px 0 11px}
+body:is(.preview-movil,.mobile-wizard-ready) #aviso-demo-real{padding:9px 12px!important;font-size:13px}
+body:is(.preview-movil,.mobile-wizard-ready) #aviso-demo-real p{font-size:12px!important}
+body:is(.preview-movil,.mobile-wizard-ready) main>section:not(#aviso-demo-real):not(#seccion-archivos):not(#seccion-confirmacion)>h1,
+body:is(.preview-movil,.mobile-wizard-ready) main>section:not(#aviso-demo-real):not(#seccion-archivos):not(#seccion-confirmacion)>p:first-of-type{display:none}
+body:is(.preview-movil,.mobile-wizard-ready) #precio-entrega{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:11px 9px;margin:0}
+body:is(.preview-movil,.mobile-wizard-ready) #precio-entrega>div{padding:0 3px}
+body:is(.preview-movil,.mobile-wizard-ready) #precio-entrega strong{font-size:10px}
+body:is(.preview-movil,.mobile-wizard-ready) #precio-entrega #precio,body:is(.preview-movil,.mobile-wizard-ready) #precio-entrega #plazo-orientativo{font-size:17px;line-height:1.25}
+body:is(.preview-movil,.mobile-wizard-ready) #plazo-explicacion{font-size:12px;padding:8px 10px}
+body:is(.preview-movil,.mobile-wizard-ready) #seccion-archivos{padding:7px 8px 14px!important}
+body:is(.preview-movil,.mobile-wizard-ready) #seccion-archivos>h2,body:is(.preview-movil,.mobile-wizard-ready) #seccion-archivos>p:first-of-type{display:none}
+body:is(.preview-movil,.mobile-wizard-ready) #pdf{height:530px;min-height:0}
+body:is(.preview-movil,.mobile-wizard-ready) #siguiente{display:block;width:100%}
+body:is(.preview-movil,.mobile-wizard-ready).mobile-wizard-ready #siguiente{display:none}
+body:is(.preview-movil,.mobile-wizard-ready) #barra-movil:not([hidden]){display:flex;position:fixed;left:0;right:0;bottom:0;
+ z-index:80;align-items:center;gap:12px;justify-content:space-between;
+ padding:12px max(14px,env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom));
+ background:#fff;border-top:2px solid #c4d9e9;box-shadow:0 -4px 22px #103c6129}
+body:is(.preview-movil,.mobile-wizard-ready) #barra-movil small{display:block;color:#43657e;font-size:12px}
+body:is(.preview-movil,.mobile-wizard-ready) #barra-movil strong{display:block;color:#153d65;font-size:18px}
+body:is(.preview-movil,.mobile-wizard-ready) #barra-movil button{min-width:125px;min-height:48px}
+`;
 export function paginaCotizarLive(req,env,{authorized=false}={}){
  const u=new URL(req.url);
  // Única selección anticipada desde la vidriera: jamás determina precio ni pago.
  const opcion=u.searchParams.get('servicio');
  const servicioInicial=opcion==='fotos'||opcion==='stickers'?opcion:'auto';
  const servicioQuery=servicioInicial==='auto'?'':'?servicio='+servicioInicial;
+ // Prueba real de lectura/cotización con las APIs comerciales existentes;
+ // no habilita órdenes, checkout, transferencia ni subida de originales.
+ const previewMovil=u.searchParams.get('vista')==='movil';
+ const routeQuery=previewMovil
+  ?servicioQuery+(servicioQuery?'&':'?')+'vista=movil':servicioQuery;
  const tituloServicio=servicioInicial==='fotos'?'Cotizá tus fotos':
   servicioInicial==='stickers'?'Cotizá tus stickers':'Cotizá tus impresiones y ploteos';
  if(req.method!=='GET'||u.protocol!=='https:'||u.hostname!==HOST||
@@ -65,7 +130,7 @@ window.saberIngresoLive=async token=>{
    headers:{'Content-Type':'application/json'},body:JSON.stringify({token})});
   const v=await r.json();
   if(!r.ok||v?.ok!==true)throw Error('No pudimos verificar el acceso.');
-  location.replace('/cotizar${servicioQuery}');
+  location.replace('/cotizar${routeQuery}');
  }catch{label.textContent='El acceso no pudo verificarse. Volvé a intentarlo.'}
 };
 </script></body></html>`;
@@ -74,13 +139,13 @@ window.saberIngresoLive=async token=>{
  }
  const scriptNonce=crypto.randomUUID().replaceAll('-','');
  const enabled=env?.DOCS_LIVE_RECEPCION_GATE===ON&&env?.DOCS_LIVE_PRICING_GATE===ON&&
-  env?.DOCS_LIVE_ORDER_GATE===ON;
+  env?.DOCS_LIVE_ORDER_GATE===ON&&!previewMovil;
  const bankEnabled=enabled&&env?.DOCS_LIVE_TRANSFER_GATE===ON&&
   env?.DOCS_LIVE_TUS_GATE===ON;
  const html=`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Cotizador de PDF · Librería Saber</title><style>${baseCss}</style></head><body>
+<title>Cotizador de PDF · Librería Saber</title><style>${baseCss}${mobileCss}${previewCss}</style></head><body class="${previewMovil?'preview-movil':''}">
 <header><strong>Librería Saber · Impresiones y ploteos</strong><a class="volver-tienda" href="https://libreriasaber.com.ar/">← Volver a la tienda</a></header>
-<main><section><h1>${servicioInicial==='fotos'?'Prepará tus fotos':servicioInicial==='stickers'?'Prepará tus stickers':'Prepará tus PDF, JPG o PNG'}</h1>
+<main>${previewMovil?'<section id="aviso-demo-real" role="status" style="border-left:4px solid #df922d;background:#fff7ec;padding:12px 15px"><strong>Prueba móvil con precios reales</strong><p style="margin:4px 0">Podés elegir archivos y verificar la detección, las opciones y la cotización comercial vigente. No genera pedidos ni permite pagar.</p></section>':''}<section><h1>${servicioInicial==='fotos'?'Prepará tus fotos':servicioInicial==='stickers'?'Prepará tus stickers':'Prepará tus PDF, JPG o PNG'}</h1>
 <p>Elegí los archivos y sus opciones de impresión. Las medidas y el tipo de trabajo se calculan por el contenido del PDF, no por el nombre ni por su peso.</p>
 <div id="precio-entrega" aria-label="Precio y fecha de entrega">
 <div><strong>TU PRECIO A PAGAR</strong><p id="precio" aria-live="polite">Pendiente de cotización</p></div>
@@ -88,7 +153,7 @@ window.saberIngresoLive=async token=>{
 </div>
 <p id="plazo-explicacion">Fecha orientativa desde la acreditación del pago, sujeta a disponibilidad, trabajo, horario y feriados. Al iniciar tu trabajo, en el seguimiento verás una fecha y hora más precisas.</p>
 <p id="promo-dia" hidden></p>
-</section><section id="seccion-archivos"><h2>1. Elegí los archivos</h2><p>Seleccioná una sola vez los PDF que querés imprimir. Con Mercado Pago se envían al acreditarse; con transferencia se reciben desde «Ya transferí», protegidos hasta verificar el banco.</p><iframe id="pdf" title="Elegir PDF, JPG o PNG y opciones de impresión" src="/cotizar/archivos${servicioQuery}" loading="eager" scrolling="no"></iframe>
+</section><section id="seccion-archivos"><h2>1. Elegí los archivos</h2><p>Seleccioná una sola vez los PDF que querés imprimir. Con Mercado Pago se envían al acreditarse; con transferencia se reciben desde «Ya transferí», protegidos hasta verificar el banco.</p><iframe id="pdf" title="Elegir PDF, JPG o PNG y opciones de impresión" src="/cotizar/archivos${routeQuery}" loading="eager" scrolling="no"></iframe>
 <button type="button" id="siguiente" disabled>Siguiente · Tus datos</button>
 <p id="aviso-siguiente" aria-live="polite">Elegí y confirmá las opciones de impresión para continuar.</p>
 </section><section id="seccion-confirmacion" hidden><h2>2. Tus datos y el pago</h2>
@@ -103,7 +168,10 @@ window.saberIngresoLive=async token=>{
 <button type="button" id="continuar" disabled>${enabled?'Confirmar presupuesto':'Recepción de pedidos temporalmente desactivada'}</button>
 <p><small>Antes de pagar, guardamos una copia privada de los PDF en este navegador. Con transferencia se envían al pulsar «Ya transferí»; con Mercado Pago al acreditarse. Si el dispositivo no puede conservarlos, no permitimos pagar.</small></p>
 <p class="transfer-warning">IMPORTANTE: Si enviás PDF pesados, mantené esta pestaña abierta durante la subida hasta que aparezca «Archivo recibido». No cierres el navegador, no apagues el dispositivo y evitá cambiar de red durante la subida.</p>
-</section></main><script type="module" nonce="${scriptNonce}">
+</section></main><div id="barra-movil" hidden role="region" aria-label="Resumen y continuar">
+<div><small>Precio estimado</small><strong id="barra-precio">Pendiente</strong></div>
+<button id="barra-continuar" type="button" disabled>${previewMovil?'Sin pago en esta prueba':'Continuar'}</button>
+</div><script type="module" nonce="${scriptNonce}">
 import {crearFlujoPresupuestoLive} from '/cotizar/flujo-live.js';
 const phone=document.getElementById('telefono');
 const nombreCliente=document.getElementById('nombre');
@@ -148,13 +216,38 @@ const stepData=document.getElementById('seccion-confirmacion');
 const back=document.getElementById('volver-archivos');
 const stepNotice=document.getElementById('aviso-siguiente');
 const iframe=document.getElementById('pdf');
-const enabled=${enabled},bankEnabled=${bankEnabled};
+const enabled=${enabled},bankEnabled=${bankEnabled},previewMode=${previewMovil};
 let pending=null,flow=null,working=false;
 const money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(n);
 const orderId=()=>{const a=new Uint8Array(16);crypto.getRandomValues(a);return 'WEB-ENSAYO-'+Array.from(a,n=>n.toString(16).padStart(2,'0')).join('').toUpperCase()};
+const mobileBar=document.getElementById('barra-movil');
+const mobileGo=document.getElementById('barra-continuar');
+const mobileAmount=document.getElementById('barra-precio');
+let mobileStage=0,mobileSendable=false,mobileTotal=null;
+const updateMobileBar=()=>{
+ const show=(previewMode||window.matchMedia('(max-width:720px), (max-width:1024px) and (pointer:coarse)').matches)&&
+   mobileStage>0&&!stepFiles.hidden;
+ mobileGo.hidden=mobileStage!==6;
+ mobileBar.hidden=!show;
+ mobileAmount.textContent=Number.isSafeInteger(mobileTotal)&&mobileTotal>0?money(mobileTotal):'Por calcular';
+ mobileGo.disabled=!enabled||!mobileSendable||working||next.disabled||!show;
+};
+mobileGo.addEventListener('click',()=>{
+ if(!mobileGo.disabled&&!next.disabled)next.click();
+});
+window.addEventListener('resize',updateMobileBar);
+
 window.addEventListener('message',event=>{
  if(event.origin!==location.origin||event.source!==iframe.contentWindow||!event.data)return;
  const data=event.data;
+ if(data.type==='SABER_MOBILE_STAGE'){
+  if(Number.isSafeInteger(data.stage)&&data.stage>=0&&data.stage<=6){
+   mobileStage=data.stage;
+   document.body.classList.toggle('mobile-wizard-ready',mobileStage>0);
+   updateMobileBar();
+  }
+  return;
+ }
  if(data.type==='SABER_SMART_RESIZE'){
   // El contenido del iframe crece cuando el cliente agrega archivos u opciones.
   // Evitar scroll anidado: el documento principal es quien debe desplazarse.
@@ -182,6 +275,11 @@ window.addEventListener('message',event=>{
   if(data.blockReason)status.textContent=data.blockReason;
   action.disabled=!enabled||!data.sendable||working;
   next.disabled=!enabled||!data.sendable||working;
+  mobileSendable=data.sendable===true;
+  mobileTotal=Number.isSafeInteger(data.total)&&data.total>0?data.total:null;
+  updateMobileBar();
+  iframe.contentWindow?.postMessage({type:'SABER_MOBILE_PRICE_CONFIRM',
+   sendable:mobileSendable,total:mobileTotal},location.origin);
   if(data.sendable)stepNotice.textContent='Todo listo. Continuá para completar tus datos y confirmar.';
  }
  if(data.type==='SABER_SMART_UNIVERSAL_PDF'){
@@ -192,6 +290,7 @@ window.addEventListener('message',event=>{
   if(enabled){
    stepFiles.hidden=true;
    stepData.hidden=false;
+   updateMobileBar();
    action.disabled=false;
    status.textContent='Archivos preparados. Completá tus datos y confirmá el presupuesto.';
    stepData.scrollIntoView({behavior:'smooth',block:'start'});
@@ -200,6 +299,7 @@ window.addEventListener('message',event=>{
  }
  if(data.type==='SABER_SMART_HANDOFF_ERROR'){
   pending=null;action.disabled=true;next.disabled=true;
+  mobileSendable=false;updateMobileBar();
   status.textContent=String(data.message||'No se pudo preparar el pedido.').slice(0,180);
  }
 });
@@ -219,6 +319,7 @@ back.addEventListener('click',()=>{
  pending=null;
  stepData.hidden=true;
  stepFiles.hidden=false;
+ updateMobileBar();
  stepNotice.textContent='Podés revisar tus opciones y volver a continuar.';
  next.disabled=false;
  action.disabled=true;
