@@ -13,12 +13,15 @@ on:
       - '.github/workflows/saber-control-cambios.yml'
       - 'tools/control-cambios-saber.mjs'
       - 'tests/control-cambios-saber.test.mjs'
+      - 'tests/publicar-estado-control-saber.test.mjs'
+      - 'tools/publicar-estado-control-saber.mjs'
       - 'docs/GOBERNANZA/**'
   workflow_dispatch:
 permissions:
   contents: read
   issues: read
   pull-requests: read
+  statuses: write
 jobs:
   control:
     name: Control de cambios Saber
@@ -38,10 +41,19 @@ jobs:
         run: |
           set -euo pipefail
           node --check tools/control-cambios-saber.mjs
-          node --test tests/control-cambios-saber.test.mjs
+          node --check tools/publicar-estado-control-saber.mjs
+          node --test tests/control-cambios-saber.test.mjs tests/publicar-estado-control-saber.test.mjs
       - name: Validar archivos protegidos y comentario auténtico del titular
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           node tools/control-cambios-saber.mjs
+      - name: Publicar veredicto en SHA real de PR para Ruleset
+        if: ${{ always() && github.event_name == 'pull_request_target' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SABER_CONTRATO_RESULT: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          node tools/publicar-estado-control-saber.mjs
