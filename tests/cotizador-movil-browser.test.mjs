@@ -52,6 +52,16 @@ try{
   assert.notEqual(active.upload,'none',label+': selector de PDF oculto');
   assert.equal(active.config,'none',label+': opciones anteriores visibles antes de tiempo');
   assert.equal(await page.locator('body').getAttribute('class'),'preview-movil mobile-wizard-ready');
+  const initialPosition=await frame.locator('#accionesAsistenteMovil').evaluate(el=>({
+    afterUpload:!!(document.getElementById('zonaArchivos').compareDocumentPosition(el)&Node.DOCUMENT_POSITION_FOLLOWING),
+    afterHeader:!!(document.getElementById('asistenteMovil').compareDocumentPosition(el)&Node.DOCUMENT_POSITION_FOLLOWING),
+    top:el.getBoundingClientRect().top, uploadBottom:document.getElementById('zonaArchivos').getBoundingClientRect().bottom,
+    insideHeader:document.getElementById('asistenteMovil').contains(el)
+  }));
+  assert.equal(initialPosition.afterUpload,true,label+': continuar debe estar debajo de carga');
+  assert.equal(initialPosition.afterHeader,true,label+': navegación no debe quedar arriba');
+  assert.equal(initialPosition.insideHeader,false,label+': botones NO dentro de cabecera');
+  assert.ok(initialPosition.top>=initialPosition.uploadBottom-2,label+': continuar se ve arriba de carga');
   // Tarjeta de prueba ya detectada: controles con la MISMA estructura del render real,
   // sin afirmar que leímos un PDF ni consultamos precios en este test de interfaz.
   await frame.locator('#lista').evaluate(el=>{
@@ -90,6 +100,17 @@ try{
   assert.equal(await frame.locator('body').getAttribute('data-mobile-stage'),'4',label+': paso 4 inaccesible');
   assert.equal(await frame.locator('.panel-edicion label').filter({hasText:'Caras'}).isVisible(),true);
   assert.equal(await frame.locator('.composicion-visible').isVisible(),true);
+  const placement=await frame.locator('#accionesAsistenteMovil').evaluate(el=>{
+    const list=document.getElementById('lista'),car= list.querySelector('.archivo');
+    return {afterList:!!(list.compareDocumentPosition(el)&Node.DOCUMENT_POSITION_FOLLOWING),
+      bottomOfOptions:car.getBoundingClientRect().bottom,
+      topOfButtons:el.getBoundingClientRect().top,
+      underHeader:!document.getElementById('asistenteMovil').contains(el)};
+  });
+  assert.equal(placement.afterList,true,label+': Siguiente debe estar debajo de las opciones');
+  assert.equal(placement.underHeader,true,label+': no hacer scroll inverso');
+  assert.ok(placement.topOfButtons>=placement.bottomOfOptions-2,
+    label+': Siguiente aparece antes de simple/doble faz');
   await frame.getByRole('button',{name:'Copias y terminación'}).click();
   assert.equal(await frame.locator('body').getAttribute('data-mobile-stage'),'5',label+': paso 5 inaccesible');
   assert.equal(await frame.locator('.panel-edicion label').filter({hasText:'Copias'}).isVisible(),true);
@@ -97,6 +118,9 @@ try{
   await frame.getByRole('button',{name:'Revisar presupuesto'}).click();
   assert.equal(await frame.locator('body').getAttribute('data-mobile-stage'),'6',label+': paso 6 inaccesible');
   assert.equal(await frame.locator('.mobile-review-row').count(),1);
+  const reviewPlacement=await frame.locator('#accionesAsistenteMovil').evaluate(el=>
+    !!(document.getElementById('asistenteResumen').compareDocumentPosition(el)&Node.DOCUMENT_POSITION_FOLLOWING));
+  assert.equal(reviewPlacement,true,label+': Modificar opciones después del resumen');
   await page.frames()[1].evaluate(()=>window.parent.postMessage({
    type:'SABER_SMART_PRICE_STATE',estado:'listo',total:1500,sendable:true
   },location.origin));
