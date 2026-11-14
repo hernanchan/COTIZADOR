@@ -30,7 +30,7 @@ test('un mismo origen, cotizador y estado comercial LIVE para PC y móvil',async
  assert.doesNotMatch(html,/https:\/\/pagos\.libreriasaber\.com\.ar\/admin/);
 });
 test('la vista móvil es una capa sin reemplazar archivo, cotización ni handoff existente',()=>{
- const html=prepararCotizadorArchivosLive(paginaCargaUnica());
+ const html=prepararCotizadorArchivosLive(paginaCargaUnica(),{previewMovil:true});
  assert.match(html,/id="lista"/);
  assert.match(html,/id="archivos"/);
  assert.match(html,/src="\/cotizar\/archivos.js"/);
@@ -61,5 +61,47 @@ test('fotos y stickers usan exactamente el mismo flujo móvil y rutas de venta',
    env,{authorized:true}).text();
   assert.match(html,new RegExp('src="/cotizar/archivos\\?servicio='+servicio+'"'));
   assert.match(html,/id="barra-movil"/);
+ }
+});
+
+test('vista móvil REAL muestra mismo iframe y precios, pero nunca autoriza checkout',async()=>{
+ const response=paginaCotizarLive(new Request(base+'?vista=movil'),env,{authorized:true});
+ assert.equal(response.status,200);
+ const html=await response.text();
+ assert.match(html,/src="\/cotizar\/archivos\?vista=movil"/);
+ assert.match(html,/Prueba móvil con precios reales/);
+ assert.match(html,/No genera pedidos ni permite pagar/);
+ assert.match(html,/const enabled=false/);
+ assert.match(html,/const enabled=false,bankEnabled=false/);
+ assert.match(html,/SABER_SMART_PRICE_STATE/);
+ assert.match(html,/id="precio"/);
+ assert.match(html,/id="plazo-orientativo"/);
+ assert.match(html,/id="barra-precio"/);
+ assert.match(html,/Sin pago en esta prueba/);
+ assert.doesNotMatch(html,/src="\/cotizar\/archivos\?servicio=(?!fotos|stickers)/);
+});
+test('sesión inicial preserva ?vista=movil, sin bypass de Turnstile',async()=>{
+ const r=paginaCotizarLive(new Request(base+'?vista=movil'),{
+  ...env,DOCS_LIVE_TURNSTILE_SITE_KEY:'abcdefghijklmnopqrstuvwx123456789'
+ },{authorized:false});
+ const html=await r.text();
+ assert.equal(r.status,200);
+ assert.match(html,/cf-turnstile/);
+ assert.match(html,/location.replace\('\/cotizar\?vista=movil'\)/);
+});
+test('el comprador normal y PC conserva adaptador sin asistente, con gate original',async()=>{
+ const regular=prepararCotizadorArchivosLive(paginaCargaUnica());
+ assert.doesNotMatch(regular,/src="\/cotizar\/movil.js"/);
+ const current=await paginaCotizarLive(new Request(base),env,{authorized:true}).text();
+ assert.match(current,/src="\/cotizar\/archivos"/);
+ assert.doesNotMatch(current,/Prueba móvil con precios reales/);
+ assert.match(current,/const enabled=(true|false)/);
+});
+test('fotos/stickers mantienen la selección y la modalidad de prueba en mismo origen',async()=>{
+ for(const servicio of ['fotos','stickers']){
+  const html=await paginaCotizarLive(new Request(base+'?servicio='+servicio+'&vista=movil'),
+    env,{authorized:true}).text();
+  assert.ok(html.includes('src="/cotizar/archivos?servicio='+servicio+'&vista=movil"'));
+  assert.match(html,/const enabled=false/);
  }
 });
