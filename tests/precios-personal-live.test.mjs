@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {administrarPreciosLivePersonal} from '../integraciones/mercadopago/pruebas/central-precios-live-personal.mjs';
 import {preciosPersonalLiveApi} from '../integraciones/autocotizador/recepcion/precios-personal-live-api.mjs';
+import {leerFirmaInternaLive} from '../integraciones/mercadopago/pruebas/central-live-bridge.mjs';
 import {paginaPreciosPersonalLive} from '../integraciones/autocotizador/recepcion/pagina-precios-personal-live.mjs';
 import {paginaCentralPersonalLive} from '../integraciones/autocotizador/recepcion/pagina-central-personal-live.mjs';
 const GO='GO_COMERCIAL_CONFIRMADO';
@@ -118,4 +119,25 @@ test('el API firma una lectura y nunca envía el secreto al navegador',async()=>
  assert.match(captured[0].headers.get('x-saber-signature'),/^[a-f0-9]{64}$/);
  assert.equal(JSON.parse(await captured[0].text()).action,'read');
  assert.equal((await r.text()).includes('XXXX'),false);
+});
+
+test('el puente HMAC verifica firma y contrato de edición, sin exponerla al cliente',async()=>{
+ const e=env();e.DOCS_LIVE_STAFF_GATE=GO;e.DOCS_LIVE_PRICING_GATE=GO;
+ e.CENTRAL_BRIDGE_KEY='X'.repeat(48);
+ let checked=null;
+ const centro={SABER_ENTORNO:'produccion',CENTRAL_DB_ENV:'produccion',MP_LIVE_GATE:GO,
+  CENTRAL_LIVE_BRIDGE_ENABLED:GO,CENTRAL_BRIDGE_KEY:e.CENTRAL_BRIDGE_KEY};
+ const fetchService=async req=>{
+  checked=await leerFirmaInternaLive(req,centro,{now:()=>1794545000});
+  return new Response(JSON.stringify({ok:!checked.error,error:checked.error||null}),{status:checked.error?403:200});
+ };
+ const r=await preciosPersonalLiveApi(
+  new Request('https://pedidos.libreriasaber.com.ar/personal/api/live-pricing'),
+  {...e,SABER_CENTRAL:{fetch:fetchService}},
+  {nonce:()=> 'cc75687e-8bb9-4f82-b06f-1beab68061c9',now:()=>1794545000}
+ );
+ assert.equal(r.status,200);
+ assert.equal(checked.payload.action,'read');
+ assert.equal(checked.payload.schema,'saber-central-live-staff-pricing-v1');
+ assert.equal(checked.payload.operator,'');
 });
