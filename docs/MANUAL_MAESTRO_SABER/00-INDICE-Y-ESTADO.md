@@ -8,7 +8,7 @@
 
 ## Norma prioritaria de la fase beta
 
-El [Contrato de control de cambios](../GOBERNANZA/CONTRATO_CONTROL_CAMBIOS.md) define decisiones protegidas, trámite de autorización del titular por PR/SHA y comprobación automatizada sin despliegue. **No está técnicamente bloqueado el merge hasta activar GitHub Rulesets y exigir el estado `Control de cambios Saber`.** El repositorio sigue siendo público; el contrato no contiene secretos.
+El [Contrato de control de cambios](../GOBERNANZA/CONTRATO_CONTROL_CAMBIOS.md) define decisiones protegidas, trámite de autorización del titular por PR/SHA y comprobación automatizada sin despliegue. **No está técnicamente bloqueado el merge hasta activar GitHub Rulesets y exigir el estado `saber/contrato`.** El repositorio sigue siendo público; el contrato no contiene secretos.
 
 ## 1. Repositorio y fuente de verdad
 
