@@ -1,7 +1,7 @@
 /** Adaptador visual comprador LIVE: un solo scroll y un solo total.
  * No modifica clasificación, precios, archivos ni pagos.
  */
-export function prepararCotizadorArchivosLive(htmlEntrada){
+export function prepararCotizadorArchivosLive(htmlEntrada,{previewMovil=false}={}){
  if(typeof htmlEntrada!=='string'||!htmlEntrada.includes('id="zonaArchivos"'))
   throw Error('HTML_COTIZADOR_NO_COMPATIBLE');
  const html=htmlEntrada
@@ -52,11 +52,12 @@ export function prepararCotizadorArchivosLive(htmlEntrada){
            requestAnimationFrame(send);
           })();
           </script></body></html>`);
- const adaptado=html.replace('</body></html>',
-   '<script src="/cotizar/movil.js" defer></script></body></html>');
+ const adaptado=previewMovil
+  ?html.replace('</body></html>','<script src="/cotizar/movil.js" defer></script></body></html>')
+  :html;
  if(!adaptado.includes('SABER_SMART_RESIZE')||
     !adaptado.includes('id="archivos"')||
-    !adaptado.includes('src="/cotizar/movil.js"'))
+    (previewMovil&&!adaptado.includes('src="/cotizar/movil.js"')))
   throw Error('HTML_COTIZADOR_NO_ADAPTADO');
  return adaptado;
 }
