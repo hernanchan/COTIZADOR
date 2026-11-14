@@ -227,7 +227,7 @@ let mobileStage=0,mobileSendable=false,mobileTotal=null;
 const updateMobileBar=()=>{
  const show=(previewMode||window.matchMedia('(max-width:720px), (pointer:coarse)').matches)&&
    mobileStage>0&&!stepFiles.hidden;
- mobileGo.hidden=mobileStage!==3;
+ mobileGo.hidden=mobileStage!==6;
  mobileBar.hidden=!show;
  mobileAmount.textContent=Number.isSafeInteger(mobileTotal)&&mobileTotal>0?money(mobileTotal):'Por calcular';
  mobileGo.disabled=!enabled||!mobileSendable||working||next.disabled||!show;
@@ -241,7 +241,7 @@ window.addEventListener('message',event=>{
  if(event.origin!==location.origin||event.source!==iframe.contentWindow||!event.data)return;
  const data=event.data;
  if(data.type==='SABER_MOBILE_STAGE'){
-  if(Number.isSafeInteger(data.stage)&&data.stage>=0&&data.stage<=3){
+  if(Number.isSafeInteger(data.stage)&&data.stage>=0&&data.stage<=6){
    mobileStage=data.stage;
    document.body.classList.toggle('mobile-wizard-ready',mobileStage>0);
    updateMobileBar();
