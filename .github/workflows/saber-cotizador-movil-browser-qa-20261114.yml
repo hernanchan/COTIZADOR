@@ -8,6 +8,7 @@ on:
       - 'integraciones/autocotizador/recepcion/pagina-cotizar-live.mjs'
       - 'integraciones/autocotizador/recepcion/pagina-archivos-live.mjs'
       - 'tests/cotizador-movil-browser.test.mjs'
+      - 'tests/cotizador-movil-asistente.test.mjs'
 permissions: {contents: read}
 jobs:
   browser:
