@@ -47,7 +47,7 @@ test('el panel está enlazado a Central, sin un segundo tarifario público',()=>
  const html=paginaPreciosPersonalLive();
  assert.match(html,/Aprobar y publicar/);
  assert.match(html,/Volver a la Central/);
- assert.doesNotMatch(html,/precios-web\.json \(21/08/);
+ assert.equal(html.includes('precios-web.json (21/08'),false);
 });
 test('la lectura devuelve únicamente el valor LIVE aprobado y la revisión',async()=>{
  const e=env();const r=await call(e,input('read'));
