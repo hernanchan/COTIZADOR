@@ -30,7 +30,7 @@ jobs:
       - name: Construir Worker documental privado sin desplegar
         working-directory: integraciones/autocotizador/recepcion
         run: |
-          npm ci --no-audit --no-fund
+          npm install --no-audit --no-fund
           npm run build:unificado
       - name: Pruebas aisladas de administración y permisos
         run: |
