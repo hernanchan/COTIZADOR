@@ -16,6 +16,7 @@ const routeSchema=new Map([
  ['/internal/central/live/transfer-staff-approve','saber-central-live-transfer-staff-approve-v1'],
  ['/internal/central/live/order','saber-central-r2-universal-create-order-v1'],
  ['/internal/central/live/pricing','saber-price-snapshot-live-v1'],
+ ['/internal/central/live/staff-pricing','saber-central-live-staff-pricing-v1'],
  ['/internal/central/live/draft','saber-r2-universal-draft-v1'],
  ['/internal/central/live/tus-gate','saber-central-r2-universal-tus-gate-v1'],
  ['/internal/central/live/tus-received','saber-central-r2-universal-tus-received-v1'],
@@ -79,7 +80,7 @@ export async function leerFirmaInternaLive(request,env,{
  const inspectionConfirm=url.pathname==='/internal/central/live/r2-inspection-confirm';
  const packageManifest=url.pathname==='/internal/central/live/package-manifest';
  const packageFile=url.pathname==='/internal/central/live/package-file';
- if(raw.length<40||raw.length>(draftRoute?512000:tusReceipt?140000:inspectionConfirm?140000:2000))
+ if(raw.length<40||raw.length>(draftRoute?512000:tusReceipt?140000:inspectionConfirm?140000:staffPricing?25000:2000))
    return {error:'Tamaño LIVE inválido',status:413};
  let payload;try{payload=JSON.parse(raw)}catch{}
  const orderRoute=url.pathname==='/internal/central/live/order';
@@ -87,8 +88,10 @@ export async function leerFirmaInternaLive(request,env,{
   url.pathname==='/internal/central/live/transfer-notify'||
   url.pathname==='/internal/central/live/transfer-status';
  const pricingRoute=url.pathname==='/internal/central/live/pricing';
+ const staffPricing=url.pathname==='/internal/central/live/staff-pricing';
  const sellerDiag=url.pathname==='/internal/central/live/diag-seller';
- const keys=staffReconcile?'purpose,schema':
+ const keys=staffPricing?'action,changes,confirmed,expectedRevision,operator,schema':
+  staffReconcile?'purpose,schema':
   bankStaffPending?'purpose,schema':
   bankStaffApprove?(Object.hasOwn(payload||{},'bank_reference')?
    'amount_ars,bank_reference,confirmed,operator,order_id,schema':
@@ -116,7 +119,12 @@ export async function leerFirmaInternaLive(request,env,{
        !['draftId','quoteHash','schema','telefono','webOrderId'].every(k=>Object.hasOwn(payload,k))):
       Object.keys(payload).sort().join(',')!==keys)||
     payload.schema!==expectedSchema||
-    (staffReconcile?payload.purpose!=='revisar-cobros-pendientes':
+    (staffPricing?(!['read','preview','draft','approve'].includes(payload.action)||
+      !Array.isArray(payload.changes)||payload.changes.length>250||
+      !Number.isSafeInteger(payload.expectedRevision)||payload.expectedRevision<0||
+      typeof payload.operator!=='string'||payload.operator.length>60||
+      typeof payload.confirmed!=='boolean'):
+     staffReconcile?payload.purpose!=='revisar-cobros-pendientes':
      bankStaffPending?payload.purpose!=='listar-transferencias-pendientes':
      bankStaffApprove?(!UUID.test(payload.order_id||'')||
       !Number.isSafeInteger(payload.amount_ars)||payload.amount_ars<1||
@@ -232,7 +240,7 @@ export async function leerFirmaInternaLive(request,env,{
        payload.direccion.trim().length>180||/[<>]/.test(payload.direccion)||
        payload.nombre===undefined)):
       !UUID.test(payload.commercialOrderId||''))||
-    (!pricingRoute&&!sellerDiag&&!boardRoute&&!staffStatus&&!staffForecast&&!staffCalendar&&!staffReconcile&&!bankStaffPending&&!bankStaffApprove&&!tusGate&&!tusReceipt&&!r2Gate&&!r2Reserve&&!r2Stage&&!r2Recover&&!WEB.test(payload.webOrderId||'')))
+    (!staffPricing&&!pricingRoute&&!sellerDiag&&!boardRoute&&!staffStatus&&!staffForecast&&!staffCalendar&&!staffReconcile&&!bankStaffPending&&!bankStaffApprove&&!tusGate&&!tusReceipt&&!r2Gate&&!r2Reserve&&!r2Stage&&!r2Recover&&!WEB.test(payload.webOrderId||'')))
    return {error:'Orden LIVE inválida',status:422};
  const key=await subtle.importKey('raw',new TextEncoder().encode(env.CENTRAL_BRIDGE_KEY),
   {name:'HMAC',hash:'SHA-256'},false,['verify']);
