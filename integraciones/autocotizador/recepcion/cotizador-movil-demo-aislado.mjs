@@ -80,7 +80,7 @@ h1{font-size:26px;color:var(--navy);letter-spacing:-.035em;line-height:1.15;marg
 </head>
 <body>
 <div class="shell">
-<header><div class="logo">SVR</div><div class="brand"><strong>Librería Saber</strong><small>Impresiones, ploteos y gráfica</small></div><span aria-hidden="true">☰</span></header>
+<header><div class="logo">SBR</div><div class="brand"><strong>Librería Saber</strong><small>Impresiones, ploteos y gráfica</small></div><span aria-hidden="true">☰</span></header>
 <p class="demo">VISTA PREVIA · Solo diseño. No se suben archivos, no se calculan precios y no hay pagos.</p>
 <main>
 <div class="headline"><span class="overline">PREPARÁ TU PEDIDO</span><span class="stepnum" id="step-label">Paso 1 de 4</span></div>
