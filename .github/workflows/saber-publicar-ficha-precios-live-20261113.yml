@@ -1,0 +1,162 @@
+name: Saber - PUBLICAR ficha de precios en Central LIVE con rollback
+on:
+  push:
+    branches: [admin/precios-live-protegido-20261113]
+    paths: ['.github/workflows/saber-publicar-ficha-precios-live-20261113.yml']
+permissions: {contents: read}
+concurrency: {group: saber-staff-pricing-live-deploy, cancel-in-progress: false}
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      CF_DEPLOY: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+      CF_DB: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Compilar y comprobar nueva ficha y Worker original
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test tests/precios-personal-live.test.mjs
+          node --test integraciones/autocotizador/recepcion/pagina-central-personal-live.test.mjs integraciones/mercadopago/pruebas/central-live-bridge.test.mjs integraciones/mercadopago/pruebas/mercadopago-live-central.test.mjs
+          npm install --no-save --no-audit --no-fund esbuild@0.25.12 >/dev/null
+          ./node_modules/.bin/esbuild integraciones/mercadopago/pruebas/worker.js --bundle --platform=browser --format=esm --target=es2022 --outfile=/tmp/saber-precios-central.mjs
+          (cd integraciones/autocotizador/recepcion && npm install --no-audit --no-fund >/dev/null && npm run build:unificado >/dev/null)
+          cp integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs /tmp/saber-precios-docs.mjs
+          node --check /tmp/saber-precios-central.mjs
+          node --check /tmp/saber-precios-docs.mjs
+          grep -Fq 'staff-pricing' /tmp/saber-precios-central.mjs
+          grep -Fq '/personal/precios' /tmp/saber-precios-docs.mjs
+          grep -Fq 'Descargar ZIP + instrucciones' /tmp/saber-precios-docs.mjs
+          echo SABER_PRECIOS_LIVE_BUILDS_OK
+      - name: Verificar versiones activas exactas, stage, promover con rollback y smoke
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          : "${CF_ACCOUNT:?}" "${CF_DEPLOY:?}"
+          root="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/scripts"
+          tmp=$(mktemp -d)
+          get(){ curl -fsS --retry 2 --connect-timeout 10 --max-time 40 -H "Authorization: Bearer $CF_DEPLOY" "$1"; }
+          for pair in 'saber-pagos-produccion:central' 'saber-documentos-produccion:docs';do
+            worker="${pair%%:*}";label="${pair##*:}"
+            get "$root/$worker/settings" > "$tmp/$worker.before.settings"
+            get "$root/$worker/deployments" > "$tmp/$worker.before.deployed"
+            jq -er '.result.deployments[0].versions | if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/$worker.before.deployed" > "$tmp/$worker.old"
+            jq -e '.success==true and (.result.bindings|any(.name=="SABER_ENTORNO" and .text=="produccion") and any(.name=="CENTRAL_DB_ENV" and .text=="produccion") and any(.name=="CENTRAL_BRIDGE_KEY" and .type=="secret_text"))' "$tmp/$worker.before.settings" >/dev/null
+            jq -r '.result.bindings[] | [.name,.type]|@tsv' "$tmp/$worker.before.settings" | sort > "$tmp/$worker.bindings"
+            get "$root/$worker" > "$tmp/$worker.live.multipart"
+            WORKER="$worker" LABEL="$label" TMP="$tmp" node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';import fs from 'node:fs';import crypto from 'node:crypto';
+          const worker=process.env.WORKER,label=process.env.LABEL,tmp=process.env.TMP;
+          const raw=fs.readFileSync(tmp+'/'+worker+'.live.multipart','utf8'),candidate=fs.readFileSync('/tmp/saber-precios-'+label+'.mjs','utf8');
+          const crlf='\r\n',boundary=raw.slice(0,raw.indexOf(crlf));
+          assert.match(boundary,/^--[a-f0-9]{40,}$/i);
+          const actual=raw.split(boundary).map(p=>{const i=p.indexOf(crlf+crlf);return i>0&&p.slice(0,i).includes('name="index.mjs"')?p.slice(i+4).replace(/\r\n$/,''):null}).find(Boolean);
+          assert.ok(actual?.length>100000);
+          const sha=x=>crypto.createHash('sha256').update(x).digest('hex').slice(0,16);
+          const expected=label==='central'?
+             {active:'04bcd098409609c3',activeSize:781739,next:'7d73be4ca169b202',nextSize:791028}:
+             {active:'39b1c9539390ac87',activeSize:2926863,next:'a68c95ad320c1e34',nextSize:2942120};
+          assert.equal(actual.length,expected.activeSize,'UNEXPECTED_ACTIVE_SIZE_'+worker);
+          assert.equal(sha(actual),expected.active,'ACTIVE_CODE_CHANGED_ABORT_'+worker);
+          assert.equal(candidate.length,expected.nextSize,'UNEXPECTED_CANDIDATE_SIZE_'+worker);
+          assert.equal(sha(candidate),expected.next,'CANDIDATE_NOT_VERIFIED_ABORT_'+worker);
+          console.log('SABER_ACTIVE_SHA_EXACT_MATCH_AND_CANDIDATE_VERIFIED_'+worker);
+          JS
+          done
+          jq -e '.result.bindings|any(.name=="CENTRAL_LIVE_PRICING_GATE" and .text=="GO_COMERCIAL_CONFIRMADO") and any(.name=="MP_LIVE_ACCESS_TOKEN" and .type=="secret_text")' "$tmp/saber-pagos-produccion.before.settings" >/dev/null
+          jq -e '.result.bindings|any(.name=="DOCS_LIVE_PRICING_GATE" and .text=="GO_COMERCIAL_CONFIRMADO") and any(.name=="DOCS_LIVE_STAFF_GATE" and .text=="GO_COMERCIAL_CONFIRMADO") and any(.name=="DOCS_LIVE_STAFF_SECRET" and .type=="secret_text") and any(.name=="SABER_CENTRAL" and .type=="service") and any(.name=="SABER_R2_GRANDES_LIVE" and .type=="r2_bucket")' "$tmp/saber-documentos-produccion.before.settings" >/dev/null
+          get "$root/saber-pagos-produccion/schedules" > "$tmp/mp.before.schedules"
+          jq -e '.success==true and (.result.schedules|type=="array")' "$tmp/mp.before.schedules" >/dev/null
+          echo SABER_PRECIOS_LIVE_GATES_SECRETS_BINDINGS_CRON_PRECHECK_OK
+          for pair in 'saber-pagos-produccion:central' 'saber-documentos-produccion:docs';do
+            worker="${pair%%:*}";label="${pair##*:}";old=$(cat "$tmp/$worker.old")
+            beta="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/workers/$worker/versions"
+            jq -nc --arg old "$old" --rawfile code "/tmp/saber-precios-$label.mjs" --slurpfile settings "$tmp/$worker.before.settings" \
+              '{main_module:"index.mjs",bindings:[$settings[0].result.bindings[]|{name,type:"inherit",version_id:$old}],modules:[{name:"index.mjs",content_type:"application/javascript+module",content_base64:($code|@base64)}]}' > "$tmp/$worker.stage.json"
+            status=$(curl -sS --max-time 160 -w '%{http_code}' -o "$tmp/$worker.stage.response" \
+              -H "Authorization: Bearer $CF_DEPLOY" -H 'Content-Type: application/json' --data-binary @"$tmp/$worker.stage.json" "$beta?deploy=false")
+            if [ "$status" != 200 ] || ! jq -e '.success==true and (.result.id|type=="string")' "$tmp/$worker.stage.response" >/dev/null;then
+              echo "SABER_PRICING_STAGE_FAILED_$worker HTTP $status"
+              jq -c '{errors:[.errors[]?|{code,message}]}' "$tmp/$worker.stage.response"
+              false
+            fi
+            jq -r '.result.id' "$tmp/$worker.stage.response" > "$tmp/$worker.new"
+            get "$beta/$(cat "$tmp/$worker.new")" > "$tmp/$worker.stage.version"
+            jq -r '(.result.bindings//.result.resources.bindings)[]|[.name,.type]|@tsv' "$tmp/$worker.stage.version" |sort > "$tmp/$worker.stage.bindings"
+            diff "$tmp/$worker.bindings" "$tmp/$worker.stage.bindings"
+            echo "SABER_PRICING_STAGE_BINDINGS_INTACT_$worker"
+          done
+          changed=""
+          rollback(){
+            code=$?
+            trap - ERR
+            for worker in $changed;do
+              echo "SABER_PRICING_ROLLBACK_START_$worker"
+              old=$(cat "$tmp/$worker.old")
+              jq -nc --arg old "$old" '{strategy:"percentage",versions:[{version_id:$old,percentage:100}],annotations:{"workers/message":"Rollback ficha admin precios: error de verificacion"}}' |
+                curl -fsS --max-time 55 -X POST -H "Authorization: Bearer $CF_DEPLOY" -H 'Content-Type: application/json' --data-binary @- "$root/$worker/deployments" >/dev/null ||
+                echo "SABER_PRICING_ROLLBACK_NOT_CONFIRMED_$worker"
+            done
+            exit "$code"
+          }
+          trap rollback ERR
+          for worker in saber-pagos-produccion saber-documentos-produccion;do
+            get "$root/$worker/deployments" > "$tmp/$worker.recheck"
+            test "$(jq -er '.result.deployments[0].versions | if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/$worker.recheck")" = "$(cat "$tmp/$worker.old")"
+          done
+          for worker in saber-pagos-produccion saber-documentos-produccion;do
+            new=$(cat "$tmp/$worker.new")
+            jq -nc --arg new "$new" '{strategy:"percentage",versions:[{version_id:$new,percentage:100}],annotations:{"workers/message":"Libreria Saber ficha protegida de administracion precios LIVE"}}' |
+              curl -fsS --max-time 50 -X POST -H "Authorization: Bearer $CF_DEPLOY" -H 'Content-Type: application/json' --data-binary @- "$root/$worker/deployments" > "$tmp/$worker.promoted"
+            jq -e '.success==true' "$tmp/$worker.promoted" >/dev/null
+            changed="$worker $changed"
+            echo "SABER_PRICING_PROMOTED_$worker"
+          done
+          for worker in saber-pagos-produccion saber-documentos-produccion;do
+            get "$root/$worker/deployments" > "$tmp/$worker.after.deployed"
+            test "$(jq -er '.result.deployments[0].versions | if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/$worker.after.deployed")" = "$(cat "$tmp/$worker.new")"
+            get "$root/$worker/settings" > "$tmp/$worker.after.settings"
+            jq -r '.result.bindings[] | [.name,.type]|@tsv' "$tmp/$worker.after.settings" | sort > "$tmp/$worker.after.bindings"
+            diff "$tmp/$worker.bindings" "$tmp/$worker.after.bindings"
+            echo "SABER_PRICING_100_PERCENT_AND_BINDINGS_UNCHANGED_$worker"
+          done
+          get "$root/saber-pagos-produccion/schedules" > "$tmp/mp.after.schedules"
+          jq -cS '.result.schedules' "$tmp/mp.before.schedules" > "$tmp/mp.before.cron"
+          jq -cS '.result.schedules' "$tmp/mp.after.schedules" > "$tmp/mp.after.cron"
+          diff "$tmp/mp.before.cron" "$tmp/mp.after.cron"
+          echo SABER_PRICING_MP_CRON_UNCHANGED
+          for path in '/personal/central' '/personal/precios' '/personal/api/live-pricing' '/personal/api/live-board' '/personal/api/live-status' '/personal/api/live-r2-inspection-original' '/personal/transferencias';do
+            status=000
+            for i in 1 2 3 4 5 6 7 8 9;do
+              status=$(curl -sS --max-time 14 -D "$tmp/staff.headers" -o /dev/null -w '%{http_code}' "https://pedidos.libreriasaber.com.ar$path") || status=000
+              [ "$status" = 401 ] && grep -qi '^www-authenticate:' "$tmp/staff.headers" && break
+              sleep 2
+            done
+            [ "$status" = 401 ] && grep -qi '^www-authenticate:' "$tmp/staff.headers" || { echo "SABER_PRICING_STAFF_PATH_ERROR_$path HTTP $status";false; }
+            echo "SABER_PRICING_STAFF_PROTECTED_$path"
+          done
+          for path in '/cotizar' '/pedido/continuar' '/pedido/estado';do
+            status=$(curl -sSL --max-time 20 -o "$tmp/buyer.html" -w '%{http_code}' "https://pedidos.libreriasaber.com.ar$path")
+            [ "$status" = 200 ] || { echo "SABER_PRICING_BUYER_PATH_ERROR_$path HTTP $status";false; }
+            grep -Eiq 'Librería Saber|Retomá tu pedido|Pedido' "$tmp/buyer.html"
+            echo "SABER_PRICING_BUYER_UNCHANGED_$path"
+          done
+          status=$(curl -sS --max-time 15 -o /dev/null -w '%{http_code}' 'https://pedidos.libreriasaber.com.ar/cotizar/archivos')
+          [ "$status" = 503 ] || { echo "SABER_PRICING_PRIVATE_FILES_NOT_BLOCKED $status";false; }
+          echo SABER_PRICING_PUBLIC_SMOKE_OK
+          trap - ERR
+          changed=""
+          echo SABER_PRICING_LIVE_PUBLISHED_AND_VERIFIED
+      - name: Monitor existente de web y pedidos (solo lectura)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node integraciones/publicacion/monitor-postpublicacion-20261112.mjs
+          echo SABER_PRICING_FINAL_MONITOR_OK
