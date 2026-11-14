@@ -1,3 +1,15 @@
+# NORMA PRIORITARIA — contrato de cambios (beta, 14/11/2026)
+
+**Antes de editar código, web, precios, servicios o workflows**, consultar [Contrato de control de cambios](docs/GOBERNANZA/CONTRATO_CONTROL_CAMBIOS.md). Se aplican estos pasos: decisión documentada del titular → PR de alcance mínimo → tests y evidencia → autorización exacta del titular en GitHub para el último SHA → integración y despliegue controlados → actualización del manual.
+
+- Está **prohibido** cambiar por iniciativa del asistente una regla comercial o un módulo ajeno al pedido. No inferir autorización a partir de un chat anterior.
+- Las aprobaciones de cambio no se fabrican mediante llamadas a GitHub ejecutadas por el asistente con la cuenta del propietario.
+- **No confundir el control automático con una barrera GitHub efectiva:** el workflow necesita Rulesets activos y un status check requerido. Hasta entonces reportar la limitación de seguridad.
+- No tocar la visibilidad del repositorio, la web pública o los secretos como efecto de editar documentación o código.
+- El contrato mismo está protegido: modificaciones de reglas requieren el mismo procedimiento que otras modificaciones críticas.
+
+---
+
 # Referencia VIGENTE — continuidad y documentación desde 14/11/2026
 
 **Antes de modificar este proyecto**, leer [Manual maestro](docs/MANUAL_MAESTRO_SABER/00-INDICE-Y-ESTADO.md), [Arquitectura y operación](docs/MANUAL_MAESTRO_SABER/01-ARQUITECTURA-Y-OPERACION.md) y [Protección y comercialización](docs/MANUAL_MAESTRO_SABER/02-PROTECCION-Y-COMERCIALIZACION.md).
