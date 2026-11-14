@@ -81,10 +81,10 @@ try{
   await frame.getByRole('button',{name:'Configurar mis archivos'}).click();
   assert.equal(await frame.locator('body').getAttribute('data-mobile-stage'),'2',label+': paso 2 inaccesible');
   assert.equal(await frame.locator('.panel-edicion label').filter({hasText:'Tamaño de impresión'}).isVisible(),true);
-  assert.equal(await frame.locator('.panel-edicion label').filter({hasText:'Impresión'}).isVisible(),false);
+  assert.equal(await frame.locator('.panel-edicion .controles > label[data-mobile-part="3"]').first().isVisible(),false);
   await frame.getByRole('button',{name:'Elegir color y papel'}).click();
   assert.equal(await frame.locator('body').getAttribute('data-mobile-stage'),'3',label+': paso 3 inaccesible');
-  assert.equal(await frame.locator('.panel-edicion label').filter({hasText:'Impresión'}).isVisible(),true);
+  assert.equal(await frame.locator('.panel-edicion .controles > label[data-mobile-part="3"]').first().isVisible(),true);
   assert.equal(await frame.locator('.panel-edicion label').filter({hasText:'Anillado'}).isVisible(),false);
   await frame.getByRole('button',{name:'Elegir caras'}).click();
   assert.equal(await frame.locator('body').getAttribute('data-mobile-stage'),'4',label+': paso 4 inaccesible');
