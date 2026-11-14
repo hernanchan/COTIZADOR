@@ -6,6 +6,10 @@
 
 > **Regla:** este índice es la puerta de entrada, no sustituye el código ni el estado del despliegue en Cloudflare. Ante discrepancias, verificar la implementación y el servicio desplegado. No tratar informes históricos como estado actual.
 
+## Norma prioritaria de la fase beta
+
+El [Contrato de control de cambios](../GOBERNANZA/CONTRATO_CONTROL_CAMBIOS.md) define decisiones protegidas, trámite de autorización del titular por PR/SHA y comprobación automatizada sin despliegue. **No está técnicamente bloqueado el merge hasta activar GitHub Rulesets y exigir el estado `saber/contrato`.** El repositorio sigue siendo público; el contrato no contiene secretos.
+
 ## 1. Repositorio y fuente de verdad
 
 - Repositorio: [hernanchan/COTIZADOR](https://github.com/hernanchan/COTIZADOR).

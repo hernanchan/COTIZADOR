@@ -1,0 +1,59 @@
+name: Saber - control de cambios sin despliegue
+on:
+  pull_request_target:
+    branches:
+      - integracion/tus-pedido-privado-20261101
+      - main
+    types: [opened, reopened, synchronize, edited, ready_for_review]
+  push:
+    branches:
+      - gobernanza/control-cambios-20261114
+      - integracion/tus-pedido-privado-20261101
+    paths:
+      - '.github/workflows/saber-control-cambios.yml'
+      - 'tools/control-cambios-saber.mjs'
+      - 'tests/control-cambios-saber.test.mjs'
+      - 'tests/publicar-estado-control-saber.test.mjs'
+      - 'tools/publicar-estado-control-saber.mjs'
+      - 'docs/GOBERNANZA/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+  statuses: write
+jobs:
+  control:
+    name: Control de cambios Saber
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Nunca hacer checkout del código de la PR en pull_request_target.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Demostrar bloqueo y autorización por SHA en tests locales
+        run: |
+          set -euo pipefail
+          node --check tools/control-cambios-saber.mjs
+          node --check tools/publicar-estado-control-saber.mjs
+          node --test tests/control-cambios-saber.test.mjs tests/publicar-estado-control-saber.test.mjs
+      - name: Validar archivos protegidos y comentario auténtico del titular
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node tools/control-cambios-saber.mjs
+      - name: Publicar veredicto en SHA real de PR para Ruleset
+        if: ${{ always() && github.event_name == 'pull_request_target' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SABER_CONTRATO_RESULT: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          node tools/publicar-estado-control-saber.mjs
