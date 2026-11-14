@@ -1,0 +1,25 @@
+name: Saber - carrito único catálogo seguro (ensayo sin cobro)
+on:
+  push:
+    branches: [integracion/carrito-unico-catalogo-20261113]
+    paths:
+      - '.github/workflows/carrito-unico-catalogo-20261113.yml'
+      - 'integraciones/autocotizador/recepcion/catalogo-productos-publicos.mjs'
+      - 'integraciones/autocotizador/recepcion/cotizar-articulos-carrito-unico.mjs'
+      - 'tests/carrito-unico-articulos-autoritativos.test.mjs'
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Test de seguridad de precios y stock (sin pedidos ni dinero)
+        run: |
+          node --check integraciones/autocotizador/recepcion/cotizar-articulos-carrito-unico.mjs
+          node --test tests/carrito-unico-articulos-autoritativos.test.mjs
+          echo SABER_CART_PRODUCT_CATALOG_SECURITY_TESTS_OK
