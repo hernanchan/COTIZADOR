@@ -136,7 +136,7 @@ test('el puente HMAC verifica firma y contrato de edición, sin exponerla al cli
   {...e,SABER_CENTRAL:{fetch:fetchService}},
   {nonce:()=> 'cc75687e-8bb9-4f82-b06f-1beab68061c9',now:()=>1794545000}
  );
- assert.equal(r.status,200);
+ assert.equal(r.status,200,'HMAC bridge response: '+JSON.stringify(await r.clone().json().catch(()=>({unreadable:true}))));
  assert.equal(checked.payload.action,'read');
  assert.equal(checked.payload.schema,'saber-central-live-staff-pricing-v1');
  assert.equal(checked.payload.operator,'');
