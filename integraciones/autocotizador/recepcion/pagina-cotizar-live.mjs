@@ -33,7 +33,7 @@ section[hidden]{display:none!important}
 @media(max-width:650px){#precio-entrega{grid-template-columns:1fr}}
 @media(max-width:700px){main{width:100%;max-width:100%;margin:0;padding:8px}section{padding:13px;margin-bottom:10px;border-radius:10px}h1{font-size:22px}h2{font-size:18px}#seccion-archivos{overflow:visible}#pdf{height:960px;min-height:0}#precio-entrega{padding:10px;gap:5px}#precio-entrega #precio,#precio-entrega #plazo-orientativo{font-size:21px}#plazo-explicacion,#promo-dia{padding:9px 11px;font-size:14px}button{max-width:100%;white-space:normal;min-height:46px}.payment-options button{display:block;width:100%;margin:8px 0!important}}`;
 const mobileCss=`
-@media(max-width:720px){
+@media(max-width:720px), (pointer:coarse){
  body{background:#f2f6fa}
  header{padding:11px 13px}
  header strong{font-size:18px}
@@ -61,6 +61,35 @@ const mobileCss=`
  #seccion-confirmacion h2{font-size:22px}
  #seccion-confirmacion label{font-size:16px}
 }
+`;
+const previewCss=`
+/* Vista de evaluación: diferente de PC aun en teléfono horizontal. */
+body.preview-movil{background:#f3f7fb}
+body.preview-movil header{padding:12px 15px;gap:8px}
+body.preview-movil header strong{font-size:18px}
+body.preview-movil main{max-width:590px;margin:0 auto;padding:8px 9px 110px}
+body.preview-movil main>section{padding:11px;margin:7px 0 11px}
+body.preview-movil #aviso-demo-real{padding:9px 12px!important;font-size:13px}
+body.preview-movil #aviso-demo-real p{font-size:12px!important}
+body.preview-movil main>section:not(#aviso-demo-real):not(#seccion-archivos):not(#seccion-confirmacion)>h1,
+body.preview-movil main>section:not(#aviso-demo-real):not(#seccion-archivos):not(#seccion-confirmacion)>p:first-of-type{display:none}
+body.preview-movil #precio-entrega{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:11px 9px;margin:0}
+body.preview-movil #precio-entrega>div{padding:0 3px}
+body.preview-movil #precio-entrega strong{font-size:10px}
+body.preview-movil #precio-entrega #precio,body.preview-movil #precio-entrega #plazo-orientativo{font-size:17px;line-height:1.25}
+body.preview-movil #plazo-explicacion{font-size:12px;padding:8px 10px}
+body.preview-movil #seccion-archivos{padding:7px 8px 14px!important}
+body.preview-movil #seccion-archivos>h2,body.preview-movil #seccion-archivos>p:first-of-type{display:none}
+body.preview-movil #pdf{height:530px;min-height:0}
+body.preview-movil #siguiente{display:block;width:100%}
+body.preview-movil.mobile-wizard-ready #siguiente{display:none}
+body.preview-movil #barra-movil:not([hidden]){display:flex;position:fixed;left:0;right:0;bottom:0;
+ z-index:80;align-items:center;gap:12px;justify-content:space-between;
+ padding:12px max(14px,env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom));
+ background:#fff;border-top:2px solid #c4d9e9;box-shadow:0 -4px 22px #103c6129}
+body.preview-movil #barra-movil small{display:block;color:#43657e;font-size:12px}
+body.preview-movil #barra-movil strong{display:block;color:#153d65;font-size:18px}
+body.preview-movil #barra-movil button{min-width:125px;min-height:48px}
 `;
 export function paginaCotizarLive(req,env,{authorized=false}={}){
  const u=new URL(req.url);
@@ -113,7 +142,7 @@ window.saberIngresoLive=async token=>{
  const bankEnabled=enabled&&env?.DOCS_LIVE_TRANSFER_GATE===ON&&
   env?.DOCS_LIVE_TUS_GATE===ON;
  const html=`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Cotizador de PDF · Librería Saber</title><style>${baseCss}${mobileCss}</style></head><body>
+<title>Cotizador de PDF · Librería Saber</title><style>${baseCss}${mobileCss}${previewCss}</style></head><body class="${previewMovil?'preview-movil':''}">
 <header><strong>Librería Saber · Impresiones y ploteos</strong><a class="volver-tienda" href="https://libreriasaber.com.ar/">← Volver a la tienda</a></header>
 <main>${previewMovil?'<section id="aviso-demo-real" role="status" style="border-left:4px solid #df922d;background:#fff7ec;padding:12px 15px"><strong>Prueba móvil con precios reales</strong><p style="margin:4px 0">Podés elegir archivos y verificar la detección, las opciones y la cotización comercial vigente. No genera pedidos ni permite pagar.</p></section>':''}<section><h1>${servicioInicial==='fotos'?'Prepará tus fotos':servicioInicial==='stickers'?'Prepará tus stickers':'Prepará tus PDF, JPG o PNG'}</h1>
 <p>Elegí los archivos y sus opciones de impresión. Las medidas y el tipo de trabajo se calculan por el contenido del PDF, no por el nombre ni por su peso.</p>
@@ -186,7 +215,7 @@ const stepData=document.getElementById('seccion-confirmacion');
 const back=document.getElementById('volver-archivos');
 const stepNotice=document.getElementById('aviso-siguiente');
 const iframe=document.getElementById('pdf');
-const enabled=${enabled},bankEnabled=${bankEnabled};
+const enabled=${enabled},bankEnabled=${bankEnabled},previewMode=${previewMovil};
 let pending=null,flow=null,working=false;
 const money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(n);
 const orderId=()=>{const a=new Uint8Array(16);crypto.getRandomValues(a);return 'WEB-ENSAYO-'+Array.from(a,n=>n.toString(16).padStart(2,'0')).join('').toUpperCase()};
@@ -195,7 +224,9 @@ const mobileGo=document.getElementById('barra-continuar');
 const mobileAmount=document.getElementById('barra-precio');
 let mobileStage=0,mobileSendable=false,mobileTotal=null;
 const updateMobileBar=()=>{
- const show=window.matchMedia('(max-width:720px)').matches&&mobileStage===3&&!stepFiles.hidden;
+ const show=(previewMode||window.matchMedia('(max-width:720px), (pointer:coarse)').matches)&&
+   mobileStage>0&&!stepFiles.hidden;
+ mobileGo.hidden=mobileStage!==3;
  mobileBar.hidden=!show;
  mobileAmount.textContent=Number.isSafeInteger(mobileTotal)&&mobileTotal>0?money(mobileTotal):'Por calcular';
  mobileGo.disabled=!enabled||!mobileSendable||working||next.disabled||!show;
