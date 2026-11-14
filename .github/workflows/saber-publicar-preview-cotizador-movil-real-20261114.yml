@@ -1,0 +1,148 @@
+name: Saber - habilitar preview movil con precio real, sin pagos (rollback)
+on:
+  push:
+    branches: [ux/cotizador-movil-asistente-20261114]
+    paths: ['.github/workflows/saber-publicar-preview-cotizador-movil-real-20261114.yml']
+permissions: {contents: read}
+concurrency: {group: saber-preview-movil-real-docs-only, cancel-in-progress: false}
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/checkout@v4
+        with:
+          ref: integracion/tus-pedido-privado-20261101
+          path: baseline
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Compilar candidato y base publicada, test con pagos deshabilitados en preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp integraciones/autocotizador/recepcion/asistente-movil-live.txt /tmp/saber-mobile-script.mjs
+          node --check /tmp/saber-mobile-script.mjs
+          node --test tests/cotizador-movil-asistente.test.mjs integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs
+          (cd integraciones/autocotizador/recepcion && npm install --no-audit --no-fund >/dev/null && npm run build:unificado >/dev/null)
+          cp integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs /tmp/saber-candidate-movil.mjs
+          (cd baseline/integraciones/autocotizador/recepcion && npm install --no-audit --no-fund >/dev/null && npm run build:unificado >/dev/null)
+          cp baseline/integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs /tmp/saber-baseline-movil.mjs
+          node --check /tmp/saber-candidate-movil.mjs
+          grep -Fq '/cotizar/movil.js' /tmp/saber-candidate-movil.mjs
+          grep -Fq 'Prueba móvil con precios reales' /tmp/saber-candidate-movil.mjs
+          grep -Fq 'SABER_SMART_PRICE_STATE' /tmp/saber-candidate-movil.mjs
+          echo SABER_PREVIEW_REAL_BUILDS_TESTS_OK_NO_WRITES
+      - name: Desplegar SOLO Worker documental tras comparación EXACTA, preservar bindings y rollback
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          : "${ACCOUNT:?}" "${TOKEN:?}"
+          worker=saber-documentos-produccion
+          root="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/$worker"
+          beta="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/workers/$worker/versions"
+          tmp=$(mktemp -d)
+          get(){ curl -fsS --retry 2 --max-time 40 -H "Authorization: Bearer $TOKEN" "$1"; }
+          get "$root/settings" > "$tmp/settings-before"
+          get "$root/deployments" > "$tmp/deploy-before"
+          get "$root" > "$tmp/code-multipart"
+          old=$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/deploy-before")
+          jq -e '.success==true and (.result.bindings|
+            any(.name=="SABER_ENTORNO" and .text=="produccion") and
+            any(.name=="CENTRAL_DB_ENV" and .text=="produccion") and
+            any(.name=="SABER_CENTRAL" and .type=="service") and
+            any(.name=="DOCS_LIVE_STAFF_SECRET" and .type=="secret_text") and
+            any(.name=="SABER_R2_GRANDES_LIVE" and .type=="r2_bucket") and
+            any(.name=="DOCS_LIVE_UI_GATE" and .text=="GO_COMERCIAL_CONFIRMADO") and
+            any(.name=="DOCS_LIVE_PRICING_GATE" and .text=="GO_COMERCIAL_CONFIRMADO"))' "$tmp/settings-before" >/dev/null
+          jq -r '.result.bindings[]|[.name,.type]|@tsv' "$tmp/settings-before" |sort > "$tmp/bindings-before"
+          TMP="$tmp" node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';import fs from 'node:fs';import crypto from 'node:crypto';
+          const dir=process.env.TMP;
+          const raw=fs.readFileSync(dir+'/code-multipart','utf8');
+          const base=fs.readFileSync('/tmp/saber-baseline-movil.mjs','utf8');
+          const candidate=fs.readFileSync('/tmp/saber-candidate-movil.mjs','utf8');
+          const crlf='\r\n',boundary=raw.slice(0,raw.indexOf(crlf));
+          assert.match(boundary,/^--[a-f0-9]{40,}$/i);
+          const deployed=raw.split(boundary).map(p=>{const i=p.indexOf(crlf+crlf);
+            return i>0&&p.slice(0,i).includes('name="index.mjs"')?p.slice(i+4).replace(/\r\n$/,''):null;
+          }).find(Boolean);
+          assert.ok(deployed?.length>100000,'DEPLOYED_CODE_NOT_READ');
+          const sha=x=>crypto.createHash('sha256').update(x).digest('hex').slice(0,16);
+          console.log('SABER_PREVIEW_COMPARE',JSON.stringify({
+            liveSize:deployed.length,baselineSize:base.length,candidateSize:candidate.length,
+            liveSha:sha(deployed),baselineSha:sha(base),candidateSha:sha(candidate)}));
+          assert.equal(deployed,base,'PRODUCTION_CODE_DRIFT_STOP_NO_DEPLOY');
+          assert.ok(candidate.length>base.length);
+          for(const marker of ['Descargar ZIP + instrucciones','/personal/precios','/personal/central','/pedido/continuar','SABER_POSTPAGO_SIN_SEGUNDA_SELECCION_V1','transferNewList','stageDialog'])
+            assert.ok(candidate.includes(marker),'MISSING_EXISTING_FUNCTION_'+marker);
+          assert.ok(!base.includes('/cotizar/movil.js'));
+          assert.ok(candidate.includes('/cotizar/movil.js'));
+          console.log('SABER_PREVIEW_BASE_MATCHED_BIT_BY_BIT_AND_FEATURES_PRESERVED');
+          JS
+          jq -nc --arg old "$old" --rawfile code /tmp/saber-candidate-movil.mjs --slurpfile settings "$tmp/settings-before" \
+            '{main_module:"index.mjs",bindings:[$settings[0].result.bindings[]|{name,type:"inherit",version_id:$old}],modules:[{name:"index.mjs",content_type:"application/javascript+module",content_base64:($code|@base64)}]}' > "$tmp/stage-body"
+          status=$(curl -sS --max-time 160 -w '%{http_code}' -o "$tmp/stage-result" -H "Authorization: Bearer $TOKEN" \
+            -H 'Content-Type: application/json' --data-binary @"$tmp/stage-body" "$beta?deploy=false")
+          if [ "$status" != 200 ] || ! jq -e '.success==true and (.result.id|type=="string")' "$tmp/stage-result" >/dev/null;then
+            echo "SABER_PREVIEW_STAGE_FAILED_HTTP_$status"
+            jq -c '{errors:[.errors[]?|{code,message}]}' "$tmp/stage-result"
+            exit 1
+          fi
+          new=$(jq -r '.result.id' "$tmp/stage-result")
+          get "$beta/$new" > "$tmp/version-staged"
+          jq -r '(.result.bindings//.result.resources.bindings)[]|[.name,.type]|@tsv' "$tmp/version-staged" |sort > "$tmp/staged-bindings"
+          diff "$tmp/bindings-before" "$tmp/staged-bindings"
+          echo SABER_PREVIEW_STAGE_PRIVATE_BINDINGS_UNCHANGED
+          changed=0
+          rollback(){
+            code=$?
+            trap - ERR
+            if [ "$changed" = 1 ];then
+              echo SABER_PREVIEW_ROLLBACK_ATTEMPT
+              jq -nc --arg id "$old" '{strategy:"percentage",versions:[{version_id:$id,percentage:100}],annotations:{"workers/message":"Rollback preview movil QA"}}' |
+                curl -fsS --max-time 55 -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' --data-binary @- "$root/deployments" >/dev/null ||
+                echo SABER_PREVIEW_ROLLBACK_UNCONFIRMED
+            fi
+            exit "$code"
+          }
+          trap rollback ERR
+          get "$root/deployments" > "$tmp/deploy-recheck"
+          test "$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/deploy-recheck")" = "$old"
+          jq -nc --arg id "$new" '{strategy:"percentage",versions:[{version_id:$id,percentage:100}],annotations:{"workers/message":"Preview movil cotizacion real sin checkout, PC intacto"}}' |
+            curl -fsS --max-time 60 -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' --data-binary @- "$root/deployments" > "$tmp/deploy-result"
+          changed=1
+          jq -e '.success==true' "$tmp/deploy-result" >/dev/null
+          get "$root/deployments" > "$tmp/deploy-after"
+          test "$(jq -er '.result.deployments[0].versions|if length==1 and .[0].percentage==100 then .[0].version_id else empty end' "$tmp/deploy-after")" = "$new"
+          get "$root/settings" > "$tmp/settings-after"
+          jq -r '.result.bindings[]|[.name,.type]|@tsv' "$tmp/settings-after" |sort > "$tmp/bindings-after"
+          diff "$tmp/bindings-before" "$tmp/bindings-after"
+          echo SABER_PREVIEW_PRODUCTION_BINDINGS_PRESERVED
+          for uri in '/cotizar' '/cotizar?vista=movil' '/cotizar?servicio=fotos&vista=movil' '/pedido/estado' '/pedido/continuar';do
+            status=000
+            for attempt in 1 2 3 4 5 6;do
+              status=$(curl -sS --max-time 20 -o "$tmp/response" -w '%{http_code}' "https://pedidos.libreriasaber.com.ar$uri") || status=000
+              [ "$status" = 200 ] && break
+              sleep 2
+            done
+            [ "$status" = 200 ] || { echo "SABER_PREVIEW_SMOKE_HTTP_FAIL $uri HTTP $status";false; }
+            echo "SABER_PREVIEW_HTTP_200 $uri"
+          done
+          for uri in '/personal/central' '/personal/precios' '/personal/api/live-pricing' '/personal/transferencias';do
+            status=$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "https://pedidos.libreriasaber.com.ar$uri")
+            [ "$status" = 401 ] || { echo "SABER_PREVIEW_STAFF_AUTH_FAIL $uri $status";false; }
+            echo "SABER_PREVIEW_STAFF_401 $uri"
+          done
+          status=$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "https://pedidos.libreriasaber.com.ar/cotizar/archivos?vista=movil")
+          [ "$status" = 503 ] || { echo "SABER_PREVIEW_UNAUTH_DOCUMENTS_NOT_BLOCKED $status";false; }
+          node integraciones/publicacion/monitor-postpublicacion-20261112.mjs
+          echo SABER_PREVIEW_PUBLICA_MOBILE_REAL_PRICING_NO_PAYMENTS_SUCCESS
+          changed=0
+          trap - ERR
