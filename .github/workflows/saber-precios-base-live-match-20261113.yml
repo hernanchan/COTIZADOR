@@ -1,0 +1,65 @@
+name: Saber - comparar baseline original con Workers activos sin desplegar
+on:
+  push:
+    branches: [admin/precios-live-protegido-20261113]
+    paths: ['.github/workflows/saber-precios-base-live-match-20261113.yml']
+permissions: {contents: read}
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      CF_DEPLOY: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 92710178f421a40a57bd663ba75e9b95f9e01fbd
+          path: before
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Reproducir builds originales anteriores a ficha precios
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd before
+          npm install --no-save --no-audit --no-fund esbuild@0.25.12 >/dev/null
+          ./node_modules/.bin/esbuild integraciones/mercadopago/pruebas/worker.js --bundle --platform=browser --format=esm --target=es2022 --outfile=/tmp/base-central.mjs >/dev/null
+          (cd integraciones/autocotizador/recepcion && npm install --no-audit --no-fund >/dev/null && npm run build:unificado >/dev/null)
+          cp integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs /tmp/base-docs.mjs
+      - name: Comparar hashes EXACTOS de versiones activas (no se revela código)
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/scripts"
+          for pair in 'saber-pagos-produccion:base-central' 'saber-documentos-produccion:base-docs';do
+            worker="${pair%%:*}";label="${pair##*:}"
+            curl -fsS --max-time 35 -H "Authorization: Bearer $CF_DEPLOY" "$root/$worker" > "/tmp/$label.raw"
+            WORKER="$worker" LABEL="$label" node --input-type=module <<'JS'
+          import fs from 'node:fs';import crypto from 'node:crypto';import assert from 'node:assert/strict';
+          const worker=process.env.WORKER,label=process.env.LABEL;
+          const raw=fs.readFileSync('/tmp/'+label+'.raw','utf8'),baseline=fs.readFileSync('/tmp/'+label+'.mjs','utf8');
+          const crlf='\r\n',boundary=raw.slice(0,raw.indexOf(crlf));
+          assert.match(boundary,/^--[a-f0-9]{40,}$/i);
+          const parts=raw.split(boundary);
+          const actual=parts.map(p=>{const i=p.indexOf(crlf+crlf);
+           return i>0&&p.slice(0,i).includes('name="index.mjs"')?
+             p.slice(i+4).replace(/\r\n$/,''):null;}).find(Boolean);
+          assert.ok(actual?.length>100000);
+          const sha=x=>crypto.createHash('sha256').update(x).digest('hex').slice(0,16);
+          let prefix=0,min=Math.min(actual.length,baseline.length);
+          while(prefix<min&&actual[prefix]===baseline[prefix])prefix++;
+          let suffix=0;while(suffix<min-prefix&&actual[actual.length-1-suffix]===baseline[baseline.length-1-suffix])suffix++;
+          const markers=worker==='saber-documentos-produccion'?
+           ['Volver a la tienda','SABER_POSTPAGO_SIN_SEGUNDA_SELECCION_V1','Descargar ZIP + instrucciones','transferNewList','stageDialog','saberIngresoLive']:
+           ['SABER_MP_LIVE_CRON_ACREDITADOS','central_live_order_archives','central_live_purge_files','staff-calendar','/internal/central/live/pricing'];
+          console.log('SABER_BASELINE_COMPARE',worker,'EXACT',baseline===actual,'BASE_BYTES',baseline.length,
+           'ACTIVE_BYTES',actual.length,'BASE_SHA16',sha(baseline),'ACTIVE_SHA16',sha(actual),
+           'PREFIX',prefix,'SUFFIX',suffix);
+          for(const f of markers)console.log('SABER_BASELINE_FEATURE',worker,JSON.stringify(f),
+            'BASE',baseline.includes(f),'LIVE',actual.includes(f));
+          JS
+          done
+          echo SABER_BASELINE_DIFF_READ_ONLY_DONE
