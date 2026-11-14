@@ -1,0 +1,207 @@
+/* Asistente visual de comprador para pantallas pequeñas.
+ * Únicamente muestra/oculta secciones del analizador ya existente.
+ * No crea pedidos, no calcula importes, no interviene en el pago.
+ */
+(() => {
+ 'use strict';
+ if (location.pathname !== '/cotizar/archivos' || window.parent === window) return;
+ const media = matchMedia('(max-width: 720px)');
+ const $ = id => document.getElementById(id);
+ const list = $('lista');
+ const input = $('archivos');
+ const main = document.querySelector('main');
+ if (!list || !input || !main) return;
+
+ const css = document.createElement('style');
+ css.textContent = `
+ body.saber-mobile main {padding:2px 2px 24px!important}
+ body.saber-mobile #zonaArchivos {padding:18px 14px!important;background:#f1f7fc}
+ body.saber-mobile #zonaArchivos input[type=file] {font-size:16px;min-height:64px}
+ body.saber-mobile #modoConfiguracion {padding:12px!important}
+ body.saber-mobile .modo-elecciones {display:grid;grid-template-columns:1fr!important;gap:10px}
+ body.saber-mobile .opciones-comunes {display:grid;grid-template-columns:1fr!important}
+ body.saber-mobile .opciones-comunes label {min-width:0!important}
+ body.saber-mobile .grupo-pedido {padding:7px!important;margin:8px 0!important}
+ body.saber-mobile .grupo-pedido .archivo {margin:5px 0!important}
+ body.saber-mobile .fila {grid-template-columns:minmax(0,1fr) auto!important;padding:12px 10px!important}
+ body.saber-mobile .fila .fila-principal {grid-column:1/-1}
+ body.saber-mobile .panel-edicion {padding:12px!important}
+ body.saber-mobile .panel-edicion .controles {grid-template-columns:1fr!important}
+ body.saber-mobile .archivo .eleccion-plotter-opciones {display:grid;grid-template-columns:1fr}
+ body.saber-mobile .archivo .eleccion-plotter-boton {width:100%;min-height:50px}
+ body.saber-mobile .archivo .composicion-opciones {display:grid;grid-template-columns:1fr 1fr}
+ body.saber-mobile .archivo .composicion-opcion {min-width:0;flex-basis:auto}
+ body.saber-mobile button, body.saber-mobile select {min-height:46px}
+ body.saber-mobile .saber-wizard {display:block!important;background:#fff;border:1px solid #cbdcea;border-radius:13px;
+   margin:5px 0 14px;padding:14px;color:#143e60;box-shadow:0 3px 12px #103c6120}
+ body.saber-mobile .saber-wizard h2 {margin:4px 0 7px;font-size:21px}
+ body.saber-mobile .saber-wizard p {font-size:14px;margin:4px 0;color:#536c81}
+ body.saber-mobile .saber-wizard .step {font-weight:750;font-size:13px;color:#17658e;letter-spacing:.03em}
+ body.saber-mobile .saber-wizard .track {height:5px;background:#dce8f1;border-radius:4px;margin:10px 0 14px;overflow:hidden}
+ body.saber-mobile .saber-wizard .progress {height:100%;width:33.33%;background:#1770a2;transition:width .15s}
+ body.saber-mobile .saber-wizard .actions {display:flex;gap:9px;flex-wrap:wrap;margin-top:13px}
+ body.saber-mobile .saber-wizard button {padding:11px 14px;font-size:16px;flex:1}
+ body.saber-mobile .saber-wizard .secondary {background:#edf5fa;color:#164e75;border:1px solid #aac5d8}
+ body.saber-mobile .saber-wizard button:disabled {opacity:.48}
+ body.saber-mobile[data-mobile-stage="1"] #modoConfiguracion,
+ body.saber-mobile[data-mobile-stage="1"] #configComunGlobal,
+ body.saber-mobile[data-mobile-stage="1"] #anilladosConjuntos,
+ body.saber-mobile[data-mobile-stage="1"] #lista,
+ body.saber-mobile[data-mobile-stage="1"] #resumenPedido,
+ body.saber-mobile[data-mobile-stage="2"] #zonaArchivos,
+ body.saber-mobile[data-mobile-stage="2"] #resumenPedido,
+ body.saber-mobile[data-mobile-stage="3"] #zonaArchivos,
+ body.saber-mobile[data-mobile-stage="3"] #modoConfiguracion,
+ body.saber-mobile[data-mobile-stage="3"] #configComunGlobal,
+ body.saber-mobile[data-mobile-stage="3"] #anilladosConjuntos,
+ body.saber-mobile[data-mobile-stage="3"] #lista {display:none!important}
+ body.saber-mobile #lista .archivo[hidden],body.saber-mobile #lista .grupo-pedido[hidden] {display:none!important}
+ body.saber-mobile .mobile-review-row {border:1px solid #d4e1ec;border-radius:9px;padding:12px;margin:9px 0;background:white}
+ body.saber-mobile .mobile-review-row strong {display:block;font-size:15px;overflow-wrap:anywhere}
+ body.saber-mobile .mobile-review-row small {display:block;color:#45657d;line-height:1.5}
+ body.saber-mobile .mobile-review-row .warning {display:block;color:#9a3100;font-weight:700}
+ body.saber-mobile .saber-wizard .file-count {font-size:14px;font-weight:650}
+ body.saber-mobile .saber-wizard .alert {color:#8d3308;font-weight:700}
+ `;
+ document.head.append(css);
+
+ const nav = document.createElement('section');
+ nav.id = 'asistenteMovil';
+ nav.className = 'saber-wizard';
+ nav.hidden = true;
+ nav.setAttribute('aria-label','Asistente de cotización');
+ const tag = document.createElement('div');tag.className='step';
+ const track = document.createElement('div');track.className='track';
+ const progress = document.createElement('div');progress.className='progress';track.append(progress);
+ const title = document.createElement('h2');
+ const description = document.createElement('p');
+ const fileCount = document.createElement('p');fileCount.className='file-count';
+ const review = document.createElement('div');review.id='asistenteResumen';
+ const actions = document.createElement('div');actions.className='actions';
+ function btn(text,action,secondary=false){
+   const button=document.createElement('button');button.type='button';button.textContent=text;
+   if(secondary)button.className='secondary';
+   button.addEventListener('click',action);return button;
+ }
+ const prev = btn('Volver',()=>go(stage===3?2:1),true);
+ const next = btn('Configurar archivos',()=>go(stage===1?2:3));
+ const filePrev=btn('Archivo anterior',()=>selectFile(activeFile-1),true);
+ const fileNext=btn('Siguiente archivo',()=>selectFile(activeFile+1));
+ const edit=btn('Modificar opciones',()=>go(2),true);
+ nav.append(tag,track,title,description,fileCount,review,actions);
+ main.insertBefore(nav,$('zonaArchivos'));
+ let stage=1,activeFile=0,sendable=false,price=null;
+ const numFiles=()=>list.querySelectorAll('.archivo').length;
+ const postStage=()=>{
+   window.parent.postMessage({type:'SABER_MOBILE_STAGE',stage},location.origin);
+ };
+ function reviewRows(){
+   review.replaceChildren();
+   const cards=[...list.querySelectorAll('.archivo')];
+   for(const card of cards){
+     const div=document.createElement('div');div.className='mobile-review-row';
+     const name=document.createElement('strong');
+     name.textContent=card.querySelector('.nombre')?.textContent||'Archivo seleccionado';
+     const details=document.createElement('small');
+     details.textContent=card.querySelector('.resumen-archivo')?.textContent||'Pendiente de analizar';
+     div.append(name,details);
+     const warning=card.querySelector('.advertencia-recepcion,.advertencia');
+     if(warning){
+       const note=document.createElement('small');
+       note.className='warning';note.textContent=warning.textContent?.slice(0,240)||'Revisá este archivo';
+       div.append(note);
+     }
+     review.append(div);
+   }
+   if(!cards.length){
+     const alert=document.createElement('p');
+     alert.className='alert';alert.textContent='Todavía no agregaste archivos.';
+     review.append(alert);
+   }
+ }
+ function showCard(){
+   const cards=[...list.querySelectorAll('.archivo')];
+   activeFile=Math.max(0,Math.min(activeFile,cards.length-1));
+   cards.forEach((card,i)=>{card.hidden=stage===2&&i!==activeFile});
+   for(const group of list.querySelectorAll('.grupo-pedido')){
+     group.hidden=stage===2&&!group.querySelector('.archivo:not([hidden])');
+   }
+   if(stage===2){
+     fileCount.textContent=cards.length?'Configurando archivo '+(activeFile+1)+' de '+cards.length:'Analizando archivos…';
+   }
+   filePrev.disabled=activeFile===0;
+   fileNext.disabled=activeFile>=cards.length-1;
+ }
+ function selectFile(index){
+   if(index<0||index>=numFiles())return;
+   activeFile=index;showCard();
+   document.querySelector('#modoConfiguracion')?.scrollIntoView({behavior:'smooth',block:'start'});
+ }
+ function refresh(){
+   if(!media.matches)return;
+   document.body.classList.add('saber-mobile');
+   document.body.dataset.mobileStage=String(stage);
+   nav.hidden=false;
+   tag.textContent='PASO '+stage+' DE 3';
+   progress.style.width=String(stage*100/3)+'%';
+   actions.replaceChildren();
+   review.replaceChildren();
+   fileCount.textContent='';
+   if(stage===1){
+     title.textContent='Elegí los archivos';
+     description.textContent='PDF, JPG o PNG. Podés seleccionar varios archivos juntos.';
+     next.textContent='Configurar archivos';next.disabled=numFiles()<1;
+     actions.append(next);
+   }else if(stage===2){
+     title.textContent='Configurá la impresión';
+     description.textContent='Elegí cómo imprimir cada archivo. Las medidas las detecta el cotizador.';
+     showCard();
+     actions.append(prev,filePrev,fileNext);
+     next.textContent='Revisar precio y pedido';
+     next.disabled=numFiles()<1;
+     actions.append(next);
+   }else{
+     title.textContent='Revisá el pedido';
+     description.textContent=sendable?'El presupuesto está listo. Continuá con tus datos en el botón inferior.':
+      'Revisá las opciones pendientes. No se puede continuar hasta obtener un presupuesto completo.';
+     fileCount.textContent=price!==null?'Precio orientativo: '+new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(price):'Precio todavía pendiente';
+     reviewRows();actions.append(edit);
+   }
+ }
+ function go(nextStep){
+   if(nextStep===2&&numFiles()<1)return;
+   if(nextStep===3&&numFiles()<1)return;
+   stage=nextStep;
+   if(stage!==2){
+     list.querySelectorAll('.archivo,.grupo-pedido').forEach(el=>{el.hidden=false});
+   }
+   refresh();postStage();
+   nav.scrollIntoView({behavior:'smooth',block:'start'});
+ }
+ function enable(){
+   if(media.matches){refresh();postStage()}
+   else{
+     document.body.classList.remove('saber-mobile');
+     document.body.removeAttribute('data-mobile-stage');
+     nav.hidden=true;
+     list.querySelectorAll('.archivo,.grupo-pedido').forEach(el=>{el.hidden=false});
+     window.parent.postMessage({type:'SABER_MOBILE_STAGE',stage:0},location.origin);
+   }
+ }
+ const observer=new MutationObserver(()=>{
+   if(!media.matches)return;
+   refresh();
+ });
+ observer.observe(list,{childList:true,subtree:true});
+ input.addEventListener('change',()=>{if(media.matches){stage=1;refresh();postStage()}});
+ window.addEventListener('message',event=>{
+   if(event.origin!==location.origin||event.source!==window.parent||
+      event.data?.type!=='SABER_MOBILE_PRICE_CONFIRM')return;
+   sendable=event.data.sendable===true;
+   price=Number.isSafeInteger(event.data.total)&&event.data.total>0?event.data.total:null;
+   if(media.matches&&stage===3)refresh();
+ });
+ if(media.addEventListener)media.addEventListener('change',enable);
+ else media.addListener(enable);
+ enable();
+})();
