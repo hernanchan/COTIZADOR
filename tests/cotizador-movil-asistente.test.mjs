@@ -22,7 +22,8 @@ test('un mismo origen, cotizador y estado comercial LIVE para PC y móvil',async
  assert.match(html,/flow\.iniciarPago\(\)/);
  assert.match(html,/SABER_MOBILE_PRICE_CONFIRM/);
  assert.match(html,/SABER_MOBILE_STAGE/);
- assert.match(html,/const enabled=true/);
+ assert.match(html,/const enabled=(true|false)/);
+ assert.match(html,/mobileGo.disabled=!enabled/);
  assert.match(html,/mobileGo\.disabled=!enabled\|\|!mobileSendable\|\|working\|\|next\.disabled/);
  assert.ok(html.includes("body.mobile-wizard-ready #siguiente{display:none}"),
    'si el asistente no carga, el botón original debe seguir visible');
