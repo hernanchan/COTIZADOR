@@ -5,7 +5,10 @@
 (() => {
  'use strict';
  if (location.pathname !== '/cotizar/archivos' || window.parent === window) return;
- const media = matchMedia('(max-width: 720px)');
+ const media = matchMedia('(max-width: 720px), (pointer: coarse)');
+ // La prueba explícita debe ser móvil incluso si el teléfono está horizontal.
+ const forced = new URLSearchParams(location.search).get('vista') === 'movil';
+ const active = () => forced || media.matches;
  const $ = id => document.getElementById(id);
  const list = $('lista');
  const input = $('archivos');
@@ -16,6 +19,11 @@
  css.textContent = `
  body.saber-mobile main {padding:2px 2px 24px!important}
  body.saber-mobile #zonaArchivos {padding:18px 14px!important;background:#f1f7fc}
+ body.saber-mobile #modoConfiguracion>p {font-size:13px;color:#5f7689}
+ body.saber-mobile .grupo-pedido .titulo-grupo{font-size:15px;font-weight:850}
+ body.saber-mobile #zonaArchivos>p {font-size:14px}
+ body.saber-mobile #zonaArchivos label[for=archivos]{display:block;padding:7px 0;font-size:18px}
+ body.saber-mobile #zonaArchivos input[type=file]{min-height:68px;background:#fff;border:2px solid #145c89;border-radius:10px}
  body.saber-mobile #zonaArchivos input[type=file] {font-size:16px;min-height:64px}
  body.saber-mobile #modoConfiguracion {padding:12px!important}
  body.saber-mobile .modo-elecciones {display:grid;grid-template-columns:1fr!important;gap:10px}
@@ -138,7 +146,7 @@
    document.querySelector('#modoConfiguracion')?.scrollIntoView({behavior:'smooth',block:'start'});
  }
  function refresh(){
-   if(!media.matches)return;
+   if(!active())return;
    document.body.classList.add('saber-mobile');
    document.body.dataset.mobileStage=String(stage);
    nav.hidden=false;
@@ -179,7 +187,7 @@
    nav.scrollIntoView({behavior:'smooth',block:'start'});
  }
  function enable(){
-   if(media.matches){refresh();postStage()}
+   if(active()){refresh();postStage()}
    else{
      document.body.classList.remove('saber-mobile');
      document.body.removeAttribute('data-mobile-stage');
@@ -189,17 +197,17 @@
    }
  }
  const observer=new MutationObserver(()=>{
-   if(!media.matches)return;
+   if(!active())return;
    refresh();
  });
  observer.observe(list,{childList:true,subtree:true});
- input.addEventListener('change',()=>{if(media.matches){stage=1;refresh();postStage()}});
+ input.addEventListener('change',()=>{if(active()){stage=1;refresh();postStage()}});
  window.addEventListener('message',event=>{
    if(event.origin!==location.origin||event.source!==window.parent||
       event.data?.type!=='SABER_MOBILE_PRICE_CONFIRM')return;
    sendable=event.data.sendable===true;
    price=Number.isSafeInteger(event.data.total)&&event.data.total>0?event.data.total:null;
-   if(media.matches&&stage===3)refresh();
+   if(active()&&stage===3)refresh();
  });
  if(media.addEventListener)media.addEventListener('change',enable);
  else media.addListener(enable);
