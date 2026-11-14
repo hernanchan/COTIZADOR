@@ -1,0 +1,1 @@
+ARCHIVO DE ENSAYO. No usar en producción. Sirve exclusivamente para comprobar que una propuesta sobre tools/ sin aprobación del titular es rechazada por saber/contrato. No contiene código ejecutable.
