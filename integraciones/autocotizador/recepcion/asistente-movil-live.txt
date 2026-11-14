@@ -106,8 +106,7 @@
  const next=btn('Continuar',()=>goForward());
  const edit=btn('Modificar opciones',()=>go(2),true);
  const help=document.createElement('p');help.className='micro-help';help.hidden=true;
- nav.insertBefore(help,review);
- nav.append(tag,track,title,description,fileCount,review,actions);
+ nav.append(tag,track,title,description,fileCount,help,review,actions);
  main.insertBefore(nav,$('zonaArchivos'));
  let stage=1,activeFile=0,sendable=false,price=null,opening=false,warning='';
  const numFiles=()=>list.querySelectorAll('.archivo').length;
