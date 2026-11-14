@@ -35,9 +35,15 @@ jobs:
           (cd baseline/integraciones/autocotizador/recepcion && npm install --no-audit --no-fund >/dev/null && npm run build:unificado >/dev/null)
           cp baseline/integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs /tmp/saber-baseline-movil.mjs
           node --check /tmp/saber-candidate-movil.mjs
-          grep -Fq '/cotizar/movil.js' /tmp/saber-candidate-movil.mjs
-          grep -Fq 'Prueba móvil con precios reales' /tmp/saber-candidate-movil.mjs
-          grep -Fq 'SABER_SMART_PRICE_STATE' /tmp/saber-candidate-movil.mjs
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';import assert from 'node:assert/strict';
+          const data=fs.readFileSync('/tmp/saber-candidate-movil.mjs','utf8');
+          for(const marker of ['/cotizar/movil.js','Prueba móvil con precios reales','SABER_SMART_PRICE_STATE']){
+            const found=data.includes(marker);
+            console.log('SABER_PREVIEW_COMPILED_MARKER',JSON.stringify(marker),found);
+          }
+          assert.ok(data.includes('/cotizar/movil.js'),'MOBILE_ROUTE_BUNDLE_MISSING');
+          JS
           echo SABER_PREVIEW_REAL_BUILDS_TESTS_OK_NO_WRITES
       - name: Desplegar SOLO Worker documental tras comparación EXACTA, preservar bindings y rollback
         shell: bash
