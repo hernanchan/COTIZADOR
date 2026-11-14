@@ -68,6 +68,11 @@ export function paginaCotizarLive(req,env,{authorized=false}={}){
  const opcion=u.searchParams.get('servicio');
  const servicioInicial=opcion==='fotos'||opcion==='stickers'?opcion:'auto';
  const servicioQuery=servicioInicial==='auto'?'':'?servicio='+servicioInicial;
+ // Prueba real de lectura/cotización con las APIs comerciales existentes;
+ // no habilita órdenes, checkout, transferencia ni subida de originales.
+ const previewMovil=u.searchParams.get('vista')==='movil';
+ const routeQuery=previewMovil
+  ?servicioQuery+(servicioQuery?'&':'?')+'vista=movil':servicioQuery;
  const tituloServicio=servicioInicial==='fotos'?'Cotizá tus fotos':
   servicioInicial==='stickers'?'Cotizá tus stickers':'Cotizá tus impresiones y ploteos';
  if(req.method!=='GET'||u.protocol!=='https:'||u.hostname!==HOST||
@@ -95,7 +100,7 @@ window.saberIngresoLive=async token=>{
    headers:{'Content-Type':'application/json'},body:JSON.stringify({token})});
   const v=await r.json();
   if(!r.ok||v?.ok!==true)throw Error('No pudimos verificar el acceso.');
-  location.replace('/cotizar${servicioQuery}');
+  location.replace('/cotizar${routeQuery}');
  }catch{label.textContent='El acceso no pudo verificarse. Volvé a intentarlo.'}
 };
 </script></body></html>`;
@@ -104,13 +109,13 @@ window.saberIngresoLive=async token=>{
  }
  const scriptNonce=crypto.randomUUID().replaceAll('-','');
  const enabled=env?.DOCS_LIVE_RECEPCION_GATE===ON&&env?.DOCS_LIVE_PRICING_GATE===ON&&
-  env?.DOCS_LIVE_ORDER_GATE===ON;
+  env?.DOCS_LIVE_ORDER_GATE===ON&&!previewMovil;
  const bankEnabled=enabled&&env?.DOCS_LIVE_TRANSFER_GATE===ON&&
   env?.DOCS_LIVE_TUS_GATE===ON;
  const html=`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cotizador de PDF · Librería Saber</title><style>${baseCss}${mobileCss}</style></head><body>
 <header><strong>Librería Saber · Impresiones y ploteos</strong><a class="volver-tienda" href="https://libreriasaber.com.ar/">← Volver a la tienda</a></header>
-<main><section><h1>${servicioInicial==='fotos'?'Prepará tus fotos':servicioInicial==='stickers'?'Prepará tus stickers':'Prepará tus PDF, JPG o PNG'}</h1>
+<main>${previewMovil?'<section id="aviso-demo-real" role="status" style="border-left:4px solid #df922d;background:#fff7ec;padding:12px 15px"><strong>Prueba móvil con precios reales</strong><p style="margin:4px 0">Podés elegir archivos y verificar la detección, las opciones y la cotización comercial vigente. No genera pedidos ni permite pagar.</p></section>':''}<section><h1>${servicioInicial==='fotos'?'Prepará tus fotos':servicioInicial==='stickers'?'Prepará tus stickers':'Prepará tus PDF, JPG o PNG'}</h1>
 <p>Elegí los archivos y sus opciones de impresión. Las medidas y el tipo de trabajo se calculan por el contenido del PDF, no por el nombre ni por su peso.</p>
 <div id="precio-entrega" aria-label="Precio y fecha de entrega">
 <div><strong>TU PRECIO A PAGAR</strong><p id="precio" aria-live="polite">Pendiente de cotización</p></div>
@@ -118,7 +123,7 @@ window.saberIngresoLive=async token=>{
 </div>
 <p id="plazo-explicacion">Fecha orientativa desde la acreditación del pago, sujeta a disponibilidad, trabajo, horario y feriados. Al iniciar tu trabajo, en el seguimiento verás una fecha y hora más precisas.</p>
 <p id="promo-dia" hidden></p>
-</section><section id="seccion-archivos"><h2>1. Elegí los archivos</h2><p>Seleccioná una sola vez los PDF que querés imprimir. Con Mercado Pago se envían al acreditarse; con transferencia se reciben desde «Ya transferí», protegidos hasta verificar el banco.</p><iframe id="pdf" title="Elegir PDF, JPG o PNG y opciones de impresión" src="/cotizar/archivos${servicioQuery}" loading="eager" scrolling="no"></iframe>
+</section><section id="seccion-archivos"><h2>1. Elegí los archivos</h2><p>Seleccioná una sola vez los PDF que querés imprimir. Con Mercado Pago se envían al acreditarse; con transferencia se reciben desde «Ya transferí», protegidos hasta verificar el banco.</p><iframe id="pdf" title="Elegir PDF, JPG o PNG y opciones de impresión" src="/cotizar/archivos${routeQuery}" loading="eager" scrolling="no"></iframe>
 <button type="button" id="siguiente" disabled>Siguiente · Tus datos</button>
 <p id="aviso-siguiente" aria-live="polite">Elegí y confirmá las opciones de impresión para continuar.</p>
 </section><section id="seccion-confirmacion" hidden><h2>2. Tus datos y el pago</h2>
@@ -135,7 +140,7 @@ window.saberIngresoLive=async token=>{
 <p class="transfer-warning">IMPORTANTE: Si enviás PDF pesados, mantené esta pestaña abierta durante la subida hasta que aparezca «Archivo recibido». No cierres el navegador, no apagues el dispositivo y evitá cambiar de red durante la subida.</p>
 </section></main><div id="barra-movil" hidden role="region" aria-label="Resumen y continuar">
 <div><small>Precio estimado</small><strong id="barra-precio">Pendiente</strong></div>
-<button id="barra-continuar" type="button" disabled>Continuar</button>
+<button id="barra-continuar" type="button" disabled>${previewMovil?'Sin pago en esta prueba':'Continuar'}</button>
 </div><script type="module" nonce="${scriptNonce}">
 import {crearFlujoPresupuestoLive} from '/cotizar/flujo-live.js';
 const phone=document.getElementById('telefono');
