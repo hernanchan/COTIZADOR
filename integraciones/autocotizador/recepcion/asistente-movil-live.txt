@@ -47,10 +47,16 @@
  body.saber-mobile .saber-wizard .step {font-weight:750;font-size:13px;color:#17658e;letter-spacing:.03em}
  body.saber-mobile .saber-wizard .track {height:5px;background:#dce8f1;border-radius:4px;margin:10px 0 14px;overflow:hidden}
  body.saber-mobile .saber-wizard .progress {height:100%;width:33.33%;background:#1770a2;transition:width .15s}
- body.saber-mobile .saber-wizard .actions {display:flex;gap:9px;flex-wrap:wrap;margin-top:13px}
- body.saber-mobile .saber-wizard button {padding:11px 14px;font-size:16px;flex:1}
- body.saber-mobile .saber-wizard .secondary {background:#edf5fa;color:#164e75;border:1px solid #aac5d8}
- body.saber-mobile .saber-wizard button:disabled {opacity:.48}
+ /* La navegación pertenece al FINAL de las opciones, nunca a la cabecera. */
+ body:not(.saber-mobile) #accionesAsistenteMovil{display:none!important}
+ body.saber-mobile #accionesAsistenteMovil{display:grid;grid-template-columns:1fr 1.6fr;
+   gap:10px;margin:13px 0 24px;padding:13px 8px 16px;
+   background:#fff;border:1px solid #c7dbea;border-radius:12px}
+ body.saber-mobile #accionesAsistenteMovil button{width:100%;min-height:54px;
+   padding:11px 13px;border-radius:10px;font-size:16px;font-weight:750}
+ body.saber-mobile #accionesAsistenteMovil button.secondary{background:#edf5fa;color:#164e75;
+   border:1px solid #aac5d8}
+ body.saber-mobile #accionesAsistenteMovil button:disabled{opacity:.48}
  body.saber-mobile[data-mobile-stage="1"] #modoConfiguracion,
  body.saber-mobile[data-mobile-stage="1"] #configComunGlobal,
  body.saber-mobile[data-mobile-stage="1"] #anilladosConjuntos,
@@ -96,7 +102,10 @@
  const description = document.createElement('p');
  const fileCount = document.createElement('p');fileCount.className='file-count';
  const review = document.createElement('div');review.id='asistenteResumen';
- const actions = document.createElement('div');actions.className='actions';
+ const actions = document.createElement('nav');
+ actions.id='accionesAsistenteMovil';
+ actions.className='actions';
+ actions.setAttribute('aria-label','Continuar o volver al terminar este paso');
  function btn(text,action,secondary=false){
    const button=document.createElement('button');button.type='button';button.textContent=text;
    if(secondary)button.className='secondary';
@@ -106,8 +115,10 @@
  const next=btn('Continuar',()=>goForward());
  const edit=btn('Modificar opciones',()=>go(2),true);
  const help=document.createElement('p');help.className='micro-help';help.hidden=true;
- nav.append(tag,track,title,description,fileCount,help,review,actions);
+ nav.append(tag,track,title,description,fileCount,help,review);
  main.insertBefore(nav,$('zonaArchivos'));
+ // Anclar debajo de los controles, no arriba junto al título del paso.
+ list.insertAdjacentElement('afterend',actions);
  let stage=1,activeFile=0,sendable=false,price=null,opening=false,warning='';
  const numFiles=()=>list.querySelectorAll('.archivo').length;
  const cards=()=>[...list.querySelectorAll('.archivo')];
@@ -215,6 +226,7 @@
  function refresh(){
   if(!active())return;
   document.body.classList.add('saber-mobile');
+  actions.hidden=false;
   document.body.dataset.mobileStage=String(stage);
   nav.hidden=false;tag.textContent='PASO '+stage+' DE 6';
   progress.style.width=String(stage*100/6)+'%';
@@ -231,6 +243,9 @@
    ?'Archivo '+(activeFile+1)+' de '+numFiles():'';
   help.hidden=true;help.textContent='';actions.replaceChildren();review.replaceChildren();
   showCard();
+  if(stage===1)$('zonaArchivos').insertAdjacentElement('afterend',actions);
+  else if(stage>=2&&stage<=5)list.insertAdjacentElement('afterend',actions);
+  else review.insertAdjacentElement('afterend',actions);
   if(stage===1){
    next.textContent='Configurar mis archivos';next.disabled=numFiles()===0;
    actions.style.gridTemplateColumns='1fr';actions.append(next);
@@ -285,6 +300,7 @@
  function enable(){
   if(active()){refresh();postStage()}
   else{
+   actions.hidden=true;
    document.body.classList.remove('saber-mobile');
    document.body.removeAttribute('data-mobile-stage');
    nav.hidden=true;
