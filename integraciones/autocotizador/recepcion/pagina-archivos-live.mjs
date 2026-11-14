@@ -52,7 +52,11 @@ export function prepararCotizadorArchivosLive(htmlEntrada){
            requestAnimationFrame(send);
           })();
           </script></body></html>`);
- if(!html.includes('SABER_SMART_RESIZE')||!html.includes('id="archivos"'))
+ const adaptado=html.replace('</body></html>',
+   '<script src="/cotizar/movil.js" defer></script></body></html>');
+ if(!adaptado.includes('SABER_SMART_RESIZE')||
+    !adaptado.includes('id="archivos"')||
+    !adaptado.includes('src="/cotizar/movil.js"'))
   throw Error('HTML_COTIZADOR_NO_ADAPTADO');
- return html;
+ return adaptado;
 }
