@@ -9,6 +9,7 @@ on:
       - 'integraciones/autocotizador/recepcion/pagina-archivos-live.mjs'
       - 'tests/cotizador-movil-browser.test.mjs'
       - 'tests/cotizador-movil-asistente.test.mjs'
+      - 'tests/cotizador-movil-publicacion-browser.test.mjs'
 permissions: {contents: read}
 jobs:
   browser:
@@ -39,4 +40,5 @@ jobs:
         run: |
           set -euo pipefail
           node tests/cotizador-movil-browser.test.mjs
+          node tests/cotizador-movil-publicacion-browser.test.mjs
           echo SABER_MOBILE_BROWSER_RENDER_QA_SUCCESS_NO_DEPLOY
