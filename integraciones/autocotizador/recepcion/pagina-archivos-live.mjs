@@ -52,12 +52,13 @@ export function prepararCotizadorArchivosLive(htmlEntrada,{previewMovil=false}={
            requestAnimationFrame(send);
           })();
           </script></body></html>`);
- const adaptado=previewMovil
-  ?html.replace('</body></html>','<script src="/cotizar/movil.js" defer></script></body></html>')
-  :html;
+ // El mismo motor de cotización se entrega a PC y móvil. El JS del asistente
+ // decide la interfaz por viewport, sin alterar precio, subida ni checkout.
+ const adaptado=html.replace('</body></html>',
+  '<script src="/cotizar/movil.js" defer></script></body></html>');
  if(!adaptado.includes('SABER_SMART_RESIZE')||
     !adaptado.includes('id="archivos"')||
-    (previewMovil&&!adaptado.includes('src="/cotizar/movil.js"')))
+    !adaptado.includes('src="/cotizar/movil.js"'))
   throw Error('HTML_COTIZADOR_NO_ADAPTADO');
  return adaptado;
 }
