@@ -2376,7 +2376,8 @@ export default {
       if(!live||!await autorizadoCompradorLive(request,env))
        return testResponse({ok:false,error:'LIVE_COTIZADOR_CERRADO'},503);
       if(page==='/cotizar/archivos'&&request.method==='GET'){
-       const html=prepararCotizadorArchivosLive(paginaCargaUnica());
+       const previewMovil=new URL(request.url).searchParams.get('vista')==='movil';
+       const html=prepararCotizadorArchivosLive(paginaCargaUnica(),{previewMovil});
        return new Response(html,{headers:{
         'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store,private',
         'Content-Security-Policy':"default-src 'none'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'",
