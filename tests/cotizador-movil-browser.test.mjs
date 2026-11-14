@@ -147,7 +147,9 @@ try{
  });
  await page.goto(root+'/cotizar',{waitUntil:'load'});
  assert.ok(!(await page.locator('body').getAttribute('class'))?.includes('preview-movil'));
- assert.equal(await page.frameLocator('#pdf').locator('#asistenteMovil').count(),0,'PC debe mantenerse intacta');
+ assert.equal(await page.frameLocator('#pdf').locator('#asistenteMovil').count(),1,'Mismo código de asistente en ambos');
+ assert.equal(await page.frameLocator('#pdf').locator('#asistenteMovil').isVisible(),false,'PC no muestra asistente');
+ assert.equal(await page.frameLocator('#pdf').locator('body.saber-mobile').count(),0,'PC mantiene interfaz habitual');
  console.log('SABER_DESKTOP_BROWSER_ORIGINAL_UI_UNTOUCHED');
  tests++;await context.close();
  console.log('SABER_BROWSER_VISUAL_TESTS_PASSED',tests);
