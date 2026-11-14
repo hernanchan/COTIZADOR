@@ -1,0 +1,41 @@
+name: Saber - cotizador móvil guiado, sin despliegue
+on:
+  push:
+    branches: [ux/cotizador-movil-asistente-20261114]
+    paths:
+      - '.github/workflows/saber-cotizador-movil-qa-20261114.yml'
+      - 'integraciones/autocotizador/recepcion/asistente-movil-live.txt'
+      - 'integraciones/autocotizador/recepcion/pagina-cotizar-live.mjs'
+      - 'integraciones/autocotizador/recepcion/pagina-archivos-live.mjs'
+      - 'integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs'
+      - 'tests/cotizador-movil-asistente.test.mjs'
+permissions: {contents: read}
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Seguridad de JS y flujo móvil sin cobros
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp integraciones/autocotizador/recepcion/asistente-movil-live.txt /tmp/saber-mobile-qa.mjs
+          node --check /tmp/saber-mobile-qa.mjs
+          node --check integraciones/autocotizador/recepcion/pagina-cotizar-live.mjs
+          node --check integraciones/autocotizador/recepcion/pagina-archivos-live.mjs
+          node --test tests/cotizador-movil-asistente.test.mjs integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs
+          echo SABER_MOBILE_UX_ISOLATED_TESTS_OK
+      - name: Compilación de Worker comercial y tests del cotizador existente (sin deploy)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd integraciones/autocotizador/recepcion
+          npm install --no-audit --no-fund
+          npm run build:unificado
+          grep -Fq '/cotizar/movil.js' dist/saber-documentos-cotizador-fase4.mjs
+          grep -Fq 'SABER_SMART_PREPARAR_ENVIO' dist/saber-documentos-cotizador-fase4.mjs
+          echo SABER_MOBILE_AND_DESKTOP_SAME_BACKEND_BUILD_OK
