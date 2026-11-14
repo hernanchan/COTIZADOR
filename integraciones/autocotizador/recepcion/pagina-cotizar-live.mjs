@@ -32,6 +32,35 @@ section[hidden]{display:none!important}
 #plazo-explicacion:not(:has(+ #promo-dia:not([hidden]))){border-bottom:2px solid #c3d9ea;border-radius:0 0 12px 12px;padding-bottom:12px}
 @media(max-width:650px){#precio-entrega{grid-template-columns:1fr}}
 @media(max-width:700px){main{width:100%;max-width:100%;margin:0;padding:8px}section{padding:13px;margin-bottom:10px;border-radius:10px}h1{font-size:22px}h2{font-size:18px}#seccion-archivos{overflow:visible}#pdf{height:960px;min-height:0}#precio-entrega{padding:10px;gap:5px}#precio-entrega #precio,#precio-entrega #plazo-orientativo{font-size:21px}#plazo-explicacion,#promo-dia{padding:9px 11px;font-size:14px}button{max-width:100%;white-space:normal;min-height:46px}.payment-options button{display:block;width:100%;margin:8px 0!important}}`;
+const mobileCss=`
+@media(max-width:720px){
+ body{background:#f2f6fa}
+ header{padding:11px 13px}
+ header strong{font-size:18px}
+ header .volver-tienda{font-size:13px;padding:7px 10px}
+ main{padding:6px 8px 0}
+ #seccion-archivos>h2,#seccion-archivos>p:first-of-type{display:none}
+ #seccion-archivos{padding:9px 9px 16px!important}
+ #pdf{height:530px;min-height:0!important;transition:height .1s}
+ #siguiente{display:none}
+ #aviso-siguiente{font-size:14px;padding:9px 8px;margin:0}
+ #precio-entrega{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:7px;padding:10px}
+ #precio-entrega strong{font-size:11px!important}
+ #precio-entrega #precio,#precio-entrega #plazo-orientativo{font-size:17px!important;line-height:1.4}
+ #plazo-explicacion{font-size:13px}
+ #barra-movil:not([hidden]){display:flex;position:fixed;left:0;right:0;bottom:0;
+   z-index:80;align-items:center;gap:12px;justify-content:space-between;
+   padding:12px max(14px,env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom));
+   background:#fff;border-top:2px solid #c4d9e9;box-shadow:0 -4px 22px #103c6129}
+ #barra-movil>div{min-width:0;flex:1}
+ #barra-movil small{display:block;font-size:12px;color:#43657e;font-weight:700}
+ #barra-movil strong{display:block;font-size:17px;overflow-wrap:anywhere;line-height:1.3}
+ #barra-movil button{min-width:125px;max-width:50%;padding:12px 13px;min-height:50px;font-size:15px}
+ body:has(#barra-movil:not([hidden])) main{padding-bottom:120px}
+ #seccion-confirmacion h2{font-size:22px}
+ #seccion-confirmacion label{font-size:16px}
+}
+`;
 export function paginaCotizarLive(req,env,{authorized=false}={}){
  const u=new URL(req.url);
  // Única selección anticipada desde la vidriera: jamás determina precio ni pago.
@@ -78,7 +107,7 @@ window.saberIngresoLive=async token=>{
  const bankEnabled=enabled&&env?.DOCS_LIVE_TRANSFER_GATE===ON&&
   env?.DOCS_LIVE_TUS_GATE===ON;
  const html=`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Cotizador de PDF · Librería Saber</title><style>${baseCss}</style></head><body>
+<title>Cotizador de PDF · Librería Saber</title><style>${baseCss}${mobileCss}</style></head><body>
 <header><strong>Librería Saber · Impresiones y ploteos</strong><a class="volver-tienda" href="https://libreriasaber.com.ar/">← Volver a la tienda</a></header>
 <main><section><h1>${servicioInicial==='fotos'?'Prepará tus fotos':servicioInicial==='stickers'?'Prepará tus stickers':'Prepará tus PDF, JPG o PNG'}</h1>
 <p>Elegí los archivos y sus opciones de impresión. Las medidas y el tipo de trabajo se calculan por el contenido del PDF, no por el nombre ni por su peso.</p>
@@ -103,7 +132,10 @@ window.saberIngresoLive=async token=>{
 <button type="button" id="continuar" disabled>${enabled?'Confirmar presupuesto':'Recepción de pedidos temporalmente desactivada'}</button>
 <p><small>Antes de pagar, guardamos una copia privada de los PDF en este navegador. Con transferencia se envían al pulsar «Ya transferí»; con Mercado Pago al acreditarse. Si el dispositivo no puede conservarlos, no permitimos pagar.</small></p>
 <p class="transfer-warning">IMPORTANTE: Si enviás PDF pesados, mantené esta pestaña abierta durante la subida hasta que aparezca «Archivo recibido». No cierres el navegador, no apagues el dispositivo y evitá cambiar de red durante la subida.</p>
-</section></main><script type="module" nonce="${scriptNonce}">
+</section></main><div id="barra-movil" hidden role="region" aria-label="Resumen y continuar">
+<div><small>Precio estimado</small><strong id="barra-precio">Pendiente</strong></div>
+<button id="barra-continuar" type="button" disabled>Continuar</button>
+</div><script type="module" nonce="${scriptNonce}">
 import {crearFlujoPresupuestoLive} from '/cotizar/flujo-live.js';
 const phone=document.getElementById('telefono');
 const nombreCliente=document.getElementById('nombre');
@@ -152,9 +184,31 @@ const enabled=${enabled},bankEnabled=${bankEnabled};
 let pending=null,flow=null,working=false;
 const money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(n);
 const orderId=()=>{const a=new Uint8Array(16);crypto.getRandomValues(a);return 'WEB-ENSAYO-'+Array.from(a,n=>n.toString(16).padStart(2,'0')).join('').toUpperCase()};
+const mobileBar=document.getElementById('barra-movil');
+const mobileGo=document.getElementById('barra-continuar');
+const mobileAmount=document.getElementById('barra-precio');
+let mobileStage=0,mobileSendable=false,mobileTotal=null;
+const updateMobileBar=()=>{
+ const show=window.matchMedia('(max-width:720px)').matches&&mobileStage===3&&!stepFiles.hidden;
+ mobileBar.hidden=!show;
+ mobileAmount.textContent=Number.isSafeInteger(mobileTotal)&&mobileTotal>0?money(mobileTotal):'Por calcular';
+ mobileGo.disabled=!enabled||!mobileSendable||working||next.disabled||!show;
+};
+mobileGo.addEventListener('click',()=>{
+ if(!mobileGo.disabled&&!next.disabled)next.click();
+});
+window.addEventListener('resize',updateMobileBar);
+
 window.addEventListener('message',event=>{
  if(event.origin!==location.origin||event.source!==iframe.contentWindow||!event.data)return;
  const data=event.data;
+ if(data.type==='SABER_MOBILE_STAGE'){
+  if(Number.isSafeInteger(data.stage)&&data.stage>=0&&data.stage<=3){
+   mobileStage=data.stage;
+   updateMobileBar();
+  }
+  return;
+ }
  if(data.type==='SABER_SMART_RESIZE'){
   // El contenido del iframe crece cuando el cliente agrega archivos u opciones.
   // Evitar scroll anidado: el documento principal es quien debe desplazarse.
@@ -182,6 +236,11 @@ window.addEventListener('message',event=>{
   if(data.blockReason)status.textContent=data.blockReason;
   action.disabled=!enabled||!data.sendable||working;
   next.disabled=!enabled||!data.sendable||working;
+  mobileSendable=data.sendable===true;
+  mobileTotal=Number.isSafeInteger(data.total)&&data.total>0?data.total:null;
+  updateMobileBar();
+  iframe.contentWindow?.postMessage({type:'SABER_MOBILE_PRICE_CONFIRM',
+   sendable:mobileSendable,total:mobileTotal},location.origin);
   if(data.sendable)stepNotice.textContent='Todo listo. Continuá para completar tus datos y confirmar.';
  }
  if(data.type==='SABER_SMART_UNIVERSAL_PDF'){
@@ -192,6 +251,7 @@ window.addEventListener('message',event=>{
   if(enabled){
    stepFiles.hidden=true;
    stepData.hidden=false;
+   updateMobileBar();
    action.disabled=false;
    status.textContent='Archivos preparados. Completá tus datos y confirmá el presupuesto.';
    stepData.scrollIntoView({behavior:'smooth',block:'start'});
@@ -200,6 +260,7 @@ window.addEventListener('message',event=>{
  }
  if(data.type==='SABER_SMART_HANDOFF_ERROR'){
   pending=null;action.disabled=true;next.disabled=true;
+  mobileSendable=false;updateMobileBar();
   status.textContent=String(data.message||'No se pudo preparar el pedido.').slice(0,180);
  }
 });
@@ -219,6 +280,7 @@ back.addEventListener('click',()=>{
  pending=null;
  stepData.hidden=true;
  stepFiles.hidden=false;
+ updateMobileBar();
  stepNotice.textContent='Podés revisar tus opciones y volver a continuar.';
  next.disabled=false;
  action.disabled=true;
