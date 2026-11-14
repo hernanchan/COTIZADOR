@@ -35,7 +35,7 @@ Un cambio que afecte `integraciones/`, `vidriera/`, `functions/`, `tests/`, `too
 AUTORIZO CAMBIO SABER PR #NUMERO SHA SHA_COMPLETO_DE_40_CARACTERES
 ```
 
-4. La comprobación automática `Control de cambios Saber` exige que el autor del comentario sea el usuario `hernanchan` y que número y SHA correspondan exactamente a ese PR. Si cambia el código, **se invalida la autorización previa**.
+4. La comprobación automática del workflow **Control de cambios Saber**, con estado de commit **`saber/contrato`**, exige que el autor del comentario sea el usuario `hernanchan` y que número y SHA correspondan exactamente a ese PR. Si cambia el código, **se invalida la autorización previa**.
 5. Tras comentar, volver a ejecutar el control en GitHub Actions (la publicación del comentario no lo vuelve a ejecutar por sí sola). Un PR sin archivos protegidos puede pasar sin este comentario.
 6. Para cambios funcionales, deben ejecutarse **además** las pruebas del módulo. Pasar la aprobación del titular no sustituye pruebas de precio, pago, archivos, móvil, Central y seguimiento.
 
@@ -43,14 +43,14 @@ AUTORIZO CAMBIO SABER PR #NUMERO SHA SHA_COMPLETO_DE_40_CARACTERES
 
 ## Activación indispensable en GitHub
 
-El workflow `.github/workflows/saber-control-cambios.yml` puede **fallar** cuando falta autorización. No impide merges o pushes por sí mismo; para bloquearlos hay que configurar una regla de rama en GitHub.
+El workflow `.github/workflows/saber-control-cambios.yml` puede **fallar** cuando falta autorización y publica un estado GitHub **`saber/contrato`** (`success` o `failure`) en el commit del PR. Al ejecutar sobre `pull_request_target` solo comprueba el código confiable de la rama base, sin ejecutar modificaciones propuestas. No impide merges o pushes por sí mismo; para bloquearlos hay que configurar una regla de rama en GitHub.
 
 Configuración sugerida, una vez que el workflow haya corrido exitosamente en el repositorio:
 
 1. Ir a `hernanchan/COTIZADOR → Settings → Rules → Rulesets → New branch ruleset`.
 2. Nombre `Saber — cambios controlados`, enforcement **Active**.
 3. Aplicar primero a la rama `integracion/tus-pedido-privado-20261101`. **No tocar todavía la rama `main` ni despliegues automáticos sin revisar dependencias.**
-4. Activar `Require a pull request before merging`, `Require status checks to pass` y seleccionar como required check **Control de cambios Saber**. Si están disponibles, activar protección contra force pushes y eliminaciones.
+4. Activar `Require a pull request before merging`, `Require status checks to pass` y seleccionar como required status **`saber/contrato`**, emitido sobre el SHA del PR por el workflow de base (no usar el nombre del job como control obligatorio). Si están disponibles, activar protección contra force pushes y eliminaciones.
 5. Revisar los **bypass**: no conceder excepciones amplias a automatizaciones; hacer una PR de ensayo bloqueada y otra aprobada por el titular.
 6. La configuración de GitHub debe hacerla una cuenta con permiso de administración. Nuestra conexión de GitHub **no tiene acción de escritura de Rulesets**; hasta configurar esto, el control de CI es informativo, no una barrera ineludible.
 7. Protección de la publicación: configurar aprobadores de `environment` y tokens de mínimo privilegio para los workflows que realmente despliegan. Los numerosos workflows antiguos pueden evitar este control si siguen pudiendo ejecutarse con permisos de despliegue; deben inventariarse antes de considerarlo universal.
