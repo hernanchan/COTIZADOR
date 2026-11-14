@@ -86,3 +86,9 @@ La propiedad de una marca, el control de cuentas y los derechos sobre biblioteca
 - No hacer cambios de visibilidad, nombre de repositorio, ramas de despliegue o DNS sin mapa de dependencias y plan de recuperación.
 - Registrar los nuevos hallazgos sensibles fuera del repositorio público y compartir solo resúmenes saneados.
 - Distinguir siempre **comprobado**, **pendiente**, **hipótesis** e **implementado**.
+
+## 6. Comprobación puntual adicional del 14/11/2026
+
+Se realizó una lectura automatizada **limitada a 13 archivos actuales de configuración, recepción y Worker** buscando patrones característicos de claves privadas, credenciales GitHub, tokens Mercado Pago, claves Supabase y JWT embebidos. **No hubo coincidencias con esos patrones en esa muestra.**
+
+Esto **no descarta otros formatos de secretos, contenido en los restantes archivos, ramas, historial Git, logs de Actions ni datos que no sigan esos patrones**. La inspección completa y el análisis de alertas de GitHub Security siguen siendo pendientes de prioridad P1. No publicar valores detectados en futuras inspecciones.
