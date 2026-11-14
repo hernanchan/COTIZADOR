@@ -42,7 +42,8 @@ const mobileCss=`
  #seccion-archivos>h2,#seccion-archivos>p:first-of-type{display:none}
  #seccion-archivos{padding:9px 9px 16px!important}
  #pdf{height:530px;min-height:0!important;transition:height .1s}
- #siguiente{display:none}
+ #siguiente{display:block;width:100%}
+ body.mobile-wizard-ready #siguiente{display:none}
  #aviso-siguiente{font-size:14px;padding:9px 8px;margin:0}
  #precio-entrega{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:7px;padding:10px}
  #precio-entrega strong{font-size:11px!important}
@@ -205,6 +206,7 @@ window.addEventListener('message',event=>{
  if(data.type==='SABER_MOBILE_STAGE'){
   if(Number.isSafeInteger(data.stage)&&data.stage>=0&&data.stage<=3){
    mobileStage=data.stage;
+   document.body.classList.toggle('mobile-wizard-ready',mobileStage>0);
    updateMobileBar();
   }
   return;
