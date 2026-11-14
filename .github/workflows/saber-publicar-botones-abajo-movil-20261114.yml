@@ -1,8 +1,6 @@
 name: Saber - navegación móvil con botones debajo de opciones (sin pagos)
 on:
-  push:
-    branches: [ux/cotizador-movil-asistente-20261114]
-    paths: ['.github/workflows/saber-publicar-botones-abajo-movil-20261114.yml']
+  workflow_dispatch:
 permissions: {contents: read}
 concurrency: {group: saber-botones-al-pie-movil-deploy-20261114, cancel-in-progress: false}
 jobs:
