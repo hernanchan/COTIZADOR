@@ -42,7 +42,7 @@ test('la vista móvil es una capa sin reemplazar archivo, cotización ni handoff
 test('el asistente funciona únicamente dentro del iframe comprador y en ancho móvil',()=>{
  assert.match(clientJs,/location\.pathname\s*!==\s*'\/cotizar\/archivos'/);
  assert.match(clientJs,/window\.parent\s*===\s*window/);
- assert.match(clientJs,/matchMedia\('\(max-width: 720px\), \(pointer: coarse\)'\)/);
+ assert.match(clientJs,/matchMedia\('\(max-width: 720px\), \(max-width: 1024px\) and \(pointer: coarse\)'\)/);
  assert.match(clientJs,/const forced\s*=\s*new URLSearchParams\(location.search\).get\('vista'\)\s*===\s*'movil'/);
  assert.match(clientJs,/media\.matches/);
  assert.match(clientJs,/body\.classList\.remove\('saber-mobile'\)/);
@@ -92,7 +92,8 @@ test('sesión inicial preserva ?vista=movil, sin bypass de Turnstile',async()=>{
 });
 test('el comprador normal y PC conserva adaptador sin asistente, con gate original',async()=>{
  const regular=prepararCotizadorArchivosLive(paginaCargaUnica());
- assert.doesNotMatch(regular,/src="\/cotizar\/movil.js"/);
+ assert.match(regular,/src="\/cotizar\/movil.js"/);
+ assert.match(clientJs,/const active = \(\) => forced \|\| media.matches/);
  const current=await paginaCotizarLive(new Request(base),env,{authorized:true}).text();
  assert.match(current,/src="\/cotizar\/archivos"/);
  assert.doesNotMatch(current,/Prueba móvil con precios reales/);
@@ -117,4 +118,18 @@ test('cada archivo tiene cuatro pantallas específicas, sin clonar controles ni 
  assert.match(clientJs,/stage===6/);
  assert.match(clientJs,/querySelector\('.panel-edicion'\)/);
  assert.doesNotMatch(clientJs,/fetch\s*\(|\.submit\s*\(|iniciarPago|mercadopago\.com/i);
+});
+
+test('circuito comercial habilitado para cotizador normal, preview no cobra',async()=>{
+ const live={...env,DOCS_LIVE_RECEPCION_GATE:gate,DOCS_LIVE_TRANSFER_GATE:gate,DOCS_LIVE_TUS_GATE:gate};
+ const regular=await paginaCotizarLive(new Request(base),live,{authorized:true}).text();
+ assert.match(regular,/const enabled=true,bankEnabled=true,previewMode=false/);
+ assert.match(regular,/src="\\/cotizar\\/archivos"/);
+ assert.match(regular,/mobileGo\.addEventListener\('click'/);
+ assert.match(regular,/if\(!mobileGo\.disabled&&!next\.disabled\)next\.click\(\)/);
+ assert.match(regular,/SABER_SMART_PREPARAR_ENVIO/);
+ assert.match(regular,/SABER_SMART_UNIVERSAL_PDF/);
+ const preview=await paginaCotizarLive(new Request(base+'?vista=movil'),live,{authorized:true}).text();
+ assert.match(preview,/const enabled=false,bankEnabled=false,previewMode=true/);
+ assert.match(preview,/src="\\/cotizar\\/archivos\\?vista=movil"/);
 });
