@@ -124,12 +124,12 @@ test('circuito comercial habilitado para cotizador normal, preview no cobra',asy
  const live={...env,DOCS_LIVE_RECEPCION_GATE:gate,DOCS_LIVE_TRANSFER_GATE:gate,DOCS_LIVE_TUS_GATE:gate};
  const regular=await paginaCotizarLive(new Request(base),live,{authorized:true}).text();
  assert.match(regular,/const enabled=true,bankEnabled=true,previewMode=false/);
- assert.match(regular,/src="\\/cotizar\\/archivos"/);
+ assert.ok(regular.includes('src="/cotizar/archivos"'));
  assert.match(regular,/mobileGo\.addEventListener\('click'/);
  assert.match(regular,/if\(!mobileGo\.disabled&&!next\.disabled\)next\.click\(\)/);
  assert.match(regular,/SABER_SMART_PREPARAR_ENVIO/);
  assert.match(regular,/SABER_SMART_UNIVERSAL_PDF/);
  const preview=await paginaCotizarLive(new Request(base+'?vista=movil'),live,{authorized:true}).text();
  assert.match(preview,/const enabled=false,bankEnabled=false,previewMode=true/);
- assert.match(preview,/src="\\/cotizar\\/archivos\\?vista=movil"/);
+ assert.ok(preview.includes('src="/cotizar/archivos?vista=movil"'));
 });
