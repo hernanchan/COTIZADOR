@@ -115,8 +115,8 @@ jobs:
             new=$(cat "$tmp/$worker.new")
             jq -nc --arg new "$new" '{strategy:"percentage",versions:[{version_id:$new,percentage:100}],annotations:{"workers/message":"Libreria Saber ficha protegida de administracion precios LIVE"}}' |
               curl -fsS --max-time 50 -X POST -H "Authorization: Bearer $CF_DEPLOY" -H 'Content-Type: application/json' --data-binary @- "$root/$worker/deployments" > "$tmp/$worker.promoted"
-            jq -e '.success==true' "$tmp/$worker.promoted" >/dev/null
             changed="$worker $changed"
+            jq -e '.success==true' "$tmp/$worker.promoted" >/dev/null
             echo "SABER_PRICING_PROMOTED_$worker"
           done
           for worker in saber-pagos-produccion saber-documentos-produccion;do
@@ -151,12 +151,8 @@ jobs:
           status=$(curl -sS --max-time 15 -o /dev/null -w '%{http_code}' 'https://pedidos.libreriasaber.com.ar/cotizar/archivos')
           [ "$status" = 503 ] || { echo "SABER_PRICING_PRIVATE_FILES_NOT_BLOCKED $status";false; }
           echo SABER_PRICING_PUBLIC_SMOKE_OK
+          node integraciones/publicacion/monitor-postpublicacion-20261112.mjs
+          echo SABER_PRICING_FINAL_MONITOR_OK
           trap - ERR
           changed=""
           echo SABER_PRICING_LIVE_PUBLISHED_AND_VERIFIED
-      - name: Monitor existente de web y pedidos (solo lectura)
-        shell: bash
-        run: |
-          set -euo pipefail
-          node integraciones/publicacion/monitor-postpublicacion-20261112.mjs
-          echo SABER_PRICING_FINAL_MONITOR_OK
