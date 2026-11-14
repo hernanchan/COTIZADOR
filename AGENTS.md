@@ -1,3 +1,16 @@
+# Referencia VIGENTE — continuidad y documentación desde 14/11/2026
+
+**Antes de modificar este proyecto**, leer [Manual maestro](docs/MANUAL_MAESTRO_SABER/00-INDICE-Y-ESTADO.md), [Arquitectura y operación](docs/MANUAL_MAESTRO_SABER/01-ARQUITECTURA-Y-OPERACION.md) y [Protección y comercialización](docs/MANUAL_MAESTRO_SABER/02-PROTECCION-Y-COMERCIALIZACION.md).
+
+- Las secciones anteriores de este archivo sobre GitHub Pages, `main`, fases y estados de ensayo se conservan **como historial** y pueden estar desactualizadas. No deben prevalecer frente al release comprobado, el código en uso o un mandato específico del propietario.
+- Diferenciar **vidriera estática**, **cotizador comercial Documentos**, **Central/Pagos** y **Polaroids**. El motor comercial consolidado está desarrollado en `integracion/tus-pedido-privado-20261101`; no asumir que el código de `main` es igual al Worker comercial.
+- No usar chats como fuente primaria de recuperación: registrar cambios relevantes, sus pruebas, commit y despliegue.
+- No trasladar contraseñas, tokens ni datos privados a GitHub. El repositorio es público y no tiene licencia abierta declarada.
+- No cambiar la visibilidad del repositorio ni tocar DNS, Pages o los Workers sin analizar dependencias y establecer rollback.
+- Documentación y auditoría de protección NO autorizan publicación, cambios de tarifas o alteraciones de cuentas/bases.
+
+---
+
 # Instrucciones de trabajo — Librería Saber
 
 ## Repositorio y publicación
