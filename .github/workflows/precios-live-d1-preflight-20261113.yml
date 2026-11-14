@@ -1,0 +1,56 @@
+name: Saber - preflight D1 tarifario LIVE solo lectura
+on:
+  push:
+    branches: [admin/precios-live-protegido-20261113]
+    paths: ['.github/workflows/precios-live-d1-preflight-20261113.yml']
+permissions: {contents: read}
+jobs:
+  read:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    env:
+      CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      CF_TOKEN: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+    steps:
+      - name: Inspeccionar metadatos de tarifario aprobado, sin precios ni modificaciones
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          const account=process.env.CF_ACCOUNT,token=process.env.CF_TOKEN;
+          assert.match(account||'',/^[a-f0-9]{32}$/i);
+          assert.ok(token?.length>20);
+          const base='https://api.cloudflare.com/client/v4/accounts/'+account;
+          async function cf(path,options={}){
+            const res=await fetch(base+path,{...options,headers:{
+             Authorization:'Bearer '+token,...options.headers},signal:AbortSignal.timeout(20000)});
+            const data=await res.json();
+            assert.ok(res.ok&&data.success===true,'CF_D1_METADATA_'+res.status);
+            return data.result;
+          }
+          const dbs=await cf('/d1/database');
+          const db=dbs.find(x=>x.name==='saber-pagos-produccion');
+          assert.ok(db?.uuid);
+          async function query(sql){
+            const result=await cf('/d1/database/'+db.uuid+'/query',{
+             method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sql})});
+            assert.ok(result.length===1&&result[0].success);
+            return result[0].results||[];
+          }
+          const tables=await query("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('central_pricing_admin_head','central_pricing_admin_history') ORDER BY name");
+          assert.deepEqual(tables.map(x=>x.name),['central_pricing_admin_head','central_pricing_admin_history']);
+          const rows=await query('SELECT revision,approved_revision,length(approved_json) as bytes,CASE WHEN json_valid(approved_json) THEN 1 ELSE 0 END as valid_json FROM central_pricing_admin_head WHERE id=1');
+          assert.equal(rows.length,1);
+          const r=rows[0];
+          assert.ok(Number.isSafeInteger(r.revision)&&r.revision>=1);
+          assert.ok(Number.isSafeInteger(r.approved_revision)&&r.approved_revision>=1);
+          assert.ok(r.revision>=r.approved_revision&&r.bytes>500&&r.valid_json===1);
+          const approvals=await query("SELECT COUNT(*) AS c FROM central_pricing_admin_history WHERE action='approve' AND revision="+r.approved_revision);
+          assert.equal(approvals[0]?.c,1);
+          console.log('SABER_LIVE_PRICING_D1_TABLES_OK');
+          console.log('SABER_LIVE_PRICING_APPROVED_AUDIT_OK');
+          console.log('SABER_LIVE_PRICING_REVISION '+r.revision+' APPROVED '+r.approved_revision);
+          console.log('SABER_NO_PRICE_VALUES_NO_WRITES');
+          JS

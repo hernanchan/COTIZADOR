@@ -4893,6 +4893,18 @@ export default {
   const url=new URL(req.url);
   // Solo con compuerta LIVE y credenciales de producción independientes.
   // En saber-pagos-pruebas quedan cerradas (HTTP 503).
+  if(url.pathname==='/internal/central/live/staff-pricing'){
+   const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
+   const {administrarPreciosLivePersonal}=await import('./central-precios-live-personal.mjs');
+   return administrarPreciosLivePersonal(req,env,{
+    readSigned:leerFirmaInternaLive,
+    fields:PRICE_ADMIN_FIELDS,
+    validate:priceAdminValidatePayload,
+    at:priceAdminAt,
+    set:priceAdminSet,
+    preview:priceAdminPreview
+   });
+  }
   if(url.pathname==='/internal/central/live/pricing'){
    const {leerFirmaInternaLive}=await import('./central-live-bridge.mjs');
    const signed=await leerFirmaInternaLive(req,env);

@@ -1,0 +1,38 @@
+name: Saber - ficha precios LIVE segura (sin desplegar)
+on:
+  push:
+    branches: [admin/precios-live-protegido-20261113]
+    paths:
+      - '.github/workflows/precios-admin-live-20261113.yml'
+      - 'integraciones/autocotizador/recepcion/precios-personal-live-api.mjs'
+      - 'integraciones/autocotizador/recepcion/pagina-precios-personal-live.mjs'
+      - 'integraciones/autocotizador/recepcion/pagina-central-personal-live.mjs'
+      - 'integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs'
+      - 'integraciones/mercadopago/pruebas/central-precios-live-personal.mjs'
+      - 'integraciones/mercadopago/pruebas/central-live-bridge.mjs'
+      - 'integraciones/mercadopago/pruebas/worker.js'
+      - 'tests/precios-personal-live.test.mjs'
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Sintaxis de panel, HMAC, Central y Workers
+        run: |
+          set -euo pipefail
+          for src in integraciones/autocotizador/recepcion/precios-personal-live-api.mjs integraciones/autocotizador/recepcion/pagina-precios-personal-live.mjs integraciones/autocotizador/recepcion/pagina-central-personal-live.mjs integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs integraciones/mercadopago/pruebas/central-precios-live-personal.mjs integraciones/mercadopago/pruebas/central-live-bridge.mjs integraciones/mercadopago/pruebas/worker.js;do node --check "$src";done
+      - name: Construir Worker documental privado sin desplegar
+        working-directory: integraciones/autocotizador/recepcion
+        run: |
+          npm install --no-audit --no-fund
+          npm run build:unificado
+      - name: Pruebas aisladas de administración y permisos
+        run: |
+          node --test tests/precios-personal-live.test.mjs
+          echo SABER_PRECIOS_LIVE_CI_OK_SIN_PUBLICACION

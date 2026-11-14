@@ -2422,7 +2422,8 @@ export default {
        'Cache-Control':'no-store,private','X-Content-Type-Options':'nosniff',
        'X-Robots-Tag':'noindex,nofollow'}});
     }
-    if(page==='/personal/api/live-calendar'||
+    if(page==='/personal/precios'||page==='/personal/api/live-pricing'||
+       page==='/personal/api/live-calendar'||
        page==='/personal/api/live-reconcile'||
        page==='/personal/api/live-forecast'||
        page==='/personal/api/live-status'||
@@ -2445,6 +2446,20 @@ export default {
        return new Response('Acceso exclusivo de personal de Librería Saber',
         {status:401,headers:{'Cache-Control':'no-store',
          'WWW-Authenticate':'Basic realm="Libreria Saber Personal LIVE", charset="UTF-8"'}});
+      if(page==='/personal/precios'){
+       if(request.method!=='GET')return closed();
+       const {paginaPreciosPersonalLive}=await import('./pagina-precios-personal-live.mjs');
+       return new Response(paginaPreciosPersonalLive(),{headers:{
+        'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store,private',
+        'X-Content-Type-Options':'nosniff','X-Robots-Tag':'noindex,nofollow',
+        'Referrer-Policy':'no-referrer',
+        'Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+       }});
+      }
+      if(page==='/personal/api/live-pricing'){
+       const {preciosPersonalLiveApi}=await import('./precios-personal-live-api.mjs');
+       return preciosPersonalLiveApi(request,env);
+      }
       if(page==='/personal/api/live-calendar'){
        const {agendaPersonalDocumentosLive}=await import('./agenda-personal-live-documentos.mjs');
        return agendaPersonalDocumentosLive(request,env,{authorized:true});

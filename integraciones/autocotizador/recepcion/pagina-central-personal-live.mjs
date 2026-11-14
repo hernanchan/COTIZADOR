@@ -24,7 +24,7 @@ button:disabled{opacity:.55}select{padding:10px;border:1px solid #b3cad9;border-
 </style></head><body><main>
 <header><h1>Central de Pedidos · Librería Saber</h1><div class="row">
 <a class="action" id="transferenciasAviso" href="/personal/transferencias" role="status" aria-live="polite">Transferencias informadas: consultando…</a>
-<button id="actualizar">Actualizar</button></div></header>
+<a class="action" href="/personal/precios">Administrar precios</a>\n<button id="actualizar">Actualizar</button></div></header>
 <section class="forecast" aria-labelledby="previsionTitle"><h2 id="previsionTitle">Previsión general de entrega</h2><p id="previsionEstado" role="status">Consultando previsión…</p><p id="previsionCliente" role="status" aria-live="polite">Verificando lo que ve el cliente…</p><div class="row"><label for="previsionModo">Plazo orientativo para pedidos nuevos</label><select id="previsionModo"><option value="por_confirmar">A confirmar</option><option value="hoy">Durante el día de hoy</option><option value="hoy_tarde">Hoy por la tarde</option><option value="proximo_dia">Próximo día de atención</option></select><button id="previsionGuardar" type="button">Guardar previsión</button></div><small>La fecha y hora exactas se fijan por pedido al comenzar la preparación. No se asignan automáticamente.</small></section>
 <section class="forecast" aria-labelledby="agendaTitle">
 <h2 id="agendaTitle">Días y horarios de atención</h2>
