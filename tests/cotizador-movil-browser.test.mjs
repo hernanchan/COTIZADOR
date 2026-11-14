@@ -142,7 +142,8 @@ try{
  await page.route(root+'/**',async route=>{
   const u=new URL(route.request().url()),p=u.pathname;
   const body=p==='/cotizar'?pageDesktop:p==='/cotizar/archivos'?iframeDesktop:
-    p==='/cotizar/archivos.js'?'':p==='/cotizar/flujo-live.js'?'export function crearFlujoPresupuestoLive(){}':null;
+    p==='/cotizar/archivos.js'?'':p==='/cotizar/movil.js'?mobile:
+    p==='/cotizar/flujo-live.js'?'export function crearFlujoPresupuestoLive(){}':null;
   await route.fulfill({status:body===null?404:200,contentType:p.endsWith('.js')?'application/javascript':'text/html',body:body??'not found'});
  });
  await page.goto(root+'/cotizar',{waitUntil:'load'});
