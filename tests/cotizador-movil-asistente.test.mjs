@@ -42,7 +42,8 @@ test('la vista móvil es una capa sin reemplazar archivo, cotización ni handoff
 test('el asistente funciona únicamente dentro del iframe comprador y en ancho móvil',()=>{
  assert.match(clientJs,/location\.pathname !== '\/cotizar\/archivos'/);
  assert.match(clientJs,/window\.parent === window/);
- assert.match(clientJs,/matchMedia\('\(max-width: 720px\)'\)/);
+ assert.match(clientJs,/matchMedia\('\(max-width: 720px\), \(pointer: coarse\)'\)/);
+ assert.match(clientJs,/const forced = new URLSearchParams\(location.search\).get\('vista'\) === 'movil'/);
  assert.match(clientJs,/media\.matches/);
  assert.match(clientJs,/body\.classList\.remove\('saber-mobile'\)/);
  assert.match(clientJs,/SABER_MOBILE_STAGE/);
