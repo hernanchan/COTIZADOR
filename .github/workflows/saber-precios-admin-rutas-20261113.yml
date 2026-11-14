@@ -1,0 +1,30 @@
+name: Saber - verificar ficha de precios histórica (solo GET)
+on:
+  push:
+    branches: [qa/catalogo-publico-20261113]
+    paths: ['.github/workflows/saber-precios-admin-rutas-20261113.yml']
+permissions: {contents: read}
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Revisar rutas sin datos ni login
+        shell: bash
+        run: |
+          set -euo pipefail
+          for u in \
+          'https://saber-pagos-pruebas.libreriasaber.workers.dev/admin/precios' \
+          'https://pedidos.libreriasaber.com.ar/admin/precios' \
+          'https://pedidos.libreriasaber.com.ar/personal/precios'; do
+            path=$(mktemp)
+            status=$(curl -sSL --connect-timeout 8 --max-time 18 -w '%{http_code}' -o "$path" "$u") || status=000
+            F="$path" U="$u" S="$status" python3 - <<'PY'
+          import os,pathlib
+          body=pathlib.Path(os.environ['F']).read_text(errors='replace')
+          print('SABER_PRECIO_PANEL_GET',os.environ['U'],os.environ['S'],'BYTES',len(body),
+           'HAS_PRICE_ADMIN',('Precios y promociones' in body or 'Administración de precios' in body),
+           'HAS_CENTRAL',('Central de Pedidos' in body))
+          PY
+            rm "$path"
+          done
