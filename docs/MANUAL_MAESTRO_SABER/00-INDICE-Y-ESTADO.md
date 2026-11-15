@@ -64,3 +64,20 @@ Empezar por este índice, revisar `AGENTS.md`, el código vigente y el último r
 ## 6. Resguardo
 
 Este manual guardado en GitHub **no es una copia independiente de seguridad**. Falta completar y verificar respaldos externos versionados de repositorio, exportaciones recuperables de bases de datos y configuraciones de infraestructura, con secretos separados y cifrados. No hacer copias de archivos de clientes como parte de esta documentación.
+
+## Cierre operativo del control de cambios — 14/11/2026
+
+**Fase:** beta publicada. **Decisión de continuidad:** cerrar este tramo y continuar desde este manual, sin reconstruir chats ni requerir que el titular configure GitHub desde el teléfono.
+
+### Comprobado
+- Contrato de doce reglas y verificador de autorización por PR + SHA instalados en la rama de integración; workflow de comprobación instalado también en `main` (sin modificar código comercial ni tarifas).
+- Once pruebas automáticas aprobadas.
+- Ensayo negativo real: [PR #21](https://github.com/hernanchan/COTIZADOR/pull/21) intentó modificar un archivo protegido sin comentario de autorización. El control lo rechazó y publicó `saber/contrato = failure` sobre el commit de la propuesta. [Ejecución 43656071522](https://github.com/hernanchan/COTIZADOR/actions/runs/43656071522). PR cerrado sin fusionarse.
+- La compilación/publicación de GitHub Pages posterior a la instalación del control en `main` terminó con éxito (run 43656050368).
+
+### Pendiente real — NO anunciar como resuelto
+- **GitHub Rulesets:** no hay ninguna regla de protección activa. El workflow detecta cambios y publica un estado negativo, pero por sí mismo **no bloquea la fusión ni un push directo**. La conexión disponible no permite crear/modificar Rulesets; el pendiente administrativo está en [issue #23](https://github.com/hernanchan/COTIZADOR/issues/23).
+- Revisar permisos y los numerosos workflows históricos que podrían desplegar sin pasar por el nuevo control, y configurar revisores/entornos protegidos antes de declarar el sistema totalmente protegido.
+- Continuar el proyecto desde el código y esta documentación; cualquier nueva corrección comercial requiere pruebas y verificación del despliegue. No confundir control de cambios probado con cierre definitivo de todas las tareas de seguridad.
+
+**Instrucción de traspaso:** el próximo chat debe abrir primero este archivo, `AGENTS.md`, el [contrato](../GOBERNANZA/CONTRATO_CONTROL_CAMBIOS.md) y el estado real de GitHub/Cloudflare. No pedirle al titular que reproduzca el contexto ni que copie un prompt. No activar cambios en producción por el solo hecho de leer esta nota.
