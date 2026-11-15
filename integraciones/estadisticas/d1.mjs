@@ -25,7 +25,7 @@ export async function resumenPorPeriodo(db, desdeMs, hastaMs) {
       COUNT(DISTINCT CASE WHEN event_type='quote_started' THEN session_id END) AS iniciadas,
       COUNT(DISTINCT CASE WHEN event_type='quote_viewed' THEN session_id END) AS cotizadas,
       COUNT(DISTINCT CASE WHEN event_type='checkout_started' THEN session_id END) AS checkout,
-      COUNT(DISTINCT CASE WHEN event_type='payment_confirmed' AND source='servidor' THEN session_id END) AS pagadas
+      COUNT(CASE WHEN event_type='payment_confirmed' AND source='servidor' THEN 1 END) AS eventosPagoConfirmado
     FROM saber_analytics_events WHERE event_time_ms >= ? AND event_time_ms < ?`
   ).bind(desdeMs, hastaMs).first();
   return {
@@ -33,6 +33,6 @@ export async function resumenPorPeriodo(db, desdeMs, hastaMs) {
     iniciadas: Number(result?.iniciadas ?? 0),
     cotizadas: Number(result?.cotizadas ?? 0),
     checkout: Number(result?.checkout ?? 0),
-    pagadas: Number(result?.pagadas ?? 0)
+    eventosPagoConfirmado: Number(result?.eventosPagoConfirmado ?? 0)
   };
 }
