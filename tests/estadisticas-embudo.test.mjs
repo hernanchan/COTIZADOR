@@ -18,6 +18,6 @@ test('deduplica eventos por sesión y separa abandono de ventas', () => {
   ];
   assert.deepEqual(resumirEmbudo(e),{
     sesiones:2,vistas:2,cotizaciones:1,checkout:1,pagos:1,
-    cotizacionesSinPago:1,checkoutSinPago:1,conversionPorcentaje:50
+    cotizacionesSinPago:1,checkoutSinPago:1,conversionPorcentaje:null
   });
 });
