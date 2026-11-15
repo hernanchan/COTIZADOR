@@ -32,7 +32,8 @@ export async function resumenPorPeriodo(db, desdeMs, hastaMs) {
   const ventas = await db.prepare(
     `SELECT COUNT(DISTINCT o.id) AS pedidosPagados
     FROM orders o JOIN payment_reviews r ON r.order_id=o.id
-    WHERE o.status='paid' AND o.paid_at IS NOT NULL AND r.state='verified'
+    WHERE o.status='paid' AND o.paid_at IS NOT NULL
+      AND o.deposit_ars=o.amount_ars AND r.state='verified'
       AND CAST(strftime('%s', o.paid_at) AS INTEGER) * 1000 >= ?
       AND CAST(strftime('%s', o.paid_at) AS INTEGER) * 1000 < ?`
   ).bind(desdeMs, hastaMs).first();
