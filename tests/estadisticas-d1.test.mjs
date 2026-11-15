@@ -12,7 +12,7 @@ function dbFalsa() {
       return {
         bind(...args) { entry.args=args; return this; },
         async run() { return {success:true}; },
-        async first() { return {visitas:3,iniciadas:2,cotizadas:2,checkout:1,pagadas:1}; }
+        async first() { return {visitas:3,iniciadas:2,cotizadas:2,checkout:1,eventosPagoConfirmado:1}; }
       };
     }
   };
@@ -30,7 +30,7 @@ test('D1 guarda evento permitido sin datos personales',async()=>{
 });
 test('consulta agregada acotada',async()=>{
   const db=dbFalsa();
-  assert.equal((await resumenPorPeriodo(db,1000,2000)).pagadas,1);
+  assert.equal((await resumenPorPeriodo(db,1000,2000)).eventosPagoConfirmado,1);
   await assert.rejects(resumenPorPeriodo(db,1000,1000),RangeError);
   await assert.rejects(resumenPorPeriodo(db,0,100*86400000),RangeError);
 });
