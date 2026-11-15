@@ -1,4 +1,5 @@
 import { guardarEvento, resumenPorPeriodo } from './d1.mjs';
+import { validarEvento } from './embudo.mjs';
 
 // Estas rutas se montan en el Worker que posee D1. Solo las invoca el Worker
 // de documentos después de autenticar personal o validar origen de navegador;
@@ -36,7 +37,7 @@ export function crearRutasEstadisticas({ db, verificarCentral, limitarIngesta })
       const signed = await verificarCentral(request.clone());
       if (signed?.error || !signed?.payload) return new Response('No autorizado', { status: signed?.status || 401 });
       const { schema, ...evento } = signed.payload;
-      if (schema !== 'saber-analytics-event-v1') return new Response('Evento inválido', { status: 400 });
+      if (schema !== 'saber-analytics-event-v1' || !validarEvento(evento, 'cliente')) return new Response('Evento inválido', { status: 400 });
       if (!(await limitarIngesta(evento.sessionId))) return new Response('Límite excedido', { status: 429 });
       const resultado = await guardarEvento(db, evento, 'cliente');
       return new Response(null, { status: resultado.status });

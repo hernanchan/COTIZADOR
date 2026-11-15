@@ -27,6 +27,14 @@ test('la ruta de evento valida y deduplica antes de guardar', async () => {
   assert.deepEqual(db.calls[0].args,[evento.eventId,evento.type,evento.sessionId,evento.at,null,'cliente']);
 });
 
+test('evento inválido se rechaza antes de consumir el límite', async () => {
+  let limited=false;
+  const routes=crearRutasEstadisticas({db:fakeDb(),verificarCentral:signed({...evento,phone:'3511234567'}),limitarIngesta:async()=>{limited=true;return true}});
+  const response=await routes.evento(new Request('https://pagos.libreriasaber.com.ar/internal/central/live/analytics-event',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(evento)}));
+  assert.equal(response.status,400);
+  assert.equal(limited,false);
+});
+
 test('el resumen interno usa el período firmado', async () => {
   const db=fakeDb(),payload={schema:'saber-analytics-summary-v1',desdeMs:1000,hastaMs:2000};
   const routes=crearRutasEstadisticas({db,verificarCentral:signed(payload),limitarIngesta:async()=>true});
