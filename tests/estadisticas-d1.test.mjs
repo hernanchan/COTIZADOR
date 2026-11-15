@@ -54,6 +54,7 @@ test('cuenta visitas y sesiones por eventos, ventas desde pagos verificados', as
     pedidosPagados: 3, abandonoPorEtapa: null, conversionPorcentaje: null
   });
   assert.match(db.calls[1].sql, /o\.status='paid'/);
+  assert.match(db.calls[1].sql, /o\.deposit_ars=o\.amount_ars/);
   assert.match(db.calls[1].sql, /r\.state='verified'/);
   assert.deepEqual(db.calls[1].args, [1000, 2000]);
   await assert.rejects(resumenPorPeriodo(db, 1000, 1000), RangeError);
