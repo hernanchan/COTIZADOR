@@ -32,7 +32,7 @@ export function resumirEmbudo(eventos) {
   return {
     sesiones: sesiones.size, vistas, cotizaciones,
     checkout: cuenta('checkout_started'), pagos,
-    cotizacionesSinPago: [...sesiones.values()].filter(s => s.has('quote_viewed') && !s.has('payment_confirmed')).length,
+    // Sin pago observado no equivale a abandono confirmado: puede estar pendiente.\n    cotizacionesSinPago: [...sesiones.values()].filter(s => s.has('quote_viewed') && !s.has('payment_confirmed')).length,
     checkoutSinPago: [...sesiones.values()].filter(s => s.has('checkout_started') && !s.has('payment_confirmed')).length,
     conversionPorcentaje: vistas ? Math.round(pagos / vistas * 10000) / 100 : 0
   };
