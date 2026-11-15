@@ -32,8 +32,10 @@ export function resumirEmbudo(eventos) {
   return {
     sesiones: sesiones.size, vistas, cotizaciones,
     checkout: cuenta('checkout_started'), pagos,
-    // Sin pago observado no equivale a abandono confirmado: puede estar pendiente.\n    cotizacionesSinPago: [...sesiones.values()].filter(s => s.has('quote_viewed') && !s.has('payment_confirmed')).length,
+    // Sin pago observado no equivale a abandono confirmado: puede estar pendiente.
+    cotizacionesSinPago: [...sesiones.values()].filter(s => s.has('quote_viewed') && !s.has('payment_confirmed')).length,
     checkoutSinPago: [...sesiones.values()].filter(s => s.has('checkout_started') && !s.has('payment_confirmed')).length,
-    // No calcular conversión global sin vinculación fiable entre pedido y sesión.\n    conversionPorcentaje: null
+    // No calcular conversión global sin vinculación fiable entre pedido y sesión.
+    conversionPorcentaje: null
   };
 }
