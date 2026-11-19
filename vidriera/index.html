@@ -443,6 +443,14 @@ footer{background:#0b2942}
 }
 @media(prefers-reduced-motion:reduce){.v3-tile-photo{transition:none}.v3-tile:hover .v3-tile-photo{transform:none}}
 
+
+/* Acceso visible al seguimiento; no altera la navegación ni el carrito. */
+.saber-track-access{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:8px 0 20px;padding:13px 16px;border:1px solid #d9e4eb;border-radius:11px;background:#f7fafc}
+.saber-track-access strong{display:block;font-size:14px;color:#0a3158}
+.saber-track-access span{display:block;font-size:12px;color:#4b6274;margin-top:3px}
+.saber-track-access a{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;min-height:44px;padding:11px 16px;text-decoration:none;background:#0a3158;color:#fff;border-radius:9px;font-size:13px;font-weight:800}
+.saber-track-access a:hover{background:#164876}
+@media(max-width:650px){.saber-track-access{flex-direction:column;align-items:stretch;gap:10px;padding:13px}.saber-track-access a{width:100%}}
 </style>
 </head>
 <body>
@@ -455,6 +463,10 @@ footer{background:#0b2942}
     <div class="v3-intro">
       <div><span class="v3-overline">LIBRERÍA SABER · CÓRDOBA</span><h1 id="titulo-inicio">Más ideas. Más color. <span>Más Saber.</span></h1></div>
       <p>Tu librería y gráfica de siempre, ahora más cerca.</p>
+    </div>
+    <div class="saber-track-access" aria-label="Seguimiento de pedidos">
+      <div><strong>¿Ya hiciste un pedido?</strong><span>Consultá su estado y fecha estimada de entrega.</span></div>
+      <a href="https://pedidos.libreriasaber.com.ar/pedido/consultar">Consultar mi pedido</a>
     </div>
     <div class="hero-grid v3-hero-tiles">
       <article class="v3-tile v3-tile-products">
