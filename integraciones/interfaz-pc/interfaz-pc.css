@@ -66,6 +66,13 @@
 @media(min-width:900px){
  #pc-size-step{padding:14px 14px 12px;border:1px solid #e7ba78;background:#fff9ef;border-radius:10px;margin-bottom:13px}
  #pc-size-step[hidden]{display:none!important}
+ #pc-mode-card:has(#pc-size-step:not([hidden])){border:2px solid #dd9b3f!important;box-shadow:0 0 0 3px #f8e9cf!important}
+ #pc-mode-card #pc-size-step{margin:16px 8px 5px;scroll-margin-top:120px;padding:19px 16px 15px}
+ #pc-mode-card #pc-size-step:focus{outline:3px solid #dfab68;outline-offset:2px}
+ #pc-mode-card #pc-size-title{font-size:19px}
+ #pc-size-buttons button{font-size:14px!important;min-height:50px!important}
+ #pc-batch{scroll-margin-top:120px}
+ #pc-sidebar #pc-size-step{display:none!important}
  #pc-size-title{margin:0 0 6px;font:800 17px/1.3 system-ui;color:#754208}
  #pc-size-description{font:13px/1.45 system-ui;color:#674821;margin:0 0 11px}
  #pc-size-buttons{display:flex;flex-wrap:wrap;gap:8px}
