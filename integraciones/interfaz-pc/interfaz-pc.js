@@ -15,7 +15,14 @@ shell.append(left,side);
 left.append(by('zonaArchivos'));
 const modeCard=el('section','pc-mode-card');modeCard.append(by('modoConfiguracion'));left.append(modeCard);
 const batch=el('section','pc-batch'),batchButton=el('button','pc-batch-apply','Guardar configuración para todas'),batchHelp=el('p','pc-batch-help','Elegí una vez color, caras y copias; después guardá todas juntas.');
-batchButton.type='button';batch.append(el('h2','','Configuración para todas las compatibles'),by('configComunGlobal'),batchButton,batchHelp);
+batchButton.type='button';
+const sizeStep=el('section','pc-size-step'),sizeTitle=el('h3','pc-size-title','Elegí el tamaño final una sola vez');
+const sizeDescription=el('p','pc-size-description','Los documentos tienen medidas no estándar. Indicá cómo querés imprimirlos a todos.');
+const sizeButtons=el('div','pc-size-buttons'),sizeStatus=el('p','pc-size-status','');
+const sizeChoices=[['a4','A4 para todos'],['a3','A3 para todos'],['original','Mantener tamaño original']];
+for(const [value,label] of sizeChoices){const button=el('button','',label);button.type='button';button.dataset.targetSize=value;sizeButtons.append(button);}
+sizeStep.append(sizeTitle,sizeDescription,sizeButtons,sizeStatus);
+batch.append(el('h2','','Configuración para todas las compatibles'),sizeStep,by('configComunGlobal'),batchButton,batchHelp);
 left.append(batch,by('estado'));
 const filebox=el('section','pc-filebox'),grid=el('div','pc-filegrid'),queue=el('nav','pc-queue'),originalList=el('div','pc-original-list');
 queue.setAttribute('aria-label','Archivos del pedido');
@@ -29,7 +36,7 @@ next.type='button';next.disabled=true;side.append(progress,message,next,el('p','
 side.append(by('prepararPedido'));root.append(shell);
 Array.from(root.children).filter(n=>n.tagName==='H2').forEach(h=>h.hidden=true);
 const parent=by('lista');
-let selected=0,keys='',ready=new Set(),lastNote='';
+let selected=0,keys='',ready=new Set(),lastNote='',sizeBatchBusy=false;
 const cards=()=>Array.from(parent.querySelectorAll('section.archivo'));
 const commonMode=()=>document.querySelector('input[name="modoImpresionLote"][value="comun"]')?.checked===true;
 const groupName=c=>c.closest('section.grupo-pedido')?.querySelector('h3.titulo-grupo')?.textContent||'';
@@ -40,6 +47,58 @@ const fileValid=c=>!!c&&!c.classList.contains('archivo-no-admitido')&&
   (!c.querySelector('.saber-ampliacion [role="alert"] input[type="checkbox"]')||
     c.querySelector('.saber-ampliacion [role="alert"] input[type="checkbox"]').checked);
 const commonFiles=()=>cards().filter(c=>isCommonCompatible(c)&&fileValid(c));
+const needsSize=c=>!!c.querySelector('.pregunta-tamano')&&
+ !c.classList.contains('archivo-no-admitido')&&
+ !c.querySelector('.eleccion-plotter-boton.seleccionada');
+const pendingSizes=()=>cards().filter(needsSize);
+function condenseSizeWarnings(count){
+ const quote=by('presupuesto');
+ const warning=Array.from(quote.querySelectorAll('p.advertencia')).filter(p=>/Confirmar tamaño final/i.test(p.textContent||''));
+ warning.forEach(p=>p.classList.toggle('pc-collapsed-warning',count>1));
+ let summary=by('pc-quote-size-summary');
+ if(count>1&&warning.length>1){
+  if(!summary){summary=el('p','pc-quote-size-summary');quote.prepend(summary);}
+  summary.textContent=count+' archivos necesitan confirmar tamaño. Elegilo una sola vez a la izquierda.';
+ }else summary?.remove();
+}
+function locateSizeOption(card,size){
+ const controls=Array.from(card.querySelectorAll('.pregunta-tamano button.tamano-opcion'));
+ const rx=size==='a4'?/A4/i:size==='a3'?/A3/i:/Mantener|original/i;
+ return controls.find(b=>rx.test(b.textContent||''));
+}
+async function applySizeForBatch(size){
+ if(sizeBatchBusy||!commonMode())return;
+ const originals=pendingSizes().length;
+ if(!originals)return;
+ sizeBatchBusy=true;
+ sizeStatus.textContent='Aplicando tamaño a '+originals+' archivos…';
+ for(const button of sizeButtons.querySelectorAll('button'))button.disabled=true;
+ try{
+  let handled=0,stuck=0;
+  while(handled<originals && stuck<2){
+   const pending=pendingSizes();
+   if(!pending.length)break;
+   const card=pending[0],button=locateSizeOption(card,size);
+   if(!button){sizeStatus.textContent='No todos admiten ese formato. Revisá los pendientes.';break;}
+   const before=basename(card);
+   button.click();
+   await new Promise(resolve=>setTimeout(resolve,80));
+   const remaining=pendingSizes();
+   if(remaining.length<pending.length){handled++;stuck=0;}
+   else if(remaining[0]&&basename(remaining[0])===before){stuck++;}
+   else {handled++;stuck=0;}
+  }
+  const left=pendingSizes().length;
+  sizeStatus.textContent=left?'Quedan '+left+' tamaños sin confirmar.':'Tamaño aplicado. Ahora elegí color, caras y copias para todos.';
+  lastNote=left?'⚠ Revisá los documentos cuyo tamaño sigue pendiente.':'✓ Tamaño definido para el lote.';
+  ready.clear();selected=0;sync();
+ }catch(err){
+  sizeStatus.textContent='No se pudo aplicar el tamaño a todos. Revisá los archivos pendientes.';
+  lastNote=sizeStatus.textContent;sync();
+ }finally{sizeBatchBusy=false;for(const button of sizeButtons.querySelectorAll('button'))button.disabled=false;}
+}
+for(const button of sizeButtons.querySelectorAll('button'))button.onclick=()=>applySizeForBatch(button.dataset.targetSize);
+
 const commonControl=name=>Array.from(by('configComunGlobal').querySelectorAll('select')).find(x=>(x.getAttribute('aria-label')||'').includes(name));
 const commonCopies=()=>by('configComunGlobal').querySelector('input[aria-label="Aplicar copias a todo el grupo"]');
 const basename=c=>(c.querySelector('.nombre')?.textContent||'Documento').replace(/^\s*\d+\.\s*/, '').trim();
@@ -54,12 +113,18 @@ function sync(){
  if(selected>=list.length)selected=0;
  queue.replaceChildren();
  const count=list.length;
- batch.hidden=!commonMode();
+ batch.hidden=!commonMode();sizeStep.hidden=!commonMode();
  if(commonMode()){
+  const pendingSizeCount=pendingSizes().length;
+  sizeStep.hidden=pendingSizeCount===0;
+  if(pendingSizeCount){
+   sizeTitle.textContent='Confirmá el tamaño de '+pendingSizeCount+' archivo'+(pendingSizeCount===1?'':'s');
+   sizeDescription.textContent='Se detectaron medidas diferentes de A4. Elegí A4, A3 o mantener el tamaño original. El ajuste a A4/A3 es proporcional y no recorta.';
+  }
   const eligible=commonFiles().length;
   batchButton.disabled=eligible===0||!by('configComunGlobal').querySelector('.opciones-comunes');
   batchButton.textContent=eligible?'Guardar '+eligible+' archivo'+(eligible===1?'':'s')+' de una vez':'Sin impresiones comunes compatibles';
-  if(!eligible)batchHelp.textContent='Estas opciones comunes solo se aplican a impresiones normales compatibles. Ploteos y archivos por revisar se configuran individualmente.';
+  if(!eligible)batchHelp.textContent=pendingSizeCount?'Primero confirmá el tamaño final para el lote. Después aparecerán las opciones comunes de impresión.':'Los archivos especiales y ploteos se configuran individualmente.';
   else if(!batchHelp.dataset.error&&!batchHelp.dataset.success)batchHelp.textContent='Elegí una vez color, caras y copias. Los demás servicios siguen pendientes si necesitan opciones distintas.';
  }
  list.forEach((c,i)=>{
@@ -76,6 +141,7 @@ function sync(){
  Array.from(parent.querySelectorAll('section.grupo-pedido')).forEach(group=>{group.style.display=group.querySelector('section.archivo:not(.pc-not-current)')?'':'none';});
  progress.textContent=ready.size+' de '+count+' archivos configurados';
  const pending=count-ready.size;
+ condenseSizeWarnings(commonMode()?pendingSizes().length:0);
  if(!count){message.textContent='Cargá los archivos para empezar.';message.className='';save.disabled=true;}
  else if(pending){message.textContent=lastNote||('⚠ Faltan configurar '+pending+' archivo'+(pending!==1?'s':'')+'. El pedido no puede continuar todavía.');message.className='';save.disabled=false;}
  else {message.textContent='✓ Todos los archivos guardados. '+(by('prepararPedido').disabled?'Esperá a que termine la cotización.':'Ya podés revisar el pedido.');message.className='pc-complete';save.disabled=false;}
