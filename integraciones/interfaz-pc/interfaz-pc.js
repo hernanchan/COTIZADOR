@@ -46,6 +46,7 @@ side.append(by('prepararPedido'));root.append(shell);
 Array.from(root.children).filter(n=>n.tagName==='H2').forEach(h=>h.hidden=true);
 const parent=by('lista');
 let selected=0,selectedId=null,keys='',ready=new Set(),lastNote='',sizeBatchBusy=false;
+let membershipTimer=null;
 let attentionTimer=null,lastAttentionKey='';
 function guideToSize(key){
  if(lastAttentionKey===key)return;
@@ -150,9 +151,17 @@ function openSelectedDetails(){
 function sync(){
  const list=cards(),ids=fileKeys(list),nextKeys=[...ids].sort().join('@@SEP@@');
  if(nextKeys!==keys){
-  keys=nextKeys;ready.clear();
+  keys=nextKeys;
+  // El motor reemplaza temporalmente las fichas al recalcular precios.
+  // No borrar los guardados por una reagrupación o un DOM incompleto.
   selected=Math.max(0,Math.min(selected,list.length-1));
-  lastNote='';
+  clearTimeout(membershipTimer);
+  membershipTimer=setTimeout(()=>{
+   const active=new Set(fileKeys(cards()));
+   for(const id of ready){if(!active.has(id))ready.delete(id);}
+   membershipTimer=null;
+   sync();
+  },600);
  }
  if(selectedId&&ids.includes(selectedId))selected=ids.indexOf(selectedId);
  if(selected>=list.length)selected=0;
@@ -221,8 +230,9 @@ function sync(){
   queue.append(card);
  });
  Array.from(parent.querySelectorAll('section.grupo-pedido')).forEach(group=>{group.style.display=group.querySelector('section.archivo:not(.pc-not-current)')?'':'none';});
- progress.textContent=ready.size+' de '+count+' archivos configurados';
- const pending=count-ready.size;
+ const activeReady=ids.filter(id=>ready.has(id)).length;
+ progress.textContent=activeReady+' de '+count+' archivos configurados';
+ const pending=count-activeReady;
  condenseSizeWarnings(commonMode()?pendingSizes().length:0);
  if(!count){message.textContent='Cargá los archivos para empezar.';message.className='';save.disabled=true;}
  else if(pending){
@@ -254,7 +264,8 @@ by('modoConfiguracion').addEventListener('change',event=>{
  batchHelp.textContent='Elegí una vez color, caras y copias; después guardá todas juntas.';
  queueMicrotask(sync);
 },true);
-by('configComunGlobal').addEventListener('change',()=>{
+by('configComunGlobal').addEventListener('change',event=>{
+ if(!event.isTrusted)return;
  cards().forEach(c=>{if(isCommonCompatible(c))ready.delete(fileKey(c));});
  lastNote='Cambiaste opciones para todos: guardá otra vez la configuración común.';
  delete batchHelp.dataset.error;delete batchHelp.dataset.success;queueMicrotask(sync);
@@ -288,6 +299,13 @@ function dirty(event){
  if(event.type==='click'&&(!button||/Quitar|Cerrar detalles|M[aá]s opciones|Personalizar/i.test(button.textContent)))return;
  if(ready.delete(id)){lastNote='Cambios sin guardar. Guardá nuevamente este archivo.';sync();}
 }
+const uploadInput=uploadZone.querySelector('input[type=file]');
+uploadInput?.addEventListener('change',()=>{
+ ready.clear();
+ keys='';
+ selectedId=null;
+ lastNote='';
+},true);
 parent.addEventListener('change',dirty,true);
 parent.addEventListener('input',dirty,true);
 parent.addEventListener('click',dirty,true);
