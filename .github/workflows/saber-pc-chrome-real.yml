@@ -1,0 +1,39 @@
+name: Saber - Chromium PC, archivo único y lote sin despliegue
+on:
+  push:
+    branches:
+      - interfaz/pc-compacta-lote-20261120
+    paths:
+      - .github/workflows/saber-pc-chrome-real.yml
+      - tests/interfaz-pc-chrome-real.mjs
+      - integraciones/interfaz-pc/interfaz-pc.js
+      - integraciones/interfaz-pc/interfaz-pc.css
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: saber-pc-chrome-real-sin-despliegue
+  cancel-in-progress: false
+jobs:
+  test-real:
+    if: github.ref == 'refs/heads/interfaz/pc-compacta-lote-20261120'
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
+    timeout-minutes: 15
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Preparar navegador y documentos sintéticos
+        run: |
+          npm install --no-save --ignore-scripts --no-audit --no-fund playwright@1.56.1 pdf-lib@1.17.1
+      - name: Ejecutar cinco PDF en navegador con Worker privado local
+        env:
+          SABER_CF_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          SABER_CF_DEPLOY_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        run: node tests/interfaz-pc-chrome-real.mjs

@@ -1,0 +1,28 @@
+name: Saber - test real del lote PC (sin despliegue)
+on:
+  push:
+    branches:
+      - interfaz/pc-compacta-lote-20261120
+    paths:
+      - .github/workflows/saber-pc-test-lote.yml
+      - integraciones/interfaz-pc/interfaz-pc.js
+      - tests/interfaz-pc-batch-dom.mjs
+      - tests/interfaz-pc-lote.test.mjs
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probar-lote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar DOM de pruebas en el runner
+        run: npm install --no-save --ignore-scripts --no-audit --no-fund jsdom@26.1.0
+      - name: Correr escenario de cinco archivos sin modificar Cloudflare
+        run: |
+          node tests/interfaz-pc-batch-dom.mjs
+          node --test tests/interfaz-pc-lote.test.mjs
