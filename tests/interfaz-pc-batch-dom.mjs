@@ -84,4 +84,11 @@ d.querySelector('#configComunGlobal input').value='2';
 save.click();await sleep(80);
 assert.match(d.getElementById('pc-progress').textContent,/6 de 6 archivos configurados/,'No guardó seis de seis');
 assert.equal(d.getElementById('pc-next').disabled,false,'No habilitó revisión después de guardar seis');
+// El motor reagrupa documentos al recalcular, a veces invirtiendo el orden.
+state.reverse();
+render();
+await sleep(160);
+assert.match(d.getElementById('pc-progress').textContent,/6 de 6 archivos configurados/,'El reordenamiento borró el guardado del lote');
+assert.equal(d.getElementById('pc-next').disabled,false,'El reordenamiento bloqueó revisión');
+console.log('REGRESIÓN DE REORDENAMIENTO: seis PDF mantienen guardado 6/6 tras invertir fichas');
 console.log('E2E DOM APROBADO: 6 PDF -> autofoco en tamaño debajo de Todos iguales -> 1 elección A4 -> 6 tamaños resueltos -> 1 configuración -> 6/6 listos.');
