@@ -56,6 +56,15 @@
 - **Pendiente de aceptar:** validación interactiva del titular con las cinco imágenes originales; no declarar funcionalmente aprobado hasta observar selección común, cinco archivos listos y presupuesto.
 - **Versión comercial y móvil:** intactas. PR todavía en borrador; requiere aprobación personal y control de cambios antes de publicar a producción.
 
+## V6: corrección orientada al usuario (20/11/2026)
+- Se comprobó localmente con **cinco PDF de 16,71 × 29,70 cm** que los botones nativos de A4 permiten resolver los cinco tamaños y que la configuración compartida habilita el guardado **5/5**. La cotización de ese ensayo local no se validó porque el servidor privado de tarifas no estaba en el entorno local.
+- **Cambio visible de PC V6:** primer paso de tamaño del lote junto al presupuesto (columna derecha, siempre visible); fichas de archivos temporalmente ocultas mientras ese paso esté pendiente. Una vez definido A4/A3/original para todos, se abre la configuración compartida de color/caras/copias. La aplicación usa botones de tamaño del motor existente.
+- GitHub Actions para el escenario de cinco fichas, recreación de DOM al cambiar cada una y guardado de 5/5: [ejecución 44812950741](https://github.com/hernanchan/COTIZADOR/actions/runs/44812950741). **12/12 comprobaciones estructurales aprobadas y simulación DOM integral aprobada.**
+- Despliegue privado **V6 confirmado:** `feaea544-3f07-43c4-b85e-b796467ef48f`, verificado en el registro de [ejecución 44812764045](https://github.com/hernanchan/COTIZADOR/actions/runs/44812764045). Conserva autenticación HTTP 401 y protección de acceso. Version V5 para rollback: `65216257-8e74-41e3-b96b-52c8b3b7d825`.
+- Los flujos viejos iniciados después fueron rechazados por protección de versión activa; **no reemplazaron la V6**.
+- El PR sigue en borrador y producción no fue modificada. **Pendiente:** validación con los archivos originales de Hernán y cálculo real en el Worker de ensayo; no afirmar aprobación comercial.
+- Una versión nueva no debe promoverse automáticamente con flujos de V4/V5; cada actualización requiere compilar desde la rama aprobada y verificar la versión activa previa.
+
 ## Estado de publicación
 - Esta rama no afecta `main`; los cambios funcionales están exclusivamente en `integraciones/interfaz-pc/`.
 - No contiene secretos, ni archivos de clientes.
