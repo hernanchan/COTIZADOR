@@ -78,8 +78,8 @@ async function promoteTo(version,message){
 }
 let parts,needsRestore=false;
 try{
- await promoteTo(originalSourceVersion,'Obtener fuente original verificada para PC V5; retorno automatico a V4');
  needsRestore=true;
+ await promoteTo(originalSourceVersion,'Obtener fuente original verificada para PC V5; retorno automatico a V4');
  for(let attempt=0;attempt<14;attempt++){
   try{
    const fetched=await getParts();
