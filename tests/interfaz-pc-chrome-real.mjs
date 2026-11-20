@@ -18,7 +18,13 @@ const WORKER='saber-ampliaciones-ensayo-20261120';
 const BASE='https://'+WORKER+'.libreriasaber.workers.dev';
 const SOURCE_VERSION='7e380acc-9a44-4703-bd57-9db6333b0cf8';
 const assert=(v,msg)=>{if(!v)throw Error(msg)};
-const ui=fs.readFileSync('integraciones/interfaz-pc/interfaz-pc.js','utf8');
+let ui=fs.readFileSync('integraciones/interfaz-pc/interfaz-pc.js','utf8');
+// Instrumentación local: no se incorpora al JS publicado ni al repositorio comercial.
+const keyMarker="if(nextKeys!==keys){keys=nextKeys;ready.clear();";
+const changeMarker="by('configComunGlobal').addEventListener('change',()=>{";
+assert(ui.includes(keyMarker)&&ui.includes(changeMarker),'Cambió el punto de auditoría de la interfaz');
+ui=ui.replace(keyMarker,"if(nextKeys!==keys){console.warn('SABER_AUDIT_KEYS',JSON.stringify({old:keys,new:nextKeys}));keys=nextKeys;ready.clear();")
+ .replace(changeMarker,"by('configComunGlobal').addEventListener('change',(event)=>{console.warn('SABER_AUDIT_COMMON',JSON.stringify({aria:event.target.getAttribute('aria-label'),trusted:event.isTrusted}));");
 const css=fs.readFileSync('integraciones/interfaz-pc/interfaz-pc.css','utf8');
 const url='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(ACCOUNT)+'/workers/workers/'+WORKER+'/versions/'+SOURCE_VERSION+'?include=modules,sourcemaps';
 const res=await fetch(url,{headers:{Authorization:'Bearer '+TOKEN}});
@@ -65,7 +71,7 @@ const context=await browser.newContext({viewport:{width:1440,height:900},ignoreH
 const page=await context.newPage();
 const messages=[];
 page.on('pageerror',e=>messages.push('JS ERROR: '+e.message.slice(0,200)));
-page.on('console',e=>{if(e.type()==='error')messages.push('CONSOLE ERROR: '+e.text().slice(0,200))});
+page.on('console',e=>{if(e.type()==='error')messages.push('CONSOLE ERROR: '+e.text().slice(0,200));if(e.text().startsWith('SABER_AUDIT'))console.log(e.text());});
 page.on('requestfailed',r=>messages.push('REQUEST FAILED: '+r.url().slice(0,120)));
 page.on('response',async response=>{
  if(response.status()<400||!response.url().startsWith(BASE))return;
@@ -138,6 +144,7 @@ try{
  if(await copies.count())await copies.fill('1');
  await page.locator('#pc-batch-apply').click();
  await page.waitForFunction(()=>document.querySelector('#pc-progress')?.textContent?.includes('5 de 5'),{timeout:10000});
+ console.log('JUSTO_TRAS_GUARDAR: '+await page.locator('#pc-progress').textContent());
  console.log('LOTE COMPLETO: '+await page.locator('#pc-progress').textContent());
  await page.waitForTimeout(4000);
  console.log('BOTÓN SIGUIENTE: '+(await page.locator('#pc-next').isEnabled()?'habilitado':'no habilitado'));
