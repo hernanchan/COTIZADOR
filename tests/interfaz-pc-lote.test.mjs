@@ -107,7 +107,7 @@ test('con un solo archivo se omite la elección redundante Todos iguales / Por s
  assert.match(css,/saber-pc-single #pc-queue\{display:none!important\}/);
 });
 test('después de subir se muestran nombres antes de botones y tamaño individual visible',()=>{
- assert.match(js,/by\('zonaArchivos'\)\.append\(uploadSummary\)/);
+ assert.match(js,/uploadZone\.append\(uploadSummary\)/);
  assert.match(js,/uploadSummary\.append\(heading,names\)/);
  assert.match(js,/if\(isSingle && pendingSizeCount\)/);
  assert.match(js,/sizeTitle\.textContent='2\. Elegí el tamaño para este archivo'/);
