@@ -1,6 +1,6 @@
 # Interfaz PC — seguimiento único (20/11/2026)
 
-**Estado:** V7 de PC con confirmación de tamaños por lote corregida, **activa solo en el Worker privado de ensayo** el 20/11/2026. **NO publicada en la web comercial**.
+**Estado:** V8 de PC con tamaño del lote bajo «Todos iguales» y navegación guiada, **activa solo en el Worker privado de ensayo** el 20/11/2026. **NO publicada en la web comercial**.
 
 ## Decisiones aprobadas por el titular
 - Solo PC: no alterar el asistente móvil por pasos.
@@ -73,6 +73,15 @@
 - **GitHub Actions:** 12/12 tests estáticos aprobados, simulación DOM aprobada; compilación del Worker y verificación de acceso privado correctas: [ejecución #44813779812](https://github.com/hernanchan/COTIZADOR/actions/runs/44813779812).
 - **Cloudflare Worker de ensayo privado:** versión activa `67bbf783-d1f3-4911-b59e-da5e1d891ada` (V7); versión anterior para rollback `feaea544-3f07-43c4-b85e-b796467ef48f` (V6).
 - **Sin cambios** en producción, móvil, tarifas ni pagos. El PR sigue en borrador. **Pendiente:** validación interactiva con los archivos del titular y presupuesto de referencia. Las pruebas DOM simulan las fichas; no son prueba de extremo a extremo del navegador con documentos de clientes.
+
+## V8 — Corrección de descubribilidad (20/11/2026)
+- **Hecho de UX:** el titular cargó tres veces los documentos porque no encontró la elección de tamaño en la columna derecha. Era un error de colocación, no del usuario ni del cálculo.
+- **Cambio solo para PC:** selector A4/A3/original movido directamente debajo de «Todos iguales», dentro de la columna izquierda. El panel derecho queda exclusivamente para el presupuesto y su estado.
+- **Navegación:** al completar la carga cuando existen tamaños pendientes, la interfaz desplaza la vista y enfoca el paso de tamaño. Mientras no se confirme, oculta fichas y opciones comunes para que el recorrido sea inequívoco. Tras resolverlo, muestra color/caras/copias en bloque y avanza a la configuración del lote.
+- **Prueba automatizada:** seis PDF, opción «Ploteo / Ampliación» marcada, foco/scroll automático al selector debajo de «Todos iguales», una decisión A4, seis tamaños confirmados, guardado conjunto **6/6**. 13/13 pruebas estructurales aprobadas, simulación DOM integral aprobada.
+- **Cloudflare privado:** versión activa `09777680-8d8b-4b2b-b5ef-37c9f8e2022b` (V8). Versión para rollback `67bbf783-d1f3-4911-b59e-da5e1d891ada` (V7).
+- **Evidencia despliegue:** [GitHub Actions #44818437082](https://github.com/hernanchan/COTIZADOR/actions/runs/44818437082). Compilación verificada; rutas de ensayo privadas, HTTP 401 sin autenticación; la web comercial permanece intacta.
+- **Pendiente:** prueba visual/interactiva del usuario en Chrome con sus archivos originales. La simulación DOM no demuestra interacción humana ni precio real; el PR permanece en borrador y no se integra a producción sin autorización.
 
 ## Estado de publicación
 - Esta rama no afecta `main`; los cambios funcionales están exclusivamente en `integraciones/interfaz-pc/`.
