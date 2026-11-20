@@ -31,9 +31,9 @@ jobs:
           node --check integraciones/interfaz-pc/interfaz-pc.js
       - name: Instalar entorno de pruebas DOM
         run: npm install --no-save --ignore-scripts --no-audit --no-fund jsdom@26.1.0
-      - name: Reproducir 6 PDF con tamaño pendiente y opción Ploteo seleccionada
+      - name: Reproducir 6 PDF, reordenamiento y preservación del guardado en lote
         run: node tests/interfaz-pc-batch-dom.mjs
-      - name: Compilar y actualizar únicamente el ensayo privado, con rollback
+      - name: Activar V9 con guardado estable en el Worker privado y rollback a V8
         env:
           SABER_CF_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
           SABER_CF_DEPLOY_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
