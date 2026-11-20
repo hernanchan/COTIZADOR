@@ -1,4 +1,4 @@
-name: Saber - Chromium real PC V8 sin despliegue
+name: Saber - Chromium PC, archivo único y lote sin despliegue
 on:
   push:
     branches:
@@ -6,6 +6,8 @@ on:
     paths:
       - .github/workflows/saber-pc-chrome-real.yml
       - tests/interfaz-pc-chrome-real.mjs
+      - integraciones/interfaz-pc/interfaz-pc.js
+      - integraciones/interfaz-pc/interfaz-pc.css
   workflow_dispatch:
 permissions:
   contents: read
