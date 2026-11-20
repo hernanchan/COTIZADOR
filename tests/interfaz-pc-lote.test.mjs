@@ -75,11 +75,19 @@ test('avisos de tamaños se agrupan visualmente, sin quitar advertencias origina
  assert.match(css,/overflow-x:hidden/);
 });
 
-test('el paso de tamaño del lote aparece antes del presupuesto y no entre fichas',()=>{
- assert.match(js,/side\.append\(el\('h2','','Tu presupuesto'\),sizeStep,by\('presupuesto'\)\)/);
- assert.match(js,/sizeTitle\.textContent='1\. Tamaño final para '/);
+test('la elección de tamaño se ve debajo de Todos iguales, no dentro del presupuesto',()=>{
+ assert.match(js,/modeCard\.append\(sizeStep\)/);
+ assert.match(js,/side\.append\(el\('h2','','Tu presupuesto'\),by\('presupuesto'\)\)/);
+ assert.match(js,/sizeTitle\.textContent='3\. Elegí el tamaño de '/);
  assert.match(js,/filebox\.hidden=true/);
+ assert.match(js,/batch\.hidden=true/);
  assert.match(js,/by\('configComunGlobal'\)\.hidden=true/);
  assert.match(js,/filebox\.hidden=false/);
- assert.match(css,/#pc-size-step/);
+ assert.match(css,/#pc-mode-card #pc-size-step/);
+});
+test('al cargar archivos guía automáticamente hacia el primer paso pendiente, solo en PC',()=>{
+ assert.match(js,/function guideToSize\(key\)/);
+ assert.match(js,/sizeStep\.scrollIntoView\(\{behavior:'smooth',block:'center'\}\)/);
+ assert.match(js,/guideToSize\(nextKeys\)/);
+ assert.match(js,/lastAttentionKey=''/);
 });
