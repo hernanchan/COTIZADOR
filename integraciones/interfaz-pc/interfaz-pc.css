@@ -8,6 +8,17 @@
  #pc-left{min-width:0;display:grid;gap:12px}
  #pc-left #zonaArchivos,#pc-left #pc-mode-card,#pc-left #pc-batch,#pc-left #pc-filebox,#pc-left #resumenPedido{background:#fff!important;border:1px solid #d6e2e8!important;border-radius:12px!important;padding:16px!important;margin:0!important;box-shadow:0 5px 18px #1437500d}
  #pc-left #zonaArchivos{padding:12px 16px!important}
+ #pc-upload-summary{margin-top:10px;padding:10px 12px;border:1px solid #c7dce7;background:#f4f9fc;border-radius:9px;max-width:100%;min-width:0}
+ #pc-upload-summary[hidden]{display:none!important}
+ #pc-upload-summary>strong{display:block;font:750 13px/1.35 system-ui;color:#183f59;margin-bottom:6px}
+ #pc-upload-summary .pc-upload-names{display:flex;flex-wrap:wrap;gap:5px;max-width:100%}
+ #pc-upload-summary .pc-upload-name{display:inline-block;min-width:0;max-width:100%;overflow-wrap:anywhere;font:650 11px/1.4 system-ui;border:1px solid #d0e2ea;background:white;color:#224d66;border-radius:7px;padding:4px 7px}
+ body.saber-pc-single #pc-mode-card[hidden]{display:none!important}
+ body.saber-pc-single #pc-queue{display:none!important}
+ body.saber-pc-single #pc-filegrid{grid-template-columns:minmax(0,1fr)!important}
+ body.saber-pc-single #pc-filebox{padding:13px 16px!important}
+ body.saber-pc-single #pc-filebox #pc-instruction{font-size:13px}
+ body.saber-pc-single #pc-original-list .archivo{padding:10px 12px!important}
  #pc-left #pc-mode-card{padding:10px 15px!important}
  #pc-mode-card #modoConfiguracion{margin:0!important;padding:8px!important;border:0!important;background:transparent!important}
  #pc-mode-card #modoConfiguracion h2{font-size:16px!important}
