@@ -1,6 +1,6 @@
 # Interfaz PC — seguimiento único (20/11/2026)
 
-**Estado:** V5 de PC con confirmación de tamaños por lote, **desplegada solo en el Worker privado de ensayo** el 20/11/2026. **NO publicada en la web comercial**.
+**Estado:** V7 de PC con confirmación de tamaños por lote corregida, **activa solo en el Worker privado de ensayo** el 20/11/2026. **NO publicada en la web comercial**.
 
 ## Decisiones aprobadas por el titular
 - Solo PC: no alterar el asistente móvil por pasos.
@@ -64,6 +64,15 @@
 - Los flujos viejos iniciados después fueron rechazados por protección de versión activa; **no reemplazaron la V6**.
 - El PR sigue en borrador y producción no fue modificada. **Pendiente:** validación con los archivos originales de Hernán y cálculo real en el Worker de ensayo; no afirmar aprobación comercial.
 - Una versión nueva no debe promoverse automáticamente con flujos de V4/V5; cada actualización requiere compilar desde la rama aprobada y verificar la versión activa previa.
+
+## Corrección V7 (20/11/2026)
+- **Captura del titular:** pese a seleccionar «Todos iguales», aparecen 6 PDF de origen WhatsApp, cada uno pendiente de tamaño. El selector único de tamaño **no se mostraba**.
+- **Causa confirmada en la interfaz:** la detección `needsSize` excluía cualquier archivo con botón `Ploteo / Ampliación` marcado mediante la clase `.seleccionada`, incluso cuando su ficha mostraba la pregunta `.pregunta-tamano` sin resolver.
+- **Corrección:** considerar pendiente de tamaño todo archivo válido con `.pregunta-tamano`, sin depender de qué botón de clasificación esté visualmente seleccionado. Así, el panel derecho debe ofrecer una sola elección A4/A3/original para todo el lote y ocultar temporalmente las fichas mientras se resuelve.
+- **Prueba más representativa:** escenario DOM de **6 PDF con botón «Ploteo / Ampliación» seleccionado**, una elección A4, seis tamaños resueltos, una configuración común y **6/6 guardados**.
+- **GitHub Actions:** 12/12 tests estáticos aprobados, simulación DOM aprobada; compilación del Worker y verificación de acceso privado correctas: [ejecución #44813779812](https://github.com/hernanchan/COTIZADOR/actions/runs/44813779812).
+- **Cloudflare Worker de ensayo privado:** versión activa `67bbf783-d1f3-4911-b59e-da5e1d891ada` (V7); versión anterior para rollback `feaea544-3f07-43c4-b85e-b796467ef48f` (V6).
+- **Sin cambios** en producción, móvil, tarifas ni pagos. El PR sigue en borrador. **Pendiente:** validación interactiva con los archivos del titular y presupuesto de referencia. Las pruebas DOM simulan las fichas; no son prueba de extremo a extremo del navegador con documentos de clientes.
 
 ## Estado de publicación
 - Esta rama no afecta `main`; los cambios funcionales están exclusivamente en `integraciones/interfaz-pc/`.
