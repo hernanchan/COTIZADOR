@@ -182,6 +182,8 @@ try{
  assert(single.summaryText?.includes(buffers[0].name),'La ficha compacta no identifica el archivo cargado');
  assert(!single.mode?.visible,'Con un archivo se sigue mostrando Todos iguales / Por separado');
  assert(single.step?.visible,'No aparece tamaño individual para el PDF no estándar');
+ const labels=await page.locator('#pc-size-buttons button').allInnerTexts();
+ assert(JSON.stringify(labels)===JSON.stringify(['A4','A3','Tamaño original']),'Los botones de un archivo todavía dicen «para todos»: '+JSON.stringify(labels));
  assert(single.step.top-single.drop.bottom<32,'Los botones de tamaño quedaron lejos del archivo cargado');
  assert(!single.filebox?.visible,'Las opciones individuales se muestran antes de confirmar tamaño');
  console.log('PRUEBA_UN_ARCHIVO: archivo visible bajo carga; botones de tamaño a '+Math.round(single.step.top-single.drop.bottom)+' px; modo de lote oculto.');
