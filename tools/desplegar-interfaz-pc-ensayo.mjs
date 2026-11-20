@@ -66,7 +66,7 @@ function replaceLiteral(source,variable,newValue) {
  let i=start+prefix.length;
  while(/\\s/.test(source[i]||'')) i++;
  const q=source[i];
- assert(q==='"'||q==="'"||q==='`','Tipo de literal no permitido para '+variable+': '+JSON.stringify(source.slice(i,i+55)));
+ assert(q==='"'||q==="'"||q==='`','Tipo de literal no permitido para '+variable+': '+JSON.stringify(source.slice(Math.max(0,i-100),i+65)));
  let j=i+1;
  for(;j<source.length;j++){
   if(source[j]==='\\\\'){j++;continue}
