@@ -5,6 +5,9 @@ on:
       - interfaz/pc-compacta-lote-20261120
     paths:
       - .github/workflows/saber-pc-ensayo-v4.yml
+      - tools/desplegar-interfaz-pc-ensayo.mjs
+      - integraciones/interfaz-pc/**
+      - tests/interfaz-pc-lote.test.mjs
   workflow_dispatch:
 permissions:
   contents: read
