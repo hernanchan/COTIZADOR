@@ -5,6 +5,7 @@ on:
       - interfaz/pc-compacta-lote-20261120
     paths:
       - .github/workflows/saber-pc-chrome-real.yml
+      - tests/interfaz-pc-chrome-real.mjs
   workflow_dispatch:
 permissions:
   contents: read
