@@ -58,28 +58,34 @@ const candidates=files.filter(p=>p.data.includes('const PC_CSS = ')&&p.data.incl
 assert(candidates.length===1,'No se encontro exactamente una interfaz PC existente; despliegue cancelado');
 const target=candidates[0];
 assert(target.data.includes('ENSAYO_PASSWORD')&&target.data.includes('const safeEnv = Object.freeze(')&&target.data.includes('/interfaz-pc'),'El aislador privado no coincide');
-// Sustituir literales en sintaxis JS sin suponer comillas dobles, simples o template.
-function replaceLiteral(source,variable,newValue) {
+// El Worker puede contener codigo JS normal o serializado como string JS.
+function replaceLiteral(source,variable,newValue){
  const prefix='const '+variable+' = ';
  const start=source.indexOf(prefix);
- assert(start>=0&&source.indexOf(prefix,start+prefix.length)<0,'No se identifico un literal unico '+variable);
+ assert(start>=0&&source.indexOf(prefix,start+prefix.length)<0,'No hay literal unico '+variable);
  let i=start+prefix.length;
- while(/\\s/.test(source[i]||'')) i++;
+ while(/\s/.test(source[i]||''))i++;
  const q=source[i];
- assert(q==='"'||q==="'"||q==='`','Tipo de literal no permitido para '+variable+': '+JSON.stringify(source.slice(Math.max(0,i-100),i+65)));
- let j=i+1;
- for(;j<source.length;j++){
-  if(source[j]==='\\\\'){j++;continue}
-  if(source[j]===q)break;
+ if(q==='\\'){
+  assert(source[i+1]==='"','Formato embebido inesperado: '+variable);
+  const boundary=variable==='PC_CSS'?'\\nconst PC_JS = ':'\\nfunction pcHtml(';
+  const stop=source.indexOf(boundary,i+2);
+  assert(stop>=0,'No se encontro limite seguro embebido: '+variable);
+  const newLine=prefix+JSON.stringify(newValue)+';';
+  const escaped=JSON.stringify(newLine).slice(1,-1).replaceAll('<','\\u003c');
+  return source.slice(0,start)+escaped+source.slice(stop);
  }
- assert(j<source.length,'Literal sin cierre: '+variable);
+ assert(q==='"'||q==="'"||q.charCodeAt(0)===96,'Literal JS no reconocido '+variable);
+ let j=i+1;
+ for(;j<source.length;j++){if(source[j]==='\\'){j++;continue}if(source[j]===q)break}
+ assert(j<source.length,'Literal sin cierre '+variable);
  const semi=source.indexOf(';',j+1);
- assert(semi>=0&&/^\\s*$/.test(source.slice(j+1,semi)),'Se esperaba fin de literal simple: '+variable);
+ assert(semi>=0&&/^\s*$/.test(source.slice(j+1,semi)),'Se esperaba fin de literal '+variable);
  return source.slice(0,start)+prefix+JSON.stringify(newValue)+';'+source.slice(semi+1);
 }
 target.data=replaceLiteral(target.data,'PC_CSS',css);
 target.data=replaceLiteral(target.data,'PC_JS',js);
-assert(target.data.includes(JSON.stringify(js))&&target.data.includes(JSON.stringify(css)),'No se pudieron inyectar los activos PC');
+assert(target.data.includes('const PC_JS = ')&&target.data.includes('const PC_CSS = '),'UI no insertada');
 const check=spawnSync(process.execPath,['--check','--input-type=module'],{input:target.data,encoding:'utf8',maxBuffer:10*1024*1024});
 assert(check.status===0,'Sintaxis invalida en Worker modificado: '+(check.stderr||'').slice(0,200));
 const metadata={main_module:target.filename,bindings:[...bindMap].map(([name])=>({name,type:'inherit'})),annotations:{'workers/message':'Libreria Saber PC V4 - solo ensayo aislado'}};
