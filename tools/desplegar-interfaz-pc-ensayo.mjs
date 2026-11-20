@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {pathToFileURL} from 'node:url';
 import {spawnSync} from 'node:child_process';
 const worker='saber-ampliaciones-ensayo-20261120';
 const account=process.env.SABER_CF_ACCOUNT_ID;
@@ -97,6 +98,25 @@ const bundled=fs.readFileSync(output,'utf8');
 assert(bundled.length>100000&&bundled.includes('pc-batch-apply')&&bundled.includes('ENSAYO_PASSWORD'),'Build incompleto');
 const check=spawnSync(process.execPath,['--check',output],{encoding:'utf8',maxBuffer:1024*1024});
 assert(check.status===0,'Worker compilado invalido: '+(check.stderr||'').slice(0,220));
+// Validar funcionalmente el Worker compilado en el runner antes de tocar Cloudflare.
+const trial=(await import(pathToFileURL(output).href)).default;
+const origin='https://'+worker+'.libreriasaber.workers.dev';
+const pass='a'.repeat(32);
+const testEnv={ENSAYO_PASSWORD:pass};
+const unauth=await trial.fetch(new Request(origin+'/interfaz-pc'),testEnv,{});
+assert(unauth.status===401,'Ensayo compilado no exige autenticacion');
+const authorization='Basic '+btoa('operador:'+pass);
+async function trialGet(route){
+ return trial.fetch(new Request(origin+route,{headers:{Authorization:authorization}}),testEnv,{});
+}
+for(const [route,expected] of [['/interfaz-pc',200],['/interfaz-pc.js',200],['/interfaz-pc.css',200],['/prueba-carga-unica',200],['/cotizar',404]]){
+ const response=await trialGet(route);
+ assert(response.status===expected,'Falla prueba local '+route+': '+response.status);
+ if(route==='/interfaz-pc.js')assert((await response.text()).includes('saveCommon'),'JS V4 no presente en local');
+ if(route==='/interfaz-pc.css')assert((await response.text()).includes('pc-batch-apply'),'CSS V4 no presente en local');
+}
+console.log('COMPILADO_VALIDADO_LOCAL: autenticacion, UI V4, ruta previa, aislamiento');
+
 const metadata={main_module:'ensayo-safe.mjs',bindings:[...bindMap].map(([name])=>({name,type:'inherit'})),annotations:{'workers/message':'Libreria Saber PC V4 - solo ensayo aislado'}};
 if(typeof settings.compatibility_date==='string')metadata.compatibility_date=settings.compatibility_date;
 if(Array.isArray(settings.compatibility_flags))metadata.compatibility_flags=settings.compatibility_flags;
@@ -110,10 +130,12 @@ let deployed=false;
 try{
  await json('/deployments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategy:'percentage',versions:[{version_id:version.id,percentage:100}],annotations:{'workers/message':'PC V4 - ensayo aislado; rollback guardado'}})});
  deployed=true;
- const confirmation=await getParts();
- assert(confirmation.some(p=>p.data.includes('pc-batch-apply')&&p.data.includes('ENSAYO_PASSWORD')),'El Worker activo no contiene la interfaz V4');
+ const active=await json('/deployments');
+ assert(active.deployments?.[0]?.versions?.length===1&&active.deployments[0].versions[0].version_id===version.id&&Number(active.deployments[0].versions[0].percentage)===100,'La version privada no figura desplegada al 100%');
  const response=await fetch('https://'+worker+'.libreriasaber.workers.dev/interfaz-pc',{redirect:'manual'});
  assert(response.status===401,'Se esperaba acceso privado HTTP 401, resultado '+response.status);
+ const jsResponse=await fetch('https://'+worker+'.libreriasaber.workers.dev/interfaz-pc.js',{redirect:'manual'});
+ assert(jsResponse.status===401,'El archivo JS del ensayo no esta protegido, HTTP '+jsResponse.status);
  console.log('ENSAYO_V4_DESPLEGADO_COMPROBADO: '+version.id);
  console.log('WEB_COMERCIAL_INTACTA: si');
 }catch(err){
