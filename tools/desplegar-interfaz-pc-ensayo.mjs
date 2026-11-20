@@ -5,6 +5,8 @@
  * Cloudflare credentials exist ONLY in GitHub Actions secrets.
  */
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 const worker='saber-ampliaciones-ensayo-20261120';
 const account=process.env.SABER_CF_ACCOUNT_ID;
@@ -53,47 +55,54 @@ async function getParts(){
  assert(files.length>0&&files.length<=25,'Cantidad inesperada de modulos');
  return files;
 }
-const files=await getParts();
-const candidates=files.filter(p=>p.data.includes('const PC_CSS = ')&&p.data.includes('const PC_JS = '));
-assert(candidates.length===1,'No se encontro exactamente una interfaz PC existente; despliegue cancelado');
-const target=candidates[0];
-assert(target.data.includes('ENSAYO_PASSWORD')&&target.data.includes('const safeEnv = Object.freeze(')&&target.data.includes('/interfaz-pc'),'El aislador privado no coincide');
-// El Worker puede contener codigo JS normal o serializado como string JS.
-function replaceLiteral(source,variable,newValue){
+const parts=await getParts();
+const sourceMaps=parts.map(p=>{try{return {part:p,map:JSON.parse(p.data)}}catch{return null}}).filter(x=>x?.map?.version===3&&Array.isArray(x.map.sources)&&Array.isArray(x.map.sourcesContent));
+assert(sourceMaps.length===1,'Se esperaba un solo mapa de fuentes Cloudflare; no publicar');
+const map=sourceMaps[0].map;
+const contents=new Map();
+for(let i=0;i<map.sources.length;i++){
+ const key=String(map.sources[i]).replaceAll('\\','/').split('/').pop();
+ if(['ensayo-safe.mjs','index.mjs','consulta-seguimiento-cliente.mjs'].includes(key)){
+  assert(!contents.has(key)&&typeof map.sourcesContent[i]==='string','Fuente ausente o duplicada: '+key);
+  contents.set(key,map.sourcesContent[i]);
+ }
+}
+for(const key of ['ensayo-safe.mjs','index.mjs','consulta-seguimiento-cliente.mjs'])assert(contents.has(key),'Fuente original no encontrada: '+key);
+let wrapper=contents.get('ensayo-safe.mjs');
+assert(wrapper.includes('ENSAYO_PASSWORD')&&wrapper.includes('const safeEnv = Object.freeze(')&&wrapper.includes('/interfaz-pc'),'Aislador del ensayo no verificado');
+function replaceSourceConstant(source,variable,value){
  const prefix='const '+variable+' = ';
  const start=source.indexOf(prefix);
- assert(start>=0&&source.indexOf(prefix,start+prefix.length)<0,'No hay literal unico '+variable);
+ assert(start>=0&&source.indexOf(prefix,start+prefix.length)<0,'Constante fuente no unica '+variable);
  let i=start+prefix.length;
- while(/\s/.test(source[i]||''))i++;
- const q=source[i];
- if(q==='\\'){
-  assert(source[i+1]==='"','Formato embebido inesperado: '+variable);
-  const boundary=variable==='PC_CSS'?'\\nconst PC_JS = ':'\\nfunction pcHtml(';
-  const stop=source.indexOf(boundary,i+2);
-  assert(stop>=0,'No se encontro limite seguro embebido: '+variable);
-  const newLine=prefix+JSON.stringify(newValue)+';';
-  const escaped=JSON.stringify(newLine).slice(1,-1).replaceAll('<','\\u003c');
-  return source.slice(0,start)+escaped+source.slice(stop);
- }
- assert(q==='"'||q==="'"||q.charCodeAt(0)===96,'Literal JS no reconocido '+variable);
+ assert(source[i]==='"','Se esperaba constante serializada con comillas dobles: '+variable);
  let j=i+1;
- for(;j<source.length;j++){if(source[j]==='\\'){j++;continue}if(source[j]===q)break}
- assert(j<source.length,'Literal sin cierre '+variable);
- const semi=source.indexOf(';',j+1);
- assert(semi>=0&&/^\s*$/.test(source.slice(j+1,semi)),'Se esperaba fin de literal '+variable);
- return source.slice(0,start)+prefix+JSON.stringify(newValue)+';'+source.slice(semi+1);
+ for(;j<source.length;j++){if(source[j]==='\\'){j++;continue}if(source[j]==='"')break}
+ assert(j<source.length,'Fin de constante no localizado '+variable);
+ let k=j+1;
+ while(/\s/.test(source[k]||''))k++;
+ assert(source[k]===';','Fin de sentencia no reconocido '+variable);
+ return source.slice(0,start)+prefix+JSON.stringify(value)+';'+source.slice(k+1);
 }
-target.data=replaceLiteral(target.data,'PC_CSS',css);
-target.data=replaceLiteral(target.data,'PC_JS',js);
-assert(target.data.includes('const PC_JS = ')&&target.data.includes('const PC_CSS = '),'UI no insertada');
-const check=spawnSync(process.execPath,['--check','--input-type=module'],{input:target.data,encoding:'utf8',maxBuffer:10*1024*1024});
-assert(check.status===0,'Sintaxis invalida en Worker modificado: '+(check.stderr||'').slice(0,200));
-const metadata={main_module:target.filename,bindings:[...bindMap].map(([name])=>({name,type:'inherit'})),annotations:{'workers/message':'Libreria Saber PC V4 - solo ensayo aislado'}};
-if(typeof settings.compatibility_date==='string') metadata.compatibility_date=settings.compatibility_date;
-if(Array.isArray(settings.compatibility_flags)) metadata.compatibility_flags=settings.compatibility_flags;
+wrapper=replaceSourceConstant(wrapper,'PC_CSS',css);
+wrapper=replaceSourceConstant(wrapper,'PC_JS',js);
+assert(wrapper.includes(JSON.stringify(js))&&wrapper.includes(JSON.stringify(css)),'Interfaz V4 no integrada en fuente');
+const directory=fs.mkdtempSync(path.join(os.tmpdir(),'saber-pc-v4-'));
+const srcDir=path.join(directory,'src');fs.mkdirSync(srcDir);
+for(const [key,value] of contents)fs.writeFileSync(path.join(srcDir,key),key==='ensayo-safe.mjs'?wrapper:value,'utf8');
+const output=path.join(directory,'ensayo-safe.mjs');
+const build=spawnSync('npx',['--yes','esbuild@0.25.12',path.join(srcDir,'ensayo-safe.mjs'),'--bundle','--platform=browser','--format=esm','--target=es2022','--outfile='+output,'--log-level=warning'],{encoding:'utf8',maxBuffer:2*1024*1024});
+assert(build.status===0,'Compilacion segura fallida: '+(build.stderr||'').slice(0,220));
+const bundled=fs.readFileSync(output,'utf8');
+assert(bundled.length>100000&&bundled.includes('pc-batch-apply')&&bundled.includes('ENSAYO_PASSWORD'),'Build incompleto');
+const check=spawnSync(process.execPath,['--check',output],{encoding:'utf8',maxBuffer:1024*1024});
+assert(check.status===0,'Worker compilado invalido: '+(check.stderr||'').slice(0,220));
+const metadata={main_module:'ensayo-safe.mjs',bindings:[...bindMap].map(([name])=>({name,type:'inherit'})),annotations:{'workers/message':'Libreria Saber PC V4 - solo ensayo aislado'}};
+if(typeof settings.compatibility_date==='string')metadata.compatibility_date=settings.compatibility_date;
+if(Array.isArray(settings.compatibility_flags))metadata.compatibility_flags=settings.compatibility_flags;
 const form=new FormData();
 form.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'}),'metadata.json');
-for(const part of files) form.append(part.name,new Blob([part.data],{type:part.type.includes('javascript')?part.type:'application/javascript+module'}),part.filename);
+form.append('ensayo-safe.mjs',new Blob([bundled],{type:'application/javascript+module'}),'ensayo-safe.mjs');
 const version=await json('/versions?bindings_inherit=strict',{method:'POST',body:form});
 assert(/^[0-9a-f-]{36}$/i.test(version.id||''),'Version nueva no confirmada');
 console.log('VERSION_PRIVADA_PREPARADA: '+version.id);
@@ -102,7 +111,7 @@ try{
  await json('/deployments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategy:'percentage',versions:[{version_id:version.id,percentage:100}],annotations:{'workers/message':'PC V4 - ensayo aislado; rollback guardado'}})});
  deployed=true;
  const confirmation=await getParts();
- assert(confirmation.some(p=>p.data.includes(JSON.stringify(js))&&p.data.includes(JSON.stringify(css))),'El Worker activo no contiene la interfaz V4');
+ assert(confirmation.some(p=>p.data.includes('pc-batch-apply')&&p.data.includes('ENSAYO_PASSWORD')),'El Worker activo no contiene la interfaz V4');
  const response=await fetch('https://'+worker+'.libreriasaber.workers.dev/interfaz-pc',{redirect:'manual'});
  assert(response.status===401,'Se esperaba acceso privado HTTP 401, resultado '+response.status);
  console.log('ENSAYO_V4_DESPLEGADO_COMPROBADO: '+version.id);
