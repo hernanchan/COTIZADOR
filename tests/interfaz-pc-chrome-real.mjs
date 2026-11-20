@@ -164,7 +164,21 @@ try{
  assert(await page.locator('#pc-next').isEnabled(),'Reordenar fichas bloqueó el avance');
  console.log('REAGRUPAR FICHAS: 5/5 configurados persisten con cotización correcta');
  assert(!messages.some(x=>x.startsWith('JS ERROR')),'Errores de Javascript en Chrome: '+messages.join(' | '));
- console.log('PRUEBA_CHROME_REAL_APROBADA: 5 PDF -> único tamaño A4 -> opciones compartidas -> 5/5 guardados');
+ // Revisar también la presentación con un único archivo, sin crear pedidos.
+ await page.goto(BASE+'/interfaz-pc',{waitUntil:'domcontentloaded',timeout:60000});
+ await page.locator('#zonaArchivos input[type=file]').first().setInputFiles([buffers[0]]);
+ await page.waitForFunction(()=>document.querySelectorAll('#lista section.archivo').length===1,{timeout:20000});
+ await page.waitForTimeout(600);
+ console.log('DIAGNOSTICO_UN_ARCHIVO: '+JSON.stringify(await page.evaluate(()=>{
+   const ids=['zonaArchivos','pc-mode-card','modoConfiguracion','pc-size-step','pc-batch','pc-filebox','pc-queue','lista','pc-sidebar','presupuesto'];
+   const describe=id=>{
+    const n=document.getElementById(id); if(!n)return null;
+    const r=n.getBoundingClientRect(),sty=getComputedStyle(n);
+    return {id,hidden:n.hidden,display:sty.display,top:Math.round(r.top+scrollY),bottom:Math.round(r.bottom+scrollY),height:Math.round(r.height),text:n.innerText?.slice(0,160)};
+   };
+   return {parts:ids.map(describe),uploadChildren:Array.from(document.getElementById('zonaArchivos')?.children||[]).map(n=>({tag:n.tagName,id:n.id,class:n.className,text:n.innerText?.slice(0,100)}))};
+ })));
+  console.log('PRUEBA_CHROME_REAL_APROBADA: 5 PDF -> único tamaño A4 -> opciones compartidas -> 5/5 guardados');
 }catch(e){
  console.error('PRUEBA_CHROME_REAL_FALLÓ: '+e.message);
  console.error('DIAGNÓSTICO '+JSON.stringify(messages.slice(0,10)));
