@@ -175,7 +175,12 @@ function sync(){
  batch.hidden=!batchMode||!count;
  sizeStep.hidden=true;
  filebox.hidden=false;
- save.textContent=isSingle?'Guardar archivo':'Guardar y siguiente →';
+ for(const b of sizeButtons.querySelectorAll('button')){
+  const format=b.dataset.targetSize;
+  b.textContent=isSingle?(format==='a4'?'A4':format==='a3'?'A3':'Tamaño original'):
+    (format==='a4'?'A4 para todos':format==='a3'?'A3 para todos':'Mantener tamaño original');
+ }
+  save.textContent=isSingle?'Guardar archivo':'Guardar y siguiente →';
  by('pc-instruction').textContent=isSingle?'Elegí cómo imprimir este archivo y guardá su configuración.':'Seleccioná un archivo y presioná «Guardar y siguiente».';
  const pendingSizeCount=pendingSizes().length;
  if(isSingle && pendingSizeCount){
