@@ -40,7 +40,7 @@ next.type='button';next.disabled=true;side.append(progress,message,next,el('p','
 side.append(by('prepararPedido'));root.append(shell);
 Array.from(root.children).filter(n=>n.tagName==='H2').forEach(h=>h.hidden=true);
 const parent=by('lista');
-let selected=0,keys='',ready=new Set(),lastNote='',sizeBatchBusy=false;
+let selected=0,selectedId=null,keys='',ready=new Set(),lastNote='',sizeBatchBusy=false;
 let attentionTimer=null,lastAttentionKey='';
 function guideToSize(key){
  if(lastAttentionKey===key)return;
@@ -108,7 +108,7 @@ async function applySizeForBatch(size){
   const left=pendingSizes().length;
   sizeStatus.textContent=left?'Quedan '+left+' tamaños sin confirmar.':'Tamaño aplicado. Ahora elegí color, caras y copias para todos.';
   lastNote=left?'⚠ Revisá los documentos cuyo tamaño sigue pendiente.':'✓ Tamaño definido para el lote.';
-  ready.clear();selected=0;sync();
+  ready.clear();selected=0;selectedId=null;sync();
   if(!pendingSizes().length){
     setTimeout(()=>{if(!batch.hidden)batch.scrollIntoView({behavior:'smooth',block:'start'});},180);
   }
@@ -122,15 +122,36 @@ for(const button of sizeButtons.querySelectorAll('button'))button.onclick=()=>ap
 const commonControl=name=>Array.from(by('configComunGlobal').querySelectorAll('select')).find(x=>(x.getAttribute('aria-label')||'').includes(name));
 const commonCopies=()=>by('configComunGlobal').querySelector('input[aria-label="Aplicar copias a todo el grupo"]');
 const basename=c=>(c.querySelector('.nombre')?.textContent||'Documento').replace(/^\s*\d+\.\s*/, '').trim();
+// El motor reordena las fichas al confirmar formatos y al recalcular.
+// Usar identificadores basados en archivo, no en la posición de la lista.
+const fileKeys=list=>{
+ const occurrences=new Map();
+ return list.map(card=>{
+  const name=basename(card);
+  const ordinal=occurrences.get(name)||0;
+  occurrences.set(name,ordinal+1);
+  return JSON.stringify([name,ordinal]);
+ });
+};
+const fileKey=c=>{
+ const list=cards(),index=list.indexOf(c);
+ return index>=0?fileKeys(list)[index]:null;
+};
 function openSelectedDetails(){
   const card=cards()[selected];if(!card)return;
   const expander=Array.from(card.querySelectorAll('button.editar')).find(b=>/M[aá]s opciones|Personalizar este PDF/i.test(b.textContent));
   if(expander&&expander.getAttribute('aria-expanded')==='false')expander.click();
 }
 function sync(){
- const list=cards(),nextKeys=list.map(basename).join('@@SEP@@');
- if(nextKeys!==keys){keys=nextKeys;ready.clear();selected=Math.max(0,Math.min(selected,list.length-1));lastNote='';}
+ const list=cards(),ids=fileKeys(list),nextKeys=[...ids].sort().join('@@SEP@@');
+ if(nextKeys!==keys){
+  keys=nextKeys;ready.clear();
+  selected=Math.max(0,Math.min(selected,list.length-1));
+  lastNote='';
+ }
+ if(selectedId&&ids.includes(selectedId))selected=ids.indexOf(selectedId);
  if(selected>=list.length)selected=0;
+ selectedId=ids[selected]||null;
  queue.replaceChildren();
  const count=list.length;
  batch.hidden=!commonMode()||!count;sizeStep.hidden=!commonMode();filebox.hidden=false;
@@ -156,11 +177,11 @@ function sync(){
   c.classList.toggle('pc-not-current',i!==selected);
   const card=el('button');card.type='button';card.className=i===selected?'pc-current':'';
   card.setAttribute('aria-pressed',String(i===selected));
-  const done=ready.has(i),symbol=el('span','',done?'✓':'!'),info=el('span'),title=el('span','',basename(c)),desc=el('span','',done?'Configurado · editar':'Pendiente · '+metadata(c));
+  const done=ready.has(ids[i]),symbol=el('span','',done?'✓':'!'),info=el('span'),title=el('span','',basename(c)),desc=el('span','',done?'Configurado · editar':'Pendiente · '+metadata(c));
   symbol.className='pc-indicator'+(done?' pc-ok':'');info.className='pc-fileinfo';title.className='pc-filename';desc.className='pc-filemeta';
   info.append(title,desc);card.append(symbol,info);
   card.setAttribute('aria-label',basename(c)+(done?' configurado':' pendiente de configurar'));card.title=card.getAttribute('aria-label');
-  card.onclick=()=>{selected=i;lastNote='';sync();openSelectedDetails();cards()[selected]?.scrollIntoView({block:'nearest',behavior:'smooth'});};
+  card.onclick=()=>{selected=i;selectedId=ids[i];lastNote='';sync();openSelectedDetails();cards()[selected]?.scrollIntoView({block:'nearest',behavior:'smooth'});};
   queue.append(card);
  });
  Array.from(parent.querySelectorAll('section.grupo-pedido')).forEach(group=>{group.style.display=group.querySelector('section.archivo:not(.pc-not-current)')?'':'none';});
@@ -173,7 +194,7 @@ function sync(){
    message.textContent=pendingSizesCount?'Elegí el tamaño de los '+pendingSizesCount+' archivos en el bloque «Todos iguales», a la izquierda.':lastNote||('⚠ Faltan configurar '+pending+' archivo'+(pending!==1?'s':'')+'. El pedido no puede continuar todavía.');message.className='';save.disabled=false;}
  else {message.textContent='✓ Todos los archivos guardados. '+(by('prepararPedido').disabled?'Esperá a que termine la cotización.':'Ya podés revisar el pedido.');message.className='pc-complete';save.disabled=false;}
  next.disabled=!(count>0&&pending===0&&!by('prepararPedido').disabled);
- note.textContent=count?'Archivo '+(selected+1)+' de '+count+(ready.has(selected)?' · guardado':' · pendiente'):'Subí tus archivos para comenzar.';
+ note.textContent=count?'Archivo '+(selected+1)+' de '+count+(ready.has(ids[selected])?' · guardado':' · pendiente'):'Subí tus archivos para comenzar.';
 }
 function saveCommon(){
  if(!commonMode())return;
@@ -184,10 +205,10 @@ function saveCommon(){
   batchHelp.textContent='⚠ Falta definir impresión (color/B/N), caras o cantidad de copias para todos.';batchHelp.dataset.error='1';return;
  }
  // El guardado confirma lo que el motor ya aplicó mediante sus controles comunes.
- const all=cards();for(const c of candidates)ready.add(all.indexOf(c));
+ const all=cards(),ids=fileKeys(all);for(const c of candidates)ready.add(ids[all.indexOf(c)]);
  delete batchHelp.dataset.error;batchHelp.dataset.success='1';
  batchHelp.textContent='✓ Configuración común guardada en '+candidates.length+' archivo'+(candidates.length===1?'':'s')+'.';
- lastNote='';const pending=all.findIndex((c,i)=>!ready.has(i));if(pending>=0)selected=pending;
+ lastNote='';const pending=all.findIndex((c,i)=>!ready.has(ids[i]));if(pending>=0){selected=pending;selectedId=ids[pending];}
  sync();openSelectedDetails();
 }
 batchButton.onclick=saveCommon;
@@ -198,7 +219,7 @@ by('modoConfiguracion').addEventListener('change',event=>{
  queueMicrotask(sync);
 },true);
 by('configComunGlobal').addEventListener('change',()=>{
- cards().forEach((c,i)=>{if(isCommonCompatible(c))ready.delete(i);});
+ cards().forEach(c=>{if(isCommonCompatible(c))ready.delete(fileKey(c));});
  lastNote='Cambiaste opciones para todos: guardá otra vez la configuración común.';
  delete batchHelp.dataset.error;delete batchHelp.dataset.success;queueMicrotask(sync);
 },true);
@@ -214,21 +235,22 @@ function saveCurrent(){
   if(plotter&&apply&&/Aplicar ampliación/i.test(apply.textContent)){lastNote='⚠ Aplicá primero la ampliación y esperá el recálculo.';sync();return;}
  }
  if(c.querySelector('.pregunta-tamano')){lastNote='⚠ Elegí el tamaño antes de guardar este archivo.';sync();return;}
- ready.add(selected);
- const after=cards().findIndex((x,i)=>i>selected&&!ready.has(i));
- const pending=after>=0?after:cards().findIndex((x,i)=>!ready.has(i));
+ ready.add(fileKey(c));
+ const list=cards(),ids=fileKeys(list);
+ const after=list.findIndex((x,i)=>i>selected&&!ready.has(ids[i]));
+ const pending=after>=0?after:list.findIndex((x,i)=>!ready.has(ids[i]));
  lastNote=pending>=0?'✓ Guardado. Ahora configurá el siguiente pendiente.':'';
- if(pending>=0)selected=pending;
+ if(pending>=0){selected=pending;selectedId=ids[pending];}
  sync();openSelectedDetails();
 }
 save.onclick=saveCurrent;
 next.onclick=()=>{if(next.disabled)return;const original=by('prepararPedido');if(!original||original.disabled)return;original.click();by('resumenPedido').scrollIntoView({block:'start',behavior:'smooth'});};
 function dirty(event){
  const c=event.target.closest('section.archivo');if(!c)return;
- const index=cards().indexOf(c);if(index<0)return;
+ const id=fileKey(c);if(!id)return;
  const button=event.target.closest('button');
  if(event.type==='click'&&(!button||/Quitar|Cerrar detalles|M[aá]s opciones|Personalizar/i.test(button.textContent)))return;
- if(ready.delete(index)){lastNote='Cambios sin guardar. Guardá nuevamente este archivo.';sync();}
+ if(ready.delete(id)){lastNote='Cambios sin guardar. Guardá nuevamente este archivo.';sync();}
 }
 parent.addEventListener('change',dirty,true);
 parent.addEventListener('input',dirty,true);
