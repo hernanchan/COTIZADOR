@@ -18,13 +18,7 @@ const WORKER='saber-ampliaciones-ensayo-20261120';
 const BASE='https://'+WORKER+'.libreriasaber.workers.dev';
 const SOURCE_VERSION='7e380acc-9a44-4703-bd57-9db6333b0cf8';
 const assert=(v,msg)=>{if(!v)throw Error(msg)};
-let ui=fs.readFileSync('integraciones/interfaz-pc/interfaz-pc.js','utf8');
-// Instrumentación local: no se incorpora al JS publicado ni al repositorio comercial.
-const keyMarker="if(nextKeys!==keys){keys=nextKeys;ready.clear();";
-const changeMarker="by('configComunGlobal').addEventListener('change',()=>{";
-assert(ui.includes(keyMarker)&&ui.includes(changeMarker),'Cambió el punto de auditoría de la interfaz');
-ui=ui.replace(keyMarker,"if(nextKeys!==keys){console.warn('SABER_AUDIT_KEYS',JSON.stringify({old:keys,new:nextKeys}));keys=nextKeys;ready.clear();")
- .replace(changeMarker,"by('configComunGlobal').addEventListener('change',(event)=>{console.warn('SABER_AUDIT_COMMON',JSON.stringify({aria:event.target.getAttribute('aria-label'),trusted:event.isTrusted}));");
+const ui=fs.readFileSync('integraciones/interfaz-pc/interfaz-pc.js','utf8');
 const css=fs.readFileSync('integraciones/interfaz-pc/interfaz-pc.css','utf8');
 const url='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(ACCOUNT)+'/workers/workers/'+WORKER+'/versions/'+SOURCE_VERSION+'?include=modules,sourcemaps';
 const res=await fetch(url,{headers:{Authorization:'Bearer '+TOKEN}});
@@ -155,6 +149,20 @@ try{
  const sideText=await page.locator('#presupuesto').innerText();
  console.log('PRESUPUESTO: '+sideText.slice(0,500).replace(/\s+/g,' '));
  assert(await page.locator('#pc-next').isEnabled(),'REGRESIÓN: cinco PDF figuran listos pero el presupuesto permanece pendiente; no se puede revisar el pedido');
+ // Simular el reagrupamiento que hace el motor sin modificar archivos ni tarifas.
+ await page.evaluate(()=>{
+  const root=document.getElementById('lista');
+  const groups=Array.from(root.querySelectorAll(':scope > section.grupo-pedido'));
+  groups.forEach(group=>{
+   Array.from(group.querySelectorAll(':scope > section.archivo')).reverse().forEach(card=>group.append(card));
+  });
+  groups.reverse().forEach(group=>root.append(group));
+ });
+ await page.waitForTimeout(300);
+ const afterShuffle=await page.locator('#pc-progress').textContent();
+ assert(afterShuffle.includes('5 de 5'),'Reordenar fichas hizo perder guardados: '+afterShuffle);
+ assert(await page.locator('#pc-next').isEnabled(),'Reordenar fichas bloqueó el avance');
+ console.log('REAGRUPAR FICHAS: 5/5 configurados persisten con cotización correcta');
  assert(!messages.some(x=>x.startsWith('JS ERROR')),'Errores de Javascript en Chrome: '+messages.join(' | '));
  console.log('PRUEBA_CHROME_REAL_APROBADA: 5 PDF -> único tamaño A4 -> opciones compartidas -> 5/5 guardados');
 }catch(e){
