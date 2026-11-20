@@ -58,12 +58,27 @@ const candidates=files.filter(p=>p.data.includes('const PC_CSS = ')&&p.data.incl
 assert(candidates.length===1,'No se encontro exactamente una interfaz PC existente; despliegue cancelado');
 const target=candidates[0];
 assert(target.data.includes('ENSAYO_PASSWORD')&&target.data.includes('const safeEnv = Object.freeze(')&&target.data.includes('/interfaz-pc'),'El aislador privado no coincide');
-const reCss=/const PC_CSS = "(?:\\.|[^"\\])*";/g;
-const reJs=/const PC_JS = "(?:\\.|[^"\\])*";/g;
-const oldCss=target.data.match(reCss);
-const oldJs=target.data.match(reJs);
-assert(oldCss?.length===1&&oldJs?.length===1,'Constantes PC no se reconocieron: cancelado');
-target.data=target.data.replace(reCss,'const PC_CSS = '+JSON.stringify(css)+';').replace(reJs,'const PC_JS = '+JSON.stringify(js)+';');
+// Sustituir literales en sintaxis JS sin suponer comillas dobles, simples o template.
+function replaceLiteral(source,variable,newValue) {
+ const prefix='const '+variable+' = ';
+ const start=source.indexOf(prefix);
+ assert(start>=0&&source.indexOf(prefix,start+prefix.length)<0,'No se identifico un literal unico '+variable);
+ let i=start+prefix.length;
+ while(/\\s/.test(source[i]||'')) i++;
+ const q=source[i];
+ assert(q==='"'||q==="'"||q==='`','Tipo de literal no permitido para '+variable);
+ let j=i+1;
+ for(;j<source.length;j++){
+  if(source[j]==='\\\\'){j++;continue}
+  if(source[j]===q)break;
+ }
+ assert(j<source.length,'Literal sin cierre: '+variable);
+ const semi=source.indexOf(';',j+1);
+ assert(semi>=0&&/^\\s*$/.test(source.slice(j+1,semi)),'Se esperaba fin de literal simple: '+variable);
+ return source.slice(0,start)+prefix+JSON.stringify(newValue)+';'+source.slice(semi+1);
+}
+target.data=replaceLiteral(target.data,'PC_CSS',css);
+target.data=replaceLiteral(target.data,'PC_JS',js);
 assert(target.data.includes(JSON.stringify(js))&&target.data.includes(JSON.stringify(css)),'No se pudieron inyectar los activos PC');
 const check=spawnSync(process.execPath,['--check','--input-type=module'],{input:target.data,encoding:'utf8',maxBuffer:10*1024*1024});
 assert(check.status===0,'Sintaxis invalida en Worker modificado: '+(check.stderr||'').slice(0,200));
