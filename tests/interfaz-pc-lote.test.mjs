@@ -27,7 +27,7 @@ test('la interfaz reutiliza IDs y motor de cotizacion, sin codigo de pagos ni re
 test('todos iguales guarda juntos los archivos compatibles',()=>{
  assert.match(js,/function saveCommon\(/);
  assert.match(js,/const candidates=commonFiles\(\)/);
- assert.match(js,/for\(const c of candidates\)ready\.add\(all\.indexOf\(c\)\)/);
+ assert.match(js,/for\(const c of candidates\)ready\.add\(ids\[all\.indexOf\(c\)\]\)/);
  assert.match(js,/batchButton\.onclick=saveCommon/);
  assert.match(js,/isCommonCompatible/);
  assert.match(js,/Documentos \(A3\|A4\|A5\|Legal\)/);
@@ -46,14 +46,14 @@ test('valida color, caras y copias antes de guardar lote',()=>{
  assert.match(js,/Number\(copias\.value\)>500/);
 });
 test('cambiar configuracion invalida guardado anterior y bloquea revision',()=>{
- assert.match(js,/ready\.delete\(i\)/);
- assert.match(js,/ready\.delete\(index\)/);
+ assert.match(js,/ready\.delete\(fileKey\(c\)\)/);
+ assert.match(js,/ready\.delete\(id\)/);
  assert.match(js,/next\.disabled=!\(/);
  assert.match(js,/by\('prepararPedido'\)\.disabled/);
 });
 test('guardado individual abre siguiente pendiente',()=>{
  assert.match(js,/save\.onclick=saveCurrent/);
- assert.match(js,/findIndex\(\(x,i\)=>i>selected&&!ready\.has\(i\)\)/);
+ assert.match(js,/findIndex\(\(x,i\)=>i>selected&&!ready\.has\(ids\[i\]\)\)/);
 });
 
 test('PC incluye confirmacion de tamaño para todo el lote sin cambiar motor de cotizacion',()=>{
@@ -90,4 +90,12 @@ test('al cargar archivos guía automáticamente hacia el primer paso pendiente, 
  assert.match(js,/sizeStep\.scrollIntoView\(\{behavior:'smooth',block:'center'\}\)/);
  assert.match(js,/guideToSize\(nextKeys\)/);
  assert.match(js,/lastAttentionKey=''/);
+});
+
+test('los identificadores de archivos no dependen del orden visual',()=>{
+ assert.match(js,/const fileKeys=list=>/);
+ assert.match(js,/nextKeys=\[\.\.\.ids\]\.sort\(\)\.join\('@@SEP@@'\)/);
+ assert.match(js,/selectedId&&ids\.includes\(selectedId\)/);
+ assert.match(js,/ready\.has\(ids\[i\]\)/);
+ assert.match(js,/ready\.add\(fileKey\(c\)\)/);
 });
