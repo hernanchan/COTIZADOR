@@ -73,3 +73,12 @@ test('avisos de tamaños se agrupan visualmente, sin quitar advertencias origina
  assert.match(css,/pc-collapsed-warning/);
  assert.match(css,/overflow-x:hidden/);
 });
+
+test('el paso de tamaño del lote aparece antes del presupuesto y no entre fichas',()=>{
+ assert.match(js,/side\.append\(el\('h2','','Tu presupuesto'\),sizeStep,by\('presupuesto'\)\)/);
+ assert.match(js,/sizeTitle\.textContent='1\. Tamaño final para '/);
+ assert.match(js,/filebox\.hidden=true/);
+ assert.match(js,/by\('configComunGlobal'\)\.hidden=true/);
+ assert.match(js,/filebox\.hidden=false/);
+ assert.match(css,/#pc-size-step/);
+});
