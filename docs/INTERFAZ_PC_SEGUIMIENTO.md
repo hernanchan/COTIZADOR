@@ -1,6 +1,6 @@
 # Interfaz PC — seguimiento único (20/11/2026)
 
-**Estado:** V9 de PC con tamaño y configuración por lote más estado estable ante reordenamiento, **activa solo en el Worker privado de ensayo** el 20/11/2026. **NO publicada en la web comercial**.
+**Estado:** V10 de PC con opciones inmediatamente después del archivo cargado y diseño especial para un solo archivo, **activa solo en el Worker privado de ensayo** el 20/11/2026. **NO publicada en la web comercial**.
 
 ## Decisiones aprobadas por el titular
 - Solo PC: no alterar el asistente móvil por pasos.
@@ -91,6 +91,15 @@
 - **Cloudflare privado:** versión V9 activa `063fca17-e0fd-4ee7-8ce1-b02e1fd637d2` (100%). Rollback a V8 `09777680-8d8b-4b2b-b5ef-37c9f8e2022b`. Acceso HTTP 401 sin contraseña comprobado por el despliegue.
 - **Alcance inmutable:** sin cambios al Worker comercial, tarifas reales, pagos, Central, transportes o asistente móvil. Este PR **sigue en borrador**. La autorización de propietario en GitHub no existe para este SHA y el control Saber puede fallar legítimamente.
 - **Pendiente:** aprobación visual/operativa del titular en la V9 desde PC. El precio de referencia del ensayo no demuestra precios comerciales vigentes y las pruebas con documentos sintéticos no equivalen a una orden comercial.
+
+## V10 — Botones junto al archivo, incluso si el cliente sube solo uno
+- **Observación del titular:** si sube un solo archivo, los botones quedan muy abajo. Problema de descubribilidad y scroll, no del motor comercial.
+- **Solución PC:** aparece inmediatamente bajo el selector de archivos un resumen compacto con el/los nombres. Con un archivo se omite la elección redundante «Todos iguales / Cada uno»; si falta tamaño, los botones «A4 / A3 / Tamaño original» quedan directamente a continuación; si no falta, aparece su ficha de impresión. Con uno también desaparece la lista lateral duplicada. Con dos o más, permanece «Todos iguales / Por separado», el tamaño común y el guardado conjunto.
+- **Medición Chrome:** con un PDF no estándar, botones a 24 px de la zona de carga; al elegir A4, ficha de opciones a 12 px y sin lista duplicada. Escenario de cinco PDF: un tamaño, configuración conjunta, cotización de ensayo ($500 orientativos), estado 5/5 y Siguiente habilitado tras recálculo y reordenamiento.
+- **Robustez:** los cambios de DOM transitorios del motor de cotización no deben borrar los guardados. El contador solo cuenta archivos actualmente visibles; la selección real de nuevos archivos o modificaciones explícitas sí invalidan lo necesario.
+- **Evidencia de navegador Chrome real:** [ejecución #44828400515](https://github.com/hernanchan/COTIZADOR/actions/runs/44828400515). **Pruebas de JS/DOM:** 16/16 controles + seis archivos ordenados y reordenados. **Despliegue privado:** [ejecución #44828578313](https://github.com/hernanchan/COTIZADOR/actions/runs/44828578313), Cloudflare V10 `6e5115b7-d661-4d0b-a5db-7f546b3ebe89` al 100%.
+- **Rollback privado:** V9 `063fca17-e0fd-4ee7-8ce1-b02e1fd637d2`. No se modifica el Worker comercial, mobile, tarifas vigentes, pagos ni Central.
+- **Pendiente:** aprobación visual/operativa del titular en PC, sobre la URL privada `/interfaz-pc?v=10`. Los importes del ensayo no son comerciales. Mantener PR borrador y no publicar en producción sin autorización personal en GitHub.
 
 ## Estado de publicación
 - Esta rama no afecta `main`; los cambios funcionales están exclusivamente en `integraciones/interfaz-pc/`.
