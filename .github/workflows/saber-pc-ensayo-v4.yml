@@ -5,7 +5,7 @@ on:
       - interfaz/pc-compacta-lote-20261120
     paths:
       - .github/workflows/saber-pc-ensayo-v4.yml
-      - tools/desplegar-interfaz-pc-ensayo.mjs
+      - tools/promover-pc-v4-ensayo.mjs
       - integraciones/interfaz-pc/**
       - tests/interfaz-pc-lote.test.mjs
   workflow_dispatch:
@@ -30,9 +30,9 @@ jobs:
       - name: Comprobar configuracion en lote y aislamiento movil
         run: |
           node --test tests/interfaz-pc-lote.test.mjs
-          node --check tools/desplegar-interfaz-pc-ensayo.mjs
+          node --check tools/promover-pc-v4-ensayo.mjs
       - name: Actualizar solamente interfaz V4 de Worker privado y verificar
         env:
           SABER_CF_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
           SABER_CF_DEPLOY_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
-        run: node tools/desplegar-interfaz-pc-ensayo.mjs
+        run: node tools/promover-pc-v4-ensayo.mjs
