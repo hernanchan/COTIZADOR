@@ -56,45 +56,24 @@ async function getParts(){
  assert(files.length>0&&files.length<=25,'Cantidad inesperada de modulos');
  return files;
 }
-// El build vigente V4 no expone su codigo por la API de contenido (HTTP 500).
-// Volvemos momentaneamente al build original de ensayo para leer el mapa
-// de fuentes y restauramos V4 SIEMPRE, antes de compilar o subir otra version.
-// Sin fuentes autenticas no se despliega ni se reconstruye el motor a ciegas.
+// Cloudflare Beta Worker Versions permite consultar los módulos de una versión
+// exacta SIN cambiar cuál está activa. Nunca alternar despliegues para leer código.
 const originalSourceVersion='7e380acc-9a44-4703-bd57-9db6333b0cf8';
 const activeV4='904e185d-73af-4480-837e-0c2474819504';
-assert(rollback===activeV4,'La version actual del ensayo es distinta a V4; detenerse para no pisar cambios ajenos');
-async function promoteTo(version,message){
- await json('/deployments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-  strategy:'percentage',versions:[{version_id:version,percentage:100}],annotations:{'workers/message':message}
- })});
- let ok=false;
- for(let retry=0;retry<15;retry++){
-  const active=await json('/deployments');
-  const all=active.deployments?.[0]?.versions;
-  if(all?.length===1&&all[0].version_id===version&&Number(all[0].percentage)===100){ok=true;break;}
-  await new Promise(resolve=>setTimeout(resolve,600));
- }
- assert(ok,'Version de ensayo no confirmada tras propagar: '+version);
-}
-let parts,needsRestore=false;
-try{
- needsRestore=true;
- await promoteTo(originalSourceVersion,'Obtener fuente original verificada para PC V5; retorno automatico a V4');
- for(let attempt=0;attempt<14;attempt++){
-  try{
-   const fetched=await getParts();
-   const mapFound=fetched.some(p=>{try{return JSON.parse(p.data).sources?.some(x=>String(x).includes('ensayo-safe.mjs'))}catch{return false;}});
-   if(mapFound){parts=fetched;break;}
-  }catch(err){if(attempt===13)throw err;}
-  await new Promise(resolve=>setTimeout(resolve,500));
- }
- assert(parts,'No se pudo recuperar mapa de fuentes autenticas del Worker base');
-}finally{
- // El retorno a la version V4 es obligatorio aun si falla la lectura del motor.
- if(needsRestore)await promoteTo(activeV4,'Restaurar V4 del ensayo tras recuperacion de fuente');
-}
-console.log('ENSAYO_BASE_RESTAURADO '+activeV4);
-
+assert(rollback===activeV4,'La version activa de ensayo cambió; no sobrescribir trabajos nuevos');
+const baseUrl='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(account)+
+ '/workers/workers/'+encodeURIComponent(worker)+'/versions/'+originalSourceVersion+'?include=modules,sourcemaps';
+const baseResponse=await fetch(baseUrl,{headers});
+let baseRecord;try{baseRecord=await baseResponse.json()}catch{throw Error('La API de versión no devolvió JSON');}
+assert(baseResponse.ok&&baseRecord.success===true,'No se pudo acceder a la versión original del ensayo: '+baseResponse.status+
+ ' / '+JSON.stringify((baseRecord.errors||[]).map(x=>x.code)));
+const modules=baseRecord.result?.modules||[];
+assert(modules.length>0,'La versión original no devolvió módulos');
+const parts=modules.filter(x=>typeof x.content_base64==='string').map(x=>({
+ name:x.name||'modulo',type:x.content_type,
+ data:Buffer.from(x.content_base64,'base64').toString('utf8')
+}));
+console.log('FUENTE_ORIGINAL_RECUPERADA_POR_VERSION '+originalSourceVersion+' MODULOS '+parts.length);
 const sourceMaps=parts.map(p=>{try{return {part:p,map:JSON.parse(p.data)}}catch{return null}}).filter(x=>x?.map?.version===3&&Array.isArray(x.map.sources)&&Array.isArray(x.map.sourcesContent));
 assert(sourceMaps.length===1,'Se esperaba un solo mapa de fuentes Cloudflare; no publicar');
 const map=sourceMaps[0].map;
