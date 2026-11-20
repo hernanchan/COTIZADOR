@@ -1,4 +1,4 @@
-name: Saber - activar V7 PC corregida solo en ensayo
+name: Saber - actualizar interfaz PC del ensayo privado
 on:
   push:
     branches:
@@ -12,7 +12,7 @@ concurrency:
   group: saber-pc-ensayo-privado
   cancel-in-progress: false
 jobs:
-  validar-ensayo-v7:
+  validar-ensayo-pc:
     if: github.ref == 'refs/heads/interfaz/pc-compacta-lote-20261120'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -33,7 +33,7 @@ jobs:
         run: npm install --no-save --ignore-scripts --no-audit --no-fund jsdom@26.1.0
       - name: Reproducir 6 PDF con tamaño pendiente y opción Ploteo seleccionada
         run: node tests/interfaz-pc-batch-dom.mjs
-      - name: Compilar y desplegar solo Worker privado con rollback
+      - name: Compilar y actualizar únicamente el ensayo privado, con rollback
         env:
           SABER_CF_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
           SABER_CF_DEPLOY_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
