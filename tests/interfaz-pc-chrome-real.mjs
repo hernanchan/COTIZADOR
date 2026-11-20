@@ -119,7 +119,7 @@ try{
  assert(await controls.isVisible(),'No aparecen las opciones comunes de color/caras/copias');
  console.log('TAMAÑO_ÚNICO: cinco PDF ahora son impresiones comunes');
  const selects=page.locator('#configComunGlobal select');
- console.log('SELECTS COMUNES:',await selects.count(), await selects.evaluateAll(nodes=>nodes.map(n=>({aria:n.getAttribute('aria-label'),options:Array.from(n.options).map(o=>[o.value,o.textContent])}))));
+ console.log('SELECTS COMUNES:',JSON.stringify(await selects.evaluateAll(nodes=>nodes.map(n=>({aria:n.getAttribute('aria-label'),options:Array.from(n.options).map(o=>[o.value,o.textContent])})))));
  const count=await selects.count();
  if(count>=2){
   for(let i=0;i<2;i++){
@@ -132,9 +132,15 @@ try{
  await page.locator('#pc-batch-apply').click();
  await page.waitForFunction(()=>document.querySelector('#pc-progress')?.textContent?.includes('5 de 5'),{timeout:10000});
  console.log('LOTE COMPLETO: '+await page.locator('#pc-progress').textContent());
+ await page.waitForTimeout(4000);
  console.log('BOTÓN SIGUIENTE: '+(await page.locator('#pc-next').isEnabled()?'habilitado':'no habilitado'));
+ console.log('BOTÓN PREPARAR: '+(await page.locator('#prepararPedido').isEnabled()?'habilitado':'no habilitado'));
+ console.log('CAMPOS SELECCIONADOS: '+JSON.stringify(await page.locator('#configComunGlobal select').evaluateAll(nodes=>nodes.map(n=>({aria:n.getAttribute('aria-label'),value:n.value})))));
+ console.log('ESTADO GENERAL: '+(await page.locator('#estado').innerText()).slice(0,500).replace(/\s+/g,' '));
+ console.log('ARCHIVOS DETALLE: '+JSON.stringify(await page.locator('#lista section.archivo').evaluateAll(nodes=>nodes.map(n=>n.innerText.slice(0,150)))));
  const sideText=await page.locator('#presupuesto').innerText();
- console.log('PRESUPUESTO: '+sideText.slice(0,220).replace(/\s+/g,' '));
+ console.log('PRESUPUESTO: '+sideText.slice(0,500).replace(/\s+/g,' '));
+ assert(await page.locator('#pc-next').isEnabled(),'REGRESIÓN: cinco PDF figuran listos pero el presupuesto permanece pendiente; no se puede revisar el pedido');
  assert(!messages.some(x=>x.startsWith('JS ERROR')),'Errores de Javascript en Chrome: '+messages.join(' | '));
  console.log('PRUEBA_CHROME_REAL_APROBADA: 5 PDF -> único tamaño A4 -> opciones compartidas -> 5/5 guardados');
 }catch(e){
