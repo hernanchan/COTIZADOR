@@ -1,6 +1,6 @@
 # Interfaz PC — seguimiento único (20/11/2026)
 
-**Estado:** V4 de PC integrada en la rama y **desplegada solo en el Worker privado de ensayo** el 20/11/2026. **NO publicada en la web comercial**.
+**Estado:** V5 de PC con confirmación de tamaños por lote, **desplegada solo en el Worker privado de ensayo** el 20/11/2026. **NO publicada en la web comercial**.
 
 ## Decisiones aprobadas por el titular
 - Solo PC: no alterar el asistente móvil por pasos.
@@ -45,6 +45,16 @@
 - Ante fallas de verificación, el desplegador hizo rollback a `7e380acc-9a44-4703-bd57-9db6333b0cf8`; el despliegue final fue verificado exitosamente.
 - **Pendiente:** prueba interactiva del usuario con cinco imágenes, modo «Todos iguales», cálculo y avisos. Sin esa prueba no afirmar aceptación comercial.
 - El flujo actual **promueve una versión específica ya construida**, no genera compilaciones futuras automáticamente. Para próximas correcciones de JS/CSS deberá prepararse una nueva versión desde fuentes verificadas y actualizar el despliegue controlado. No reactivar V4 vieja ante cambios nuevos.
+
+## Corrección V5 del 20/11/2026
+- **Fallo observado por titular:** cinco PDF de imágenes con medida detectada 16,71 × 29,70 cm; en `Todos iguales` se mantenían cinco preguntas de tamaño, el bloque de configuración común estaba deshabilitado, presupuesto con cinco advertencias, lista con barra horizontal.
+- **Solución programada exclusivamente para PC:** pantalla de decisión de tamaño final por lote: A4, A3 o mantener original. Ejecuta la elección individual mediante los controles existentes del motor, uno por archivo, y deja que el motor actualice la clasificación. Después muestra color/caras/copias comunes cuando hay documentos compatibles. Los avisos repetitivos se condensan visualmente; originales siguen presentes en el DOM; se suprime scroll horizontal.
+- **No se presume que archivos con medidas no estándar son A4:** el cliente debe elegir explícitamente su tamaño final, sin alterar los cálculos existentes.
+- **Activa en Cloudflare privado:** `65216257-8e74-41e3-b96b-52c8b3b7d825` al 100%; version anterior para rollback `904e185d-73af-4480-837e-0c2474819504`.
+- **Pruebas ejecutadas:** 11/11 en GitHub; compilación funcional local y endpoints de acceso privado HTTP 401. Despliegue completado: [ejecución 44810794755](https://github.com/hernanchan/COTIZADOR/actions/runs/44810794755).
+- **Método de despliegue:** las fuentes del Worker original se recuperaron por el endpoint versionado de Cloudflare con `include=modules,sourcemaps`, sin alternar versiones activas. No se descargó ZIP ni se usaron claves fuera de los secretos de GitHub.
+- **Pendiente de aceptar:** validación interactiva del titular con las cinco imágenes originales; no declarar funcionalmente aprobado hasta observar selección común, cinco archivos listos y presupuesto.
+- **Versión comercial y móvil:** intactas. PR todavía en borrador; requiere aprobación personal y control de cambios antes de publicar a producción.
 
 ## Estado de publicación
 - Esta rama no afecta `main`; los cambios funcionales están exclusivamente en `integraciones/interfaz-pc/`.
