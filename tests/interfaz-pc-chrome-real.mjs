@@ -169,6 +169,34 @@ try{
  await page.locator('#zonaArchivos input[type=file]').first().setInputFiles([buffers[0]]);
  await page.waitForFunction(()=>document.querySelectorAll('#lista section.archivo').length===1,{timeout:20000});
  await page.waitForTimeout(600);
+ const single=await page.evaluate(()=>{
+  const rect=id=>{const e=document.getElementById(id);if(!e)return null;const r=e.getBoundingClientRect();return {top:r.top+scrollY,bottom:r.bottom+scrollY,visible:getComputedStyle(e).display!=='none'&&r.height>0};};
+  return {fileCount:document.querySelectorAll('#lista section.archivo').length,
+    summary:rect('pc-upload-summary'),drop:rect('zonaArchivos'),mode:rect('modoConfiguracion'),
+    step:rect('pc-size-step'),filebox:rect('pc-filebox'),modeCard:rect('pc-mode-card'),
+    summaryText:document.getElementById('pc-upload-summary')?.innerText,
+    stepParent:document.getElementById('pc-size-step')?.parentElement?.id};
+ });
+ assert(single.fileCount===1,'Se esperaba un PDF individual');
+ assert(single.summary?.visible,'Falta nombre del archivo justo debajo del selector de carga');
+ assert(single.summaryText?.includes(buffers[0].name),'La ficha compacta no identifica el archivo cargado');
+ assert(!single.mode?.visible,'Con un archivo se sigue mostrando Todos iguales / Por separado');
+ assert(single.step?.visible,'No aparece tamaño individual para el PDF no estándar');
+ assert(single.step.top-single.drop.bottom<32,'Los botones de tamaño quedaron lejos del archivo cargado');
+ assert(!single.filebox?.visible,'Las opciones individuales se muestran antes de confirmar tamaño');
+ console.log('PRUEBA_UN_ARCHIVO: archivo visible bajo carga; botones de tamaño a '+Math.round(single.step.top-single.drop.bottom)+' px; modo de lote oculto.');
+ await page.locator('#pc-size-buttons [data-target-size=a4]').click();
+ await page.waitForFunction(()=>document.querySelector('#pc-mode-card')?.hidden===true && document.querySelector('#pc-filebox')?.hidden===false,{timeout:15000});
+ const afterSingle=await page.evaluate(()=>{
+  const drop=document.getElementById('zonaArchivos').getBoundingClientRect();
+  const file=document.getElementById('pc-filebox').getBoundingClientRect();
+  return {gap:Math.round(file.top-drop.bottom),queueVisible:getComputedStyle(document.getElementById('pc-queue')).display!=='none',button:document.getElementById('pc-save')?.innerText};
+ });
+ assert(afterSingle.gap<35,'Opciones de impresión siguen demasiado abajo después de elegir A4: '+afterSingle.gap+'px');
+ assert(!afterSingle.queueVisible,'Lista de un único archivo duplicada');
+ assert(/Guardar archivo/.test(afterSingle.button),'No se adaptó el botón a un solo archivo');
+ console.log('PRUEBA_UN_ARCHIVO_COMPLETA: opciones bajo carga, distancia '+afterSingle.gap+' px, sin lista duplicada.');
+
  console.log('DIAGNOSTICO_UN_ARCHIVO: '+JSON.stringify(await page.evaluate(()=>{
    const ids=['zonaArchivos','pc-mode-card','modoConfiguracion','pc-size-step','pc-batch','pc-filebox','pc-queue','lista','pc-sidebar','presupuesto'];
    const describe=id=>{
