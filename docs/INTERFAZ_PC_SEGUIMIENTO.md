@@ -1,6 +1,6 @@
 # Interfaz PC — seguimiento único (20/11/2026)
 
-**Estado:** en desarrollo en rama aislada. **No publicado** en la web comercial.
+**Estado:** V4 de PC integrada como código fuente y pruebas en la rama aislada. **No desplegada** al Worker ni publicada en la web comercial.
 
 ## Decisiones aprobadas por el titular
 - Solo PC: no alterar el asistente móvil por pasos.
@@ -18,10 +18,12 @@
 - V4 con corrección de `Todos iguales` preparada y verificada localmente, **aún sin desplegar** al detener la secuencia de ZIP.
 - Archivo de trabajo previamente entregado en conversación: `SABER_PC_MOTOR_REAL_ENSAYO_V4_CONFIGURACION_COMUN_20261120.zip`.
 - El Worker de ensayo usa **tarifas históricas**, no el tarifario comercial vigente.
-- La fuente de UI V4 se conserva en el paquete; **hay que incorporar sus fuentes al repositorio antes de volver a desplegar**. Este documento registra el estado, no simula que el código ya esté versionado.
+- Las fuentes de interfaz V4 ya están integradas en esta rama: `integraciones/interfaz-pc/interfaz-pc.js` y `integraciones/interfaz-pc/interfaz-pc.css`.
+- Pruebas estáticas y de sintaxis de la rama: `tests/interfaz-pc-lote.test.mjs` (comando `node --test tests/interfaz-pc-lote.test.mjs`).
+- Estas fuentes **todavía no están vinculadas a un despliegue automático de Cloudflare**. El Worker de ensayo antiguo no se modifica por crear commits.
 
 ## Flujo único de trabajo, sin parches ZIP
-1. Centralizar fuentes del ensayo y cambios de PC en esta rama de GitHub.
+1. Centralizar fuentes de la interfaz PC en esta rama de GitHub. **Cumplido** para JS y CSS; el envoltorio Worker y su fuente comercial embebida aún deben consolidarse sin publicar secretos.
 2. Acumular correcciones y ejecutar pruebas automáticas antes de actualizar el Worker de ensayo.
 3. Validar en navegador con 5 imágenes y `Todos iguales`, y con mezcla de tipos.
 4. Publicar al Worker de ensayo solo el conjunto aprobado, sin tocar móvil ni producción.
@@ -36,7 +38,7 @@
 - PC y móvil comparten el motor de precios comercial **solo cuando se complete la integración futura**.
 
 ## Estado de publicación
-- Esta rama no afecta `main`.
+- Esta rama no afecta `main`; los cambios funcionales están exclusivamente en `integraciones/interfaz-pc/`.
 - No contiene secretos, ni archivos de clientes.
 - No despliega ni habilita ningún Worker.
-- Siguiente paso técnico: registrar los fuentes CSS/JS exactos de la V4 y organizar pruebas en repositorio.
+- Siguiente paso técnico: ejecutar las pruebas de la rama, conectar estos activos a la compilación del Worker de ensayo privado (sin tocar producción) y validar en navegador con cinco imágenes.
