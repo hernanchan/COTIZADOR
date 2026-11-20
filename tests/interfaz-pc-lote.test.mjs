@@ -99,3 +99,17 @@ test('los identificadores de archivos no dependen del orden visual',()=>{
  assert.match(js,/ready\.has\(ids\[i\]\)/);
  assert.match(js,/ready\.add\(fileKey\(c\)\)/);
 });
+
+test('con un solo archivo se omite la elección redundante Todos iguales / Por separado',()=>{
+ assert.match(js,/modeControl\.hidden=isSingle/);
+ assert.match(js,/modeCard\.hidden=isSingle&&sizeStep\.hidden/);
+ assert.match(js,/save\.textContent=isSingle\?'Guardar archivo'/);
+ assert.match(css,/saber-pc-single #pc-queue\{display:none!important\}/);
+});
+test('después de subir se muestran nombres antes de botones y tamaño individual visible',()=>{
+ assert.match(js,/by\('zonaArchivos'\)\.append\(uploadSummary\)/);
+ assert.match(js,/uploadSummary\.append\(heading,names\)/);
+ assert.match(js,/if\(isSingle && pendingSizeCount\)/);
+ assert.match(js,/sizeTitle\.textContent='2\. Elegí el tamaño para este archivo'/);
+ assert.match(css,/#pc-upload-summary/);
+});
