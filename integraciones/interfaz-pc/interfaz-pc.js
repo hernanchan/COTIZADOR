@@ -33,7 +33,7 @@ let selected=0,keys='',ready=new Set(),lastNote='';
 const cards=()=>Array.from(parent.querySelectorAll('section.archivo'));
 const commonMode=()=>document.querySelector('input[name="modoImpresionLote"][value="comun"]')?.checked===true;
 const groupName=c=>c.closest('section.grupo-pedido')?.querySelector('h3.titulo-grupo')?.textContent||'';
-const isCommonCompatible=c=>/^(Documentos (A3|A4|A5|Legal)|Tama(?:ño|\\xF1)o original menor que A4)/i.test(groupName(c));
+const isCommonCompatible=c=>/^(Documentos (A3|A4|A5|Legal)|Tamaño original menor que A4)/i.test(groupName(c));
 const metadata=c=>c.querySelector('.resumen-archivo')?.textContent||'Analizando archivo…';
 const fileValid=c=>!!c&&!c.classList.contains('archivo-no-admitido')&&
   !/Analizando PDF|Error de lectura/i.test(metadata(c))&&!c.querySelector('.pregunta-tamano')&&
@@ -42,14 +42,14 @@ const fileValid=c=>!!c&&!c.classList.contains('archivo-no-admitido')&&
 const commonFiles=()=>cards().filter(c=>isCommonCompatible(c)&&fileValid(c));
 const commonControl=name=>Array.from(by('configComunGlobal').querySelectorAll('select')).find(x=>(x.getAttribute('aria-label')||'').includes(name));
 const commonCopies=()=>by('configComunGlobal').querySelector('input[aria-label="Aplicar copias a todo el grupo"]');
-const basename=c=>(c.querySelector('.nombre')?.textContent||'Documento').replace(/^\\s*\\d+\\.\\s*/, '').trim();
+const basename=c=>(c.querySelector('.nombre')?.textContent||'Documento').replace(/^\s*\d+\.\s*/, '').trim();
 function openSelectedDetails(){
   const card=cards()[selected];if(!card)return;
   const expander=Array.from(card.querySelectorAll('button.editar')).find(b=>/M[aá]s opciones|Personalizar este PDF/i.test(b.textContent));
   if(expander&&expander.getAttribute('aria-expanded')==='false')expander.click();
 }
 function sync(){
- const list=cards(),nextKeys=list.map(basename).join('\\u0001');
+ const list=cards(),nextKeys=list.map(basename).join('@@SEP@@');
  if(nextKeys!==keys){keys=nextKeys;ready.clear();selected=Math.max(0,Math.min(selected,list.length-1));lastNote='';}
  if(selected>=list.length)selected=0;
  queue.replaceChildren();
