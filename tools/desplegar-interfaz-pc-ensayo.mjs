@@ -68,6 +68,8 @@ assert(target.data.includes(JSON.stringify(js))&&target.data.includes(JSON.strin
 const check=spawnSync(process.execPath,['--check','--input-type=module'],{input:target.data,encoding:'utf8',maxBuffer:10*1024*1024});
 assert(check.status===0,'Sintaxis invalida en Worker modificado: '+(check.stderr||'').slice(0,200));
 const metadata={main_module:target.filename,bindings:[...bindMap].map(([name])=>({name,type:'inherit'})),annotations:{'workers/message':'Libreria Saber PC V4 - solo ensayo aislado'}};
+if(typeof settings.compatibility_date==='string') metadata.compatibility_date=settings.compatibility_date;
+if(Array.isArray(settings.compatibility_flags)) metadata.compatibility_flags=settings.compatibility_flags;
 const form=new FormData();
 form.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'}),'metadata.json');
 for(const part of files) form.append(part.name,new Blob([part.data],{type:part.type.includes('javascript')?part.type:'application/javascript+module'}),part.filename);
