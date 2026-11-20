@@ -59,7 +59,7 @@ async function getParts(){
 // Cloudflare Beta Worker Versions permite consultar los módulos de una versión
 // exacta SIN cambiar cuál está activa. Nunca alternar despliegues para leer código.
 const originalSourceVersion='7e380acc-9a44-4703-bd57-9db6333b0cf8';
-const activeV4='feaea544-3f07-43c4-b85e-b796467ef48f';
+const activeV4='67bbf783-d1f3-4911-b59e-da5e1d891ada';
 assert(rollback===activeV4,'La version activa de ensayo cambió; no sobrescribir trabajos nuevos');
 const baseUrl='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(account)+
  '/workers/workers/'+encodeURIComponent(worker)+'/versions/'+originalSourceVersion+'?include=modules,sourcemaps';
@@ -105,7 +105,7 @@ function replaceSourceConstant(source,variable,value){
 wrapper=replaceSourceConstant(wrapper,'PC_CSS',css);
 wrapper=replaceSourceConstant(wrapper,'PC_JS',js);
 assert(wrapper.includes(JSON.stringify(js))&&wrapper.includes(JSON.stringify(css)),'Interfaz V4 no integrada en fuente');
-const directory=fs.mkdtempSync(path.join(os.tmpdir(),'saber-pc-v7-'));
+const directory=fs.mkdtempSync(path.join(os.tmpdir(),'saber-pc-v8-'));
 const srcDir=path.join(directory,'src');fs.mkdirSync(srcDir);
 for(const [key,value] of contents)fs.writeFileSync(path.join(srcDir,key),key==='ensayo-safe.mjs'?wrapper:value,'utf8');
 const output=path.join(directory,'ensayo-safe.mjs');
@@ -129,12 +129,12 @@ async function trialGet(route){
 for(const [route,expected] of [['/interfaz-pc',200],['/interfaz-pc.js',200],['/interfaz-pc.css',200],['/prueba-carga-unica',200],['/cotizar',404]]){
  const response=await trialGet(route);
  assert(response.status===expected,'Falla prueba local '+route+': '+response.status);
- if(route==='/interfaz-pc.js'){const body=await response.text();assert(body.includes("side.append(el('h2','','Tu presupuesto'),sizeStep")&&body.includes("const needsSize=c=>!!c.querySelector('.pregunta-tamano')"),'JS V7 no presente en local');}
- if(route==='/interfaz-pc.css')assert((await response.text()).includes('pc-size-step'),'CSS V7 no presente en local');
+ if(route==='/interfaz-pc.js'){const body=await response.text();assert(body.includes("modeCard.append(sizeStep)")&&body.includes("side.append(el('h2','','Tu presupuesto'),by('presupuesto'))")&&body.includes("guideToSize(nextKeys)")&&body.includes("const needsSize=c=>!!c.querySelector('.pregunta-tamano')"),'JS V8 no presente en local');}
+ if(route==='/interfaz-pc.css')assert((await response.text()).includes('pc-size-step'),'CSS V8 no presente en local');
 }
 console.log('COMPILADO_VALIDADO_LOCAL: autenticacion, UI V4, ruta previa, aislamiento');
 
-const metadata={main_module:'ensayo-safe.mjs',bindings:[...bindMap].map(([name])=>({name,type:'inherit'})),annotations:{'workers/message':'Libreria Saber PC V7 - solo ensayo aislado'}};
+const metadata={main_module:'ensayo-safe.mjs',bindings:[...bindMap].map(([name])=>({name,type:'inherit'})),annotations:{'workers/message':'Libreria Saber PC V8 - solo ensayo aislado'}};
 if(typeof settings.compatibility_date==='string')metadata.compatibility_date=settings.compatibility_date;
 if(Array.isArray(settings.compatibility_flags))metadata.compatibility_flags=settings.compatibility_flags;
 const form=new FormData();
@@ -142,10 +142,10 @@ form.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/js
 form.append('ensayo-safe.mjs',new Blob([bundled],{type:'application/javascript+module'}),'ensayo-safe.mjs');
 const version=await json('/versions?bindings_inherit=strict',{method:'POST',body:form});
 assert(/^[0-9a-f-]{36}$/i.test(version.id||''),'Version nueva no confirmada');
-console.log('ENSAYO_V7_PREPARADO: '+version.id);
+console.log('ENSAYO_V8_PREPARADO: '+version.id);
 let deployed=false;
 try{
- await json('/deployments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategy:'percentage',versions:[{version_id:version.id,percentage:100}],annotations:{'workers/message':'PC V7 - ensayo aislado; rollback guardado'}})});
+ await json('/deployments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategy:'percentage',versions:[{version_id:version.id,percentage:100}],annotations:{'workers/message':'PC V8 - ensayo aislado; rollback guardado'}})});
  deployed=true;
  let accepted=false;
  for(let attempt=0;attempt<15;attempt++){
@@ -159,7 +159,7 @@ try{
  assert(response.status===401,'Se esperaba acceso privado HTTP 401, resultado '+response.status);
  const jsResponse=await fetch('https://'+worker+'.libreriasaber.workers.dev/interfaz-pc.js',{redirect:'manual'});
  assert(jsResponse.status===401,'El archivo JS del ensayo no esta protegido, HTTP '+jsResponse.status);
- console.log('ENSAYO_V7_ACTIVO_VERIFICADO: '+version.id);
+ console.log('ENSAYO_V8_ACTIVO_VERIFICADO: '+version.id);
  console.log('WEB_COMERCIAL_INTACTA: si');
 }catch(err){
  console.error('VERIFICACION_FALLIDA: '+err.message);
