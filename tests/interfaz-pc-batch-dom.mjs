@@ -16,7 +16,8 @@ const html=`<!doctype html><html><body><main>
 </main></body></html>`;
 const {window}=new JSDOM(html,{runScripts:'outside-only',url:'https://saber-ampliaciones-ensayo-20261120.libreriasaber.workers.dev/interfaz-pc',pretendToBeVisual:true});
 window.matchMedia=()=>({matches:true});
-window.HTMLElement.prototype.scrollIntoView=()=>{};
+const scrollTargets=[];
+window.HTMLElement.prototype.scrollIntoView=function(){scrollTargets.push(this.id||this.className||'unknown');};
 const d=window.document;
 const state=Array.from({length:6},(_,i)=>({name:'imagen-0'+(i+1)+'.pdf',format:null}));
 function render(){
@@ -57,12 +58,15 @@ function render(){
 render();
 try{window.eval(script)}catch(e){throw Error('No pudo iniciarse la interfaz: '+e.message)}
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-await sleep(40);
+await sleep(410);
 const sizeStep=d.getElementById('pc-size-step');
 assert(sizeStep,'No existe selector de tamaño común');
-assert.equal(sizeStep.parentElement?.id,'pc-sidebar','El selector no está al lado del presupuesto');
+assert.equal(sizeStep.parentElement?.id,'pc-mode-card','El selector debe quedar debajo de «Todos iguales»');
+assert.equal(d.querySelector('#pc-sidebar #pc-size-step'),null,'El selector sigue erróneamente en el presupuesto');
+assert(scrollTargets.includes('pc-size-step'),'El cliente no fue guiado automáticamente hacia el selector al terminar de cargar');
 assert.equal(sizeStep.hidden,false,'El selector de tamaño no es visible');
 assert.equal(d.getElementById('pc-filebox').hidden,true,'Las fichas deben ocultarse hasta elegir tamaño');
+assert.equal(d.getElementById('pc-batch').hidden,true,'No se debe mostrar el formulario común antes de resolver el tamaño');
 const batchSize=d.querySelector('#pc-size-buttons button[data-target-size="a4"]');
 assert(batchSize,'No hay opción A4 para todos');
 batchSize.click();await sleep(1200);
@@ -70,6 +74,7 @@ assert.equal(state.filter(s=>s.format==='a4').length,6,'No se aplicó el tamaño
 assert.equal(d.querySelectorAll('#lista .pregunta-tamano').length,0,'Quedaron tamaños sin confirmar');
 assert.equal(sizeStep.hidden,true,'No se ocultó el paso de tamaño completado');
 assert.equal(d.getElementById('pc-filebox').hidden,false,'No se restituyó la lista después');
+assert.equal(d.getElementById('pc-batch').hidden,false,'No apareció color, caras y copias después de resolver tamaño');
 const save=d.getElementById('pc-batch-apply');
 assert.match(save.textContent,/Guardar 6 archivos de una vez/,'No se habilitó el guardado común');
 const selects=d.querySelectorAll('#configComunGlobal select');
@@ -79,4 +84,4 @@ d.querySelector('#configComunGlobal input').value='2';
 save.click();await sleep(80);
 assert.match(d.getElementById('pc-progress').textContent,/6 de 6 archivos configurados/,'No guardó seis de seis');
 assert.equal(d.getElementById('pc-next').disabled,false,'No habilitó revisión después de guardar seis');
-console.log('E2E DOM APROBADO: 6 PDF con Ploteo seleccionado -> 1 elección A4 -> 6 tamaños resueltos -> 1 configuración -> 6/6 listos.');
+console.log('E2E DOM APROBADO: 6 PDF -> autofoco en tamaño debajo de Todos iguales -> 1 elección A4 -> 6 tamaños resueltos -> 1 configuración -> 6/6 listos.');
