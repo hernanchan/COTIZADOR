@@ -63,9 +63,9 @@ test('PC incluye confirmacion de tamaño para todo el lote sin cambiar motor de 
  for(const text of ['A4 para todos','A3 para todos','Mantener tamaño original'])assert.ok(js.includes(text),text);
  assert.match(js,/button\.click\(\)/);
 });
-test('no aplica masivamente medidas a ploteos ya elegidos',()=>{
- assert.match(js,/eleccion-plotter-boton\.seleccionada/);
- assert.match(js,/\/Ploteo\/i\.test/);
+test('detecta medida pendiente sin depender del botón de Ploteo seleccionado',()=>{
+ assert.match(js,/const needsSize=c=>!!c\.querySelector\('\.pregunta-tamano'\)/);
+ assert.doesNotMatch(js,/const needsSize=[\s\S]*?\.eleccion-plotter-boton\.seleccionada/);
 });
 test('avisos de tamaños se agrupan visualmente, sin quitar advertencias originales',()=>{
  assert.match(js,/function condenseSizeWarnings\(count\)/);
