@@ -49,7 +49,7 @@ const fileValid=c=>!!c&&!c.classList.contains('archivo-no-admitido')&&
 const commonFiles=()=>cards().filter(c=>isCommonCompatible(c)&&fileValid(c));
 const needsSize=c=>!!c.querySelector('.pregunta-tamano')&&
  !c.classList.contains('archivo-no-admitido')&&
- !c.querySelector('.eleccion-plotter-boton.seleccionada');
+ !Array.from(c.querySelectorAll('.eleccion-plotter-boton.seleccionada')).some(b=>/Ploteo/i.test(b.textContent||''));
 const pendingSizes=()=>cards().filter(needsSize);
 function condenseSizeWarnings(count){
  const quote=by('presupuesto');
