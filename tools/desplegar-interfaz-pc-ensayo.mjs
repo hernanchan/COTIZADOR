@@ -56,7 +56,45 @@ async function getParts(){
  assert(files.length>0&&files.length<=25,'Cantidad inesperada de modulos');
  return files;
 }
-const parts=await getParts();
+// El build vigente V4 no expone su codigo por la API de contenido (HTTP 500).
+// Volvemos momentaneamente al build original de ensayo para leer el mapa
+// de fuentes y restauramos V4 SIEMPRE, antes de compilar o subir otra version.
+// Sin fuentes autenticas no se despliega ni se reconstruye el motor a ciegas.
+const originalSourceVersion='7e380acc-9a44-4703-bd57-9db6333b0cf8';
+const activeV4='904e185d-73af-4480-837e-0c2474819504';
+assert(rollback===activeV4,'La version actual del ensayo es distinta a V4; detenerse para no pisar cambios ajenos');
+async function promoteTo(version,message){
+ await json('/deployments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+  strategy:'percentage',versions:[{version_id:version,percentage:100}],annotations:{'workers/message':message}
+ })});
+ let ok=false;
+ for(let retry=0;retry<15;retry++){
+  const active=await json('/deployments');
+  const all=active.deployments?.[0]?.versions;
+  if(all?.length===1&&all[0].version_id===version&&Number(all[0].percentage)===100){ok=true;break;}
+  await new Promise(resolve=>setTimeout(resolve,600));
+ }
+ assert(ok,'Version de ensayo no confirmada tras propagar: '+version);
+}
+let parts,needsRestore=false;
+try{
+ await promoteTo(originalSourceVersion,'Obtener fuente original verificada para PC V5; retorno automatico a V4');
+ needsRestore=true;
+ for(let attempt=0;attempt<14;attempt++){
+  try{
+   const fetched=await getParts();
+   const mapFound=fetched.some(p=>{try{return JSON.parse(p.data).sources?.some(x=>String(x).includes('ensayo-safe.mjs'))}catch{return false;}});
+   if(mapFound){parts=fetched;break;}
+  }catch(err){if(attempt===13)throw err;}
+  await new Promise(resolve=>setTimeout(resolve,500));
+ }
+ assert(parts,'No se pudo recuperar mapa de fuentes autenticas del Worker base');
+}finally{
+ // El retorno a la version V4 es obligatorio aun si falla la lectura del motor.
+ if(needsRestore)await promoteTo(activeV4,'Restaurar V4 del ensayo tras recuperacion de fuente');
+}
+console.log('ENSAYO_BASE_RESTAURADO '+activeV4);
+
 const sourceMaps=parts.map(p=>{try{return {part:p,map:JSON.parse(p.data)}}catch{return null}}).filter(x=>x?.map?.version===3&&Array.isArray(x.map.sources)&&Array.isArray(x.map.sourcesContent));
 assert(sourceMaps.length===1,'Se esperaba un solo mapa de fuentes Cloudflare; no publicar');
 const map=sourceMaps[0].map;
@@ -88,7 +126,7 @@ function replaceSourceConstant(source,variable,value){
 wrapper=replaceSourceConstant(wrapper,'PC_CSS',css);
 wrapper=replaceSourceConstant(wrapper,'PC_JS',js);
 assert(wrapper.includes(JSON.stringify(js))&&wrapper.includes(JSON.stringify(css)),'Interfaz V4 no integrada en fuente');
-const directory=fs.mkdtempSync(path.join(os.tmpdir(),'saber-pc-v4-'));
+const directory=fs.mkdtempSync(path.join(os.tmpdir(),'saber-pc-v5-'));
 const srcDir=path.join(directory,'src');fs.mkdirSync(srcDir);
 for(const [key,value] of contents)fs.writeFileSync(path.join(srcDir,key),key==='ensayo-safe.mjs'?wrapper:value,'utf8');
 const output=path.join(directory,'ensayo-safe.mjs');
@@ -112,12 +150,12 @@ async function trialGet(route){
 for(const [route,expected] of [['/interfaz-pc',200],['/interfaz-pc.js',200],['/interfaz-pc.css',200],['/prueba-carga-unica',200],['/cotizar',404]]){
  const response=await trialGet(route);
  assert(response.status===expected,'Falla prueba local '+route+': '+response.status);
- if(route==='/interfaz-pc.js')assert((await response.text()).includes('saveCommon'),'JS V4 no presente en local');
- if(route==='/interfaz-pc.css')assert((await response.text()).includes('pc-batch-apply'),'CSS V4 no presente en local');
+ if(route==='/interfaz-pc.js')assert((await response.text()).includes('applySizeForBatch'),'JS V5 no presente en local');
+ if(route==='/interfaz-pc.css')assert((await response.text()).includes('pc-size-step'),'CSS V5 no presente en local');
 }
 console.log('COMPILADO_VALIDADO_LOCAL: autenticacion, UI V4, ruta previa, aislamiento');
 
-const metadata={main_module:'ensayo-safe.mjs',bindings:[...bindMap].map(([name])=>({name,type:'inherit'})),annotations:{'workers/message':'Libreria Saber PC V4 - solo ensayo aislado'}};
+const metadata={main_module:'ensayo-safe.mjs',bindings:[...bindMap].map(([name])=>({name,type:'inherit'})),annotations:{'workers/message':'Libreria Saber PC V5 - solo ensayo aislado'}};
 if(typeof settings.compatibility_date==='string')metadata.compatibility_date=settings.compatibility_date;
 if(Array.isArray(settings.compatibility_flags))metadata.compatibility_flags=settings.compatibility_flags;
 const form=new FormData();
@@ -125,18 +163,24 @@ form.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/js
 form.append('ensayo-safe.mjs',new Blob([bundled],{type:'application/javascript+module'}),'ensayo-safe.mjs');
 const version=await json('/versions?bindings_inherit=strict',{method:'POST',body:form});
 assert(/^[0-9a-f-]{36}$/i.test(version.id||''),'Version nueva no confirmada');
-console.log('VERSION_PRIVADA_PREPARADA: '+version.id);
+console.log('ENSAYO_V5_PREPARADO: '+version.id);
 let deployed=false;
 try{
- await json('/deployments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategy:'percentage',versions:[{version_id:version.id,percentage:100}],annotations:{'workers/message':'PC V4 - ensayo aislado; rollback guardado'}})});
+ await json('/deployments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategy:'percentage',versions:[{version_id:version.id,percentage:100}],annotations:{'workers/message':'PC V5 - ensayo aislado; rollback guardado'}})});
  deployed=true;
- const active=await json('/deployments');
- assert(active.deployments?.[0]?.versions?.length===1&&active.deployments[0].versions[0].version_id===version.id&&Number(active.deployments[0].versions[0].percentage)===100,'La version privada no figura desplegada al 100%');
+ let accepted=false;
+ for(let attempt=0;attempt<15;attempt++){
+  const active=await json('/deployments');
+  const versions=active.deployments?.[0]?.versions||[];
+  if(versions.length===1&&versions[0].version_id===version.id&&Number(versions[0].percentage)===100){accepted=true;break}
+  await new Promise(resolve=>setTimeout(resolve,650));
+ }
+ assert(accepted,'La version nueva de ensayo no figura desplegada al 100%');
  const response=await fetch('https://'+worker+'.libreriasaber.workers.dev/interfaz-pc',{redirect:'manual'});
  assert(response.status===401,'Se esperaba acceso privado HTTP 401, resultado '+response.status);
  const jsResponse=await fetch('https://'+worker+'.libreriasaber.workers.dev/interfaz-pc.js',{redirect:'manual'});
  assert(jsResponse.status===401,'El archivo JS del ensayo no esta protegido, HTTP '+jsResponse.status);
- console.log('ENSAYO_V4_DESPLEGADO_COMPROBADO: '+version.id);
+ console.log('ENSAYO_V5_ACTIVO_VERIFICADO: '+version.id);
  console.log('WEB_COMERCIAL_INTACTA: si');
 }catch(err){
  console.error('VERIFICACION_FALLIDA: '+err.message);
