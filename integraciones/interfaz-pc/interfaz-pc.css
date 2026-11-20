@@ -63,6 +63,30 @@
  #pc-trial-note{color:#9b5709;font-size:11px;line-height:1.5;margin-top:12px;font-weight:700}
  #pc-left #resumenPedido{margin-top:0!important}
 }
+@media(min-width:900px){
+ #pc-size-step{padding:14px 14px 12px;border:1px solid #e7ba78;background:#fff9ef;border-radius:10px;margin-bottom:13px}
+ #pc-size-step[hidden]{display:none!important}
+ #pc-size-title{margin:0 0 6px;font:800 17px/1.3 system-ui;color:#754208}
+ #pc-size-description{font:13px/1.45 system-ui;color:#674821;margin:0 0 11px}
+ #pc-size-buttons{display:flex;flex-wrap:wrap;gap:8px}
+ #pc-size-buttons button{min-height:45px;flex:1 1 140px;border:1px solid #b47c34;border-radius:8px;background:#fff;color:#5d3b13;font:800 13px/1.3 system-ui;padding:9px 12px;cursor:pointer}
+ #pc-size-buttons button:first-child{background:#0e5078;color:white;border-color:#0e5078}
+ #pc-size-buttons button:disabled{opacity:.6;cursor:wait}
+ #pc-size-status{font:650 12px/1.4 system-ui;color:#275475;margin:7px 0 0}
+ #pc-size-status:empty{display:none}
+ #pc-batch #configComunGlobal[hidden]{display:none!important}
+ #pc-batch #configComunGlobal{min-width:0}
+ #pc-queue{min-width:0;width:100%;overflow-x:hidden}
+ #pc-queue button{min-width:0;max-width:100%;box-sizing:border-box;overflow:hidden}
+ #pc-original-list,#pc-original-list #lista,#pc-original-list .grupo-pedido,#pc-original-list .archivo{min-width:0;max-width:100%;box-sizing:border-box;overflow-x:clip}
+ #pc-original-list .archivo .fila,#pc-original-list .archivo .fila-principal{min-width:0;max-width:100%;overflow-wrap:anywhere}
+ #pc-original-list .archivo .fila{display:flex!important;gap:9px!important;align-items:flex-start}
+ #pc-original-list .archivo .nombre{min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:break-word}
+ #pc-original-list .archivo .pregunta-tamano{max-width:100%;min-width:0;display:flex;flex-wrap:wrap;gap:7px}
+ #pc-original-list .archivo button{white-space:normal;min-width:0}
+ #pc-sidebar #presupuesto .pc-collapsed-warning{display:none!important}
+ #pc-quote-size-summary{border:1px solid #f0ce9e;background:#fff2de;border-radius:8px;padding:10px;margin:7px 0;color:#815013;font:700 13px/1.4 system-ui}
+}
 @media(min-width:900px) and (max-width:1170px){
  #pc-shell{grid-template-columns:minmax(0,1.6fr) minmax(265px,.8fr)}
  #pc-filegrid{grid-template-columns:1fr}
