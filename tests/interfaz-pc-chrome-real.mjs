@@ -67,13 +67,20 @@ const messages=[];
 page.on('pageerror',e=>messages.push('JS ERROR: '+e.message.slice(0,200)));
 page.on('console',e=>{if(e.type()==='error')messages.push('CONSOLE ERROR: '+e.text().slice(0,200))});
 page.on('requestfailed',r=>messages.push('REQUEST FAILED: '+r.url().slice(0,120)));
+page.on('response',async response=>{
+ if(response.status()<400||!response.url().startsWith(BASE))return;
+ const target=new URL(response.url());
+ console.log('HTTP_BROWSER_'+response.status()+' '+response.request().method()+' '+target.pathname);
+});
 await page.route('**/*',async route=>{
  const request=route.request(),address=request.url();
  if(!address.startsWith(BASE+'/'))return route.continue();
  try{
   const headers={...request.headers(),authorization:auth};
   delete headers.host;
-  const response=await trial.fetch(new Request(address,{method:request.method(),headers}),env,{waitUntil(){}});
+  const method=request.method();
+  const body=['GET','HEAD'].includes(method)?undefined:request.postDataBuffer()||undefined;
+  const response=await trial.fetch(new Request(address,{method,headers,body}),env,{waitUntil(){}});
   const buffer=Buffer.from(await response.arrayBuffer());
   await route.fulfill({status:response.status,body:buffer,headers:{'content-type':response.headers.get('content-type')||'text/plain;charset=UTF-8'}});
  }catch(e){
