@@ -14,6 +14,8 @@
  #pc-upload-summary .pc-upload-names{display:flex;flex-wrap:wrap;gap:5px;max-width:100%}
  #pc-upload-summary .pc-upload-name{display:inline-block;min-width:0;max-width:100%;overflow-wrap:anywhere;font:650 11px/1.4 system-ui;border:1px solid #d0e2ea;background:white;color:#224d66;border-radius:7px;padding:4px 7px}
  body.saber-pc-single #pc-mode-card[hidden]{display:none!important}
+ body.saber-pc-single #pc-mode-card:not([hidden]){padding:0!important}
+ body.saber-pc-single #pc-mode-card #pc-size-step{margin:0!important;padding:13px 14px!important;border-radius:10px!important}
  body.saber-pc-single #pc-queue{display:none!important}
  body.saber-pc-single #pc-filegrid{grid-template-columns:minmax(0,1fr)!important}
  body.saber-pc-single #pc-filebox{padding:13px 16px!important}
