@@ -18,13 +18,7 @@ const WORKER='saber-ampliaciones-ensayo-20261120';
 const BASE='https://'+WORKER+'.libreriasaber.workers.dev';
 const SOURCE_VERSION='7e380acc-9a44-4703-bd57-9db6333b0cf8';
 const assert=(v,msg)=>{if(!v)throw Error(msg)};
-let ui=fs.readFileSync('integraciones/interfaz-pc/interfaz-pc.js','utf8');
-const setMarker="ready=new Set(),lastNote=";
-assert(ui.includes(setMarker),'Estado de UI cambió');
-ui=ui.replace(setMarker,`ready=new (class extends Set{
- clear(){console.warn('SABER_READY_CLEAR',new Error().stack?.split('\\n').slice(1,4).join('|'));return super.clear();}
- delete(id){console.warn('SABER_READY_DELETE',id,new Error().stack?.split('\\n').slice(1,4).join('|'));return super.delete(id);}
-})(),lastNote=`);
+const ui=fs.readFileSync('integraciones/interfaz-pc/interfaz-pc.js','utf8');
 const css=fs.readFileSync('integraciones/interfaz-pc/interfaz-pc.css','utf8');
 const url='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(ACCOUNT)+'/workers/workers/'+WORKER+'/versions/'+SOURCE_VERSION+'?include=modules,sourcemaps';
 const res=await fetch(url,{headers:{Authorization:'Bearer '+TOKEN}});
@@ -71,7 +65,7 @@ const context=await browser.newContext({viewport:{width:1440,height:900},ignoreH
 const page=await context.newPage();
 const messages=[];
 page.on('pageerror',e=>messages.push('JS ERROR: '+e.message.slice(0,200)));
-page.on('console',e=>{if(e.type()==='error')messages.push('CONSOLE ERROR: '+e.text().slice(0,200));if(e.text().startsWith('SABER_READY'))console.log(e.text().slice(0,900));});
+page.on('console',e=>{if(e.type()==='error')messages.push('CONSOLE ERROR: '+e.text().slice(0,200));});
 page.on('requestfailed',r=>messages.push('REQUEST FAILED: '+r.url().slice(0,120)));
 page.on('response',async response=>{
  if(response.status()<400||!response.url().startsWith(BASE))return;
