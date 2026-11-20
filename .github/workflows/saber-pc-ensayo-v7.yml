@@ -1,4 +1,4 @@
-name: Saber - actualizar interfaz PC del ensayo privado
+name: Saber - actualizar interfaz PC del ensayo privado V10
 on:
   push:
     branches:
@@ -33,7 +33,7 @@ jobs:
         run: npm install --no-save --ignore-scripts --no-audit --no-fund jsdom@26.1.0
       - name: Reproducir 6 PDF, reordenamiento y preservación del guardado en lote
         run: node tests/interfaz-pc-batch-dom.mjs
-      - name: Activar V9 con guardado estable en el Worker privado y rollback a V8
+      - name: Activar V10 con botones junto a archivos y rollback a V9
         env:
           SABER_CF_ACCOUNT_ID: ${{ secrets.SABER_CF_ACCOUNT_ID }}
           SABER_CF_DEPLOY_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
