@@ -34,8 +34,14 @@ let deployed=false;
 try{
  await api('/deployments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategy:'percentage',versions:[{version_id:candidate,percentage:100}],annotations:{'workers/message':'Saber V4 PC - solo entorno de ensayo privado'}})});
  deployed=true;
- const active=await api('/deployments');
- assert(active.deployments?.[0]?.versions?.length===1&&active.deployments[0].versions[0].version_id===candidate&&Number(active.deployments[0].versions[0].percentage)===100,'Version activa no coincide');
+ let confirmed=false,seen=[];
+ for(let attempt=0;attempt<12;attempt++){
+  const active=await api('/deployments');
+  seen=active.deployments?.[0]?.versions||[];
+  if(seen.length===1&&seen[0].version_id===candidate&&Number(seen[0].percentage)===100){confirmed=true;break}
+  await new Promise(resolve=>setTimeout(resolve,750));
+ }
+ assert(confirmed,'Version activa no coincide tras reintentos: '+JSON.stringify(seen.map(x=>({id:x.version_id,percentage:x.percentage}))));
  const base='https://'+name+'.libreriasaber.workers.dev';
  for(const p of ['/interfaz-pc','/interfaz-pc.js','/interfaz-pc.css','/prueba-carga-unica']){
   const response=await fetch(base+p,{redirect:'manual'});
