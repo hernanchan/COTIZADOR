@@ -48,9 +48,10 @@ const fileValid=c=>!!c&&!c.classList.contains('archivo-no-admitido')&&
   (!c.querySelector('.saber-ampliacion [role="alert"] input[type="checkbox"]')||
     c.querySelector('.saber-ampliacion [role="alert"] input[type="checkbox"]').checked);
 const commonFiles=()=>cards().filter(c=>isCommonCompatible(c)&&fileValid(c));
+// Una pregunta de tamaño no resuelta SIEMPRE se debe resolver, incluso cuando
+// el selector "Impresión común / Ploteo / Ampliación" tiene un estilo activo.
 const needsSize=c=>!!c.querySelector('.pregunta-tamano')&&
- !c.classList.contains('archivo-no-admitido')&&
- !Array.from(c.querySelectorAll('.eleccion-plotter-boton.seleccionada')).some(b=>/Ploteo/i.test(b.textContent||''));
+ !c.classList.contains('archivo-no-admitido');
 const pendingSizes=()=>cards().filter(needsSize);
 function condenseSizeWarnings(count){
  const quote=by('presupuesto');
@@ -59,7 +60,7 @@ function condenseSizeWarnings(count){
  let summary=by('pc-quote-size-summary');
  if(count>1&&warning.length>1){
   if(!summary){summary=el('p','pc-quote-size-summary');quote.prepend(summary);}
-  summary.textContent=count+' archivos necesitan confirmar tamaño. Elegilo una sola vez a la izquierda.';
+  summary.textContent=count+' archivos necesitan confirmar tamaño. Elegilo una sola vez en el panel de presupuesto.';
  }else summary?.remove();
 }
 function locateSizeOption(card,size){
