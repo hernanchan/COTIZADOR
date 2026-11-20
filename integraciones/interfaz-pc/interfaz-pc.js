@@ -22,7 +22,7 @@ const sizeButtons=el('div','pc-size-buttons'),sizeStatus=el('p','pc-size-status'
 const sizeChoices=[['a4','A4 para todos'],['a3','A3 para todos'],['original','Mantener tamaño original']];
 for(const [value,label] of sizeChoices){const button=el('button','',label);button.type='button';button.dataset.targetSize=value;sizeButtons.append(button);}
 sizeStep.append(sizeTitle,sizeDescription,sizeButtons,sizeStatus);
-batch.append(el('h2','','Configuración para todas las compatibles'),sizeStep,by('configComunGlobal'),batchButton,batchHelp);
+batch.append(el('h2','','2. Configuración común: color, caras y copias'),by('configComunGlobal'),batchButton,batchHelp);
 left.append(batch,by('estado'));
 const filebox=el('section','pc-filebox'),grid=el('div','pc-filegrid'),queue=el('nav','pc-queue'),originalList=el('div','pc-original-list');
 queue.setAttribute('aria-label','Archivos del pedido');
@@ -30,7 +30,8 @@ originalList.append(by('anilladosConjuntos'),by('lista'));grid.append(queue,orig
 filebox.append(el('h2','','Configurá tus archivos'),el('p','pc-instruction','Seleccioná un archivo, elegí sus opciones y presioná «Guardar y siguiente».'),grid);
 const actions=el('div','pc-config-actions'),save=el('button','pc-save','Guardar y siguiente →'),note=el('span','pc-config-status','Subí tus archivos para comenzar.');
 save.type='button';actions.append(save,note);filebox.append(actions);left.append(filebox,by('resumenPedido'));
-side.append(el('h2','','Tu presupuesto'),by('presupuesto'));
+side.append(el('h2','','Tu presupuesto'),sizeStep,by('presupuesto'));
+sizeTitle.textContent='1. Elegí el tamaño final para todos';
 const progress=el('div','pc-progress','0 de 0 configurados'),message=el('div','pc-message','Cargá los archivos para empezar.'),next=el('button','pc-next','Siguiente: revisar pedido');
 next.type='button';next.disabled=true;side.append(progress,message,next,el('p','pc-trial-note','ENSAYO · Usa tarifas de referencia del 21/08/2026. No se envían pedidos ni se habilitan cobros.'));
 side.append(by('prepararPedido'));root.append(shell);
@@ -53,7 +54,7 @@ const needsSize=c=>!!c.querySelector('.pregunta-tamano')&&
 const pendingSizes=()=>cards().filter(needsSize);
 function condenseSizeWarnings(count){
  const quote=by('presupuesto');
- const warning=Array.from(quote.querySelectorAll('p.advertencia')).filter(p=>/Confirmar tamaño final/i.test(p.textContent||''));
+ const warning=Array.from(quote.querySelectorAll('.advertencia')).filter(p=>/Confirmar tamaño final/i.test(p.textContent||''));
  warning.forEach(p=>p.classList.toggle('pc-collapsed-warning',count>1));
  let summary=by('pc-quote-size-summary');
  if(count>1&&warning.length>1){
@@ -113,15 +114,18 @@ function sync(){
  if(selected>=list.length)selected=0;
  queue.replaceChildren();
  const count=list.length;
- batch.hidden=!commonMode();sizeStep.hidden=!commonMode();
+ batch.hidden=!commonMode();sizeStep.hidden=!commonMode();filebox.hidden=false;
  if(commonMode()){
   const pendingSizeCount=pendingSizes().length;
   sizeStep.hidden=pendingSizeCount===0;
   if(pendingSizeCount){
-   sizeTitle.textContent='Confirmá el tamaño de '+pendingSizeCount+' archivo'+(pendingSizeCount===1?'':'s');
+   sizeTitle.textContent='1. Tamaño final para '+pendingSizeCount+' archivo'+(pendingSizeCount===1?'':'s');
+   filebox.hidden=true;
+   by('configComunGlobal').hidden=true;
    sizeDescription.textContent='Se detectaron medidas diferentes de A4. Elegí A4, A3 o mantener el tamaño original. El ajuste a A4/A3 es proporcional y no recorta.';
   }
   const eligible=commonFiles().length;
+  if(!pendingSizeCount){filebox.hidden=false;by('configComunGlobal').hidden=false;}
   batchButton.disabled=eligible===0||!by('configComunGlobal').querySelector('.opciones-comunes');
   batchButton.textContent=eligible?'Guardar '+eligible+' archivo'+(eligible===1?'':'s')+' de una vez':'Sin impresiones comunes compatibles';
   if(!eligible)batchHelp.textContent=pendingSizeCount?'Primero confirmá el tamaño final para el lote. Después aparecerán las opciones comunes de impresión.':'Los archivos especiales y ploteos se configuran individualmente.';
@@ -143,7 +147,9 @@ function sync(){
  const pending=count-ready.size;
  condenseSizeWarnings(commonMode()?pendingSizes().length:0);
  if(!count){message.textContent='Cargá los archivos para empezar.';message.className='';save.disabled=true;}
- else if(pending){message.textContent=lastNote||('⚠ Faltan configurar '+pending+' archivo'+(pending!==1?'s':'')+'. El pedido no puede continuar todavía.');message.className='';save.disabled=false;}
+ else if(pending){
+   const pendingSizesCount=commonMode()?pendingSizes().length:0;
+   message.textContent=pendingSizesCount?'Primero elegí el tamaño para los '+pendingSizesCount+' archivos aquí arriba. Después configurás todos juntos.':lastNote||('⚠ Faltan configurar '+pending+' archivo'+(pending!==1?'s':'')+'. El pedido no puede continuar todavía.');message.className='';save.disabled=false;}
  else {message.textContent='✓ Todos los archivos guardados. '+(by('prepararPedido').disabled?'Esperá a que termine la cotización.':'Ya podés revisar el pedido.');message.className='pc-complete';save.disabled=false;}
  next.disabled=!(count>0&&pending===0&&!by('prepararPedido').disabled);
  note.textContent=count?'Archivo '+(selected+1)+' de '+count+(ready.has(selected)?' · guardado':' · pendiente'):'Subí tus archivos para comenzar.';
