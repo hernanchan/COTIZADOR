@@ -55,3 +55,21 @@ test('guardado individual abre siguiente pendiente',()=>{
  assert.match(js,/save\.onclick=saveCurrent/);
  assert.match(js,/findIndex\(\(x,i\)=>i>selected&&!ready\.has\(i\)\)/);
 });
+
+test('PC incluye confirmacion de tamaño para todo el lote sin cambiar motor de cotizacion',()=>{
+ assert.match(js,/function applySizeForBatch\(size\)/);
+ assert.match(js,/const pendingSizes=/);
+ assert.match(js,/\.pregunta-tamano button\.tamano-opcion/);
+ for(const text of ['A4 para todos','A3 para todos','Mantener tamaño original'])assert.ok(js.includes(text),text);
+ assert.match(js,/button\.click\(\)/);
+});
+test('no aplica masivamente medidas a ploteos ya elegidos',()=>{
+ assert.match(js,/eleccion-plotter-boton\.seleccionada/);
+ assert.match(js,/\/Ploteo\/i\.test/);
+});
+test('avisos de tamaños se agrupan visualmente, sin quitar advertencias originales',()=>{
+ assert.match(js,/function condenseSizeWarnings\(count\)/);
+ assert.match(js,/pc-collapsed-warning/);
+ assert.match(css,/pc-collapsed-warning/);
+ assert.match(css,/overflow-x:hidden/);
+});
