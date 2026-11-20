@@ -1,6 +1,6 @@
 # Interfaz PC — seguimiento único (20/11/2026)
 
-**Estado:** V4 de PC integrada como código fuente y pruebas en la rama aislada. **No desplegada** al Worker ni publicada en la web comercial.
+**Estado:** V4 de PC integrada en la rama y **desplegada solo en el Worker privado de ensayo** el 20/11/2026. **NO publicada en la web comercial**.
 
 ## Decisiones aprobadas por el titular
 - Solo PC: no alterar el asistente móvil por pasos.
@@ -37,8 +37,17 @@
 - Ploteo de 61 PPP: advertencia visible y aceptación expresa, nunca automática.
 - PC y móvil comparten el motor de precios comercial **solo cuando se complete la integración futura**.
 
+## Despliegue de ensayo verificado (20/11/2026)
+- URL privada: `https://saber-ampliaciones-ensayo-20261120.libreriasaber.workers.dev/interfaz-pc`.
+- Versión Cloudflare activa: `904e185d-73af-4480-837e-0c2474819504` (100%).
+- GitHub Actions: [ejecución aprobada #44808818799](https://github.com/hernanchan/COTIZADOR/actions/runs/44808818799). Las 8 pruebas estructurales de PC aprobaron.
+- El flujo confirmó HTTP 401 sin contraseña para `/interfaz-pc`, `/interfaz-pc.js`, `/interfaz-pc.css` y la página de ensayo anterior.
+- Ante fallas de verificación, el desplegador hizo rollback a `7e380acc-9a44-4703-bd57-9db6333b0cf8`; el despliegue final fue verificado exitosamente.
+- **Pendiente:** prueba interactiva del usuario con cinco imágenes, modo «Todos iguales», cálculo y avisos. Sin esa prueba no afirmar aceptación comercial.
+- El flujo actual **promueve una versión específica ya construida**, no genera compilaciones futuras automáticamente. Para próximas correcciones de JS/CSS deberá prepararse una nueva versión desde fuentes verificadas y actualizar el despliegue controlado. No reactivar V4 vieja ante cambios nuevos.
+
 ## Estado de publicación
 - Esta rama no afecta `main`; los cambios funcionales están exclusivamente en `integraciones/interfaz-pc/`.
 - No contiene secretos, ni archivos de clientes.
-- No despliega ni habilita ningún Worker.
-- Siguiente paso técnico: ejecutar las pruebas de la rama, conectar estos activos a la compilación del Worker de ensayo privado (sin tocar producción) y validar en navegador con cinco imágenes.
+- El despliegue aislado del Worker de ensayo V4 está confirmado; no se modifica ni habilita ningún Worker comercial.
+- Siguiente paso: confirmar la UX en navegador con cinco imágenes y modo «Todos iguales»; después integrar mejoras nuevas sin regresiones.
