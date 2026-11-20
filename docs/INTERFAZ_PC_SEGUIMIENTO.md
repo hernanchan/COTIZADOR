@@ -1,6 +1,6 @@
 # Interfaz PC — seguimiento único (20/11/2026)
 
-**Estado:** V8 de PC con tamaño del lote bajo «Todos iguales» y navegación guiada, **activa solo en el Worker privado de ensayo** el 20/11/2026. **NO publicada en la web comercial**.
+**Estado:** V9 de PC con tamaño y configuración por lote más estado estable ante reordenamiento, **activa solo en el Worker privado de ensayo** el 20/11/2026. **NO publicada en la web comercial**.
 
 ## Decisiones aprobadas por el titular
 - Solo PC: no alterar el asistente móvil por pasos.
@@ -82,6 +82,15 @@
 - **Cloudflare privado:** versión activa `09777680-8d8b-4b2b-b5ef-37c9f8e2022b` (V8). Versión para rollback `67bbf783-d1f3-4911-b59e-da5e1d891ada` (V7).
 - **Evidencia despliegue:** [GitHub Actions #44818437082](https://github.com/hernanchan/COTIZADOR/actions/runs/44818437082). Compilación verificada; rutas de ensayo privadas, HTTP 401 sin autenticación; la web comercial permanece intacta.
 - **Pendiente:** prueba visual/interactiva del usuario en Chrome con sus archivos originales. La simulación DOM no demuestra interacción humana ni precio real; el PR permanece en borrador y no se integra a producción sin autorización.
+
+## V9 — Guardado estable comprobado en Chrome (20/11/2026)
+- **Causa encontrada:** durante la reclasificación/cotización el motor reordena temporalmente las fichas `section.archivo`. La interfaz PC V8 almacenaba los estados `Configurado` por índice y comparaba el orden de los nombres; por ello podía perder el guardado del lote y deshabilitar «Siguiente» después de cotizar.
+- **Solución V9:** IDs por archivo/nombre y ordinal de repetidos, firma ordenada para detectar cambios reales de membresía y restauración de selección según ID. Ya no se invalida todo cuando el motor reordena los documentos. El cliente sigue viendo una ficha seleccionada y guardado común para compatibles.
+- **Prueba integral con navegador real:** Playwright Chromium en GitHub Actions, con cinco PDFs sintéticos de **16,71 × 29,70 cm** servidos desde el Worker original reconstruido **en memoria**, sin subir al negocio. Flujo: subir cinco archivos → seleccionar «Todos iguales» → A4 para todos → B/N, simple faz y copias → cotización real del ensayo ($500 **solo de referencia**) → 5/5 configurados → «Siguiente» habilitado → reordenar elementos DOM → 5/5 permanece y «Siguiente» sigue habilitado. [Ejecución de Chrome aprobada #44821614947](https://github.com/hernanchan/COTIZADOR/actions/runs/44821614947).
+- **Prueba adicional:** seis fichas PDF con «Ploteo / Ampliación» inicialmente seleccionado, confirmación de medida A4, 6/6 guardados y conservación de estado al invertir el orden. **14/14 controles estructurales y prueba DOM aprobadas** en [ejecución de despliegue #44821865598](https://github.com/hernanchan/COTIZADOR/actions/runs/44821865598).
+- **Cloudflare privado:** versión V9 activa `063fca17-e0fd-4ee7-8ce1-b02e1fd637d2` (100%). Rollback a V8 `09777680-8d8b-4b2b-b5ef-37c9f8e2022b`. Acceso HTTP 401 sin contraseña comprobado por el despliegue.
+- **Alcance inmutable:** sin cambios al Worker comercial, tarifas reales, pagos, Central, transportes o asistente móvil. Este PR **sigue en borrador**. La autorización de propietario en GitHub no existe para este SHA y el control Saber puede fallar legítimamente.
+- **Pendiente:** aprobación visual/operativa del titular en la V9 desde PC. El precio de referencia del ensayo no demuestra precios comerciales vigentes y las pruebas con documentos sintéticos no equivalen a una orden comercial.
 
 ## Estado de publicación
 - Esta rama no afecta `main`; los cambios funcionales están exclusivamente en `integraciones/interfaz-pc/`.
