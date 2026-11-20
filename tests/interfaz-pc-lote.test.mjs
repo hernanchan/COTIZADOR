@@ -65,7 +65,8 @@ test('PC incluye confirmacion de tamaño para todo el lote sin cambiar motor de 
 });
 test('detecta medida pendiente sin depender del botón de Ploteo seleccionado',()=>{
  assert.match(js,/const needsSize=c=>!!c\.querySelector\('\.pregunta-tamano'\)/);
- assert.doesNotMatch(js,/const needsSize=[\s\S]*?\.eleccion-plotter-boton\.seleccionada/);
+ const needsSizeExpression=js.slice(js.indexOf('const needsSize='),js.indexOf('const pendingSizes='));
+ assert.doesNotMatch(needsSizeExpression,/\.eleccion-plotter-boton\.seleccionada/);
 });
 test('avisos de tamaños se agrupan visualmente, sin quitar advertencias originales',()=>{
  assert.match(js,/function condenseSizeWarnings\(count\)/);
