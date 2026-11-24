@@ -17,6 +17,7 @@ const copy=c=>c.querySelector('input[aria-label^="Cantidad de copias"]');
 const quality=c=>amp(c)?.querySelector('[role=alert] input[type=checkbox]');
 const apply=c=>amp(c)?.querySelector('[data-saber-amp-aplicar]');
 const ampSelect=c=>amp(c)?.querySelector('select');
+const nativePaper=c=>c.querySelector('.eleccion-plotter-papel select');
 const originalSize=c=>c.querySelector('select[aria-label^="Tamaño final de"]');
 const sizeButton=(c,v)=>[...c.querySelectorAll('.tamano-rapido button.tamano-opcion')].find(b=>v==='original'?/original|real/i.test(b.textContent):new RegExp('\\b'+v+'\\b','i').test(b.textContent));
 const element=(tag,t)=>{const e=document.createElement(tag);if(t)e.textContent=t;return e;};
@@ -30,6 +31,7 @@ function selectSize(forImage){
  for(const [v,t] of fields){if(forImage&&v==='original')continue;s.add(new Option(t,v));}
  return s;
 }
+function paperSelect(){const s=element('select');s.setAttribute('aria-label','Papel');s.add(new Option('Obra 80 g','obra80'));s.add(new Option('Recubierto 130 g','recubierto'));return s;}
 function inputCopies(){const i=element('input');i.type='number';i.min=1;i.max=500;i.step=1;i.value='1';i.setAttribute('aria-label','Cantidad de copias');return i;}
 function label(t,control){const l=element('label',t);l.append(control);return l;}
 function nativeCopies(c){return Number(copy(c)?.value||meta(c).match(/(\d+)\s+copia\(s\)/i)?.[1]||1);}
@@ -44,17 +46,18 @@ function nativeSize(c){
 function state(c){
  const k=key(c),existing=requested.get(k);
  if(existing&&existing.name===name(c))return existing;
- const s={name:name(c),size:image(c)?'':nativeSize(c),copies:nativeCopies(c),pending:false,appliedSize:null};
+ const s={name:name(c),size:image(c)?'':nativeSize(c),copies:nativeCopies(c),pending:false,appliedSize:null,paper:nativePaper(c)?.value||'obra80'};
  requested.set(k,s);return s;
 }
 function waitCard(k){return get(k);}
 function note(text){alertText=text;message.textContent=text;}
 const batch=element('section');batch.id='pc-v11-batch';batch.hidden=true;
 const h=element('h2','Configurar todas juntas'),description=element('p','Elegí el tamaño y la cantidad para todas las imágenes. Después podés cambiar las que necesites.');
-const batchSize=selectSize(true),batchCopies=inputCopies(),batchApply=element('button','Aplicar a todas');batchApply.type='button';
-const batchRow=element('div');batchRow.className='v11-fields';batchRow.append(label('Tamaño',batchSize),label('Copias por imagen',batchCopies),batchApply);
+const batchSize=selectSize(true),batchCopies=inputCopies(),batchPaper=paperSelect(),batchApply=element('button','Aplicar a todas');batchApply.type='button';
+const batchRow=element('div');batchRow.className='v11-fields';batchRow.append(label('Tamaño',batchSize),label('Copias por imagen',batchCopies),label('Papel para A2/A1/A0',batchPaper),batchApply);
 const message=element('p');message.id='pc-v11-message';message.setAttribute('role','status');
-batch.append(h,description,batchRow,message);upload.insertAdjacentElement('afterend',batch);
+const warnings=element('div');warnings.id='pc-v11-warnings';warnings.hidden=true;
+batch.append(h,description,batchRow,message,warnings);upload.insertAdjacentElement('afterend',batch);
 const intro=element('p','Elegí tamaño y cantidad en cada archivo. El presupuesto se actualiza solo.');intro.id='pc-v11-intro';upload.insertAdjacentElement('afterend',intro);
 document.body.classList.add('saber-pc-v11');
 function pending(){return busy||cards().some(c=>{const s=state(c);return s.pending||(image(c)&&!s.size);});}
@@ -78,10 +81,13 @@ async function setCopies(k,n){
  if(!Number.isSafeInteger(n)||n<1||n>500)return false;
  let c=waitCard(k);if(!c)return false;
  if(nativeCopies(c)===n)return true;
+ const opened=!copy(c)&&exp(c)?.getAttribute('aria-expanded')==='false';
  if(!copy(c))c=await openDetails(k);
  const i=c&&copy(c);if(!i)return false;
  i.value=String(n);i.dispatchEvent(new Event('change',{bubbles:true}));await wait(90);
- c=waitCard(k);return !!c&&nativeCopies(c)===n;
+ c=waitCard(k);const ok=!!c&&nativeCopies(c)===n;
+ if(opened&&c&&exp(c)?.getAttribute('aria-expanded')==='true'){exp(c).click();await wait(70);}
+ return ok;
 }
 async function selectNativeSize(k,v){
  let c=waitCard(k);if(!c)return false;
@@ -124,6 +130,7 @@ async function finish(k){
   s.appliedSize=s.size;
  }
  if(c.querySelector('.pregunta-tamano')||(wantsLarge&&s.appliedSize!==s.size)){s.pending=true;return false;}
+ if(wantsLarge){const p=nativePaper(c);if(!p||!selectValue(p,s.paper)){s.pending=true;return false;}await wait(90);}
  s.pending=!(await setCopies(k,s.copies));
  return !s.pending;
 }
@@ -144,7 +151,7 @@ batchApply.onclick=()=>run(async()=>{
  const v=batchSize.value,n=Number(batchCopies.value);
  if(!v||!Number.isSafeInteger(n)||n<1||n>500){note('Elegí tamaño y una cantidad entre 1 y 500.');return;}
  const keys=cards().filter(image).map(key);
- for(const k of keys)await changeOne(k,v,n);
+ for(const k of keys){const c=get(k);if(c)state(c).paper=batchPaper.value;await changeOne(k,v,n);}
  note(cards().filter(c=>image(c)&&state(c).pending).length?'Revisá las advertencias de las imágenes señaladas.':'Configuración aplicada.');
 });
 function decorate(c){
@@ -153,19 +160,23 @@ function decorate(c){
  let row=c.querySelector('.v11-direct');
  if(!row){
   row=element('div');row.className='v11-direct';
-  const size=selectSize(isImage),copies=inputCopies();
-  size.className='v11-size';copies.className='v11-copies';
+  const size=selectSize(isImage),copies=inputCopies(),paper=paperSelect();
+  size.className='v11-size';copies.className='v11-copies';paper.className='v11-paper';
   // Un PDF grande mantiene el original y su clasificación técnica nativa.
   if(!isImage&&!amp(c))for(const o of [...size.options])if(['a2','a1','a0'].includes(o.value))o.remove();
   size.addEventListener('change',()=>run(async()=>{const current=get(k);if(!current)return;await changeOne(k,size.value,state(current).copies);}));
   copies.addEventListener('change',()=>run(async()=>{const current=get(k);if(!current)return;const n=Number(copies.value);if(!Number.isSafeInteger(n)||n<1||n>500){copies.reportValidity();return;}const st=state(current);st.copies=n;if(st.size)await finish(k);}));
-  row.append(label('Tamaño final',size),label('Copias',copies));
+  const paperLabel=label('Papel',paper);paperLabel.className='v11-paper-label';
+  paper.addEventListener('change',()=>run(async()=>{const c=get(k);if(!c)return;const s=state(c);s.paper=paper.value;if(s.size)await finish(k);}));
+  row.append(label('Tamaño final',size),label('Copias',copies),paperLabel);
   const status=element('span');status.className='v11-state';row.append(status);
   c.querySelector('.fila')?.insertAdjacentElement('afterend',row);
  }
  const size=row.querySelector('.v11-size'),copies=row.querySelector('.v11-copies');
  if(document.activeElement!==size)size.value=s.size||'';
  if(document.activeElement!==copies)copies.value=String(s.copies);
+ const paper=row.querySelector('.v11-paper');paper.value=s.paper;
+ row.querySelector('.v11-paper-label').hidden=!(isImage&&['a2','a1','a0'].includes(s.size));
  const t=row.querySelector('.v11-state');
  t.textContent=s.pending?'Revisar configuración':isImage&&!s.size?'Elegí tamaño':'';
  c.classList.toggle('v11-image',isImage);
@@ -181,6 +192,29 @@ function decorate(c){
   if(file.length===1){const img=element('img');img.className='v11-thumb';img.src=thumbnails.get(file[0]);img.alt='Vista previa';c.querySelector('.fila-principal')?.prepend(img);}
  }
 }
+function renderWarnings(all){
+ const affected=all.filter(c=>image(c)&&state(c).pending&&quality(c)&&!quality(c).checked);
+ warnings.hidden=affected.length===0;warnings.replaceChildren();
+ if(!affected.length)return;
+ warnings.append(element('strong','Revisá la calidad de '+affected.length+' imagen(es) antes de imprimir.'));
+ for(const c of affected){
+  const a=amp(c),q=quality(c),text=q.closest('[role=alert]')?.innerText||q.closest('label')?.innerText||'';
+  const d=element('details');d.open=true;d.append(element('summary',name(c)),element('p',text));warnings.append(d);
+ }
+ const accept=element('button','Acepto las advertencias de estas imágenes y quiero cotizarlas');accept.type='button';
+ accept.onclick=()=>run(async()=>{
+  // Consentimiento explícito del comprador, para los archivos y medidas que
+  // acaba de ver. No aceptar automáticamente al elegir un tamaño.
+  for(const old of affected){
+   const k=key(old),c=get(k),q=c&&quality(c);
+   if(!c||!q||q.checked)continue;
+   if(state(c).size!==state(old).size)continue;
+   q.click();await wait(100);await finish(k);
+  }
+  note('Revisá el presupuesto actualizado.');
+ });
+ warnings.append(accept);
+}
 function sync(){
  if(busy)return;
  const all=cards();
@@ -194,6 +228,7 @@ function sync(){
  batch.hidden=all.filter(image).length<2;
  intro.hidden=!all.length;
  all.forEach(c=>{if(!image(c)&&document.querySelector('input[name="modoImpresionLote"][value="comun"]')?.checked){c.querySelector('.v11-direct')?.remove();return;}decorate(c);});
+ renderWarnings(all);
 }
 function schedule(){if(scheduled)return;scheduled=true;queueMicrotask(()=>{scheduled=false;sync();});}
 by('archivos').addEventListener('change',e=>{
