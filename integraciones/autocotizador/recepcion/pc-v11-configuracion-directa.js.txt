@@ -127,9 +127,16 @@ async function selectNativeSize(k,v){
 }
 async function finish(k){
  let c=waitCard(k);if(!c)return false;const s=state(c);
- const q=quality(c),a=apply(c);
+ let q=quality(c),a=apply(c);
  const wantsLarge=['a2','a1','a0'].includes(s.size);
  const needsApply=wantsLarge&&s.appliedSize!==s.size;
+ if(needsApply&&a&&!q){
+  // El resultado de la calidad puede llegar después del selector.
+  // En caso de demora, conservar la configuración pendiente; jamás
+  // confirmar una advertencia que todavía no está disponible.
+  await wait(200);
+  c=get(k);if(!c)return false;q=quality(c);a=apply(c);
+ }
  if(q&&!q.checked){s.pending=true;return false;}
  if(a&&needsApply){
   if(a.disabled){s.pending=true;return false;}
@@ -220,13 +227,17 @@ function decorate(c){
   if(file.length===1&&thumbnails.get(file[0])){const img=element('img');img.className='v11-thumb';img.src=thumbnails.get(file[0]);img.alt='Vista previa';c.querySelector('.fila-principal')?.prepend(img);}
  }
 }
+let warningSignature='';
 function renderWarnings(all){
  const affected=all.filter(c=>regularImage(c)&&state(c).pending&&quality(c)&&!quality(c).checked);
+ const signature=affected.map(c=>name(c)+'|'+state(c).size+'|'+quality(c)?.closest('[role=alert]')?.textContent).join('\n');
+ if(signature===warningSignature&&warnings.hidden===(affected.length===0))return;
+ warningSignature=signature;
  warnings.hidden=affected.length===0;warnings.replaceChildren();
  if(!affected.length)return;
  warnings.append(element('strong','Calidad de impresión: '+affected.length+' imagen(es) para revisar.'),element('p','Al ampliar estas imágenes pueden verse píxeles, bordes dentados o falta de nitidez. Revisá el tamaño y la resolución de cada una antes de aceptar.'));
  for(const c of affected){
-  const a=amp(c),q=quality(c),text=q.closest('[role=alert]')?.innerText||q.closest('label')?.innerText||'';
+  const a=amp(c),q=quality(c),text=q.closest('[role=alert]')?.textContent||q.closest('label')?.textContent||'';
   const d=element('details');d.open=false;
   const ppp=text.match(/\d+\s*PPP/i)?.[0]||'resolución a revisar';
   d.append(element('summary',imageStem(c)+' · '+state(c).size.toUpperCase()+' · '+ppp),element('p',text));warnings.append(d);
@@ -281,6 +292,12 @@ function rememberImages(files){
 by('archivos').addEventListener('change',e=>rememberImages(e.target.files),true);
 document.addEventListener('drop',e=>{if(e.dataTransfer?.files?.length)rememberImages(e.dataTransfer.files);},true);
 new MutationObserver(schedule).observe(by('estado'),{childList:true,subtree:true,characterData:true});
-new MutationObserver(records=>{if(records.some(r=>[...r.addedNodes,...r.removedNodes].some(n=>n.nodeType===1&&!n.classList?.contains('v11-direct')&&!n.classList?.contains('v11-thumb'))))schedule();}).observe(list,{childList:true,subtree:true});
+new MutationObserver(records=>{
+ if(records.some(r=>r.target.nodeType===1&&!r.target.closest('.v11-direct,.v11-thumb')&&
+   (r.type==='attributes'||r.type==='characterData'||[...r.addedNodes,...r.removedNodes].some(n=>n.nodeType===1&&!n.classList?.contains('v11-direct')&&!n.classList?.contains('v11-thumb')))))schedule();
+}).observe(list,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled','checked']});
+// Reconciliar la advertencia tardía aunque el motor sólo cambie propiedades DOM.
+// Sin recotizar ni transformar archivos; únicamente actualizar la vista.
+setInterval(()=>{if(!busy&&cards().some(c=>state(c).pending))renderWarnings(cards());},250);
 sync();
 })();
