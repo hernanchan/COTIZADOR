@@ -26,7 +26,7 @@ jobs:
       - name: Instalar herramientas de ensayo
         run: npm install --no-save --ignore-scripts --no-audit --no-fund playwright@1.56.1 pdf-lib@1.17.1
       - name: Verificar capa reversible y rutas protegidas
-        run: node --version
+        run: node --test tests/pc-v10-capa-reversible.test.mjs
       - name: Recuperar copia exacta activa por GET y comprobar SHA256
         env:
           CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
@@ -162,8 +162,36 @@ jobs:
           const css=fs.readFileSync(folder+'pc-v11-configuracion-directa.css.txt','utf8');
           const js=fs.readFileSync(folder+'pc-v11-configuracion-directa.js.txt','utf8');
           assert(!/<\/style/i.test(css)&&!/<\/script/i.test(js));
-          const preview=frame.replace('</head>','<style>'+css+'</style></head>').replace('</body>','<script>document.addEventListener("DOMContentLoaded",()=>{'+js+'},{once:true});</script></body>');
-
+          // Ensayo del mismo paquete modular que se instalará. Reemplaza sólo
+          // la entrada V10; importa el motor original por su nombre y conserva la capa.
+          const entryName=fs.readFileSync(dir+'/entry.txt','utf8');
+          const layerName='saber-pc-v10-layer.mjs',entry='saber-pc-v10-entry.mjs';
+          assert(![entry,layerName].includes(entryName));
+          const oldLayer=fs.readFileSync(dir+'/'+layerName);
+          assert(oldLayer.equals(fs.readFileSync(folder+'pc-v10-capa-reversible.mjs')),'Capa activa distinta');
+          const entryCode='import base from '+JSON.stringify('./'+entryName)+';\nexport * from '+JSON.stringify('./'+entryName)+';\nimport {crearCapaPcV10} from "./'+layerName+'";\nexport default crearCapaPcV10(base,{css:'+JSON.stringify(css)+',js:'+JSON.stringify(js)+'});\n';
+          fs.writeFileSync(dir+'/'+entry,entryCode,{mode:0o600});
+          const candidate=(await import(pathToFileURL(dir+'/'+entry).href)).default;
+          assert.equal(crypto.createHash('sha256').update(fs.readFileSync(dir+'/'+entryName)).digest('hex'),'c8f04928d6e0ad8885a174e34ac1ccebf461a47d3775cb83bf2bccd1ffc802f6');
+          const enabledEnv={...env,DOCS_LIVE_PC_V10_GATE:on};
+          const request=(path,auth=true)=>new Request(origin+path,{headers:auth?{Cookie:cookie}:{}});
+          assert.equal(await (await candidate.fetch(request('/cotizar/archivos'),env,ctx)).text(),frame);
+          const response=await candidate.fetch(request('/cotizar/archivos'),enabledEnv,ctx);
+          const preview=await response.text();
+          assert(preview.includes('saber-pc-v10-layer-js')&&preview.includes('pc-v11-batch'));
+          assert.equal(preview.replace(/<style id="saber-pc-v10-layer-css">[\s\S]*?<\/style>/,'').replace(/<script id="saber-pc-v10-layer-js">[\s\S]*?<\/script>/,''),frame);
+          assert.equal(response.headers.get('Content-Security-Policy'),assets.get('/cotizar/archivos').headers['content-security-policy']);
+          assert.notEqual((await candidate.fetch(request('/cotizar/archivos',false),enabledEnv,ctx)).status,200);
+          const mobileBase=await worker.fetch(request('/cotizar/archivos?vista=movil'),env,ctx);
+          const mobileCandidate=await candidate.fetch(request('/cotizar/archivos?vista=movil'),enabledEnv,ctx);
+          assert.equal(await mobileCandidate.text(),await mobileBase.text());
+          for(const path of routes.filter(x=>x!=='/cotizar/archivos')){
+            const r=await candidate.fetch(request(path),enabledEnv,ctx);
+            assert.equal(r.status,assets.get(path).status);
+            assert.equal(await r.text(),assets.get(path).body);
+          }
+          const previewHeaders=Object.fromEntries(response.headers);
+          console.log('V11_PAQUETE_REAL_OK CAPA_ORIGINAL CSP_AUTENTICACION_Y_MOVIL_CONSERVADOS');
           const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
           const errors=[];
           let blocked=0,quotes=0;
@@ -181,7 +209,7 @@ jobs:
               }
               if(method==='GET'&&assets.has(p)){
                 const r=assets.get(p);
-                return route.fulfill({status:r.status,headers:r.headers,body:p==='/cotizar/archivos'&&useV10?preview:r.body});
+                return route.fulfill({status:r.status,headers:p==='/cotizar/archivos'&&useV10?previewHeaders:r.headers,body:p==='/cotizar/archivos'&&useV10?preview:r.body});
               }
               if(p==='/api/pedido/live/materiales'&&method==='GET'){
                 const r=await local(p);
