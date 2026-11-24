@@ -2387,7 +2387,7 @@ export default {
        });
        return new Response(html,{headers:{
         'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store,private',
-        'Content-Security-Policy':"default-src 'none'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'",
+        'Content-Security-Policy':"default-src 'none'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src "+(previewPcV10?"'self' ":"")+"'unsafe-inline'; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'",
         'X-Content-Type-Options':'nosniff','X-Robots-Tag':'noindex,nofollow'}});
       }
       if((page==='/cotizar/pc-v10.js'||page==='/cotizar/pc-v10.css')&&
