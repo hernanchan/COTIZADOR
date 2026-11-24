@@ -1,4 +1,4 @@
-name: Saber V11 - cinco imágenes, tamaños mixtos y copias sin pedidos
+name: Saber V11 - imágenes y PDF con clasificación y cotización reales
 on:
   push:
     branches: [integracion/pc-v11-configuracion-directa-20261124]
@@ -256,6 +256,53 @@ jobs:
             assert.equal(errors.length,0,'Excepciones navegador');
             console.log('V11_ENSAYO_OK SIN_PEDIDOS_NI_PAGO');
             await pc.context.close();
+            // PDF A4 y dos grandes, uno de trazos y otro de cobertura elevada.
+            const pdfpc=await setup({width:1440,height:900},true);
+            const files=[];
+            for(const [title,w,h,kind] of [['documento',21,29.7,'doc'],['plano',59.4,84.1,'cad'],['poster',42,59.4,'poster']]){
+              const doc=await PDFDocument.create(),pg=doc.addPage([w*72/2.54,h*72/2.54]);
+              const font=await doc.embedFont(StandardFonts.Helvetica);
+              if(kind==='poster')pg.drawRectangle({x:0,y:0,width:pg.getWidth(),height:pg.getHeight(),color:(await import('pdf-lib')).rgb(.3,.5,.8)});
+              if(kind==='cad')for(let i=0;i<12;i++)pg.drawLine({start:{x:20+i*7,y:20},end:{x:pg.getWidth()-20,y:pg.getHeight()-20-i*7},thickness:.4});
+              pg.drawText(title,{x:30,y:pg.getHeight()-50,font,size:14});
+              files.push({name:'v11_'+title+'.pdf',mimeType:'application/pdf',buffer:Buffer.from(await doc.save())});
+            }
+            await pdfpc.frame.locator('#archivos').setInputFiles(files);
+            await pdfpc.frame.locator('#lista .v11-direct').nth(2).waitFor({state:'visible',timeout:30000});
+            await pdfpc.page.waitForTimeout(1000);
+            const logPdf=async tag=>console.log('V11_PDF_'+tag+' '+JSON.stringify(await pdfpc.frame.locator('#lista').evaluate(l=>[...l.querySelectorAll('section.archivo')].map(c=>({name:c.querySelector('.nombre')?.textContent,size:c.querySelector('.v11-size')?.value,copies:c.querySelector('.v11-copies')?.value,meta:c.querySelector('.resumen-archivo')?.textContent,classification:c.querySelector('.clasificacion-ploteo-visible')?.textContent,measure:c.querySelector('.medida-ploteo-visible')?.textContent,state:c.querySelector('.v11-state')?.textContent})))));
+            await logPdf('DETECTADO');
+            for(const [title,size,n] of [['documento','a4',2],['plano','original',3],['poster','original',4]]){
+              const card=pdfpc.frame.locator('#lista section.archivo').filter({hasText:new RegExp('v11_'+title+'\\.pdf')});
+              const sel=card.locator('.v11-size');
+              if(await sel.inputValue()!==size)await sel.selectOption(size);
+              await pdfpc.frame.locator('body:not(.v11-busy)').waitFor({state:'attached',timeout:30000});
+              const input=card.locator('.v11-copies');
+              await input.fill(String(n));await input.press('Tab');
+              await pdfpc.frame.locator('body:not(.v11-busy)').waitFor({state:'attached',timeout:30000});
+            }
+            await pdfpc.page.waitForTimeout(600);
+            await logPdf('CONFIGURADO');
+            const last=pdfpc.responses.at(-1);
+            const docs=last?.payload?.archivos||[];
+            console.log('V11_PDF_PAYLOAD '+JSON.stringify(docs.map(f=>({nombre:f.nombre,copias:f.copias,seleccion:f.seleccion,paginas:f.paginas?.map(p=>({anchoCm:p.anchoCm,altoCm:p.altoCm,modo:p.modo}))}))));
+            assert.equal(docs.length,3);
+            assert.deepEqual(docs.map(f=>f.copias),[2,3,4]);
+            assert.equal(docs[1].seleccion,'original');
+            assert.equal(docs[2].seleccion,'original');
+            assert.equal(docs[1].paginas[0].modo,'cad');
+            assert.equal(docs[2].paginas[0].modo,'poster');
+            assert(Math.abs(docs[1].paginas[0].anchoCm-59.4)<.2);
+            assert(Math.abs(docs[2].paginas[0].altoCm-59.4)<.2);
+            await pdfpc.frame.locator('#prepararPedido:not([disabled])').waitFor({state:'attached',timeout:30000});
+            console.log('V11_PDF_A4_CAD_A1_POSTER_A2_COPIAS_OK');
+            await pdfpc.context.close();
+            const mobile=await setup({width:390,height:844},true);
+            assert.equal(await mobile.frame.locator('#pc-v11-batch').count(),0);
+            assert.equal(await mobile.frame.locator('body').evaluate(e=>e.classList.contains('saber-pc-v11')),false);
+            await mobile.context.close();
+            console.log('V11_MOVIL_SIN_CAMBIOS_OK');
+            assert.equal(errors.length,0,'Excepciones navegador');
           }catch(e){console.log('V11_ENSAYO_FALLO '+e.name+' '+String(e.message).slice(0,250));throw e;}
           finally{await browser.close();}
           JS
