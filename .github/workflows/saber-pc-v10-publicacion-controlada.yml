@@ -3,7 +3,7 @@ on:
   push:
     branches: [integracion/pc-v10-comercial-aislada-20261124]
     paths: [.github/workflows/saber-pc-v10-publicacion-controlada.yml]
-permissions: {contents: read, pull-requests: read, issues: read, statuses: read}
+permissions: {contents: read, pull-requests: read, issues: read, statuses: read, actions: read}
 concurrency: {group: saber-docs-v10-production-release, cancel-in-progress: false}
 jobs:
   publicar:
@@ -127,7 +127,7 @@ jobs:
             const created=await api(versions,payload);
             newId=created.id;
             assert(/^[a-f0-9-]{36}$/i.test(newId||'')&&newId!==old);
-            console.log('VERSION_CREADA_SIN_TRÁFICO '+newId);
+            console.log('VERSION_CREADA_SIN_TRAFICO '+newId);
             const candidate=await api(versions+'/'+newId+'?include=modules');
             assert(candidate.main_module===entry);
             assert(candidate.modules?.length===3);
