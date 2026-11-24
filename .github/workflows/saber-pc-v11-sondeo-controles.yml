@@ -1,0 +1,240 @@
+name: Saber V11 - contrato real de configuración de imágenes y PDF
+on:
+  push:
+    branches: [integracion/pc-v11-configuracion-directa-20261124]
+    paths: [.github/workflows/saber-pc-v11-sondeo-controles.yml]
+permissions: {contents: read}
+jobs:
+  ensayo:
+    if: github.ref == 'refs/heads/integracion/pc-v11-configuracion-directa-20261124'
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
+    timeout-minutes: 9
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Instalar herramientas de ensayo
+        run: npm install --no-save --ignore-scripts --no-audit --no-fund playwright@1.56.1 pdf-lib@1.17.1
+      - name: Verificar capa reversible y rutas protegidas
+        run: node --version
+      - name: Recuperar copia exacta activa por GET y comprobar SHA256
+        env:
+          CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          CF_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+          const a=process.env.CF_ACCOUNT,t=process.env.CF_TOKEN;
+          if(!/^[a-f0-9]{32}$/i.test(a||'')||!t)throw Error('Credenciales no disponibles');
+          const root='https://api.cloudflare.com/client/v4/accounts/'+a;
+          async function get(p){
+            const r=await fetch(root+p,{method:'GET',redirect:'error',headers:{Authorization:'Bearer '+t,Accept:'application/json'},signal:AbortSignal.timeout(30000)});
+            if(!r.ok)throw Error('Cloudflare GET '+r.status);
+            const j=await r.json();if(!j.success||!j.result)throw Error('GET no confirmado');return j.result;
+          }
+          const w='saber-documentos-produccion';
+          const d=await get('/workers/scripts/'+w+'/deployments');
+          const v=(Array.isArray(d)?d:d.deployments)?.[0]?.versions;
+          if(v?.length!==1||v[0].percentage!==100||v[0].version_id!=='07b17b59-0749-46ff-864c-c41a1b739f8d')throw Error('Version activa cambió; revisar antes de continuar');
+          const result=await get('/workers/workers/'+w+'/versions/'+v[0].version_id+'?include=modules');
+          const modules=(result.modules||[]).filter(m=>typeof m.content_base64==='string').map(m=>({name:String(m.name||''),type:String(m.content_type||''),buf:Buffer.from(m.content_base64,'base64')}));
+          const hash=x=>crypto.createHash('sha256').update(x).digest('hex');
+          const wanted='c8f04928d6e0ad8885a174e34ac1ccebf461a47d3775cb83bf2bccd1ffc802f6';
+          const main=modules.find(m=>hash(m.buf)===wanted);
+          if(!main)throw Error('SHA256 activo no coincide');
+          const dir='/tmp/saber-v10-live-exact';fs.mkdirSync(dir,{mode:0o700});
+          fs.writeFileSync(dir+'/package.json','{"type":"module"}',{mode:0o600});
+          for(const m of modules){
+            if(m.name.endsWith('.map'))continue;
+            if(!/^[a-zA-Z0-9_.-]+$/.test(m.name)||m.name==='package.json'||m.name==='.'||m.name==='..')throw Error('Nombre de modulo no admitido');
+            fs.writeFileSync(dir+'/'+m.name,m.buf,{mode:0o600,flag:'wx'});
+          }
+          fs.writeFileSync(dir+'/entry.txt',main.name,{mode:0o600});
+          console.log('BASE_ACTIVA_EXACTA_OK '+v[0].version_id+' SHA256='+wanted+' MODULOS='+modules.length);
+          JS
+      - name: Leer únicamente la revisión tarifaria aprobada en D1
+        env:
+          CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          CF_DB: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          const root='https://api.cloudflare.com/client/v4/accounts/'+process.env.CF_ACCOUNT;
+          const token=process.env.CF_DB;
+          assert.match(process.env.CF_ACCOUNT||'',/^[a-f0-9]{32}$/i);
+          assert(token?.length>20);
+          async function api(p,opts={}){
+            const r=await fetch(root+p,{...opts,redirect:'error',headers:{Authorization:'Bearer '+token,...opts.headers},signal:AbortSignal.timeout(25000)});
+            const j=await r.json();
+            assert(r.ok&&j.success===true,'D1 lectura HTTP '+r.status);
+            return j.result;
+          }
+          const db=(await api('/d1/database')).find(x=>x.name==='saber-pagos-produccion');
+          assert(db?.uuid,'No se identifica D1 comercial');
+          // Una única SELECT con JOIN de la revisión vigente y su aprobación. No se leen pedidos ni datos de clientes.
+          const sql="SELECT h.approved_revision,h.approved_json,a.created_at FROM central_pricing_admin_head h JOIN central_pricing_admin_history a ON a.revision=h.approved_revision AND a.action='approve' WHERE h.id=1 LIMIT 1";
+          const out=await api('/d1/database/'+db.uuid+'/query',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sql})});
+          assert(out.length===1&&out[0].success===true);
+          const row=out[0].results?.[0];
+          assert(Number.isSafeInteger(row?.approved_revision)&&row.approved_revision>0);
+          assert(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(row.created_at));
+          const x=JSON.parse(row.approved_json);
+          assert(x.prices?.schema==='saber-web-prices-v1'&&Array.isArray(x.promotions?.codes));
+          const snap={ok:true,schema:'saber-price-snapshot-v1',source:'production-d1-approved-only',approvedRevision:row.approved_revision,approvedAt:row.created_at.replace(' ','T')+'Z',prices:x.prices,promotions:x.promotions,paymentAuthorized:false,commercialRelease:false};
+          fs.writeFileSync('/tmp/saber-v10-live-exact/pricing.json',JSON.stringify(snap),{mode:0o600,flag:'wx'});
+          console.log('TARIFARIO_APROBADO_SOLO_SELECT REVISION='+snap.approvedRevision);
+          JS
+      - name: Comparar cotizaciones reales del motor activo en navegador aislado
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+          import assert from 'node:assert/strict';
+          import {pathToFileURL} from 'node:url';
+          import {chromium} from 'playwright';
+          import {crearCapaPcV10} from './integraciones/autocotizador/recepcion/pc-v10-capa-reversible.mjs';
+          import {PDFDocument,StandardFonts} from 'pdf-lib';
+          assert(!process.env.CF_TOKEN&&!process.env.CF_ACCOUNT&&!process.env.CF_DB);
+          const dir='/tmp/saber-v10-live-exact';
+          // No usar servicios reales: sin credenciales ni bindings y sin fetch externo.
+          globalThis.fetch=async()=>{throw Error('ENSAYO_LOCAL_RED_BLOQUEADA');};
+          let worker;
+          try{worker=(await import(pathToFileURL(dir+'/'+fs.readFileSync(dir+'/entry.txt','utf8')).href)).default;}catch(e){console.log('IMPORTACION_LOCAL_NO_DISPONIBLE '+e.name+' '+(e.code||''));throw Error('No se pudo ejecutar copia activa en Node');}
+          assert.equal(typeof worker?.fetch,'function');
+          const origin='https://pedidos.libreriasaber.com.ar',on='GO_COMERCIAL_CONFIRMADO';
+          const key='SABER_CLAVE_FICTICIA_SOLO_ENSAYO_000000000';
+          const env={SABER_ENTORNO:'produccion',CENTRAL_DB_ENV:'produccion',
+            DOCS_LIVE_UI_GATE:on,DOCS_MP_LIVE_GATE:on,DOCS_LIVE_SESSION_GATE:on,
+            DOCS_LIVE_PRICING_GATE:on,DOCS_LIVE_RECEPCION_GATE:on,
+            DOCS_LIVE_ORDER_GATE:'OFF',DOCS_LIVE_TRANSFER_GATE:'OFF',DOCS_LIVE_TUS_GATE:'OFF',
+            DOCS_LIVE_SESSION_KEY:key,DOCS_LIVE_TURNSTILE_SECRET:'FICTICIO_TURNSTILE_NO_REAL_000',
+            DOCS_LIVE_TURNSTILE_SITE_KEY:'FICTICIO_SITEKEY_NO_REAL_000'};
+          const snap=JSON.parse(fs.readFileSync(dir+'/pricing.json','utf8'));
+          let pricingReads=0;
+          env.CENTRAL_BRIDGE_KEY='FICTICIA_CENTRAL_SOLO_PRUEBA_NO_REAL_00000';
+          env.SABER_CENTRAL={fetch:async req=>{
+            assert.equal(req.method,'POST');
+            assert.equal(new URL(req.url).pathname,'/internal/central/live/pricing');
+            const body=await req.json();
+            assert.equal(body.purpose,'quote-production-approved');
+            pricingReads++;
+            return Response.json(snap);
+          }};
+          const ts=String(Math.floor(Date.now()/1000)),nonce='a'.repeat(32);
+          const sig=crypto.createHmac('sha256',key).update('saber-live-comprador-v1\n'+ts+'\n'+nonce).digest('hex');
+          const cookie='saber_pedido_live_v1='+ts+'.'+nonce+'.'+sig;
+          const ctx={waitUntil(){},passThroughOnException(){}};
+          async function local(path,auth=true,body=null){
+            const req=new Request(origin+path,{method:body===null?'GET':'POST',headers:{...(auth?{Cookie:cookie}:{}),...(body===null?{}:{Origin:origin,'Content-Type':'application/json','Sec-Fetch-Site':'same-origin'})},...(body===null?{}:{body})});
+            const r=await worker.fetch(req,env,ctx);
+            return {status:r.status,headers:Object.fromEntries(r.headers),body:await r.text()};
+          }
+          const routes=['/cotizar','/cotizar/archivos','/cotizar/archivos.js','/cotizar/movil.js','/cotizar/flujo-live.js'];
+          const assets=new Map();
+          for(const path of routes){
+            let r;try{r=await local(path);}catch(e){console.log('RUTA_LOCAL_FALLO '+path+' '+e.name);throw Error('No se pudo ejecutar ruta local');}
+            console.log('RUTA_BASE '+path+' HTTP='+r.status+' BYTES='+Buffer.byteLength(r.body));
+            assert.equal(r.status,200,'Ruta no accesible en entorno ficticio: '+path);assets.set(path,r);
+          }
+          const unauth=await local('/cotizar/archivos',false);
+          assert.notEqual(unauth.status,200,'El iframe base no exigió sesión');
+          const parent=assets.get('/cotizar').body,frame=assets.get('/cotizar/archivos').body;
+          assert.match(parent,/id="pdf"/);
+          assert.match(parent,/const enabled=false[,;]/,'No se pudo demostrar que el checkout está deshabilitado');
+          for(const id of ['zonaArchivos','archivos','modoConfiguracion','configComunGlobal','estado','presupuesto','prepararPedido','resumenPedido','anilladosConjuntos','lista'])assert(frame.includes('id="'+id+'"'),'Falta ancla de interfaz: '+id);
+          for(const marker of ['/cotizar/archivos.js','/cotizar/movil.js','SABER_SMART_RESIZE'])assert(frame.includes(marker),'Falta recurso base: '+marker);
+          const preview=frame;
+          const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+          const errors=[];
+          let blocked=0,quotes=0;
+          async function setup(viewport,useV10){
+            const context=await browser.newContext({viewport,serviceWorkers:'block'});
+            const page=await context.newPage();
+            const responses=[];
+            page.on('pageerror',e=>errors.push(e.name));
+            await page.route('**/*',async route=>{
+              const u=new URL(route.request().url()),p=u.pathname,method=route.request().method();
+              if(u.origin!==origin){
+                // Solo biblioteca PDF estática; jamás tráfico al sitio real o a un API.
+                if(method==='GET'&&u.hostname==='cdnjs.cloudflare.com'&&p.startsWith('/ajax/libs/pdf.js/'))return route.continue();
+                blocked++;return route.abort();
+              }
+              if(method==='GET'&&assets.has(p)){
+                const r=assets.get(p);
+                return route.fulfill({status:r.status,headers:r.headers,body:p==='/cotizar/archivos'&&useV10?preview:r.body});
+              }
+              if(p==='/api/pedido/live/materiales'&&method==='GET'){
+                const r=await local(p);
+                assert.equal(r.status,200,'Catálogo no disponible');
+                return route.fulfill({status:r.status,headers:r.headers,body:r.body});
+              }
+              if(p==='/api/pedido/live/cotizar'&&method==='POST'){
+                quotes++;
+                const payload=route.request().postData();
+                const r=await local(p,true,payload);
+                let v;try{v=JSON.parse(r.body);}catch{throw Error('Cotizacion no JSON');}
+                responses.push({status:r.status,body:v,payload:JSON.parse(payload)});
+                return route.fulfill({status:r.status,headers:r.headers,body:r.body});
+              }
+              blocked++;return route.fulfill({status:403,contentType:'application/json',body:'{"ok":false,"error":"ENSAYO_SIN_OPERACIONES"}'});
+            });
+            // Esperar el catálogo solicitado por el analizador real: el listener de archivos
+            // ya está instalado cuando ese script inicia la consulta del catálogo.
+            const ready=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/pedido/live/materiales'&&r.status()===200,{timeout:30000});
+            await page.goto(origin+'/cotizar',{waitUntil:'load',timeout:30000});
+            await ready;
+            const frame=page.frameLocator('#pdf');
+            await frame.locator('#archivos').waitFor({state:'attached',timeout:15000});
+            if(useV10&&viewport.width>=900)await frame.locator('#pc-shell').waitFor({state:'attached',timeout:15000});
+            console.log('ANALIZADOR_LISTO '+(useV10?'V10':'BASE')+' '+viewport.width);
+            return {context,page,frame:page.frameLocator('#pdf'),responses};
+          }
+          try{
+            const pc=await setup({width:1440,height:900},false);
+            const img=await pc.page.evaluate(()=>{const c=document.createElement('canvas');c.width=1200;c.height=800;const x=c.getContext('2d');x.fillStyle='#7799bb';x.fillRect(0,0,1200,800);x.fillStyle='#fff';x.font='70px Arial';x.fillText('Imagen ficticia',100,200);return c.toDataURL('image/jpeg').split(',')[1];});
+            await pc.frame.locator('#archivos').setInputFiles([1,2].map(i=>({name:'v11_imagen_'+i+'.jpg',mimeType:'image/jpeg',buffer:Buffer.from(img,'base64')})));
+            await pc.frame.locator('#lista section.archivo').nth(1).waitFor({state:'attached',timeout:30000});
+            await pc.frame.locator('#lista .saber-ampliacion').first().waitFor({state:'attached',timeout:30000});
+            async function snapshot(tag){
+              const state=await pc.frame.locator('#lista').evaluate(root=>[...root.querySelectorAll('section.archivo')].map(c=>({name:c.querySelector('.nombre')?.textContent,group:c.closest('.grupo-pedido')?.querySelector('.titulo-grupo')?.textContent,meta:c.querySelector('.resumen-archivo')?.textContent,amp:c.querySelector('.saber-ampliacion')?.innerText?.slice(0,1800),controls:[...c.querySelectorAll('button,input,select')].map(x=>({tag:x.tagName,type:x.type,cls:x.className,txt:x.tagName==='BUTTON'?x.textContent.trim().slice(0,100):undefined,label:x.getAttribute('aria-label'),wrap:x.closest('label')?.textContent?.trim().slice(0,160),value:x.value,checked:x.type==='checkbox'?x.checked:undefined,data:Object.fromEntries(Object.entries(x.dataset)),opts:x.tagName==='SELECT'?[...x.options].map(o=>[o.value,o.text]):undefined}))})));
+              console.log('V11_DOM_'+tag+' '+JSON.stringify(state));
+            }
+            await snapshot('INICIAL');
+            const c=pc.frame.locator('#lista section.archivo').first();
+            const plot=c.locator('.saber-ampliacion button').filter({hasText:/Ploteo/i}).first();
+            await plot.click();
+            await pc.page.waitForTimeout(500);
+            await snapshot('PLOTEO');
+            const a2=c.locator('.saber-ampliacion button').filter({hasText:/\bA2\b/i}).first();
+            if(await a2.count()){await a2.click();await pc.page.waitForTimeout(500);}
+            else{
+              const sel=c.locator('.saber-ampliacion select').filter({has:pc.frame.locator('option').filter({hasText:/\bA2\b/i})});
+              if(await sel.count()){const v=await sel.first().locator('option').filter({hasText:/\bA2\b/i}).first().getAttribute('value');await sel.first().selectOption(v);await pc.page.waitForTimeout(500);}
+            }
+            await snapshot('A2');
+            const exp=c.locator('button.editar').filter({hasText:/Más opciones|Personalizar/i}).first();
+            if(await exp.count())await exp.click();
+            await pc.page.waitForTimeout(300);
+            await snapshot('DETALLES');
+            assert(errors.length===0,'Errores de navegador');
+            console.log('SONDEO_V11_OK SIN_PEDIDOS_NI_ESCRITURAS');
+            await pc.context.close();
+          }catch(e){console.log('SONDEO_FALLO '+e.name+' '+String(e.message).slice(0,200));throw e;}
+          finally{await browser.close();}
+          JS
+      - name: Eliminar copia temporal
+        if: always()
+        shell: bash
+        run: rm -rf /tmp/saber-v10-live-exact
