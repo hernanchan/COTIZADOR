@@ -65,3 +65,10 @@ Este documento no autoriza un cambio de producción ni el encendido del nuevo ga
 ### Resultado del ensayo 45379916190
 
 APROBADO en el runner: versión y SHA-256 del módulo activo exactos; cinco rutas originales del Worker respondieron HTTP 200 bajo sesión ficticia local. El iframe original se recuperó byte por byte al retirar CSS/JS añadidos. Chrome: un PDF, controles a 24 px; cinco PDF, disponibilidad de configuración común; vista de 390 px sin capa PC. 16 solicitudes de cotización simuladas con 503 intencional, 3 peticiones bloqueadas. Sin operaciones reales, sin despliegue y sin copia remota publicada. Pendiente: probar cotización con datos tarifarios reales en un circuito aislado y preparar un parche desplegable con rollback verificable, sin reemplazar el código activo por el histórico.
+
+## Ensayo de paridad tarifaria — 24/11/2026
+
+- Workflow `.github/workflows/saber-pc-v10-paridad-precios-activos.yml`, commit `1e44f74215c3d6923bf11543f9e4743d69483bb0`, [ejecución 45382643778](https://github.com/hernanchan/COTIZADOR/actions/runs/45382643778).
+- Se recupera la versión exacta activa de Documentos y se consulta exclusivamente la revisión aprobada del tarifario comercial de D1 (SELECT sobre cabecera e historial de tarifas; no se leen pedidos ni datos de clientes). La instantánea se usa como respuesta local del binding de precios ficticio; sin tokens ni bindings reales durante el ensayo.
+- Objetivo: comparar opciones y precio visible entre la interfaz original y V10 con cinco PDF sintéticos, blanco y negro doble faz, dos copias, y color simple faz, una copia. Las cotizaciones las calcula el Worker activo ejecutado localmente; la red comercial, pago y recepción quedan bloqueados. Sin alterar tarifas, sin publicar instantáneas, sin desplegar.
+- La aprobación de esta prueba no sustituye la validación de un parche desplegable y el rollback. Mantener intacto el Worker Pagos. El PR #27 sigue en borrador, no autoriza publicación.
