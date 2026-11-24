@@ -28,7 +28,7 @@ La V10 de ensayo estaba sobre un motor más antiguo y tenía un panel de presupu
 ## Evidencia y límites
 
 - GitHub Actions #45375038270: 8/8 pruebas propias de integración, 14/14 de la página LIVE, 11/11 de móvil, 127/127 tests de handoff existentes, compilación completa del Worker y pruebas E2E de fuente, todo sin despliegue.
-- Test de navegador con motor comercial: un PDF no estándar deja los controles de tamaño inmediatamente debajo del archivo; cinco PDF permiten un tamaño único y la configuración compartida. Los importes no se prueban: se usa HTTP 503 simulado intencionalmente.
+- **Prueba de Chrome con motor comercial de la rama aprobada**: [GitHub Actions #45376066258](https://github.com/hernanchan/COTIZADOR/actions/runs/45376066258) SUCCESS. Un PDF no estándar deja los controles de tamaño a 24 px de la zona de carga; cinco PDF permiten tamaño único y configuración compartida. CTA de confirmar pedido deshabilitado. Se interceptaron localmente 35 solicitudes al dominio comercial; no se enviaron archivos, pedidos ni cobros. **El cálculo de precios no se prueba**: se devuelve HTTP 503 simulado de manera intencional.
 - **No se ha comprobado todavía que el Worker actualmente desplegado sea byte a byte idéntico al código de esta rama histórica de integración.** Esa diferencia debe medirse antes de una eventual promoción.
 - Las pruebas con documentos sintéticos y rutas simuladas **no** equivalen a una operación comercial auténtica.
 
