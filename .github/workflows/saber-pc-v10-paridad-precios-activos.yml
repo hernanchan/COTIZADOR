@@ -206,7 +206,7 @@ jobs:
             return {context,page,frame:page.frameLocator('#pdf'),responses};
           }
           async function pdf(i){
-            const doc=await PDFDocument.create(),pg=doc.addPage([595.28,841.89]);
+            const doc=await PDFDocument.create(),pg=doc.addPage([473.67,841.89]);
             const font=await doc.embedFont(StandardFonts.Helvetica);
             pg.drawText('Ensayo aislado '+i,{x:38,y:800,font,size:15});
             return {name:'ensayo_'+i+'.pdf',mimeType:'application/pdf',buffer:Buffer.from(await doc.save())};
@@ -217,7 +217,21 @@ jobs:
               const pc=await setup({width:1440,height:900},useV10);
               try{
                 await pc.frame.locator('#archivos').setInputFiles(files);
-                await pc.frame.locator('input[name=modoImpresionLote][value=comun]').check({timeout:30000});
+                await pc.frame.locator('#lista section.archivo').first().waitFor({state:'attached',timeout:15000});
+                await pc.frame.locator('input[name=modoImpresionLote][value=comun]').check({timeout:15000});
+                if(useV10){
+                  await pc.frame.locator('#pc-size-step').waitFor({state:'visible',timeout:15000});
+                  await pc.frame.locator('#pc-size-buttons [data-target-size=a4]').click();
+                }else{
+                  const buttons=pc.frame.locator('#lista .pregunta-tamano button.tamano-opcion').filter({hasText:/A4/i});
+                  await buttons.first().waitFor({state:'visible',timeout:15000});
+                  for(let i=0;i<5;i++){
+                    if(!await buttons.count())break;
+                    await buttons.first().click({timeout:10000});
+                    await pc.page.waitForTimeout(150);
+                  }
+                }
+                console.log('TAMANOS_RESUELTOS '+(useV10?'V10':'BASE')+' PENDIENTES='+await pc.frame.locator('#lista .pregunta-tamano').count());
                 const global=pc.frame.locator('#configComunGlobal');
                 await global.locator('select[aria-label="Impresión para todos"]').waitFor({state:'visible',timeout:30000});
                 await global.locator('select[aria-label="Impresión para todos"]').selectOption(mode);
@@ -237,6 +251,10 @@ jobs:
                 assert(await pc.page.locator('#continuar').isDisabled());
                 // Comparar resultado visible y opciones enviadas, sin imprimir tarifas o payloads.
                 return {price,quote:last.body,payload:last.payload};
+              }catch(e){
+                const info=await pc.frame.locator('body').evaluate(el=>({cards:el.querySelectorAll('#lista section.archivo').length,pendingSize:el.querySelectorAll('.pregunta-tamano').length,commonMode:el.querySelector('input[name=modoImpresionLote]:checked')?.value,controls:[...el.querySelectorAll('#configComunGlobal select')].map(x=>x.getAttribute('aria-label')),state:el.querySelector('#estado')?.textContent?.slice(0,180),priceState:el.querySelector('#prepararPedido')?.disabled})).catch(()=>({unavailable:true}));
+                console.log('DIAGNOSTICO_ESCENARIO '+(useV10?'V10':'BASE')+' '+JSON.stringify(info)+' RESPUESTAS='+pc.responses.length+' HTTP='+pc.responses.at(-1)?.status+' ESTADO='+pc.responses.at(-1)?.body?.estado);
+                throw e;
               }finally{await pc.context.close();}
             }
             for(const [mode,faces,copies] of [['bn','double',2],['color','simple',1]]){
