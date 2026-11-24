@@ -4,6 +4,8 @@ on:
     branches: [integracion/pc-v10-comercial-aislada-20261124]
     paths:
       - .github/workflows/saber-pc-v10-paridad-precios-activos.yml
+      - integraciones/autocotizador/recepcion/pc-v10-capa-reversible.mjs
+      - tests/pc-v10-capa-reversible.test.mjs
   workflow_dispatch:
 permissions: {contents: read}
 jobs:
@@ -24,6 +26,8 @@ jobs:
         with: {node-version: '22'}
       - name: Instalar herramientas de ensayo
         run: npm install --no-save --ignore-scripts --no-audit --no-fund playwright@1.56.1 pdf-lib@1.17.1
+      - name: Verificar capa reversible y rutas protegidas
+        run: node --test tests/pc-v10-capa-reversible.test.mjs
       - name: Recuperar copia exacta activa por GET y comprobar SHA256
         env:
           CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
@@ -104,6 +108,7 @@ jobs:
           import assert from 'node:assert/strict';
           import {pathToFileURL} from 'node:url';
           import {chromium} from 'playwright';
+          import {crearCapaPcV10} from './integraciones/autocotizador/recepcion/pc-v10-capa-reversible.mjs';
           import {PDFDocument,StandardFonts} from 'pdf-lib';
           assert(!process.env.CF_TOKEN&&!process.env.CF_ACCOUNT&&!process.env.CF_DB);
           const dir='/tmp/saber-v10-live-exact';
@@ -158,16 +163,19 @@ jobs:
           const css=fs.readFileSync(folder+'pc-v10-comercial.css.txt','utf8');
           const js=fs.readFileSync(folder+'pc-v10-comercial.js.txt','utf8');
           assert(!/<\/style/i.test(css)&&!/<\/script/i.test(js));
-          const a='<style id="pc-v10-local-style">'+css+'</style>';
-          const b='<script id="pc-v10-local-script">'+js+'</script>';
-          assert.equal(frame.split('</head>').length,2);
-          assert.equal(frame.split('</body>').length,2);
-          const overlay=frame.replace('</head>',a+'</head>').replace('</body>',b+'</body>');
-          assert.equal(overlay.replace(a,'').replace(b,''),frame,'Se modificó el HTML original');
-          console.log('CAPA_VISUAL_REVERSIBLE_OK; JS y CSS adicionales, rutas y motor originales sin reemplazo');
-          // El script se ejecuta al final del documento, antes del analizador defer;
-          // se conserva el mismo orden lógico de inicialización mediante DOMContentLoaded.
-          const preview=overlay.replace(b,'<script id="pc-v10-local-script">document.addEventListener("DOMContentLoaded",()=>{'+js+'},{once:true});</script>');
+          const layer=crearCapaPcV10(worker,{css,js});
+          const rq=()=>new Request(origin+'/cotizar/archivos',{headers:{Cookie:cookie}});
+          const off=await layer.fetch(rq(),env,ctx);
+          assert.equal(await off.text(),frame,'Gate OFF alteró HTML activo');
+          const enabledEnv={...env,DOCS_LIVE_PC_V10_GATE:on};
+          const active=await layer.fetch(rq(),enabledEnv,ctx);
+          const preview=await active.text();
+          assert(preview.includes('id="saber-pc-v10-layer-js"'),'La capa no se instaló sobre la respuesta real');
+          assert.equal(preview.replace(/<style id="saber-pc-v10-layer-css">[\s\S]*?<\/style>/,'').replace(/<script id="saber-pc-v10-layer-js">[\s\S]*?<\/script>/,''),frame);
+          const denied=await layer.fetch(new Request(origin+'/cotizar/archivos'),enabledEnv,ctx);
+          assert.notEqual(denied.status,200,'La capa alteró autorización');
+          assert.equal(active.headers.get('Content-Security-Policy'),assets.get('/cotizar/archivos').headers['content-security-policy']);
+          console.log('CAPA_FINAL_REAL_OK GATE_OFF_IDENTICO AUTENTICACION_Y_CSP_CONSERVADAS');
           const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
           const errors=[];
           let blocked=0,quotes=0;
@@ -239,10 +247,17 @@ jobs:
                 const count=global.locator('input[aria-label="Aplicar copias a todo el grupo"]');
                 await count.fill(String(copies));await count.press('Tab');
                 await global.locator('select[aria-label="Anillado para todos"]').selectOption('ninguno');
-                if(useV10)await pc.frame.locator('#pc-batch-apply').click();
+                if(useV10){
+                  await pc.frame.locator('#lista .pregunta-tamano').first().waitFor({state:'detached',timeout:15000}).catch(()=>{});
+                  await pc.frame.locator('#pc-batch-apply').click();
+                }
                 await pc.frame.locator('#prepararPedido:not([disabled])').waitFor({state:'attached',timeout:30000});
                 await pc.page.waitForFunction(()=>/\d/.test(document.getElementById('precio')?.textContent||''),{timeout:30000});
                 await pc.page.waitForTimeout(400);
+                if(useV10){
+                  assert.equal(await pc.frame.locator('#lista .pregunta-tamano').count(),0);
+                  assert((await pc.frame.locator('#pc-batch-help').innerText()).includes('5 archivos'),'El guardado común no confirmó cinco archivos');
+                }
                 const last=pc.responses.at(-1);
                 assert(last?.status===200,'Respuesta de cotización no exitosa');
                 assert(last.body?.ok===true&&last.body.paymentAuthorized!==true,'Cotización inválida o habilitó pago');
