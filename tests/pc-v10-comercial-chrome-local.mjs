@@ -31,7 +31,7 @@ const errors=[];
 page.on('pageerror',e=>errors.push('JS: '+e.message.slice(0,240)));
 let blocked=0;
 await page.route('**/*',async route=>{
- const request=route.request(),u=new URL(request.url);
+ const request=route.request(),u=new URL(request.url());
  // No permitir ninguna petición al dominio comercial: todo se simula en memoria.
  if(u.hostname!=='pedidos.libreriasaber.com.ar')return route.continue();
  blocked++;
