@@ -29,6 +29,8 @@ import {verificarVinculoCotizadorV2} from './verificar-vinculo-cotizador-v2.mjs'
 import {paginaCotizadorV2PruebaPrivada,paginaCotizadorTUSClientePruebas} from './pantalla-cotizador-v2-prueba-privada.mjs';
 import {prepararCotizadorArchivosLive} from './pagina-archivos-live.mjs';
 import asistenteMovilLiveJs from './asistente-movil-live.txt';
+import pcV10LiveJs from './pc-v10-comercial.js.txt';
+import pcV10LiveCss from './pc-v10-comercial.css.txt';
 import portadaSaberDirectoHtml from '../../../vidriera/index.html';
 import ofertasSaberDirectoHtml from '../../../vidriera/ofertas.html';
 import {prepararVistaDisenoPrivada,prepararVistaDisenoAbierta} from './saber-directo-vista-previa.mjs';
@@ -2365,6 +2367,7 @@ export default {
       return plazoProduccionCliente(request,env);
     }
     if(page==='/cotizar/archivos'||page==='/cotizar/archivos.js'||
+       page==='/cotizar/pc-v10.js'||page==='/cotizar/pc-v10.css'||
        page==='/cotizar/movil.js'||
        page==='/cotizar/flujo-live.js'||page==='/api/pedido/live/materiales'||
        page==='/api/pedido/live/cotizar'){
@@ -2375,13 +2378,26 @@ export default {
        new URL(request.url).origin==='https://pedidos.libreriasaber.com.ar';
       if(!live||!await autorizadoCompradorLive(request,env))
        return testResponse({ok:false,error:'LIVE_COTIZADOR_CERRADO'},503);
+      const previewPcV10=env?.DOCS_LIVE_PC_V10_PREVIEW_GATE==='PRIVATE_TEST_ONLY'&&
+       new URL(request.url).searchParams.get('pc')==='v10';
       if(page==='/cotizar/archivos'&&request.method==='GET'){
        const previewMovil=new URL(request.url).searchParams.get('vista')==='movil';
-       const html=prepararCotizadorArchivosLive(paginaCargaUnica(),{previewMovil});
+       const html=prepararCotizadorArchivosLive(paginaCargaUnica(),{
+        previewMovil,previewPcV10:previewPcV10&&!previewMovil
+       });
        return new Response(html,{headers:{
         'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store,private',
-        'Content-Security-Policy':"default-src 'none'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'",
+        'Content-Security-Policy':"default-src 'none'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'",
         'X-Content-Type-Options':'nosniff','X-Robots-Tag':'noindex,nofollow'}});
+      }
+      if((page==='/cotizar/pc-v10.js'||page==='/cotizar/pc-v10.css')&&
+        request.method==='GET'){
+       if(!previewPcV10)return testResponse({ok:false,error:'PC_V10_PREVIEW_CERRADA'},404);
+       return new Response(page.endsWith('.js')?pcV10LiveJs:pcV10LiveCss,{headers:{
+        'Content-Type':page.endsWith('.js')?'text/javascript; charset=utf-8':'text/css; charset=utf-8',
+        'Cache-Control':'no-store,private','X-Content-Type-Options':'nosniff',
+        'X-Robots-Tag':'noindex,nofollow'
+       }});
       }
       if(page==='/cotizar/movil.js'&&request.method==='GET')
        return new Response(asistenteMovilLiveJs,{headers:{
