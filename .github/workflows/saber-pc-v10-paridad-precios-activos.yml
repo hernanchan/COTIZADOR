@@ -163,7 +163,22 @@ jobs:
           const css=fs.readFileSync(folder+'pc-v10-comercial.css.txt','utf8');
           const js=fs.readFileSync(folder+'pc-v10-comercial.js.txt','utf8');
           assert(!/<\/style/i.test(css)&&!/<\/script/i.test(js));
-          const layer=crearCapaPcV10(worker,{css,js});
+          // Ensayar un paquete de módulos instalable, conservando el módulo real sin recompilarlo.
+          const entryName=fs.readFileSync(dir+'/entry.txt','utf8');
+          assert(/^[a-zA-Z0-9_.-]+$/.test(entryName));
+          assert(!['saber-pc-v10-entry.mjs','saber-pc-v10-layer.mjs'].includes(entryName));
+          const originalHash=crypto.createHash('sha256').update(fs.readFileSync(dir+'/'+entryName)).digest('hex');
+          fs.copyFileSync(folder+'pc-v10-capa-reversible.mjs',dir+'/saber-pc-v10-layer.mjs',fs.constants.COPYFILE_EXCL);
+          fs.writeFileSync(dir+'/saber-pc-v10-entry.mjs',
+            'import base from '+JSON.stringify('./'+entryName)+';\n'+
+            'export * from '+JSON.stringify('./'+entryName)+';\n'+
+            'import {crearCapaPcV10} from "./saber-pc-v10-layer.mjs";\n'+
+            'export default crearCapaPcV10(base,{css:'+JSON.stringify(css)+',js:'+JSON.stringify(js)+'});\n',{mode:0o600,flag:'wx'});
+          const pkg=await import(pathToFileURL(dir+'/saber-pc-v10-entry.mjs').href);
+          const layer=pkg.default;
+          assert.equal(typeof layer.fetch,'function');
+          assert.equal(crypto.createHash('sha256').update(fs.readFileSync(dir+'/'+entryName)).digest('hex'),originalHash);
+          console.log('PAQUETE_MODULAR_LOCAL_OK ORIGINAL_INTACTO_SHA256='+originalHash);
           const rq=()=>new Request(origin+'/cotizar/archivos',{headers:{Cookie:cookie}});
           const off=await layer.fetch(rq(),env,ctx);
           assert.equal(await off.text(),frame,'Gate OFF alteró HTML activo');
@@ -210,7 +225,15 @@ jobs:
               }
               blocked++;return route.fulfill({status:403,contentType:'application/json',body:'{"ok":false,"error":"ENSAYO_SIN_OPERACIONES"}'});
             });
-            await page.goto(origin+'/cotizar',{waitUntil:'domcontentloaded',timeout:30000});
+            // Esperar el catálogo solicitado por el analizador real: el listener de archivos
+            // ya está instalado cuando ese script inicia la consulta del catálogo.
+            const ready=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/pedido/live/materiales'&&r.status()===200,{timeout:30000});
+            await page.goto(origin+'/cotizar',{waitUntil:'load',timeout:30000});
+            await ready;
+            const frame=page.frameLocator('#pdf');
+            await frame.locator('#archivos').waitFor({state:'attached',timeout:15000});
+            if(useV10&&viewport.width>=900)await frame.locator('#pc-shell').waitFor({state:'attached',timeout:15000});
+            console.log('ANALIZADOR_LISTO '+(useV10?'V10':'BASE')+' '+viewport.width);
             return {context,page,frame:page.frameLocator('#pdf'),responses};
           }
           async function pdf(i){
@@ -225,7 +248,7 @@ jobs:
               const pc=await setup({width:1440,height:900},useV10);
               try{
                 await pc.frame.locator('#archivos').setInputFiles(files);
-                await pc.frame.locator('#lista section.archivo').first().waitFor({state:'attached',timeout:15000});
+                await pc.frame.locator('#lista section.archivo').nth(4).waitFor({state:'attached',timeout:20000});
                 await pc.frame.locator('input[name=modoImpresionLote][value=comun]').check({timeout:15000});
                 if(useV10){
                   await pc.frame.locator('#pc-size-step').waitFor({state:'visible',timeout:15000});
@@ -239,7 +262,9 @@ jobs:
                     await pc.page.waitForTimeout(150);
                   }
                 }
-                console.log('TAMANOS_RESUELTOS '+(useV10?'V10':'BASE')+' PENDIENTES='+await pc.frame.locator('#lista .pregunta-tamano').count());
+                await pc.frame.locator('#lista .pregunta-tamano').first().waitFor({state:'detached',timeout:15000});
+                assert.equal(await pc.frame.locator('#lista .pregunta-tamano').count(),0);
+                console.log('TAMANOS_RESUELTOS '+(useV10?'V10':'BASE')+' PENDIENTES=0');
                 const global=pc.frame.locator('#configComunGlobal');
                 await global.locator('select[aria-label="Impresión para todos"]').waitFor({state:'visible',timeout:30000});
                 await global.locator('select[aria-label="Impresión para todos"]').selectOption(mode);
@@ -248,7 +273,6 @@ jobs:
                 await count.fill(String(copies));await count.press('Tab');
                 await global.locator('select[aria-label="Anillado para todos"]').selectOption('ninguno');
                 if(useV10){
-                  await pc.frame.locator('#lista .pregunta-tamano').first().waitFor({state:'detached',timeout:15000}).catch(()=>{});
                   await pc.frame.locator('#pc-batch-apply').click();
                 }
                 await pc.frame.locator('#prepararPedido:not([disabled])').waitFor({state:'attached',timeout:30000});
@@ -281,6 +305,12 @@ jobs:
               assert(strip(after.payload)===strip(before.payload),'Opciones enviadas distintas: '+mode);
               console.log('PARIDAD_PRECIO_VISIBLE_Y_OPCIONES_OK '+mode+' '+faces+' COPIAS='+copies+' ARCHIVOS=5');
             }
+            const mobile=await setup({width:390,height:844},true);
+            try{
+              assert.equal(await mobile.frame.locator('#pc-shell').count(),0);
+              assert.equal(await mobile.frame.locator('body').evaluate(el=>el.classList.contains('saber-pc-v3')),false);
+              console.log('CAPA_MODULAR_MOVIL_SIN_CAMBIOS_OK');
+            }finally{await mobile.context.close();}
             assert(pricingReads>0&&quotes>0);
             assert.equal(errors.length,0,'Excepciones de navegador: '+errors.join(','));
             console.log('PARIDAD_TARIFARIO_APROBADO_OK REVISION='+snap.approvedRevision+' CONSULTAS_LOCALES='+quotes+' LECTURAS_SNAPSHOT='+pricingReads+' PETICIONES_BLOQUEADAS='+blocked);
