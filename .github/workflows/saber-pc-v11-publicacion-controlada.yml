@@ -35,8 +35,8 @@ jobs:
           assert(comments.some(c=>c.user?.login==='hernanchan'&&c.body?.trim()===expected),'FALTA AUTORIZACION MANUAL DEL TITULAR');
           const st=await get('/commits/'+sha+'/status');
           assert(st.statuses?.find(x=>x.context==='saber/contrato')?.state==='success','FALTA CONTROL SABER/CONTRATO VERDE');
-          const tested=await get('/actions/runs/45401629620');
-          assert(tested.conclusion==='success'&&tested.head_sha==='cf8161ee7c4e69a0a69ab4d9a0885c4160e23e65','Ensayo modular no confirmado');
+          const tested=await get('/actions/runs/45401794496');
+          assert(tested.conclusion==='success'&&tested.head_sha==='c7588fdf7b071f865fb0bdc5b8062f1e1412b7c3','Ensayo modular no confirmado');
           console.log('AUTORIZACION_SHA_Y_PRUEBAS_VERIFICADAS');
           JS
       - name: Verificar que los tres recursos de interfaz son los ensayados
@@ -45,7 +45,7 @@ jobs:
           for p in pc-v10-capa-reversible.mjs pc-v11-configuracion-directa.js.txt pc-v11-configuracion-directa.css.txt; do
             file="integraciones/autocotizador/recepcion/$p"
             # Descarga explícita de objetos de código ya públicos; no credenciales Cloudflare.
-            curl -fsS --max-time 25 "https://raw.githubusercontent.com/hernanchan/COTIZADOR/cf8161ee7c4e69a0a69ab4d9a0885c4160e23e65/$file" | cmp - "$file"
+            curl -fsS --max-time 25 "https://raw.githubusercontent.com/hernanchan/COTIZADOR/c7588fdf7b071f865fb0bdc5b8062f1e1412b7c3/$file" | cmp - "$file"
           done
           node --test tests/pc-v10-capa-reversible.test.mjs
       - name: Crear versión aislada, verificar todos los bindings y publicar solo si son idénticos
