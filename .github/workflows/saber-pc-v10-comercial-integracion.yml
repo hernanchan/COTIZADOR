@@ -36,6 +36,7 @@ jobs:
         working-directory: integraciones/autocotizador/recepcion
         run: |
           npm install --no-save --ignore-scripts --no-audit --no-fund esbuild@0.24.2 pdf-lib@1.17.1
-          ./node_modules/.bin/esbuild ./worker-fase4-cotizador-unificado.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --loader:.html=text --loader:.txt=text --outfile=/tmp/saber-pc-v10-commercial-check.mjs
+          npm run build:unificado
+          cp ./dist/saber-documentos-cotizador-fase4.mjs /tmp/saber-pc-v10-commercial-check.mjs
           node --check /tmp/saber-pc-v10-commercial-check.mjs
           echo SABER_PC_V10_COMMERCIAL_COMPILED_NO_DEPLOY
