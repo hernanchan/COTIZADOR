@@ -22,6 +22,9 @@ const originalSize=c=>c.querySelector('select[aria-label^="Tamaño final de"]');
 const sizeButton=(c,v)=>[...c.querySelectorAll('.tamano-rapido button.tamano-opcion')].find(b=>v==='original'?/original|real/i.test(b.textContent):new RegExp('\\b'+v+'\\b','i').test(b.textContent));
 const element=(tag,t)=>{const e=document.createElement(tag);if(t)e.textContent=t;return e;};
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const analyzing=()=>/Analizando|Leyendo|Preparando imágenes/i.test(by('estado')?.textContent||'')||cards().some(c=>/Analizando PDF/i.test(meta(c)));
+const imagesReady=()=>!analyzing()&&cards().filter(image).every(c=>!!amp(c));
+async function until(test,ms=3500){const start=Date.now();while(Date.now()-start<ms){const r=test();if(r)return r;await wait(75);}return null;}
 const selectValue=(e,v)=>{if(!e||![...e.options].some(o=>o.value===v))return false;if(e.value!==v){e.value=v;e.dispatchEvent(new Event('change',{bubbles:true}));}return true;};
 const requested=new Map();let busy=false,scheduled=false,alertText='';
 const thumbnails=new Map();
@@ -93,13 +96,13 @@ async function selectNativeSize(k,v){
  let c=waitCard(k);if(!c)return false;
  if(['a2','a1','a0'].includes(v)){
   // La ampliación y su consentimiento son exclusivamente los originales.
-  const a=amp(c);if(!a)return false;
+  const a=await until(()=>{const live=get(k);return live&&amp(live);});if(!a)return false;c=get(k);if(!c)return false;
   if(!ampSelect(c)){
    const button=[...a.querySelectorAll('button.eleccion-plotter-boton')].find(b=>/Ploteo/i.test(b.textContent));
-   if(!button)return false;button.click();await wait(100);c=waitCard(k);if(!c)return false;
+   if(!button)return false;button.click();c=await until(()=>{const live=get(k);return live&&ampSelect(live)?live:null;});if(!c)return false;
   }
   if(!selectValue(ampSelect(c),v))return false;
-  await wait(100);return true;
+  return !!await until(()=>{const live=get(k);return live&&ampSelect(live)?.value===v&&apply(live)?live:null;});
  }
  if(ampSelect(c)){
   const b=[...amp(c).querySelectorAll('button.eleccion-plotter-boton')].find(b=>/Impresión común/i.test(b.textContent));
@@ -145,11 +148,12 @@ async function changeOne(k,v,n){
 async function run(fn){
  if(busy)return;busy=true;batchApply.disabled=true;document.body.classList.add('v11-busy');
  try{await fn();}catch(e){note('No pudimos completar una opción. Revisá el archivo y volvé a intentar.');}
- finally{busy=false;batchApply.disabled=false;document.body.classList.remove('v11-busy');schedule();}
+ finally{busy=false;batchApply.disabled=!imagesReady();document.body.classList.remove('v11-busy');schedule();}
 }
 batchApply.onclick=()=>run(async()=>{
  const v=batchSize.value,n=Number(batchCopies.value);
  if(!v||!Number.isSafeInteger(n)||n<1||n>500){note('Elegí tamaño y una cantidad entre 1 y 500.');return;}
+ if(!imagesReady()){note('Esperá a que termine el análisis de las imágenes.');return;}
  const keys=cards().filter(image).map(key);
  for(const k of keys){const c=get(k);if(c)state(c).paper=batchPaper.value;await changeOne(k,v,n);}
  note(cards().filter(c=>image(c)&&state(c).pending).length?'Revisá las advertencias de las imágenes señaladas.':'Configuración aplicada.');
@@ -226,6 +230,7 @@ function sync(){
  document.body.classList.toggle('v11-images-only',imagesOnly);
  if(imagesOnly&&indiv&&!indiv.checked){indiv.click();return;}
  batch.hidden=all.filter(image).length<2;
+ batchApply.disabled=!imagesReady();
  intro.hidden=!all.length;
  all.forEach(c=>{if(!image(c)&&document.querySelector('input[name="modoImpresionLote"][value="comun"]')?.checked){c.querySelector('.v11-direct')?.remove();return;}decorate(c);});
  renderWarnings(all);
@@ -240,6 +245,7 @@ by('archivos').addEventListener('change',e=>{
  }
 },true);
 window.addEventListener('pagehide',()=>{for(const url of thumbnails.values())URL.revokeObjectURL(url);});
+new MutationObserver(schedule).observe(by('estado'),{childList:true,subtree:true,characterData:true});
 new MutationObserver(records=>{if(records.some(r=>[...r.addedNodes,...r.removedNodes].some(n=>n.nodeType===1&&!n.classList?.contains('v11-direct')&&!n.classList?.contains('v11-thumb'))))schedule();}).observe(list,{childList:true,subtree:true});
 sync();
 })();
