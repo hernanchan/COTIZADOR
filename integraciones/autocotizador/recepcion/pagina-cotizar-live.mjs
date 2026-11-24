@@ -101,8 +101,13 @@ export function paginaCotizarLive(req,env,{authorized=false}={}){
  // Prueba real de lectura/cotización con las APIs comerciales existentes;
  // no habilita órdenes, checkout, transferencia ni subida de originales.
  const previewMovil=u.searchParams.get('vista')==='movil';
- const routeQuery=previewMovil
+ // Preview PC cerrada por defecto; el cliente comercial nunca cambia sin gate.
+ const previewPcV10=!previewMovil&&
+  env?.DOCS_LIVE_PC_V10_PREVIEW_GATE==='PRIVATE_TEST_ONLY'&&
+  u.searchParams.get('pc')==='v10';
+ const baseRouteQuery=previewMovil
   ?servicioQuery+(servicioQuery?'&':'?')+'vista=movil':servicioQuery;
+ const routeQuery=previewPcV10?baseRouteQuery+(baseRouteQuery?'&':'?')+'pc=v10':baseRouteQuery;
  const tituloServicio=servicioInicial==='fotos'?'Cotizá tus fotos':
   servicioInicial==='stickers'?'Cotizá tus stickers':'Cotizá tus impresiones y ploteos';
  if(req.method!=='GET'||u.protocol!=='https:'||u.hostname!==HOST||
@@ -139,13 +144,13 @@ window.saberIngresoLive=async token=>{
  }
  const scriptNonce=crypto.randomUUID().replaceAll('-','');
  const enabled=env?.DOCS_LIVE_RECEPCION_GATE===ON&&env?.DOCS_LIVE_PRICING_GATE===ON&&
-  env?.DOCS_LIVE_ORDER_GATE===ON&&!previewMovil;
+  env?.DOCS_LIVE_ORDER_GATE===ON&&!previewMovil&&!previewPcV10;
  const bankEnabled=enabled&&env?.DOCS_LIVE_TRANSFER_GATE===ON&&
   env?.DOCS_LIVE_TUS_GATE===ON;
  const html=`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cotizador de PDF · Librería Saber</title><style>${baseCss}${mobileCss}${previewCss}</style></head><body class="${previewMovil?'preview-movil':''}">
 <header><strong>Librería Saber · Impresiones y ploteos</strong><a class="volver-tienda" href="https://libreriasaber.com.ar/">← Volver a la tienda</a></header>
-<main>${previewMovil?'<section id="aviso-demo-real" role="status" style="border-left:4px solid #df922d;background:#fff7ec;padding:12px 15px"><strong>Prueba móvil con precios reales</strong><p style="margin:4px 0">Podés elegir archivos y verificar la detección, las opciones y la cotización comercial vigente. No genera pedidos ni permite pagar.</p></section>':''}<section><h1>${servicioInicial==='fotos'?'Prepará tus fotos':servicioInicial==='stickers'?'Prepará tus stickers':'Prepará tus PDF, JPG o PNG'}</h1>
+<main>${previewPcV10?'<section id="pc-v10-ensayo" role="status" style="border-left:4px solid #e2a43f;background:#fff7e8;padding:12px 14px"><strong>Ensayo de interfaz PC con motor comercial</strong><p>Precios y detección del motor vigente. Esta vista no permite realizar pedidos ni pagos.</p></section>':''}${previewMovil?'<section id="aviso-demo-real"' role="status" style="border-left:4px solid #df922d;background:#fff7ec;padding:12px 15px"><strong>Prueba móvil con precios reales</strong><p style="margin:4px 0">Podés elegir archivos y verificar la detección, las opciones y la cotización comercial vigente. No genera pedidos ni permite pagar.</p></section>':''}<section><h1>${servicioInicial==='fotos'?'Prepará tus fotos':servicioInicial==='stickers'?'Prepará tus stickers':'Prepará tus PDF, JPG o PNG'}</h1>
 <p>Elegí los archivos y sus opciones de impresión. Las medidas y el tipo de trabajo se calculan por el contenido del PDF, no por el nombre ni por su peso.</p>
 <div id="precio-entrega" aria-label="Precio y fecha de entrega">
 <div><strong>TU PRECIO A PAGAR</strong><p id="precio" aria-live="polite">Pendiente de cotización</p></div>
