@@ -131,11 +131,25 @@ async function finish(k){
  const wantsLarge=['a2','a1','a0'].includes(s.size);
  const needsApply=wantsLarge&&s.appliedSize!==s.size;
  if(needsApply&&a&&!q){
-  // El resultado de la calidad puede llegar después del selector.
-  // En caso de demora, conservar la configuración pendiente; jamás
-  // confirmar una advertencia que todavía no está disponible.
-  await wait(200);
-  c=get(k);if(!c)return false;q=quality(c);a=apply(c);
+  // Esperar el analizador nativo antes de iniciar el siguiente archivo.
+  const ready=()=>{const live=get(k);if(!live)return null;const b=apply(live);
+   return b&&(quality(live)||(!b.disabled&&!/Analizando resolución/i.test(amp(live)?.textContent||'')))?live:null;};
+  let live=await until(ready,1800);
+  if(!live){
+   const sel=ampSelect(get(k)||c);
+   if(sel&&sel.value===s.size)sel.dispatchEvent(new Event('change',{bubbles:true}));
+   live=await until(ready,3500);
+  }
+  if(!live){
+   const card=get(k),button=card&&exp(card);
+   if(button?.getAttribute('aria-expanded')==='false'){
+    button.click();await wait(100);const expanded=get(k);const close=expanded&&exp(expanded);
+    if(close?.getAttribute('aria-expanded')==='true')close.click();
+   }
+   live=await until(ready,3500);
+  }
+  if(!live){s.pending=true;return false;}
+  c=live;q=quality(c);a=apply(c);
  }
  if(q&&!q.checked){s.pending=true;return false;}
  if(a&&needsApply){
@@ -206,7 +220,8 @@ function decorate(c){
  const paper=row.querySelector('.v11-paper');paper.value=s.paper;
  row.querySelector('.v11-paper-label').hidden=!(isImage&&['a2','a1','a0'].includes(s.size));
  const t=row.querySelector('.v11-state');
- t.textContent=s.pending?'Revisar configuración':isImage&&!s.size?'Elegí tamaño':'';
+ const hasPendingAnalysis=s.pending&&s.size&&['a2','a1','a0'].includes(s.size)&&!quality(c)&&apply(c)?.disabled;
+ t.textContent=hasPendingAnalysis?'Análisis pendiente · revisá Otros ajustes':s.pending?'Revisar configuración':isImage&&!s.size?'Elegí tamaño':'';
  c.classList.toggle('v11-image',isImage);
  c.classList.toggle('v11-compact-image',isImage);
  const advanced=exp(c);
@@ -224,7 +239,11 @@ function decorate(c){
  // Las miniaturas se vinculan sólo cuando el nombre coincide inequívocamente.
  if(isImage&&!c.querySelector('.v11-thumb')){
   const file=[...thumbnails.keys()].filter(n=>n===imageStem(c));
-  if(file.length===1&&thumbnails.get(file[0])){const img=element('img');img.className='v11-thumb';img.src=thumbnails.get(file[0]);img.alt='Vista previa';c.querySelector('.fila-principal')?.prepend(img);}
+  if(file.length===1&&thumbnails.get(file[0])){
+   const source=thumbnails.get(file[0]),thumb=element('canvas');thumb.className='v11-thumb';
+   thumb.width=source.width;thumb.height=source.height;thumb.setAttribute('role','img');thumb.setAttribute('aria-label','Vista previa');
+   thumb.getContext('2d').drawImage(source,0,0);thumb.dataset.ready='1';c.querySelector('.fila-principal')?.prepend(thumb);
+  }
  }
 }
 let warningSignature='';
@@ -285,7 +304,7 @@ function rememberImages(files){
    const b=await createImageBitmap(f),r=Math.min(1,160/Math.max(b.width,b.height));
    const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(b.width*r));canvas.height=Math.max(1,Math.round(b.height*r));
    canvas.getContext('2d').drawImage(b,0,0,canvas.width,canvas.height);b.close();
-   thumbnails.set(stem,canvas.toDataURL('image/jpeg',.8));schedule();
+   thumbnails.set(stem,canvas);schedule();
   }catch{schedule();}})();
  }
 }
