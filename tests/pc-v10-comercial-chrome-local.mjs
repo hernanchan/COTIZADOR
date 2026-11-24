@@ -29,6 +29,7 @@ const context=await browser.newContext({viewport:{width:1440,height:900}});
 const page=await context.newPage();
 const errors=[];
 page.on('pageerror',e=>errors.push('JS: '+e.message.slice(0,240)));
+page.on('console',e=>{if(e.type()==='error'||e.type()==='warning')errors.push(e.type()+': '+e.text().slice(0,240));});
 let blocked=0;
 await page.route('**/*',async route=>{
  const request=route.request(),u=new URL(request.url());
@@ -70,6 +71,8 @@ const content=page.frameLocator('#pdf');
 try{
  await page.goto(prefix+'/cotizar?pc=v10',{waitUntil:'domcontentloaded',timeout:30000});
  await content.locator('#archivos').setInputFiles([buffers[0]]);
+ await page.waitForTimeout(1800);
+ console.log('ESTADO_TRAS_CARGA_UNO '+JSON.stringify(await content.locator('#estado').innerText()));
  await content.locator('#pc-upload-summary').waitFor({state:'visible',timeout:30000});
  await content.locator('#pc-size-step').waitFor({state:'visible',timeout:30000});
  assert.equal(await content.locator('#modoConfiguracion').isVisible(),false);
@@ -105,7 +108,7 @@ try{
   summary:el.querySelector('#pc-upload-summary')?.innerText.slice(0,180),
   step:el.querySelector('#pc-size-step')?.hidden,
   batch:el.querySelector('#pc-batch')?.hidden,
-  general:el.innerText.slice(0,400)
+  general:el.innerText.slice(0,400),estado:el.querySelector('#estado')?.innerText,modo:el.querySelector('input[name=modoImpresionLote]:checked')?.value,input:el.querySelector('#archivos')?.files?.length,scripts:[...document.scripts].map(x=>x.src).filter(Boolean)
  })).catch(()=>({unavailable:true}))));
  throw e;
 }finally{await browser.close();}
