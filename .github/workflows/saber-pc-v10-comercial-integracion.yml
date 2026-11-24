@@ -58,3 +58,45 @@ jobs:
           npm --prefix integraciones/autocotizador/recepcion run build:live-buyer
       - name: Abrir iframe comercial en Chromium con 1 y 5 PDF sinteticos
         run: node tests/pc-v10-comercial-chrome-local.mjs
+  auditar-worker-publicado-solo-lectura:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    env:
+      CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      CF_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Consultar version activa y fuente remota sin escribir
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -n "$CF_ACCOUNT" && -n "$CF_TOKEN" ]]
+          root="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT"
+          curl -fsS --max-time 25 -H "Authorization: Bearer $CF_TOKEN" "$root/workers/scripts/saber-documentos-produccion/deployments" -o /tmp/saber-live-deploy.json
+          jq -e '.success==true and (.result.deployments[0].versions | length)==1 and .result.deployments[0].versions[0].percentage==100' /tmp/saber-live-deploy.json >/dev/null
+          ver=$(jq -r '.result.deployments[0].versions[0].version_id' /tmp/saber-live-deploy.json)
+          echo "CLOUDFLARE_DOCUMENTOS_VERSION_ACTIVA=$ver"
+          curl -fsS --max-time 30 -H "Authorization: Bearer $CF_TOKEN" "$root/workers/workers/saber-documentos-produccion/versions/$ver?include=modules,sourcemaps" -o /tmp/saber-live-version.json
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+          const data=JSON.parse(fs.readFileSync('/tmp/saber-live-version.json','utf8'));
+          if(data.success!==true)throw Error('Cloudflare no devolvio fuente de version');
+          const arr=data.result?.modules||[];
+          const modules=arr.filter(x=>typeof x.content_base64==='string').map(x=>({name:x.name,type:x.content_type,bytes:Buffer.from(x.content_base64,'base64')}));
+          const js=modules.filter(x=>x.type?.includes('javascript')||x.name?.endsWith('.mjs'));
+          if(!js.length)throw Error('Version remota sin modulo JS comparable');
+          js.sort((a,b)=>b.bytes.length-a.bytes.length);
+          const hash=x=>crypto.createHash('sha256').update(x).digest('hex');
+          const old=fs.readFileSync('integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs');
+          console.log('CLOUDFLARE_DOCUMENTOS_MODULO_JS_SHA256='+hash(js[0].bytes));
+          console.log('GITHUB_DIST_BASE_SHA256='+hash(old));
+          console.log('GITHUB_DIST_BASE_COINCIDE_REMOTO='+String(hash(js[0].bytes)===hash(old)));
+          console.log('AVISO: comparar hashes no confirma igualdad de fuentes si Cloudflare reempaqueta los modulos');
+          JS
+          echo SABER_DOCUMENTOS_VERIFICADO_SOLO_GET
