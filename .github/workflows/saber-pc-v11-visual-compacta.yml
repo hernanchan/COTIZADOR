@@ -255,13 +255,20 @@ jobs:
             await batch.waitFor({state:'visible',timeout:20000});
             await pc.frame.locator('#lista .saber-ampliacion').nth(4).waitFor({state:'attached',timeout:30000});
             await pc.page.waitForTimeout(700);
+            const beforeShot=await pc.frame.locator('#lista').screenshot({type:'jpeg',quality:55});
+            console.log('V11_CAPTURA_INICIAL_BASE64 '+beforeShot.toString('base64'));
+
             await batch.locator('select[aria-label="Tamaño de impresión"]').selectOption('a2');
             await batch.locator('input[aria-label="Cantidad de copias"]').fill('3');
             await batch.locator('select[aria-label="Papel"]').selectOption('obra80');
             await batch.getByRole('button',{name:'Aplicar a todas'}).click();
             const accept=pc.frame.locator('#pc-v11-warnings button');
             await accept.waitFor({state:'visible',timeout:30000});
-            await pc.frame.locator('#pc-v11-warnings details').nth(4).waitFor({state:'visible',timeout:30000});
+            try{await pc.frame.locator('#pc-v11-warnings details').nth(4).waitFor({state:'visible',timeout:15000});}
+            catch(e){
+              console.log('V11_DIAGNOSTICO_AVISOS '+JSON.stringify(await pc.frame.locator('#lista').evaluate(root=>[...root.querySelectorAll('.archivo')].map(card=>({name:card.querySelector('.nombre')?.textContent,meta:card.querySelector('.resumen-archivo')?.textContent,selected:card.querySelector('.v11-size')?.value,amp:card.querySelector('.saber-ampliacion')?.textContent?.slice(0,1200),disabled:card.querySelector('[data-saber-amp-aplicar]')?.disabled,warning:!!card.querySelector('.saber-ampliacion [role=alert] input'),status:card.querySelector('.v11-state')?.textContent})))));
+              throw e;
+            }
             console.log('V11_ESTADO_LOTE '+JSON.stringify(await pc.frame.locator('#lista').evaluate(l=>[...l.querySelectorAll('section.archivo')].map(c=>({name:c.querySelector('.nombre')?.textContent,size:c.querySelector('.v11-size')?.value,copies:c.querySelector('.v11-copies')?.value,amp:c.querySelector('.saber-ampliacion select')?.value,warning:!!c.querySelector('.saber-ampliacion [role=alert] input'),state:c.querySelector('.v11-state')?.textContent})))));
             assert.equal(await pc.frame.locator('#pc-v11-warnings details').count(),5);
             assert.equal(await pc.frame.locator('#lista .saber-ampliacion input[type=checkbox]:checked').count(),0,'No se debe aceptar advertencia sin consentimiento');
