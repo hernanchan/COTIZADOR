@@ -47,3 +47,10 @@ La V10 de ensayo estaba sobre un motor más antiguo y tenía un panel de presupu
 3. Validación del titular y autorización manual exigida por el contrato de control de cambios para el commit final, previo a cualquier publicación.
 
 Este documento no autoriza un cambio de producción ni el encendido del nuevo gate.
+
+## Segunda auditoría de seguridad — 24/11/2026
+
+- Workflow aislado `.github/workflows/saber-pc-v10-paridad-produccion-readonly.yml`, commit `b5b11d1c57d81140892b410b2bbbc8690f7908aa`, [ejecución 45378875683](https://github.com/hernanchan/COTIZADOR/actions/runs/45378875683). Lectura GET de Cloudflare; sin despliegue, cambios de compuertas, cobros, D1, R2 ni TUS. Las fuentes remotas se procesaron en el runner y no se publicaron como artefactos ni en logs.
+- Documentos: versión activa única al 100% `52585d3a-6d3d-42bb-9f1f-a809811383b7`; binding a Central de producción confirmado. Pagos: versión activa única al 100% `d2f09188-3ab4-4bf7-802b-8fb87f727530`; binding D1 confirmado.
+- Ninguno de los dos artefactos históricos de referencia coincide exactamente con los módulos o candidatos de sourcemap recuperados. No se encontraron las tres fuentes individuales de Documentos bajo nombres comparables. La comparación estructural AST dio escasa coincidencia, pero **no permite medir diferencias funcionales** debido a compilación, minificación y reempaquetado. Tampoco se encontraron los recursos JS exactos en el dist histórico ni en el remoto con el método de búsqueda usado; resultado inconcluso, no ausencia de funcionalidad.
+- **Decisión de seguridad: no reinstalar el paquete histórico de GitHub ni modificar el Worker de Pagos.** Identificar/reconstruir una base verificable del Worker Documentos activo antes de portar únicamente V10; no perder cambios operativos posteriores a la rama comercial. Mantener la prueba con tarifas en entorno controlado sin pedidos ni cobros y la autorización manual de PR/SHA final.
