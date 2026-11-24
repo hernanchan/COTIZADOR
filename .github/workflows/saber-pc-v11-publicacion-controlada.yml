@@ -29,7 +29,7 @@ jobs:
             assert(r.ok,'GitHub lectura '+r.status);return r.json();
           }
           const pr=await get('/pulls/28');
-          assert(pr.state==='open'&&pr.head.sha===sha&&pr.head.ref==='integracion/pc-v11-configuracion-directa-20261124'&&pr.base.ref==='integracion/pc-v10-comercial-aislada-20261124','PR o SHA desactualizado');
+          assert(pr.state==='open'&&pr.head.sha===sha&&pr.head.ref==='integracion/pc-v11-configuracion-directa-20261124'&&pr.base.ref==='integracion/tus-pedido-privado-20261101','PR o SHA desactualizado');
           const comments=await get('/issues/28/comments?per_page=100');
           const expected='AUTORIZO CAMBIO SABER PR #28 SHA '+sha;
           assert(comments.some(c=>c.user?.login==='hernanchan'&&c.body?.trim()===expected),'FALTA AUTORIZACION MANUAL DEL TITULAR');
