@@ -13,7 +13,7 @@ const get=k=>cards().find(c=>key(c)===k);
 const meta=c=>c.querySelector('.resumen-archivo')?.textContent||'';
 const amp=c=>c.querySelector('.saber-ampliacion');
 const exp=c=>[...c.querySelectorAll('button.editar')].find(b=>/^(Más opciones|Personalizar este PDF|Cerrar detalles)$/i.test(b.textContent.trim()));
-const copy=c=>c.querySelector('input[aria-label^="Cantidad de copias"]');
+const copy=c=>c.querySelector('input[aria-label^="Cantidad de copias"]:not(.v11-copies)');
 const quality=c=>amp(c)?.querySelector('[role=alert] input[type=checkbox]');
 const apply=c=>amp(c)?.querySelector('[data-saber-amp-aplicar]');
 const ampSelect=c=>amp(c)?.querySelector('select');
@@ -48,7 +48,15 @@ function nativeSize(c){
 }
 function state(c){
  const k=key(c),existing=requested.get(k);
- if(existing&&existing.name===name(c))return existing;
+ if(existing&&existing.name===name(c)){
+  // El análisis inicial puede montar la ficha antes de conocer las medidas.
+  // Las opciones de PDF se hidratan desde el motor, nunca desde la copia visual.
+  if(!image(c)&&!busy&&!existing.pending){
+   existing.size=nativeSize(c);
+   existing.copies=nativeCopies(c);
+  }
+  return existing;
+ }
  const s={name:name(c),size:image(c)?'':nativeSize(c),copies:nativeCopies(c),pending:false,appliedSize:null,paper:nativePaper(c)?.value||'obra80'};
  requested.set(k,s);return s;
 }
@@ -169,7 +177,10 @@ function decorate(c){
   // Un PDF grande mantiene el original y su clasificación técnica nativa.
   if(!isImage&&!amp(c))for(const o of [...size.options])if(['a2','a1','a0'].includes(o.value))o.remove();
   size.addEventListener('change',()=>run(async()=>{const current=get(k);if(!current)return;await changeOne(k,size.value,state(current).copies);}));
-  copies.addEventListener('change',()=>run(async()=>{const current=get(k);if(!current)return;const n=Number(copies.value);if(!Number.isSafeInteger(n)||n<1||n>500){copies.reportValidity();return;}const st=state(current);st.copies=n;if(st.size)await finish(k);}));
+  copies.addEventListener('change',()=>run(async()=>{const current=get(k);if(!current)return;const n=Number(copies.value);if(!Number.isSafeInteger(n)||n<1||n>500){copies.reportValidity();return;}const st=state(current);st.copies=n;
+   if(!isImage&&!st.size)st.size=nativeSize(current);
+   if(st.size){st.pending=true;await finish(k);}
+  }));
   const paperLabel=label('Papel',paper);paperLabel.className='v11-paper-label';
   paper.addEventListener('change',()=>run(async()=>{const c=get(k);if(!c)return;const s=state(c);s.paper=paper.value;if(s.size)await finish(k);}));
   row.append(label('Tamaño final',size),label('Copias',copies),paperLabel);
