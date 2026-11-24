@@ -1,0 +1,76 @@
+name: Saber V10 - preflight de publicación solo lectura
+on:
+  push:
+    branches: [integracion/pc-v10-comercial-aislada-20261124]
+    paths: [.github/workflows/saber-pc-v10-preflight-publicacion.yml]
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  preflight:
+    if: github.ref == 'refs/heads/integracion/pc-v10-comercial-aislada-20261124'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    environment: {name: saber-cloudflare-pruebas, deployment: false}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Validar contrato de preservación de configuración y recuperación
+        env:
+          CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          CF_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import crypto from 'node:crypto';
+          const account=process.env.CF_ACCOUNT,token=process.env.CF_TOKEN;
+          assert(/^[a-f0-9]{32}$/i.test(account||'')&&token?.length>20);
+          async function get(path){
+            const r=await fetch('https://api.cloudflare.com/client/v4/accounts/'+account+path,{method:'GET',redirect:'error',headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(25000)});
+            assert(r.ok,'GET '+r.status);
+            const v=await r.json();assert(v.success===true);return v.result;
+          }
+          const name='saber-documentos-produccion',pay='saber-pagos-produccion';
+          const old='52585d3a-6d3d-42bb-9f1f-a809811383b7';
+          const hash='c8f04928d6e0ad8885a174e34ac1ccebf461a47d3775cb83bf2bccd1ffc802f6';
+          async function active(n){
+            const d=await get('/workers/scripts/'+n+'/deployments');
+            const v=(Array.isArray(d)?d:d.deployments)?.[0]?.versions;
+            assert(v?.length===1&&v[0].percentage===100,'No hay version unica activa');
+            return v[0].version_id;
+          }
+          assert.equal(await active(name),old,'Produccion cambió; detener');
+          const payId=await active(pay);
+          const v=await get('/workers/workers/'+name+'/versions/'+old+'?include=modules');
+          const settings=await get('/workers/scripts/'+name+'/settings');
+          assert.equal(v.id,old);
+          const modules=v.modules||[];
+          assert.equal(modules.length,1,'Se requiere revisar módulos adicionales');
+          const m=modules[0];
+          assert.equal(crypto.createHash('sha256').update(Buffer.from(m.content_base64,'base64')).digest('hex'),hash);
+          assert.equal(m.name,v.main_module);
+          assert.equal(m.content_type,'application/javascript+module');
+          assert(Array.isArray(v.bindings)&&v.bindings.length>0);
+          const shape=xs=>xs.map(x=>[x.name,x.type]).sort((a,b)=>a[0].localeCompare(b[0]));
+          assert.deepEqual(shape(v.bindings),shape(settings.bindings),'Bindings de la version y settings difieren');
+          assert(!v.bindings.some(b=>b.name==='DOCS_LIVE_PC_V10_GATE'),'Gate ya existe; revisar');
+          assert(v.bindings.some(b=>b.name==='SABER_CENTRAL'&&b.type==='service'&&b.service===pay));
+          assert(v.bindings.some(b=>b.name==='SABER_R2_GRANDES_LIVE'&&b.type==='r2_bucket'));
+          assert(v.bindings.some(b=>b.name==='DOCS_LIVE_SESSION_KEY'&&b.type==='secret_text'));
+          assert(/^\d{4}-\d{2}-\d{2}$/.test(v.compatibility_date||''));
+          // No imprimir valores, código, hashes de secretos ni configuración privada.
+          const writable=['assets','cache_options','compatibility_date','compatibility_flags','containers','exports','limits','package_dependencies','placement','usage_model'];
+          const present=writable.filter(k=>v[k]!==undefined&&v[k]!==null);
+          console.log('VERSION_BASE_Y_MODULO_VERIFICADOS');
+          console.log('BINDINGS_VERSION_Y_SETTINGS_COINCIDEN CANTIDAD='+v.bindings.length);
+          console.log('CAMPOS_CONFIG_VERSION='+present.join(','));
+          console.log('TIPOS_BINDING='+[...new Set(v.bindings.map(b=>b.type))].sort().join(','));
+          console.log('EXPORTS_SOLO_DEFAULT='+String(!v.exports||Object.keys(v.exports).every(k=>k==='default')));
+          console.log('ASSETS_PRESENTES='+String(Boolean(v.assets))+' MIGRACION_PRESENTE='+String(Boolean(v.migration_tag||v.migrations)));
+          assert.equal(await active(name),old);
+          assert.equal(await active(pay),payId);
+          console.log('ROLLBACK_VERSION_EXISTENTE_Y_PAGOS_INTACTOS_OK');
+          console.log('PREFLIGHT_READONLY_OK SIN_PUBLICACION');
+          JS
