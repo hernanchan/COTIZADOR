@@ -1,0 +1,139 @@
+name: Saber PC V10 - paridad de produccion solo lectura
+on:
+  push:
+    branches: [integracion/pc-v10-comercial-aislada-20261124]
+    paths:
+      - .github/workflows/saber-pc-v10-paridad-produccion-readonly.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  auditar:
+    if: github.ref == 'refs/heads/integracion/pc-v10-comercial-aislada-20261124'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 367938a241529e0cf70e7c124d8d5599b6ca4250
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar analizador y regenerar recursos base sin credenciales Cloudflare
+        run: |
+          npm install --no-save --ignore-scripts --no-audit --no-fund acorn@8.15.0 esbuild@0.24.2 pdf-lib@1.17.1
+          npm --prefix integraciones/autocotizador/recepcion run build:intake-client
+          npm --prefix integraciones/autocotizador/recepcion run build:live-buyer
+          npm --prefix integraciones/autocotizador/recepcion run build:live-postpay-tus
+          npm --prefix integraciones/autocotizador/recepcion run build:live-postpay-r2
+      - name: Comparar modulos y recursos sin imprimir codigo ni datos
+        env:
+          CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          CF_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+          import {parse} from 'acorn';
+          const account=process.env.CF_ACCOUNT,token=process.env.CF_TOKEN;
+          if(!/^[a-f0-9]{32}$/i.test(account||'')||!token)throw Error('Credenciales no disponibles');
+          const root='https://api.cloudflare.com/client/v4/accounts/'+account;
+          async function get(path){
+            const r=await fetch(root+path,{method:'GET',redirect:'error',headers:{Authorization:'Bearer '+token,Accept:'application/json'},signal:AbortSignal.timeout(30000)});
+            if(!r.ok)throw Error('Cloudflare GET HTTP '+r.status);
+            const j=await r.json();
+            if(j.success!==true||!j.result)throw Error('Respuesta Cloudflare no confirmada');
+            return j.result;
+          }
+          const hash=x=>crypto.createHash('sha256').update(x).digest('hex');
+          const folder='integraciones/autocotizador/recepcion/';
+          const assets=['carga-unica-cliente.txt','asistente-movil-live.txt','flujo-presupuesto-live-cliente.txt','recepcion-tus-live-cliente.txt','recepcion-r2-live-cliente.txt'];
+          const targets=new Map(assets.map(n=>[hash(fs.readFileSync(folder+n,'utf8')),n]));
+          function inspect(src){
+            let ast;
+            try{ast=parse(src,{ecmaVersion:'latest',sourceType:'module',allowHashBang:true});}catch{return null;}
+            const fingerprint=n=>hash(JSON.stringify(n,(k,v)=>['start','end','loc','raw'].includes(k)?undefined:typeof v==='bigint'?String(v)+'n':v));
+            const statements=ast.body.map(fingerprint);
+            const matches=new Set();
+            const stack=[ast];
+            while(stack.length){
+              const n=stack.pop();
+              if(!n||typeof n!=='object')continue;
+              if(n.type==='Literal'&&typeof n.value==='string'&&n.value.length>500){
+                const label=targets.get(hash(n.value));
+                if(label)matches.add(label);
+              }
+              for(const v of Object.values(n)){
+                if(Array.isArray(v)){for(const item of v)if(item&&typeof item==='object')stack.push(item);}
+                else if(v&&typeof v==='object')stack.push(v);
+              }
+            }
+            return {statements,matches:[...matches].sort()};
+          }
+          const workers=[
+            {name:'saber-documentos-produccion',file:folder+'dist/saber-documentos-cotizador-fase4.mjs',assets:true},
+            {name:'saber-pagos-produccion',file:'integraciones/mercadopago/pruebas/worker.js',assets:false}
+          ];
+          let uncertain=false;
+          for(const w of workers){
+            const deployed=await get('/workers/scripts/'+w.name+'/deployments');
+            const list=Array.isArray(deployed)?deployed:deployed.deployments;
+            const active=list?.[0]?.versions;
+            if(!Array.isArray(active)||active.length!==1||active[0].percentage!==100)throw Error(w.name+': despliegue no unico al 100%');
+            const id=active[0].version_id;
+            if(!/^[a-f0-9-]{36}$/i.test(id))throw Error('ID no valido');
+            console.log(w.name+' VERSION_100='+id);
+            const version=await get('/workers/workers/'+w.name+'/versions/'+id+'?include=modules,sourcemaps');
+            const modules=(version.modules||[]).filter(m=>typeof m.content_base64==='string').map(m=>({name:String(m.name||''),type:String(m.content_type||''),buf:Buffer.from(m.content_base64,'base64')}));
+            const baseline=fs.readFileSync(w.file,'utf8');
+            const original=inspect(baseline);
+            if(!original)throw Error('No se pudo analizar el artefacto GitHub');
+            const baseSet=new Set(original.statements);
+            const maps=modules.map(m=>{try{return JSON.parse(m.buf.toString('utf8'));}catch{return null;}}).filter(m=>m?.version===3&&Array.isArray(m.sources)&&Array.isArray(m.sourcesContent));
+            const candidates=modules.filter(m=>m.type.includes('javascript')||/\.(m?js)$/.test(m.name)).map(m=>({kind:'modulo',src:m.buf.toString('utf8')}));
+            const sources=maps.flatMap(m=>m.sources.map((name,i)=>({name:String(name),src:m.sourcesContent[i]}))).filter(s=>typeof s.src==='string');
+            for(const s of sources)if(s.src.length>=Math.max(10000,baseline.length*.3))candidates.push({kind:'sourcemap',src:s.src});
+            if(!candidates.length)throw Error(w.name+': no hay fuente comparable');
+            console.log(w.name+' BASE_SHA256='+hash(baseline)+' MAPAS='+maps.length+' FUENTES='+sources.length+' CANDIDATOS='+candidates.length);
+            if(w.assets){
+              for(const n of ['pagina-cotizar-live.mjs','pagina-archivos-live.mjs','worker-fase4-cotizador-unificado.mjs']){
+                const found=sources.filter(s=>s.name===n||s.name.endsWith('/'+n));
+                const label=found.length!==1?'NO_COMPARABLE':hash(found[0].src)===hash(fs.readFileSync(folder+n,'utf8'))?'IGUAL':'DISTINTO';
+                console.log('FUENTE_BASE '+n+' '+label);
+              }
+              console.log('RECURSOS_PRESENTES_EN_DIST_BASE='+original.matches.join(','));
+            }
+            let best=null,exact=false,assetUnion=new Set();
+            for(const c of candidates){
+              if(hash(c.src)===hash(baseline))exact=true;
+              const parsed=inspect(c.src);
+              if(!parsed)continue;
+              const common=parsed.statements.filter(x=>baseSet.has(x)).length;
+              for(const m of parsed.matches)assetUnion.add(m);
+              const score=common/Math.max(original.statements.length,parsed.statements.length,1);
+              if(!best||score>best.score)best={kind:c.kind,common,total:parsed.statements.length,score};
+            }
+            console.log(w.name+' BASE_EXACTA_EN_MODULO_O_MAPA='+exact);
+            console.log(w.name+' AST_MEJOR='+JSON.stringify(best)+' BASE_SENTENCIAS='+original.statements.length);
+            if(w.assets)for(const a of assets)console.log('RECURSO '+a+' DIST_BASE='+original.matches.includes(a)+' REMOTO='+assetUnion.has(a));
+            const settings=await get('/workers/scripts/'+w.name+'/settings');
+            const bindings=Array.isArray(settings.bindings)?settings.bindings:[];
+            if(w.assets){
+              const link=bindings.some(b=>b.name==='SABER_CENTRAL'&&b.type==='service'&&b.service==='saber-pagos-produccion');
+              console.log('DOCUMENTOS_VINCULO_CENTRAL='+link);
+              if(!link)uncertain=true;
+            }else{
+              const db=bindings.some(b=>b.name==='DB'&&b.type==='d1');
+              console.log('PAGOS_BINDING_D1='+db);
+              if(!db)uncertain=true;
+            }
+            if(!exact)uncertain=true;
+          }
+          console.log('ESTADO_PARIDAD='+ (uncertain?'PENDIENTE_NO_PUBLICAR':'ARTEFACTOS_BASE_ENCONTRADOS_REVISAR_DEPLOY'));
+          console.log('SOLO_GET: sin cambios en Cloudflare, D1, pagos, archivos o compuertas; no se guardan fuentes remotas como artefactos.');
+          JS
