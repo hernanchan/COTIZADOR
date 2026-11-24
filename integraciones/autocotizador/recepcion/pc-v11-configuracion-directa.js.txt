@@ -115,9 +115,16 @@ async function selectNativeSize(k,v){
 }
 async function finish(k){
  let c=waitCard(k);if(!c)return false;const s=state(c);
- const q=quality(c),a=apply(c);
+ let q=quality(c),a=apply(c);
  const wantsLarge=['a2','a1','a0'].includes(s.size);
  const needsApply=wantsLarge&&s.appliedSize!==s.size;
+ if(needsApply){
+  // La estimación de PPP se completa de manera asíncrona. No presentar el
+  // lote como listo mientras el control nativo sigue preparando el aviso.
+  const live=await until(()=>{const x=get(k),b=x&&apply(x);return x&&b&&(quality(x)||!b.disabled)?x:null;},5000);
+  if(!live){s.pending=true;return false;}
+  c=live;q=quality(c);a=apply(c);
+ }
  if(q&&!q.checked){s.pending=true;return false;}
  if(a&&needsApply){
   if(a.disabled){s.pending=true;return false;}
@@ -230,6 +237,7 @@ function sync(){
  document.body.classList.toggle('v11-images-only',imagesOnly);
  if(imagesOnly&&indiv&&!indiv.checked){indiv.click();return;}
  batch.hidden=all.filter(image).length<2;
+ if(all.filter(image).length===1&&all.some(c=>image(c)&&state(c).pending&&quality(c)&&!quality(c).checked))batch.hidden=false;
  batchApply.disabled=!imagesReady();
  intro.hidden=!all.length;
  all.forEach(c=>{if(!image(c)&&document.querySelector('input[name="modoImpresionLote"][value="comun"]')?.checked){c.querySelector('.v11-direct')?.remove();return;}decorate(c);});
