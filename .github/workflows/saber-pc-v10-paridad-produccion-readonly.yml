@@ -23,8 +23,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Instalar analizador local sin credenciales Cloudflare
-        run: npm install --no-save --ignore-scripts --no-audit --no-fund acorn@8.15.0
+      - name: Instalar analizador y regenerar recursos base sin credenciales Cloudflare
+        run: |
+          npm install --no-save --ignore-scripts --no-audit --no-fund acorn@8.15.0 esbuild@0.24.2 pdf-lib@1.17.1
+          npm --prefix integraciones/autocotizador/recepcion run build:intake-client
+          npm --prefix integraciones/autocotizador/recepcion run build:live-buyer
+          npm --prefix integraciones/autocotizador/recepcion run build:live-postpay-tus
+          npm --prefix integraciones/autocotizador/recepcion run build:live-postpay-r2
       - name: Comparar modulos y recursos sin imprimir codigo ni datos
         env:
           CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
