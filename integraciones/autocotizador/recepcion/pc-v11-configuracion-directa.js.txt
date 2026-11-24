@@ -72,7 +72,61 @@ const message=element('p');message.id='pc-v11-message';message.setAttribute('rol
 const warnings=element('div');warnings.id='pc-v11-warnings';warnings.hidden=true;
 batch.append(h,description,batchRow);upload.insertAdjacentElement('afterend',batch);
 batch.insertAdjacentElement('afterend',message);
-message.insertAdjacentElement('afterend',warnings);
+// Cierre de la cotización: una sola lectura de arriba hacia abajo.
+const footer=element('section');footer.id='pc-v11-footer';footer.hidden=true;
+const totalLabel=element('span','Total del pedido');
+const totalValue=element('strong','Precio pendiente');totalValue.id='pc-v11-total-final';
+const total=element('div');total.className='v11-total';total.append(totalLabel,totalValue);
+footer.append(total,warnings);list.insertAdjacentElement('afterend',footer);
+const main=list.closest('main');
+let resizeFrame=()=>{};
+try{
+ // Solo en el iframe comercial de escritorio. No intervenir en otros documentos.
+ const outer=window.parent,frame=window.frameElement;
+ const parentPrice=outer.document.getElementById('precio');
+ const parentNext=outer.document.getElementById('siguiente');
+ if(outer!==window&&outer.location.origin===location.origin&&
+    frame?.id==='pdf'&&frame.contentWindow===window&&main&&parentPrice&&parentNext){
+  const mirror=()=>{totalValue.textContent=parentPrice.textContent.trim()||'Precio pendiente';};
+  mirror();
+  const priceObserver=new MutationObserver(mirror);
+  priceObserver.observe(parentPrice,{childList:true,subtree:true,characterData:true});
+  // El emisor original mide scrollHeight, que nunca es menor al viewport
+  // del iframe. El padre le suma 12 px: así acumula altura al editar.
+  // Medir la caja real del contenido, independiente de la altura actual.
+  let queued=false;
+  resizeFrame=()=>{
+   if(queued)return;queued=true;
+   requestAnimationFrame(()=>{
+    queued=false;
+    if(!frame.isConnected||frame.contentWindow!==window||!frame.getClientRects().length)return;
+    const rect=main.getBoundingClientRect();
+    const marginBottom=parseFloat(getComputedStyle(main).marginBottom)||0;
+    const h=Math.ceil(rect.bottom+window.scrollY+Math.max(0,marginBottom)+8);
+    if(!Number.isFinite(h)||h<0||h>30000)return;
+    const target=Math.max(280,h);
+    if(Math.abs(frame.getBoundingClientRect().height-target)>2)frame.style.height=target+'px';
+   });
+  };
+  const onNativeResize=event=>{
+   if(event.origin!==location.origin||event.source!==window||
+      event.data?.type!=='SABER_SMART_RESIZE')return;
+   // Exclusivamente sustituir la medida geométrica. No tocar mensajes
+   // de precio, validación, preparación, ni estados de pedido.
+   event.stopImmediatePropagation();resizeFrame();
+  };
+  outer.addEventListener('message',onNativeResize,true);
+  const ro=new ResizeObserver(resizeFrame);ro.observe(main);
+  const mo=new MutationObserver(resizeFrame);mo.observe(main,{childList:true,subtree:true,attributes:true,characterData:true});
+  outer.addEventListener('resize',resizeFrame);
+  window.addEventListener('pagehide',()=>{
+   outer.removeEventListener('message',onNativeResize,true);
+   outer.removeEventListener('resize',resizeFrame);
+   priceObserver.disconnect();ro.disconnect();mo.disconnect();
+  },{once:true});
+  resizeFrame();
+ }
+}catch{/* La navegación nativa sigue disponible si no se puede medir el iframe. */}
 const intro=element('p','Elegí tamaño y cantidad en cada archivo. El presupuesto se actualiza solo.');intro.id='pc-v11-intro';upload.insertAdjacentElement('afterend',intro);
 document.body.classList.add('saber-pc-v11');
 function pending(){return busy||cards().some(c=>{const s=state(c);return s.pending||(image(c)&&!s.size);});}
@@ -85,7 +139,7 @@ window.addEventListener('message',event=>{
  window.parent.postMessage({type:'SABER_SMART_HANDOFF_ERROR',message:'Hay archivos pendientes de configurar.'},location.origin);
 },true);
 document.addEventListener('click',event=>{
- if(pending()&&event.target.closest('#prepararPedido,#enviar-cotizacion-inteligente')){event.preventDefault();event.stopImmediatePropagation();note('Completá las opciones pendientes.');}
+ if(pending()&&event.target.closest('#prepararPedido,#enviar-cotizacion-inteligente')){event.preventDefault();event.stopImmediatePropagation();note('Completá las opciones pendientes al final de la cotización.');}
 },true);
 async function openDetails(k){
  let c=waitCard(k);if(!c)return null;
@@ -189,7 +243,7 @@ batchApply.onclick=()=>run(async()=>{
  if(!imagesReady()){note('Esperá a que termine el análisis de las imágenes.');return;}
  const keys=cards().filter(regularImage).map(key);
  for(const k of keys){const c=get(k);if(c)state(c).paper=batchPaper.value;await changeOne(k,v,n);}
- note(cards().filter(c=>image(c)&&state(c).pending).length?'Revisá las advertencias de las imágenes señaladas.':'Configuración aplicada.');
+ note(cards().filter(c=>image(c)&&state(c).pending).length?'Revisá las advertencias al final de la cotización.':'Configuración aplicada.');
 });
 function decorate(c){
  const s=state(c),k=key(c),isImage=regularImage(c);
@@ -288,6 +342,7 @@ function sync(){
  batch.hidden=all.filter(regularImage).length<2;
  batchApply.disabled=!imagesReady();
  intro.hidden=!all.length;
+ footer.hidden=!all.length;
  all.forEach(c=>{if(!image(c)&&document.querySelector('input[name="modoImpresionLote"][value="comun"]')?.checked){c.querySelector('.v11-direct')?.remove();return;}decorate(c);});
  renderWarnings(all);
 }
