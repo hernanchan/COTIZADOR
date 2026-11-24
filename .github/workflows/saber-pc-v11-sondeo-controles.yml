@@ -228,6 +228,19 @@ jobs:
             if(await exp.count())await exp.click();
             await pc.page.waitForTimeout(300);
             await snapshot('DETALLES');
+            const q=c.locator('.saber-ampliacion [role=alert] input[type=checkbox]');
+            if(await q.count())await q.check();
+            await c.locator('[data-saber-amp-aplicar]').click();
+            await pc.page.waitForTimeout(1000);
+            await snapshot('APLICADO');
+            const first=pc.frame.locator('#lista section.archivo').filter({hasText:/v11_imagen_1/i});
+            const copies=first.locator('input[aria-label^="Cantidad de copias"]');
+            if(!await copies.count())await first.locator('button.editar').filter({hasText:/Más opciones|Personalizar/i}).first().click();
+            await copies.fill('3');await copies.press('Tab');
+            await pc.page.waitForTimeout(600);
+            await snapshot('COPIAS');
+            console.log('V11_PAYLOAD_FORMA '+JSON.stringify(pc.responses.at(-1)?.payload?.archivos?.map(x=>({seleccion:x.seleccion,copias:x.copias,servicio:x.servicio,papelPoster:x.papelPoster,paginas:x.paginas?.map(p=>({anchoCm:p.anchoCm,altoCm:p.altoCm,modo:p.modo}))}))));
+
             assert(errors.length===0,'Errores de navegador');
             console.log('SONDEO_V11_OK SIN_PEDIDOS_NI_ESCRITURAS');
             await pc.context.close();
