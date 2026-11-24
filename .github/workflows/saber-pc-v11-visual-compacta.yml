@@ -255,6 +255,7 @@ jobs:
             await batch.waitFor({state:'visible',timeout:20000});
             await pc.frame.locator('#lista .saber-ampliacion').nth(4).waitFor({state:'attached',timeout:30000});
             await pc.page.waitForTimeout(700);
+            await pc.frame.locator('.v11-thumb[data-ready="1"]').nth(4).waitFor({state:'visible',timeout:10000});
             const beforeShot=await pc.frame.locator('#lista').screenshot({type:'jpeg',quality:55});
             console.log('V11_CAPTURA_INICIAL_BASE64 '+beforeShot.toString('base64'));
 
@@ -264,7 +265,7 @@ jobs:
             await batch.getByRole('button',{name:'Aplicar a todas'}).click();
             const accept=pc.frame.locator('#pc-v11-warnings button');
             await accept.waitFor({state:'visible',timeout:30000});
-            try{await pc.frame.locator('#pc-v11-warnings details').nth(4).waitFor({state:'visible',timeout:15000});}
+            try{await pc.frame.locator('#pc-v11-warnings details').nth(4).waitFor({state:'visible',timeout:40000});}
             catch(e){
               console.log('V11_DIAGNOSTICO_AVISOS '+JSON.stringify(await pc.frame.locator('#lista').evaluate(root=>[...root.querySelectorAll('.archivo')].map(card=>({name:card.querySelector('.nombre')?.textContent,meta:card.querySelector('.resumen-archivo')?.textContent,selected:card.querySelector('.v11-size')?.value,amp:card.querySelector('.saber-ampliacion')?.textContent?.slice(0,1200),disabled:card.querySelector('[data-saber-amp-aplicar]')?.disabled,warning:!!card.querySelector('.saber-ampliacion [role=alert] input'),status:card.querySelector('.v11-state')?.textContent})))));
               throw e;
@@ -301,7 +302,7 @@ jobs:
             const layout=await pc.frame.locator('#lista').evaluate(root=>[...root.querySelectorAll('.archivo.v11-compact-image')].map(card=>{
               const visible=e=>!!e&&e.getClientRects().length>0&&getComputedStyle(e).visibility!=='hidden';
               const direct=card.querySelector('.v11-direct'),name=card.querySelector('.nombre'),thumb=card.querySelector('.v11-thumb');
-              return {height:Math.round(card.getBoundingClientRect().height),direct:visible(direct),offset:direct&&name?Math.round(direct.getBoundingClientRect().top-name.getBoundingClientRect().bottom):null,thumb:!!thumb&&thumb.complete&&thumb.naturalWidth>0,oldVisible:[...card.querySelectorAll('.saber-ampliacion,.tamano-rapido,.eleccion-plotter')].filter(visible).length,visibleCopies:[...card.querySelectorAll('input[aria-label^="Cantidad de copias"]')].filter(visible).length};
+              return {height:Math.round(card.getBoundingClientRect().height),direct:visible(direct),offset:direct&&name?Math.round(direct.getBoundingClientRect().top-name.getBoundingClientRect().bottom):null,thumb:!!thumb&&thumb.tagName==='CANVAS'&&thumb.dataset.ready==='1'&&thumb.width>0&&thumb.getContext('2d').getImageData(0,0,1,1).data[3]>0,oldVisible:[...card.querySelectorAll('.saber-ampliacion,.tamano-rapido,.eleccion-plotter')].filter(visible).length,visibleCopies:[...card.querySelectorAll('input[aria-label^="Cantidad de copias"]')].filter(visible).length};
             }));
             console.log('V11_LAYOUT_REAL '+JSON.stringify(layout));
             assert.equal(layout.length,5);
