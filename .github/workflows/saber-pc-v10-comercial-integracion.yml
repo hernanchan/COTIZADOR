@@ -98,5 +98,15 @@ jobs:
           console.log('GITHUB_DIST_BASE_SHA256='+hash(old));
           console.log('GITHUB_DIST_BASE_COINCIDE_REMOTO='+String(hash(js[0].bytes)===hash(old)));
           console.log('AVISO: comparar hashes no confirma igualdad de fuentes si Cloudflare reempaqueta los modulos');
+          const maps=modules.map(m=>{try{return JSON.parse(m.bytes.toString('utf8'))}catch{return null}})
+           .filter(m=>m?.version===3&&Array.isArray(m.sources)&&Array.isArray(m.sourcesContent));
+          console.log('MAPAS_FUENTES_ACTIVOS='+maps.length);
+          for(const file of ['pagina-cotizar-live.mjs','pagina-archivos-live.mjs','worker-fase4-cotizador-unificado.mjs']){
+           const found=maps.flatMap(m=>m.sources.map((name,i)=>({name:String(name),body:m.sourcesContent[i]})))
+            .filter(x=>(x.name===''+file||x.name.endsWith('/'+file))&&typeof x.body==='string');
+           const status=found.length!==1?'SIN_FUENTE_COMPARABLE':
+            (hash(found[0].body)===hash(fs.readFileSync('integraciones/autocotizador/recepcion/'+file,'utf8'))?'IGUAL':'DISTINTO');
+           console.log('PARIDAD_FUENTE_DEPLOY_GITHUB_'+file+'='+status);
+          }
           JS
           echo SABER_DOCUMENTOS_VERIFICADO_SOLO_GET
