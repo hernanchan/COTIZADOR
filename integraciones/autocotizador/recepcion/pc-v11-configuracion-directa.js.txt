@@ -1,0 +1,203 @@
+/* V11 PC: configuración directa sobre los controles nativos del cotizador.
+   No cambia tarifas, documentos, clasificación, transporte ni pagos. */
+(()=>{'use strict';
+if(!matchMedia('(min-width:900px) and (pointer:fine)').matches)return;
+const by=id=>document.getElementById(id),list=by('lista'),upload=by('zonaArchivos');
+if(!list||!upload||!by('prepararPedido')||!by('archivos'))return;
+const cards=()=>[...list.querySelectorAll('section.archivo')];
+const name=c=>c.querySelector('.nombre')?.textContent?.trim()||'';
+const image=c=>/^(\d+\.\s*)?imagen-\d+-/i.test(name(c));
+const key=c=>name(c).match(/^\d+\./)?.[0]||name(c);
+const get=k=>cards().find(c=>key(c)===k);
+const meta=c=>c.querySelector('.resumen-archivo')?.textContent||'';
+const amp=c=>c.querySelector('.saber-ampliacion');
+const exp=c=>[...c.querySelectorAll('button.editar')].find(b=>/^(Más opciones|Personalizar este PDF|Cerrar detalles)$/i.test(b.textContent.trim()));
+const copy=c=>c.querySelector('input[aria-label^="Cantidad de copias"]');
+const quality=c=>amp(c)?.querySelector('[role=alert] input[type=checkbox]');
+const apply=c=>amp(c)?.querySelector('[data-saber-amp-aplicar]');
+const ampSelect=c=>amp(c)?.querySelector('select');
+const originalSize=c=>c.querySelector('select[aria-label^="Tamaño final de"]');
+const sizeButton=(c,v)=>[...c.querySelectorAll('.tamano-rapido button.tamano-opcion')].find(b=>v==='original'?/original|real/i.test(b.textContent):new RegExp('\\b'+v+'\\b','i').test(b.textContent));
+const element=(tag,t)=>{const e=document.createElement(tag);if(t)e.textContent=t;return e;};
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const selectValue=(e,v)=>{if(!e||![...e.options].some(o=>o.value===v))return false;if(e.value!==v){e.value=v;e.dispatchEvent(new Event('change',{bubbles:true}));}return true;};
+const requested=new Map();let busy=false,scheduled=false,lastSignature='',alertText='';
+const thumbnails=new Map();
+const fields=[['','Elegir tamaño'],['original','Tamaño original'],['a4','A4 · 21 × 29,7 cm'],['a3','A3 · 29,7 × 42 cm'],['a2','A2 · 42 × 59,4 cm'],['a1','A1 · 59,4 × 84,1 cm'],['a0','A0 · 84,1 × 118,9 cm']];
+function selectSize(forImage){
+ const s=element('select');s.setAttribute('aria-label','Tamaño de impresión');
+ for(const [v,t] of fields){if(forImage&&v==='original')continue;s.add(new Option(t,v));}
+ return s;
+}
+function inputCopies(){const i=element('input');i.type='number';i.min=1;i.max=500;i.step=1;i.value='1';i.setAttribute('aria-label','Cantidad de copias');return i;}
+function label(t,control){const l=element('label',t);l.append(control);return l;}
+function nativeCopies(c){return Number(copy(c)?.value||meta(c).match(/(\d+)\s+copia\(s\)/i)?.[1]||1);}
+function nativeSize(c){
+ if(c.querySelector('.pregunta-tamano'))return '';
+ const selected=c.querySelector('.tamano-rapido button.seleccionada');
+ if(selected){const t=selected.textContent;if(/original|real/i.test(t))return 'original';const m=t.match(/\bA[0-5]\b/i);if(m)return m[0].toLowerCase();}
+ const s=originalSize(c);if(s&&s.value!=='sin-confirmar')return s.value;
+ const m=meta(c).match(/(?:Impresión|Ploteo)\s+(original|A[0-5])/i);
+ return m?.[1]?.toLowerCase()||'';
+}
+function state(c){
+ const k=key(c),existing=requested.get(k);
+ if(existing&&existing.name===name(c))return existing;
+ const s={name:name(c),size:image(c)?'':nativeSize(c),copies:nativeCopies(c),pending:false};
+ requested.set(k,s);return s;
+}
+function waitCard(k){return get(k);}
+function note(text){alertText=text;message.textContent=text;}
+const batch=element('section');batch.id='pc-v11-batch';batch.hidden=true;
+const h=element('h2','Configurar todas juntas'),description=element('p','Elegí el tamaño y la cantidad para todas las imágenes. Después podés cambiar las que necesites.');
+const batchSize=selectSize(true),batchCopies=inputCopies(),batchApply=element('button','Aplicar a todas');batchApply.type='button';
+const batchRow=element('div');batchRow.className='v11-fields';batchRow.append(label('Tamaño',batchSize),label('Copias por imagen',batchCopies),batchApply);
+const message=element('p');message.id='pc-v11-message';message.setAttribute('role','status');
+batch.append(h,description,batchRow,message);upload.insertAdjacentElement('afterend',batch);
+const intro=element('p','Elegí tamaño y cantidad en cada archivo. El presupuesto se actualiza solo.');intro.id='pc-v11-intro';upload.insertAdjacentElement('afterend',intro);
+document.body.classList.add('saber-pc-v11');
+function pending(){return busy||cards().some(c=>{const s=state(c);return s.pending||(image(c)&&!s.size);});}
+// No permitir que un presupuesto viejo de una imagen pendiente llegue al
+// puente de preparación de pedido. El motor mantiene su propia validación.
+window.addEventListener('message',event=>{
+ if(event.origin!==location.origin||event.source!==window.parent||event.data?.type!=='SABER_SMART_PREPARAR_ENVIO'||!pending())return;
+ event.stopImmediatePropagation();
+ note('Revisá los tamaños o advertencias pendientes antes de continuar.');
+ window.parent.postMessage({type:'SABER_SMART_HANDOFF_ERROR',message:'Hay archivos pendientes de configurar.'},location.origin);
+},true);
+document.addEventListener('click',event=>{
+ if(pending()&&event.target.closest('#prepararPedido,#enviar-cotizacion-inteligente')){event.preventDefault();event.stopImmediatePropagation();note('Completá las opciones pendientes.');}
+},true);
+async function openDetails(k){
+ let c=waitCard(k);if(!c)return null;
+ const b=exp(c);if(b?.getAttribute('aria-expanded')==='false'){b.click();await wait(70);}
+ return waitCard(k);
+}
+async function setCopies(k,n){
+ if(!Number.isSafeInteger(n)||n<1||n>500)return false;
+ let c=waitCard(k);if(!c)return false;
+ if(nativeCopies(c)===n)return true;
+ if(!copy(c))c=await openDetails(k);
+ const i=c&&copy(c);if(!i)return false;
+ i.value=String(n);i.dispatchEvent(new Event('change',{bubbles:true}));await wait(90);
+ c=waitCard(k);return !!c&&nativeCopies(c)===n;
+}
+async function selectNativeSize(k,v){
+ let c=waitCard(k);if(!c)return false;
+ if(['a2','a1','a0'].includes(v)){
+  // La ampliación y su consentimiento son exclusivamente los originales.
+  const a=amp(c);if(!a)return false;
+  if(!ampSelect(c)){
+   const button=[...a.querySelectorAll('button.eleccion-plotter-boton')].find(b=>/Ploteo/i.test(b.textContent));
+   if(!button)return false;button.click();await wait(100);c=waitCard(k);if(!c)return false;
+  }
+  if(!selectValue(ampSelect(c),v))return false;
+  await wait(100);return true;
+ }
+ if(ampSelect(c)){
+  const b=[...amp(c).querySelectorAll('button.eleccion-plotter-boton')].find(b=>/Impresión común/i.test(b.textContent));
+  if(!b)return false;b.click();await wait(100);c=waitCard(k);if(!c)return false;
+ }
+ const b=sizeButton(c,v);
+ if(b){b.click();await wait(90);return true;}
+ c=await openDetails(k);
+ return !!c&&selectValue(originalSize(c),v);
+}
+async function finish(k){
+ let c=waitCard(k);if(!c)return false;const s=state(c);
+ const q=quality(c),a=apply(c);
+ if(q&&!q.checked){s.pending=true;return false;}
+ if(a&&/Aplicar ampliación/i.test(a.textContent)){
+  if(a.disabled){s.pending=true;return false;}
+  const previous=name(c);a.click();
+  // Esperar a que el motor termine su transformación local.
+  for(let i=0;i<80;i++){
+   await wait(100);c=waitCard(k);if(!c)continue;
+   if(!/Aplicar ampliación/i.test(apply(c)?.textContent||'')&&!c.querySelector('.pregunta-tamano'))break;
+  }
+  c=waitCard(k);if(!c)return false;
+  if(name(c)!==previous)s.name=name(c);
+  if(/Aplicar ampliación/i.test(apply(c)?.textContent||'')||c.querySelector('.pregunta-tamano')){s.pending=true;return false;}
+ }
+ if(c.querySelector('.pregunta-tamano')){s.pending=true;return false;}
+ s.pending=!(await setCopies(k,s.copies));
+ return !s.pending;
+}
+async function changeOne(k,v,n){
+ let c=waitCard(k);if(!c)return false;const s=state(c);
+ s.size=v;s.copies=n;s.pending=true;
+ if(!v)return false;
+ if(!await selectNativeSize(k,v))return false;
+ return finish(k);
+}
+async function run(fn){
+ if(busy)return;busy=true;batchApply.disabled=true;
+ try{await fn();}catch(e){note('No pudimos completar una opción. Revisá el archivo y volvé a intentar.');}
+ finally{busy=false;batchApply.disabled=false;schedule();}
+}
+batchApply.onclick=()=>run(async()=>{
+ const v=batchSize.value,n=Number(batchCopies.value);
+ if(!v||!Number.isSafeInteger(n)||n<1||n>500){note('Elegí tamaño y una cantidad entre 1 y 500.');return;}
+ const keys=cards().filter(image).map(key);
+ for(const k of keys)await changeOne(k,v,n);
+ note(cards().filter(c=>image(c)&&state(c).pending).length?'Revisá las advertencias de las imágenes señaladas.':'Configuración aplicada.');
+});
+function decorate(c){
+ const s=state(c),k=key(c),isImage=image(c);
+ if(c.classList.contains('archivo-no-admitido'))return;
+ let row=c.querySelector('.v11-direct');
+ if(!row){
+  row=element('div');row.className='v11-direct';
+  const size=selectSize(isImage),copies=inputCopies();
+  size.className='v11-size';copies.className='v11-copies';
+  // Un PDF grande mantiene el original y su clasificación técnica nativa.
+  if(!isImage&&!amp(c))for(const o of [...size.options])if(['a2','a1','a0'].includes(o.value))o.remove();
+  size.addEventListener('change',()=>run(async()=>{const current=get(k);if(!current)return;await changeOne(k,size.value,state(current).copies);}));
+  copies.addEventListener('change',()=>run(async()=>{const current=get(k);if(!current)return;const n=Number(copies.value);if(!Number.isSafeInteger(n)||n<1||n>500){copies.reportValidity();return;}const st=state(current);st.copies=n;if(st.size)await finish(k);}));
+  row.append(label('Tamaño final',size),label('Copias',copies));
+  const status=element('span');status.className='v11-state';row.append(status);
+  c.querySelector('.fila')?.insertAdjacentElement('afterend',row);
+ }
+ const size=row.querySelector('.v11-size'),copies=row.querySelector('.v11-copies');
+ if(document.activeElement!==size)size.value=s.size||'';
+ if(document.activeElement!==copies)copies.value=String(s.copies);
+ const t=row.querySelector('.v11-state');
+ t.textContent=s.pending?'Revisar configuración':isImage&&!s.size?'Elegí tamaño':'';
+ c.classList.toggle('v11-image',isImage);
+ c.classList.toggle('v11-awaiting',s.pending||isImage&&!s.size);
+ const warning=quality(c);
+ if(warning&&!warning.dataset.v11Bound){
+  warning.dataset.v11Bound='1';
+  warning.addEventListener('change',()=>{if(warning.checked)run(async()=>{await finish(k);});});
+ }
+ // Las miniaturas se vinculan sólo cuando el nombre coincide inequívocamente.
+ if(isImage&&!c.querySelector('.v11-thumb')){
+  const file=[...thumbnails.keys()].filter(n=>name(c).toLowerCase().includes(n.toLowerCase()));
+  if(file.length===1){const img=element('img');img.className='v11-thumb';img.src=thumbnails.get(file[0]);img.alt='Vista previa';c.querySelector('.fila-principal')?.prepend(img);}
+ }
+}
+function sync(){
+ if(busy)return;
+ const all=cards();
+ const current=new Set(all.map(key));
+ for(const k of requested.keys())if(!current.has(k))requested.delete(k);
+ // El modo individual nativo mantiene cada excepción en su propia ficha.
+ const indiv=document.querySelector('input[name="modoImpresionLote"][value="individual"]');
+ if(indiv&&!indiv.checked){indiv.click();return;}
+ batch.hidden=all.filter(image).length<2;
+ intro.hidden=!all.length;
+ all.forEach(decorate);
+}
+function schedule(){if(scheduled)return;scheduled=true;queueMicrotask(()=>{scheduled=false;sync();});}
+by('archivos').addEventListener('change',e=>{
+ for(const f of [...(e.target.files||[])]){
+  if(!/^image\/(jpeg|png)$/i.test(f.type))continue;
+  const stem=f.name.replace(/\.(jpe?g|png)$/i,'');
+  if(!stem||thumbnails.has(stem))continue;
+  thumbnails.set(stem,URL.createObjectURL(f));
+ }
+},true);
+window.addEventListener('pagehide',()=>{for(const url of thumbnails.values())URL.revokeObjectURL(url);});
+new MutationObserver(records=>{if(records.some(r=>[...r.addedNodes,...r.removedNodes].some(n=>n.nodeType===1&&!n.classList?.contains('v11-direct')&&!n.classList?.contains('v11-thumb'))))schedule();}).observe(list,{childList:true,subtree:true});
+sync();
+})();
