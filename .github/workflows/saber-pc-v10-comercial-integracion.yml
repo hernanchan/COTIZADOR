@@ -1,0 +1,112 @@
+name: Saber PC V10 comercial - test sin despliegue
+on:
+  push:
+    branches: [integracion/pc-v10-comercial-aislada-20261124]
+    paths:
+      - .github/workflows/saber-pc-v10-comercial-integracion.yml
+      - integraciones/autocotizador/recepcion/pagina-cotizar-live.mjs
+      - integraciones/autocotizador/recepcion/pagina-archivos-live.mjs
+      - integraciones/autocotizador/recepcion/pc-v10-comercial.js.txt
+      - integraciones/autocotizador/recepcion/pc-v10-comercial.css.txt
+      - integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs
+      - tests/pc-v10-comercial-integracion.test.mjs
+      - tests/pc-v10-comercial-chrome-local.mjs
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Pruebas de preview y mobile preservado
+        run: |
+          node --test tests/pc-v10-comercial-integracion.test.mjs
+          node --test integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs
+          node --test tests/cotizador-movil-asistente.test.mjs
+      - name: Comprobar sintaxis
+        run: |
+          node --check integraciones/autocotizador/recepcion/pagina-cotizar-live.mjs
+          node --check integraciones/autocotizador/recepcion/pagina-archivos-live.mjs
+          node --check integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs
+          cp integraciones/autocotizador/recepcion/pc-v10-comercial.js.txt /tmp/pc-v10-comercial.mjs
+          node --check /tmp/pc-v10-comercial.mjs
+      - name: Compilar Worker comercial sin publicar
+        working-directory: integraciones/autocotizador/recepcion
+        run: |
+          npm install --no-save --ignore-scripts --no-audit --no-fund esbuild@0.24.2 pdf-lib@1.17.1
+          npm run build:unificado
+          cp ./dist/saber-documentos-cotizador-fase4.mjs /tmp/saber-pc-v10-commercial-check.mjs
+          node --check /tmp/saber-pc-v10-commercial-check.mjs
+          echo SABER_PC_V10_COMMERCIAL_COMPILED_NO_DEPLOY
+  chrome-local:
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
+    timeout-minutes: 13
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Instalar herramientas de prueba locales
+        run: npm install --no-save --ignore-scripts --no-audit --no-fund playwright@1.56.1 esbuild@0.24.2 pdf-lib@1.17.1
+      - name: Compilar analizador y flujo comercial sin desplegar
+        run: |
+          npm --prefix integraciones/autocotizador/recepcion run build:intake-client
+          npm --prefix integraciones/autocotizador/recepcion run build:live-buyer
+      - name: Abrir iframe comercial en Chromium con 1 y 5 PDF sinteticos
+        run: node tests/pc-v10-comercial-chrome-local.mjs
+  auditar-worker-publicado-solo-lectura:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    env:
+      CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+      CF_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Consultar version activa y fuente remota sin escribir
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -n "$CF_ACCOUNT" && -n "$CF_TOKEN" ]]
+          root="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT"
+          curl -fsS --max-time 25 -H "Authorization: Bearer $CF_TOKEN" "$root/workers/scripts/saber-documentos-produccion/deployments" -o /tmp/saber-live-deploy.json
+          jq -e '.success==true and (.result.deployments[0].versions | length)==1 and .result.deployments[0].versions[0].percentage==100' /tmp/saber-live-deploy.json >/dev/null
+          ver=$(jq -r '.result.deployments[0].versions[0].version_id' /tmp/saber-live-deploy.json)
+          echo "CLOUDFLARE_DOCUMENTOS_VERSION_ACTIVA=$ver"
+          curl -fsS --max-time 30 -H "Authorization: Bearer $CF_TOKEN" "$root/workers/workers/saber-documentos-produccion/versions/$ver?include=modules,sourcemaps" -o /tmp/saber-live-version.json
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+          const data=JSON.parse(fs.readFileSync('/tmp/saber-live-version.json','utf8'));
+          if(data.success!==true)throw Error('Cloudflare no devolvio fuente de version');
+          const arr=data.result?.modules||[];
+          const modules=arr.filter(x=>typeof x.content_base64==='string').map(x=>({name:x.name,type:x.content_type,bytes:Buffer.from(x.content_base64,'base64')}));
+          const js=modules.filter(x=>x.type?.includes('javascript')||x.name?.endsWith('.mjs'));
+          if(!js.length)throw Error('Version remota sin modulo JS comparable');
+          js.sort((a,b)=>b.bytes.length-a.bytes.length);
+          const hash=x=>crypto.createHash('sha256').update(x).digest('hex');
+          const old=fs.readFileSync('integraciones/autocotizador/recepcion/dist/saber-documentos-cotizador-fase4.mjs');
+          console.log('CLOUDFLARE_DOCUMENTOS_MODULO_JS_SHA256='+hash(js[0].bytes));
+          console.log('GITHUB_DIST_BASE_SHA256='+hash(old));
+          console.log('GITHUB_DIST_BASE_COINCIDE_REMOTO='+String(hash(js[0].bytes)===hash(old)));
+          console.log('AVISO: comparar hashes no confirma igualdad de fuentes si Cloudflare reempaqueta los modulos');
+          const maps=modules.map(m=>{try{return JSON.parse(m.bytes.toString('utf8'))}catch{return null}})
+           .filter(m=>m?.version===3&&Array.isArray(m.sources)&&Array.isArray(m.sourcesContent));
+          console.log('MAPAS_FUENTES_ACTIVOS='+maps.length);
+          for(const file of ['pagina-cotizar-live.mjs','pagina-archivos-live.mjs','worker-fase4-cotizador-unificado.mjs']){
+           const found=maps.flatMap(m=>m.sources.map((name,i)=>({name:String(name),body:m.sourcesContent[i]})))
+            .filter(x=>(x.name===''+file||x.name.endsWith('/'+file))&&typeof x.body==='string');
+           const status=found.length!==1?'SIN_FUENTE_COMPARABLE':
+            (hash(found[0].body)===hash(fs.readFileSync('integraciones/autocotizador/recepcion/'+file,'utf8'))?'IGUAL':'DISTINTO');
+           console.log('PARIDAD_FUENTE_DEPLOY_GITHUB_'+file+'='+status);
+          }
+          JS
+          echo SABER_DOCUMENTOS_VERIFICADO_SOLO_GET

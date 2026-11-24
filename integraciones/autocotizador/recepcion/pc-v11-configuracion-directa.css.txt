@@ -1,0 +1,24 @@
+/* PC V11: no ocultar advertencias, clasificación, condiciones ni acciones de servicios especiales. */
+@media (min-width:900px) and (pointer:fine){
+body.saber-pc-v11.v11-images-only #modoConfiguracion,body.saber-pc-v11.v11-images-only #configComunGlobal{display:none!important}
+body.saber-pc-v11 #pc-v11-batch{margin:10px 0;padding:14px;border:1px solid #b5d3e4;border-radius:10px;background:#f0f8fc}
+body.saber-pc-v11 #pc-v11-batch[hidden],body.saber-pc-v11 #pc-v11-intro[hidden]{display:none!important}
+body.saber-pc-v11 #pc-v11-batch h2{font-size:17px;margin:0 0 6px}
+body.saber-pc-v11.v11-busy .v11-direct,body.saber-pc-v11.v11-busy #pc-v11-batch,body.saber-pc-v11.v11-busy #lista{pointer-events:none;opacity:.85}
+body.saber-pc-v11 #pc-v11-batch p{font-size:13px;margin:5px 0}
+body.saber-pc-v11 .v11-fields,body.saber-pc-v11 .v11-direct{display:grid;grid-template-columns:minmax(180px,1fr) minmax(85px,.45fr) minmax(110px,.8fr);align-items:end;gap:9px;margin:8px 0}
+body.saber-pc-v11 .v11-fields label,body.saber-pc-v11 .v11-direct label{font-size:13px;font-weight:700;min-width:0}
+body.saber-pc-v11 .v11-fields input,body.saber-pc-v11 .v11-fields select,body.saber-pc-v11 .v11-direct select,body.saber-pc-v11 .v11-direct input{font-size:15px;min-height:40px;width:100%;box-sizing:border-box}
+body.saber-pc-v11 .v11-fields button{min-height:42px;font-weight:750}
+body.saber-pc-v11 #lista .grupo-pedido{padding:8px 0;background:transparent;border:0}
+body.saber-pc-v11 #lista .archivo{border:1px solid #cadce6;border-radius:10px;padding:12px;margin:8px 0;min-width:0}
+body.saber-pc-v11 .v11-image .saber-ampliacion .eleccion-plotter-opciones{display:none!important}
+body.saber-pc-v11 .v11-image .saber-ampliacion select{max-width:100%}
+body.saber-pc-v11 .v11-image .composicion-por-cara{display:none!important}
+body.saber-pc-v11 .v11-state{font-size:12px;color:#86510a;align-self:center}
+body.saber-pc-v11 .v11-awaiting{border-color:#dcb577!important}
+body.saber-pc-v11 .v11-thumb{width:70px;height:70px;object-fit:contain;float:left;margin:0 10px 6px 0;border:1px solid #d5e0e7;border-radius:5px;background:#fff}
+body.saber-pc-v11 #pc-v11-intro{font-size:13px;color:#31566c}
+body.saber-pc-v11 #pc-v11-message{color:#83520d;min-height:1em}
+@media(max-width:1100px){body.saber-pc-v11 .v11-direct,body.saber-pc-v11 .v11-fields{grid-template-columns:1fr 100px}body.saber-pc-v11 .v11-fields button,body.saber-pc-v11 .v11-state{grid-column:1/-1}}
+}
