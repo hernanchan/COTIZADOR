@@ -193,7 +193,10 @@ jobs:
             // Comparar bytes de los JS estáticos, no valores dinámicos del HTML.
             if(path==='/cotizar'){
               assert(body.includes('id="pdf"')&&!body.includes('pc-v11-batch'),'HTML padre inesperado');
-              assert.equal(r.headers.get('Content-Security-Policy'),assets.get(path).headers['content-security-policy']);
+              const normalizeNonce=s=>String(s).replace(/'nonce-[a-f0-9]+'/g,"'nonce-FICTICIO'");
+              assert.equal(normalizeNonce(r.headers.get('Content-Security-Policy')),normalizeNonce(assets.get(path).headers['content-security-policy']));
+              const nonce=r.headers.get('Content-Security-Policy')?.match(/'nonce-([a-f0-9]+)'/)?.[1];
+              assert(nonce&&body.includes('nonce="'+nonce+'"'),'Nonce del HTML padre no coincide con CSP');
             }else assert(body===assets.get(path).body,'Recurso estático distinto: '+path);
           }
           const previewHeaders=Object.fromEntries(response.headers);
