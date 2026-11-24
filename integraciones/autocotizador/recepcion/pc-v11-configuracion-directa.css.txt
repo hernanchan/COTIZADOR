@@ -57,3 +57,12 @@ body.saber-pc-v11 section.archivo:not(.v11-compact-image):has(.v11-direct) .tama
 body.saber-pc-v11 .v11-compact-image:not(.v11-native-open) .panel-edicion{display:none}
 body.saber-pc-v11 .v11-compact-image.v11-native-open .panel-edicion label:has(input[aria-label^="Cantidad de copias de "]){display:none}
 }
+
+/* Cierre lineal: total, advertencias y siguiente sin desplazamiento inverso. */
+@media(min-width:900px) and (pointer:fine){
+body.saber-pc-v11 #pc-v11-footer{margin:12px 0 0;padding:0;border:0;background:transparent}
+body.saber-pc-v11 #pc-v11-footer[hidden]{display:none!important}
+body.saber-pc-v11 #pc-v11-footer .v11-total{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 15px;background:#f1f7fb;border:1px solid #c3d9ea;border-radius:9px;color:#153d65;font-size:16px}
+body.saber-pc-v11 #pc-v11-footer .v11-total strong{font-size:20px;text-align:right}
+body.saber-pc-v11 #pc-v11-footer #pc-v11-warnings:not([hidden]){margin:8px 0 0}
+}
