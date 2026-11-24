@@ -32,6 +32,14 @@ La V10 de ensayo estaba sobre un motor más antiguo y tenía un panel de presupu
 - **No se ha comprobado todavía que el Worker actualmente desplegado sea byte a byte idéntico al código de esta rama histórica de integración.** Esa diferencia debe medirse antes de una eventual promoción.
 - Las pruebas con documentos sintéticos y rutas simuladas **no** equivalen a una operación comercial auténtica.
 
+## Auditoría de producción por lectura (24/11/2026)
+
+- [GitHub Actions #45376600509](https://github.com/hernanchan/COTIZADOR/actions/runs/45376600509), job `auditar-worker-publicado-solo-lectura`: GET de Cloudflare. Worker documental `saber-documentos-produccion`, versión única al 100% `52585d3a-6d3d-42bb-9f1f-a809811383b7`.
+- SHA256 del módulo JavaScript activo: `c8f04928d6e0ad8885a174e34ac1ccebf461a47d3775cb83bf2bccd1ffc802f6`.
+- SHA256 de `dist/saber-documentos-cotizador-fase4.mjs` guardado en la rama base: `9b1b35adf84eb7414211d1ccf540296f136304a7b375a49626bcc0a0682e51e9`. **Distintos.**
+- Hay un mapa de fuentes remoto, pero las tres fuentes de interés (página comercial, adaptador iframe y Worker unificado) no aparecen bajo nombres comparables; por lo tanto **no es posible declarar paridad byte a byte ni disparidad funcional** solo con esa evidencia.
+- No se cambió ninguna versión de Cloudflare, gate, binding, clave, tarifa, ruta comercial ni cobro. La verificación de vigencia exacta de fuentes sigue pendiente. No publicar ni interpretar esta diferencia como fallo del sistema.
+
 ## Próximas comprobaciones imprescindibles
 
 1. Confirmar el estado/vigencia de las versiones de ambos Workers comerciales, **solo lectura**, y cotejar con fuente GitHub.
