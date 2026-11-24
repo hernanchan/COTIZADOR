@@ -10,6 +10,7 @@ on:
       - integraciones/autocotizador/recepcion/pc-v10-comercial.css.txt
       - integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs
       - tests/pc-v10-comercial-integracion.test.mjs
+      - tests/pc-v10-comercial-chrome-local.mjs
   workflow_dispatch:
 permissions: {contents: read}
 jobs:
@@ -40,3 +41,20 @@ jobs:
           cp ./dist/saber-documentos-cotizador-fase4.mjs /tmp/saber-pc-v10-commercial-check.mjs
           node --check /tmp/saber-pc-v10-commercial-check.mjs
           echo SABER_PC_V10_COMMERCIAL_COMPILED_NO_DEPLOY
+  chrome-local:
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
+    timeout-minutes: 13
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Instalar herramientas de prueba locales
+        run: npm install --no-save --ignore-scripts --no-audit --no-fund playwright@1.56.1 esbuild@0.24.2 pdf-lib@1.17.1
+      - name: Compilar analizador y flujo comercial sin desplegar
+        run: |
+          npm --prefix integraciones/autocotizador/recepcion run build:intake-client
+          npm --prefix integraciones/autocotizador/recepcion run build:live-buyer
+      - name: Abrir iframe comercial en Chromium con 1 y 5 PDF sinteticos
+        run: node tests/pc-v10-comercial-chrome-local.mjs
