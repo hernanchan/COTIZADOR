@@ -1,0 +1,41 @@
+name: Saber PC V10 comercial - test sin despliegue
+on:
+  push:
+    branches: [integracion/pc-v10-comercial-aislada-20261124]
+    paths:
+      - .github/workflows/saber-pc-v10-comercial-integracion.yml
+      - integraciones/autocotizador/recepcion/pagina-cotizar-live.mjs
+      - integraciones/autocotizador/recepcion/pagina-archivos-live.mjs
+      - integraciones/autocotizador/recepcion/pc-v10-comercial.js.txt
+      - integraciones/autocotizador/recepcion/pc-v10-comercial.css.txt
+      - integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs
+      - tests/pc-v10-comercial-integracion.test.mjs
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Pruebas de preview y mobile preservado
+        run: |
+          node --test tests/pc-v10-comercial-integracion.test.mjs
+          node --test integraciones/autocotizador/recepcion/pagina-cotizar-live.test.mjs
+          node --test tests/cotizador-movil-asistente.test.mjs
+      - name: Comprobar sintaxis
+        run: |
+          node --check integraciones/autocotizador/recepcion/pagina-cotizar-live.mjs
+          node --check integraciones/autocotizador/recepcion/pagina-archivos-live.mjs
+          node --check integraciones/autocotizador/recepcion/worker-fase4-cotizador-unificado.mjs
+          cp integraciones/autocotizador/recepcion/pc-v10-comercial.js.txt /tmp/pc-v10-comercial.mjs
+          node --check /tmp/pc-v10-comercial.mjs
+      - name: Compilar Worker comercial sin publicar
+        working-directory: integraciones/autocotizador/recepcion
+        run: |
+          npm install --no-save --ignore-scripts --no-audit --no-fund esbuild@0.24.2 pdf-lib@1.17.1
+          ./node_modules/.bin/esbuild ./worker-fase4-cotizador-unificado.mjs --bundle --minify --platform=browser --format=esm --target=es2022 --loader:.html=text --loader:.txt=text --outfile=/tmp/saber-pc-v10-commercial-check.mjs
+          node --check /tmp/saber-pc-v10-commercial-check.mjs
+          echo SABER_PC_V10_COMMERCIAL_COMPILED_NO_DEPLOY
