@@ -57,6 +57,11 @@ test('la V10 muestra solo el presupuesto y el avance del contenedor comercial',(
  assert.match(pc,/left\.insertBefore\(batch,uploadZone\)/);
  assert.match(pc,/modeControl\.hidden=isSingle/);
  assert.match(pc,/batchButton\.onclick=saveCommon/);
+ assert.match(pc,/el\('div','pc-work-services'\)/);
+ assert.match(pc,/filter\(service=>service\.enabled\)/);
+ assert.match(pc,/pc-work-services-label/);
+ assert.match(pc,/aria-pressed/);
+ assert.doesNotMatch(pc,/serviceSelect/);
 });
 
 test('la pantalla comercial no ofrece preview si no está activada la compuerta',async()=>{
