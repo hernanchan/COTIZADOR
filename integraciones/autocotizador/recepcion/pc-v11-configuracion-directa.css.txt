@@ -66,3 +66,16 @@ body.saber-pc-v11 #pc-v11-footer .v11-total{display:flex;align-items:center;just
 body.saber-pc-v11 #pc-v11-footer .v11-total strong{font-size:20px;text-align:right}
 body.saber-pc-v11 #pc-v11-footer #pc-v11-warnings:not([hidden]){margin:8px 0 0}
 }
+
+/* Divulgación progresiva: el tamaño abre sólo sus opciones compatibles. */
+@media(min-width:900px) and (pointer:fine){
+body.saber-pc-v11 #pc-v11-batch :is(label,button)[hidden]{display:none!important}
+body.saber-pc-v11 #pc-v11-batch .v11-fields[data-chosen="false"]{grid-template-columns:minmax(180px,320px)}
+body.saber-pc-v11 #pc-v11-batch .v11-fields[data-chosen="true"][data-large="false"]{grid-template-columns:minmax(180px,1fr) minmax(90px,.45fr) auto}
+body.saber-pc-v11 .v11-direct[data-chosen="false"]{grid-template-columns:minmax(145px,320px)}
+body.saber-pc-v11 .v11-direct[data-chosen="true"][data-large="false"]{grid-template-columns:minmax(145px,1fr) minmax(64px,.45fr)}
+body.saber-pc-v11 .v12-wait-size .composicion-por-cara{display:none!important}
+body.saber-pc-v11 .v12-native-progressive .controles{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:9px;align-items:end}
+body.saber-pc-v11 .v12-native-progressive .controles label{font-size:13px;min-width:0}
+body.saber-pc-v11 .v12-native-progressive .controles select,body.saber-pc-v11 .v12-native-progressive .controles input{width:100%;min-height:38px;font-size:14px;box-sizing:border-box}
+}
