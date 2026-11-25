@@ -43,11 +43,13 @@ const workCards=el('div','pc-work-cards'),workActions=el('div','pc-work-actions'
 const newWork=el('button','pc-work-new','+ Agregar trabajo'),duplicateWork=el('button','pc-work-duplicate','Duplicar configuración');
 newWork.type=duplicateWork.type='button';
 const renameInput=el('input','pc-work-name');renameInput.type='text';renameInput.maxLength=80;renameInput.autocomplete='off';renameInput.setAttribute('aria-label','Nombre del trabajo');
-const serviceSelect=el('select','pc-work-service');serviceSelect.setAttribute('aria-label','Servicio de este trabajo');
+const serviceGroup=el('div','pc-work-service-group'),serviceTitle=el('span','pc-work-services-label','Servicio para este trabajo');
+const serviceChoices=el('div','pc-work-services');serviceChoices.setAttribute('role','group');serviceChoices.setAttribute('aria-labelledby','pc-work-services-label');
 const renameWork=el('button','pc-work-rename','Guardar nombre'),deleteWork=el('button','pc-work-delete','Eliminar trabajo');
 renameWork.type=deleteWork.type='button';
 const workNote=el('p','pc-work-note','Seleccioná un trabajo antes de cargar sus archivos. Las opciones compartidas se aplican a ese trabajo.');
-workActions.append(newWork,duplicateWork,serviceSelect,renameInput,renameWork,deleteWork);
+serviceGroup.append(serviceTitle,serviceChoices);
+workActions.append(newWork,duplicateWork,serviceGroup,renameInput,renameWork,deleteWork);
 workPanel.append(workHeading,workCards,workActions,workNote);
 const moveRow=el('div','pc-move-row'),moveLabel=el('label','pc-move-label','Mover este archivo a otro trabajo');
 const moveSelect=el('select','pc-move-select');moveSelect.setAttribute('aria-label','Mover archivo seleccionado a otro trabajo');
@@ -120,9 +122,19 @@ function renderWorkControls(){
  }
  const current=s.works.find(w=>w.id===currentWorkId)||s.works[0];
  renameInput.value=current.nombre;
- serviceSelect.replaceChildren();
- for(const service of api()?.getServiceOptions?.()||[]){const option=new Option(service.nombre,service.id);option.disabled=!service.enabled;serviceSelect.add(option);}
- serviceSelect.value=current.servicio||'auto';serviceSelect.disabled=current.cantidad>0;
+ serviceChoices.replaceChildren();serviceChoices.hidden=current.cantidad>0;
+ const enabledServices=(api()?.getServiceOptions?.()||[]).filter(service=>service.enabled);
+ for(const service of enabledServices){
+  const button=el('button','',service.nombre);button.type='button';
+  button.className='pc-service-choice'+(service.id===current.servicio?' pc-service-active':'');
+  button.setAttribute('aria-pressed',String(service.id===current.servicio));
+  button.onclick=()=>{
+   try{api()?.setService?.(currentWorkId,service.id);workNote.textContent='Servicio elegido para este trabajo.';sync();}
+   catch(error){workNote.textContent=String(error.message||error);renderWorkControls();}
+  };
+  serviceChoices.append(button);
+ }
+ if(!enabledServices.length)serviceChoices.append(el('p','','No hay otros servicios disponibles para este trabajo.'));
  renameInput.disabled=false;renameWork.disabled=false;
  deleteWork.disabled=current.cantidad>0||s.works.length<2;
  moveRow.hidden=!s.files.some(f=>f.trabajoPedidoId===currentWorkId);
@@ -141,10 +153,6 @@ function createWork(duplicate){
 }
 newWork.onclick=()=>createWork(false);
 duplicateWork.onclick=()=>createWork(true);
-serviceSelect.onchange=()=>{
- try{api()?.setService?.(currentWorkId,serviceSelect.value);workNote.textContent='Servicio actualizado para los próximos archivos de este trabajo.';sync();}
- catch(error){workNote.textContent=String(error.message||error);renderWorkControls();}
-};
 renameWork.onclick=()=>{
  const work=window.SABER_TRABAJOS_PEDIDO.find(w=>w.id===currentWorkId),name=renameInput.value.trim();
  if(!work||!name||name.length>80||/[<>]/.test(name)){workNote.textContent='Usá un nombre de hasta 80 caracteres, sin etiquetas.';return;}
