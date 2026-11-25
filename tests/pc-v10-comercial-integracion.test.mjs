@@ -52,6 +52,9 @@ test('la V10 muestra solo el presupuesto y el avance del contenedor comercial',(
  assert.match(css,/body\.saber-pc-v3 #pc-sidebar\{display:none!important\}/);
  assert.match(css,/body\.saber-pc-v3 #pc-shell\{display:block!important\}/);
  assert.match(pc,/uploadZone\.append\(uploadSummary\)/);
+ assert.match(pc,/left\.insertBefore\(workPanel,uploadZone\)/);
+ assert.match(pc,/left\.insertBefore\(modeCard,uploadZone\)/);
+ assert.match(pc,/left\.insertBefore\(batch,uploadZone\)/);
  assert.match(pc,/modeControl\.hidden=isSingle/);
  assert.match(pc,/batchButton\.onclick=saveCommon/);
 });

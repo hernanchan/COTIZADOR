@@ -53,7 +53,10 @@ const moveRow=el('div','pc-move-row'),moveLabel=el('label','pc-move-label','Move
 const moveSelect=el('select','pc-move-select');moveSelect.setAttribute('aria-label','Mover archivo seleccionado a otro trabajo');
 const moveButton=el('button','pc-move-button','Mover archivo');moveButton.type='button';
 moveLabel.append(moveSelect);moveRow.append(moveLabel,moveButton);
-filebox.append(workPanel,moveRow);
+left.insertBefore(workPanel,uploadZone);
+left.insertBefore(modeCard,uploadZone);
+left.insertBefore(batch,uploadZone);
+filebox.append(moveRow);
 originalList.append(by('anilladosConjuntos'),by('lista'));grid.append(queue,originalList);
 filebox.append(el('h2','','Configurá tus archivos'),el('p','pc-instruction','Seleccioná un archivo, elegí sus opciones y presioná «Guardar y siguiente».'),grid);
 const actions=el('div','pc-config-actions'),save=el('button','pc-save','Guardar y siguiente →'),note=el('span','pc-config-status','Subí tus archivos para comenzar.');
