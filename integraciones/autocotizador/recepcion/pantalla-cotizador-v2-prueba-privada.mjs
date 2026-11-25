@@ -1691,6 +1691,8 @@ window.addEventListener('message',async event=>{
      universalPendiente||universalFlujo||!Array.isArray(p.files)||
      !Array.isArray(p.archivos)||p.files.length<1||p.files.length>10||
      p.files.length!==p.archivos.length||
+     (p.trabajosPedido!==undefined&&(!Array.isArray(p.trabajosPedido)||
+       p.trabajosPedido.length<1||p.trabajosPedido.length>p.files.length))||
      !(p.files.some(f=>f instanceof File&&f.size>40*1024*1024)||
      p.archivos.some(a=>a.servicio==='fotos'))||
      p.files.some((f,i)=>!(f instanceof File)||
@@ -1699,7 +1701,8 @@ window.addEventListener('message',async event=>{
    batchProgress.textContent='Revisá los archivos del pedido; todavía no se recibió ni cobró nada.';
    return;
   }
-  universalPendiente={files:p.files,archivos:p.archivos};
+  universalPendiente={files:p.files,archivos:p.archivos,
+   ...(Array.isArray(p.trabajosPedido)?{trabajosPedido:p.trabajosPedido}:{})};
   return;
  }
  if(event.source===smart.contentWindow&&event.data?.type==='SABER_SMART_R2_PREPAGO'){

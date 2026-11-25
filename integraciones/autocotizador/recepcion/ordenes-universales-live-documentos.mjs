@@ -53,7 +53,8 @@ export async function guardarBorradorUniversalLive(req,env,{
  if(raw.length>150000)return reply({ok:false,error:'LIVE_DRAFT_LIMITE'},413);
  let input;try{input=JSON.parse(raw)}catch{}
  if(!input||typeof input!=='object'||Array.isArray(input)||
-  Object.keys(input).sort().join(',')!=='archivos,manifiestos,webOrderId'||
+  !['archivos,manifiestos,webOrderId',
+    'archivos,manifiestos,trabajosPedido,webOrderId'].includes(Object.keys(input).sort().join(','))||
   !WEB.test(input.webOrderId||''))return reply({ok:false,error:'LIVE_DRAFT_INPUT'},422);
  let ficha;
  try{ficha=quoteBuilder({...input,tarifario:await priceLoader(env),produccion:true})}

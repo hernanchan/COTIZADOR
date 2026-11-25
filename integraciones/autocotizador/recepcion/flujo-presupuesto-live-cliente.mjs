@@ -6,6 +6,7 @@
 import {sha256PdfLocalPorFragmentos} from './sha256-pdf-local-fragmentos.mjs';
 import {iniciarCheckoutLiveCliente} from './checkout-live-cliente.mjs';
 import {guardarOriginalesLive,leerOriginalesLive} from './custodia-local-originales-live.mjs';
+import {validarTrabajosPedido} from './validar-trabajos-pedido.mjs';
 export {leerOriginalesLive,borrarOriginalesLive} from './custodia-local-originales-live.mjs';
 const MIB=1048576,WEB=/^WEB-ENSAYO-[A-F0-9]{32}$/;
 const SHA=/^[a-f0-9]{64}$/,UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
@@ -17,7 +18,7 @@ async function post(fetcher,path,body){
  return data;
 }
 export function crearFlujoPresupuestoLive({
- files,archivos,webOrderId,telefono,nombre,direccion='',origin=location.origin,
+ files,archivos,trabajosPedido,webOrderId,telefono,nombre,direccion='',origin=location.origin,
  fetcher=fetch,hasher=sha256PdfLocalPorFragmentos,uuid=()=>crypto.randomUUID(),
  storage=typeof sessionStorage==='undefined'?null:sessionStorage,
  onProgress=()=>{},onState=()=>{},
@@ -43,6 +44,8 @@ export function crearFlujoPresupuestoLive({
    throw Error('LIVE_FLUJO_ARCHIVOS_INVALIDOS');
   if(f.size<=40*MIB)totalTus+=f.size;
  }
+ const grupos=trabajosPedido===undefined?undefined:
+  validarTrabajosPedido(trabajosPedido,files.length,{maxTrabajos:10});
  if(totalTus>60*MIB)throw Error('LIVE_FLUJO_TUS_EXCEDE_CUPO');
  let state='seleccionado',order=null,metas=null;
  const setState=s=>{state=s;onState(s)};
@@ -68,7 +71,7 @@ export function crearFlujoPresupuestoLive({
      m.pages<1||m.pages>2000))throw Error('LIVE_METAS_POSTPAGO_INVALIDAS');
    setState('registrando_borrador');
    const draft=await post(fetcher,'/api/pedido/live/borrador',{
-    webOrderId,archivos,manifiestos});
+    webOrderId,archivos,manifiestos,...(grupos?{trabajosPedido:grupos}:{})});
    if(draft.webOrderId!==webOrderId||draft.fileCount!==files.length||
       !UUID.test(draft.draftId||'')||!SHA.test(draft.quoteHash||'')||
       !Number.isSafeInteger(draft.totalArs)||draft.totalArs<1||

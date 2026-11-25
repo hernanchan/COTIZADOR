@@ -2,6 +2,7 @@
  * Mantener circuito histórico R2_PREPAID_PLOT sin cambios.
  */
 import {decidirTransportePDF} from '../../autocotizador/recepcion/seleccionar-transporte-pdf.mjs';
+import {validarGruposArchivosPedido} from '../../autocotizador/recepcion/validar-trabajos-pedido.mjs';
 const WEB=/^WEB-ENSAYO-[A-F0-9]{32}$/;
 const ID=/^[A-Za-z0-9_-]{1,80}$/;
 const SHA=/^[a-f0-9]{64}$/;
@@ -25,9 +26,12 @@ export async function verificarFichaUniversal(p,{subtle=crypto.subtle,allowTusOn
  if(!p||typeof p!=='object'||Array.isArray(p)||!SHA.test(p.quoteHash||''))
   throw Error('UNIVERSAL_FICHA_INVALIDA');
  const {quoteHash,...ficha}=p;
- if(Object.keys(ficha).sort().join(',')!==
-   'archivos,armados,estado,pagoAutorizado,priceRevision,produccionAutorizada,schema,subidaAutorizada,totalArs,webOrderId'||
-   ficha.schema!=='saber-r2-universal-draft-v1'||!WEB.test(ficha.webOrderId||'')||
+ const keys=Object.keys(ficha).sort().join(',');
+ const legacyKeys='archivos,armados,estado,pagoAutorizado,priceRevision,produccionAutorizada,schema,subidaAutorizada,totalArs,webOrderId';
+ const groupedKeys='archivos,armados,estado,pagoAutorizado,priceRevision,produccionAutorizada,schema,subidaAutorizada,totalArs,trabajosPedido,webOrderId';
+ const grouped=ficha.schema==='saber-r2-universal-draft-v2';
+ if((grouped?(keys!==groupedKeys):(keys!==legacyKeys||ficha.schema!=='saber-r2-universal-draft-v1'))||
+   !WEB.test(ficha.webOrderId||'')||
    !/^d1-approved-revision-[1-9]\d{0,7}$/.test(ficha.priceRevision||'')||
    !Number.isSafeInteger(ficha.totalArs)||ficha.totalArs<1||ficha.totalArs>50000000||
    !Array.isArray(ficha.archivos)||!ficha.archivos.length||ficha.archivos.length>10||
@@ -37,10 +41,19 @@ export async function verificarFichaUniversal(p,{subtle=crypto.subtle,allowTusOn
   throw Error('UNIVERSAL_FICHA_INVALIDA');
  if(await digest(JSON.stringify(ficha),subtle)!==quoteHash)
   throw Error('UNIVERSAL_HASH_INVALIDO');
+ let grupos=new Map();
+ if(grouped){
+  const normalized=validarGruposArchivosPedido(ficha.trabajosPedido,
+   ficha.archivos.map(f=>f?.fileId),{maxTrabajos:10});
+  for(const g of normalized)for(const fileId of g.fileIds)grupos.set(fileId,g);
+ }
  const ids=new Set(),workIds=new Set();let subtotal=0,tusBytes=0,r2=0;
  for(const [i,f] of ficha.archivos.entries()){
-  if(!f||Object.keys(f).sort().join(',')!==
-   'bytes,configuracion,destino,detalle,fileId,formatoFinal,idTrabajo,importeArs,indice,integridadVerificada,nombre,originalRecibido,paginasElegidas,preprensaAprobada,sha256,transporte'||
+  const itemKeys=Object.keys(f||{}).sort().join(',');
+  const legacyItemKeys='bytes,configuracion,destino,detalle,fileId,formatoFinal,idTrabajo,importeArs,indice,integridadVerificada,nombre,originalRecibido,paginasElegidas,preprensaAprobada,sha256,transporte';
+  const groupedItemKeys='bytes,configuracion,destino,detalle,fileId,formatoFinal,idTrabajo,importeArs,indice,integridadVerificada,nombre,nombreTrabajo,originalRecibido,paginasElegidas,preprensaAprobada,sha256,trabajoPedidoId,transporte';
+  const group=grouped?grupos.get(f?.fileId):null;
+  if(!f||(grouped?itemKeys!==groupedItemKeys:itemKeys!==legacyItemKeys)||
    f.indice!==i||!ID.test(f.fileId||'')||ids.has(f.fileId)||
    !SHA.test(f.sha256||'')||!Number.isSafeInteger(f.bytes)||
    decidirTransportePDF(f.bytes).ruta!==f.transporte||
@@ -55,7 +68,8 @@ export async function verificarFichaUniversal(p,{subtle=crypto.subtle,allowTusOn
    f.detalle.subtotal!==f.importeArs||
    !Number.isSafeInteger(f.importeArs)||f.importeArs<0||
    f.originalRecibido!==false||f.integridadVerificada!==false||
-   f.preprensaAprobada!==false)
+   f.preprensaAprobada!==false||
+   (grouped&&(!group||f.trabajoPedidoId!==group.id||f.nombreTrabajo!==group.nombre)))
    throw Error('UNIVERSAL_ARCHIVO_INVALIDO');
   ids.add(f.fileId);workIds.add(f.idTrabajo);subtotal+=f.importeArs;
   if(f.transporte==='r2')r2++;else tusBytes+=f.bytes;

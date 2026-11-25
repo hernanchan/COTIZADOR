@@ -29,6 +29,8 @@ export function convertirTrabajoZIPUniversal(t){
     typeof t.nombreOriginal!=='string')
   throw Error('Instrucciones del archivo incompletas');
  return {orden:t.orden,nombreOriginal:t.nombreOriginal,servicio:t.servicio,
+  trabajoPedidoId:t.trabajoPedidoId||null,
+  nombreTrabajo:t.nombreTrabajo||null,
   paginasOriginales:c.paginas.length,paginasElegidas:t.paginasElegidas,
   copias:c.copias,formatoFinal:t.formatoFinal,modo:c.modo,
   carasPresupuestadas:c.caras,paginasPorCaraPresupuestadas:c.paginasPorHoja||1,
@@ -69,6 +71,7 @@ function filas(t,i){
  const values=[
   ['Archivo de este ZIP',name(i)],
   ['Original del cliente',t.nombreOriginal],
+  ...(t.nombreTrabajo?[['Trabajo del pedido',t.nombreTrabajo]]:[]),
   ['Servicio',t.servicio==='ploteos'?'Ploteo CAD/Póster':'Impresión A4/A3'],
   ['Páginas originales',config.paginas.length],
   ['Páginas elegidas',resumirPaginasElegidas(t.paginasElegidas)],

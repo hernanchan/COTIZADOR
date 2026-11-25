@@ -289,7 +289,8 @@ window.addEventListener('message',event=>{
  }
  if(data.type==='SABER_SMART_UNIVERSAL_PDF'){
   if(working)return;
-  pending={files:data.files,archivos:data.archivos};
+  pending={files:data.files,archivos:data.archivos,
+   ...(Array.isArray(data.trabajosPedido)?{trabajosPedido:data.trabajosPedido}:{})};
   action.disabled=!enabled;
   status.textContent=enabled?'Archivos preparados, validando el presupuesto…':'Presupuesto preparado. El pago y el envío todavía no están habilitados.';
   if(enabled){

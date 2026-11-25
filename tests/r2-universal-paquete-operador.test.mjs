@@ -14,7 +14,8 @@ const R2='12345678-1234-4123-8123-123456789abe';
 const PDF=new TextEncoder().encode('%PDF-1.7\nHola Saber!\n%%EOF');
 const hash=b=>createHash('sha256').update(b).digest('hex');
 const M=1048576;
-function make({paid=true,received=true,missingR2=false,delivered=false}={}){
+function make({paid=true,received=true,missingR2=false,delivered=false,
+ trabajosPedido}={}){
  const base=n=>({nombre:n,paginas:[{numero:1,anchoCm:21,altoCm:29.7,modo:'sin-clasificar'}],
   seleccion:'original',servicio:'auto',copias:1,modo:'bn',caras:'simple',
   anillado:'ninguno',grupoAnillado:'',materialColor:'',papelPoster:'obra80'});
@@ -22,6 +23,7 @@ function make({paid=true,received=true,missingR2=false,delivered=false}={}){
  const m=[{fileId:'small',nombre:'Clase.pdf',bytes:PDF.length,sha256:hash(PDF)},
   {fileId:'large',nombre:'Plano.pdf',bytes:70*M,sha256:'b'.repeat(64)}];
  const f=fichaPrearchivoUniversal({webOrderId:WEB,archivos:files,manifiestos:m,
+  ...(trabajosPedido?{trabajosPedido}:{}),
   tarifario:{source:'private-d1-approved-only',revision:8,
    prices:{...prices,priceVersion:'d1-approved-revision-8'}}});
  const q=hash(JSON.stringify(f)),w=f.archivos;
@@ -93,6 +95,24 @@ test('ficha D1: dos originales TUS/R2, orden única y pago confirmado',async()=>
  const file=await consultarArchivoUniversalCentral(req(f2),env,{readSigned:signed,subtle:webcrypto.subtle});
  assert.equal(file.status,200,JSON.stringify(await file.clone().json()));
  assert.equal((await file.json()).objectKey,'r2-v1/'+WEB+'/'+R2+'.pdf');
+});
+test('manifiesto de producción conserva nombre e identidad de cada trabajo',async()=>{
+ const {env,f}=make({trabajosPedido:[
+  {id:'docs',nombre:'Apuntes',indices:[0]},
+  {id:'plot',nombre:'Plano A1',indices:[1]}
+ ]});
+ const r=await consultarPaqueteUniversalCentral(req({
+  schema:'saber-central-r2-universal-package-manifest-v1',webOrderId:WEB
+ }),env,{readSigned:signed,subtle:webcrypto.subtle});
+ const x=await r.json();
+ assert.equal(r.status,200,JSON.stringify(x));
+ assert.deepEqual(x.gruposPedido,[
+  {id:'docs',nombre:'Apuntes',fileIds:['small']},
+  {id:'plot',nombre:'Plano A1',fileIds:['large']}
+ ]);
+ assert.deepEqual(x.trabajos.map(t=>t.nombreTrabajo),['Apuntes','Plano A1']);
+ assert.deepEqual(x.trabajos.map(t=>t.trabajoPedidoId),['docs','plot']);
+ assert.equal(f.schema,'saber-r2-universal-draft-v2');
 });
 test('no empaqueta pedidos sin pago, entrega o recibos originales completos',async()=>{
  const p={schema:'saber-central-r2-universal-package-manifest-v1',webOrderId:WEB};

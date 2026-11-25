@@ -125,13 +125,14 @@ export function eliminarTrabajo(works,id){
  */
 export function aplanarTrabajosParaCotizar(works){
  if(!Array.isArray(works)||!works.length)throw Error('El pedido no tiene trabajos.');
- const archivos=[],vinculos=[];
+ const archivos=[],vinculos=[],trabajosPedido=[];
  for(const work of works){
   assertId(work?.id,'ID de trabajo');
   if(!SERVICES.has(work.servicio)||!Array.isArray(work.archivos))
    throw Error('Trabajo no cotizable.');
   if(work.archivos.length===0)throw Error('Hay un trabajo sin archivos.');
   const defaults=sanitizeConfig(work.configuracion);
+  const grupo={id:work.id,nombre:work.nombre,indices:[]};
   for(const file of work.archivos){
    if(!file||!VALID_ID.test(file.id||'')||!Array.isArray(file.paginas)||!file.paginas.length)
     throw Error('Hay un archivo sin análisis completo.');
@@ -149,8 +150,11 @@ export function aplanarTrabajosParaCotizar(works){
     materialColor:config.materialColor
    });
    vinculos.push(Object.freeze({indice,trabajoId:work.id,archivoId:file.id}));
+   grupo.indices.push(indice);
   }
+  trabajosPedido.push(Object.freeze(grupo));
  }
  if(!archivos.length)throw Error('El pedido no tiene archivos.');
- return Object.freeze({archivos:Object.freeze(archivos),vinculos:Object.freeze(vinculos)});
+ return Object.freeze({archivos:Object.freeze(archivos),vinculos:Object.freeze(vinculos),
+  trabajosPedido:Object.freeze(trabajosPedido)});
 }
