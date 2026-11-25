@@ -1,7 +1,7 @@
 /** Adaptador visual comprador LIVE: un solo scroll y un solo total.
  * No modifica clasificación, precios, archivos ni pagos.
  */
-export function prepararCotizadorArchivosLive(htmlEntrada,{previewMovil=false}={}){
+export function prepararCotizadorArchivosLive(htmlEntrada,{previewMovil=false,previewPcV10=false}={}){
  if(typeof htmlEntrada!=='string'||!htmlEntrada.includes('id="zonaArchivos"'))
   throw Error('HTML_COTIZADOR_NO_COMPATIBLE');
  const html=htmlEntrada
@@ -60,5 +60,17 @@ export function prepararCotizadorArchivosLive(htmlEntrada,{previewMovil=false}={
     !adaptado.includes('id="archivos"')||
     !adaptado.includes('src="/cotizar/movil.js"'))
   throw Error('HTML_COTIZADOR_NO_ADAPTADO');
- return adaptado;
+ // PC V10 se incorpora solo con una compuerta explícita, nunca como cambio
+ // silencioso del iframe comercial. El asistente móvil permanece intacto.
+ if(!previewPcV10||previewMovil)return adaptado;
+ if(!adaptado.includes('</style></head><body>'))
+  throw Error('HTML_COTIZADOR_NO_ADMITE_PC_V10');
+ const withCss=adaptado.replace('</style></head><body>',
+   '</style><link rel="stylesheet" href="/cotizar/pc-v10.css?pc=v10"></head><body>');
+ const preview=withCss.replace('</body></html>',
+   '<script src="/cotizar/pc-v10.js?pc=v10" defer></script></body></html>');
+ if(!preview.includes('src="/cotizar/pc-v10.js?pc=v10"')||
+    !preview.includes('src="/cotizar/movil.js"'))
+  throw Error('PC_V10_INTEGRACION_INCOMPLETA');
+ return preview;
 }

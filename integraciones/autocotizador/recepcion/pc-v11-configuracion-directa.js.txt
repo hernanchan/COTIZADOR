@@ -1,0 +1,420 @@
+/* V11 PC: configuración directa sobre los controles nativos del cotizador.
+   No cambia tarifas, documentos, clasificación, transporte ni pagos. */
+(()=>{'use strict';
+if(!matchMedia('(min-width:900px) and (pointer:fine)').matches)return;
+const by=id=>document.getElementById(id),list=by('lista'),upload=by('zonaArchivos');
+if(!list||!upload||!by('prepararPedido')||!by('archivos'))return;
+const cards=()=>[...list.querySelectorAll('section.archivo')];
+const name=c=>c.querySelector('.nombre')?.textContent?.trim()||'';
+const imageStem=c=>name(c).replace(/^\d+\.\s*imagen-\d+-/i,'').replace(/(?:-PLT-A[012])?\.pdf$/i,'');
+const image=c=>/^\d+\.\s*imagen-\d+-/i.test(name(c))&&thumbnails.has(imageStem(c));
+const special=c=>/Stickers|Fotografías|Gráfica comercial|Ploteo de corte/i.test(meta(c));
+const regularImage=c=>image(c)&&!special(c);
+const key=c=>name(c).match(/^\d+\./)?.[0]||name(c);
+const get=k=>cards().find(c=>key(c)===k);
+const meta=c=>c.querySelector('.resumen-archivo')?.textContent||'';
+const amp=c=>c.querySelector('.saber-ampliacion');
+const exp=c=>[...c.querySelectorAll('button.editar')].find(b=>/^(Más opciones|Personalizar este PDF|Cerrar detalles|Otros ajustes|Opciones de impresión)$/i.test(b.textContent.trim()));
+const copy=c=>c.querySelector('input[aria-label^="Cantidad de copias"]:not(.v11-copies)');
+const quality=c=>amp(c)?.querySelector('[role=alert] input[type=checkbox]');
+const apply=c=>amp(c)?.querySelector('[data-saber-amp-aplicar]');
+const ampSelect=c=>amp(c)?.querySelector('select');
+const nativePaper=c=>c.querySelector('.eleccion-plotter-papel select');
+const originalSize=c=>c.querySelector('select[aria-label^="Tamaño final de"]');
+const sizeButton=(c,v)=>[...c.querySelectorAll('.tamano-rapido button.tamano-opcion')].find(b=>v==='original'?/original|real/i.test(b.textContent):new RegExp('\\b'+v+'\\b','i').test(b.textContent));
+const element=(tag,t)=>{const e=document.createElement(tag);if(t)e.textContent=t;return e;};
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const analyzing=()=>/Analizando|Leyendo|Preparando imágenes/i.test(by('estado')?.textContent||'')||cards().some(c=>/Analizando PDF/i.test(meta(c)));
+const imagesReady=()=>!analyzing()&&cards().filter(image).every(c=>!!amp(c));
+async function until(test,ms=3500){const start=Date.now();while(Date.now()-start<ms){const r=test();if(r)return r;await wait(75);}return null;}
+const selectValue=(e,v)=>{if(!e||![...e.options].some(o=>o.value===v))return false;if(e.value!==v){e.value=v;e.dispatchEvent(new Event('change',{bubbles:true}));}return true;};
+const requested=new Map();let busy=false,scheduled=false,alertText='';
+const thumbnails=new Map();
+const fields=[['','Elegir tamaño'],['original','Tamaño original'],['a4','A4 · 21 × 29,7 cm'],['a3','A3 · 29,7 × 42 cm'],['a2','A2 · 42 × 59,4 cm'],['a1','A1 · 59,4 × 84,1 cm'],['a0','A0 · 84,1 × 118,9 cm']];
+function selectSize(forImage){
+ const s=element('select');s.setAttribute('aria-label','Tamaño de impresión');
+ for(const [v,t] of fields){if(forImage&&v==='original')continue;s.add(new Option(t,v));}
+ return s;
+}
+function paperSelect(){const s=element('select');s.setAttribute('aria-label','Papel');s.add(new Option('Obra 80 g','obra80'));s.add(new Option('Recubierto 130 g','recubierto'));return s;}
+function inputCopies(){const i=element('input');i.type='number';i.min=1;i.max=500;i.step=1;i.value='1';i.setAttribute('aria-label','Cantidad de copias');return i;}
+function label(t,control){const l=element('label',t);l.append(control);return l;}
+function nativeCopies(c){return Number(copy(c)?.value||meta(c).match(/(\d+)\s+copia\(s\)/i)?.[1]||1);}
+function nativeSize(c){
+ if(c.querySelector('.pregunta-tamano'))return '';
+ const selected=c.querySelector('.tamano-rapido button.seleccionada');
+ if(selected){const t=selected.textContent;if(/original|real/i.test(t))return 'original';const m=t.match(/\bA[0-5]\b/i);if(m)return m[0].toLowerCase();}
+ const s=originalSize(c);if(s&&s.value!=='sin-confirmar')return s.value;
+ const m=meta(c).match(/(?:Impresión|Ploteo)\s+(original|A[0-5])/i);
+ return m?.[1]?.toLowerCase()||'';
+}
+function state(c){
+ const k=key(c),existing=requested.get(k);
+ if(existing&&existing.name===name(c)){
+  // El análisis inicial puede montar la ficha antes de conocer las medidas.
+  // Las opciones de PDF se hidratan desde el motor, nunca desde la copia visual.
+  if(!image(c)&&!busy&&!existing.pending){
+   existing.size=nativeSize(c);
+   existing.copies=nativeCopies(c);
+  }
+  return existing;
+ }
+ const s={name:name(c),size:image(c)?'':nativeSize(c),copies:nativeCopies(c),pending:false,appliedSize:null,paper:nativePaper(c)?.value||'obra80'};
+ requested.set(k,s);return s;
+}
+function waitCard(k){return get(k);}
+function note(text){alertText=text;message.textContent=text;}
+const batch=element('section');batch.id='pc-v11-batch';batch.hidden=true;
+const h=element('h2','¿Todas las imágenes iguales?'),description=element('p','Configurá el grupo una sola vez. Después podés ajustar cualquier archivo.');
+const batchSize=selectSize(true),batchCopies=inputCopies(),batchPaper=paperSelect(),batchApply=element('button','Aplicar a todas');batchApply.type='button';
+const batchRow=element('div');batchRow.className='v11-fields';
+const batchSizeLabel=label('Tamaño final',batchSize),batchCopiesLabel=label('Copias por imagen',batchCopies),batchPaperLabel=label('Papel',batchPaper);
+batchRow.append(batchSizeLabel,batchCopiesLabel,batchPaperLabel,batchApply);
+function updateBatch(){
+ const chosen=!!batchSize.value,large=['a2','a1','a0'].includes(batchSize.value);
+ batchCopiesLabel.hidden=!chosen;batchPaperLabel.hidden=!large;
+ batchApply.hidden=!chosen;batchApply.disabled=!chosen||busy||!imagesReady();
+ batchRow.dataset.large=String(large);batchRow.dataset.chosen=String(chosen);
+}
+batchSize.addEventListener('change',updateBatch);
+updateBatch();
+const message=element('p');message.id='pc-v11-message';message.setAttribute('role','status');
+const warnings=element('div');warnings.id='pc-v11-warnings';warnings.hidden=true;
+batch.append(h,description,batchRow);upload.insertAdjacentElement('afterend',batch);
+batch.insertAdjacentElement('afterend',message);
+// Cierre de la cotización: una sola lectura de arriba hacia abajo.
+const footer=element('section');footer.id='pc-v11-footer';footer.hidden=true;
+const totalLabel=element('span','Total del pedido');
+const totalValue=element('strong','Precio pendiente');totalValue.id='pc-v11-total-final';
+const total=element('div');total.className='v11-total';total.append(totalLabel,totalValue);
+footer.append(total,warnings);list.insertAdjacentElement('afterend',footer);
+const main=list.closest('main');
+let resizeFrame=()=>{};
+try{
+ // Solo en el iframe comercial de escritorio. No intervenir en otros documentos.
+ const outer=window.parent,frame=window.frameElement;
+ const parentPrice=outer.document.getElementById('precio');
+ const parentNext=outer.document.getElementById('siguiente');
+ if(outer!==window&&outer.location.origin===location.origin&&
+    frame?.id==='pdf'&&frame.contentWindow===window&&main&&parentPrice&&parentNext){
+  const mirror=()=>{totalValue.textContent=parentPrice.textContent.trim()||'Precio pendiente';};
+  mirror();
+  const priceObserver=new MutationObserver(mirror);
+  priceObserver.observe(parentPrice,{childList:true,subtree:true,characterData:true});
+  // El emisor original mide scrollHeight, que nunca es menor al viewport
+  // del iframe. El padre le suma 12 px: así acumula altura al editar.
+  // Medir la caja real del contenido, independiente de la altura actual.
+  let queued=false;
+  resizeFrame=()=>{
+   if(queued)return;queued=true;
+   requestAnimationFrame(()=>{
+    queued=false;
+    if(!frame.isConnected||frame.contentWindow!==window||!frame.getClientRects().length)return;
+    const rect=main.getBoundingClientRect();
+    const marginBottom=parseFloat(getComputedStyle(main).marginBottom)||0;
+    const h=Math.ceil(rect.bottom+window.scrollY+Math.max(0,marginBottom)+8);
+    if(!Number.isFinite(h)||h<0||h>30000)return;
+    const target=Math.max(280,h);
+    if(Math.abs(frame.getBoundingClientRect().height-target)>2)frame.style.height=target+'px';
+   });
+  };
+  const onNativeResize=event=>{
+   if(event.origin!==location.origin||event.source!==window||
+      event.data?.type!=='SABER_SMART_RESIZE')return;
+   // Exclusivamente sustituir la medida geométrica. No tocar mensajes
+   // de precio, validación, preparación, ni estados de pedido.
+   event.stopImmediatePropagation();resizeFrame();
+  };
+  outer.addEventListener('message',onNativeResize,true);
+  const ro=new ResizeObserver(resizeFrame);ro.observe(main);
+  const mo=new MutationObserver(resizeFrame);mo.observe(main,{childList:true,subtree:true,attributes:true,characterData:true});
+  outer.addEventListener('resize',resizeFrame);
+  window.addEventListener('pagehide',()=>{
+   outer.removeEventListener('message',onNativeResize,true);
+   outer.removeEventListener('resize',resizeFrame);
+   priceObserver.disconnect();ro.disconnect();mo.disconnect();
+  },{once:true});
+  resizeFrame();
+ }
+}catch{/* La navegación nativa sigue disponible si no se puede medir el iframe. */}
+const intro=element('p','Elegí cómo querés imprimir. Solo verás las opciones necesarias para cada archivo.');intro.id='pc-v11-intro';upload.insertAdjacentElement('afterend',intro);
+document.body.classList.add('saber-pc-v11');
+function pending(){return busy||cards().some(c=>{const s=state(c);return !special(c)&&(s.pending||(regularImage(c)&&!s.size));});}
+// No permitir que un presupuesto viejo de una imagen pendiente llegue al
+// puente de preparación de pedido. El motor mantiene su propia validación.
+window.addEventListener('message',event=>{
+ if(event.origin!==location.origin||event.source!==window.parent||event.data?.type!=='SABER_SMART_PREPARAR_ENVIO'||!pending())return;
+ event.stopImmediatePropagation();
+ note('Revisá los tamaños o advertencias pendientes antes de continuar.');
+ window.parent.postMessage({type:'SABER_SMART_HANDOFF_ERROR',message:'Hay archivos pendientes de configurar.'},location.origin);
+},true);
+document.addEventListener('click',event=>{
+ if(pending()&&event.target.closest('#prepararPedido,#enviar-cotizacion-inteligente')){event.preventDefault();event.stopImmediatePropagation();note('Completá las opciones pendientes al final de la cotización.');}
+},true);
+async function openDetails(k){
+ let c=waitCard(k);if(!c)return null;
+ const b=exp(c);if(b?.getAttribute('aria-expanded')==='false'){b.click();await wait(70);}
+ return waitCard(k);
+}
+async function setCopies(k,n){
+ if(!Number.isSafeInteger(n)||n<1||n>500)return false;
+ let c=waitCard(k);if(!c)return false;
+ if(nativeCopies(c)===n)return true;
+ const opened=!copy(c)&&exp(c)?.getAttribute('aria-expanded')==='false';
+ if(!copy(c))c=await openDetails(k);
+ const i=c&&copy(c);if(!i)return false;
+ i.value=String(n);i.dispatchEvent(new Event('change',{bubbles:true}));await wait(90);
+ c=waitCard(k);const ok=!!c&&nativeCopies(c)===n;
+ if(opened&&c&&exp(c)?.getAttribute('aria-expanded')==='true'){exp(c).click();await wait(70);}
+ return ok;
+}
+async function selectNativeSize(k,v){
+ let c=waitCard(k);if(!c)return false;
+ if(['a2','a1','a0'].includes(v)){
+  // La ampliación y su consentimiento son exclusivamente los originales.
+  const a=await until(()=>{const live=get(k);return live&&amp(live);});if(!a)return false;c=get(k);if(!c)return false;
+  if(!ampSelect(c)){
+   const button=[...a.querySelectorAll('button.eleccion-plotter-boton')].find(b=>/Ploteo/i.test(b.textContent));
+   if(!button)return false;button.click();c=await until(()=>{const live=get(k);return live&&ampSelect(live)?live:null;});if(!c)return false;
+  }
+  if(!selectValue(ampSelect(c),v))return false;
+  return !!await until(()=>{const live=get(k);return live&&ampSelect(live)?.value===v&&apply(live)?live:null;});
+ }
+ if(ampSelect(c)){
+  const b=[...amp(c).querySelectorAll('button.eleccion-plotter-boton')].find(b=>/Impresión común/i.test(b.textContent));
+  if(!b)return false;b.click();await wait(100);c=waitCard(k);if(!c)return false;
+ }
+ const b=sizeButton(c,v);
+ if(b){b.click();await wait(90);return true;}
+ c=await openDetails(k);
+ return !!c&&selectValue(originalSize(c),v);
+}
+async function finish(k){
+ let c=waitCard(k);if(!c)return false;const s=state(c);
+ let q=quality(c),a=apply(c);
+ const wantsLarge=['a2','a1','a0'].includes(s.size);
+ const needsApply=wantsLarge&&s.appliedSize!==s.size;
+ if(needsApply&&a&&!q){
+  // Esperar el analizador nativo antes de iniciar el siguiente archivo.
+  const ready=()=>{const live=get(k);if(!live)return null;const b=apply(live);
+   return b&&(quality(live)||(!b.disabled&&!/Analizando resolución/i.test(amp(live)?.textContent||'')))?live:null;};
+  let live=await until(ready,1800);
+  if(!live){
+   const sel=ampSelect(get(k)||c);
+   if(sel&&sel.value===s.size)sel.dispatchEvent(new Event('change',{bubbles:true}));
+   live=await until(ready,3500);
+  }
+  if(!live){
+   const card=get(k),button=card&&exp(card);
+   if(button?.getAttribute('aria-expanded')==='false'){
+    button.click();await wait(100);const expanded=get(k);const close=expanded&&exp(expanded);
+    if(close?.getAttribute('aria-expanded')==='true')close.click();
+   }
+   live=await until(ready,3500);
+  }
+  if(!live){s.pending=true;return false;}
+  c=live;q=quality(c);a=apply(c);
+ }
+ if(q&&!q.checked){s.pending=true;return false;}
+ if(a&&needsApply){
+  if(a.disabled){s.pending=true;return false;}
+  const previous=name(c);a.click();
+  // Esperar a que el motor termine su transformación local.
+  for(let i=0;i<80;i++){
+   await wait(100);c=waitCard(k);if(!c)continue;
+   if(name(c)!==previous&&/Actualizar tamaño del ploteo/i.test(apply(c)?.textContent||'')&&!c.querySelector('.pregunta-tamano'))break;
+  }
+  c=waitCard(k);if(!c)return false;
+  if(name(c)!==previous)s.name=name(c);
+  if(!name(c).toLowerCase().endsWith('-plt-'+s.size+'.pdf')||!/Actualizar tamaño del ploteo/i.test(apply(c)?.textContent||'')||c.querySelector('.pregunta-tamano')){s.pending=true;return false;}
+  s.appliedSize=s.size;
+ }
+ if(c.querySelector('.pregunta-tamano')||(wantsLarge&&s.appliedSize!==s.size)){s.pending=true;return false;}
+ if(wantsLarge){const p=nativePaper(c);if(!p||!selectValue(p,s.paper)){s.pending=true;return false;}await wait(90);}
+ s.pending=!(await setCopies(k,s.copies));
+ return !s.pending;
+}
+async function changeOne(k,v,n){
+ let c=waitCard(k);if(!c)return false;const s=state(c);
+ s.size=v;s.copies=n;s.pending=true;
+ if(!['a2','a1','a0'].includes(v))s.appliedSize=null;
+ if(!v)return false;
+ if(!await selectNativeSize(k,v))return false;
+ return finish(k);
+}
+async function run(fn){
+ if(busy)return;busy=true;batchApply.disabled=true;document.body.classList.add('v11-busy');
+ try{await fn();}catch(e){note('No pudimos completar una opción. Revisá el archivo y volvé a intentar.');}
+ finally{busy=false;updateBatch();document.body.classList.remove('v11-busy');schedule();}
+}
+batchApply.onclick=()=>run(async()=>{
+ const v=batchSize.value,n=Number(batchCopies.value);
+ if(!v||!Number.isSafeInteger(n)||n<1||n>500){note('Elegí tamaño y una cantidad entre 1 y 500.');return;}
+ if(!imagesReady()){note('Esperá a que termine el análisis de las imágenes.');return;}
+ const keys=cards().filter(regularImage).map(key);
+ for(const k of keys){const c=get(k);if(c)state(c).paper=batchPaper.value;await changeOne(k,v,n);}
+ note(cards().filter(c=>image(c)&&state(c).pending).length?'Revisá las advertencias al final de la cotización.':'Configuración aplicada.');
+});
+function decorate(c){
+ const s=state(c),k=key(c),isImage=regularImage(c);
+ if(c.classList.contains('archivo-no-admitido')||special(c)){
+ c.querySelector('.v11-direct')?.remove();c.classList.remove('v11-image','v11-compact-image');return;
+ }
+ let row=c.querySelector('.v11-direct');
+ if(!row){
+  row=element('div');row.className='v11-direct';
+  const size=selectSize(isImage),copies=inputCopies(),paper=paperSelect();
+  size.className='v11-size';copies.className='v11-copies';paper.className='v11-paper';
+  // Un PDF grande mantiene el original y su clasificación técnica nativa.
+  if(!isImage&&!amp(c))for(const o of [...size.options])if(['a2','a1','a0'].includes(o.value))o.remove();
+  size.addEventListener('change',()=>run(async()=>{const current=get(k);if(!current)return;await changeOne(k,size.value,state(current).copies);}));
+  copies.addEventListener('change',()=>run(async()=>{const current=get(k);if(!current)return;const n=Number(copies.value);if(!Number.isSafeInteger(n)||n<1||n>500){copies.reportValidity();return;}const st=state(current);st.copies=n;
+   if(!isImage&&!st.size)st.size=nativeSize(current);
+   if(st.size){st.pending=true;await finish(k);}
+  }));
+  const paperLabel=label('Papel',paper);paperLabel.className='v11-paper-label';
+  paper.addEventListener('change',()=>run(async()=>{const c=get(k);if(!c)return;const s=state(c);s.paper=paper.value;if(s.size)await finish(k);}));
+  const copiesLabel=label('Copias',copies);copiesLabel.className='v11-copies-label';
+  row.append(label('Tamaño final',size),copiesLabel,paperLabel);
+  const status=element('span');status.className='v11-state';row.append(status);
+  c.querySelector('.resumen-archivo')?.insertAdjacentElement('afterend',row);
+ }
+ const size=row.querySelector('.v11-size'),copies=row.querySelector('.v11-copies');
+ if(document.activeElement!==size)size.value=s.size||'';
+ if(document.activeElement!==copies)copies.value=String(s.copies);
+ const paper=row.querySelector('.v11-paper');paper.value=s.paper;
+ row.querySelector('.v11-paper-label').hidden=!(isImage&&['a2','a1','a0'].includes(s.size));
+ row.querySelector('.v11-copies-label').hidden=!s.size;
+ row.dataset.chosen=String(!!s.size);row.dataset.large=String(isImage&&['a2','a1','a0'].includes(s.size));
+ const t=row.querySelector('.v11-state');
+ const hasPendingAnalysis=s.pending&&s.size&&['a2','a1','a0'].includes(s.size)&&!quality(c)&&apply(c)?.disabled;
+ t.textContent=hasPendingAnalysis?'Análisis pendiente · revisá Otros ajustes':s.pending?'Revisar configuración':isImage&&!s.size?'Elegí tamaño':'';
+ c.classList.toggle('v11-image',isImage);
+ c.classList.toggle('v11-compact-image',isImage);
+ const advanced=exp(c);
+ if(isImage&&advanced){
+  const expanded=advanced.getAttribute('aria-expanded')==='true';
+  c.classList.toggle('v11-native-open',expanded);
+  if(!expanded)advanced.textContent=s.size&&['a2','a1','a0'].includes(s.size)?'Otros ajustes':'Opciones de impresión';
+ }
+ c.classList.toggle('v11-awaiting',s.pending||isImage&&!s.size);
+ const warning=quality(c);
+ if(warning&&!warning.dataset.v11Bound){
+  warning.dataset.v11Bound='1';
+  warning.addEventListener('change',()=>{if(warning.checked)run(async()=>{await wait(100);await finish(k);});});
+ }
+ // Las miniaturas se vinculan sólo cuando el nombre coincide inequívocamente.
+ if(isImage&&!c.querySelector('.v11-thumb')){
+  const file=[...thumbnails.keys()].filter(n=>n===imageStem(c));
+  if(file.length===1&&thumbnails.get(file[0])){
+   const source=thumbnails.get(file[0]),thumb=element('canvas');thumb.className='v11-thumb';
+   thumb.width=source.width;thumb.height=source.height;thumb.setAttribute('role','img');thumb.setAttribute('aria-label','Vista previa');
+   thumb.getContext('2d').drawImage(source,0,0);thumb.dataset.ready='1';c.querySelector('.fila-principal')?.prepend(thumb);
+  }
+ }
+}
+// Reordenar únicamente los controles nativos cuando están abiertos.
+ // El motor sigue decidiendo qué campos existen y qué valores admite.
+ // No crear catálogos, opciones comerciales ni defaults paralelos.
+function progressiveNative(c){
+ const panel=c.querySelector('.panel-edicion'),controls=panel?.querySelector('.controles');
+ if(!controls)return;
+ const entries=[...controls.children].filter(e=>e.tagName==='LABEL');
+ const labelText=e=>String(e.childNodes[0]?.textContent||'').trim().toLowerCase();
+ const order=['servicio','tamaño de impresión','impresión','material','caras','copias','lotes','anillado','grupo de anillado','producto y variante','papel y tamaño','tipo de corte','metros lineales'];
+ const rank=e=>{const s=labelText(e),i=order.findIndex(n=>s===n||s.startsWith(n+' '));return i<0?100:i};
+ const sorted=[...entries].sort((a,b)=>rank(a)-rank(b));
+ if(entries.some((e,i)=>e!==sorted[i]))sorted.forEach(e=>controls.append(e));
+ panel.classList.add('v12-native-progressive');
+ // Mantener las opciones de tamaño especiales, los avisos técnicos y
+ // las selecciones de páginas sin cambios.
+ for(const e of sorted){
+  if(labelText(e)==='caras')for(const o of e.querySelectorAll('option')){
+   if(o.value==='simple'&&o.textContent!=='Una cara')o.textContent='Una cara';
+   if(o.value==='double'&&o.textContent!=='Ambas caras')o.textContent='Ambas caras';
+  }
+ }
+}
+let warningSignature='';
+function renderWarnings(all){
+ const affected=all.filter(c=>regularImage(c)&&state(c).pending&&quality(c)&&!quality(c).checked);
+ const signature=affected.map(c=>name(c)+'|'+state(c).size+'|'+quality(c)?.closest('[role=alert]')?.textContent).join('\n');
+ if(signature===warningSignature&&warnings.hidden===(affected.length===0))return;
+ warningSignature=signature;
+ warnings.hidden=affected.length===0;warnings.replaceChildren();
+ if(!affected.length)return;
+ warnings.append(element('strong','Calidad de impresión: '+affected.length+' imagen(es) para revisar.'),element('p','Al ampliar estas imágenes pueden verse píxeles, bordes dentados o falta de nitidez. Revisá el tamaño y la resolución de cada una antes de aceptar.'));
+ for(const c of affected){
+  const a=amp(c),q=quality(c),text=q.closest('[role=alert]')?.textContent||q.closest('label')?.textContent||'';
+  const d=element('details');d.open=false;
+  const ppp=text.match(/\d+\s*PPP/i)?.[0]||'resolución a revisar';
+  d.append(element('summary',imageStem(c)+' · '+state(c).size.toUpperCase()+' · '+ppp),element('p',text));warnings.append(d);
+ }
+ const accept=element('button','Acepto las advertencias de estas imágenes y quiero cotizarlas');accept.type='button';
+ accept.onclick=()=>run(async()=>{
+  // Consentimiento explícito del comprador, para los archivos y medidas que
+  // acaba de ver. No aceptar automáticamente al elegir un tamaño.
+  for(const old of affected){
+   const k=key(old),c=get(k),q=c&&quality(c);
+   if(!c||!q||q.checked)continue;
+   if(state(c).size!==state(old).size)continue;
+   q.click();await wait(100);await finish(k);
+  }
+  note('Revisá el presupuesto actualizado.');
+ });
+ warnings.append(accept);
+}
+function sync(){
+ if(busy)return;
+ const all=cards();
+ const current=new Set(all.map(key));
+ for(const k of requested.keys())if(!current.has(k))requested.delete(k);
+ // El modo individual nativo mantiene cada excepción en su propia ficha.
+ const indiv=document.querySelector('input[name="modoImpresionLote"][value="individual"]');
+ const imagesOnly=all.length>0&&all.every(image);
+ document.body.classList.toggle('v11-images-only',imagesOnly);
+ if(imagesOnly&&indiv&&!indiv.checked){indiv.click();return;}
+ batch.hidden=all.filter(regularImage).length<2;
+ updateBatch();
+ intro.hidden=!all.length;
+ footer.hidden=!all.length;
+ all.forEach(c=>{
+  if(!image(c)&&document.querySelector('input[name="modoImpresionLote"][value="comun"]')?.checked)c.querySelector('.v11-direct')?.remove();
+  else decorate(c);
+  progressiveNative(c);
+ });
+ // En una ficha pendiente el selector de composición no aporta nada
+ // hasta confirmar el tamaño; se conserva el control original.
+ for(const c of all)c.classList.toggle('v12-wait-size',!special(c)&&!!c.querySelector('.pregunta-tamano'));
+
+ renderWarnings(all);
+}
+function schedule(){if(scheduled)return;scheduled=true;queueMicrotask(()=>{scheduled=false;sync();});}
+function rememberImages(files){
+ for(const f of [...(files||[])]){
+  if(!/^image\/(jpeg|png)$/i.test(f.type)&&!/\.(jpe?g|png)$/i.test(f.name))continue;
+  const stem=f.name.replace(/\.(jpe?g|png)$/i,'').replace(/[^\p{L}\p{N}._ -]/gu,'_').slice(0,75);
+  if(!stem||thumbnails.has(stem))continue;
+  thumbnails.set(stem,null);
+  // Miniatura local reducida; no usar blob: como src, porque la CSP comercial
+  // puede impedirlo. No transmitir el contenido fuera del dispositivo.
+  (async()=>{try{
+   const b=await createImageBitmap(f),r=Math.min(1,160/Math.max(b.width,b.height));
+   const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(b.width*r));canvas.height=Math.max(1,Math.round(b.height*r));
+   canvas.getContext('2d').drawImage(b,0,0,canvas.width,canvas.height);b.close();
+   thumbnails.set(stem,canvas);schedule();
+  }catch{schedule();}})();
+ }
+}
+by('archivos').addEventListener('change',e=>rememberImages(e.target.files),true);
+document.addEventListener('drop',e=>{if(e.dataTransfer?.files?.length)rememberImages(e.dataTransfer.files);},true);
+new MutationObserver(schedule).observe(by('estado'),{childList:true,subtree:true,characterData:true});
+new MutationObserver(records=>{
+ if(records.some(r=>r.target.nodeType===1&&!r.target.closest('.v11-direct,.v11-thumb')&&
+   (r.type==='attributes'||r.type==='characterData'||[...r.addedNodes,...r.removedNodes].some(n=>n.nodeType===1&&!n.classList?.contains('v11-direct')&&!n.classList?.contains('v11-thumb')))))schedule();
+}).observe(list,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled','checked']});
+// Reconciliar la advertencia tardía aunque el motor sólo cambie propiedades DOM.
+// Sin recotizar ni transformar archivos; únicamente actualizar la vista.
+setInterval(()=>{if(!busy&&cards().some(c=>state(c).pending))renderWarnings(cards());},250);
+sync();
+})();
