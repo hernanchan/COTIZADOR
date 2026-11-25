@@ -1,5 +1,23 @@
 /* Interfaz PC V4 · Solo aplica a pantallas >= 900px. */
 @media(min-width:900px) and (pointer:fine){
+ #pc-left #pc-work-panel{background:#fff!important;border:1px solid #d6e2e8!important;border-radius:12px!important;padding:13px 15px!important;margin:0!important;box-shadow:0 5px 18px #1437500d}
+ #pc-work-heading h2{margin:0 0 3px;font:800 17px/1.3 system-ui;color:#173f5a}
+ #pc-work-heading p,#pc-work-note{margin:4px 0;color:#526c7e;font:12px/1.45 system-ui}
+ #pc-work-cards{display:flex;flex-wrap:wrap;gap:7px;margin:9px 0}
+ #pc-work-cards .pc-work-card{min-height:40px;border:1px solid #bfd3df;border-radius:8px;padding:8px 12px;background:#f6fafc;color:#19435e;font:750 12px/1.3 system-ui;cursor:pointer}
+ #pc-work-cards .pc-work-card.pc-work-active{border:2px solid #e19a3a;background:#fff7e9;color:#663d0b}
+ #pc-work-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+ #pc-work-actions button,#pc-move-row button{min-height:39px;border:1px solid #1a4d6c;border-radius:7px;padding:8px 11px;background:#174d70;color:white;font:750 12px/1.2 system-ui;cursor:pointer}
+ #pc-work-actions #pc-work-delete{background:#fff;color:#8b3737;border-color:#d4b6b6}
+ #pc-work-actions button:disabled,#pc-move-row button:disabled{opacity:.45;cursor:not-allowed}
+ #pc-work-name,#pc-work-service{min-width:170px;min-height:38px;padding:7px 9px;border:1px solid #b8cbd6;border-radius:7px;font:13px system-ui}
+ #pc-move-row{display:flex;align-items:end;gap:8px;flex-wrap:wrap;margin:0 0 10px;padding:8px 10px;background:#f7fafc;border:1px solid #d4e1e8;border-radius:8px}
+ #pc-move-row[hidden]{display:none!important}
+ #pc-move-label{display:flex;gap:8px;align-items:center;color:#34566d;font:650 12px system-ui}
+ #pc-move-select{min-height:38px;min-width:180px;border:1px solid #b8cbd6;border-radius:7px;padding:6px;font:13px system-ui}
+ #pc-filebox>h2{margin-bottom:3px!important}
+}
+@media(min-width:900px) and (pointer:fine){
  body.saber-pc-v3{background:#f0f4f7!important;color:#173d58}
  body.saber-pc-v3 main{max-width:1580px!important;width:calc(100% - 46px)!important;margin:20px auto 60px!important;padding:0!important;background:transparent!important;box-shadow:none!important;border:0!important}
  body.saber-pc-v3 main>h1{font:800 27px/1.2 system-ui,Arial!important;color:#113a57;margin:7px 0 6px!important}
