@@ -128,6 +128,11 @@ test('móvil permite separar trabajos, duplicar configuración y elegir servicio
  assert.match(clientJs,/workApi\(\)\?\.getServiceOptions/);
  assert.match(clientJs,/mobile-review-file/);
  assert.match(clientJs,/Eliminar trabajo vacío/);
+ assert.match(clientJs,/mobile-service-choices/);
+ assert.match(clientJs,/filter\(item=>item\.enabled\)/);
+ assert.match(clientJs,/Servicio del trabajo/);
+ assert.match(clientJs,/aria-pressed/);
+ assert.doesNotMatch(clientJs,/workService\.addEventListener\('change'/);
 });
 test('móvil permite definir las opciones compartidas del trabajo antes de cargar archivos',()=>{
  assert.match(clientJs,/sharedWorkButton\.disabled=!current\|\|current\.servicio!=='auto'/);
