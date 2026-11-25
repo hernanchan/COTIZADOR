@@ -30,3 +30,11 @@
 ## Próximo paso
 
 Instalar/abrir un Chromium verificable en entorno de prueba autorizado, recorrer PC y móvil con archivos ficticios, corregir errores observados, revisar los cambios con el titular en el PR y solo luego preparar la integración técnica. La publicación en Cloudflare queda para el chat normal siguiendo el procedimiento de control de cambios y rollback.
+
+
+## Prototipo navegable independiente
+
+- Archivo: [prototipos/cotizador-trabajos.html](../prototipos/cotizador-trabajos.html). Es una maqueta autónoma HTML/CSS/JS, adaptable a PC y celular, con inicio, selección de servicio, configuración, carga local de archivos, creación/duplicación/edición/eliminación de trabajos, resumen de pedido y pantalla final simulada.
+- Los precios, catálogo, promociones, plazos, páginas detectadas y advertencias son ficticios. La selección de archivos solo lee nombres y tamaños en el navegador: no se sube ni guarda información; no crea órdenes ni habilita pagos.
+- Validación disponible: script JavaScript embebido supera `node --check`; `git diff --check` no informa errores. No se verificó en navegador: el navegador aislado no alcanza el servidor local del entorno (conexión rechazada). No presentarlo como revisión visual de PC/celular.
+- El archivo queda en la rama del PR #34 para descarga y revisión. No se desplegó en el negocio ni en Cloudflare.
