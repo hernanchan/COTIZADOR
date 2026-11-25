@@ -23,9 +23,17 @@
 - No se publicaron recursos ni se desplegó Worker. No se hicieron pagos ni se usaron archivos de clientes.
 - La vista previa automática de Pages asociada al PR abre la vidriera; desde ahí, el cotizador redirige a la ruta de pruebas del Worker y no carga la interfaz PC V10 del PR. No presentarla como vista de este rediseño.
 
+### Actualización: subtotales por trabajo
+
+- Se agregó un resumen por trabajo que reutiliza exclusivamente los subtotales y detalles devueltos por el cotizador comercial vigente; no calcula tarifas ni reparte descuentos.
+- El anillado agrupado se suma al trabajo propietario solo si todos los archivos del grupo pertenecen a ese mismo trabajo. El reparto se oculta si no reconcilia exactamente con los subtotales de categoría del motor.
+- El resumen se comunica al portal mediante el mensaje existente de precio orientativo, valida los datos recibidos y escribe nombres/importes con `textContent`. Ante una promoción, los importes por trabajo se identifican como previos al descuento global; el total general sigue siendo el importe final.
+- Pruebas locales focales: **50/50** (modelo y resumen por trabajo, PC/móvil, cotización, handoff, grupos y conservación en Central/manifiesto). `node --check` de los dos módulos y `git diff --check`: aprobados.
+- `npm run build:unificado` fue intentado; se detuvo porque este entorno no tiene instalada la dependencia de desarrollo `esbuild@0.24.2`. En esa corrida también se detectó y corrigió una dependencia ausente del test de handoff; tras la corrección, ese test pasó. La compilación completa queda **pendiente de un entorno con esbuild**.
+
 ## Límites y riesgos pendientes
 
-- El flujo conserva parte de la estructura previa; aún falta completar la propuesta integral de tarjetas progresivas para todos los servicios, resumen visual de precio/plazo por trabajo y navegación final de datos/pago.
+- El flujo conserva parte de la estructura previa; aún falta completar la propuesta integral de tarjetas progresivas para todos los servicios y verificar el resumen visual de precio/plazo por trabajo y la navegación final de datos/pago.
 - El asistente móvil permite configurar opciones compartidas antes de la carga. Las excepciones por archivo y compatibilidad completa entre servicios requieren prueba de navegador.
 - La vista previa ilustrativa de composición ya está implementada en el prototipo autónomo; todavía no está integrada en el cotizador comercial.
 - No se verificó el código del Worker activo ni se cambió infraestructura. La integración final contra la versión comercial debe cotejarse con el release vigente al comenzar la etapa normal.
