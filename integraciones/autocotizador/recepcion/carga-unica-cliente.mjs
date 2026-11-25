@@ -14,6 +14,7 @@ import {prepararLoteParcial,recomponerLoteParcial} from './cotizar-lote-parcial.
 import {solicitarCotizacionPrivada} from './solicitar-cotizacion-privada.mjs';
 import {decidirTransportePDF,LIMITE_TUS_PDF_BYTES,LIMITE_R2_PDF_BYTES} from './seleccionar-transporte-pdf.mjs';
 import {normalizarArchivosImpresion} from './imagenes-a-pdf-local.mjs';
+import {resumirSubtotalesTrabajos} from './resumir-subtotales-trabajos.mjs';
 const $=id=>document.getElementById(id);
 const entries=[];
 const idTrabajoInicial='trabajo_1';
@@ -105,12 +106,19 @@ function informarPrecioPrivado(estado,total=null,motivo=''){
  if(window.parent===window)return;
  const bloqueoRecepcion=[...alertasRecepcionPDF().values()][0]||'';
  const sendable=estado==='listo'&&ultimoPresupuesto?.estado==='PRELIMINAR'&&!bloqueoRecepcion;
+ let trabajos=null;
+ if(estado==='listo'&&ultimoPresupuesto?.estado==='PRELIMINAR'&&
+    typeof resumirSubtotalesTrabajos==='function'){
+  trabajos=resumirSubtotalesTrabajos({cotizacion:ultimoPresupuesto,
+   trabajos:sidecarTrabajosPedido(),cantidadArchivos:entries.length});
+ }
  window.parent.postMessage({type:'SABER_SMART_PRICE_STATE',estado,
   total:Number.isSafeInteger(total)&&total>0?total:null,
   promocion:estado==='listo'&&ultimoPresupuesto?.promocion?.aplicada===true?
    {titulo:ultimoPresupuesto.promocion.titulo,descuento:ultimoPresupuesto.promocion.descuento,
     totalAnterior:ultimoPresupuesto.promocion.totalAnterior}:null,
-  sendable,blockReason:bloqueoRecepcion||(estado==='error'?String(motivo||'No se pudo verificar el precio.').slice(0,220):null)},location.origin);
+  ...(trabajos?{trabajos}:{}),sendable,
+  blockReason:bloqueoRecepcion||(estado==='error'?String(motivo||'No se pudo verificar el precio.').slice(0,220):null)},location.origin);
 }
 function importeArchivo(indice){
  if(!ultimoPresupuesto)return null;
@@ -1092,6 +1100,19 @@ async function cotizar(){
  if(d.promocion?.aplicada===true)out.append(texto('p',
   'Promoción aplicada: '+d.promocion.titulo+' · Antes '+ars(d.promocion.totalAnterior)+
   ' · Ahorrás '+ars(d.promocion.descuento)+' · Total '+ars(d.total)));
+ const subtotalesTrabajos=resumirSubtotalesTrabajos({cotizacion:d,
+  trabajos:sidecarTrabajosPedido(),cantidadArchivos:entries.length});
+ if(subtotalesTrabajos){
+  const resumen=texto('section','');resumen.className='resumen-subtotales-trabajos';
+  resumen.append(texto('strong','Subtotal por trabajo'+(d.promocion?.aplicada===true?' · antes de la promoción':'')));
+  const lista=document.createElement('ul');
+  for(const trabajo of subtotalesTrabajos){
+   const fila=document.createElement('li'),nombre=document.createElement('span'),importe=document.createElement('strong');
+   nombre.textContent=trabajo.nombre+' · '+trabajo.archivos+' archivo(s)';
+   importe.textContent=ars(trabajo.subtotal);fila.append(nombre,importe);lista.append(fila);
+  }
+  resumen.append(lista);out.append(resumen);
+ }
  for(const p of d.pendientes){
   const warning=texto('p',p.nombre+': '+p.motivo+
    '. Tocá Editar o Quitá únicamente ese archivo; los demás mantienen su cálculo.');
