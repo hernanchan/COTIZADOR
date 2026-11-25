@@ -4,6 +4,10 @@
 **Objetivo:** permitir operar, mantener, recuperar y eventualmente adaptar el sistema a otro comercio sin depender de conversaciones de chat.  
 **Alcance:** inventario verificable y guía de continuidad. **No contiene claves, tokens, datos de compradores ni documentación privada de seguridad.** El repositorio es actualmente público.
 
+## Continuidad activa — 25/11/2026
+
+El rediseño del cotizador por trabajos está en desarrollo en el PR [#34](https://github.com/hernanchan/COTIZADOR/pull/34). Estado, pruebas, límites y próximo paso: [`docs/REDISENO-COTIZADOR-TRABAJOS-20261125.md`](../REDISENO-COTIZADOR-TRABAJOS-20261125.md). No se ha publicado ni desplegado.
+
 > **Regla:** este índice es la puerta de entrada, no sustituye el código ni el estado del despliegue en Cloudflare. Ante discrepancias, verificar la implementación y el servicio desplegado. No tratar informes históricos como estado actual.
 
 ## Norma prioritaria de la fase beta
