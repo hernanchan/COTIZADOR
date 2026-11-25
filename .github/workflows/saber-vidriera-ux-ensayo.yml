@@ -1,0 +1,54 @@
+name: Saber - validar portada de acceso directo sin despliegue
+on:
+  push:
+    branches: [interfaz/vidriera-progresiva-20261124]
+    paths: [vidriera/index.html, .github/workflows/saber-vidriera-ux-ensayo.yml]
+permissions: {contents: read}
+jobs:
+  vista:
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm install --no-save --ignore-scripts --no-audit --no-fund playwright@1.56.1
+      - name: Probar portada local a 1440 y 390 px
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          import {chromium} from 'playwright';
+          const html=fs.readFileSync('vidriera/index.html','utf8');
+          const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+          try{
+            for(const width of [1440,390]){
+              const page=await browser.newPage({viewport:{width,height:900},deviceScaleFactor:1,serviceWorkers:'block'});
+              await page.route('**/*',route=>{
+                const u=new URL(route.request().url());
+                if(u.origin==='https://ensayo-saber.invalid'&&u.pathname==='/')return route.fulfill({status:200,contentType:'text/html',body:html});
+                // Ni compras ni pagos; recursos externos no necesarios para geometría.
+                return route.abort();
+              });
+              await page.goto('https://ensayo-saber.invalid/',{waitUntil:'domcontentloaded'});
+              const data=await page.evaluate(()=>{
+                const cards=[...document.querySelectorAll('.v3-service-strip .service-link')];
+                const track=document.querySelector('.saber-track-access'),promo=document.querySelector('#beneficio');
+                return {width:innerWidth,scrollWidth:document.documentElement.scrollWidth,links:cards.map(e=>({text:e.querySelector('strong')?.textContent,href:e.getAttribute('href'),height:Math.round(e.getBoundingClientRect().height),bottom:Math.round(e.getBoundingClientRect().bottom)})),trackBottom:Math.round(track.getBoundingClientRect().bottom),promoTop:Math.round(promo.getBoundingClientRect().top),cart:!!document.querySelector('#cartBadge'),catalog:!!document.querySelector('#gridEscolar')};
+              });
+              assert.equal(data.links.length,4);
+              assert(data.links.every(x=>x.height>=44&&x.bottom<=600));
+              assert(data.scrollWidth<=width+2);
+              assert(data.trackBottom<=data.promoTop);
+              assert(data.cart&&data.catalog);
+              assert.deepEqual(data.links.map(x=>x.href),['https://pedidos.libreriasaber.com.ar/cotizar','https://pedidos.libreriasaber.com.ar/cotizar','fotos-stickers.html','#categorias']);
+              console.log('VIDRIERA_ACCESO_OK '+JSON.stringify(data));
+              const jpeg=await page.screenshot({type:'jpeg',quality:55});
+              console.log('VIDRIERA_CAPTURA_'+width+' '+jpeg.toString('base64'));
+              await page.close();
+            }
+          }finally{await browser.close()}
+          JS
