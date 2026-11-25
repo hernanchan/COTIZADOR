@@ -5,6 +5,7 @@ import {prepararBorradorPedido} from './preparar-borrador-pedido.mjs';
 import {componerCarritoPreliminar} from './componer-carrito-preliminar.mjs';
 import {seleccionarPaginas} from './seleccionar-paginas.mjs';
 import {decidirTamanoCliente} from './decision-tamano-impresion.mjs';
+import {aplicarConfiguracionCompartida,aplicarValorCompartido,establecerExcepcionDeArchivo,limpiarExcepcionDeArchivo,excepcionesDeArchivo} from './configuracion-compartida-trabajos.mjs';
 import {clasificarPaginasPloteo} from './clasificar-paginas-ploteo.mjs';
 import {clasificarMosaicoRasterPDFGrande} from './clasificar-ploteo-grande-raster-local.mjs';
 import {clasificarPloteoGrandeVisualLimitado} from './clasificar-ploteo-grande-visual-limitado.mjs';
@@ -235,7 +236,12 @@ window.SABER_PEDIDO_TRABAJOS_API={
   const work=window.SABER_TRABAJOS_PEDIDO.find(w=>w.id===workId);
   if(!work)throw Error('No se encontró el trabajo.');
   const file=entries.find(e=>e.trabajoPedidoId===workId&&e.paginas&&!e.error);
-  const config={...work.configuracion,...(file?instantaneaConfigTrabajo(file):{})};
+  const config={...work.configuracion};
+  if(file){
+   const excepciones=excepcionesDeArchivo(file),instantanea=instantaneaConfigTrabajo(file);
+   for(const [campo,valor] of Object.entries(instantanea))
+    if(config[campo]===undefined&&!Object.hasOwn(excepciones,campo))config[campo]=valor;
+  }
   // La selección de páginas pertenece al archivo de origen, no a la plantilla.
   delete config.paginasSeleccionadas;
   return config;
@@ -256,7 +262,7 @@ function selectorPaginasPorCara(e,indice){
   const input=document.createElement('input');
   input.type='radio';input.name='paginas-por-cara-'+indice;input.value=String(value);
   input.checked=n===value;
-  input.onchange=()=>{if(input.checked){e.paginasPorHoja=value;cambio()}};
+  input.onchange=()=>{if(input.checked){asignarOpcionIndividual(e,'paginasPorHoja',value);cambio()}};
   wrapper.append(input,texto('span',label));
   return wrapper;
  };
@@ -307,12 +313,23 @@ function cantidadCopias(e){
    input.setCustomValidity('Elegí una cantidad entera entre 1 y 500.');
    input.reportValidity();input.value=String(e.copias);return;
   }
-  input.setCustomValidity('');e.copias=n;cambio();
+  input.setCustomValidity('');asignarOpcionIndividual(e,'copias',n);cambio();
  };
  l.append(input);return l;
 }
 
 const texto=(tag,value)=>{const n=document.createElement(tag);n.textContent=value;return n};
+function asignarOpcionIndividual(e,campo,valor){
+ if(modoLote==='comun')establecerExcepcionDeArchivo(e,campo,valor);
+ else if(campo==='anillado'){
+  const grupo=/^grupo:([1-5])$/.exec(String(valor));
+  e.anillado=grupo?'grupo':valor;e.grupoAnillado=grupo?grupo[1]:'';
+ }else e[campo]=valor;
+}
+function restablecerExcepcionesTrabajo(e){
+ for(const campo of Object.keys(excepcionesDeArchivo(e)))limpiarExcepcionDeArchivo(e,campo);
+ aplicarConfiguracionComunAlDocumento(e);
+}
 // La categoría es sólo presentación: no reordena `entries` ni los índices del
 // manifiesto, ni modifica la clasificación página a página o los importes.
 function grupoVisible(e){
@@ -355,16 +372,8 @@ function aplicarConfiguracionComunAlDocumento(e){
  const destino=clasificarDestino(paginas,e.seleccion);
  if(!destino.confirmado||destino.destino!=='documentos')return;
  const config=configTrabajo(e.trabajoPedidoId);
- for(const [campo,valor] of Object.entries(config)){
-  if(campo==='modo'){e.modo=valor;e.materialColor=''}
-  else if(campo==='caras')e.caras=valor;
-  else if(campo==='copias')e.copias=valor;
-  else if(campo==='paginasPorHoja')e.paginasPorHoja=valor;
-  else if(campo==='anillado'){
-   const g=/^grupo:([1-5])$/.exec(valor);
-   e.anillado=g?'grupo':valor;e.grupoAnillado=g?g[1]:'';
-  }
- }
+ aplicarConfiguracionCompartida(e,config);
+ if(config.modo&&!Object.hasOwn(excepcionesDeArchivo(e),'modo'))e.materialColor='';
 }
 function renderConfiguracionGlobal(){
  const holder=$('configComunGlobal');if(!holder)return;
@@ -390,20 +399,13 @@ function controlesComunes(grupo,global=false){
   barra.append(texto('strong',global?(grupo.indices.length?'Opciones compartidas para '+grupo.indices.length+' documentos de este trabajo':'Opciones compartidas del trabajo'):'Opciones para estos '+grupo.indices.length+' archivos'));
  const aplicar=(campo,valor)=>{
   if(global){
-   const work=trabajoActual();if(work){work.configuracion={...work.configuracion,[campo]:valor};}
+   const work=trabajoActual();if(work)work.configuracion={...work.configuracion,[campo]:valor};
   }
   for(const i of grupo.indices){
    const e=entries[i];
-   if(campo==='modo'){e.modo=valor;e.materialColor=''}
-   else if(campo==='caras')e.caras=valor;
-   else if(campo==='anillado'){
-    const id=/^grupo:([1-5])$/.exec(valor);
-    e.anillado=id?'grupo':valor;
-    e.grupoAnillado=id?id[1]:'';
-   }
-   else if(campo==='papelPoster')e.papelPoster=valor;
-   else if(campo==='copias')e.copias=valor;
-   else if(campo==='paginasPorHoja')e.paginasPorHoja=valor;
+   if(global||modoLote!=='comun')aplicarValorCompartido(e,campo,valor);
+   else establecerExcepcionDeArchivo(e,campo,valor);
+   if(campo==='modo')e.materialColor='';
   }
   cambio();
  };
@@ -547,7 +549,7 @@ function render(){
    const extra=e.servicio==='grafica'?' · '+(productosGrafica.find(p=>p.id===e.productoGrafica)?.name||'Elegir variante'):e.servicio==='corte'?' · '+e.corteMetros+' m':e.servicio==='fotos'?' · '+(productosFoto.find(p=>p.id===e.productoFoto)?.name||'Elegir producto'):e.servicio==='stickers'?' · Adhesivo fotográfico':d.destino==='documentos'?(' · '+material+(e.anillado==='individual'?' · Anillado':e.anillado==='grupo'?' · Grupo '+e.grupoAnillado:'')):
     (elegidas.some(p=>p.modo==='poster')?' · '+(e.papelPoster==='recubierto'?'Recubierto':'Obra 80 g'):'');
    const nup=d.destino==='documentos'&&(e.paginasPorHoja??1)>1?' · '+e.paginasPorHoja+' por cara':'';
-   resumen.textContent=(e.paginasSeleccionadas?(e.paginasSeleccionadas+' de '+e.paginas.length):(e.paginas.length+' pág.'))+' · '+tipo+(d.confirmado?' '+(d.tamanoFinal==='original'?'original':d.tamanoFinal.toUpperCase()):'')+' · '+e.copias+(e.servicio==='grafica'?' lote(s)':' copia(s)')+((d.confirmado||independiente)?extra+nup:'');
+   resumen.textContent=(e.paginasSeleccionadas?(e.paginasSeleccionadas+' de '+e.paginas.length):(e.paginas.length+' pág.'))+' · '+tipo+(d.confirmado?' '+(d.tamanoFinal==='original'?'original':d.tamanoFinal.toUpperCase()):'')+' · '+e.copias+(e.servicio==='grafica'?' lote(s)':' copia(s)')+((d.confirmado||independiente)?extra+nup:'')+(Object.keys(excepcionesDeArchivo(e)).length?' · Personalizado':'');
   }else resumen.textContent=e.error?'Error de lectura':'Analizando PDF…';
   principal.append(resumen);
   // La selección es visible ANTES del render de las páginas raster pesadas.
@@ -824,8 +826,8 @@ function render(){
      const aviso=texto('p','Para stickers, elegí tamaño de salida A4 o A3.');aviso.className='advertencia';panel.append(aviso);
     }else panel.append(texto('p','Incluye impresión en adhesivo fotográfico y precorte. Cada página del PDF representa una plancha por copia.'));
    }else if(decision.destino==='documentos'){
-    controles.append(valor('Impresión', [['bn','Blanco y negro'],['color','Color']],e.modo,v=>{e.modo=v;cambio()}));
-    controles.append(valor('Caras', [['simple','Simple faz'],['double','Doble faz']],e.caras,v=>{e.caras=v;cambio()}));
+    controles.append(valor('Impresión', [['bn','Blanco y negro'],['color','Color']],e.modo,v=>{asignarOpcionIndividual(e,'modo',v);e.materialColor='';cambio()}));
+    controles.append(valor('Caras', [['simple','Simple faz'],['double','Doble faz']],e.caras,v=>{asignarOpcionIndividual(e,'caras',v);cambio()}));
     panel.append(texto('p','Elegí 1 o 2 páginas por cara directamente debajo del archivo. En doble faz, 2 páginas por cara permite hasta cuatro páginas del PDF por hoja física.'));
     const formato=decision.tamanoFinal==='original'?formatoOriginal(paginas):decision.tamanoFinal;
     if(e.modo==='color'&&['personalizado_a4','a5','a4','a3'].includes(formato)){
@@ -834,8 +836,8 @@ function render(){
      if(disponibles.length)controles.append(valor('Material',disponibles.map(m=>[m.id,m.name]),e.materialColor,v=>{e.materialColor=v;cambio()}));
      else panel.append(texto('p','Materiales no disponibles: no cotizar hasta recuperar el catálogo.'));
     }
-    controles.append(valor('Anillado',[['ninguno','Sin anillado'],['individual','Cada archivo por separado'],['grupo','Varios archivos juntos']],e.anillado,v=>{e.anillado=v;if(v!=='grupo')e.grupoAnillado='';else e.grupoAnillado='1';cambio()}));
-    if(e.anillado==='grupo')controles.append(valor('Grupo de anillado',[['1','Grupo 1'],['2','Grupo 2'],['3','Grupo 3'],['4','Grupo 4'],['5','Grupo 5']],e.grupoAnillado,v=>{e.grupoAnillado=v;cambio()}));
+    controles.append(valor('Anillado',[['ninguno','Sin anillado'],['individual','Cada archivo por separado'],['grupo','Varios archivos juntos']],e.anillado,v=>{const binding=v==='grupo'?'grupo:'+(e.grupoAnillado||'1'):v;asignarOpcionIndividual(e,'anillado',binding);cambio()}));
+    if(e.anillado==='grupo')controles.append(valor('Grupo de anillado',[['1','Grupo 1'],['2','Grupo 2'],['3','Grupo 3'],['4','Grupo 4'],['5','Grupo 5']],e.grupoAnillado,v=>{asignarOpcionIndividual(e,'anillado','grupo:'+v);cambio()}));
     if(e.anillado==='grupo')panel.append(texto('p','Los PDF del grupo deben tener igual tamaño final y cantidad de copias.'));
    }else{
     // CAD/pleno y el papel se eligen en la tarjeta visible, sin abrir detalles.
@@ -853,6 +855,12 @@ function render(){
      panel.append(texto('p','Análisis CAD/Póster pendiente: requiere revisión, sin precio.'));
    }
   }else {const n=texto('p','Elegí el tamaño de impresión para continuar.');n.className='advertencia';panel.append(n)}
+  const excepciones=excepcionesDeArchivo(e);
+  if(Object.keys(excepciones).length){
+   const aviso=texto('small','Este archivo tiene opciones distintas de las compartidas en el trabajo.');aviso.className='excepcion-trabajo';panel.append(aviso);
+   const restablecer=texto('button','Usar configuración del trabajo');restablecer.type='button';restablecer.className='editar';
+   restablecer.onclick=()=>{restablecerExcepcionesTrabajo(e);cambio()};panel.append(restablecer);
+  }
   panel.append(controles);
   card.append(panel);
   bloque.append(card);
