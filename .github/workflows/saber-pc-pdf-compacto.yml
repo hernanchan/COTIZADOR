@@ -426,7 +426,7 @@ jobs:
             await pdfpc.frame.locator('#prepararPedido:not([disabled])').waitFor({state:'attached',timeout:30000});
             console.log('V11_PDF_A4_CAD_A1_POSTER_A2_COPIAS_OK');
             await pdfpc.context.close();
-            const single=await setup({width:1440,height:900},true);
+            const singlePdf=await setup({width:1440,height:900},true);
             // Reproducir la medida de la captura del titular con un PDF
             // completamente ficticio de dos páginas y sin datos de clientes.
             const large=await PDFDocument.create();
@@ -434,10 +434,10 @@ jobs:
               const pg=large.addPage([32*72/2.54,45*72/2.54]);
               pg.drawRectangle({x:0,y:0,width:pg.getWidth(),height:pg.getHeight(),color:(await import('pdf-lib')).rgb(.3,.5,.8)});
             }
-            await single.frame.locator('#archivos').setInputFiles({name:'ensayo-poster-32x45.pdf',mimeType:'application/pdf',buffer:Buffer.from(await large.save())});
-            const card=single.frame.locator('#lista section.archivo');
+            await singlePdf.frame.locator('#archivos').setInputFiles({name:'ensayo-poster-32x45.pdf',mimeType:'application/pdf',buffer:Buffer.from(await large.save())});
+            const card=singlePdf.frame.locator('#lista section.archivo');
             await card.locator('.v13-native-paper select').waitFor({state:'visible',timeout:30000});
-            assert.equal(await single.frame.locator('#modoConfiguracion').isVisible(),false);
+            assert.equal(await singlePdf.frame.locator('#modoConfiguracion').isVisible(),false);
             assert.equal(await card.locator('.v13-plot-details').evaluate(e=>e.open),false);
             assert.equal(await card.locator('.eleccion-plotter').isVisible(),false);
             assert.equal(await card.locator('.v13-review').isVisible(),true);
@@ -447,16 +447,16 @@ jobs:
             await card.locator('.v13-native-paper select').selectOption('recubierto');
             await card.locator('.v11-copies').fill('3');
             await card.locator('.v11-copies').press('Tab');
-            await single.frame.locator('body:not(.v11-busy)').waitFor({state:'attached',timeout:30000});
-            await single.frame.locator('#prepararPedido:not([disabled])').waitFor({state:'attached',timeout:30000});
-            await single.page.waitForTimeout(500);
-            const payload=single.responses.at(-1)?.payload?.archivos?.[0];
+            await singlePdf.frame.locator('body:not(.v11-busy)').waitFor({state:'attached',timeout:30000});
+            await singlePdf.frame.locator('#prepararPedido:not([disabled])').waitFor({state:'attached',timeout:30000});
+            await singlePdf.page.waitForTimeout(500);
+            const payload=singlePdf.responses.at(-1)?.payload?.archivos?.[0];
             assert(payload?.copias===3&&payload?.papelPoster==='recubierto'&&payload.paginas.length===2&&payload.paginas.every(p=>p.modo==='poster'&&Math.abs(p.anchoCm-32)<.2&&Math.abs(p.altoCm-45)<.2),'La ficha no conserva el presupuesto nativo');
             await card.locator('.v13-plot-details summary').click();
             assert.equal(await card.locator('.eleccion-plotter').isVisible(),true);
             await card.locator('.v13-plot-details summary').click();
             console.log('PC_PDF_COMPACTO_OK 32X45 DOS_PAGINAS TRES_COPIAS PAPEL_NATIVO');
-            await single.context.close();
+            await singlePdf.context.close();
             const mobile=await setup({width:390,height:844},true);
             assert.equal(await mobile.frame.locator('#pc-v11-batch').count(),0);
             assert.equal(await mobile.frame.locator('body').evaluate(e=>e.classList.contains('saber-pc-v11')),false);
