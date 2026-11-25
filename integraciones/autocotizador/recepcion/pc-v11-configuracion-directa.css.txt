@@ -79,3 +79,23 @@ body.saber-pc-v11 .v12-native-progressive .controles{display:grid;grid-template-
 body.saber-pc-v11 .v12-native-progressive .controles label{font-size:13px;min-width:0}
 body.saber-pc-v11 .v12-native-progressive .controles select,body.saber-pc-v11 .v12-native-progressive .controles input{width:100%;min-height:38px;font-size:14px;box-sizing:border-box}
 }
+
+/* PDF de ploteo confirmado: una ficha, un selector por decisión. */
+@media(min-width:900px) and (pointer:fine){
+body.saber-pc-v11.v13-single-file #modoConfiguracion{display:none!important}
+body.saber-pc-v11 #lista .v13-compact-plot{padding:10px 12px;margin:5px 0}
+body.saber-pc-v11 .v13-compact-plot .fila{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:start;padding:0}
+body.saber-pc-v11 .v13-compact-plot .fila-principal{grid-row:1/span 2;min-width:0}
+body.saber-pc-v11 .v13-compact-plot .nombre{font-size:14px;overflow-wrap:anywhere}
+body.saber-pc-v11 .v13-compact-plot .resumen-archivo{font-size:12px;margin:2px 0}
+body.saber-pc-v11 .v13-compact-plot .v11-direct{grid-template-columns:minmax(145px,1.3fr) minmax(64px,.45fr) minmax(112px,1fr);gap:8px}
+body.saber-pc-v11 .v13-compact-plot .v13-native-paper{margin:0;padding:0;border:0;background:none}
+body.saber-pc-v11 .v13-compact-plot :is(.clasificacion-ploteo-visible,.medida-ploteo-visible){display:inline-block;font-size:12px;line-height:1.35;margin:5px 8px 0 0;padding:0;background:none;border:0}
+body.saber-pc-v11 .v13-plot-details{display:inline-block;font-size:12px;color:#31566c;margin:6px 10px 0 0}
+body.saber-pc-v11 .v13-plot-details[open]{display:block}
+body.saber-pc-v11 .v13-plot-details summary{cursor:pointer}
+body.saber-pc-v11 .v13-review{font-size:12px;display:inline-block;margin-top:6px}
+body.saber-pc-v11 .v13-compact-plot .precio-archivo{grid-column:2;grid-row:1;font-size:15px;white-space:nowrap;text-align:right;padding:2px 0}
+body.saber-pc-v11 .v13-compact-plot .acciones-archivo{grid-column:2;grid-row:2;display:flex;flex-direction:column;gap:4px;align-items:flex-end}
+body.saber-pc-v11 .v13-compact-plot .acciones-archivo button{font-size:11px;padding:5px 8px;min-height:28px}
+}
