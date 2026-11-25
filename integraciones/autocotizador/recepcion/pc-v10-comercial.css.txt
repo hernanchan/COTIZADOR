@@ -9,8 +9,13 @@
  #pc-work-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
  #pc-work-actions button,#pc-move-row button{min-height:39px;border:1px solid #1a4d6c;border-radius:7px;padding:8px 11px;background:#174d70;color:white;font:750 12px/1.2 system-ui;cursor:pointer}
  #pc-work-actions #pc-work-delete{background:#fff;color:#8b3737;border-color:#d4b6b6}
+ #pc-work-service-group{display:grid;gap:4px}
+ #pc-work-services-label{color:#526c7e;font:700 11px/1.2 system-ui}
+ #pc-work-services{display:flex;flex-wrap:wrap;gap:6px}
+ #pc-work-services .pc-service-choice{min-height:39px;background:#f5fafc;color:#19435e;border-color:#b9cfdb}
+ #pc-work-services .pc-service-choice.pc-service-active{background:#fff5e4;color:#70430d;border:2px solid #e19a3a}
  #pc-work-actions button:disabled,#pc-move-row button:disabled{opacity:.45;cursor:not-allowed}
- #pc-work-name,#pc-work-service{min-width:170px;min-height:38px;padding:7px 9px;border:1px solid #b8cbd6;border-radius:7px;font:13px system-ui}
+ #pc-work-name{min-width:170px;min-height:38px;padding:7px 9px;border:1px solid #b8cbd6;border-radius:7px;font:13px system-ui}
  #pc-move-row{display:flex;align-items:end;gap:8px;flex-wrap:wrap;margin:0 0 10px;padding:8px 10px;background:#f7fafc;border:1px solid #d4e1e8;border-radius:8px}
  #pc-move-row[hidden]{display:none!important}
  #pc-move-label{display:flex;gap:8px;align-items:center;color:#34566d;font:650 12px system-ui}
