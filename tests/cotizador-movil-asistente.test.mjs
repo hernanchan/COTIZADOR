@@ -120,6 +120,15 @@ test('cada archivo tiene cuatro pantallas específicas, sin clonar controles ni 
  assert.doesNotMatch(clientJs,/fetch\s*\(|\.submit\s*\(|iniciarPago|mercadopago\.com/i);
 });
 
+test('móvil permite separar trabajos, duplicar configuración y elegir servicios vigentes',()=>{
+ assert.match(clientJs,/mobile-work-tools/);
+ assert.match(clientJs,/Duplicar configuración/);
+ assert.match(clientJs,/api\.snapshot/);
+ assert.match(clientJs,/workApi\(\)\?\.getServiceOptions/);
+ assert.match(clientJs,/mobile-review-file/);
+ assert.match(clientJs,/Eliminar trabajo vacío/);
+});
+
 test('circuito comercial habilitado para cotizador normal, preview no cobra',async()=>{
  const live={...env,DOCS_LIVE_RECEPCION_GATE:gate,DOCS_LIVE_TRANSFER_GATE:gate,DOCS_LIVE_TUS_GATE:gate};
  const regular=await paginaCotizarLive(new Request(base),live,{authorized:true}).text();
