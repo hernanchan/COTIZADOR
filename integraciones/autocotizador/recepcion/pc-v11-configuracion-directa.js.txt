@@ -316,6 +316,45 @@ function decorate(c){
 // Reordenar únicamente los controles nativos cuando están abiertos.
  // El motor sigue decidiendo qué campos existen y qué valores admite.
  // No crear catálogos, opciones comerciales ni defaults paralelos.
+// Compactar también PDF nativos de gran formato con clasificación
+// confirmada. Reutilizar el selector de papel real, sin proxy ni recálculo.
+function compactPlotPdf(c){
+ if(image(c)||special(c)||c.classList.contains('archivo-no-admitido'))return;
+ const row=c.querySelector('.v11-direct'),plot=c.querySelector('.eleccion-plotter'),measure=c.querySelector('.medida-ploteo-visible'),kind=c.querySelector('.clasificacion-ploteo-visible');
+ const paper=plot?.querySelector('.eleccion-plotter-papel')||row?.querySelector('.v13-native-paper');
+ if(!row||!plot||!measure||!kind||!paper||c.querySelector('.pregunta-tamano')||!paper.querySelector('select'))return;
+ // Solo clasificación confirmada y tamaño resuelto. Los casos dudosos
+ // mantienen íntegramente el panel original y sus acciones de consulta.
+ if(!c.querySelector('.consulta-clasificacion-ploteo')||/pendiente/i.test(kind.textContent))return;
+ c.classList.add('v13-compact-plot');
+ row.dataset.large='true';
+ if(paper.parentElement!==row){
+  paper.classList.add('v13-native-paper');
+  paper.insertBefore(document.createTextNode('Papel'),paper.firstChild);
+  // Quitar únicamente el rótulo anterior; conservar nodo select y handler.
+  for(const n of [...paper.childNodes])if(n.nodeType===3&&n.textContent.trim()==='Papel para ploteo')n.remove();
+  row.insertBefore(paper,row.querySelector('.v11-state'));
+ }
+ const principal=c.querySelector('.fila-principal');
+ if(!principal)return;
+ let details=principal.querySelector('.v13-plot-details');
+ if(!details){
+  details=element('details');details.className='v13-plot-details';
+  details.append(element('summary','Detalles del tamaño y clasificación'));
+  const quick=c.querySelector('.tamano-rapido');
+  plot.insertAdjacentElement('beforebegin',details);
+  details.append(plot);
+  if(quick&&!quick.classList.contains('pregunta-tamano'))details.append(quick);
+ }
+ // No ocultar el enlace para corregir una clasificación equivocada.
+ const review=plot.querySelector('.consulta-clasificacion-ploteo');
+ if(review&&review.parentElement===plot){
+  review.classList.add('v13-review');
+  details.insertAdjacentElement('afterend',review);
+ }
+ const advanced=exp(c);
+ if(advanced&&advanced.getAttribute('aria-expanded')==='false'&&advanced.textContent!=='Otros ajustes')advanced.textContent='Otros ajustes';
+}
 function progressiveNative(c){
  const panel=c.querySelector('.panel-edicion'),controls=panel?.querySelector('.controles');
  if(!controls)return;
@@ -373,15 +412,17 @@ function sync(){
  const indiv=document.querySelector('input[name="modoImpresionLote"][value="individual"]');
  const imagesOnly=all.length>0&&all.every(image);
  document.body.classList.toggle('v11-images-only',imagesOnly);
+ document.body.classList.toggle('v13-single-file',all.length===1&&!!indiv?.checked&&!special(all[0]));
  if(imagesOnly&&indiv&&!indiv.checked){indiv.click();return;}
  batch.hidden=all.filter(regularImage).length<2;
  updateBatch();
- intro.hidden=!all.length;
+ intro.hidden=!all.length||all.length===1;
  footer.hidden=!all.length;
  all.forEach(c=>{
   if(!image(c)&&document.querySelector('input[name="modoImpresionLote"][value="comun"]')?.checked)c.querySelector('.v11-direct')?.remove();
   else decorate(c);
   progressiveNative(c);
+  compactPlotPdf(c);
  });
  // En una ficha pendiente el selector de composición no aporta nada
  // hasta confirmar el tamaño; se conserva el control original.
