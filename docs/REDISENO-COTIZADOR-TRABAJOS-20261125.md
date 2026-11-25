@@ -42,3 +42,25 @@
 ## Próximo paso
 
 Instalar/abrir un Chromium verificable en entorno de prueba autorizado, recorrer PC y móvil con archivos ficticios, corregir errores observados, revisar los cambios con el titular en el PR y solo luego preparar la integración técnica. La publicación en Cloudflare queda para el chat normal siguiendo el procedimiento de control de cambios y rollback.
+
+
+## Actualización de continuidad — 25/11/2026
+
+### Prototipo privado
+
+- Se actualizó el Site privado `saber-cotizador-prototipo` (no es el cotizador comercial). Site source commit `13b8351e4fc125511ddfface34f6c5c56375bb71`; publicación reportada como exitosa en `https://saber-cotizador-prototipo.primetoast32.chatgpt.site/`.
+- Verificación de navegador con dos archivos ficticios de planos: el panel ahora muestra un croquis de ploteo, salida y proporción orientativa. No analiza ni representa el PDF/PNG. El flujo sigue marcado como simulación; no hubo carga, orden ni pago real.
+
+### Revisión de integración del PR #34 (solo lectura)
+
+- El modelo nuevo aplana los trabajos al formato por archivo que ya consume `cotizarCargaUnica`; el resumen de trabajos agrega subtotales que devuelve esa misma cotización y solo se muestra si reconcilia con el total bruto del motor. La promoción continúa siendo global; no se calcula un segundo precio.
+- La asociación trabajo/archivo viaja en un sidecar validado y la ficha de pedido conserva `trabajoPedidoId`/nombre, incluidos en el hash de la cotización. La Central vuelve a reconstruir los grupos por IDs de archivo antes del empaquetado. Esto es evidencia de estructura de código, no de un pedido real ni de la igualdad operativa del ZIP.
+- Hallazgo pendiente frente al pedido UX: `aplicarConfiguracionComunAlDocumento` propaga modo, caras, copias, páginas por carilla y anillado, pero mantiene tamaño (`seleccion`) y páginas seleccionadas por PDF. La interfaz aún requiere definir cómo compartir tamaño con detección automática, compatibilidad explícita y excepciones; no cambiarlo silenciosamente.
+- El flujo LIVE de la rama limita la recepción a 10 archivos, aunque una función común valida hasta 30. El diseño debe mostrar el límite comercial vigente y no prometer más hasta verificar el endpoint y paquete activos.
+- La última nota de auditoría encontrada para el Worker de Documentos en `docs/INTEGRACION_PC_V10_COMERCIAL_20261124.md` registra la versión activa `07b17b59-0749-46ff-864c-c41a1b739f8d` después del despliegue V10 del 24/11. La base de PR #34 es `interfaz/pc-pdf-compacto-20261124` / `be6791e9cf3833b7e6d3e2ebf08a4e44f1138399`. El registro también reporta discrepancia entre hash del módulo activo y el artefacto fuente histórico; no acredita paridad exacta con esta base. No se ingresó a Cloudflare.
+- Bloqueo de integración segura: localizar/recuperar en GitHub una fuente verificable del Worker activo más reciente, cotejarla con el código propuesto y preservar el circuito de pagos, manifiesto y ZIP. No sustituir por la rama base histórica por suposición.
+- Estado del PR: borrador, sin merge ni publicación comercial. La autorización personal previa no cubre el SHA actual; el control `saber/contrato` debe ejecutarse sobre el commit final según el contrato.
+
+### Próximo paso
+
+Completar en rama aislada la configuración compartida de tamaño y compatibilidad con excepciones por archivo, resolver el límite de archivos desde la fuente LIVE verificable y agregar cobertura específica de pedidos mixtos, escalas/promoción, grupos de anillado por trabajo y correlación presupuesto-orden-ZIP. Luego repetir verificación visual PC/celular sobre la rama comercial correcta. Mantener producción intacta.
