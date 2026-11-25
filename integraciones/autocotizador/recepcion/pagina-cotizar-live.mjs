@@ -24,6 +24,12 @@ button:disabled{opacity:.47;cursor:not-allowed}#estado{min-height:25px}small{col
 #plazo-explicacion{font-size:15px;color:#536579;margin:0;padding:10px 20px 4px;background:#f4f9fe;border-left:2px solid #c3d9ea;border-right:2px solid #c3d9ea}
 #promo-dia{font-size:15px;font-weight:650;color:#69420b;margin:0;padding:4px 20px 12px;background:#f4f9fe;border-left:2px solid #c3d9ea;border-right:2px solid #c3d9ea;border-bottom:2px solid #c3d9ea;border-radius:0 0 12px 12px}
 #promo-dia[hidden]{display:none}
+#resumen-trabajos{margin:10px 0 0;padding:12px 16px;background:#fff;border:1px solid #cbddea;border-radius:10px}
+#resumen-trabajos[hidden]{display:none}
+#resumen-trabajos strong{color:#1b4b6c}
+#resumen-trabajos ul{list-style:none;margin:7px 0 0;padding:0;display:grid;gap:5px}
+#resumen-trabajos li{display:flex;justify-content:space-between;gap:12px;color:#3e5569}
+#resumen-trabajos li strong{white-space:nowrap}
 .transfer-box{width:100%;max-width:720px;padding:18px;border:2px solid #1a689b;border-radius:13px;background:#edf7ff;display:grid;gap:10px}.transfer-box strong{color:#123b5d}.transfer-amount{font-size:clamp(23px,3vw,30px);font-weight:900;color:#0b3f68}.transfer-alias{display:block;width:100%;padding:13px;background:white;border:2px dashed #427aa6;border-radius:9px;font-size:clamp(23px,3vw,32px);font-weight:850;letter-spacing:.025em;overflow-wrap:anywhere;color:#133d66;user-select:all}.transfer-box p{margin:0}.transfer-warning{font-size:16px;color:#193f5c;font-weight:650;line-height:1.55}
 section[hidden]{display:none!important}
 #siguiente{margin-top:12px}
@@ -158,6 +164,7 @@ window.saberIngresoLive=async token=>{
 </div>
 <p id="plazo-explicacion">Fecha orientativa desde la acreditación del pago, sujeta a disponibilidad, trabajo, horario y feriados. Al iniciar tu trabajo, en el seguimiento verás una fecha y hora más precisas.</p>
 <p id="promo-dia" hidden></p>
+<div id="resumen-trabajos" hidden aria-live="polite"></div>
 </section><section id="seccion-archivos"><h2>1. Elegí los archivos</h2><p>Seleccioná una sola vez los PDF que querés imprimir. Con Mercado Pago se envían al acreditarse; con transferencia se reciben desde «Ya transferí», protegidos hasta verificar el banco.</p><iframe id="pdf" title="Elegir PDF, JPG o PNG y opciones de impresión" src="/cotizar/archivos${routeQuery}" loading="eager" scrolling="no"></iframe>
 <button type="button" id="siguiente" disabled>Siguiente · Tus datos</button>
 <p id="aviso-siguiente" aria-live="polite">Elegí y confirmá las opciones de impresión para continuar.</p>
@@ -267,6 +274,29 @@ window.addEventListener('message',event=>{
  if(data.type==='SABER_SMART_PRICE_STATE'){
   if(Number.isSafeInteger(data.total)&&data.total>0)price.textContent='Presupuesto orientativo: '+money(data.total);
   else price.textContent='Precio pendiente';
+  const workSummary=document.getElementById('resumen-trabajos');
+  workSummary.replaceChildren();workSummary.hidden=true;
+  if(data.estado==='listo'&&Array.isArray(data.trabajos)&&data.trabajos.length>=1&&data.trabajos.length<=10){
+   const ids=new Set(),rows=[];
+   for(const work of data.trabajos){
+    if(!work||typeof work.id!=='string'||!work.id||ids.has(work.id)||
+       typeof work.nombre!=='string'||work.nombre.length<1||work.nombre.length>80||
+       !Number.isSafeInteger(work.archivos)||work.archivos<1||work.archivos>30||
+       !Number.isSafeInteger(work.subtotal)||work.subtotal<0){rows.length=0;break}
+    ids.add(work.id);rows.push(work);
+   }
+   if(rows.length){
+    const title=document.createElement('strong');
+    title.textContent='Subtotal por trabajo'+(data.promocion?.aplicada===true?' · antes de la promoción':'');
+    const list=document.createElement('ul');
+    for(const work of rows){
+     const item=document.createElement('li'),label=document.createElement('span'),amount=document.createElement('strong');
+     label.textContent=work.nombre+' · '+work.archivos+' archivo(s)';
+     amount.textContent=money(work.subtotal);item.append(label,amount);list.append(item);
+    }
+    workSummary.append(title,list);workSummary.hidden=false;
+   }
+  }
   if(data.estado==='listo'&&data.promocion&&
      typeof data.promocion.titulo==='string'&&data.promocion.titulo.length<=90&&
      Number.isSafeInteger(data.promocion.descuento)&&data.promocion.descuento>0&&
