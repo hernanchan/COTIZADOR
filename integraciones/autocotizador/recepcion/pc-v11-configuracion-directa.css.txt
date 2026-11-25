@@ -1,0 +1,101 @@
+/* PC V11: no ocultar advertencias, clasificación, condiciones ni acciones de servicios especiales. */
+@media (min-width:900px) and (pointer:fine){
+body.saber-pc-v11.v11-images-only #modoConfiguracion,body.saber-pc-v11.v11-images-only #configComunGlobal{display:none!important}
+body.saber-pc-v11 #pc-v11-batch{margin:10px 0;padding:14px;border:1px solid #b5d3e4;border-radius:10px;background:#f0f8fc}
+body.saber-pc-v11 #pc-v11-batch[hidden],body.saber-pc-v11 #pc-v11-intro[hidden]{display:none!important}
+body.saber-pc-v11 #pc-v11-batch h2{font-size:17px;margin:0 0 6px}
+body.saber-pc-v11.v11-busy .v11-direct,body.saber-pc-v11.v11-busy #pc-v11-batch,body.saber-pc-v11.v11-busy #lista{pointer-events:none;opacity:.85}
+body.saber-pc-v11 #pc-v11-batch p{font-size:13px;margin:5px 0}
+body.saber-pc-v11 .v11-fields,body.saber-pc-v11 .v11-direct{display:grid;grid-template-columns:minmax(180px,1fr) minmax(85px,.45fr) minmax(110px,.8fr);align-items:end;gap:9px;margin:8px 0}
+body.saber-pc-v11 .v11-fields label,body.saber-pc-v11 .v11-direct label{font-size:13px;font-weight:700;min-width:0}
+body.saber-pc-v11 .v11-fields input,body.saber-pc-v11 .v11-fields select,body.saber-pc-v11 .v11-direct select,body.saber-pc-v11 .v11-direct input{font-size:15px;min-height:40px;width:100%;box-sizing:border-box}
+body.saber-pc-v11 .v11-fields button{min-height:42px;font-weight:750}
+body.saber-pc-v11 #lista .grupo-pedido{padding:8px 0;background:transparent;border:0}
+body.saber-pc-v11 #lista .archivo{border:1px solid #cadce6;border-radius:10px;padding:12px;margin:8px 0;min-width:0}
+body.saber-pc-v11 .v11-image .saber-ampliacion .eleccion-plotter-opciones{display:none!important}
+body.saber-pc-v11 .v11-image .saber-ampliacion select{max-width:100%}
+body.saber-pc-v11 .v11-image .composicion-por-cara{display:none!important}
+body.saber-pc-v11 .v11-state{font-size:12px;color:#86510a;align-self:center}
+body.saber-pc-v11 .v11-awaiting{border-color:#dcb577!important}
+body.saber-pc-v11 .v11-thumb{width:70px;height:70px;object-fit:contain;float:left;margin:0 10px 6px 0;border:1px solid #d5e0e7;border-radius:5px;background:#fff}
+body.saber-pc-v11 #pc-v11-intro{font-size:13px;color:#31566c}
+body.saber-pc-v11 #pc-v11-message{color:#83520d;min-height:1em}
+@media(max-width:1100px){body.saber-pc-v11 .v11-direct,body.saber-pc-v11 .v11-fields{grid-template-columns:1fr 100px}body.saber-pc-v11 .v11-fields button,body.saber-pc-v11 .v11-state{grid-column:1/-1}}
+}
+
+/* Vista compacta: una sola ficha visible por imagen. Los controles originales
+   se conservan y quedan disponibles bajo Otros ajustes, no duplicados. */
+@media (min-width:900px) and (pointer:fine){
+body.saber-pc-v11 #pc-v11-intro{margin:4px 0 8px}
+body.saber-pc-v11 #pc-v11-batch .v11-fields{grid-template-columns:minmax(155px,1.2fr) minmax(70px,.45fr) minmax(140px,1fr) auto;align-items:end;gap:8px}
+body.saber-pc-v11 #pc-v11-batch .v11-fields button{grid-column:auto;white-space:nowrap}
+body.saber-pc-v11 #pc-v11-message:empty{display:none}
+body.saber-pc-v11 #pc-v11-warnings:not([hidden]){display:block;background:#fff9ed;border:1px solid #d9b574;border-radius:10px;padding:12px;margin:10px 0}
+body.saber-pc-v11 #pc-v11-warnings p{font-size:13px;margin:4px 0 8px}
+body.saber-pc-v11 #pc-v11-warnings details{font-size:13px;padding:4px 0;border-bottom:1px solid #e7d8b9}
+body.saber-pc-v11 #pc-v11-warnings button{margin-top:10px;min-height:40px;font-size:14px}
+body.saber-pc-v11 #lista .v11-compact-image{padding:9px 12px;margin:5px 0}
+body.saber-pc-v11 .v11-compact-image .fila{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:8px;padding:0}
+body.saber-pc-v11 .v11-compact-image .fila-principal{grid-row:1/span 2;min-width:0}
+body.saber-pc-v11 .v11-compact-image .fila-principal:has(>.v11-thumb){display:grid;grid-template-columns:62px minmax(0,1fr);gap:3px 10px}
+body.saber-pc-v11 .v11-compact-image .fila-principal:has(>.v11-thumb)>:not(.v11-thumb){grid-column:2;min-width:0}
+body.saber-pc-v11 .v11-compact-image .fila-principal>.v11-thumb{grid-column:1;grid-row:1/span 3;float:none;width:62px;height:62px;margin:0;object-fit:contain}
+body.saber-pc-v11 .v11-compact-image .nombre{display:block;font-size:14px;overflow-wrap:anywhere}
+body.saber-pc-v11 .v11-compact-image .resumen-archivo{font-size:12px;margin:0}
+body.saber-pc-v11 .v11-direct{display:grid;grid-template-columns:minmax(145px,1.3fr) minmax(64px,.45fr) minmax(112px,1fr);gap:7px;align-items:end;margin:5px 0 0}
+body.saber-pc-v11 .v11-direct label{font-size:12px;line-height:1.2}
+body.saber-pc-v11 .v11-direct select,body.saber-pc-v11 .v11-direct input{font-size:13px;min-height:34px;margin:3px 0 0;padding:4px 7px}
+body.saber-pc-v11 .v11-direct label[hidden]{display:none!important}
+body.saber-pc-v11 .v11-state{grid-column:1/-1;font-size:12px}
+body.saber-pc-v11 .v11-state:empty{display:none}
+body.saber-pc-v11 .v11-compact-image .precio-archivo{grid-column:2;grid-row:1;font-size:15px;white-space:nowrap;padding:2px 0;text-align:right}
+body.saber-pc-v11 .v11-compact-image .acciones-archivo{grid-column:2;grid-row:2;display:flex;flex-direction:column;gap:4px;align-items:flex-end}
+body.saber-pc-v11 .v11-compact-image .acciones-archivo button{font-size:11px;padding:5px 8px;min-height:28px}
+body.saber-pc-v11 .v11-compact-image:not(.v11-native-open) :is(.saber-ampliacion,.tamano-rapido,.eleccion-plotter,.clasificacion-ploteo-visible,.medida-ploteo-visible){display:none!important}
+body.saber-pc-v11 .v11-compact-image.v11-native-open .saber-ampliacion .eleccion-plotter-opciones{display:flex!important}
+body.saber-pc-v11 section.archivo:not(.v11-compact-image):has(.v11-direct) .tamano-rapido .tamano-opcion{display:none!important}
+body.saber-pc-v11 .v11-compact-image:not(.v11-native-open) .panel-edicion{display:none}
+body.saber-pc-v11 .v11-compact-image.v11-native-open .panel-edicion label:has(input[aria-label^="Cantidad de copias de "]){display:none}
+}
+
+/* Cierre lineal: total, advertencias y siguiente sin desplazamiento inverso. */
+@media(min-width:900px) and (pointer:fine){
+body.saber-pc-v11 #pc-v11-footer{margin:12px 0 0;padding:0;border:0;background:transparent}
+body.saber-pc-v11 #pc-v11-footer[hidden]{display:none!important}
+body.saber-pc-v11 #pc-v11-footer .v11-total{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 15px;background:#f1f7fb;border:1px solid #c3d9ea;border-radius:9px;color:#153d65;font-size:16px}
+body.saber-pc-v11 #pc-v11-footer .v11-total strong{font-size:20px;text-align:right}
+body.saber-pc-v11 #pc-v11-footer #pc-v11-warnings:not([hidden]){margin:8px 0 0}
+}
+
+/* Divulgación progresiva: el tamaño abre sólo sus opciones compatibles. */
+@media(min-width:900px) and (pointer:fine){
+body.saber-pc-v11 #pc-v11-batch :is(label,button)[hidden]{display:none!important}
+body.saber-pc-v11 #pc-v11-batch .v11-fields[data-chosen="false"]{grid-template-columns:minmax(180px,320px)}
+body.saber-pc-v11 #pc-v11-batch .v11-fields[data-chosen="true"][data-large="false"]{grid-template-columns:minmax(180px,1fr) minmax(90px,.45fr) auto}
+body.saber-pc-v11 .v11-direct[data-chosen="false"]{grid-template-columns:minmax(145px,320px)}
+body.saber-pc-v11 .v11-direct[data-chosen="true"][data-large="false"]{grid-template-columns:minmax(145px,1fr) minmax(64px,.45fr)}
+body.saber-pc-v11 .v12-wait-size .composicion-por-cara{display:none!important}
+body.saber-pc-v11 .v12-native-progressive .controles{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:9px;align-items:end}
+body.saber-pc-v11 .v12-native-progressive .controles label{font-size:13px;min-width:0}
+body.saber-pc-v11 .v12-native-progressive .controles select,body.saber-pc-v11 .v12-native-progressive .controles input{width:100%;min-height:38px;font-size:14px;box-sizing:border-box}
+}
+
+/* PDF de ploteo confirmado: una ficha, un selector por decisión. */
+@media(min-width:900px) and (pointer:fine){
+body.saber-pc-v11.v13-single-file #modoConfiguracion{display:none!important}
+body.saber-pc-v11 #lista .v13-compact-plot{padding:10px 12px;margin:5px 0}
+body.saber-pc-v11 .v13-compact-plot .fila{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:start;padding:0}
+body.saber-pc-v11 .v13-compact-plot .fila-principal{grid-row:1/span 2;min-width:0}
+body.saber-pc-v11 .v13-compact-plot .nombre{font-size:14px;overflow-wrap:anywhere}
+body.saber-pc-v11 .v13-compact-plot .resumen-archivo{font-size:12px;margin:2px 0}
+body.saber-pc-v11 .v13-compact-plot .v11-direct{grid-template-columns:minmax(145px,1.3fr) minmax(64px,.45fr) minmax(112px,1fr);gap:8px}
+body.saber-pc-v11 .v13-compact-plot .v13-native-paper{margin:0;padding:0;border:0;background:none}
+body.saber-pc-v11 .v13-compact-plot :is(.clasificacion-ploteo-visible,.medida-ploteo-visible){display:inline-block;font-size:12px;line-height:1.35;margin:5px 8px 0 0;padding:0;background:none;border:0}
+body.saber-pc-v11 .v13-plot-details{display:inline-block;font-size:12px;color:#31566c;margin:6px 10px 0 0}
+body.saber-pc-v11 .v13-plot-details[open]{display:block}
+body.saber-pc-v11 .v13-plot-details summary{cursor:pointer}
+body.saber-pc-v11 .v13-review{font-size:12px;display:inline-block;margin-top:6px}
+body.saber-pc-v11 .v13-compact-plot .precio-archivo{grid-column:2;grid-row:1;font-size:15px;white-space:nowrap;text-align:right;padding:2px 0}
+body.saber-pc-v11 .v13-compact-plot .acciones-archivo{grid-column:2;grid-row:2;display:flex;flex-direction:column;gap:4px;align-items:flex-end}
+body.saber-pc-v11 .v13-compact-plot .acciones-archivo button{font-size:11px;padding:5px 8px;min-height:28px}
+}

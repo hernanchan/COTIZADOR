@@ -1,0 +1,405 @@
+name: Saber - comprobar cierre y posición de Siguiente sin despliegue
+on:
+  push:
+    branches: [interfaz/pc-v11-cierre-cotizacion-20261124]
+    paths:
+      - .github/workflows/saber-pc-v11-cierre-cotizacion.yml
+      - integraciones/autocotizador/recepcion/pc-v11-configuracion-directa.js.txt
+      - integraciones/autocotizador/recepcion/pc-v11-configuracion-directa.css.txt
+permissions: {contents: read}
+jobs:
+  ensayo:
+    if: github.ref == 'refs/heads/interfaz/pc-v11-cierre-cotizacion-20261124'
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
+    timeout-minutes: 9
+    environment:
+      name: saber-cloudflare-pruebas
+      deployment: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Instalar herramientas de ensayo
+        run: npm install --no-save --ignore-scripts --no-audit --no-fund playwright@1.56.1 pdf-lib@1.17.1
+      - name: Verificar capa reversible y rutas protegidas
+        run: node --test tests/pc-v10-capa-reversible.test.mjs
+      - name: Recuperar copia exacta activa por GET y comprobar SHA256
+        env:
+          CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          CF_TOKEN: ${{ secrets.SABER_CF_DEPLOY_TOKEN }}
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+          const a=process.env.CF_ACCOUNT,t=process.env.CF_TOKEN;
+          if(!/^[a-f0-9]{32}$/i.test(a||'')||!t)throw Error('Credenciales no disponibles');
+          const root='https://api.cloudflare.com/client/v4/accounts/'+a;
+          async function get(p){
+            const r=await fetch(root+p,{method:'GET',redirect:'error',headers:{Authorization:'Bearer '+t,Accept:'application/json'},signal:AbortSignal.timeout(30000)});
+            if(!r.ok)throw Error('Cloudflare GET '+r.status);
+            const j=await r.json();if(!j.success||!j.result)throw Error('GET no confirmado');return j.result;
+          }
+          const w='saber-documentos-produccion';
+          const d=await get('/workers/scripts/'+w+'/deployments');
+          const v=(Array.isArray(d)?d:d.deployments)?.[0]?.versions;
+          if(v?.length!==1||v[0].percentage!==100||v[0].version_id!=='67a31f1f-3f01-447b-a259-5ae1c8956708')throw Error('Version activa cambió; revisar antes de continuar');
+          const result=await get('/workers/workers/'+w+'/versions/'+v[0].version_id+'?include=modules');
+          const modules=(result.modules||[]).filter(m=>typeof m.content_base64==='string').map(m=>({name:String(m.name||''),type:String(m.content_type||''),buf:Buffer.from(m.content_base64,'base64')}));
+          const hash=x=>crypto.createHash('sha256').update(x).digest('hex');
+          const wanted='c8f04928d6e0ad8885a174e34ac1ccebf461a47d3775cb83bf2bccd1ffc802f6';
+          const main=modules.find(m=>hash(m.buf)===wanted);
+          if(!main)throw Error('SHA256 activo no coincide');
+          const dir='/tmp/saber-v10-live-exact';fs.mkdirSync(dir,{mode:0o700});
+          fs.writeFileSync(dir+'/package.json','{"type":"module"}',{mode:0o600});
+          for(const m of modules){
+            if(m.name.endsWith('.map'))continue;
+            if(!/^[a-zA-Z0-9_.-]+$/.test(m.name)||m.name==='package.json'||m.name==='.'||m.name==='..')throw Error('Nombre de modulo no admitido');
+            fs.writeFileSync(dir+'/'+m.name,m.buf,{mode:0o600,flag:'wx'});
+          }
+          fs.writeFileSync(dir+'/entry.txt',main.name,{mode:0o600});
+          console.log('BASE_ACTIVA_EXACTA_OK '+v[0].version_id+' SHA256='+wanted+' MODULOS='+modules.length);
+          JS
+      - name: Leer únicamente la revisión tarifaria aprobada en D1
+        env:
+          CF_ACCOUNT: ${{ secrets.SABER_CF_ACCOUNT_ID }}
+          CF_DB: ${{ secrets.SABER_CF_D1_WRITE_TOKEN }}
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          const root='https://api.cloudflare.com/client/v4/accounts/'+process.env.CF_ACCOUNT;
+          const token=process.env.CF_DB;
+          assert.match(process.env.CF_ACCOUNT||'',/^[a-f0-9]{32}$/i);
+          assert(token?.length>20);
+          async function api(p,opts={}){
+            const r=await fetch(root+p,{...opts,redirect:'error',headers:{Authorization:'Bearer '+token,...opts.headers},signal:AbortSignal.timeout(25000)});
+            const j=await r.json();
+            assert(r.ok&&j.success===true,'D1 lectura HTTP '+r.status);
+            return j.result;
+          }
+          const db=(await api('/d1/database')).find(x=>x.name==='saber-pagos-produccion');
+          assert(db?.uuid,'No se identifica D1 comercial');
+          // Una única SELECT con JOIN de la revisión vigente y su aprobación. No se leen pedidos ni datos de clientes.
+          const sql="SELECT h.approved_revision,h.approved_json,a.created_at FROM central_pricing_admin_head h JOIN central_pricing_admin_history a ON a.revision=h.approved_revision AND a.action='approve' WHERE h.id=1 LIMIT 1";
+          const out=await api('/d1/database/'+db.uuid+'/query',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sql})});
+          assert(out.length===1&&out[0].success===true);
+          const row=out[0].results?.[0];
+          assert(Number.isSafeInteger(row?.approved_revision)&&row.approved_revision>0);
+          assert(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(row.created_at));
+          const x=JSON.parse(row.approved_json);
+          assert(x.prices?.schema==='saber-web-prices-v1'&&Array.isArray(x.promotions?.codes));
+          const snap={ok:true,schema:'saber-price-snapshot-v1',source:'production-d1-approved-only',approvedRevision:row.approved_revision,approvedAt:row.created_at.replace(' ','T')+'Z',prices:x.prices,promotions:x.promotions,paymentAuthorized:false,commercialRelease:false};
+          fs.writeFileSync('/tmp/saber-v10-live-exact/pricing.json',JSON.stringify(snap),{mode:0o600,flag:'wx'});
+          console.log('TARIFARIO_APROBADO_SOLO_SELECT REVISION='+snap.approvedRevision);
+          JS
+      - name: Comparar cotizaciones reales del motor activo en navegador aislado
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+          import assert from 'node:assert/strict';
+          import {pathToFileURL} from 'node:url';
+          import {chromium} from 'playwright';
+          import {crearCapaPcV10} from './integraciones/autocotizador/recepcion/pc-v10-capa-reversible.mjs';
+          import {PDFDocument,StandardFonts} from 'pdf-lib';
+          assert(!process.env.CF_TOKEN&&!process.env.CF_ACCOUNT&&!process.env.CF_DB);
+          const dir='/tmp/saber-v10-live-exact';
+          // No usar servicios reales: sin credenciales ni bindings y sin fetch externo.
+          globalThis.fetch=async()=>{throw Error('ENSAYO_LOCAL_RED_BLOQUEADA');};
+          let worker;
+          try{worker=(await import(pathToFileURL(dir+'/'+fs.readFileSync(dir+'/entry.txt','utf8')).href)).default;}catch(e){console.log('IMPORTACION_LOCAL_NO_DISPONIBLE '+e.name+' '+(e.code||''));throw Error('No se pudo ejecutar copia activa en Node');}
+          assert.equal(typeof worker?.fetch,'function');
+          const origin='https://pedidos.libreriasaber.com.ar',on='GO_COMERCIAL_CONFIRMADO';
+          const key='SABER_CLAVE_FICTICIA_SOLO_ENSAYO_000000000';
+          const env={SABER_ENTORNO:'produccion',CENTRAL_DB_ENV:'produccion',
+            DOCS_LIVE_UI_GATE:on,DOCS_MP_LIVE_GATE:on,DOCS_LIVE_SESSION_GATE:on,
+            DOCS_LIVE_PRICING_GATE:on,DOCS_LIVE_RECEPCION_GATE:on,
+            DOCS_LIVE_ORDER_GATE:'OFF',DOCS_LIVE_TRANSFER_GATE:'OFF',DOCS_LIVE_TUS_GATE:'OFF',
+            DOCS_LIVE_SESSION_KEY:key,DOCS_LIVE_TURNSTILE_SECRET:'FICTICIO_TURNSTILE_NO_REAL_000',
+            DOCS_LIVE_TURNSTILE_SITE_KEY:'FICTICIO_SITEKEY_NO_REAL_000'};
+          const snap=JSON.parse(fs.readFileSync(dir+'/pricing.json','utf8'));
+          let pricingReads=0;
+          env.CENTRAL_BRIDGE_KEY='FICTICIA_CENTRAL_SOLO_PRUEBA_NO_REAL_00000';
+          env.SABER_CENTRAL={fetch:async req=>{
+            assert.equal(req.method,'POST');
+            assert.equal(new URL(req.url).pathname,'/internal/central/live/pricing');
+            const body=await req.json();
+            assert.equal(body.purpose,'quote-production-approved');
+            pricingReads++;
+            return Response.json(snap);
+          }};
+          const ts=String(Math.floor(Date.now()/1000)),nonce='a'.repeat(32);
+          const sig=crypto.createHmac('sha256',key).update('saber-live-comprador-v1\n'+ts+'\n'+nonce).digest('hex');
+          const cookie='saber_pedido_live_v1='+ts+'.'+nonce+'.'+sig;
+          const ctx={waitUntil(){},passThroughOnException(){}};
+          async function local(path,auth=true,body=null){
+            const req=new Request(origin+path,{method:body===null?'GET':'POST',headers:{...(auth?{Cookie:cookie}:{}),...(body===null?{}:{Origin:origin,'Content-Type':'application/json','Sec-Fetch-Site':'same-origin'})},...(body===null?{}:{body})});
+            const r=await worker.fetch(req,env,ctx);
+            return {status:r.status,headers:Object.fromEntries(r.headers),body:await r.text()};
+          }
+          const routes=['/cotizar','/cotizar/archivos','/cotizar/archivos.js','/cotizar/movil.js','/cotizar/flujo-live.js'];
+          const assets=new Map();
+          for(const path of routes){
+            let r;try{r=await local(path);}catch(e){console.log('RUTA_LOCAL_FALLO '+path+' '+e.name);throw Error('No se pudo ejecutar ruta local');}
+            console.log('RUTA_BASE '+path+' HTTP='+r.status+' BYTES='+Buffer.byteLength(r.body));
+            assert.equal(r.status,200,'Ruta no accesible en entorno ficticio: '+path);assets.set(path,r);
+          }
+          const unauth=await local('/cotizar/archivos',false);
+          assert.notEqual(unauth.status,200,'El iframe base no exigió sesión');
+          const parent=assets.get('/cotizar').body,frame=assets.get('/cotizar/archivos').body;
+          assert.match(parent,/id="pdf"/);
+          assert.match(parent,/const enabled=false[,;]/,'No se pudo demostrar que el checkout está deshabilitado');
+          for(const id of ['zonaArchivos','archivos','modoConfiguracion','configComunGlobal','estado','presupuesto','prepararPedido','resumenPedido','anilladosConjuntos','lista'])assert(frame.includes('id="'+id+'"'),'Falta ancla de interfaz: '+id);
+          for(const marker of ['/cotizar/archivos.js','/cotizar/movil.js','SABER_SMART_RESIZE'])assert(frame.includes(marker),'Falta recurso base: '+marker);
+          const folder='integraciones/autocotizador/recepcion/';
+          const css=fs.readFileSync(folder+'pc-v11-configuracion-directa.css.txt','utf8');
+          const js=fs.readFileSync(folder+'pc-v11-configuracion-directa.js.txt','utf8');
+          assert(!/<\/style/i.test(css)&&!/<\/script/i.test(js));
+          // Ensayo del mismo paquete modular que se instalará. Reemplaza sólo
+          // la entrada V10; importa el motor original por su nombre y conserva la capa.
+          const entryName=fs.readFileSync(dir+'/entry.txt','utf8');
+          const layerName='saber-pc-v10-layer.mjs',entry='saber-pc-v10-entry.mjs';
+          assert(![entry,layerName].includes(entryName));
+          const oldLayer=fs.readFileSync(dir+'/'+layerName);
+          assert(oldLayer.equals(fs.readFileSync(folder+'pc-v10-capa-reversible.mjs')),'Capa activa distinta');
+          const entryCode='import base from '+JSON.stringify('./'+entryName)+';\nexport * from '+JSON.stringify('./'+entryName)+';\nimport {crearCapaPcV10} from "./'+layerName+'";\nexport default crearCapaPcV10(base,{css:'+JSON.stringify(css)+',js:'+JSON.stringify(js)+'});\n';
+          fs.writeFileSync(dir+'/'+entry,entryCode,{mode:0o600});
+          const candidate=(await import(pathToFileURL(dir+'/'+entry).href)).default;
+          assert.equal(crypto.createHash('sha256').update(fs.readFileSync(dir+'/'+entryName)).digest('hex'),'c8f04928d6e0ad8885a174e34ac1ccebf461a47d3775cb83bf2bccd1ffc802f6');
+          const enabledEnv={...env,DOCS_LIVE_PC_V10_GATE:on};
+          const request=(path,auth=true)=>new Request(origin+path,{headers:auth?{Cookie:cookie}:{}});
+          assert.equal(await (await candidate.fetch(request('/cotizar/archivos'),env,ctx)).text(),frame);
+          const response=await candidate.fetch(request('/cotizar/archivos'),enabledEnv,ctx);
+          const preview=await response.text();
+          assert(preview.includes('saber-pc-v10-layer-js')&&preview.includes('pc-v11-batch'));
+          assert.equal(preview.replace(/<style id="saber-pc-v10-layer-css">[\s\S]*?<\/style>/,'').replace(/<script id="saber-pc-v10-layer-js">[\s\S]*?<\/script>/,''),frame);
+          assert.equal(response.headers.get('Content-Security-Policy'),assets.get('/cotizar/archivos').headers['content-security-policy']);
+          assert.notEqual((await candidate.fetch(request('/cotizar/archivos',false),enabledEnv,ctx)).status,200);
+          const mobileBase=await worker.fetch(request('/cotizar/archivos?vista=movil'),env,ctx);
+          const mobileCandidate=await candidate.fetch(request('/cotizar/archivos?vista=movil'),enabledEnv,ctx);
+          assert.equal(await mobileCandidate.text(),await mobileBase.text());
+          for(const path of routes.filter(x=>x!=='/cotizar/archivos')){
+            const r=await candidate.fetch(request(path),enabledEnv,ctx);
+            assert.equal(r.status,assets.get(path).status);
+            const body=await r.text();
+            // El HTML padre incluye valores de sesión generados por el motor.
+            // Comparar bytes de los JS estáticos, no valores dinámicos del HTML.
+            if(path==='/cotizar'){
+              assert(body.includes('id="pdf"')&&!body.includes('pc-v11-batch'),'HTML padre inesperado');
+              const normalizeNonce=s=>String(s).replace(/'nonce-[a-f0-9]+'/g,"'nonce-FICTICIO'");
+              assert.equal(normalizeNonce(r.headers.get('Content-Security-Policy')),normalizeNonce(assets.get(path).headers['content-security-policy']));
+              const nonce=r.headers.get('Content-Security-Policy')?.match(/'nonce-([a-f0-9]+)'/)?.[1];
+              assert(nonce&&body.includes('nonce="'+nonce+'"'),'Nonce del HTML padre no coincide con CSP');
+            }else assert(body===assets.get(path).body,'Recurso estático distinto: '+path);
+          }
+          const previewHeaders=Object.fromEntries(response.headers);
+          console.log('V11_PAQUETE_REAL_OK CAPA_ORIGINAL CSP_AUTENTICACION_Y_MOVIL_CONSERVADOS');
+          const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+          const errors=[];
+          let blocked=0,quotes=0;
+          async function setup(viewport,useV10){
+            const context=await browser.newContext({viewport,serviceWorkers:'block'});
+            const page=await context.newPage();
+            const responses=[];
+            page.on('pageerror',e=>errors.push(e.name));
+            await page.route('**/*',async route=>{
+              const u=new URL(route.request().url()),p=u.pathname,method=route.request().method();
+              if(u.origin!==origin){
+                // Solo biblioteca PDF estática; jamás tráfico al sitio real o a un API.
+                if(method==='GET'&&u.hostname==='cdnjs.cloudflare.com'&&p.startsWith('/ajax/libs/pdf.js/'))return route.continue();
+                blocked++;return route.abort();
+              }
+              if(method==='GET'&&assets.has(p)){
+                const r=assets.get(p);
+                return route.fulfill({status:r.status,headers:p==='/cotizar/archivos'&&useV10?previewHeaders:r.headers,body:p==='/cotizar/archivos'&&useV10?preview:r.body});
+              }
+              if(p==='/api/pedido/live/materiales'&&method==='GET'){
+                const r=await local(p);
+                assert.equal(r.status,200,'Catálogo no disponible');
+                return route.fulfill({status:r.status,headers:r.headers,body:r.body});
+              }
+              if(p==='/api/pedido/live/cotizar'&&method==='POST'){
+                quotes++;
+                const payload=route.request().postData();
+                const r=await local(p,true,payload);
+                let v;try{v=JSON.parse(r.body);}catch{throw Error('Cotizacion no JSON');}
+                responses.push({status:r.status,body:v,payload:JSON.parse(payload)});
+                return route.fulfill({status:r.status,headers:r.headers,body:r.body});
+              }
+              blocked++;return route.fulfill({status:403,contentType:'application/json',body:'{"ok":false,"error":"ENSAYO_SIN_OPERACIONES"}'});
+            });
+            // Esperar el catálogo solicitado por el analizador real: el listener de archivos
+            // ya está instalado cuando ese script inicia la consulta del catálogo.
+            const ready=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/pedido/live/materiales'&&r.status()===200,{timeout:30000});
+            await page.goto(origin+'/cotizar',{waitUntil:'load',timeout:30000});
+            await ready;
+            const frame=page.frameLocator('#pdf');
+            await frame.locator('#archivos').waitFor({state:'attached',timeout:15000});
+            if(useV10&&viewport.width>=900)await frame.locator('#pc-v11-batch').waitFor({state:'attached',timeout:15000});
+            console.log('ANALIZADOR_LISTO '+(useV10?'V10':'BASE')+' '+viewport.width);
+            return {context,page,frame:page.frameLocator('#pdf'),responses};
+          }
+          try{
+            const pc=await setup({width:1440,height:900},true);
+            const img=await pc.page.evaluate(()=>{const c=document.createElement('canvas');c.width=1200;c.height=800;const x=c.getContext('2d');x.fillStyle='#7799bb';x.fillRect(0,0,1200,800);x.fillStyle='#fff';x.font='70px Arial';x.fillText('Imagen ficticia',100,200);return c.toDataURL('image/jpeg').split(',')[1];});
+            await pc.frame.locator('#archivos').setInputFiles([1,2,3,4,5].map(i=>({name:'v11_imagen_'+i+'.jpg',mimeType:'image/jpeg',buffer:Buffer.from(img,'base64')})));
+            await pc.frame.locator('#lista .v11-direct').nth(4).waitFor({state:'visible',timeout:30000});
+            const batch=pc.frame.locator('#pc-v11-batch');
+            await batch.waitFor({state:'visible',timeout:20000});
+            await pc.frame.locator('#lista .saber-ampliacion').nth(4).waitFor({state:'attached',timeout:30000});
+            await pc.page.waitForTimeout(700);
+            await pc.frame.locator('.v11-thumb[data-ready="1"]').nth(4).waitFor({state:'visible',timeout:10000});
+            const beforeShot=await pc.frame.locator('#lista').screenshot({type:'jpeg',quality:55});
+            console.log('V11_CAPTURA_INICIAL_BASE64 '+beforeShot.toString('base64'));
+
+            await batch.locator('select[aria-label="Tamaño de impresión"]').selectOption('a2');
+            await batch.locator('input[aria-label="Cantidad de copias"]').fill('3');
+            await batch.locator('select[aria-label="Papel"]').selectOption('obra80');
+            await batch.getByRole('button',{name:'Aplicar a todas'}).click();
+            const accept=pc.frame.locator('#pc-v11-warnings button');
+            await accept.waitFor({state:'visible',timeout:30000});
+            try{await pc.frame.locator('#pc-v11-warnings details').nth(4).waitFor({state:'visible',timeout:40000});}
+            catch(e){
+              console.log('V11_DIAGNOSTICO_AVISOS '+JSON.stringify(await pc.frame.locator('#lista').evaluate(root=>[...root.querySelectorAll('.archivo')].map(card=>({name:card.querySelector('.nombre')?.textContent,meta:card.querySelector('.resumen-archivo')?.textContent,selected:card.querySelector('.v11-size')?.value,amp:card.querySelector('.saber-ampliacion')?.textContent?.slice(0,1200),disabled:card.querySelector('[data-saber-amp-aplicar]')?.disabled,warning:!!card.querySelector('.saber-ampliacion [role=alert] input'),status:card.querySelector('.v11-state')?.textContent})))));
+              throw e;
+            }
+            console.log('V11_ESTADO_LOTE '+JSON.stringify(await pc.frame.locator('#lista').evaluate(l=>[...l.querySelectorAll('section.archivo')].map(c=>({name:c.querySelector('.nombre')?.textContent,size:c.querySelector('.v11-size')?.value,copies:c.querySelector('.v11-copies')?.value,amp:c.querySelector('.saber-ampliacion select')?.value,warning:!!c.querySelector('.saber-ampliacion [role=alert] input'),state:c.querySelector('.v11-state')?.textContent})))));
+            assert.equal(await pc.frame.locator('#pc-v11-warnings details').count(),5);
+            const checkCierre=async(label,withWarnings)=>{
+              await pc.page.waitForTimeout(300);
+              const geo=await pc.frame.locator('#pc-v11-footer').evaluate((footer)=>{
+                const frame=window.frameElement,doc=window.parent.document;
+                const list=document.querySelector('#lista'),total=document.querySelector('#pc-v11-total-final'),warnings=document.querySelector('#pc-v11-warnings'),next=doc.querySelector('#siguiente');
+                const y=e=>e.getBoundingClientRect();
+                return {footerAfterList:y(footer).top>=y(list).bottom-1,totalAboveWarnings:warnings.hidden||y(total).bottom<=y(warnings).top,warningVisible:!warnings.hidden,price:total.textContent,parentPrice:doc.querySelector('#precio').textContent.trim(),gap:Math.round(y(next).top-y(frame).top-y(footer).bottom-window.scrollY),frameHeight:Math.round(y(frame).height),mainHeight:Math.round(y(document.querySelector('main')).height),nextVisible:next.getClientRects().length>0};
+              });
+              console.log('V11_CIERRE_'+label+' '+JSON.stringify(geo));
+              assert(geo.footerAfterList&&geo.totalAboveWarnings&&geo.warningVisible===withWarnings&&geo.price===geo.parentPrice&&geo.nextVisible,'Orden incorrecto de cierre');
+              assert(geo.gap>=0&&geo.gap<=140,'Siguiente demasiado separado: '+geo.gap+' px');
+              assert(geo.frameHeight<=Math.max(280,geo.mainHeight+40),'Altura del iframe excede contenido');
+              return geo;
+            };
+            await checkCierre('CINCO_PENDIENTES',true);
+            assert.equal(await pc.frame.locator('#lista .saber-ampliacion input[type=checkbox]:checked').count(),0,'No se debe aceptar advertencia sin consentimiento');
+            await accept.click();
+            await pc.frame.locator('body:not(.v11-busy)').waitFor({state:'attached',timeout:60000});
+            await pc.frame.locator('#prepararPedido:not([disabled])').waitFor({state:'attached',timeout:30000});
+            function checkPayload(a2,a1){
+              const last=pc.responses.at(-1);
+              assert(last?.status===200&&last.body?.ok===true,'Cotización no aprobada');
+              const files=last.payload.archivos;
+              assert.equal(files.length,5);
+              assert(files.every(f=>f.copias===3&&f.seleccion==='original'&&f.papelPoster==='obra80'&&f.paginas.every(p=>p.modo==='poster')));
+              const group=(w,h)=>files.filter(f=>f.paginas.length===1&&Math.abs(Math.max(f.paginas[0].anchoCm,f.paginas[0].altoCm)-w)<.2&&Math.abs(Math.min(f.paginas[0].anchoCm,f.paginas[0].altoCm)-h)<.2).length;
+              assert.equal(group(59.4,42),a2);assert.equal(group(84.1,59.4),a1);
+              assert.equal(files.reduce((n,f)=>n+f.copias*f.paginas.length,0),15);
+            }
+            checkPayload(5,0);console.log('V11_LOTE_5_A2_3_COPIAS_OK');
+            for(const i of [4,5]){
+              const card=pc.frame.locator('#lista section.archivo').filter({hasText:new RegExp('v11_imagen_'+i)});
+              await card.locator('.v11-size').selectOption('a1');
+              await pc.frame.locator('body:not(.v11-busy)').waitFor({state:'attached',timeout:30000});
+              await pc.frame.locator('#pc-v11-warnings button').waitFor({state:'visible',timeout:30000});
+              await pc.frame.locator('#pc-v11-warnings button').click();
+              await pc.frame.locator('body:not(.v11-busy)').waitFor({state:'attached',timeout:60000});
+            }
+            await pc.frame.locator('#prepararPedido:not([disabled])').waitFor({state:'attached',timeout:30000});
+            checkPayload(3,2);console.log('V11_EXCEPCIONES_3_A2_2_A1_15_IMPRESIONES_OK');
+            const before=await checkCierre('CINCO_CONFIRMADAS',false);
+            // Repetir el mensaje de resize nativo: no debe sumar altura al iframe.
+            for(let i=0;i<10;i++){
+              await pc.frame.locator('body').evaluate(()=>window.parent.postMessage({type:'SABER_SMART_RESIZE',height:document.documentElement.scrollHeight},location.origin));
+              await pc.page.waitForTimeout(50);
+            }
+            const after=await checkCierre('ESTABLE',false);
+            assert(Math.abs(after.frameHeight-before.frameHeight)<=3,'Crecimiento acumulativo del iframe');
+
+            // La pantalla debe tener una sola configuración principal visible.
+            // La anterior prueba comprobaba cantidades, pero no composición visual.
+            const layout=await pc.frame.locator('#lista').evaluate(root=>[...root.querySelectorAll('.archivo.v11-compact-image')].map(card=>{
+              const visible=e=>!!e&&e.getClientRects().length>0&&getComputedStyle(e).visibility!=='hidden';
+              const direct=card.querySelector('.v11-direct'),name=card.querySelector('.nombre'),thumb=card.querySelector('.v11-thumb');
+              return {height:Math.round(card.getBoundingClientRect().height),direct:visible(direct),offset:direct&&name?Math.round(direct.getBoundingClientRect().top-name.getBoundingClientRect().bottom):null,thumb:!!thumb&&thumb.tagName==='CANVAS'&&thumb.dataset.ready==='1'&&thumb.width>0&&thumb.getContext('2d').getImageData(0,0,1,1).data[3]>0,oldVisible:[...card.querySelectorAll('.saber-ampliacion,.tamano-rapido,.eleccion-plotter')].filter(visible).length,visibleCopies:[...card.querySelectorAll('input[aria-label^="Cantidad de copias"]')].filter(visible).length};
+            }));
+            console.log('V11_LAYOUT_REAL '+JSON.stringify(layout));
+            assert.equal(layout.length,5);
+            assert(layout.every(x=>x.direct&&x.thumb&&x.oldVisible===0&&x.visibleCopies===1&&x.height<=190&&x.offset<=50),'La composición no coincide con la ficha compacta');
+            const shot=await pc.frame.locator('#lista').screenshot({type:'jpeg',quality:65});
+            console.log('V11_CAPTURA_SINTETICA_BASE64 '+shot.toString('base64'));
+            console.log('V11_COMPACTA_VISUAL_OK CINCO_FICHAS_SIN_DUPLICADOS');
+            for(let i=0;i<4;i++){
+              await pc.frame.locator('#lista section.archivo').last().getByRole('button',{name:'Quitar',exact:false}).click();
+              await pc.page.waitForTimeout(180);
+            }
+            assert.equal(await pc.frame.locator('#lista section.archivo').count(),1);
+            await pc.frame.locator('#prepararPedido:not([disabled])').waitFor({state:'attached',timeout:30000});
+            const single=await checkCierre('UN_ARCHIVO',false);
+            assert(single.frameHeight<before.frameHeight-200,'El iframe no se achicó al quitar archivos');
+            console.log('V11_CIERRE_OK SIN_HUECO NI_SCROLL_INVERSO');
+
+
+            assert(await pc.page.locator('#continuar').isDisabled(),'El ensayo no habilita cobros');
+            assert.equal(errors.length,0,'Excepciones navegador');
+            console.log('V11_ENSAYO_OK SIN_PEDIDOS_NI_PAGO');
+            await pc.context.close();
+            // PDF A4 y dos grandes, uno de trazos y otro de cobertura elevada.
+            const pdfpc=await setup({width:1440,height:900},true);
+            const files=[];
+            for(const [title,w,h,kind] of [['documento',21,29.7,'doc'],['plano',59.4,84.1,'cad'],['poster',42,59.4,'poster']]){
+              const doc=await PDFDocument.create(),pg=doc.addPage([w*72/2.54,h*72/2.54]);
+              const font=await doc.embedFont(StandardFonts.Helvetica);
+              if(kind==='poster')pg.drawRectangle({x:0,y:0,width:pg.getWidth(),height:pg.getHeight(),color:(await import('pdf-lib')).rgb(.3,.5,.8)});
+              if(kind==='cad')for(let i=0;i<12;i++)pg.drawLine({start:{x:20+i*7,y:20},end:{x:pg.getWidth()-20,y:pg.getHeight()-20-i*7},thickness:.4});
+              pg.drawText(title,{x:30,y:pg.getHeight()-50,font,size:14});
+              files.push({name:'v11_'+title+'.pdf',mimeType:'application/pdf',buffer:Buffer.from(await doc.save())});
+            }
+            await pdfpc.frame.locator('#archivos').setInputFiles(files);
+            await pdfpc.frame.locator('#lista .v11-direct').nth(2).waitFor({state:'visible',timeout:30000});
+            await pdfpc.page.waitForTimeout(1000);
+            const logPdf=async tag=>console.log('V11_PDF_'+tag+' '+JSON.stringify(await pdfpc.frame.locator('#lista').evaluate(l=>[...l.querySelectorAll('section.archivo')].map(c=>({name:c.querySelector('.nombre')?.textContent,size:c.querySelector('.v11-size')?.value,copies:c.querySelector('.v11-copies')?.value,meta:c.querySelector('.resumen-archivo')?.textContent,classification:c.querySelector('.clasificacion-ploteo-visible')?.textContent,measure:c.querySelector('.medida-ploteo-visible')?.textContent,state:c.querySelector('.v11-state')?.textContent})))));
+            await logPdf('DETECTADO');
+            for(const [title,size,n] of [['documento','a4',2],['plano','original',3],['poster','original',4]]){
+              const card=pdfpc.frame.locator('#lista section.archivo').filter({hasText:new RegExp('v11_'+title+'\\.pdf')});
+              const sel=card.locator('.v11-size');
+              if(await sel.inputValue()!==size)await sel.selectOption(size);
+              await pdfpc.frame.locator('body:not(.v11-busy)').waitFor({state:'attached',timeout:30000});
+              const input=card.locator('.v11-copies');
+              await input.fill(String(n));await input.press('Tab');
+              await pdfpc.frame.locator('body:not(.v11-busy)').waitFor({state:'attached',timeout:30000});
+            }
+            await pdfpc.page.waitForTimeout(600);
+            await logPdf('CONFIGURADO');
+            const last=pdfpc.responses.at(-1);
+            const docs=last?.payload?.archivos||[];
+            console.log('V11_PDF_PAYLOAD '+JSON.stringify(docs.map(f=>({nombre:f.nombre,copias:f.copias,seleccion:f.seleccion,paginas:f.paginas?.map(p=>({anchoCm:p.anchoCm,altoCm:p.altoCm,modo:p.modo}))}))));
+            assert.equal(docs.length,3);
+            assert.deepEqual(docs.map(f=>f.copias),[2,3,4]);
+            assert.equal(docs[1].seleccion,'original');
+            assert.equal(docs[2].seleccion,'original');
+            assert.equal(docs[1].paginas[0].modo,'cad');
+            assert.equal(docs[2].paginas[0].modo,'poster');
+            assert(Math.abs(docs[1].paginas[0].anchoCm-59.4)<.2);
+            assert(Math.abs(docs[2].paginas[0].altoCm-59.4)<.2);
+            await pdfpc.frame.locator('#prepararPedido:not([disabled])').waitFor({state:'attached',timeout:30000});
+            console.log('V11_PDF_A4_CAD_A1_POSTER_A2_COPIAS_OK');
+            await pdfpc.context.close();
+            const mobile=await setup({width:390,height:844},true);
+            assert.equal(await mobile.frame.locator('#pc-v11-batch').count(),0);
+            assert.equal(await mobile.frame.locator('body').evaluate(e=>e.classList.contains('saber-pc-v11')),false);
+            await mobile.context.close();
+            console.log('V11_MOVIL_SIN_CAMBIOS_OK');
+            assert.equal(errors.length,0,'Excepciones navegador');
+          }catch(e){console.log('V11_ENSAYO_FALLO '+e.name+' '+String(e.message).slice(0,250));throw e;}
+          finally{await browser.close();}
+          JS
+      - name: Eliminar copia temporal
+        if: always()
+        shell: bash
+        run: rm -rf /tmp/saber-v10-live-exact
