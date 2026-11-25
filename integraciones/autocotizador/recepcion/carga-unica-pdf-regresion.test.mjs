@@ -44,6 +44,7 @@ const finish=source.indexOf("\n };\n bridgeButton.hidden=true",begin);
 assert.ok(begin>=0&&finish>begin,'No se encontró el callback real del botón');
 const clickHandler=new Function('leyendo','ultimoPresupuesto','entries','window','location','info','MAX_PDF_CARGA','paginasElegidas',
  `const MAX_PDF_TUS_BYTES=40*1024*1024;const MAX_LOTE_TUS_BYTES=60*1024*1024;const tamanoPdfMiB=f=>(f.size/(1024*1024)).toFixed(1).replace('.',',')+' MiB';
+const entradasParaCotizar=()=>entries;const sidecarTrabajosPedido=()=>[{id:'trabajo_1',nombre:'Trabajo 1',indices:entries.map((_,i)=>i)}];
 `+source.slice(begin+marker.length,finish));
 
 function runPrivateHandoff(name='MUEBLES.pdf',size=2464154){
@@ -263,6 +264,7 @@ test('A4 de 500 páginas y 100 MiB va a R2 universal, sin cambiar a plotter',()=
  const callback=new Function('leyendo','ultimoPresupuesto','entries','window','location','info','MAX_PDF_CARGA','paginasElegidas',
   'const MAX_PDF_TUS_BYTES=40*1048576,MAX_PDF_R2_PREPAGO_BYTES=200*1048576,MAX_LOTE_TUS_BYTES=60*1048576,R2_UNIVERSAL_ENSAYO=true;'+
   'const prepararLoteParcial=xs=>({archivos:xs.map(e=>({nombre:e.name,servicio:"auto",paginas:e.paginas,modo:e.modo}))});'+
+  'const entradasParaCotizar=()=>entries;const sidecarTrabajosPedido=()=>[{id:"trabajo_1",nombre:"Trabajo 1",indices:entries.map((_,i)=>i)}];'+
   source.slice(start+marker.length,end));
  const pages=Array.from({length:500},(_,i)=>({numero:i+1,anchoCm:21,altoCm:29.7,modo:'sin-clasificar'}));
  const file=new File([new Uint8Array([37,80,68,70,45])],'Apunte_500_paginas_A4.pdf',{type:'application/pdf'});
