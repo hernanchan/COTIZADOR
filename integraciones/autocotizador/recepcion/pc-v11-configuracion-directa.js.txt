@@ -14,7 +14,7 @@ const key=c=>name(c).match(/^\d+\./)?.[0]||name(c);
 const get=k=>cards().find(c=>key(c)===k);
 const meta=c=>c.querySelector('.resumen-archivo')?.textContent||'';
 const amp=c=>c.querySelector('.saber-ampliacion');
-const exp=c=>[...c.querySelectorAll('button.editar')].find(b=>/^(Más opciones|Personalizar este PDF|Cerrar detalles|Otros ajustes)$/i.test(b.textContent.trim()));
+const exp=c=>[...c.querySelectorAll('button.editar')].find(b=>/^(Más opciones|Personalizar este PDF|Cerrar detalles|Otros ajustes|Opciones de impresión)$/i.test(b.textContent.trim()));
 const copy=c=>c.querySelector('input[aria-label^="Cantidad de copias"]:not(.v11-copies)');
 const quality=c=>amp(c)?.querySelector('[role=alert] input[type=checkbox]');
 const apply=c=>amp(c)?.querySelector('[data-saber-amp-aplicar]');
@@ -65,9 +65,19 @@ function state(c){
 function waitCard(k){return get(k);}
 function note(text){alertText=text;message.textContent=text;}
 const batch=element('section');batch.id='pc-v11-batch';batch.hidden=true;
-const h=element('h2','Configurar todas juntas'),description=element('p','Elegí el tamaño y la cantidad para todas las imágenes. Después podés cambiar las que necesites.');
+const h=element('h2','¿Todas las imágenes iguales?'),description=element('p','Configurá el grupo una sola vez. Después podés ajustar cualquier archivo.');
 const batchSize=selectSize(true),batchCopies=inputCopies(),batchPaper=paperSelect(),batchApply=element('button','Aplicar a todas');batchApply.type='button';
-const batchRow=element('div');batchRow.className='v11-fields';batchRow.append(label('Tamaño',batchSize),label('Copias por imagen',batchCopies),label('Papel para A2/A1/A0',batchPaper),batchApply);
+const batchRow=element('div');batchRow.className='v11-fields';
+const batchSizeLabel=label('Tamaño final',batchSize),batchCopiesLabel=label('Copias por imagen',batchCopies),batchPaperLabel=label('Papel',batchPaper);
+batchRow.append(batchSizeLabel,batchCopiesLabel,batchPaperLabel,batchApply);
+function updateBatch(){
+ const chosen=!!batchSize.value,large=['a2','a1','a0'].includes(batchSize.value);
+ batchCopiesLabel.hidden=!chosen;batchPaperLabel.hidden=!large;
+ batchApply.hidden=!chosen;batchApply.disabled=!chosen||busy||!imagesReady();
+ batchRow.dataset.large=String(large);batchRow.dataset.chosen=String(chosen);
+}
+batchSize.addEventListener('change',updateBatch);
+updateBatch();
 const message=element('p');message.id='pc-v11-message';message.setAttribute('role','status');
 const warnings=element('div');warnings.id='pc-v11-warnings';warnings.hidden=true;
 batch.append(h,description,batchRow);upload.insertAdjacentElement('afterend',batch);
@@ -127,9 +137,9 @@ try{
   resizeFrame();
  }
 }catch{/* La navegación nativa sigue disponible si no se puede medir el iframe. */}
-const intro=element('p','Elegí tamaño y cantidad en cada archivo. El presupuesto se actualiza solo.');intro.id='pc-v11-intro';upload.insertAdjacentElement('afterend',intro);
+const intro=element('p','Elegí cómo querés imprimir. Solo verás las opciones necesarias para cada archivo.');intro.id='pc-v11-intro';upload.insertAdjacentElement('afterend',intro);
 document.body.classList.add('saber-pc-v11');
-function pending(){return busy||cards().some(c=>{const s=state(c);return s.pending||(image(c)&&!s.size);});}
+function pending(){return busy||cards().some(c=>{const s=state(c);return !special(c)&&(s.pending||(regularImage(c)&&!s.size));});}
 // No permitir que un presupuesto viejo de una imagen pendiente llegue al
 // puente de preparación de pedido. El motor mantiene su propia validación.
 window.addEventListener('message',event=>{
@@ -235,7 +245,7 @@ async function changeOne(k,v,n){
 async function run(fn){
  if(busy)return;busy=true;batchApply.disabled=true;document.body.classList.add('v11-busy');
  try{await fn();}catch(e){note('No pudimos completar una opción. Revisá el archivo y volvé a intentar.');}
- finally{busy=false;batchApply.disabled=!imagesReady();document.body.classList.remove('v11-busy');schedule();}
+ finally{busy=false;updateBatch();document.body.classList.remove('v11-busy');schedule();}
 }
 batchApply.onclick=()=>run(async()=>{
  const v=batchSize.value,n=Number(batchCopies.value);
@@ -264,7 +274,8 @@ function decorate(c){
   }));
   const paperLabel=label('Papel',paper);paperLabel.className='v11-paper-label';
   paper.addEventListener('change',()=>run(async()=>{const c=get(k);if(!c)return;const s=state(c);s.paper=paper.value;if(s.size)await finish(k);}));
-  row.append(label('Tamaño final',size),label('Copias',copies),paperLabel);
+  const copiesLabel=label('Copias',copies);copiesLabel.className='v11-copies-label';
+  row.append(label('Tamaño final',size),copiesLabel,paperLabel);
   const status=element('span');status.className='v11-state';row.append(status);
   c.querySelector('.resumen-archivo')?.insertAdjacentElement('afterend',row);
  }
@@ -273,6 +284,8 @@ function decorate(c){
  if(document.activeElement!==copies)copies.value=String(s.copies);
  const paper=row.querySelector('.v11-paper');paper.value=s.paper;
  row.querySelector('.v11-paper-label').hidden=!(isImage&&['a2','a1','a0'].includes(s.size));
+ row.querySelector('.v11-copies-label').hidden=!s.size;
+ row.dataset.chosen=String(!!s.size);row.dataset.large=String(isImage&&['a2','a1','a0'].includes(s.size));
  const t=row.querySelector('.v11-state');
  const hasPendingAnalysis=s.pending&&s.size&&['a2','a1','a0'].includes(s.size)&&!quality(c)&&apply(c)?.disabled;
  t.textContent=hasPendingAnalysis?'Análisis pendiente · revisá Otros ajustes':s.pending?'Revisar configuración':isImage&&!s.size?'Elegí tamaño':'';
@@ -282,7 +295,7 @@ function decorate(c){
  if(isImage&&advanced){
   const expanded=advanced.getAttribute('aria-expanded')==='true';
   c.classList.toggle('v11-native-open',expanded);
-  if(!expanded)advanced.textContent='Otros ajustes';
+  if(!expanded)advanced.textContent=s.size&&['a2','a1','a0'].includes(s.size)?'Otros ajustes':'Opciones de impresión';
  }
  c.classList.toggle('v11-awaiting',s.pending||isImage&&!s.size);
  const warning=quality(c);
@@ -297,6 +310,28 @@ function decorate(c){
    const source=thumbnails.get(file[0]),thumb=element('canvas');thumb.className='v11-thumb';
    thumb.width=source.width;thumb.height=source.height;thumb.setAttribute('role','img');thumb.setAttribute('aria-label','Vista previa');
    thumb.getContext('2d').drawImage(source,0,0);thumb.dataset.ready='1';c.querySelector('.fila-principal')?.prepend(thumb);
+  }
+ }
+}
+// Reordenar únicamente los controles nativos cuando están abiertos.
+ // El motor sigue decidiendo qué campos existen y qué valores admite.
+ // No crear catálogos, opciones comerciales ni defaults paralelos.
+function progressiveNative(c){
+ const panel=c.querySelector('.panel-edicion'),controls=panel?.querySelector('.controles');
+ if(!controls)return;
+ const entries=[...controls.children].filter(e=>e.tagName==='LABEL');
+ const labelText=e=>String(e.childNodes[0]?.textContent||'').trim().toLowerCase();
+ const order=['servicio','tamaño de impresión','impresión','material','caras','copias','lotes','anillado','grupo de anillado','producto y variante','papel y tamaño','tipo de corte','metros lineales'];
+ const rank=e=>{const s=labelText(e),i=order.findIndex(n=>s===n||s.startsWith(n+' '));return i<0?100:i};
+ const sorted=[...entries].sort((a,b)=>rank(a)-rank(b));
+ if(entries.some((e,i)=>e!==sorted[i]))sorted.forEach(e=>controls.append(e));
+ panel.classList.add('v12-native-progressive');
+ // Mantener las opciones de tamaño especiales, los avisos técnicos y
+ // las selecciones de páginas sin cambios.
+ for(const e of sorted){
+  if(labelText(e)==='caras')for(const o of e.querySelectorAll('option')){
+   if(o.value==='simple'&&o.textContent!=='Una cara')o.textContent='Una cara';
+   if(o.value==='double'&&o.textContent!=='Ambas caras')o.textContent='Ambas caras';
   }
  }
 }
@@ -340,10 +375,18 @@ function sync(){
  document.body.classList.toggle('v11-images-only',imagesOnly);
  if(imagesOnly&&indiv&&!indiv.checked){indiv.click();return;}
  batch.hidden=all.filter(regularImage).length<2;
- batchApply.disabled=!imagesReady();
+ updateBatch();
  intro.hidden=!all.length;
  footer.hidden=!all.length;
- all.forEach(c=>{if(!image(c)&&document.querySelector('input[name="modoImpresionLote"][value="comun"]')?.checked){c.querySelector('.v11-direct')?.remove();return;}decorate(c);});
+ all.forEach(c=>{
+  if(!image(c)&&document.querySelector('input[name="modoImpresionLote"][value="comun"]')?.checked)c.querySelector('.v11-direct')?.remove();
+  else decorate(c);
+  progressiveNative(c);
+ });
+ // En una ficha pendiente el selector de composición no aporta nada
+ // hasta confirmar el tamaño; se conserva el control original.
+ for(const c of all)c.classList.toggle('v12-wait-size',!special(c)&&!!c.querySelector('.pregunta-tamano'));
+
  renderWarnings(all);
 }
 function schedule(){if(scheduled)return;scheduled=true;queueMicrotask(()=>{scheduled=false;sync();});}
