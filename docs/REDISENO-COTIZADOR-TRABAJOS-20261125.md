@@ -28,8 +28,8 @@
 - Se agregó un resumen por trabajo que reutiliza exclusivamente los subtotales y detalles devueltos por el cotizador comercial vigente; no calcula tarifas ni reparte descuentos.
 - El anillado agrupado se suma al trabajo propietario solo si todos los archivos del grupo pertenecen a ese mismo trabajo. El reparto se oculta si no reconcilia exactamente con los subtotales de categoría del motor.
 - El resumen se comunica al portal mediante el mensaje existente de precio orientativo, valida los datos recibidos y escribe nombres/importes con `textContent`. Ante una promoción, los importes por trabajo se identifican como previos al descuento global; el total general sigue siendo el importe final.
-- Pruebas locales focales: **50/50** (modelo y resumen por trabajo, PC/móvil, cotización, handoff, grupos y conservación en Central/manifiesto). `node --check` de los dos módulos y `git diff --check`: aprobados.
-- `npm run build:unificado` fue intentado; se detuvo porque este entorno no tiene instalada la dependencia de desarrollo `esbuild@0.24.2`. En esa corrida también se detectó y corrigió una dependencia ausente del test de handoff; tras la corrección, ese test pasó. La compilación completa queda **pendiente de un entorno con esbuild**.
+- Pruebas locales focales: **55/55** (modelo y resumen por trabajo, PC/móvil, cotización, handoff, grupos, Central/manifiesto y paquete operador). `node --check` de los dos módulos y `git diff --check`: aprobados.
+- `npm run build:unificado` fue intentado; se detuvo porque este entorno no tiene instalada la dependencia de desarrollo `esbuild@0.24.2`. La compilación completa queda **pendiente de un entorno con esbuild**.
 
 ## Límites y riesgos pendientes
 
