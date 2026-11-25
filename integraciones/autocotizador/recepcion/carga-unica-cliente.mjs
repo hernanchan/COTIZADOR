@@ -327,7 +327,11 @@ function asignarOpcionIndividual(e,campo,valor){
  }else e[campo]=valor;
 }
 function restablecerExcepcionesTrabajo(e){
- for(const campo of Object.keys(excepcionesDeArchivo(e)))limpiarExcepcionDeArchivo(e,campo);
+ const config=configTrabajo(e.trabajoPedidoId),defaults={modo:'bn',caras:'simple',copias:1,paginasPorHoja:1,anillado:'ninguno',papelPoster:'obra80'};
+ for(const campo of Object.keys(excepcionesDeArchivo(e))){
+  limpiarExcepcionDeArchivo(e,campo);
+  aplicarValorCompartido(e,campo,Object.hasOwn(config,campo)?config[campo]:defaults[campo]);
+ }
  aplicarConfiguracionComunAlDocumento(e);
 }
 // La categoría es sólo presentación: no reordena `entries` ni los índices del
