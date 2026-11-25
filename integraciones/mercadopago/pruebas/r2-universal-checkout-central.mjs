@@ -97,10 +97,26 @@ export async function verificarPedidoUniversalCobrable(env,commercialOrderId,{
      detail.prepressPending!==true||detail.originalsReceived!==false||
      JSON.stringify(ids)!==JSON.stringify(works.map(f=>f.fileId)))
    throw Error('Order line inconsistent');
+  const grouped=works.some(w=>Object.hasOwn(w,'trabajoPedidoId')||
+   Object.hasOwn(w,'nombreTrabajo'));
+  let trabajosPedido;
+  if(grouped){
+   const byId=new Map();
+   for(const w of works){
+    if(typeof w.trabajoPedidoId!=='string'||typeof w.nombreTrabajo!=='string')
+     throw Error('Work grouping incomplete');
+    let g=byId.get(w.trabajoPedidoId);
+    if(!g){g={id:w.trabajoPedidoId,nombre:w.nombreTrabajo,fileIds:[]};byId.set(g.id,g)}
+    if(g.nombre!==w.nombreTrabajo)throw Error('Work grouping changed');
+    g.fileIds.push(w.fileId);
+   }
+   trabajosPedido=[...byId.values()];
+  }
   await verificarFichaUniversal({
-   schema:'saber-r2-universal-draft-v1',webOrderId:link.web_order_id,
+   schema:grouped?'saber-r2-universal-draft-v2':'saber-r2-universal-draft-v1',
+   webOrderId:link.web_order_id,
    priceRevision:link.price_revision,totalArs:link.total_ars,
-   archivos:works,armados:groups,pagoAutorizado:false,
+   archivos:works,armados:groups,...(grouped?{trabajosPedido}:{}),pagoAutorizado:false,
    subidaAutorizada:false,produccionAutorizada:false,
    estado:'PRELIMINAR_SIN_ORIGINALES',
    quoteHash:link.quote_hash

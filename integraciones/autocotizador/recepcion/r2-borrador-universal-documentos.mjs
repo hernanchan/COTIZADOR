@@ -24,7 +24,8 @@ export async function guardarBorradorUniversal(request,env,{
  const raw=await request.text();
  if(raw.length>150000)return reply({ok:false,error:'UNIVERSAL_LARGO'},413);
  let data;try{data=JSON.parse(raw)}catch{}
- if(!data||Object.keys(data).sort().join(',')!=='archivos,manifiestos,webOrderId')
+ if(!data||!['archivos,manifiestos,webOrderId',
+    'archivos,manifiestos,trabajosPedido,webOrderId'].includes(Object.keys(data).sort().join(',')))
   return reply({ok:false,error:'UNIVERSAL_DATOS'},422);
  let ficha;try{ficha=fichaPrearchivoUniversal({...data,tarifario:await priceLoader(env),
   admitirFotosTusPruebas:env?.DOCS_R2_UNIVERSAL_TUS_ENABLED==='PRIVATE_TEST_ONLY'})}

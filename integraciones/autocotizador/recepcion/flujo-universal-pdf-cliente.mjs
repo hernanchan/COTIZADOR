@@ -5,6 +5,7 @@
 import {sha256PdfLocalPorFragmentos} from './sha256-pdf-local-fragmentos.mjs';
 import {enviarArchivoR2Grande} from './r2-pdf-grandes-cliente.mjs';
 import {enviarTUSUniversalPagado} from './tus-universal-directo-cliente.mjs';
+import {validarTrabajosPedido} from './validar-trabajos-pedido.mjs';
 const WEB=/^WEB-ENSAYO-[A-F0-9]{32}$/;
 const SHA=/^[a-f0-9]{64}$/;
 const UUID=/^[a-f0-9-]{36}$/i;
@@ -27,7 +28,7 @@ async function post(fetcher,path,payload){
  return body;
 }
 export function crearFlujoUniversalPDF({
- files,archivos,webOrderId,telefono,nombre,direccion,fetcher=fetch,
+ files,archivos,trabajosPedido,webOrderId,telefono,nombre,direccion,fetcher=fetch,
  hasher=sha256PdfLocalPorFragmentos,
  uploadR2=enviarArchivoR2Grande,uploadTus=enviarTUSUniversalPagado,
  uuid=()=>crypto.randomUUID(),
@@ -58,6 +59,8 @@ export function crearFlujoUniversalPDF({
   if(file.size>40*MIB)r2Count++;
   else tusBytes+=file.size;
  }
+ const grupos=trabajosPedido===undefined?undefined:
+  validarTrabajosPedido(trabajosPedido,files.length,{maxTrabajos:10});
  if(nombre!==undefined&&(typeof nombre!=='string'||nombre.trim().length<2||nombre.trim().length>100||/[<>]/.test(nombre)))
   throw Error('UNIVERSAL_NOMBRE_INVALIDO');
  if(direccion!==undefined&&(typeof direccion!=='string'||direccion.trim().length>180||/[<>]/.test(direccion)))
@@ -99,7 +102,8 @@ export function crearFlujoUniversalPDF({
   }));
   transition('registrando_presupuesto');
   const saved=await post(fetcher,'/prueba-v2/api/ensayo-r2-borrador-universal',{
-   webOrderId,archivos,manifiestos:manifests});
+   webOrderId,archivos,manifiestos:manifests,
+   ...(grupos?{trabajosPedido:grupos}:{})});
   if(saved.webOrderId!==webOrderId||saved.fileCount!==files.length||
      !money(saved.totalArs)||!UUID.test(saved.draftId||'')||
      !SHA.test(saved.quoteHash||'')||

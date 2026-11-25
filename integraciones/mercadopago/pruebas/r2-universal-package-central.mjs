@@ -154,15 +154,27 @@ export async function consultarPaqueteUniversalCentral(request,env,{
    reciboPrivado:r.receiptId,formatoFinal:w.formatoFinal,
    paginasElegidas:w.paginasElegidas,
    importeArs:w.importeArs,configuracion:w.configuracion,detalle:w.detalle,
+   ...(w.trabajoPedidoId?{trabajoPedidoId:w.trabajoPedidoId,
+    nombreTrabajo:w.nombreTrabajo}:{}),
    preprensaAprobada:false});
  }
  let armados;try{armados=JSON.parse(valid.link.armados_json)}catch{}
  if(!Array.isArray(armados))return respond({ok:false,error:'PAQUETE_ARMADO_INVALIDO'},409);
+ const gruposPedido=[];
+ for(const t of trabajos){
+  if(!t.trabajoPedidoId)continue;
+  let grupo=gruposPedido.find(g=>g.id===t.trabajoPedidoId);
+  if(!grupo){grupo={id:t.trabajoPedidoId,nombre:t.nombreTrabajo,fileIds:[]};gruposPedido.push(grupo)}
+  if(grupo.nombre!==t.nombreTrabajo)
+   return respond({ok:false,error:'PAQUETE_GRUPO_INCONSISTENTE'},409);
+  grupo.fileIds.push(t.fileId);
+ }
  return respond({ok:true,schema:'saber-central-r2-universal-package-manifest-v1',
   webOrderId:p.webOrderId,numeroOrden:String(number.number).padStart(3,'0'),
   importe:valid.amountArs,estadoPago:'PAGADO_VERIFICADO',pagoVerificado:true,
   nombreCliente,telefonoContacto,direccionCliente,
-  totalArchivos:trabajos.length,trabajos,armados,
+  totalArchivos:trabajos.length,trabajos,
+  ...(gruposPedido.length?{gruposPedido}:{}),armados,
   listoParaProducir:false,productionAuthorized:false,preprensaPendiente:true},200);
 }
 export async function consultarArchivoUniversalCentral(request,env,{

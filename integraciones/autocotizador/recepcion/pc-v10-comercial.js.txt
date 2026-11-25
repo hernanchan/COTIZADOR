@@ -1,10 +1,12 @@
 /* Librería Saber: V4 interfaz PC, sobre el motor original del ensayo.
- * Solo presentación y guardado de configuración ya aplicada por el motor.
- * Móvil (<900px), precios, pagos y transporte de archivos sin cambios.
+ * El asistente móvil conserva su flujo cuando está activo; escritorio usa esta capa
+ * también en ventanas angostas, con el mismo contenido reacomodado por CSS.
+ * Precios, pagos y transporte de archivos sin cambios.
  */
 (()=>{'use strict';
-// Solo PC de escritorio: el asistente móvil comercial conserva sus seis pasos.
-if(!matchMedia('(min-width:900px) and (pointer:fine)').matches)return;
+// El modo móvil se decide en el asistente por viewport/puntero. No ocultar PC V10
+// por debajo de 900 px: en una ventana angosta se adapta la misma interfaz.
+if(document.body.classList.contains('saber-mobile'))return;
 const by=id=>document.getElementById(id),root=document.querySelector('main');
 const ids=['zonaArchivos','modoConfiguracion','configComunGlobal','estado','presupuesto','prepararPedido','resumenPedido','anilladosConjuntos','lista'];
 if(!root||ids.some(id=>!by(id)))return;
@@ -35,6 +37,28 @@ batch.append(el('h2','','4. Elegí color, caras y copias para todos'),by('config
 left.append(batch);
 const filebox=el('section','pc-filebox'),grid=el('div','pc-filegrid'),queue=el('nav','pc-queue'),originalList=el('div','pc-original-list');
 queue.setAttribute('aria-label','Archivos del pedido');
+const workPanel=el('section','pc-work-panel'),workHeading=el('div','pc-work-heading');
+workHeading.append(el('h2','','Trabajos de impresión'),el('p','','Un trabajo reúne archivos con opciones compartidas. Los archivos nuevos se agregan al trabajo seleccionado.'));
+const workCards=el('div','pc-work-cards'),workActions=el('div','pc-work-actions');
+const newWork=el('button','pc-work-new','+ Agregar trabajo'),duplicateWork=el('button','pc-work-duplicate','Duplicar configuración');
+newWork.type=duplicateWork.type='button';
+const renameInput=el('input','pc-work-name');renameInput.type='text';renameInput.maxLength=80;renameInput.autocomplete='off';renameInput.setAttribute('aria-label','Nombre del trabajo');
+const serviceGroup=el('div','pc-work-service-group'),serviceTitle=el('span','pc-work-services-label','Servicio para este trabajo');
+const serviceChoices=el('div','pc-work-services');serviceChoices.setAttribute('role','group');serviceChoices.setAttribute('aria-labelledby','pc-work-services-label');
+const renameWork=el('button','pc-work-rename','Guardar nombre'),deleteWork=el('button','pc-work-delete','Eliminar trabajo');
+renameWork.type=deleteWork.type='button';
+const workNote=el('p','pc-work-note','Seleccioná un trabajo antes de cargar sus archivos. Las opciones compartidas se aplican a ese trabajo.');
+serviceGroup.append(serviceTitle,serviceChoices);
+workActions.append(newWork,duplicateWork,serviceGroup,renameInput,renameWork,deleteWork);
+workPanel.append(workHeading,workCards,workActions,workNote);
+const moveRow=el('div','pc-move-row'),moveLabel=el('label','pc-move-label','Mover este archivo a otro trabajo');
+const moveSelect=el('select','pc-move-select');moveSelect.setAttribute('aria-label','Mover archivo seleccionado a otro trabajo');
+const moveButton=el('button','pc-move-button','Mover archivo');moveButton.type='button';
+moveLabel.append(moveSelect);moveRow.append(moveLabel,moveButton);
+left.insertBefore(workPanel,uploadZone);
+left.insertBefore(modeCard,uploadZone);
+left.insertBefore(batch,uploadZone);
+filebox.append(moveRow);
 originalList.append(by('anilladosConjuntos'),by('lista'));grid.append(queue,originalList);
 filebox.append(el('h2','','Configurá tus archivos'),el('p','pc-instruction','Seleccioná un archivo, elegí sus opciones y presioná «Guardar y siguiente».'),grid);
 const actions=el('div','pc-config-actions'),save=el('button','pc-save','Guardar y siguiente →'),note=el('span','pc-config-status','Subí tus archivos para comenzar.');
@@ -47,6 +71,7 @@ side.append(by('prepararPedido'));root.append(shell);
 Array.from(root.children).filter(n=>n.tagName==='H2').forEach(h=>h.hidden=true);
 const parent=by('lista');
 let selected=0,selectedId=null,keys='',ready=new Set(),lastNote='',sizeBatchBusy=false;
+let currentWorkId=window.SABER_TRABAJO_ACTUAL||'trabajo_1';
 let membershipTimer=null;
 let attentionTimer=null,lastAttentionKey='';
 function guideToSize(key){
@@ -69,12 +94,90 @@ const fileValid=c=>!!c&&!c.classList.contains('archivo-no-admitido')&&
   !/Analizando PDF|Error de lectura/i.test(metadata(c))&&!c.querySelector('.pregunta-tamano')&&
   (!c.querySelector('.saber-ampliacion [role="alert"] input[type="checkbox"]')||
     c.querySelector('.saber-ampliacion [role="alert"] input[type="checkbox"]').checked);
-const commonFiles=()=>cards().filter(c=>isCommonCompatible(c)&&fileValid(c));
+const commonFiles=()=>cards().filter(c=>fileWorkId(c)===currentWorkId&&isCommonCompatible(c)&&fileValid(c));
+const api=()=>window.SABER_PEDIDO_TRABAJOS_API;
+const state=()=>api()?.getState?.()||{works:[],files:[],current:currentWorkId};
+const fileWorkId=c=>c?.dataset?.saberTrabajoArchivoId?
+ state().files.find(f=>f.id===c.dataset.saberTrabajoArchivoId)?.trabajoPedidoId:null;
+function applyCurrentWork(id){
+ const s=state();if(!s.works.some(w=>w.id===id))return;
+ currentWorkId=id;api()?.setCurrent?.(id);
+ workNote.textContent='Opciones y nuevos archivos para «'+(s.works.find(w=>w.id===id)?.nombre||'este trabajo')+'».';
+ lastNote='';sync();
+}
+function renderWorkControls(){
+ const s=state();
+ if(!s.works.length){workCards.replaceChildren(el('p','','Creando el primer trabajo…'));return;}
+ if(!s.works.some(w=>w.id===currentWorkId))currentWorkId=s.current||s.works[0].id;
+ workCards.replaceChildren();
+ for(const w of s.works){
+  const card=el('button','',`${w.nombre} · ${w.cantidad} archivo${w.cantidad===1?'':'s'}`);
+  card.type='button';card.className='pc-work-card'+(w.id===currentWorkId?' pc-work-active':'');
+  card.setAttribute('aria-pressed',String(w.id===currentWorkId));
+  card.onclick=()=>{
+   applyCurrentWork(w.id);
+   const file=cards().find(c=>fileWorkId(c)===w.id);
+   if(file){selected=cards().indexOf(file);selectedId=fileKey(file);sync();}
+  };workCards.append(card);
+ }
+ const current=s.works.find(w=>w.id===currentWorkId)||s.works[0];
+ renameInput.value=current.nombre;
+ serviceChoices.replaceChildren();serviceChoices.hidden=current.cantidad>0;
+ const enabledServices=(api()?.getServiceOptions?.()||[]).filter(service=>service.enabled);
+ for(const service of enabledServices){
+  const button=el('button','',service.nombre);button.type='button';
+  button.className='pc-service-choice'+(service.id===current.servicio?' pc-service-active':'');
+  button.setAttribute('aria-pressed',String(service.id===current.servicio));
+  button.onclick=()=>{
+   try{api()?.setService?.(currentWorkId,service.id);workNote.textContent='Servicio elegido para este trabajo.';sync();}
+   catch(error){workNote.textContent=String(error.message||error);renderWorkControls();}
+  };
+  serviceChoices.append(button);
+ }
+ if(!enabledServices.length)serviceChoices.append(el('p','','No hay otros servicios disponibles para este trabajo.'));
+ renameInput.disabled=false;renameWork.disabled=false;
+ deleteWork.disabled=current.cantidad>0||s.works.length<2;
+ moveRow.hidden=!s.files.some(f=>f.trabajoPedidoId===currentWorkId);
+ moveSelect.replaceChildren();
+ for(const w of s.works)if(w.id!==currentWorkId&&w.servicio===current.servicio)moveSelect.add(new Option(w.nombre,w.id));
+ moveButton.disabled=!s.files.some(f=>f.trabajoPedidoId===currentWorkId)||!moveSelect.value;
+}
+function createWork(duplicate){
+ const s=state();if(s.works.length>=10){workNote.textContent='El pedido admite hasta 10 trabajos.';return;}
+ const n=s.works.length+1,id='trabajo_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7);
+ const source=s.works.find(w=>w.id===currentWorkId)||s.works.at(-1);
+ const config=duplicate?api().snapshot(source.id):{};
+ window.SABER_TRABAJOS_PEDIDO.push({id,nombre:'Trabajo '+n,servicio:source?.servicio||'auto',configuracion:config});
+ applyCurrentWork(id);renderWorkControls();
+ workNote.textContent=duplicate?'Configuración duplicada; el trabajo nuevo no tiene archivos.':'Trabajo nuevo. Cargá archivos para este trabajo.';
+}
+newWork.onclick=()=>createWork(false);
+duplicateWork.onclick=()=>createWork(true);
+renameWork.onclick=()=>{
+ const work=window.SABER_TRABAJOS_PEDIDO.find(w=>w.id===currentWorkId),name=renameInput.value.trim();
+ if(!work||!name||name.length>80||/[<>]/.test(name)){workNote.textContent='Usá un nombre de hasta 80 caracteres, sin etiquetas.';return;}
+ work.nombre=name;api()?.refresh?.();renderWorkControls();
+};
+deleteWork.onclick=()=>{
+ const s=state(),work=s.works.find(w=>w.id===currentWorkId);
+ if(!work||work.cantidad||s.works.length<2){workNote.textContent='Primero quitá o mové los archivos de este trabajo.';return;}
+ window.SABER_TRABAJOS_PEDIDO=window.SABER_TRABAJOS_PEDIDO.filter(w=>w.id!==work.id);
+ currentWorkId=window.SABER_TRABAJOS_PEDIDO[0].id;applyCurrentWork(currentWorkId);renderWorkControls();
+};
+moveButton.onclick=()=>{
+ const c=cards()[selected],fileId=c?.dataset?.saberTrabajoArchivoId;
+ if(!fileId||!moveSelect.value)return;
+ try{api()?.moveFile?.(fileId,moveSelect.value);}catch(error){workNote.textContent=String(error.message||error);return;}
+ currentWorkId=moveSelect.value;
+ const all=cards();const target=all.findIndex(x=>x.dataset.saberTrabajoArchivoId===fileId);
+ if(target>=0){selected=target;selectedId=fileKeys(all)[target];}
+ renderWorkControls();sync();
+};
 // Una pregunta de tamaño no resuelta SIEMPRE se debe resolver, incluso cuando
 // el selector "Impresión común / Ploteo / Ampliación" tiene un estilo activo.
 const needsSize=c=>!!c.querySelector('.pregunta-tamano')&&
  !c.classList.contains('archivo-no-admitido');
-const pendingSizes=()=>cards().filter(needsSize);
+const pendingSizes=()=>cards().filter(needsSize).filter(c=>fileWorkId(c)===currentWorkId);
 function condenseSizeWarnings(count){
  const quote=by('presupuesto');
  const warning=Array.from(quote.querySelectorAll('.advertencia')).filter(p=>/Confirmar tamaño final/i.test(p.textContent||''));
@@ -134,6 +237,7 @@ const basename=c=>(c.querySelector('.nombre')?.textContent||'Documento').replace
 const fileKeys=list=>{
  const occurrences=new Map();
  return list.map(card=>{
+  if(card.dataset.saberTrabajoArchivoId)return card.dataset.saberTrabajoArchivoId;
   const name=basename(card);
   const ordinal=occurrences.get(name)||0;
   occurrences.set(name,ordinal+1);
@@ -227,7 +331,14 @@ function sync(){
   symbol.className='pc-indicator'+(done?' pc-ok':'');info.className='pc-fileinfo';title.className='pc-filename';desc.className='pc-filemeta';
   info.append(title,desc);card.append(symbol,info);
   card.setAttribute('aria-label',basename(c)+(done?' configurado':' pendiente de configurar'));card.title=card.getAttribute('aria-label');
-  card.onclick=()=>{selected=i;selectedId=ids[i];lastNote='';sync();openSelectedDetails();cards()[selected]?.scrollIntoView({block:'nearest',behavior:'smooth'});};
+  const fileId=c.dataset.saberTrabajoArchivoId,work=state().works.find(w=>w.id===fileWorkId(c));
+  if(work)desc.textContent=(done?'Configurado':'Pendiente')+' · '+work.nombre+' · '+metadata(c);
+  card.onclick=()=>{
+   const selectedKey=ids[i],workId=fileWorkId(c);
+   if(workId&&workId!==currentWorkId){currentWorkId=workId;api()?.setCurrent?.(workId);}
+   const currentCards=cards(),index=fileId?currentCards.findIndex(x=>x.dataset.saberTrabajoArchivoId===fileId):i;
+   selected=index>=0?index:i;selectedId=selectedKey;lastNote='';sync();openSelectedDetails();cards()[selected]?.scrollIntoView({block:'nearest',behavior:'smooth'});
+  };
   queue.append(card);
  });
  Array.from(parent.querySelectorAll('section.grupo-pedido')).forEach(group=>{group.style.display=group.querySelector('section.archivo:not(.pc-not-current)')?'':'none';});
@@ -242,6 +353,7 @@ function sync(){
  else {message.textContent='✓ Todos los archivos guardados. '+(by('prepararPedido').disabled?'Esperá a que termine la cotización.':'Ya podés revisar el pedido.');message.className='pc-complete';save.disabled=false;}
  next.disabled=!(count>0&&pending===0&&!by('prepararPedido').disabled);
  note.textContent=count?'Archivo '+(selected+1)+' de '+count+(ready.has(ids[selected])?' · guardado':' · pendiente'):'Subí tus archivos para comenzar.';
+ renderWorkControls();
 }
 function saveCommon(){
  if(!commonMode())return;
@@ -255,7 +367,7 @@ function saveCommon(){
  const all=cards(),ids=fileKeys(all);for(const c of candidates)ready.add(ids[all.indexOf(c)]);
  delete batchHelp.dataset.error;batchHelp.dataset.success='1';
  batchHelp.textContent='✓ Configuración común guardada en '+candidates.length+' archivo'+(candidates.length===1?'':'s')+'.';
- lastNote='';const pending=all.findIndex((c,i)=>!ready.has(ids[i]));if(pending>=0){selected=pending;selectedId=ids[pending];}
+ lastNote='';const pending=all.findIndex((c,i)=>fileWorkId(c)===currentWorkId&&!ready.has(ids[i]));if(pending>=0){selected=pending;selectedId=ids[pending];}
  sync();openSelectedDetails();
 }
 batchButton.onclick=saveCommon;
@@ -267,7 +379,7 @@ by('modoConfiguracion').addEventListener('change',event=>{
 },true);
 by('configComunGlobal').addEventListener('change',event=>{
  if(!event.isTrusted)return;
- cards().forEach(c=>{if(isCommonCompatible(c))ready.delete(fileKey(c));});
+ cards().forEach(c=>{if(fileWorkId(c)===currentWorkId&&isCommonCompatible(c))ready.delete(fileKey(c));});
  lastNote='Cambiaste opciones para todos: guardá otra vez la configuración común.';
  delete batchHelp.dataset.error;delete batchHelp.dataset.success;queueMicrotask(sync);
 },true);

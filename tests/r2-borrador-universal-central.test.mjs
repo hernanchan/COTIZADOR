@@ -18,7 +18,8 @@ const archivos=[a4('Apuntes.pdf'),a4('Resumen.pdf'),{...a4('Panel.pdf'),
  paginas:[{numero:1,anchoCm:59.4,altoCm:84.1,modo:'cad'}]}];
 const manifiestos=archivos.map((f,i)=>({fileId:'pdf_'+i,nombre:f.nombre,
  sha256:String(i+1).repeat(64),bytes:[60*MIB,2*MIB,150*MIB][i]}));
-const ficha=()=>fichaPrearchivoUniversal({webOrderId,archivos,manifiestos,tarifario});
+const ficha=(trabajosPedido)=>fichaPrearchivoUniversal({webOrderId,archivos,manifiestos,tarifario,
+ ...(trabajosPedido?{trabajosPedido}:{})});
 async function firmada(q){const digest=await webcrypto.subtle.digest('SHA-256',
  new TextEncoder().encode(JSON.stringify(q)));
  return {...q,quoteHash:Buffer.from(digest).toString('hex')};}
@@ -51,6 +52,32 @@ test('un solo lote con tres PDFs y configuración completa por archivo',()=>{
  assert.equal(q.archivos[2].detalle.paginas[0].modo,'cad');
  assert.equal(q.totalArs,q.archivos.reduce((n,f)=>n+f.importeArs,0));
  assert.equal(q.pagoAutorizado,false);
+});
+test('trabajos agrupados conservan el orden en la ficha, Central y manifiesto',async()=>{
+ const q=ficha([
+  {id:'apuntes',nombre:'Apuntes',indices:[0,1]},
+  {id:'plano',nombre:'Plano',indices:[2]}
+ ]);
+ assert.equal(q.schema,'saber-r2-universal-draft-v2');
+ assert.deepEqual(q.trabajosPedido,[
+  {id:'apuntes',nombre:'Apuntes',fileIds:['pdf_0','pdf_1']},
+  {id:'plano',nombre:'Plano',fileIds:['pdf_2']}
+ ]);
+ assert.deepEqual(q.archivos.map(x=>[x.trabajoPedidoId,x.nombreTrabajo]),[
+  ['apuntes','Apuntes'],['apuntes','Apuntes'],['plano','Plano']
+ ]);
+ const payload=await firmada(q);
+ await verificarFichaUniversal(payload,{subtle:webcrypto.subtle});
+ const mock=fakeDB(),env={CENTRAL_R2_UNIVERSAL_DRAFT_ENABLED:'PRIVATE_TEST_ONLY',DB:mock.db};
+ const call=()=>registrarFichaUniversalD1(new Request('https://central.invalid',{method:'POST',body:JSON.stringify(payload)}),env,{
+  readSigned:async req=>({payload:await req.json()}),subtle:webcrypto.subtle,uuid:()=>uid});
+ const saved=await call();assert.equal(saved.status,201,JSON.stringify(await saved.clone().json()));
+ assert.deepEqual(mock.files.map(x=>x.trabajo.trabajoPedidoId),['apuntes','apuntes','plano']);
+ const invalid=await firmada({...q,trabajosPedido:[
+  {id:'apuntes',nombre:'Apuntes',fileIds:['pdf_0']},
+  {id:'plano',nombre:'Plano',fileIds:['pdf_1','pdf_2']}
+ ]});
+ await assert.rejects(verificarFichaUniversal(invalid,{subtle:webcrypto.subtle}));
 });
 test('Central: lote se graba atómicamente y reintento no duplica',async()=>{
  const mock=fakeDB(),payload=await firmada(ficha());

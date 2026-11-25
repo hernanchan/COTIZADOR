@@ -9,6 +9,7 @@ const base='https://pedidos.libreriasaber.com.ar/cotizar';
 const env={SABER_ENTORNO:'produccion',DOCS_LIVE_UI_GATE:gate,DOCS_MP_LIVE_GATE:gate,
  DOCS_LIVE_SESSION_GATE:gate,DOCS_LIVE_ORDER_GATE:gate,DOCS_LIVE_PRICING_GATE:gate};
 const clientJs=fs.readFileSync(new URL('../integraciones/autocotizador/recepcion/asistente-movil-live.txt',import.meta.url),'utf8');
+const cargaJs=fs.readFileSync(new URL('../integraciones/autocotizador/recepcion/carga-unica-cliente.mjs',import.meta.url),'utf8');
 test('un mismo origen, cotizador y estado comercial LIVE para PC y móvil',async()=>{
  const response=paginaCotizarLive(new Request(base),env,{authorized:true});
  assert.equal(response.status,200);
@@ -118,6 +119,28 @@ test('cada archivo tiene cuatro pantallas específicas, sin clonar controles ni 
  assert.match(clientJs,/stage===6/);
  assert.match(clientJs,/querySelector\('.panel-edicion'\)/);
  assert.doesNotMatch(clientJs,/fetch\s*\(|\.submit\s*\(|iniciarPago|mercadopago\.com/i);
+});
+
+test('móvil permite separar trabajos, duplicar configuración y elegir servicios vigentes',()=>{
+ assert.match(clientJs,/mobile-work-tools/);
+ assert.match(clientJs,/Duplicar configuración/);
+ assert.match(clientJs,/api\.snapshot/);
+ assert.match(clientJs,/workApi\(\)\?\.getServiceOptions/);
+ assert.match(clientJs,/mobile-review-file/);
+ assert.match(clientJs,/Eliminar trabajo vacío/);
+ assert.match(clientJs,/mobile-service-choices/);
+ assert.match(clientJs,/filter\(item=>item\.enabled\)/);
+ assert.match(clientJs,/Servicio del trabajo/);
+ assert.match(clientJs,/aria-pressed/);
+ assert.doesNotMatch(clientJs,/workService\.addEventListener\('change'/);
+});
+test('móvil permite definir las opciones compartidas del trabajo antes de cargar archivos',()=>{
+ assert.match(clientJs,/sharedWorkButton\.disabled=!current\|\|current\.servicio!=='auto'/);
+ assert.match(clientJs,/stage===1&&commonMode\(\)&&numFiles\(\)===0/);
+ assert.match(clientJs,/data-mobile-empty/);
+ assert.match(clientJs,/data-mobile-stage="1"\]\[data-mobile-shared="true"\]\[data-mobile-empty="true"\]/);
+ assert.match(cargaJs,/Opciones compartidas del trabajo/);
+ assert.match(cargaJs,/Se aplicarán a los documentos compatibles que agregues/);
 });
 
 test('circuito comercial habilitado para cotizador normal, preview no cobra',async()=>{

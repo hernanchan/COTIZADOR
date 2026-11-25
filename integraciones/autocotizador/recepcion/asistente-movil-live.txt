@@ -58,7 +58,6 @@
    border:1px solid #aac5d8}
  body.saber-mobile #accionesAsistenteMovil button:disabled{opacity:.48}
  body.saber-mobile[data-mobile-stage="1"] #modoConfiguracion,
- body.saber-mobile[data-mobile-stage="1"] #configComunGlobal,
  body.saber-mobile[data-mobile-stage="1"] #anilladosConjuntos,
  body.saber-mobile[data-mobile-stage="1"] #lista,
  body.saber-mobile[data-mobile-stage="1"] #resumenPedido,
@@ -69,9 +68,11 @@
  body.saber-mobile[data-mobile-stage="6"] #zonaArchivos,
  body.saber-mobile[data-mobile-stage="6"] #lista,
  body.saber-mobile #modoConfiguracion,
- body.saber-mobile #configComunGlobal,
  body.saber-mobile #anilladosConjuntos,
  body.saber-mobile #resumenPedido{display:none!important}
+ body.saber-mobile #configComunGlobal{display:none!important}
+ body.saber-mobile[data-mobile-stage="1"][data-mobile-shared="true"][data-mobile-empty="true"] #configComunGlobal{display:grid!important;margin:10px 0;padding:10px;background:#f7fafc;border:1px solid #d6e4ed;border-radius:10px}
+ body.saber-mobile[data-mobile-stage="3"][data-mobile-shared="true"] #configComunGlobal{display:grid!important;margin:10px 0;padding:10px;background:#f7fafc;border:1px solid #d6e4ed;border-radius:10px}
  body.saber-mobile .archivo [data-mobile-hidden="true"]{display:none!important}
  body.saber-mobile .archivo .acciones-archivo{display:none!important}
  body.saber-mobile .archivo .panel-edicion label{font-weight:750;font-size:16px;gap:7px}
@@ -85,8 +86,21 @@
  body.saber-mobile .mobile-review-row strong {display:block;font-size:15px;overflow-wrap:anywhere}
  body.saber-mobile .mobile-review-row small {display:block;color:#45657d;line-height:1.5}
  body.saber-mobile .mobile-review-row .warning {display:block;color:#9a3100;font-weight:700}
+ body.saber-mobile .mobile-review-file{margin-top:8px;padding:9px;border:1px solid #e1e9ef;border-radius:8px;background:#fbfdfe}
+ body.saber-mobile .mobile-review-file strong{font-size:14px}
  body.saber-mobile .saber-wizard .file-count {font-size:14px;font-weight:650}
  body.saber-mobile .saber-wizard .alert {color:#8d3308;font-weight:700}
+ body.saber-mobile .mobile-work-tools{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0;padding:10px;border:1px solid #d6e4ed;border-radius:10px;background:#f7fafc}
+ body.saber-mobile .mobile-work-tools label{grid-column:1/-1;font-size:13px;font-weight:750;color:#234e69}
+ body.saber-mobile .mobile-work-tools select,body.saber-mobile .mobile-work-tools input{width:100%;min-width:0;min-height:44px;border:1px solid #b9ccd9;border-radius:8px;padding:8px;font-size:15px;background:#fff}
+ body.saber-mobile .mobile-service-choices{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+ body.saber-mobile .mobile-service-group{grid-column:1/-1;display:grid;gap:6px}
+ body.saber-mobile .mobile-service-label{font-size:13px;font-weight:750;color:#234e69}
+ body.saber-mobile .mobile-service-choices button{min-width:0;min-height:46px;padding:8px 9px;border:1px solid #b9ccd9;border-radius:9px;background:#fff;color:#234e69;font-size:13px;line-height:1.25}
+ body.saber-mobile .mobile-service-choices button[aria-pressed="true"]{border:2px solid #e19a3a;background:#fff5e4;color:#70430d}
+ body.saber-mobile .mobile-work-tools button{min-height:44px;border:1px solid #174d70;border-radius:8px;background:#174d70;color:white;font-weight:700}
+ body.saber-mobile .mobile-work-tools button.subtle{background:#fff;color:#174d70}
+ body.saber-mobile .mobile-work-tools .mobile-work-status{grid-column:1/-1;margin:0;font-size:12px;color:#536c81}
  `;
  document.head.append(css);
 
@@ -101,6 +115,20 @@
  const title = document.createElement('h2');
  const description = document.createElement('p');
  const fileCount = document.createElement('p');fileCount.className='file-count';
+ const workTools=document.createElement('section');workTools.className='mobile-work-tools';
+ const workLabel=document.createElement('label');workLabel.textContent='Trabajo seleccionado';
+ const workSelect=document.createElement('select');workSelect.setAttribute('aria-label','Seleccionar trabajo');workLabel.append(workSelect);
+ const workServiceGroup=document.createElement('section');workServiceGroup.className='mobile-service-group';
+ const workServiceLabel=document.createElement('strong');workServiceLabel.className='mobile-service-label';workServiceLabel.textContent='Servicio del trabajo';
+ const workService=document.createElement('div');workService.className='mobile-service-choices';workService.setAttribute('role','group');workService.setAttribute('aria-labelledby','mobile-service-label');workServiceLabel.id='mobile-service-label';workServiceGroup.append(workServiceLabel,workService);
+ const newWorkButton=document.createElement('button');newWorkButton.type='button';newWorkButton.textContent='+ Nuevo trabajo';
+ const duplicateWorkButton=document.createElement('button');duplicateWorkButton.type='button';duplicateWorkButton.className='subtle';duplicateWorkButton.textContent='Duplicar configuración';
+ const sharedWorkButton=document.createElement('button');sharedWorkButton.type='button';sharedWorkButton.className='subtle';sharedWorkButton.textContent='Compartir opciones del trabajo';
+ const workName=document.createElement('input');workName.maxLength=80;workName.setAttribute('aria-label','Nombre del trabajo');
+ const saveWorkName=document.createElement('button');saveWorkName.type='button';saveWorkName.className='subtle';saveWorkName.textContent='Guardar nombre';
+ const deleteWorkButton=document.createElement('button');deleteWorkButton.type='button';deleteWorkButton.className='subtle';deleteWorkButton.textContent='Eliminar trabajo vacío';
+ const workStatus=document.createElement('p');workStatus.className='mobile-work-status';
+ workTools.append(workLabel,workServiceGroup,newWorkButton,duplicateWorkButton,sharedWorkButton,workName,saveWorkName,deleteWorkButton,workStatus);
  const review = document.createElement('div');review.id='asistenteResumen';
  const actions = document.createElement('nav');
  actions.id='accionesAsistenteMovil';
@@ -115,15 +143,74 @@
  const next=btn('Continuar',()=>goForward());
  const edit=btn('Modificar opciones',()=>go(2),true);
  const help=document.createElement('p');help.className='micro-help';help.hidden=true;
- nav.append(tag,track,title,description,fileCount,help,review);
+ nav.append(tag,track,title,description,workTools,fileCount,help,review);
  main.insertBefore(nav,$('zonaArchivos'));
  // Anclar debajo de los controles, no arriba junto al título del paso.
  list.insertAdjacentElement('afterend',actions);
  let stage=1,activeFile=0,sendable=false,price=null,opening=false,warning='';
+ let workNumber=1;
  const numFiles=()=>list.querySelectorAll('.archivo').length;
  const cards=()=>[...list.querySelectorAll('.archivo')];
  const postStage=()=>window.parent.postMessage({type:'SABER_MOBILE_STAGE',stage},location.origin);
  const money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(n);
+ const commonMode=()=>document.querySelector('input[name="modoImpresionLote"]:checked')?.value==='comun'&&
+  currentWorkState().works?.find(w=>w.id===currentWorkState().current)?.servicio==='auto';
+ const workApi=()=>window.SABER_PEDIDO_TRABAJOS_API;
+ function currentWorkState(){return workApi()?.getState?.()||{works:[],current:''};}
+ function renderWorkTools(){
+  const s=currentWorkState(),works=s.works||[];workSelect.replaceChildren();
+  for(const work of works)workSelect.add(new Option(work.nombre+' · '+work.cantidad+' archivo'+(work.cantidad===1?'':'s'),work.id));
+  if(s.current)workSelect.value=s.current;
+  const current=works.find(w=>w.id===s.current);
+  workService.replaceChildren();workServiceGroup.hidden=!current||current.cantidad>0;
+  for(const service of (workApi()?.getServiceOptions?.()||[]).filter(item=>item.enabled)){
+   const choice=document.createElement('button');choice.type='button';choice.textContent=service.nombre;
+   choice.setAttribute('aria-pressed',String(service.id===current?.servicio));
+   choice.addEventListener('click',()=>{
+    try{workApi()?.setService?.(workSelect.value,service.id);workStatus.textContent='Servicio elegido para este trabajo.';refresh();}
+    catch(error){workStatus.textContent=String(error.message||error);renderWorkTools();}
+   });workService.append(choice);
+  }
+  workName.value=current?.nombre||'';
+  workTools.hidden=(stage!==1&&stage!==6)||!works.length;
+  duplicateWorkButton.disabled=!current||works.length>=10;
+  deleteWorkButton.disabled=!current||current.cantidad>0||works.length<2;
+  newWorkButton.disabled=works.length>=10;
+  sharedWorkButton.disabled=!current||current.servicio!=='auto';
+  sharedWorkButton.textContent=commonMode()?'Usar opciones por archivo':'Compartir opciones del trabajo';
+  if(current)workStatus.textContent='Los archivos nuevos se agregan a «'+current.nombre+'».';
+ }
+ workSelect.addEventListener('change',()=>{if(workSelect.value)workApi()?.setCurrent?.(workSelect.value);activeFile=0;warning='';refresh()});
+ sharedWorkButton.addEventListener('click',()=>{
+  const input=document.querySelector('input[name="modoImpresionLote"][value="'+(commonMode()?'individual':'comun')+'"]');
+  if(!input)return;
+  input.checked=true;input.dispatchEvent(new Event('change',{bubbles:true}));
+  workStatus.textContent='Tamaño y páginas se revisan por archivo; color, caras, distribución y copias se eligen una sola vez para los documentos del trabajo.';
+  refresh();
+ });
+ function addWork(duplicate){
+  const api=workApi(),s=currentWorkState();if(!api||s.works.length>=10)return;
+  workNumber=Math.max(workNumber,...s.works.map(w=>Number((w.nombre.match(/\d+/)||[])[0])||0))+1;
+  const id='trabajo_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7);
+  const source=s.works.find(w=>w.id===s.current)||s.works.at(-1);
+  const config=duplicate&&source?api.snapshot(source.id):{};
+  window.SABER_TRABAJOS_PEDIDO.push({id,nombre:'Trabajo '+workNumber,servicio:source?.servicio||'auto',configuracion:config});
+  api.setCurrent(id);renderWorkTools();workStatus.textContent=duplicate?'Configuración duplicada; sin archivos.':'Trabajo vacío. Cargá archivos para agregarlo al pedido.';
+  refresh();
+ }
+ newWorkButton.addEventListener('click',()=>addWork(false));
+ duplicateWorkButton.addEventListener('click',()=>addWork(true));
+ saveWorkName.addEventListener('click',()=>{
+  const work=window.SABER_TRABAJOS_PEDIDO?.find(w=>w.id===workSelect.value),name=workName.value.trim();
+  if(!work||!name||name.length>80||/[<>]/.test(name)){workStatus.textContent='Usá un nombre de hasta 80 caracteres.';return;}
+  work.nombre=name;workApi()?.refresh?.();renderWorkTools();refresh();
+ });
+ deleteWorkButton.addEventListener('click',()=>{
+  const s=currentWorkState(),work=s.works.find(w=>w.id===s.current);
+  if(!work||work.cantidad||s.works.length<2)return;
+  window.SABER_TRABAJOS_PEDIDO=window.SABER_TRABAJOS_PEDIDO.filter(w=>w.id!==work.id);
+  workApi()?.setCurrent?.(window.SABER_TRABAJOS_PEDIDO[0].id);renderWorkTools();refresh();
+ });
  function fieldName(label){
   return String(label.childNodes[0]?.textContent||'').replace(/\s+/g,' ').trim().toLowerCase();
  }
@@ -173,14 +260,14 @@
   const all=cards(),editing=stage>=2&&stage<=5;
   activeFile=Math.min(Math.max(0,activeFile),Math.max(0,all.length-1));
   all.forEach((card,i)=>{
-   card.hidden=editing&&i!==activeFile;
+   card.hidden=(stage===3&&commonMode())||(editing&&i!==activeFile);
    if(editing&&i===activeFile)partition(card);
    else if(!editing)card.querySelectorAll('[data-mobile-hidden]').forEach(el=>{el.dataset.mobileHidden='false'});
   });
   list.querySelectorAll('.grupo-pedido').forEach(group=>{
-   group.hidden=editing&&!group.querySelector('.archivo:not([hidden])');
+   group.hidden=(stage===3&&commonMode())||(editing&&!group.querySelector('.archivo:not([hidden])'));
   });
-  if(!editing||!all.length||opening)return;
+  if(!editing||!all.length||opening||(stage===3&&commonMode()))return;
   const current=all[activeFile];
   if(current.querySelector('.panel-edicion'))return;
   const button=current.querySelector('.acciones-archivo button[aria-expanded="false"]');
@@ -191,8 +278,13 @@
  }
  function reviewRows(){
   review.replaceChildren();
+  const groups=new Map();
   for(const card of cards()){
-   const div=document.createElement('div');div.className='mobile-review-row';
+   const fileId=card.dataset.saberTrabajoArchivoId;
+   const work=currentWorkState().files?.find(f=>f.id===fileId)?.trabajoPedidoId||'sin-trabajo';
+   if(!groups.has(work)){const section=document.createElement('section');section.className='mobile-review-row';const heading=document.createElement('strong');
+    heading.textContent=currentWorkState().works?.find(w=>w.id===work)?.nombre||'Trabajo';section.append(heading);groups.set(work,section);review.append(section);}
+   const div=document.createElement('div');div.className='mobile-review-file';
    const name=document.createElement('strong');
    name.textContent=card.querySelector('.nombre')?.textContent||'Archivo seleccionado';
    const details=document.createElement('small');
@@ -204,7 +296,7 @@
     note.textContent=warn.textContent?.slice(0,190)||'Revisá este archivo';
     div.append(note);
    }
-   review.append(div);
+   groups.get(work).append(div);
   }
  }
  function checkFile(){
@@ -239,7 +331,13 @@
    ['Revisá tu presupuesto','Comprobá las opciones y el importe antes de continuar.']
   ][stage-1];
   title.textContent=headings[0];description.textContent=headings[1];
-  fileCount.textContent=(stage>=2&&stage<=5&&numFiles())
+  document.body.dataset.mobileShared=String(commonMode()&&(stage===3||stage===1));
+  document.body.dataset.mobileEmpty=String(numFiles()===0);
+  const shared=$('configComunGlobal');
+  if(shared&&((stage===3&&commonMode())||(stage===1&&commonMode()&&numFiles()===0)))nav.insertBefore(shared,fileCount);
+  else if(shared&&nav.contains(shared))$('modoConfiguracion').insertAdjacentElement('afterend',shared);
+  renderWorkTools();
+  fileCount.textContent=(stage===3&&commonMode()?numFiles()+' documentos · configuración del trabajo':stage>=2&&stage<=5&&numFiles())
    ?'Archivo '+(activeFile+1)+' de '+numFiles():'';
   help.hidden=true;help.textContent='';actions.replaceChildren();review.replaceChildren();
   showCard();
@@ -251,7 +349,7 @@
    actions.style.gridTemplateColumns='1fr';actions.append(next);
   }else if(stage>=2&&stage<=5){
    actions.style.gridTemplateColumns='1fr 1.6fr';
-   next.textContent=stage===2?'Elegir color y papel':stage===3?'Elegir caras':
+   next.textContent=stage===2&&commonMode()&&activeFile<numFiles()-1?'Siguiente archivo':stage===2&&commonMode()?'Configurar opciones compartidas':stage===2?'Elegir color y papel':stage===3&&commonMode()?'Revisar presupuesto':stage===3?'Elegir caras':
     stage===4?'Copias y terminación':
      activeFile<numFiles()-1?'Siguiente archivo':'Revisar presupuesto';
    next.disabled=numFiles()===0;actions.append(prev,next);
@@ -282,6 +380,7 @@
  }
  function goBack(){
   if(stage===6){activeFile=Math.max(0,numFiles()-1);go(5);return}
+  if(stage===3&&commonMode()){activeFile=Math.max(0,numFiles()-1);go(2);return}
   if(stage===2&&activeFile>0){activeFile--;go(5);return}
   go(stage-1);
  }
@@ -290,6 +389,8 @@
   if(stage>=2&&stage<=5){
    warning=checkFile();
    if(warning){refresh();return}
+   if(stage===2&&commonMode()&&activeFile<numFiles()-1){activeFile++;go(2);return;}
+   if(stage===3&&commonMode()){go(6);return;}
    if(stage===5){
     if(activeFile<numFiles()-1){activeFile++;go(2);return}
     go(6);return;
@@ -303,6 +404,7 @@
    actions.hidden=true;
    document.body.classList.remove('saber-mobile');
    document.body.removeAttribute('data-mobile-stage');
+  document.body.removeAttribute('data-mobile-shared');
    nav.hidden=true;
    list.querySelectorAll('.archivo,.grupo-pedido').forEach(el=>{el.hidden=false});
    list.querySelectorAll('[data-mobile-hidden]').forEach(el=>{el.dataset.mobileHidden='false'});

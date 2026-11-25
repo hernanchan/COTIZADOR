@@ -16,7 +16,8 @@ const order={ok:true,webOrderId,commercialOrderId,numeroOrden:'018',
 const checkout={ok:true,webOrderId,commercialOrderId,amountArs:5000,fileCount:1,
  uploadAuthorized:false,productionAuthorized:false,
  checkoutUrl:'https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=abc'};
-function fixture({originOverride=origin,draftOverride={},orderOverride={},localSaveFails=false}={}){
+function fixture({originOverride=origin,draftOverride={},orderOverride={},localSaveFails=false,
+ trabajosPedido}={}){
  const calls=[],store=new Map(),state=[],originals=new Map();
  const fetcher=async(path,opts)=>{
   calls.push({path,opts});
@@ -32,6 +33,7 @@ function fixture({originOverride=origin,draftOverride={},orderOverride={},localS
  };
  const build=()=>crearFlujoPresupuestoLive({
   origin:originOverride,files:[file],archivos,webOrderId,telefono:'351 5554444',
+  ...(trabajosPedido?{trabajosPedido}:{}) ,
   nombre:'Ana Pérez',direccion:'Poeta Lugones 123, Córdoba',
   fetcher,hasher:async()=>sha,uuid:()=>draftId,
   storage:{setItem:(key,val)=>store.set(key,val)},
@@ -49,6 +51,22 @@ function fixture({originOverride=origin,draftOverride={},orderOverride={},localS
  });
  return {calls,store,state,build};
 }
+test('LIVE envía los grupos validados al borrador sin alterar las líneas cotizables',async()=>{
+ const groups=[{id:'documentos',nombre:'Apuntes',indices:[0]}];
+ const f=fixture({trabajosPedido:groups}),flow=f.build();
+ await flow.preparar();
+ const draftCall=f.calls.find(c=>c.path.endsWith('/borrador'));
+ const body=JSON.parse(draftCall.opts.body);
+ assert.deepEqual(body.trabajosPedido,groups);
+ assert.equal(Object.hasOwn(body.archivos[0],'trabajoPedidoId'),false);
+ assert.equal(Object.hasOwn(body.archivos[0],'nombreTrabajo'),false);
+});
+test('LIVE rechaza grupos incompletos antes de conservar archivos o llamar al servidor',async()=>{
+ const f=fixture({trabajosPedido:[{id:'documentos',nombre:'Apuntes',indices:[]}]});
+ assert.throws(f.build,/TRABAJO_PEDIDO/);
+ assert.equal(f.calls.length,0);
+ assert.equal(f.store.size,0);
+});
 test('LIVE presupuestar y crear orden sin transmitir originales',async()=>{
  const f=fixture(),flow=f.build();
  const r=await flow.preparar();

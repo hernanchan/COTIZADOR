@@ -107,11 +107,23 @@ export async function promoverPedidoUniversalD1(request,env,{
    return w;
   });
   armados=JSON.parse(d.armados_json);
+  const grouped=f.some(w=>Object.hasOwn(w,'trabajoPedidoId')||Object.hasOwn(w,'nombreTrabajo'));
+  if(grouped&&f.some(w=>typeof w.trabajoPedidoId!=='string'||
+     typeof w.nombreTrabajo!=='string'))throw Error('Agrupación incompleta');
+  const byJob=new Map();
+  if(grouped)for(const w of f){
+   let g=byJob.get(w.trabajoPedidoId);
+   if(!g){g={id:w.trabajoPedidoId,nombre:w.nombreTrabajo,fileIds:[]};byJob.set(g.id,g)}
+   if(g.nombre!==w.nombreTrabajo)throw Error('Nombre de trabajo inconsistente');
+   g.fileIds.push(w.fileId);
+  }
   // Rebuild the original SHA-256 signed full quote, not a browser subtotal.
   await verificarFichaUniversal({
-   schema:'saber-r2-universal-draft-v1',webOrderId:p.webOrderId,
+   schema:grouped?'saber-r2-universal-draft-v2':'saber-r2-universal-draft-v1',
+   webOrderId:p.webOrderId,
    priceRevision:d.price_revision,totalArs:d.total_ars,
-   archivos:f,armados,pagoAutorizado:false,subidaAutorizada:false,
+   archivos:f,armados,...(grouped?{trabajosPedido:[...byJob.values()]}:{}),
+   pagoAutorizado:false,subidaAutorizada:false,
    produccionAutorizada:false,estado:'PRELIMINAR_SIN_ORIGINALES',
    quoteHash:d.quote_hash
   },{subtle,allowTusOnly:live||f.some(w=>w.destino==='fotos')});

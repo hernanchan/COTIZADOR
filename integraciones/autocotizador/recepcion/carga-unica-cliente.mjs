@@ -5,6 +5,7 @@ import {prepararBorradorPedido} from './preparar-borrador-pedido.mjs';
 import {componerCarritoPreliminar} from './componer-carrito-preliminar.mjs';
 import {seleccionarPaginas} from './seleccionar-paginas.mjs';
 import {decidirTamanoCliente} from './decision-tamano-impresion.mjs';
+import {aplicarConfiguracionCompartida,aplicarValorCompartido,establecerExcepcionDeArchivo,limpiarExcepcionDeArchivo,excepcionesDeArchivo} from './configuracion-compartida-trabajos.mjs';
 import {clasificarPaginasPloteo} from './clasificar-paginas-ploteo.mjs';
 import {clasificarMosaicoRasterPDFGrande} from './clasificar-ploteo-grande-raster-local.mjs';
 import {clasificarPloteoGrandeVisualLimitado} from './clasificar-ploteo-grande-visual-limitado.mjs';
@@ -14,10 +15,21 @@ import {prepararLoteParcial,recomponerLoteParcial} from './cotizar-lote-parcial.
 import {solicitarCotizacionPrivada} from './solicitar-cotizacion-privada.mjs';
 import {decidirTransportePDF,LIMITE_TUS_PDF_BYTES,LIMITE_R2_PDF_BYTES} from './seleccionar-transporte-pdf.mjs';
 import {normalizarArchivosImpresion} from './imagenes-a-pdf-local.mjs';
+import {resumirSubtotalesTrabajos} from './resumir-subtotales-trabajos.mjs';
 const $=id=>document.getElementById(id);
 const entries=[];
+const idTrabajoInicial='trabajo_1';
+const nuevoIdArchivoTrabajo=()=>typeof crypto?.randomUUID==='function'?
+ 'archivo_'+crypto.randomUUID().replaceAll('-',''):
+ 'archivo_'+Date.now().toString(36)+Math.random().toString(36).slice(2,12);
+window.SABER_TRABAJOS_PEDIDO=Array.isArray(window.SABER_TRABAJOS_PEDIDO)?
+ window.SABER_TRABAJOS_PEDIDO:[{id:idTrabajoInicial,nombre:'Trabajo 1',configuracion:{}}];
+window.SABER_TRABAJO_ACTUAL=window.SABER_TRABAJO_ACTUAL||idTrabajoInicial;
+const trabajoActual=()=>window.SABER_TRABAJOS_PEDIDO.find(t=>t.id===window.SABER_TRABAJO_ACTUAL)||
+ window.SABER_TRABAJOS_PEDIDO[0];
 let modoLote='individual'; // Predeterminado móvil: la carga está siempre disponible.
-const configuracionComun={}; // Opciones comunes persistentes para nuevos PDF compatibles.
+const configuracionComunInicial={}; // Se conserva como valor inicial para trabajos existentes.
+const configTrabajo=id=>window.SABER_TRABAJOS_PEDIDO.find(t=>t.id===id)?.configuracion||configuracionComunInicial;
 function actualizarModoLote(){
  const zona=$('zonaArchivos');if(zona)zona.hidden=false;
  const aviso=$('modoAviso');if(aviso)aviso.textContent=modoLote==='comun'?'Configuración común: las medidas y las páginas se revisan para cada PDF.':modoLote==='individual'?'Cada archivo conserva sus propias opciones, dentro del mismo pedido.':'Elegí una opción antes de subir archivos.';
@@ -27,6 +39,7 @@ function actualizarModoLote(){
 const UNIVERSAL_COMPRADOR_LIVE=location.pathname==='/cotizar/archivos'&&window.parent!==window;
 const SERVICIO_INICIAL_LIVE=UNIVERSAL_COMPRADOR_LIVE&&['fotos','stickers'].includes(new URLSearchParams(location.search).get('servicio'))?
  new URLSearchParams(location.search).get('servicio'):'auto';
+for(const work of window.SABER_TRABAJOS_PEDIDO)if(!work.servicio)work.servicio=SERVICIO_INICIAL_LIVE;
 // Para 30 imágenes fotográficas, agrupar hasta 10 páginas en cada PDF sin subir JPG/PNG originales.
 if(SERVICIO_INICIAL_LIVE==='fotos')modoLote='comun';
 const MAX_PDF_CARGA=(location.pathname==='/prueba-v2/carga-inteligente'||UNIVERSAL_COMPRADOR_LIVE)?10:30;
@@ -94,12 +107,19 @@ function informarPrecioPrivado(estado,total=null,motivo=''){
  if(window.parent===window)return;
  const bloqueoRecepcion=[...alertasRecepcionPDF().values()][0]||'';
  const sendable=estado==='listo'&&ultimoPresupuesto?.estado==='PRELIMINAR'&&!bloqueoRecepcion;
+ let trabajos=null;
+ if(estado==='listo'&&ultimoPresupuesto?.estado==='PRELIMINAR'&&
+    typeof resumirSubtotalesTrabajos==='function'){
+  trabajos=resumirSubtotalesTrabajos({cotizacion:ultimoPresupuesto,
+   trabajos:sidecarTrabajosPedido(),cantidadArchivos:entries.length});
+ }
  window.parent.postMessage({type:'SABER_SMART_PRICE_STATE',estado,
   total:Number.isSafeInteger(total)&&total>0?total:null,
   promocion:estado==='listo'&&ultimoPresupuesto?.promocion?.aplicada===true?
    {titulo:ultimoPresupuesto.promocion.titulo,descuento:ultimoPresupuesto.promocion.descuento,
     totalAnterior:ultimoPresupuesto.promocion.totalAnterior}:null,
-  sendable,blockReason:bloqueoRecepcion||(estado==='error'?String(motivo||'No se pudo verificar el precio.').slice(0,220):null)},location.origin);
+  ...(trabajos?{trabajos}:{}),sendable,
+  blockReason:bloqueoRecepcion||(estado==='error'?String(motivo||'No se pudo verificar el precio.').slice(0,220):null)},location.origin);
 }
 function importeArchivo(indice){
  if(!ultimoPresupuesto)return null;
@@ -143,6 +163,91 @@ const formatoOriginal=paginas=>{
 const valor=(label,options,selected,change)=>{const l=texto('label',label+' '),sel=document.createElement('select');for(const [k,v] of options)sel.add(new Option(v,k));sel.value=selected;sel.onchange=()=>change(sel.value);l.append(sel);return l};
 function paginasElegidas(e){try{return seleccionarPaginas(e.paginas,e.paginasSeleccionadas)}catch(_){return null}}
 function cambio(){version++;render();cotizar()}
+const CONFIGURACION_TRABAJO_KEYS=['seleccion','modo','caras','papelPoster','copias',
+ 'anillado','grupoAnillado','paginasPorHoja','materialColor','paginasSeleccionadas',
+ 'productoFoto','productoGrafica','corteVariante','corteMetros'];
+function instantaneaConfigTrabajo(e){
+ return Object.fromEntries(CONFIGURACION_TRABAJO_KEYS.filter(k=>e&&e[k]!==undefined).map(k=>[k,e[k]]));
+}
+function normalizarOrdenDeTrabajos(){
+ const orden=new Map(window.SABER_TRABAJOS_PEDIDO.map((w,i)=>[w.id,i]));
+ entries.sort((a,b)=>(orden.get(a.trabajoPedidoId)??999)-(orden.get(b.trabajoPedidoId)??999));
+ for(const e of entries){
+  const work=window.SABER_TRABAJOS_PEDIDO.find(w=>w.id===e.trabajoPedidoId);
+  if(work)e.nombreTrabajo=work.nombre;
+ }
+}
+function sidecarTrabajosPedido(){
+ normalizarOrdenDeTrabajos();
+ const groups=[];
+ entries.forEach((e,indice)=>{
+  let group=groups.at(-1);
+  if(!group||group.id!==e.trabajoPedidoId){
+   const work=window.SABER_TRABAJOS_PEDIDO.find(w=>w.id===e.trabajoPedidoId);
+   if(!work)throw Error('Hay un archivo sin trabajo asignado.');
+   group={id:work.id,nombre:work.nombre,indices:[]};groups.push(group);
+  }
+  group.indices.push(indice);
+ });
+ return groups;
+}
+function entradasParaCotizar(){
+ const anillados=new Map();let nextId=0;
+ return entries.map(e=>{
+  if(e.anillado!=='grupo')return e;
+  const key=e.trabajoPedidoId+'\u0000'+String(e.grupoAnillado||'');
+  if(!anillados.has(key))anillados.set(key,String(++nextId));
+  return {...e,grupoAnillado:anillados.get(key)};
+ });
+}
+window.SABER_PEDIDO_TRABAJOS_API={
+ getState:()=>({works:window.SABER_TRABAJOS_PEDIDO.map(w=>({
+  id:w.id,nombre:w.nombre,servicio:w.servicio||SERVICIO_INICIAL_LIVE,configuracion:{...w.configuracion},
+  cantidad:entries.filter(e=>e.trabajoPedidoId===w.id).length})),
+  current:window.SABER_TRABAJO_ACTUAL,
+  files:entries.map(e=>({id:e.trabajoArchivoId,nombre:e.name,trabajoPedidoId:e.trabajoPedidoId,servicio:e.servicio}))}),
+ getServiceOptions:()=>[
+  {id:'auto',nombre:'Documentos, planos y pósters',enabled:true},
+  {id:'stickers',nombre:'Stickers con precorte',enabled:true},
+  {id:'fotos',nombre:'Fotografías y carnet',enabled:productosFoto.length>0},
+  {id:'corte',nombre:'Ploteo de corte',enabled:variantesCorte.length>0},
+  {id:'grafica',nombre:'Gráfica comercial',enabled:productosGrafica.length>0}
+ ],
+ setCurrent:id=>{
+  if(!window.SABER_TRABAJOS_PEDIDO.some(w=>w.id===id))throw Error('No se encontró el trabajo.');
+  window.SABER_TRABAJO_ACTUAL=id;renderConfiguracionGlobal();render();
+ },
+ setService:(workId,service)=>{
+  const work=window.SABER_TRABAJOS_PEDIDO.find(w=>w.id===workId);
+  if(!work)throw Error('No se encontró el trabajo.');
+  if(entries.some(e=>e.trabajoPedidoId===workId))throw Error('Para cambiar el servicio, creá otro trabajo y mové allí los archivos compatibles.');
+  if(!window.SABER_PEDIDO_TRABAJOS_API.getServiceOptions().some(x=>x.id===service&&x.enabled))
+   throw Error('Ese servicio no está disponible en este momento.');
+  work.servicio=service;render();
+ },
+ moveFile:(fileId,workId)=>{
+  const e=entries.find(x=>x.trabajoArchivoId===fileId),work=window.SABER_TRABAJOS_PEDIDO.find(w=>w.id===workId);
+  if(!e||!work)throw Error('No se pudo asignar el archivo al trabajo.');
+  if(e.servicio!==(work.servicio||SERVICIO_INICIAL_LIVE))throw Error('El archivo y el trabajo elegido usan servicios distintos. Creá un trabajo con el mismo servicio para conservar su configuración.');
+  e.trabajoPedidoId=work.id;e.nombreTrabajo=work.nombre;
+  normalizarOrdenDeTrabajos();cambio();
+ },
+ snapshot:(workId)=>{
+  const work=window.SABER_TRABAJOS_PEDIDO.find(w=>w.id===workId);
+  if(!work)throw Error('No se encontró el trabajo.');
+  const file=entries.find(e=>e.trabajoPedidoId===workId&&e.paginas&&!e.error);
+  const config={...work.configuracion};
+  if(file){
+   const excepciones=excepcionesDeArchivo(file),instantanea=instantaneaConfigTrabajo(file);
+   for(const [campo,valor] of Object.entries(instantanea))
+    if(config[campo]===undefined&&!Object.hasOwn(excepciones,campo))config[campo]=valor;
+  }
+  // La selección de páginas pertenece al archivo de origen, no a la plantilla.
+  delete config.paginasSeleccionadas;
+  return config;
+ },
+ refresh:()=>{normalizarOrdenDeTrabajos();cambio()}
+};
 // Sólo impresiones documentales: dos decisiones visibles y las demás
 // en un desplegable. Conserva el mismo "paginasPorHoja" del presupuesto,
 // la verificación del servidor y la ficha de producción.
@@ -157,7 +262,7 @@ function selectorPaginasPorCara(e,indice){
   const input=document.createElement('input');
   input.type='radio';input.name='paginas-por-cara-'+indice;input.value=String(value);
   input.checked=n===value;
-  input.onchange=()=>{if(input.checked){e.paginasPorHoja=value;cambio()}};
+  input.onchange=()=>{if(input.checked){asignarOpcionIndividual(e,'paginasPorHoja',value);cambio()}};
   wrapper.append(input,texto('span',label));
   return wrapper;
  };
@@ -208,12 +313,27 @@ function cantidadCopias(e){
    input.setCustomValidity('Elegí una cantidad entera entre 1 y 500.');
    input.reportValidity();input.value=String(e.copias);return;
   }
-  input.setCustomValidity('');e.copias=n;cambio();
+  input.setCustomValidity('');asignarOpcionIndividual(e,'copias',n);cambio();
  };
  l.append(input);return l;
 }
 
 const texto=(tag,value)=>{const n=document.createElement(tag);n.textContent=value;return n};
+function asignarOpcionIndividual(e,campo,valor){
+ if(modoLote==='comun')establecerExcepcionDeArchivo(e,campo,valor);
+ else if(campo==='anillado'){
+  const grupo=/^grupo:([1-5])$/.exec(String(valor));
+  e.anillado=grupo?'grupo':valor;e.grupoAnillado=grupo?grupo[1]:'';
+ }else e[campo]=valor;
+}
+function restablecerExcepcionesTrabajo(e){
+ const config=configTrabajo(e.trabajoPedidoId),defaults={modo:'bn',caras:'simple',copias:1,paginasPorHoja:1,anillado:'ninguno',papelPoster:'obra80'};
+ for(const campo of Object.keys(excepcionesDeArchivo(e))){
+  limpiarExcepcionDeArchivo(e,campo);
+  aplicarValorCompartido(e,campo,Object.hasOwn(config,campo)?config[campo]:defaults[campo]);
+ }
+ aplicarConfiguracionComunAlDocumento(e);
+}
 // La categoría es sólo presentación: no reordena `entries` ni los índices del
 // manifiesto, ni modifica la clasificación página a página o los importes.
 function grupoVisible(e){
@@ -255,24 +375,23 @@ function aplicarConfiguracionComunAlDocumento(e){
  const paginas=paginasElegidas(e);if(!paginas)return;
  const destino=clasificarDestino(paginas,e.seleccion);
  if(!destino.confirmado||destino.destino!=='documentos')return;
- for(const [campo,valor] of Object.entries(configuracionComun)){
-  if(campo==='modo'){e.modo=valor;e.materialColor=''}
-  else if(campo==='caras')e.caras=valor;
-  else if(campo==='copias')e.copias=valor;
-  else if(campo==='paginasPorHoja')e.paginasPorHoja=valor;
-  else if(campo==='anillado'){
-   const g=/^grupo:([1-5])$/.exec(valor);
-   e.anillado=g?'grupo':valor;e.grupoAnillado=g?g[1]:'';
-  }
- }
+ const config=configTrabajo(e.trabajoPedidoId);
+ aplicarConfiguracionCompartida(e,config);
+ if(config.modo&&!Object.hasOwn(excepcionesDeArchivo(e),'modo'))e.materialColor='';
 }
 function renderConfiguracionGlobal(){
  const holder=$('configComunGlobal');if(!holder)return;
  holder.replaceChildren();holder.hidden=modoLote!=='comun';
  if(modoLote!=='comun')return;
- const indices=entries.map((e,i)=>({e,i})).filter(({e})=>e.paginas&&!e.error&&
+ const config=configTrabajo(window.SABER_TRABAJO_ACTUAL);
+ const indices=entries.map((e,i)=>({e,i})).filter(({e})=>e.trabajoPedidoId===window.SABER_TRABAJO_ACTUAL&&e.paginas&&!e.error&&
   e.servicio==='auto'&&clasificarDestino(paginasElegidas(e)||e.paginas,e.seleccion).destino==='documentos').map(({i})=>i);
- if(!indices.length){holder.append(texto('p','Cargá al menos un PDF documental para definir las opciones compartidas.'));return}
+ if(!indices.length){
+  const barra=controlesComunes({id:'a4',indices},true);
+  if(barra){barra.querySelector('strong').textContent='Opciones compartidas del trabajo';holder.append(barra)}
+  holder.append(texto('small','Se aplicarán a los documentos compatibles que agregues. El tamaño y la selección de páginas se revisan en cada PDF.'));
+  return;
+ }
  const barra=controlesComunes({id:'a4',indices},true);
  if(barra){barra.querySelector('strong').textContent='Configuración compartida · '+indices.length+' documentos';holder.append(barra)}
  holder.append(texto('small','Estas opciones se aplican a todos los documentos compatibles. Las fichas inferiores muestran solo el resumen y las decisiones de tamaño necesarias; podés personalizar un PDF como excepción.'));
@@ -281,28 +400,24 @@ function controlesComunes(grupo,global=false){
  const tipos=['personalizado_a4','a5','a4','a3'].includes(grupo.id),ploteo=['cad','poster','mixtos'].includes(grupo.id);
  if((grupo.indices.length<2&&!global)||(!tipos&&!ploteo))return null;
  const barra=document.createElement('div');barra.className='opciones-comunes';
- barra.append(texto('strong','Opciones para estos '+grupo.indices.length+' archivos'));
+  barra.append(texto('strong',global?(grupo.indices.length?'Opciones compartidas para '+grupo.indices.length+' documentos de este trabajo':'Opciones compartidas del trabajo'):'Opciones para estos '+grupo.indices.length+' archivos'));
  const aplicar=(campo,valor)=>{
-  if(global)configuracionComun[campo]=valor;
+  if(global){
+   const work=trabajoActual();if(work)work.configuracion={...work.configuracion,[campo]:valor};
+  }
   for(const i of grupo.indices){
    const e=entries[i];
-   if(campo==='modo'){e.modo=valor;e.materialColor=''}
-   else if(campo==='caras')e.caras=valor;
-   else if(campo==='anillado'){
-    const id=/^grupo:([1-5])$/.exec(valor);
-    e.anillado=id?'grupo':valor;
-    e.grupoAnillado=id?id[1]:'';
-   }
-   else if(campo==='papelPoster')e.papelPoster=valor;
-   else if(campo==='copias')e.copias=valor;
-   else if(campo==='paginasPorHoja')e.paginasPorHoja=valor;
+   if(global||modoLote!=='comun')aplicarValorCompartido(e,campo,valor);
+   else establecerExcepcionDeArchivo(e,campo,valor);
+   if(campo==='modo')e.materialColor='';
   }
   cambio();
  };
- const lCopias=texto('label','Copias para todos');
+  const lCopias=texto('label',global?'Copias para los documentos de este trabajo':'Copias para todos');
  const copias=document.createElement('input');copias.type='number';copias.min='1';copias.max='500';copias.step='1';
  copias.placeholder='1 a 500';copias.setAttribute('aria-label','Aplicar copias a todo el grupo');
- if(global&&Number.isSafeInteger(configuracionComun.copias))copias.value=String(configuracionComun.copias);
+ const config=configTrabajo(window.SABER_TRABAJO_ACTUAL);
+ if(global&&Number.isSafeInteger(config.copias))copias.value=String(config.copias);
  copias.onchange=()=>{
   const v=Number(copias.value);
   if(!Number.isSafeInteger(v)||v<1||v>500){copias.setCustomValidity('Elegí de 1 a 500 copias');copias.reportValidity();return}
@@ -310,10 +425,10 @@ function controlesComunes(grupo,global=false){
  };
  lCopias.append(copias);barra.append(lCopias);
  if(tipos){
-  barra.append(accionComun('Impresión para todos',[['bn','Blanco y negro'],['color','Color']],v=>aplicar('modo',v),global?(configuracionComun.modo||''):''));
-  barra.append(accionComun('Caras para todos',[['simple','Simple faz'],['double','Doble faz']],v=>aplicar('caras',v),global?(configuracionComun.caras||''):''));
-  barra.append(accionComun('Páginas por cara para todos',[['1','1 página'],['2','2 páginas'],['4','4 páginas'],['9','9 páginas']],v=>aplicar('paginasPorHoja',Number(v)),global?String(configuracionComun.paginasPorHoja||''):''));
-  barra.append(accionComun('Anillado para todos',[['ninguno','Sin anillado'],['individual','Individual por archivo'],...Array.from({length:5},(_,i)=>['grupo:'+(i+1),'Juntos · Grupo '+(i+1)])],v=>aplicar('anillado',v),global?(configuracionComun.anillado||''):''));
+  barra.append(accionComun(global?'Impresión para estos documentos':'Impresión para todos',[['bn','Blanco y negro'],['color','Color']],v=>aplicar('modo',v),global?(config.modo||''):''));
+  barra.append(accionComun(global?'Caras para estos documentos':'Caras para todos',[['simple','Simple faz'],['double','Doble faz']],v=>aplicar('caras',v),global?(config.caras||''):''));
+  barra.append(accionComun(global?'Páginas por cara para estos documentos':'Páginas por cara para todos',[['1','1 página'],['2','2 páginas'],['4','4 páginas'],['9','9 páginas']],v=>aplicar('paginasPorHoja',Number(v)),global?String(config.paginasPorHoja||''):''));
+  barra.append(accionComun(global?'Anillado de estos documentos':'Anillado para todos',[['ninguno','Sin anillado'],['individual','Individual por archivo'],...Array.from({length:5},(_,i)=>['grupo:'+(i+1),'Juntos · Grupo '+(i+1)])],v=>aplicar('anillado',v),global?(config.anillado||''):''));
  }
  if(['cad','poster','mixtos'].includes(grupo.id))
   barra.append(accionComun('Papel para ploteos',[['obra80','Obra 80 g'],['recubierto','Recubierto 130 g']],v=>aplicar('papelPoster',v)));
@@ -415,6 +530,7 @@ function render(){
   for(const i of grupo.indices){
   const e=entries[i];
   const card=texto('section','');card.className='archivo';
+  card.dataset.saberTrabajoArchivoId=e.trabajoArchivoId;
   const advertenciaRecepcion=advertenciasRecepcion.get(e);
   if(advertenciaRecepcion)card.classList.add('archivo-no-admitido');
   const fila=document.createElement('div');fila.className='fila';
@@ -437,7 +553,7 @@ function render(){
    const extra=e.servicio==='grafica'?' · '+(productosGrafica.find(p=>p.id===e.productoGrafica)?.name||'Elegir variante'):e.servicio==='corte'?' · '+e.corteMetros+' m':e.servicio==='fotos'?' · '+(productosFoto.find(p=>p.id===e.productoFoto)?.name||'Elegir producto'):e.servicio==='stickers'?' · Adhesivo fotográfico':d.destino==='documentos'?(' · '+material+(e.anillado==='individual'?' · Anillado':e.anillado==='grupo'?' · Grupo '+e.grupoAnillado:'')):
     (elegidas.some(p=>p.modo==='poster')?' · '+(e.papelPoster==='recubierto'?'Recubierto':'Obra 80 g'):'');
    const nup=d.destino==='documentos'&&(e.paginasPorHoja??1)>1?' · '+e.paginasPorHoja+' por cara':'';
-   resumen.textContent=(e.paginasSeleccionadas?(e.paginasSeleccionadas+' de '+e.paginas.length):(e.paginas.length+' pág.'))+' · '+tipo+(d.confirmado?' '+(d.tamanoFinal==='original'?'original':d.tamanoFinal.toUpperCase()):'')+' · '+e.copias+(e.servicio==='grafica'?' lote(s)':' copia(s)')+((d.confirmado||independiente)?extra+nup:'');
+   resumen.textContent=(e.paginasSeleccionadas?(e.paginasSeleccionadas+' de '+e.paginas.length):(e.paginas.length+' pág.'))+' · '+tipo+(d.confirmado?' '+(d.tamanoFinal==='original'?'original':d.tamanoFinal.toUpperCase()):'')+' · '+e.copias+(e.servicio==='grafica'?' lote(s)':' copia(s)')+((d.confirmado||independiente)?extra+nup:'')+(Object.keys(excepcionesDeArchivo(e)).length?' · Personalizado':'');
   }else resumen.textContent=e.error?'Error de lectura':'Analizando PDF…';
   principal.append(resumen);
   // La selección es visible ANTES del render de las páginas raster pesadas.
@@ -714,8 +830,8 @@ function render(){
      const aviso=texto('p','Para stickers, elegí tamaño de salida A4 o A3.');aviso.className='advertencia';panel.append(aviso);
     }else panel.append(texto('p','Incluye impresión en adhesivo fotográfico y precorte. Cada página del PDF representa una plancha por copia.'));
    }else if(decision.destino==='documentos'){
-    controles.append(valor('Impresión', [['bn','Blanco y negro'],['color','Color']],e.modo,v=>{e.modo=v;cambio()}));
-    controles.append(valor('Caras', [['simple','Simple faz'],['double','Doble faz']],e.caras,v=>{e.caras=v;cambio()}));
+    controles.append(valor('Impresión', [['bn','Blanco y negro'],['color','Color']],e.modo,v=>{asignarOpcionIndividual(e,'modo',v);e.materialColor='';cambio()}));
+    controles.append(valor('Caras', [['simple','Simple faz'],['double','Doble faz']],e.caras,v=>{asignarOpcionIndividual(e,'caras',v);cambio()}));
     panel.append(texto('p','Elegí 1 o 2 páginas por cara directamente debajo del archivo. En doble faz, 2 páginas por cara permite hasta cuatro páginas del PDF por hoja física.'));
     const formato=decision.tamanoFinal==='original'?formatoOriginal(paginas):decision.tamanoFinal;
     if(e.modo==='color'&&['personalizado_a4','a5','a4','a3'].includes(formato)){
@@ -724,8 +840,8 @@ function render(){
      if(disponibles.length)controles.append(valor('Material',disponibles.map(m=>[m.id,m.name]),e.materialColor,v=>{e.materialColor=v;cambio()}));
      else panel.append(texto('p','Materiales no disponibles: no cotizar hasta recuperar el catálogo.'));
     }
-    controles.append(valor('Anillado',[['ninguno','Sin anillado'],['individual','Cada archivo por separado'],['grupo','Varios archivos juntos']],e.anillado,v=>{e.anillado=v;if(v!=='grupo')e.grupoAnillado='';else e.grupoAnillado='1';cambio()}));
-    if(e.anillado==='grupo')controles.append(valor('Grupo de anillado',[['1','Grupo 1'],['2','Grupo 2'],['3','Grupo 3'],['4','Grupo 4'],['5','Grupo 5']],e.grupoAnillado,v=>{e.grupoAnillado=v;cambio()}));
+    controles.append(valor('Anillado',[['ninguno','Sin anillado'],['individual','Cada archivo por separado'],['grupo','Varios archivos juntos']],e.anillado,v=>{const binding=v==='grupo'?'grupo:'+(e.grupoAnillado||'1'):v;asignarOpcionIndividual(e,'anillado',binding);cambio()}));
+    if(e.anillado==='grupo')controles.append(valor('Grupo de anillado',[['1','Grupo 1'],['2','Grupo 2'],['3','Grupo 3'],['4','Grupo 4'],['5','Grupo 5']],e.grupoAnillado,v=>{asignarOpcionIndividual(e,'anillado','grupo:'+v);cambio()}));
     if(e.anillado==='grupo')panel.append(texto('p','Los PDF del grupo deben tener igual tamaño final y cantidad de copias.'));
    }else{
     // CAD/pleno y el papel se eligen en la tarjeta visible, sin abrir detalles.
@@ -743,6 +859,12 @@ function render(){
      panel.append(texto('p','Análisis CAD/Póster pendiente: requiere revisión, sin precio.'));
    }
   }else {const n=texto('p','Elegí el tamaño de impresión para continuar.');n.className='advertencia';panel.append(n)}
+  const excepciones=excepcionesDeArchivo(e);
+  if(Object.keys(excepciones).length){
+   const aviso=texto('small','Este archivo tiene opciones distintas de las compartidas en el trabajo.');aviso.className='excepcion-trabajo';panel.append(aviso);
+   const restablecer=texto('button','Usar configuración del trabajo');restablecer.type='button';restablecer.className='editar';
+   restablecer.onclick=()=>{restablecerExcepcionesTrabajo(e);cambio()};panel.append(restablecer);
+  }
   panel.append(controles);
   card.append(panel);
   bloque.append(card);
@@ -873,7 +995,7 @@ document.querySelectorAll('input[name="modoImpresionLote"]').forEach(input=>{
   modoLote=input.value;
   actualizarModoLote();
   // Al activar modo común sobre un lote existente, reutilizar las preferencias explícitas previas.
-  if(modoLote==='comun')for(const e of entries)aplicarConfiguracionComunAlDocumento(e);
+  if(modoLote==='comun')for(const e of entries)if(e.trabajoPedidoId===window.SABER_TRABAJO_ACTUAL)aplicarConfiguracionComunAlDocumento(e);
   cambio();
  });
 });
@@ -912,7 +1034,18 @@ $('archivos').addEventListener('change',async ev=>{
 
  // Mantener fichas compactas al cargar un lote; cada PDF se edita sólo si hace falta.
  if(!entries.length)abierto=-1;
- for(const f of files)entries.push({name:f.name,archivoOriginal:f,paginas:null,seleccion:SERVICIO_INICIAL_LIVE==='fotos'?'a4':'sin-confirmar',error:null,copias:1,modo:SERVICIO_INICIAL_LIVE==='fotos'?'color':'bn',caras:'simple',papelPoster:'obra80',anillado:'ninguno',grupoAnillado:'',paginasPorHoja:1,materialColor:'',paginasSeleccionadas:'',servicio:SERVICIO_INICIAL_LIVE,productoFoto:SERVICIO_INICIAL_LIVE==='fotos'?(productosFoto[0]?.id||''):'',productoGrafica:'',corteVariante:'gt3',corteMetros:1});
+ const work=trabajoActual();
+ for(const f of files){
+  const entry={trabajoArchivoId:nuevoIdArchivoTrabajo(),trabajoPedidoId:work.id,nombreTrabajo:work.nombre,
+   name:f.name,archivoOriginal:f,paginas:null,seleccion:(work.servicio||SERVICIO_INICIAL_LIVE)==='fotos'?'a4':'sin-confirmar',
+   error:null,copias:1,modo:(work.servicio||SERVICIO_INICIAL_LIVE)==='fotos'?'color':'bn',caras:'simple',
+   papelPoster:'obra80',anillado:'ninguno',grupoAnillado:'',paginasPorHoja:1,materialColor:'',
+   paginasSeleccionadas:'',servicio:work.servicio||SERVICIO_INICIAL_LIVE,
+   productoFoto:(work.servicio||SERVICIO_INICIAL_LIVE)==='fotos'?(productosFoto[0]?.id||''):'',productoGrafica:'',
+   corteVariante:'gt3',corteMetros:1};
+  Object.assign(entry,work.configuracion||{});entry.name=f.name;entry.archivoOriginal=f;entry.paginas=null;
+  entries.push(entry);
+ }
  render();
  const start=entries.length-files.length;
  // Lotes pequeños: lectura de hasta tres PDF en paralelo, sin cargar Google.
@@ -927,7 +1060,7 @@ $('archivos').addEventListener('change',async ev=>{
    render();
   }
  }));
- leyendo=false;render();cotizar();
+ normalizarOrdenDeTrabajos();leyendo=false;render();cotizar();
 });
 async function cotizar(){
  const n=++version,out=$('presupuesto');
@@ -937,7 +1070,8 @@ async function cotizar(){
  $('resumenPedido').replaceChildren();
  ultimoPresupuesto=null;
  if(leyendo||!entries.length){out.textContent='Esperando archivos…';informarPrecioPrivado('esperando');return}
- const lote=prepararLoteParcial(entries);
+ const cotizables=entradasParaCotizar();
+ const lote=prepararLoteParcial(cotizables);
  if(!lote.archivos.length){
   out.replaceChildren(texto('strong','No hay PDF aptos para cotizar'));
   for(const e of lote.noLeidos){
@@ -960,7 +1094,7 @@ async function cotizar(){
   if(!e.materialColor&&disponibles.length)e.materialColor=disponibles[0].id;
  }
  // Los materiales de color se completan antes de formar el payload.
- const archivos=prepararLoteParcial(entries).archivos;
+ const archivos=prepararLoteParcial(entradasParaCotizar()).archivos;
  try{const respuesta=await solicitarCotizacionPrivada(archivos);if(n!==version)return;
  const d=recomponerLoteParcial(respuesta,lote);
  ultimoPresupuesto=d;
@@ -978,6 +1112,19 @@ async function cotizar(){
  if(d.promocion?.aplicada===true)out.append(texto('p',
   'Promoción aplicada: '+d.promocion.titulo+' · Antes '+ars(d.promocion.totalAnterior)+
   ' · Ahorrás '+ars(d.promocion.descuento)+' · Total '+ars(d.total)));
+ const subtotalesTrabajos=resumirSubtotalesTrabajos({cotizacion:d,
+  trabajos:sidecarTrabajosPedido(),cantidadArchivos:entries.length});
+ if(subtotalesTrabajos){
+  const resumen=texto('section','');resumen.className='resumen-subtotales-trabajos';
+  resumen.append(texto('strong','Subtotal por trabajo'+(d.promocion?.aplicada===true?' · antes de la promoción':'')));
+  const lista=document.createElement('ul');
+  for(const trabajo of subtotalesTrabajos){
+   const fila=document.createElement('li'),nombre=document.createElement('span'),importe=document.createElement('strong');
+   nombre.textContent=trabajo.nombre+' · '+trabajo.archivos+' archivo(s)';
+   importe.textContent=ars(trabajo.subtotal);fila.append(nombre,importe);lista.append(fila);
+  }
+  resumen.append(lista);out.append(resumen);
+ }
  for(const p of d.pendientes){
   const warning=texto('p',p.nombre+': '+p.motivo+
    '. Tocá Editar o Quitá únicamente ese archivo; los demás mantienen su cálculo.');
@@ -1032,7 +1179,7 @@ if((location.pathname==='/prueba-v2/carga-inteligente'||UNIVERSAL_COMPRADOR_LIVE
     throw Error('Completá primero la cotización de todos los documentos.');
    if((typeof UNIVERSAL_COMPRADOR_LIVE!=='undefined'&&UNIVERSAL_COMPRADOR_LIVE)||((typeof R2_UNIVERSAL_ENSAYO!=='undefined'&&R2_UNIVERSAL_ENSAYO)&&entries.some(e=>
       e.servicio==='fotos'||(e.archivoOriginal instanceof File&&e.archivoOriginal.size>MAX_PDF_TUS_BYTES)))){
-    const lote=prepararLoteParcial(entries);
+    const lote=prepararLoteParcial(entradasParaCotizar());
     if(lote.archivos.length!==entries.length||
        ultimoPresupuesto.pendientes?.length||
        entries.length>10)
@@ -1058,7 +1205,8 @@ if((location.pathname==='/prueba-v2/carga-inteligente'||UNIVERSAL_COMPRADOR_LIVE
     // Un solo mensaje a la vista padre, sin originales al servidor.
     window.parent.postMessage({type:'SABER_SMART_UNIVERSAL_PDF',
      files:entries.map(e=>e.archivoOriginal),
-     archivos:lote.archivos,totalOrientativo:ultimoPresupuesto.total
+     archivos:lote.archivos,totalOrientativo:ultimoPresupuesto.total,
+     trabajosPedido:sidecarTrabajosPedido()
     },location.origin);
     info.classList?.remove?.('estado-recepcion-error');
     info.textContent=(typeof UNIVERSAL_COMPRADOR_LIVE!=='undefined'&&UNIVERSAL_COMPRADOR_LIVE)?'Archivos preparados. El precio se validará con el servidor y ningún PDF se enviará antes del pago acreditado.':'Pedido completo preparado. El servidor confirmará el precio; los PDF siguen en tu dispositivo hasta el pago de prueba.';
@@ -1134,7 +1282,7 @@ if((location.pathname==='/prueba-v2/carga-inteligente'||UNIVERSAL_COMPRADOR_LIVE
     if(!Number.isSafeInteger(totalDocumentos)||totalDocumentos<1)
      throw Error('Las impresiones no tienen subtotal de pedido válido.');
     window.parent.postMessage({type:'SABER_SMART_DOCUMENTS_TO_PRIVATE',
-     files,options,total:totalDocumentos},location.origin);
+     files,options,total:totalDocumentos,trabajosPedido:sidecarTrabajosPedido()},location.origin);
    }
    for(const trabajo of ploteosPendientes)
     window.parent.postMessage(trabajo,location.origin);
