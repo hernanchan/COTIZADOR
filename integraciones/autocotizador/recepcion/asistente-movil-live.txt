@@ -58,7 +58,6 @@
    border:1px solid #aac5d8}
  body.saber-mobile #accionesAsistenteMovil button:disabled{opacity:.48}
  body.saber-mobile[data-mobile-stage="1"] #modoConfiguracion,
- body.saber-mobile[data-mobile-stage="1"] #configComunGlobal,
  body.saber-mobile[data-mobile-stage="1"] #anilladosConjuntos,
  body.saber-mobile[data-mobile-stage="1"] #lista,
  body.saber-mobile[data-mobile-stage="1"] #resumenPedido,
@@ -72,6 +71,7 @@
  body.saber-mobile #anilladosConjuntos,
  body.saber-mobile #resumenPedido{display:none!important}
  body.saber-mobile #configComunGlobal{display:none!important}
+ body.saber-mobile[data-mobile-stage="1"][data-mobile-shared="true"][data-mobile-empty="true"] #configComunGlobal{display:grid!important;margin:10px 0;padding:10px;background:#f7fafc;border:1px solid #d6e4ed;border-radius:10px}
  body.saber-mobile[data-mobile-stage="3"][data-mobile-shared="true"] #configComunGlobal{display:grid!important;margin:10px 0;padding:10px;background:#f7fafc;border:1px solid #d6e4ed;border-radius:10px}
  body.saber-mobile .archivo [data-mobile-hidden="true"]{display:none!important}
  body.saber-mobile .archivo .acciones-archivo{display:none!important}
@@ -163,7 +163,7 @@
   duplicateWorkButton.disabled=!current||works.length>=10;
   deleteWorkButton.disabled=!current||current.cantidad>0||works.length<2;
   newWorkButton.disabled=works.length>=10;
-  sharedWorkButton.disabled=!current||current.servicio!=='auto'||current.cantidad<2;
+  sharedWorkButton.disabled=!current||current.servicio!=='auto';
   sharedWorkButton.textContent=commonMode()?'Usar opciones por archivo':'Compartir opciones del trabajo';
   if(current)workStatus.textContent='Los archivos nuevos se agregan a «'+current.nombre+'».';
  }
@@ -322,9 +322,10 @@
    ['Revisá tu presupuesto','Comprobá las opciones y el importe antes de continuar.']
   ][stage-1];
   title.textContent=headings[0];description.textContent=headings[1];
-  document.body.dataset.mobileShared=String(stage===3&&commonMode());
+  document.body.dataset.mobileShared=String(commonMode()&&(stage===3||stage===1));
+  document.body.dataset.mobileEmpty=String(numFiles()===0);
   const shared=$('configComunGlobal');
-  if(shared&&stage===3&&commonMode())nav.insertBefore(shared,fileCount);
+  if(shared&&((stage===3&&commonMode())||(stage===1&&commonMode()&&numFiles()===0)))nav.insertBefore(shared,fileCount);
   else if(shared&&nav.contains(shared))$('modoConfiguracion').insertAdjacentElement('afterend',shared);
   renderWorkTools();
   fileCount.textContent=(stage===3&&commonMode()?numFiles()+' documentos · configuración del trabajo':stage>=2&&stage<=5&&numFiles())

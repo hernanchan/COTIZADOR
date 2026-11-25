@@ -42,8 +42,10 @@ test('la experiencia móvil nunca se sustituye por PC, ni forzando preview',()=>
  const mobile=prepararCotizadorArchivosLive(paginaCargaUnica(),{previewMovil:true,previewPcV10:true});
  assert.doesNotMatch(mobile,/pc-v10\.(js|css)/);
  assert.match(mobile,/\/cotizar\/movil\.js/);
- assert.match(pc,/matchMedia\('\(min-width:900px\) and \(pointer:fine\)'\)/);
- assert.match(css,/@media\(min-width:900px\) and \(pointer:fine\)/);
+ assert.match(pc,/document\.body\.classList\.contains\('saber-mobile'\)/);
+ assert.doesNotMatch(pc,/matchMedia\('\(min-width:900px\) and \(pointer:fine\)'\)/);
+ assert.match(css,/@media\(min-width:721px\)/);
+ assert.doesNotMatch(css,/@media\(min-width:900px\) and \(pointer:fine\)/);
 });
 
 test('la V10 muestra solo el presupuesto y el avance del contenedor comercial',()=>{

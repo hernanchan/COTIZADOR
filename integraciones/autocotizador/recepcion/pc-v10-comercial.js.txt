@@ -1,10 +1,12 @@
 /* Librería Saber: V4 interfaz PC, sobre el motor original del ensayo.
- * Solo presentación y guardado de configuración ya aplicada por el motor.
- * Móvil (<900px), precios, pagos y transporte de archivos sin cambios.
+ * El asistente móvil conserva su flujo cuando está activo; escritorio usa esta capa
+ * también en ventanas angostas, con el mismo contenido reacomodado por CSS.
+ * Precios, pagos y transporte de archivos sin cambios.
  */
 (()=>{'use strict';
-// Solo PC de escritorio: el asistente móvil comercial conserva sus seis pasos.
-if(!matchMedia('(min-width:900px) and (pointer:fine)').matches)return;
+// El modo móvil se decide en el asistente por viewport/puntero. No ocultar PC V10
+// por debajo de 900 px: en una ventana angosta se adapta la misma interfaz.
+if(document.body.classList.contains('saber-mobile'))return;
 const by=id=>document.getElementById(id),root=document.querySelector('main');
 const ids=['zonaArchivos','modoConfiguracion','configComunGlobal','estado','presupuesto','prepararPedido','resumenPedido','anilladosConjuntos','lista'];
 if(!root||ids.some(id=>!by(id)))return;
