@@ -93,6 +93,11 @@
  body.saber-mobile .mobile-work-tools{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0;padding:10px;border:1px solid #d6e4ed;border-radius:10px;background:#f7fafc}
  body.saber-mobile .mobile-work-tools label{grid-column:1/-1;font-size:13px;font-weight:750;color:#234e69}
  body.saber-mobile .mobile-work-tools select,body.saber-mobile .mobile-work-tools input{width:100%;min-width:0;min-height:44px;border:1px solid #b9ccd9;border-radius:8px;padding:8px;font-size:15px;background:#fff}
+ body.saber-mobile .mobile-service-choices{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+ body.saber-mobile .mobile-service-group{grid-column:1/-1;display:grid;gap:6px}
+ body.saber-mobile .mobile-service-label{font-size:13px;font-weight:750;color:#234e69}
+ body.saber-mobile .mobile-service-choices button{min-width:0;min-height:46px;padding:8px 9px;border:1px solid #b9ccd9;border-radius:9px;background:#fff;color:#234e69;font-size:13px;line-height:1.25}
+ body.saber-mobile .mobile-service-choices button[aria-pressed="true"]{border:2px solid #e19a3a;background:#fff5e4;color:#70430d}
  body.saber-mobile .mobile-work-tools button{min-height:44px;border:1px solid #174d70;border-radius:8px;background:#174d70;color:white;font-weight:700}
  body.saber-mobile .mobile-work-tools button.subtle{background:#fff;color:#174d70}
  body.saber-mobile .mobile-work-tools .mobile-work-status{grid-column:1/-1;margin:0;font-size:12px;color:#536c81}
@@ -113,7 +118,9 @@
  const workTools=document.createElement('section');workTools.className='mobile-work-tools';
  const workLabel=document.createElement('label');workLabel.textContent='Trabajo seleccionado';
  const workSelect=document.createElement('select');workSelect.setAttribute('aria-label','Seleccionar trabajo');workLabel.append(workSelect);
- const workService=document.createElement('select');workService.setAttribute('aria-label','Servicio de este trabajo');
+ const workServiceGroup=document.createElement('section');workServiceGroup.className='mobile-service-group';
+ const workServiceLabel=document.createElement('strong');workServiceLabel.className='mobile-service-label';workServiceLabel.textContent='Servicio del trabajo';
+ const workService=document.createElement('div');workService.className='mobile-service-choices';workService.setAttribute('role','group');workService.setAttribute('aria-labelledby','mobile-service-label');workServiceLabel.id='mobile-service-label';workServiceGroup.append(workServiceLabel,workService);
  const newWorkButton=document.createElement('button');newWorkButton.type='button';newWorkButton.textContent='+ Nuevo trabajo';
  const duplicateWorkButton=document.createElement('button');duplicateWorkButton.type='button';duplicateWorkButton.className='subtle';duplicateWorkButton.textContent='Duplicar configuración';
  const sharedWorkButton=document.createElement('button');sharedWorkButton.type='button';sharedWorkButton.className='subtle';sharedWorkButton.textContent='Compartir opciones del trabajo';
@@ -121,7 +128,7 @@
  const saveWorkName=document.createElement('button');saveWorkName.type='button';saveWorkName.className='subtle';saveWorkName.textContent='Guardar nombre';
  const deleteWorkButton=document.createElement('button');deleteWorkButton.type='button';deleteWorkButton.className='subtle';deleteWorkButton.textContent='Eliminar trabajo vacío';
  const workStatus=document.createElement('p');workStatus.className='mobile-work-status';
- workTools.append(workLabel,workService,newWorkButton,duplicateWorkButton,sharedWorkButton,workName,saveWorkName,deleteWorkButton,workStatus);
+ workTools.append(workLabel,workServiceGroup,newWorkButton,duplicateWorkButton,sharedWorkButton,workName,saveWorkName,deleteWorkButton,workStatus);
  const review = document.createElement('div');review.id='asistenteResumen';
  const actions = document.createElement('nav');
  actions.id='accionesAsistenteMovil';
@@ -155,9 +162,15 @@
   for(const work of works)workSelect.add(new Option(work.nombre+' · '+work.cantidad+' archivo'+(work.cantidad===1?'':'s'),work.id));
   if(s.current)workSelect.value=s.current;
   const current=works.find(w=>w.id===s.current);
-  workService.replaceChildren();
-  for(const service of workApi()?.getServiceOptions?.()||[]){const option=new Option(service.nombre,service.id);option.disabled=!service.enabled;workService.add(option);}
-  workService.value=current?.servicio||'auto';workService.disabled=!current||current.cantidad>0;
+  workService.replaceChildren();workServiceGroup.hidden=!current||current.cantidad>0;
+  for(const service of (workApi()?.getServiceOptions?.()||[]).filter(item=>item.enabled)){
+   const choice=document.createElement('button');choice.type='button';choice.textContent=service.nombre;
+   choice.setAttribute('aria-pressed',String(service.id===current?.servicio));
+   choice.addEventListener('click',()=>{
+    try{workApi()?.setService?.(workSelect.value,service.id);workStatus.textContent='Servicio elegido para este trabajo.';refresh();}
+    catch(error){workStatus.textContent=String(error.message||error);renderWorkTools();}
+   });workService.append(choice);
+  }
   workName.value=current?.nombre||'';
   workTools.hidden=(stage!==1&&stage!==6)||!works.length;
   duplicateWorkButton.disabled=!current||works.length>=10;
@@ -174,10 +187,6 @@
   input.checked=true;input.dispatchEvent(new Event('change',{bubbles:true}));
   workStatus.textContent='Tamaño y páginas se revisan por archivo; color, caras, distribución y copias se eligen una sola vez para los documentos del trabajo.';
   refresh();
- });
- workService.addEventListener('change',()=>{
-  try{workApi()?.setService?.(workSelect.value,workService.value);workStatus.textContent='Servicio actualizado para los próximos archivos de este trabajo.';refresh();}
-  catch(error){workStatus.textContent=String(error.message||error);renderWorkTools();}
  });
  function addWork(duplicate){
   const api=workApi(),s=currentWorkState();if(!api||s.works.length>=10)return;
