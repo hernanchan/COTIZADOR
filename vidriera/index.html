@@ -451,6 +451,36 @@ footer{background:#0b2942}
 .saber-track-access a{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;min-height:44px;padding:11px 16px;text-decoration:none;background:#0a3158;color:#fff;border-radius:9px;font-size:13px;font-weight:800}
 .saber-track-access a:hover{background:#164876}
 @media(max-width:650px){.saber-track-access{flex-direction:column;align-items:stretch;gap:10px;padding:13px}.saber-track-access a{width:100%}}
+
+/* Portada de acceso directo: cuatro destinos antes de contenidos secundarios. */
+.hero.hero-direct{padding-top:26px;padding-bottom:24px}
+.hero-direct .v3-intro{margin-bottom:17px}
+.hero-direct .v3-intro h1{font-size:clamp(30px,4vw,48px)}
+.hero-direct .v3-service-strip{gap:12px;border:0;background:none;margin:0 0 16px}
+.hero-direct .v3-service-strip .service-link{display:flex;flex-direction:column;justify-content:center;align-items:flex-start;min-height:116px;padding:20px 18px;border:1px solid #d9e4eb;border-radius:12px;background:#fff;position:relative;box-shadow:0 2px 8px rgba(15,54,83,.05);text-decoration:none}
+.hero-direct .v3-service-strip .service-link:last-child{border-right:1px solid #d9e4eb}
+.hero-direct .v3-service-strip .service-link strong{font-size:19px;line-height:1.15;max-width:calc(100% - 14px)}
+.hero-direct .v3-service-strip .service-link small{font-size:13px;line-height:1.35;margin-top:8px}
+.hero-direct .v3-service-strip .service-link .service-arrow{position:absolute;right:12px;top:12px;color:#d07821}
+.hero-direct .saber-track-access{margin:0 0 14px}
+.hero-direct .saber-track-access a{background:transparent;border:1px solid #b5c9db;color:#0a3158}
+.hero-direct .saber-track-access a:hover{background:#e8f0f5}
+.hero-direct .v3-promo{min-height:0}
+@media(max-width:650px){
+ .hero.hero-direct{padding:15px 0 18px}
+ .hero-direct .v3-intro{margin-bottom:12px}
+ .hero-direct .v3-service-strip{gap:8px;margin:0 0 10px}
+ .hero-direct .v3-service-strip .service-link{min-height:92px;padding:13px 10px}
+ .hero-direct .v3-service-strip .service-link:nth-child(2){border-right:1px solid #d9e4eb}
+ .hero-direct .v3-service-strip .service-link:nth-child(-n+2){border-bottom:1px solid #d9e4eb}
+ .hero-direct .v3-service-strip .service-link strong{font-size:15px;max-width:calc(100% - 8px)}
+ .hero-direct .v3-service-strip .service-link small{font-size:11px;margin-top:5px}
+ .hero-direct .v3-service-strip .service-link .service-arrow{right:8px;top:8px;font-size:13px}
+ .hero-direct .saber-track-access{flex-direction:row;align-items:center;gap:8px;padding:10px;margin-bottom:10px}
+ .hero-direct .saber-track-access span{display:none}
+ .hero-direct .saber-track-access a{width:auto;min-height:40px;padding:8px 10px;font-size:12px}
+ .hero-direct .saber-track-access strong{font-size:12px}
+}
 </style>
 </head>
 <body>
@@ -461,39 +491,21 @@ footer{background:#0b2942}
 <section class="hero hero-direct" id="inicio" aria-labelledby="titulo-inicio">
   <div class="container">
     <div class="v3-intro">
-      <div><span class="v3-overline">LIBRERÍA SABER · CÓRDOBA</span><h1 id="titulo-inicio">Más ideas. Más color. <span>Más Saber.</span></h1></div>
-      <p>Tu librería y gráfica de siempre, ahora más cerca.</p>
+      <div><span class="v3-overline">LIBRERÍA SABER · CÓRDOBA</span><h1 id="titulo-inicio">¿Qué <span>necesitás hoy?</span></h1></div>
+      <p>Elegí un servicio para empezar.</p>
     </div>
+    <nav class="hero-services v3-service-strip" aria-label="Servicios principales">
+      <a class="service-link" href="https://pedidos.libreriasaber.com.ar/cotizar"><strong>Imprimir archivos</strong><small>PDF, imágenes y anillados</small><span class="service-arrow" aria-hidden="true">↗</span></a>
+      <a class="service-link" href="https://pedidos.libreriasaber.com.ar/cotizar"><strong>Planos y pósters</strong><small>Impresiones grandes</small><span class="service-arrow" aria-hidden="true">↗</span></a>
+      <a class="service-link" href="fotos-stickers.html"><strong>Fotos y stickers</strong><small>Gráfica personalizada</small><span class="service-arrow" aria-hidden="true">↗</span></a>
+      <a class="service-link" href="#categorias"><strong>Librería</strong><small>Escolar y oficina</small><span class="service-arrow" aria-hidden="true">↘</span></a>
+    </nav>
+
     <div class="saber-track-access" aria-label="Seguimiento de pedidos">
       <div><strong>¿Ya hiciste un pedido?</strong><span>Consultá su estado y fecha estimada de entrega.</span></div>
       <a href="https://pedidos.libreriasaber.com.ar/pedido/consultar">Consultar mi pedido</a>
     </div>
-    <div class="hero-grid v3-hero-tiles">
-      <article class="v3-tile v3-tile-products">
-        <img class="v3-tile-photo" src="https://images.unsplash.com/photo-1654931800100-2ecf6eee7c64?auto=format&fit=crop&w=1400&q=80" alt="Artículos de papelería de colores: cuadernos y útiles escolares" loading="eager" fetchpriority="high" decoding="async">
-        <div class="v3-tile-shade"></div>
-        <div class="v3-tile-content">
-          <div class="v3-tile-top"><span class="v3-tag">PAPELERÍA · ESCOLAR · OFICINA</span><span class="v3-count">01 / 02</span></div>
-          <div><h2>Todo para empezar <em>algo bueno.</em></h2><p>Útiles, cuadernos, colores y novedades para cada día.</p>
-          <a class="v3-action v3-action-light" href="#categorias">Descubrir productos <span aria-hidden="true">↗</span></a></div>
-        </div>
-      </article>
-      <article class="v3-tile v3-tile-print">
-        <img class="v3-tile-photo" src="https://images.unsplash.com/photo-1770017863955-56a1501a3c93?auto=format&fit=crop&w=1100&q=80" alt="Impresión de gran formato en equipo de gráfica" loading="eager" decoding="async">
-        <div class="v3-tile-shade"></div>
-        <div class="v3-tile-content">
-          <div class="v3-tile-top"><span class="v3-tag">IMPRESIONES · ANILLADOS · PLOTEOS</span><span class="v3-count">02 / 02</span></div>
-          <div><h2>Subí tu archivo. <em>Nosotros imprimimos.</em></h2><p>Cotizá tus trabajos desde el celular, fácil y rápido.</p>
-          <a class="v3-action v3-action-orange" href="https://pedidos.libreriasaber.com.ar/cotizar">Cotizar impresiones <span aria-hidden="true">↗</span></a></div>
-        </div>
-      </article>
-    </div>
-    <nav class="hero-services v3-service-strip" aria-label="Servicios principales">
-      <a class="service-link" href="https://pedidos.libreriasaber.com.ar/cotizar"><span class="service-number">01</span><strong>Documentos</strong><small>Impresiones y anillados</small><span class="service-arrow" aria-hidden="true">↗</span></a>
-      <a class="service-link" href="https://pedidos.libreriasaber.com.ar/cotizar"><span class="service-number">02</span><strong>Ploteos</strong><small>Planos y pósters</small><span class="service-arrow" aria-hidden="true">↗</span></a>
-      <a class="service-link" href="fotos-stickers.html"><span class="service-number">03</span><strong>Fotos y stickers</strong><small>Gráfica personalizada</small><span class="service-arrow" aria-hidden="true">↗</span></a>
-      <a class="service-link" href="#categorias"><span class="service-number">04</span><strong>Escolar y oficina</strong><small>Productos y novedades</small><span class="service-arrow" aria-hidden="true">↘</span></a>
-    </nav>
+    
     <article class="promo-now hero-promo v3-promo" id="beneficio" aria-labelledby="promoTitle">
       <div class="promo-overline"><span class="promo-symbol" aria-hidden="true">✓</span><small id="promoDay">Precio claro</small></div>
       <div class="promo-main"><h2 id="promoTitle">Cotizá antes de encargar</h2><p id="promoText">Elegí cómo querés imprimir y revisá el importe calculado para tu trabajo.</p></div>
